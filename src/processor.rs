@@ -1,7 +1,7 @@
 use boxcars;
 use std::collections::HashMap;
 
-static BALL_TYPES: [&str; 5] = [
+pub static BALL_TYPES: [&str; 5] = [
     "Archetypes.Ball.Ball_Default",
     "Archetypes.Ball.Ball_Basketball",
     "Archetypes.Ball.Ball_Puck",
@@ -9,28 +9,28 @@ static BALL_TYPES: [&str; 5] = [
     "Archetypes.Ball.Ball_Breakout",
 ];
 
-static BOOST_TYPE: &str = "Archetypes.CarComponents.CarComponent_Boost";
-static JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_Jump";
-static DOUBLE_JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_DoubleJump";
-static DODGE_TYPE: &str = "Archetypes.CarComponents.CarComponent_Dodge";
-static CAR_TYPE: &str = "Archetypes.Car.Car_Default";
-static PLAYER_REPLICATION_KEY: &str = "Engine.Pawn:PlayerReplicationInfo";
-static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
-static GAME_TYPE: &str = "Archetypes.GameEvent.GameEvent_Soccar";
+pub static BOOST_TYPE: &str = "Archetypes.CarComponents.CarComponent_Boost";
+pub static JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_Jump";
+pub static DOUBLE_JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_DoubleJump";
+pub static DODGE_TYPE: &str = "Archetypes.CarComponents.CarComponent_Dodge";
+pub static CAR_TYPE: &str = "Archetypes.Car.Car_Default";
+pub static PLAYER_REPLICATION_KEY: &str = "Engine.Pawn:PlayerReplicationInfo";
+pub static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
+pub static GAME_TYPE: &str = "Archetypes.GameEvent.GameEvent_Soccar";
 
-static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
-static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
-static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
-static RIGID_BODY_STATE_KEY: &str = "TAGame.RBActor_TA:ReplicatedRBState";
-static TEAM_KEY: &str = "Engine.PlayerReplicationInfo:Team";
-static UNIQUE_ID_KEY: &str = "Engine.PlayerReplicationInfo:UniqueId";
-static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";
-static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
-static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
+pub static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
+pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
+pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
+pub static RIGID_BODY_STATE_KEY: &str = "TAGame.RBActor_TA:ReplicatedRBState";
+pub static TEAM_KEY: &str = "Engine.PlayerReplicationInfo:Team";
+pub static UNIQUE_ID_KEY: &str = "Engine.PlayerReplicationInfo:UniqueId";
+pub static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";
+pub static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
+pub static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 
-static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
+pub static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 
-static BOOST_USED_PER_SECOND: f32 = 80.0 / 0.93;
+pub static BOOST_USED_PER_SECOND: f32 = 80.0 / 0.93;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
@@ -59,7 +59,7 @@ impl ActorState {
     }
 }
 
-struct ActorStateModeler {
+pub struct ActorStateModeler {
     actor_states: HashMap<boxcars::ActorId, ActorState>,
     actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
 }
@@ -207,18 +207,18 @@ fn get_actor_id(active_actor: &boxcars::ActiveActor) -> boxcars::ActorId {
 pub type ReplayProcessorFrameHandler = dyn FnMut(&ReplayProcessor, &boxcars::Frame);
 
 pub struct ReplayProcessor<'a> {
-    replay: &'a boxcars::Replay,
-    actor_state: ActorStateModeler,
-    object_id_to_name: HashMap<boxcars::ObjectId, String>,
-    name_to_object_id: HashMap<String, boxcars::ObjectId>,
-    ball_actor_id: Option<boxcars::ActorId>,
-    player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
-    player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
-    player_to_team: HashMap<boxcars::ActorId, boxcars::ActorId>,
-    car_to_boost: HashMap<boxcars::ActorId, boxcars::ActorId>,
-    car_to_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
-    car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
-    car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub replay: &'a boxcars::Replay,
+    pub actor_state: ActorStateModeler,
+    pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
+    pub name_to_object_id: HashMap<String, boxcars::ObjectId>,
+    pub ball_actor_id: Option<boxcars::ActorId>,
+    pub player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
+    pub player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub player_to_team: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub car_to_boost: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub car_to_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -483,7 +483,9 @@ impl<'a> ReplayProcessor<'a> {
             .ok_or(format!("Could not find object_id for {:?}", property))?;
         map.get(attribute_object_id).ok_or(format!(
             "Could not find {:?} with object id {:?} on {:?}",
-            property, attribute_object_id, map
+            property,
+            attribute_object_id,
+            self.map_attribute_keys(map)
         ))
     }
 
@@ -650,31 +652,32 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> Result<&u8, String> {
+    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> Result<u8, String> {
         get_actor_attribute_matching!(
             self,
             &actor_id,
             COMPONENT_ACTIVE_KEY,
             boxcars::Attribute::Byte
         )
+        .cloned()
     }
 
-    pub fn get_jump_active(&self, player_id: &PlayerId) -> Result<&u8, String> {
-        self.get_jump_actor_id(player_id)
-            .and_then(|actor_id| self.get_component_active(&actor_id))
-    }
-
-    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> Result<&u8, String> {
-        self.get_double_jump_actor_id(player_id)
-            .and_then(|actor_id| self.get_component_active(&actor_id))
-    }
-
-    pub fn get_boost_active(&self, player_id: &PlayerId) -> Result<&u8, String> {
+    pub fn get_boost_active(&self, player_id: &PlayerId) -> Result<u8, String> {
         self.get_boost_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_dodge_active(&self, player_id: &PlayerId) -> Result<&u8, String> {
+    pub fn get_jump_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+        self.get_jump_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+        self.get_double_jump_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_dodge_active(&self, player_id: &PlayerId) -> Result<u8, String> {
         self.get_dodge_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }

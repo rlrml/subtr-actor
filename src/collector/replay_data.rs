@@ -10,7 +10,7 @@ pub enum BallFrame {
 
 impl BallFrame {
     fn new_from_processor(processor: &ReplayProcessor) -> Self {
-        if processor.get_ignore_ball_syncing().unwrap_or(true) {
+        if processor.get_ignore_ball_syncing().unwrap_or(false) {
             Self::Empty
         } else if let Ok(rigid_body) = processor.get_ball_rigid_body() {
             Self::new_from_rigid_body(rigid_body)
@@ -20,8 +20,12 @@ impl BallFrame {
     }
 
     fn new_from_rigid_body(rigid_body: &boxcars::RigidBody) -> Self {
-        Self::Data {
-            rigid_body: rigid_body.clone(),
+        if rigid_body.sleeping {
+            Self::Empty
+        } else {
+            Self::Data {
+                rigid_body: rigid_body.clone(),
+            }
         }
     }
 }
@@ -45,11 +49,17 @@ impl PlayerFrame {
         player_id: &PlayerId,
     ) -> Result<Self, String> {
         let rigid_body = processor.get_player_rigid_body(player_id)?;
+
+        if rigid_body.sleeping {
+            return Ok(PlayerFrame::Empty);
+        }
+
         let boost_amount = processor.get_player_boost_level(player_id)?;
-        let boost_active = processor.get_boost_active(player_id)? % 2 == 1;
-        let jump_active = processor.get_jump_active(player_id)? % 2 == 1;
-        let double_jump_active = processor.get_double_jump_active(player_id)? % 2 == 1;
-        let dodge_active = processor.get_dodge_active(player_id)? % 2 == 1;
+        let boost_active = processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1;
+        let jump_active = processor.get_jump_active(player_id).unwrap_or(0) % 2 == 1;
+        let double_jump_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2 == 1;
+        let dodge_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1;
+
         Ok(Self::from_data(
             rigid_body,
             *boost_amount,
@@ -68,13 +78,17 @@ impl PlayerFrame {
         double_jump_active: bool,
         dodge_active: bool,
     ) -> Self {
-        Self::Data {
-            rigid_body: rigid_body.clone(),
-            boost_amount,
-            boost_active,
-            jump_active,
-            double_jump_active,
-            dodge_active,
+        if rigid_body.sleeping {
+            Self::Empty
+        } else {
+            Self::Data {
+                rigid_body: rigid_body.clone(),
+                boost_amount,
+                boost_active,
+                jump_active,
+                double_jump_active,
+                dodge_active,
+            }
         }
     }
 }

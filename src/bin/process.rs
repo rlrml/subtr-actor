@@ -11,9 +11,9 @@ fn main() {
     ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
 }
 
-// TODO: move ReplayDataBuilder to lib
+// TODO: create nd array/python stuff
+// DONE: move ReplayDataBuilder to lib
 
-// TODO: TAGame.RBActor_TA:bIgnoreSyncing
 // TODO: handle car sleeping
 
 // TODO: Handle team assignment
@@ -24,10 +24,10 @@ fn main() {
 
 // TODO: demos
 
-// TODO: create nd array/python stuff
-
 // TODO: sampling rate wrapper
-// TODO: remove post-goal wrapper
+// TODO: remove post-goal wrapper (using ball rigid body non-existent)
+
+// TODO: extract data from rigid body in replay_data
 
 // Later
 // TODO: overtime, ball_has_benn_hit
