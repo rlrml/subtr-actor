@@ -227,15 +227,26 @@ fn main() {
         .unwrap();
 }
 
-// DONE: Generalize processor to handle creation of any datatype
+// TODO: TAGame.RBActor_TA:bIgnoreSyncing
 // TODO: handle car sleeping
-// DONE: Handle boost
-// DONE: handle pickups
-// TODO: frame metadata
+
 // TODO: Handle team assignment
 // TODO: handle headers
-// DONE: Handle jump
 
-// TODO: TAGame.RBActor_TA:bIgnoreSyncing
 // TODO: TAGame.GameEvent_Soccar_TA
+// TODO: test replays
+
 // TODO: demos
+
+// TODO: create nd array/python stuff
+
+// TODO: sampling rate wrapper
+// TODO: remove post-goal wrapper
+
+// TODO: goal-scored feature
+// TODO: who was last touch feature
+// TODO: handle boost pickups
+
+// Later
+// TODO: overtime, ball_has_benn_hit
+// TODO: pad availability
