@@ -227,6 +227,8 @@ fn main() {
         .unwrap();
 }
 
+// TODO: move ReplayDataBuilder to lib
+
 // TODO: TAGame.RBActor_TA:bIgnoreSyncing
 // TODO: handle car sleeping
 
