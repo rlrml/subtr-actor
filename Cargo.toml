@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 boxcars = { git = "https://github.com/IvanMalison/boxcars.git" }
+log = "0.4.17"
 
 [[bin]]
 name = "process"

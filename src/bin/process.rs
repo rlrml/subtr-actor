@@ -10,7 +10,9 @@ enum BallFrame {
 
 impl BallFrame {
     fn new_from_processor(processor: &ReplayProcessor) -> Self {
-        if let Ok(rigid_body) = processor.get_ball_rigid_body() {
+        if processor.get_ignore_ball_syncing().unwrap_or(true) {
+            Self::Empty
+        } else if let Ok(rigid_body) = processor.get_ball_rigid_body() {
             Self::new_from_rigid_body(rigid_body)
         } else {
             Self::Empty
@@ -245,10 +247,10 @@ fn main() {
 // TODO: sampling rate wrapper
 // TODO: remove post-goal wrapper
 
-// TODO: goal-scored feature
-// TODO: who was last touch feature
-// TODO: handle boost pickups
-
 // Later
 // TODO: overtime, ball_has_benn_hit
 // TODO: pad availability
+
+// TODO: goal-scored feature
+// TODO: who was last touch feature
+// TODO: handle boost pickups

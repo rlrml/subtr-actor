@@ -26,6 +26,7 @@ static TEAM_KEY: &str = "Engine.PlayerReplicationInfo:Team";
 static UNIQUE_ID_KEY: &str = "Engine.PlayerReplicationInfo:UniqueId";
 static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";
 static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
+static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 
 static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 
@@ -148,21 +149,6 @@ impl ActorStateModeler {
 
 pub type PlayerId = boxcars::UniqueId;
 
-macro_rules! get_actor_attribute_matching {
-    ($self:ident, $actor:expr, $prop:expr, $type:path) => {
-        $self.get_actor_attribute($actor, $prop).and_then(|found| {
-            attribute_match!(
-                found,
-                $type,
-                format!(
-                    "Actor {:?} value for {:?} not of the expected type",
-                    $actor, $prop
-                )
-            )
-        })
-    };
-}
-
 macro_rules! attribute_match {
     ($value:expr, $type:path, $err:expr) => {
         if let $type(value) = $value {
@@ -180,6 +166,21 @@ macro_rules! get_attribute {
                 found,
                 $type,
                 format!("Value for {:?} not of the expected type, {:?}", $prop, $map)
+            )
+        })
+    };
+}
+
+macro_rules! get_actor_attribute_matching {
+    ($self:ident, $actor:expr, $prop:expr, $type:path) => {
+        $self.get_actor_attribute($actor, $prop).and_then(|found| {
+            attribute_match!(
+                found,
+                $type,
+                format!(
+                    "Actor {:?} value for {:?} not of the expected type",
+                    $actor, $prop
+                )
             )
         })
     };
@@ -595,6 +596,20 @@ impl<'a> ReplayProcessor<'a> {
             SECONDS_REMAINING_KEY,
             boxcars::Attribute::Int
         )
+    }
+
+    pub fn get_ignore_ball_syncing(&self) -> Result<bool, String> {
+        self.ball_actor_id
+            .ok_or("Ball actor not known".to_string())
+            .and_then(|actor_id| {
+                get_actor_attribute_matching!(
+                    self,
+                    &actor_id,
+                    IGNORE_SYNCING_KEY,
+                    boxcars::Attribute::Boolean
+                )
+            })
+            .cloned()
     }
 
     pub fn get_ball_rigid_body(&self) -> Result<&boxcars::RigidBody, String> {
