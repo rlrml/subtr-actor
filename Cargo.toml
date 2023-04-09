@@ -1,0 +1,10 @@
+[package]
+name = "boxcars-frames"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+boxcars = { git = "https://github.com/IvanMalison/boxcars.git" }
+
+[[bin]]
+name = "process"
