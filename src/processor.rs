@@ -1,4 +1,4 @@
-use boxcars::{self, ActiveActor, Frame};
+use boxcars;
 use std::collections::HashMap;
 
 static BALL_TYPES: [&str; 5] = [
@@ -200,7 +200,7 @@ macro_rules! get_derived_attribute {
     };
 }
 
-fn get_actor_id(active_actor: &ActiveActor) -> boxcars::ActorId {
+fn get_actor_id(active_actor: &boxcars::ActiveActor) -> boxcars::ActorId {
     active_actor.actor
 }
 
@@ -346,7 +346,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn update_boost_amounts(&mut self, frame: &Frame) -> Result<(), String> {
+    fn update_boost_amounts(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
