@@ -147,7 +147,8 @@ impl ActorStateModeler {
     }
 }
 
-pub type PlayerId = boxcars::UniqueId;
+pub type PlayerId = boxcars::RemoteId;
+pub type ReplayProcessorResult<T> = Result<T, String>;
 
 macro_rules! attribute_match {
     ($value:expr, $type:path, $err:expr) => {
@@ -200,11 +201,19 @@ macro_rules! get_derived_attribute {
     };
 }
 
-fn get_actor_id(active_actor: &boxcars::ActiveActor) -> boxcars::ActorId {
+fn get_actor_id_from_active_actor<T>(
+    _: T,
+    active_actor: &boxcars::ActiveActor,
+) -> boxcars::ActorId {
     active_actor.actor
 }
 
-pub type ReplayProcessorFrameHandler = dyn FnMut(&ReplayProcessor, &boxcars::Frame);
+fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
+    id
+}
+
+pub type ReplayProcessorFrameHandler =
+    dyn FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> Result<(), String>;
 
 pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
@@ -212,6 +221,8 @@ pub struct ReplayProcessor<'a> {
     pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
     pub name_to_object_id: HashMap<String, boxcars::ObjectId>,
     pub ball_actor_id: Option<boxcars::ActorId>,
+    pub team_zero: Vec<PlayerId>,
+    pub team_one: Vec<PlayerId>,
     pub player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
     pub player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub player_to_team: HashMap<boxcars::ActorId, boxcars::ActorId>,
@@ -222,6 +233,7 @@ pub struct ReplayProcessor<'a> {
 }
 
 impl<'a> ReplayProcessor<'a> {
+    // Initialization
     pub fn new(replay: &'a boxcars::Replay) -> Self {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
@@ -230,11 +242,13 @@ impl<'a> ReplayProcessor<'a> {
             object_id_to_name.insert(object_id, name.clone());
             name_to_object_id.insert(name.clone(), object_id);
         }
-        Self {
+        let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
             object_id_to_name,
             name_to_object_id,
+            team_zero: Vec::new(),
+            team_one: Vec::new(),
             ball_actor_id: None,
             player_to_car: HashMap::new(),
             player_to_team: HashMap::new(),
@@ -243,8 +257,76 @@ impl<'a> ReplayProcessor<'a> {
             car_to_jump: HashMap::new(),
             car_to_double_jump: HashMap::new(),
             car_to_dodge: HashMap::new(),
-        }
+        };
+        // TODO: get rid of unwrap here and change return type to a result
+        processor
+            .set_player_order_from_headers()
+            .or_else(|_| processor.set_player_order_from_frames())
+            .unwrap();
+
+        processor
     }
+
+    pub fn reset(&mut self) {
+        self.player_to_car = HashMap::new();
+        self.player_to_team = HashMap::new();
+        self.player_to_actor_id = HashMap::new();
+        self.car_to_boost = HashMap::new();
+        self.car_to_jump = HashMap::new();
+        self.car_to_double_jump = HashMap::new();
+        self.car_to_dodge = HashMap::new();
+        self.actor_state = ActorStateModeler::new();
+    }
+
+    fn set_player_order_from_headers(&mut self) -> Result<(), String> {
+        let _player_stats = self
+            .replay
+            .properties
+            .iter()
+            .find(|(key, _)| key == "PlayerStats")
+            .ok_or_else(|| "Player stats header not found.")?;
+        Err("Not yet implemented".to_string())
+    }
+
+    fn set_player_order_from_frames(&mut self) -> Result<(), String> {
+        let error_string = "10 seconds is enough".to_string();
+        let process_err = self
+            .process(&mut |_p, _f, n| {
+                // XXX: 10 seconds should be enough to find everyone, right?
+                if n > 10 * 30 {
+                    Err(error_string.clone())
+                } else {
+                    Ok(())
+                }
+            })
+            .err();
+        if process_err != Some(error_string) {
+            return Err(format!(
+                "Process ended with unexpected error {:?}",
+                process_err
+            ));
+        }
+        let result: Result<HashMap<PlayerId, bool>, String> = self
+            .player_to_actor_id
+            .keys()
+            .map(|player_id| Ok((player_id.clone(), self.get_player_is_team_0(player_id)?)))
+            .collect();
+
+        let player_to_team_0 = result?;
+
+        let (team_zero, team_one): (Vec<_>, Vec<_>) = player_to_team_0
+            .keys()
+            .cloned()
+            .partition(|player_id| *player_to_team_0.get(player_id).unwrap());
+
+        self.team_zero = team_zero;
+        self.team_one = team_one;
+
+        self.reset();
+        Ok(())
+    }
+
+    // Public interface
 
     pub fn process<H>(&mut self, handler: &mut H) -> Result<(), String>
     where
@@ -254,7 +336,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .unwrap()
+            .ok_or("Replay has no network frames")?
             .frames
             .iter()
             .enumerate()
@@ -273,7 +355,7 @@ impl<'a> ReplayProcessor<'a> {
     fn update_mappings(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_type:expr, $attr:expr, $get_key: expr, $type:path) => {{
+                ($map:expr, $actor_type:expr, $attr:expr, $get_key: expr, $get_value: expr, $type:path) => {{
                     if &update.object_id == self.get_object_id_for_key(&$attr)? {
                         if self
                             .get_actor_ids_by_type($actor_type)?
@@ -286,7 +368,10 @@ impl<'a> ReplayProcessor<'a> {
                                 $attr,
                                 $type
                             )?;
-                            $map.insert($get_key(value), update.actor_id);
+                            $map.insert(
+                                $get_key(update.actor_id, value),
+                                $get_value(update.actor_id, value),
+                            );
                         }
                     }
                 }};
@@ -297,7 +382,10 @@ impl<'a> ReplayProcessor<'a> {
                         $map,
                         $actor_type,
                         $attr,
-                        get_actor_id,
+                        // This is slightly confusing, but in these cases we are
+                        // using the attribute as the key to the current actor.
+                        get_actor_id_from_active_actor,
+                        use_update_actor,
                         boxcars::Attribute::ActiveActor
                     )
                 };
@@ -311,11 +399,20 @@ impl<'a> ReplayProcessor<'a> {
                 self.player_to_actor_id,
                 PLAYER_TYPE,
                 UNIQUE_ID_KEY,
-                |unique_id: &Box<boxcars::UniqueId>| *unique_id.clone(),
+                |_, unique_id: &Box<boxcars::UniqueId>| unique_id.remote_id.clone(),
+                use_update_actor,
                 boxcars::Attribute::UniqueId
             );
+            maintain_link!(
+                self.player_to_team,
+                PLAYER_TYPE,
+                TEAM_KEY,
+                // In this case we are using the update actor as the key.
+                use_update_actor,
+                get_actor_id_from_active_actor,
+                boxcars::Attribute::ActiveActor
+            );
             maintain_actor_link!(self.player_to_car, CAR_TYPE, PLAYER_REPLICATION_KEY);
-            maintain_actor_link!(self.player_to_team, PLAYER_TYPE, TEAM_KEY);
             maintain_vehicle_key_link!(self.car_to_boost, BOOST_TYPE);
             maintain_vehicle_key_link!(self.car_to_dodge, DODGE_TYPE);
             maintain_vehicle_key_link!(self.car_to_jump, JUMP_TYPE);
@@ -553,7 +650,7 @@ impl<'a> ReplayProcessor<'a> {
     // Actor iteration
 
     pub fn iter_player_ids_in_order(&self) -> impl Iterator<Item = &PlayerId> {
-        self.player_to_actor_id.keys()
+        self.team_zero.iter().chain(self.team_one.iter())
     }
 
     pub fn player_count(&self) -> usize {
@@ -629,6 +726,30 @@ impl<'a> ReplayProcessor<'a> {
                     boxcars::Attribute::RigidBody
                 )
             })
+    }
+
+    pub fn get_player_team_key(&self, player_id: &PlayerId) -> Result<String, String> {
+        let team_actor_id = self
+            .player_to_team
+            .get(&self.get_player_actor_id(player_id)?)
+            .ok_or(format!("Player team unknown, {:?}", player_id))?;
+        let state = self.get_actor_state(team_actor_id)?;
+        self.object_id_to_name
+            .get(&state.object_id)
+            .ok_or(format!(
+                "Team object id not known {:?}, for player {:?}",
+                state.object_id, player_id
+            ))
+            .cloned()
+    }
+
+    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> Result<bool, String> {
+        Ok(self
+            .get_player_team_key(player_id)?
+            .chars()
+            .last()
+            .ok_or(format!("Team name was empty for {:?}", player_id))?
+            == '0')
     }
 
     pub fn get_player_rigid_body(
@@ -710,11 +831,22 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
+    pub fn print_actors_by_id<'b>(&self, actor_ids: impl Iterator<Item = &'b boxcars::ActorId>) {
+        actor_ids.for_each(|actor_id| {
+            let state = self.get_actor_state(actor_id).unwrap();
+            println!(
+                "{:?}\n\n\n",
+                self.object_id_to_name.get(&state.object_id).unwrap()
+            );
+            println!("{:?}", self.map_attribute_keys(&state.attributes))
+        })
+    }
+
     pub fn print_actors_of_type(&self, actor_type: &str) {
         self.iter_actors_by_type(actor_type)
             .unwrap()
             .for_each(|(_actor_id, state)| {
-                println!("{:?}", self.map_attribute_keys(&state.attributes));
+                println!("{:?}", self.map_attribute_keys(&state.attributes).unwrap());
             });
     }
 
