@@ -1,11 +1,14 @@
+use ::ndarray;
 use boxcars;
-use ndarray;
 
-use crate::processor::*;
+use crate::*;
 
 macro_rules! string_error {
-    ($format:expr) => {
-        |e| format!($format, e)
+	($format:expr) => {
+		string_error!($format,)
+	};
+    ($format:expr, $( $arg:expr ),* $(,)?) => {
+        |e| format!($format, $( $arg, )* e)
     };
 }
 
@@ -60,11 +63,14 @@ impl<F> NDArrayCollector<F> {
         let mut vector = Vec::new();
         let features_per_row = self.get_frame_feature_count(processor);
         let mut frames_added = 0;
-        processor.process(&mut |p, f, n| {
-            self.extend_vector_for_frame(p, f, n, &mut vector)?;
-            frames_added += 1;
-            Ok(())
-        })?;
+        processor.process(&mut filter_decorate!(
+            require_ball_rigid_body_exists,
+            |p, f, n| {
+                self.extend_vector_for_frame(p, f, n, &mut vector)?;
+                frames_added += 1;
+                Ok(())
+            }
+        ))?;
         let expected_length = features_per_row * frames_added;
         if vector.len() != expected_length {
             Err(format!(
@@ -77,7 +83,7 @@ impl<F> NDArrayCollector<F> {
         } else {
             Ok(
                 ndarray::Array2::from_shape_vec((frames_added, features_per_row), vector)
-                    .map_err(string_error!("Error building array from vec {:?}"))?,
+                    .map_err(string_error!("Error building array from vec {:?}",))?,
             )
         }
     }
@@ -233,6 +239,27 @@ where
     ))
 }
 
+fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    Ok(convert_all!(
+        string_error!("{:?}"),
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ))
+}
+
 pub fn get_ball_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
@@ -248,10 +275,14 @@ pub fn get_player_rb_properties<F: TryFrom<f32>>(
     player_id: &PlayerId,
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
-    _: usize,
+    _frame_number: usize,
 ) -> RigidBodyArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    get_rigid_body_properties(processor.get_player_rigid_body(player_id)?)
+    if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+        get_rigid_body_properties(rb)
+    } else {
+        default_rb_state()
+    }
 }
