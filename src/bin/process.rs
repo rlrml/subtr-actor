@@ -1,5 +1,5 @@
 use boxcars;
-use boxcars_frames::ReplayDataCollector;
+use boxcars_frames::*;
 
 fn main() {
     let data = include_bytes!("../../aeda154d-a79c-490c-8c7f-0b8e9e43479d.replay");
@@ -8,7 +8,10 @@ fn main() {
         .must_parse_network_data()
         .parse();
 
-    ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
+    // ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
+    NDArrayCollector::<f32>::rb_properties_only()
+        .build_ndarray(&parsing.unwrap())
+        .unwrap();
 }
 
 // TODO: create nd array/python stuff

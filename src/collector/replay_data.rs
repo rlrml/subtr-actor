@@ -1,6 +1,7 @@
-use crate::processor::*;
 use boxcars;
 use std::collections::HashMap;
+
+use crate::processor::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BallFrame {
@@ -227,7 +228,7 @@ impl ReplayDataCollector {
         processor: &ReplayProcessor,
     ) -> Result<Vec<(PlayerId, PlayerFrame)>, String> {
         Ok(processor
-            .iter_player_ids()
+            .iter_player_ids_in_order()
             .map(|player_id| {
                 (
                     player_id.clone(),

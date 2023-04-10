@@ -246,7 +246,7 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
-    pub fn process<H>(mut self, handler: &mut H) -> Result<(), String>
+    pub fn process<H>(&mut self, handler: &mut H) -> Result<(), String>
     where
         H: FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> Result<(), String>,
     {
@@ -552,8 +552,12 @@ impl<'a> ReplayProcessor<'a> {
 
     // Actor iteration
 
-    pub fn iter_player_ids(&self) -> impl Iterator<Item = &PlayerId> {
+    pub fn iter_player_ids_in_order(&self) -> impl Iterator<Item = &PlayerId> {
         self.player_to_actor_id.keys()
+    }
+
+    pub fn player_count(&self) -> usize {
+        self.iter_player_ids_in_order().count()
     }
 
     fn iter_actors_by_type_err(

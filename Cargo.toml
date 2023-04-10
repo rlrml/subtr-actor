@@ -5,7 +5,12 @@ edition = "2021"
 
 [dependencies]
 boxcars = { git = "https://github.com/IvanMalison/boxcars.git" }
+glam = "0.23.0"
 log = "0.4.17"
+ndarray = "0.15.6"
+num-traits = "0.2"
+numpy = "0.18.0"
+
 
 [[bin]]
 name = "process"
