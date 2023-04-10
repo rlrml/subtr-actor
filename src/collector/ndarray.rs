@@ -189,8 +189,6 @@ macro_rules! convert_all {
 	}};
 }
 
-// Player feature adders
-
 fn or_zero_boxcars_3f() -> boxcars::Vector3f {
     boxcars::Vector3f {
         x: 0.0,
@@ -199,9 +197,11 @@ fn or_zero_boxcars_3f() -> boxcars::Vector3f {
     }
 }
 
+type RigidBodyArrayResult<F> = Result<[F; 12], String>;
+
 pub fn get_rigid_body_properties<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
-) -> Result<[F; 15], String>
+) -> RigidBodyArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -221,9 +221,6 @@ where
         location.x,
         location.y,
         location.z,
-        rotation.x,
-        rotation.y,
-        rotation.z,
         rx,
         ry,
         rz,
@@ -240,7 +237,7 @@ pub fn get_ball_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
     _: usize,
-) -> Result<[F; 15], String>
+) -> RigidBodyArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -252,7 +249,7 @@ pub fn get_player_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
     _: usize,
-) -> Result<[F; 15], String>
+) -> RigidBodyArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
