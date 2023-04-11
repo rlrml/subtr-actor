@@ -1,7 +1,7 @@
 use boxcars;
 use std::collections::HashMap;
 
-use crate::processor::*;
+use crate::{processor::*, Collector};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BallFrame {
@@ -205,22 +205,8 @@ impl ReplayDataCollector {
         mut self,
         replay: &boxcars::Replay,
     ) -> Result<ReplayData, String> {
-        ReplayProcessor::new(replay).process(&mut |p, f, n| self.process_frame(p, f, n))?;
+        ReplayProcessor::new(replay).process(&mut self)?;
         Ok(self.replay_data)
-    }
-
-    pub fn process_frame(
-        &mut self,
-        processor: &ReplayProcessor,
-        frame: &boxcars::Frame,
-        _frame_number: usize,
-    ) -> Result<(), String> {
-        let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
-        let ball_frame = BallFrame::new_from_processor(processor);
-        let player_frames = self.get_player_frames(processor)?;
-        self.replay_data
-            .add_frame(metadata_frame, ball_frame, player_frames)?;
-        Ok(())
     }
 
     fn get_player_frames(
@@ -237,5 +223,21 @@ impl ReplayDataCollector {
                 )
             })
             .collect())
+    }
+}
+
+impl Collector for ReplayDataCollector {
+    fn process_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        _frame_number: usize,
+    ) -> Result<(), String> {
+        let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
+        let ball_frame = BallFrame::new_from_processor(processor);
+        let player_frames = self.get_player_frames(processor)?;
+        self.replay_data
+            .add_frame(metadata_frame, ball_frame, player_frames)?;
+        Ok(())
     }
 }

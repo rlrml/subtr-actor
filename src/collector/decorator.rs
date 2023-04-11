@@ -3,9 +3,9 @@ use crate::*;
 #[macro_export]
 macro_rules! filter_decorate {
     ($filter:expr, $handler:expr) => {
-        |p, f, c| {
-            if $filter(p, f, c)? {
-                $handler(p, f, c)
+        |p: &ReplayProcessor, f: &boxcars::Frame, n: usize| {
+            if $filter(p, f, n)? {
+                $handler.process_frame(p, f, n)
             } else {
                 Ok(())
             }

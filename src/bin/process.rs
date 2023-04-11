@@ -1,4 +1,3 @@
-use ::ndarray::s;
 use boxcars;
 use boxcars_frames::*;
 

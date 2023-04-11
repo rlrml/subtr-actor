@@ -65,7 +65,7 @@ impl<F> NDArrayCollector<F> {
         let mut frames_added = 0;
         processor.process(&mut filter_decorate!(
             require_ball_rigid_body_exists,
-            |p, f, n| {
+            |p: &ReplayProcessor, f: &boxcars::Frame, n: usize| {
                 self.extend_vector_for_frame(p, f, n, &mut vector)?;
                 frames_added += 1;
                 Ok(())

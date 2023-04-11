@@ -1,3 +1,4 @@
+use crate::collector::*;
 use boxcars;
 use std::collections::HashMap;
 
@@ -290,16 +291,15 @@ impl<'a> ReplayProcessor<'a> {
 
     fn set_player_order_from_frames(&mut self) -> Result<(), String> {
         let error_string = "10 seconds is enough".to_string();
-        let process_err = self
-            .process(&mut |_p, _f, n| {
-                // XXX: 10 seconds should be enough to find everyone, right?
-                if n > 10 * 30 {
-                    Err(error_string.clone())
-                } else {
-                    Ok(())
-                }
-            })
-            .err();
+        let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize| {
+            // XXX: 10 seconds should be enough to find everyone, right?
+            if n > 10 * 30 {
+                Err(error_string.clone())
+            } else {
+                Ok(())
+            }
+        };
+        let process_err = self.process(&mut handler).err();
         if process_err != Some(error_string) {
             return Err(format!(
                 "Process ended with unexpected error {:?}",
@@ -333,10 +333,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Public interface
 
-    pub fn process<H>(&mut self, handler: &mut H) -> Result<(), String>
-    where
-        H: FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> Result<(), String>,
-    {
+    pub fn process<H: Collector>(&mut self, handler: &mut H) -> Result<(), String> {
         for (index, frame) in self
             .replay
             .network_frames
@@ -350,7 +347,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame)?;
-            handler(&self, frame, index)?;
+            handler.process_frame(&self, frame, index)?;
         }
         self.check_player_id_set()
     }
