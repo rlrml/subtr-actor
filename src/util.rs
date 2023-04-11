@@ -12,7 +12,7 @@ macro_rules! fmt_err {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerInfo {
     pub remote_id: RemoteId,
-    pub stats: Vec<(String, HeaderProp)>,
+    pub stats: std::collections::HashMap<String, HeaderProp>,
 }
 
 pub fn find_player(
@@ -28,7 +28,9 @@ pub fn find_player(
                 "Player not found {:?} {:?}",
                 player_id, all_player_stats
             ))?
-            .clone();
+            .iter()
+            .cloned()
+            .collect();
 
         Ok(PlayerInfo {
             remote_id: player_id.clone(),
