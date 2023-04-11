@@ -24,6 +24,8 @@ pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
     data: Vec<F>,
+    player_count: Option<usize>,
+    frames_added: usize,
 }
 
 impl<F> NDArrayCollector<F> {
@@ -35,70 +37,61 @@ impl<F> NDArrayCollector<F> {
             feature_adders,
             player_feature_adders,
             data: Vec::new(),
+            player_count: None,
+            frames_added: 0,
         }
     }
 
-    fn get_frame_feature_count(&self, processor: &ReplayProcessor) -> usize {
+    fn try_get_frame_feature_count(&self) -> Result<usize, String> {
+        let player_count = self.player_count.ok_or("Player count not yet set")?;
         let global_feature_count: usize = self
             .feature_adders
             .iter()
             .map(|fa| fa.features_added())
             .sum();
-        let player_count = processor.player_count();
         let player_feature_count: usize = self
             .player_feature_adders
             .iter()
             .map(|pfa| pfa.features_added() * player_count)
             .sum();
-        global_feature_count + player_feature_count
+        Ok(global_feature_count + player_feature_count)
     }
 
-    pub fn build_ndarray(&self, replay: &boxcars::Replay) -> Result<ndarray::Array2<F>, String> {
-        let mut processor = ReplayProcessor::new(replay);
-        self.build_ndarray_with_processor(&mut processor)
-    }
-
-    pub fn build_ndarray_with_processor(
-        &self,
-        processor: &mut ReplayProcessor,
-    ) -> Result<ndarray::Array2<F>, String> {
-        let mut vector = Vec::new();
-        let features_per_row = self.get_frame_feature_count(processor);
-        let mut frames_added = 0;
-        processor.process(&mut filter_decorate!(
-            require_ball_rigid_body_exists,
-            |p: &ReplayProcessor, f: &boxcars::Frame, n: usize| {
-                self.extend_vector_for_frame(p, f, n, &mut vector)?;
-                frames_added += 1;
-                Ok(())
-            }
-        ))?;
-        let expected_length = features_per_row * frames_added;
-        if vector.len() != expected_length {
+    pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
+        let features_per_row = self.try_get_frame_feature_count()?;
+        let expected_length = features_per_row * self.frames_added;
+        if self.data.len() != expected_length {
             Err(format!(
                 "Unexpected vector length: actual: {}, expected: {}, features: {}, rows: {}",
-                vector.len(),
+                self.data.len(),
                 expected_length,
                 features_per_row,
-                frames_added,
+                self.frames_added,
             ))
         } else {
             Ok(
-                ndarray::Array2::from_shape_vec((frames_added, features_per_row), vector)
+                ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
                     .map_err(string_error!("Error building array from vec {:?}",))?,
             )
         }
     }
+}
 
-    fn extend_vector_for_frame(
-        &self,
+impl<F> Collector for NDArrayCollector<F> {
+    fn process_frame(
+        &mut self,
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_number: usize,
-        vector: &mut Vec<F>,
     ) -> Result<(), String> {
+        if let None = self.player_count {
+            self.player_count = Some(processor.player_count());
+        }
+        if !require_ball_rigid_body_exists(processor, frame, frame_number)? {
+            return Ok(());
+        }
         for feature_adder in self.feature_adders.iter() {
-            feature_adder.add_features(processor, frame, frame_number, vector)?;
+            feature_adder.add_features(processor, frame, frame_number, &mut self.data)?;
         }
         for player_id in processor.iter_player_ids_in_order() {
             for player_feature_adder in self.player_feature_adders.iter() {
@@ -107,10 +100,11 @@ impl<F> NDArrayCollector<F> {
                     processor,
                     frame,
                     frame_number,
-                    vector,
+                    &mut self.data,
                 )?;
             }
         }
+        self.frames_added += 1;
         Ok(())
     }
 }

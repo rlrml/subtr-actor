@@ -7,11 +7,14 @@ fn main() {
         .always_check_crc()
         .must_parse_network_data()
         .parse();
+    let replay = parsing.unwrap();
 
     // ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
-    let array = NDArrayCollector::<f32>::with_jump_availabilities()
-        .build_ndarray(&parsing.unwrap())
+    let collector = NDArrayCollector::<f32>::with_jump_availabilities()
+        .process_replay(&replay)
         .unwrap();
+
+    let array = collector.get_ndarray().unwrap();
 
     for i in 0..array.shape()[1] {
         println!(
@@ -26,29 +29,3 @@ fn main() {
         );
     }
 }
-
-// TODO: create nd array/python stuff
-// DONE: move ReplayDataBuilder to lib
-
-// DONE: handle car sleeping
-
-// TODO: Handle team assignment
-// TODO: handle headers
-
-// TODO: TAGame.GameEvent_Soccar_TA
-// TODO: test replays
-
-// TODO: demos
-
-// TODO: sampling rate wrapper
-// TODO: remove post-goal wrapper (using ball rigid body non-existent)
-
-// TODO: extract data from rigid body in replay_data
-
-// Later
-// TODO: overtime, ball_has_benn_hit
-// TODO: pad availability
-
-// TODO: goal-scored feature
-// TODO: who was last touch feature
-// TODO: handle boost pickups

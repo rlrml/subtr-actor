@@ -197,18 +197,6 @@ impl ReplayDataCollector {
         }
     }
 
-    pub fn process_replay(replay: &boxcars::Replay) -> Result<ReplayData, String> {
-        Self::new().build_processer_and_process(replay)
-    }
-
-    pub fn build_processer_and_process(
-        mut self,
-        replay: &boxcars::Replay,
-    ) -> Result<ReplayData, String> {
-        ReplayProcessor::new(replay).process(&mut self)?;
-        Ok(self.replay_data)
-    }
-
     fn get_player_frames(
         &self,
         processor: &ReplayProcessor,
