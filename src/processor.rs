@@ -349,14 +349,16 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame)?;
             handler.process_frame(&self, frame, index)?;
         }
+        // Make sure that we didn't encounter any players we did not know about
+        // at the beggining of the replay.
         self.check_player_id_set()
     }
 
     fn check_player_id_set(&self) -> Result<(), String> {
         let known_players =
-            std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys().cloned());
+            std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys());
         let original_players =
-            std::collections::HashSet::<_>::from_iter(self.iter_player_ids_in_order().cloned());
+            std::collections::HashSet::<_>::from_iter(self.iter_player_ids_in_order());
 
         if original_players != known_players {
             Err(
