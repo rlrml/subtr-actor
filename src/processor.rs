@@ -372,19 +372,26 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
-    pub fn get_player_infos(&self) -> Result<Vec<PlayerInfo>, String> {
+    pub fn get_replay_meta(&self) -> Result<ReplayMeta, String> {
         let player_stats = self
             .replay
             .properties
             .iter()
             .find(|(key, _)| key == "PlayerStats")
             .ok_or_else(|| "Player stats header not found.")?;
-        self.iter_player_ids_in_order()
-            .map(|player_id| {
-                let known_name = self.get_player_name(player_id);
-                find_player(player_id, known_name?, &player_stats.1)
-            })
-            .collect()
+        let get_player_info = |player_id| {
+            let known_name = self.get_player_name(player_id)?;
+            find_player(player_id, known_name, &player_stats.1)
+        };
+        let team_zero: ReplayProcessorResult<Vec<PlayerInfo>> =
+            self.team_zero.iter().map(get_player_info).collect();
+        let team_one: ReplayProcessorResult<Vec<PlayerInfo>> =
+            self.team_one.iter().map(get_player_info).collect();
+        Ok(ReplayMeta {
+            team_zero: team_zero?,
+            team_one: team_one?,
+            all_headers: self.replay.properties.clone(),
+        })
     }
 
     // Update functions

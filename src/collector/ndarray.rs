@@ -24,7 +24,7 @@ pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
     data: Vec<F>,
-    player_infos: Vec<PlayerInfo>,
+    replay_meta: Option<ReplayMeta>,
     frames_added: usize,
 }
 
@@ -37,13 +37,17 @@ impl<F> NDArrayCollector<F> {
             feature_adders,
             player_feature_adders,
             data: Vec::new(),
-            player_infos: Vec::new(),
+            replay_meta: None,
             frames_added: 0,
         }
     }
 
     fn try_get_frame_feature_count(&self) -> Result<usize, String> {
-        let player_count = self.player_infos.len();
+        let player_count = self
+            .replay_meta
+            .as_ref()
+            .ok_or("Replay meta not yet set")?
+            .player_count();
         let global_feature_count: usize = self
             .feature_adders
             .iter()
@@ -61,7 +65,7 @@ impl<F> NDArrayCollector<F> {
         self.get_meta_and_ndarray().map(|a| a.1)
     }
 
-    pub fn get_meta_and_ndarray(self) -> Result<(Vec<PlayerInfo>, ndarray::Array2<F>), String> {
+    pub fn get_meta_and_ndarray(self) -> Result<(ReplayMeta, ndarray::Array2<F>), String> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
         if self.data.len() != expected_length {
@@ -74,7 +78,7 @@ impl<F> NDArrayCollector<F> {
             ))
         } else {
             Ok((
-                self.player_infos,
+                self.replay_meta.ok_or("No replay meta")?,
                 ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
                     .map_err(string_error!("Error building array from vec {:?}",))?,
             ))
@@ -89,8 +93,8 @@ impl<F> Collector for NDArrayCollector<F> {
         frame: &boxcars::Frame,
         frame_number: usize,
     ) -> Result<(), String> {
-        if self.player_infos.len() == 0 {
-            self.player_infos = processor.get_player_infos()?;
+        if let None = self.replay_meta {
+            self.replay_meta = Some(processor.get_replay_meta()?);
         }
         if !require_ball_rigid_body_exists(processor, frame, frame_number)? {
             return Ok(());

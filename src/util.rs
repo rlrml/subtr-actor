@@ -10,6 +10,19 @@ macro_rules! fmt_err {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReplayMeta {
+    pub team_zero: Vec<PlayerInfo>,
+    pub team_one: Vec<PlayerInfo>,
+    pub all_headers: Vec<(String, HeaderProp)>,
+}
+
+impl ReplayMeta {
+    pub fn player_count(&self) -> usize {
+        self.team_one.len() + self.team_zero.len()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerInfo {
     pub remote_id: RemoteId,
     pub stats: std::collections::HashMap<String, HeaderProp>,
