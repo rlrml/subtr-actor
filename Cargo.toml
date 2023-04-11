@@ -10,6 +10,7 @@ glam = "0.23.0"
 log = "0.4.17"
 ndarray = "0.15.6"
 num-traits = "0.2"
+serde = { version = "1", features = ["derive"] }
 
 [[bin]]
 name = "process"

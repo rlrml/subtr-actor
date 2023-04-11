@@ -24,7 +24,7 @@ pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
     data: Vec<F>,
-    player_count: Option<usize>,
+    player_infos: Vec<PlayerInfo>,
     frames_added: usize,
 }
 
@@ -37,13 +37,13 @@ impl<F> NDArrayCollector<F> {
             feature_adders,
             player_feature_adders,
             data: Vec::new(),
-            player_count: None,
+            player_infos: Vec::new(),
             frames_added: 0,
         }
     }
 
     fn try_get_frame_feature_count(&self) -> Result<usize, String> {
-        let player_count = self.player_count.ok_or("Player count not yet set")?;
+        let player_count = self.player_infos.len();
         let global_feature_count: usize = self
             .feature_adders
             .iter()
@@ -58,6 +58,10 @@ impl<F> NDArrayCollector<F> {
     }
 
     pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
+        self.get_meta_and_ndarray().map(|a| a.1)
+    }
+
+    pub fn get_meta_and_ndarray(self) -> Result<(Vec<PlayerInfo>, ndarray::Array2<F>), String> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
         if self.data.len() != expected_length {
@@ -69,10 +73,11 @@ impl<F> NDArrayCollector<F> {
                 self.frames_added,
             ))
         } else {
-            Ok(
+            Ok((
+                self.player_infos,
                 ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
                     .map_err(string_error!("Error building array from vec {:?}",))?,
-            )
+            ))
         }
     }
 }
@@ -84,8 +89,8 @@ impl<F> Collector for NDArrayCollector<F> {
         frame: &boxcars::Frame,
         frame_number: usize,
     ) -> Result<(), String> {
-        if let None = self.player_count {
-            self.player_count = Some(processor.player_count());
+        if self.player_infos.len() == 0 {
+            self.player_infos = processor.get_player_infos()?;
         }
         if !require_ball_rigid_body_exists(processor, frame, frame_number)? {
             return Ok(());

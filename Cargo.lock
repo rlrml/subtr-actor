@@ -17,7 +17,7 @@ checksum = "803ffa563b84251ab8856d83d6b891e8d161e7df73806e10f78b35af05ba1a04"
 [[package]]
 name = "boxcars"
 version = "0.9.8"
-source = "git+https://github.com/IvanMalison/boxcars.git#f6f52d058eed5c7e2c9cf54a191b237c9838e2c7"
+source = "git+https://github.com/IvanMalison/boxcars.git#392ad81e36ecee17e64a41488d9529ba43b9b72c"
 dependencies = [
  "bitter",
  "encoding_rs",
@@ -36,6 +36,7 @@ dependencies = [
  "log",
  "ndarray",
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -213,18 +214,18 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "serde"
-version = "1.0.159"
+version = "1.0.160"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c04e8343c3daeec41f58990b9d77068df31209f2af111e059e9fe9646693065"
+checksum = "bb2f3770c8bce3bcda7e149193a069a0f4365bda1fa5cd88e03bca26afc1216c"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.159"
+version = "1.0.160"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c614d17805b093df4b147b51339e7e44bf05ef59fba1e45d83500bcfb4d8585"
+checksum = "291a097c63d8497e00160b166a967a4a79c64f3facdd01cbd7502231688d77df"
 dependencies = [
  "proc-macro2",
  "quote",
