@@ -172,7 +172,7 @@ impl ReplayData {
         frame_metadata: MetadataFrame,
         ball_frame: BallFrame,
         player_frames: Vec<(PlayerId, PlayerFrame)>,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         self.frame_metadata.push(frame_metadata);
         let frame_number = self.frame_metadata.len();
         self.ball_data.add_frame(frame_number, ball_frame);
@@ -220,7 +220,7 @@ impl Collector for ReplayDataCollector {
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         _frame_number: usize,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
         let ball_frame = BallFrame::new_from_processor(processor);
         let player_frames = self.get_player_frames(processor)?;

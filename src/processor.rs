@@ -74,7 +74,7 @@ impl ActorStateModeler {
         }
     }
 
-    fn process_frame(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
+    fn process_frame(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
         if let Some(err) = frame
             .deleted_actors
             .iter()
@@ -102,7 +102,7 @@ impl ActorStateModeler {
         Ok(())
     }
 
-    fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> Result<(), String> {
+    fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> ReplayProcessorResult<()> {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
                 return Err(format!(
@@ -215,7 +215,7 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
 }
 
 pub type ReplayProcessorFrameHandler =
-    dyn FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> Result<(), String>;
+    dyn FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> ReplayProcessorResult<()>;
 
 pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
@@ -280,7 +280,7 @@ impl<'a> ReplayProcessor<'a> {
         self.actor_state = ActorStateModeler::new();
     }
 
-    fn set_player_order_from_headers(&mut self) -> Result<(), String> {
+    fn set_player_order_from_headers(&mut self) -> ReplayProcessorResult<()> {
         let _player_stats = self
             .replay
             .properties
@@ -290,7 +290,7 @@ impl<'a> ReplayProcessor<'a> {
         Err("Not yet implemented".to_string())
     }
 
-    fn set_player_order_from_frames(&mut self) -> Result<(), String> {
+    fn set_player_order_from_frames(&mut self) -> ReplayProcessorResult<()> {
         let error_string = "10 seconds is enough".to_string();
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize| {
             // XXX: 10 seconds should be enough to find everyone, right?
@@ -334,7 +334,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Public interface
 
-    pub fn process<H: Collector>(&mut self, handler: &mut H) -> Result<(), String> {
+    pub fn process<H: Collector>(&mut self, handler: &mut H) -> ReplayProcessorResult<()> {
         for (index, frame) in self
             .replay
             .network_frames
@@ -355,7 +355,7 @@ impl<'a> ReplayProcessor<'a> {
         self.check_player_id_set()
     }
 
-    fn check_player_id_set(&self) -> Result<(), String> {
+    fn check_player_id_set(&self) -> ReplayProcessorResult<()> {
         let known_players =
             std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys());
         let original_players =
@@ -401,7 +401,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Update functions
 
-    fn update_mappings(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
+    fn update_mappings(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
                 ($map:expr, $actor_type:expr, $attr:expr, $get_key: expr, $get_value: expr, $type:path) => {{
@@ -477,7 +477,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn update_ball_id(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
+    fn update_ball_id(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
         // XXX: This assumes there is only ever one ball, which is safe (I think?)
         if let Some(actor_id) = self.ball_actor_id {
             if frame.deleted_actors.contains(&actor_id) {
@@ -492,14 +492,15 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn update_boost_amounts(&mut self, frame: &boxcars::Frame) -> Result<(), String> {
+    fn update_boost_amounts(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
                 let (actor_amount_value, last_value, _, derived_value, is_active) =
                     self.get_current_boost_values(actor_state);
                 let mut current_value = if actor_amount_value == last_value {
-                    // If we don't have an update in the actor, just continue using our derived value
+                    // If we don't have an update in the actor, just continue
+                    // using our derived value
                     derived_value
                 } else {
                     // If we do have an update in the actor, use that value.

@@ -13,4 +13,4 @@ num-traits = "0.2"
 serde = { version = "1", features = ["derive"] }
 
 [[bin]]
-name = "process"
+name = "main"

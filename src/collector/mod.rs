@@ -15,7 +15,7 @@ pub trait Collector: Sized {
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_number: usize,
-    ) -> Result<(), String>;
+    ) -> ReplayProcessorResult<()>;
 
     fn process_replay(mut self, replay: &boxcars::Replay) -> ReplayProcessorResult<Self> {
         ReplayProcessor::new(replay).process(&mut self)?;
@@ -25,14 +25,14 @@ pub trait Collector: Sized {
 
 impl<G> Collector for G
 where
-    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> Result<(), String>,
+    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize) -> ReplayProcessorResult<()>,
 {
     fn process_frame(
         &mut self,
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_number: usize,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         self(processor, frame, frame_number)
     }
 }

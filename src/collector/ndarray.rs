@@ -92,7 +92,7 @@ impl<F> Collector for NDArrayCollector<F> {
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_number: usize,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         if let None = self.replay_meta {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
@@ -157,7 +157,7 @@ pub trait FeatureAdder<F> {
         frame: &boxcars::Frame,
         frame_count: usize,
         vector: &mut Vec<F>,
-    ) -> Result<(), String>;
+    ) -> ReplayProcessorResult<()>;
 }
 
 pub trait PlayerFeatureAdder<F> {
@@ -169,7 +169,7 @@ pub trait PlayerFeatureAdder<F> {
         frame: &boxcars::Frame,
         frame_count: usize,
         vector: &mut Vec<F>,
-    ) -> Result<(), String>;
+    ) -> ReplayProcessorResult<()>;
 }
 
 impl<G, F, const N: usize> FeatureAdder<F> for G
@@ -186,7 +186,7 @@ where
         frame: &boxcars::Frame,
         frame_count: usize,
         vector: &mut Vec<F>,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         Ok(vector.extend(self(processor, frame, frame_count)?))
     }
 }
@@ -206,7 +206,7 @@ where
         frame: &boxcars::Frame,
         frame_count: usize,
         vector: &mut Vec<F>,
-    ) -> Result<(), String> {
+    ) -> ReplayProcessorResult<()> {
         Ok(vector.extend(self(player_id, processor, frame, frame_count)?))
     }
 }
