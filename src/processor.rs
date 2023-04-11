@@ -374,12 +374,11 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn get_replay_meta(&self) -> Result<ReplayMeta, String> {
         let empty_player_stats = Vec::new();
-        let player_stats = if let (_, boxcars::HeaderProp::Array(per_player)) = self
+        let player_stats = if let Some((_, boxcars::HeaderProp::Array(per_player))) = self
             .replay
             .properties
             .iter()
             .find(|(key, _)| key == "PlayerStats")
-            .ok_or_else(|| "Player stats header not found.")?
         {
             per_player
         } else {
