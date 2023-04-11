@@ -380,8 +380,13 @@ impl<'a> ReplayProcessor<'a> {
             .find(|(key, _)| key == "PlayerStats")
             .ok_or_else(|| "Player stats header not found.")?;
         let get_player_info = |player_id| {
-            let known_name = self.get_player_name(player_id)?;
-            find_player(player_id, known_name, &player_stats.1)
+            let name = self.get_player_name(player_id)?;
+            let stats = find_player_stats(player_id, &name, &player_stats.1).ok();
+            Ok(PlayerInfo {
+                name,
+                stats,
+                remote_id: player_id.clone(),
+            })
         };
         let team_zero: ReplayProcessorResult<Vec<PlayerInfo>> =
             self.team_zero.iter().map(get_player_info).collect();

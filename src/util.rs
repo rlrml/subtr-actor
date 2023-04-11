@@ -25,30 +25,26 @@ impl ReplayMeta {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerInfo {
     pub remote_id: RemoteId,
-    pub stats: std::collections::HashMap<String, HeaderProp>,
+    pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
+    pub name: String,
 }
 
-pub fn find_player(
+pub fn find_player_stats(
     player_id: &RemoteId,
-    name: String,
+    name: &String,
     all_player_stats: &HeaderProp,
-) -> Result<PlayerInfo, String> {
+) -> Result<std::collections::HashMap<String, HeaderProp>, String> {
     if let HeaderProp::Array(per_player) = all_player_stats {
-        let stats = per_player
+        Ok(per_player
             .iter()
-            .find(|player_stats| matches_stats(player_id, &name, player_stats))
+            .find(|player_stats| matches_stats(player_id, name, player_stats))
             .ok_or(format!(
                 "Player not found {:?} {:?}",
                 player_id, all_player_stats
             ))?
             .iter()
             .cloned()
-            .collect();
-
-        Ok(PlayerInfo {
-            remote_id: player_id.clone(),
-            stats,
-        })
+            .collect())
     } else {
         fmt_err!("Unexpected player stats value {:?}", all_player_stats)
     }
