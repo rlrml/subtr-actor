@@ -32,22 +32,18 @@ pub struct PlayerInfo {
 pub fn find_player_stats(
     player_id: &RemoteId,
     name: &String,
-    all_player_stats: &HeaderProp,
+    all_player_stats: &Vec<Vec<(String, HeaderProp)>>,
 ) -> Result<std::collections::HashMap<String, HeaderProp>, String> {
-    if let HeaderProp::Array(per_player) = all_player_stats {
-        Ok(per_player
-            .iter()
-            .find(|player_stats| matches_stats(player_id, name, player_stats))
-            .ok_or(format!(
-                "Player not found {:?} {:?}",
-                player_id, all_player_stats
-            ))?
-            .iter()
-            .cloned()
-            .collect())
-    } else {
-        fmt_err!("Unexpected player stats value {:?}", all_player_stats)
-    }
+    Ok(all_player_stats
+        .iter()
+        .find(|player_stats| matches_stats(player_id, name, player_stats))
+        .ok_or(format!(
+            "Player not found {:?} {:?}",
+            player_id, all_player_stats
+        ))?
+        .iter()
+        .cloned()
+        .collect())
 }
 
 fn matches_stats(player_id: &RemoteId, name: &String, props: &Vec<(String, HeaderProp)>) -> bool {

@@ -373,15 +373,29 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     pub fn get_replay_meta(&self) -> Result<ReplayMeta, String> {
-        let player_stats = self
+        let empty_player_stats = Vec::new();
+        let player_stats = if let (_, boxcars::HeaderProp::Array(per_player)) = self
             .replay
             .properties
             .iter()
             .find(|(key, _)| key == "PlayerStats")
-            .ok_or_else(|| "Player stats header not found.")?;
+            .ok_or_else(|| "Player stats header not found.")?
+        {
+            per_player
+        } else {
+            &empty_player_stats
+        };
+        let known_count = self.iter_player_ids_in_order().count();
+        if player_stats.len() != known_count {
+            log::warn!(
+                "Replay does not have player stats for all players. encountered {:?} {:?}",
+                known_count,
+                player_stats.len()
+            )
+        }
         let get_player_info = |player_id| {
             let name = self.get_player_name(player_id)?;
-            let stats = find_player_stats(player_id, &name, &player_stats.1).ok();
+            let stats = find_player_stats(player_id, &name, player_stats).ok();
             Ok(PlayerInfo {
                 name,
                 stats,
