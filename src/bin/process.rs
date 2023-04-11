@@ -9,7 +9,7 @@ fn main() {
         .parse();
 
     // ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
-    let array = NDArrayCollector::<f32>::default()
+    let array = NDArrayCollector::<f32>::with_jump_availabilities()
         .build_ndarray(&parsing.unwrap())
         .unwrap();
 

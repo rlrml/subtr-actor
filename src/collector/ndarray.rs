@@ -23,6 +23,7 @@ impl<'a, T, const N: usize> ArrayLen for &'a [T; N] {
 pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
+    data: Vec<F>,
 }
 
 impl<F> NDArrayCollector<F> {
@@ -33,6 +34,7 @@ impl<F> NDArrayCollector<F> {
         Self {
             feature_adders,
             player_feature_adders,
+            data: Vec::new(),
         }
     }
 
@@ -113,18 +115,34 @@ impl<F> NDArrayCollector<F> {
     }
 }
 
+impl<F: TryFrom<f32> + 'static> NDArrayCollector<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    pub fn with_jump_availabilities() -> Self {
+        NDArrayCollector::new(
+            vec![Box::new(&get_ball_rb_properties)],
+            vec![
+                Box::new(&get_player_rb_properties),
+                Box::new(&get_player_boost_level),
+                Box::new(&get_jump_availabilities),
+            ],
+        )
+    }
+}
+
 impl<F: TryFrom<f32> + 'static> Default for NDArrayCollector<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     fn default() -> Self {
-        NDArrayCollector {
-            feature_adders: vec![Box::new(&get_ball_rb_properties)],
-            player_feature_adders: vec![
+        NDArrayCollector::new(
+            vec![Box::new(&get_ball_rb_properties)],
+            vec![
                 Box::new(&get_player_rb_properties),
                 Box::new(&get_player_boost_level),
             ],
-        }
+        )
     }
 }
 
@@ -308,5 +326,33 @@ where
             .get_player_boost_level(player_id)
             .cloned()
             .unwrap_or(0.0)
+    )
+}
+
+pub fn get_jump_availabilities<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _frame_number: usize,
+) -> Result<[F; 3], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let get_f32 =
+        |b| -> Result<f32, String> { TryFrom::try_from(b % 2).map_err(string_error!("{:?}")) };
+    convert_all!(
+        string_error!("{:?}"),
+        processor
+            .get_dodge_active(player_id)
+            .and_then(get_f32)
+            .unwrap_or(0.0),
+        processor
+            .get_jump_active(player_id)
+            .and_then(get_f32)
+            .unwrap_or(0.0),
+        processor
+            .get_double_jump_active(player_id)
+            .and_then(get_f32)
+            .unwrap_or(0.0),
     )
 }
