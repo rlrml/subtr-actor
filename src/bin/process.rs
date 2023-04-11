@@ -13,7 +13,18 @@ fn main() {
         .build_ndarray(&parsing.unwrap())
         .unwrap();
 
-    println!("{:?}", array);
+    for i in 0..array.shape()[1] {
+        println!(
+            "{}: {:?}",
+            i,
+            array
+                .slice(::ndarray::s![.., i])
+                .iter()
+                .cloned()
+                .map(float_ord::FloatOrd)
+                .max()
+        );
+    }
 }
 
 // TODO: create nd array/python stuff

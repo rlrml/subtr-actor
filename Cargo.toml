@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 boxcars = { git = "https://github.com/IvanMalison/boxcars.git" }
+float-ord = "0.3.2"
 glam = "0.23.0"
 log = "0.4.17"
 ndarray = "0.15.6"

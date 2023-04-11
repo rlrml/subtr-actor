@@ -248,9 +248,12 @@ where
 {
     convert_all!(
         string_error!("{:?}"),
-        0.0,
-        0.0,
-        0.0,
+        // We use huge values for location instead of 0s so that hopefully any
+        // model built on this data can understand that the player is not
+        // actually on the field.
+        200000.0,
+        200000.0,
+        200000.0,
         0.0,
         0.0,
         0.0,
