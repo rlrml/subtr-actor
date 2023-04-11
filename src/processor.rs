@@ -322,6 +322,11 @@ impl<'a> ReplayProcessor<'a> {
         self.team_zero = team_zero;
         self.team_one = team_one;
 
+        self.team_zero
+            .sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+        self.team_one
+            .sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+
         self.reset();
         Ok(())
     }
@@ -347,7 +352,24 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame)?;
             handler(&self, frame, index)?;
         }
-        Ok(())
+        self.check_player_id_set()
+    }
+
+    fn check_player_id_set(&self) -> Result<(), String> {
+        let known_players =
+            std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys().cloned());
+        let original_players =
+            std::collections::HashSet::<_>::from_iter(self.iter_player_ids_in_order().cloned());
+
+        if original_players != known_players {
+            Err(
+                format!(
+                    "Players found in frames that were not part of original set. found: {:?}, original: {:?}",
+                    original_players, known_players
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     // Update functions

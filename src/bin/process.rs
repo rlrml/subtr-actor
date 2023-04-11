@@ -1,3 +1,4 @@
+use ::ndarray::s;
 use boxcars;
 use boxcars_frames::*;
 
@@ -9,15 +10,17 @@ fn main() {
         .parse();
 
     // ReplayDataCollector::process_replay(&parsing.unwrap()).unwrap();
-    NDArrayCollector::<f32>::rb_properties_only()
+    let array = NDArrayCollector::<f32>::default()
         .build_ndarray(&parsing.unwrap())
         .unwrap();
+
+    println!("{:?}", array);
 }
 
 // TODO: create nd array/python stuff
 // DONE: move ReplayDataBuilder to lib
 
-// TODO: handle car sleeping
+// DONE: handle car sleeping
 
 // TODO: Handle team assignment
 // TODO: handle headers

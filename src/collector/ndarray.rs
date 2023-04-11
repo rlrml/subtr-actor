@@ -113,14 +113,17 @@ impl<F> NDArrayCollector<F> {
     }
 }
 
-impl<F: TryFrom<f32> + 'static> NDArrayCollector<F>
+impl<F: TryFrom<f32> + 'static> Default for NDArrayCollector<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    pub fn rb_properties_only() -> Self {
+    fn default() -> Self {
         NDArrayCollector {
             feature_adders: vec![Box::new(&get_ball_rb_properties)],
-            player_feature_adders: vec![Box::new(&get_player_rb_properties)],
+            player_feature_adders: vec![
+                Box::new(&get_player_rb_properties),
+                Box::new(&get_player_boost_level),
+            ],
         }
     }
 }
@@ -189,9 +192,9 @@ where
 
 macro_rules! convert_all {
     ($err:expr, $( $item:expr ),* $(,)?) => {{
-		[
+		Ok([
 			$( $item.try_into().map_err($err)? ),*
-		]
+		])
 	}};
 }
 
@@ -222,7 +225,7 @@ where
     let location = rigid_body.location;
     let (rx, ry, rz) =
         glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
-    Ok(convert_all!(
+    convert_all!(
         convert,
         location.x,
         location.y,
@@ -236,14 +239,14 @@ where
         angular_velocity.x,
         angular_velocity.y,
         angular_velocity.z,
-    ))
+    )
 }
 
 fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    Ok(convert_all!(
+    convert_all!(
         string_error!("{:?}"),
         0.0,
         0.0,
@@ -257,7 +260,7 @@ where
         0.0,
         0.0,
         0.0,
-    ))
+    )
 }
 
 pub fn get_ball_rb_properties<F: TryFrom<f32>>(
@@ -285,4 +288,22 @@ where
     } else {
         default_rb_state()
     }
+}
+
+pub fn get_player_boost_level<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _frame_number: usize,
+) -> Result<[F; 1], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all!(
+        string_error!("{:?}"),
+        processor
+            .get_player_boost_level(player_id)
+            .cloned()
+            .unwrap_or(0.0)
+    )
 }
