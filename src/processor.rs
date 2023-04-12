@@ -236,7 +236,7 @@ pub struct ReplayProcessor<'a> {
 
 impl<'a> ReplayProcessor<'a> {
     // Initialization
-    pub fn new(replay: &'a boxcars::Replay) -> Self {
+    pub fn new(replay: &'a boxcars::Replay) -> ReplayProcessorResult<Self> {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
         for (id, name) in replay.objects.iter().enumerate() {
@@ -263,10 +263,9 @@ impl<'a> ReplayProcessor<'a> {
         // TODO: get rid of unwrap here and change return type to a result
         processor
             .set_player_order_from_headers()
-            .or_else(|_| processor.set_player_order_from_frames())
-            .unwrap();
+            .or_else(|_| processor.set_player_order_from_frames())?;
 
-        processor
+        Ok(processor)
     }
 
     pub fn reset(&mut self) {
@@ -318,6 +317,7 @@ impl<'a> ReplayProcessor<'a> {
         let (team_zero, team_one): (Vec<_>, Vec<_>) = player_to_team_0
             .keys()
             .cloned()
+            // The unwrap here is fine because we know the get will succeed
             .partition(|player_id| *player_to_team_0.get(player_id).unwrap());
 
         self.team_zero = team_zero;
@@ -531,6 +531,7 @@ impl<'a> ReplayProcessor<'a> {
                 .actor_state
                 .actor_states
                 .get_mut(&actor_id)
+                // This actor is known to exist, so unwrap is fine
                 .unwrap()
                 .derived_attributes;
 
@@ -659,8 +660,7 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     pub fn get_metadata_actor_id(&self) -> Result<&boxcars::ActorId, String> {
-        self.get_actor_ids_by_type(GAME_TYPE)
-            .unwrap()
+        self.get_actor_ids_by_type(GAME_TYPE)?
             .iter()
             .next()
             .ok_or("No game actor".to_string())
@@ -750,6 +750,8 @@ impl<'a> ReplayProcessor<'a> {
 
         actor_ids
             .iter()
+            // This unwrap is fine because we know the actor will exist as it is
+            // in the actor_ids_by_type
             .map(move |id| (id, self.actor_state.actor_states.get(id).unwrap()))
     }
 

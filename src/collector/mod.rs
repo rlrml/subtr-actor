@@ -18,7 +18,7 @@ pub trait Collector: Sized {
     ) -> ReplayProcessorResult<()>;
 
     fn process_replay(mut self, replay: &boxcars::Replay) -> ReplayProcessorResult<Self> {
-        ReplayProcessor::new(replay).process(&mut self)?;
+        ReplayProcessor::new(replay)?.process(&mut self)?;
         Ok(self)
     }
 }
