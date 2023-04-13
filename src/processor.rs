@@ -289,7 +289,7 @@ impl<'a> ReplayProcessor<'a> {
         Err("Not yet implemented".to_string())
     }
 
-    fn set_player_order_from_frames(&mut self) -> ReplayProcessorResult<()> {
+    fn process_long_enough_to_get_actor_ids(&mut self) -> ReplayProcessorResult<()> {
         let error_string = "10 seconds is enough".to_string();
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize| {
             // XXX: 10 seconds should be enough to find everyone, right?
@@ -306,6 +306,11 @@ impl<'a> ReplayProcessor<'a> {
                 process_err
             ));
         }
+        return Ok(());
+    }
+
+    fn set_player_order_from_frames(&mut self) -> ReplayProcessorResult<()> {
+        self.process_long_enough_to_get_actor_ids()?;
         let result: Result<HashMap<PlayerId, bool>, String> = self
             .player_to_actor_id
             .keys()
@@ -372,7 +377,14 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
-    pub fn get_replay_meta(&self) -> Result<ReplayMeta, String> {
+    pub fn process_and_get_replay_meta(&mut self) -> ReplayProcessorResult<ReplayMeta> {
+        if self.player_to_actor_id.is_empty() {
+            self.process_long_enough_to_get_actor_ids()?;
+        }
+        self.get_replay_meta()
+    }
+
+    pub fn get_replay_meta(&self) -> ReplayProcessorResult<ReplayMeta> {
         let empty_player_stats = Vec::new();
         let player_stats = if let Some((_, boxcars::HeaderProp::Array(per_player))) = self
             .replay
