@@ -12,14 +12,6 @@ macro_rules! string_error {
     };
 }
 
-trait ArrayLen {
-    const SIZE: usize;
-}
-
-impl<'a, T, const N: usize> ArrayLen for &'a [T; N] {
-    const SIZE: usize = N;
-}
-
 pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
