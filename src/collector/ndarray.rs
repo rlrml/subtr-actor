@@ -50,11 +50,6 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
-	// what you need for like p1 and all that
-	// important
-	// from now just pattern match, find the other functions and just do what we did
-	// get column headers
-	// get the player count
     fn try_get_frame_feature_count(&self) -> Result<usize, String> {
         let player_count = self
             .replay_meta
@@ -71,14 +66,38 @@ impl<F> NDArrayCollector<F> {
             .iter() // iterate
             .map(|pfa| pfa.features_added() * player_count)
             .sum();
+        Ok(global_feature_count + player_feature_count)
+    }
+
+	// what you need for like p1 and all that
+	// important
+	// from now just pattern match, find the other functions and just do what we did
+	// get column headers
+	// get the player count
+	// -> Result<usize, String>
+	pub fn get_column_headers(&self) -> Result<usize, String> {
+		let global_feature_columns = self
+			.feature_adders
+			.iter()
+			.map(|fa| fa.get_column_headers())
+			.collect::<Vec<_>>();
+		let player_feature_columns = self
+			.player_feature_adders
+			.iter()
+			.chain(self.player_feature_adders.iter())
+			.map(|pfa| pfa.get_column_headers())
+			.collect::<Vec<_>>();
+		println!("{:?}", global_feature_columns);
+		println!("{:?}", player_feature_columns);
+		Ok(0)
+		//player_feature_columns
 		// flat map, map each feature to the vec
 		// .get column headers
 		// .chain with player feature count and iterate over those
 		// do all feature adders for one player, then next player
 		// .collect collect it into a vector .collect: vec<_> <- do a let binding
 		// have to return a result, anything that an error do a ? call
-        Ok(global_feature_count + player_feature_count)
-    }
+	}
 
     pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
         self.get_meta_and_ndarray().map(|a| a.1)
@@ -98,6 +117,7 @@ impl<F> NDArrayCollector<F> {
         } else {
 			// put column in between these two thats a call to get column headers with a ?
 			// self.get_column_headers()?
+			self.get_column_headers();
             Ok((
                 self.replay_meta.ok_or("No replay meta")?,
                 ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
