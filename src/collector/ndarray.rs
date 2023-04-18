@@ -62,7 +62,8 @@ impl<F> NDArrayCollector<F> {
     }
 
     pub fn get_column_headers(&self) -> Result<Vec<String>, String> {
-        let mut global_column_headers: Vec<String> = self
+        let replay_meta = self.replay_meta.as_ref().ok_or("Replay meta not yet set")?;
+        Ok(self
             .feature_adders
             .iter()
             .flat_map(move |fa| {
@@ -70,20 +71,14 @@ impl<F> NDArrayCollector<F> {
                     .iter()
                     .map(move |column_name| format!("{}", column_name))
             })
-            .collect();
-        let replay_meta = self.replay_meta.as_ref().ok_or("Replay meta not yet set")?;
-        let player_column_headers: Vec<String> = replay_meta
-            .player_order()
-            .flat_map(|player_info| {
+            .chain(replay_meta.player_order().flat_map(|player_info| {
                 self.player_feature_adders.iter().flat_map(move |pfa| {
                     pfa.get_column_headers().iter().map(move |base_name| {
                         format!("Player {} - {}", player_info.name, base_name)
                     })
                 })
-            })
-            .collect();
-        global_column_headers.extend(player_column_headers);
-        Ok(global_column_headers)
+            }))
+            .collect())
     }
 
     pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
