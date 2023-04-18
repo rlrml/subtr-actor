@@ -75,21 +75,43 @@ impl<F> NDArrayCollector<F> {
 	// get column headers
 	// get the player count
 	// -> Result<usize, String>
-	pub fn get_column_headers(&self) -> Result<usize, String> {
-		let global_feature_columns = self
+	pub fn get_column_headers(&self) -> Result<Vec<String>, String> {
+		let mut global_column_headers: Vec<String> = self
 			.feature_adders
 			.iter()
-			.map(|fa| fa.get_column_headers())
-			.collect::<Vec<_>>();
+			.flat_map(move |fa| {
+				fa.get_column_headers()
+				.iter()
+				.map(move |column_name| format!("{}", column_name))
+			})
+			.collect();
+		/*
 		let player_feature_columns = self
 			.player_feature_adders
 			.iter()
 			.chain(self.player_feature_adders.iter())
 			.map(|pfa| pfa.get_column_headers())
 			.collect::<Vec<_>>();
-		println!("{:?}", global_feature_columns);
-		println!("{:?}", player_feature_columns);
-		Ok(0)
+		*/
+		let player_count = self
+            .replay_meta
+            .as_ref()
+            .ok_or("Replay meta not yet set")?
+            .player_count();
+		let player_column_headers: Vec<String> = (0..player_count)
+			.into_iter()
+			.flat_map(|player_number| {
+				self.player_feature_adders.iter().flat_map(move |pfa| {
+					pfa.get_column_headers()
+					.iter()
+					.map(move |base_name| format!("Player {} - {}", player_number+1, base_name))
+				})
+			})
+			.collect();
+		global_column_headers.extend(player_column_headers);
+		//println!("{:?}", global_column_headers);
+		//println!("{:?}", player_column_headers);
+		Ok(global_column_headers)
 		//player_feature_columns
 		// flat map, map each feature to the vec
 		// .get column headers
@@ -100,10 +122,10 @@ impl<F> NDArrayCollector<F> {
 	}
 
     pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
-        self.get_meta_and_ndarray().map(|a| a.1)
+        self.get_meta_and_ndarray().map(|a| a.2)
     }
 
-    pub fn get_meta_and_ndarray(self) -> Result<(ReplayMeta, ndarray::Array2<F>), String> {
+    pub fn get_meta_and_ndarray(self) -> Result<(ReplayMeta, Vec<String>, ndarray::Array2<F>), String> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
         if self.data.len() != expected_length {
@@ -117,9 +139,9 @@ impl<F> NDArrayCollector<F> {
         } else {
 			// put column in between these two thats a call to get column headers with a ?
 			// self.get_column_headers()?
-			self.get_column_headers();
             Ok((
-                self.replay_meta.ok_or("No replay meta")?,
+                self.replay_meta.clone().ok_or("No replay meta")?,
+				self.get_column_headers()?,
                 ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
                     .map_err(string_error!("Error building array from vec {:?}",))?,
             ))

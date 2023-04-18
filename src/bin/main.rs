@@ -15,12 +15,12 @@ fn main() {
         .process_replay(&replay)
         .unwrap();
 
-    let (player_infos, array) = collector.get_meta_and_ndarray().unwrap();
+    let (player_infos, columns, array) = collector.get_meta_and_ndarray().unwrap();
 
     for i in 0..array.shape()[1] {
         println!(
             "{}: {:?}",
-            i,
+            columns[i],
             array
                 .slice(::ndarray::s![.., i])
                 .iter()
