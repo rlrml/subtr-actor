@@ -1,8 +1,11 @@
 use boxcars;
 use boxcars_frames::*;
 
+use std::env;
+
 fn main() {
-    let data = include_bytes!("../../029103f9-4d58-4964-b47a-539b32f6fb33.replay");
+    let args: Vec<_> = env::args().collect();
+    let data = std::fs::read(&args[1]).unwrap();
     let parsing = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
         .must_parse_network_data()
