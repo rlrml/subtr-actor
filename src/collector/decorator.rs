@@ -13,8 +13,6 @@ macro_rules! filter_decorate {
     };
 }
 
-// write a function that wraps an arbitrary collector
-
 pub fn require_ball_rigid_body_exists(
     processor: &ReplayProcessor,
     _f: &boxcars::Frame,

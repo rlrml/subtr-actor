@@ -9,12 +9,6 @@ pub use replay_data::*;
 use crate::{processor::ReplayProcessor, ReplayProcessorResult};
 use boxcars;
 
-// collector is just something that can process a frame
-// each one has a time and deltatime
-// resolution downsampler wrapper
-// implements Collector, takes another, remembers last time, make sure at least that amount of time has passed
-// only then tell the nexted collector to make a frame
-// currently 30 frames a second
 pub trait Collector: Sized {
     fn process_frame(
         &mut self,

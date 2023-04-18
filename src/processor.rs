@@ -337,12 +337,6 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    // Public interface
-    // handler - instance of collector - processes all the frames internally
-    // updates it's own mappings and actor state - maintains data not in that frame
-    // handler processes the frame
-    // give coherent state of the frame
-    // self, frame, frame index to handler
     pub fn process<H: Collector>(&mut self, handler: &mut H) -> ReplayProcessorResult<()> {
         for (index, frame) in self
             .replay

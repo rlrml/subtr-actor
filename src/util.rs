@@ -20,6 +20,10 @@ impl ReplayMeta {
     pub fn player_count(&self) -> usize {
         self.team_one.len() + self.team_zero.len()
     }
+
+    pub fn player_order(&self) -> impl Iterator<Item = &PlayerInfo> {
+        self.team_zero.iter().chain(self.team_one.iter())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
