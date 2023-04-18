@@ -20,6 +20,9 @@ impl<'a, T, const N: usize> ArrayLen for &'a [T; N] {
     const SIZE: usize = N;
 }
 
+// vectors of things that can add vectors to each frame
+// once per frame
+// once per player per frame
 pub struct NDArrayCollector<F> {
     feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
     player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
@@ -28,6 +31,11 @@ pub struct NDArrayCollector<F> {
     frames_added: usize,
 }
 
+// TODO: in addition to feature adders
+// type of feature adder is array of fixed length
+// another array of fixed length that tells you what each column is
+// names
+// associate them with particular player if they are from a specific player
 impl<F> NDArrayCollector<F> {
     pub fn new(
         feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
@@ -42,6 +50,11 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
+	// what you need for like p1 and all that
+	// important
+	// from now just pattern match, find the other functions and just do what we did
+	// get column headers
+	// get the player count
     fn try_get_frame_feature_count(&self) -> Result<usize, String> {
         let player_count = self
             .replay_meta
@@ -55,9 +68,15 @@ impl<F> NDArrayCollector<F> {
             .sum();
         let player_feature_count: usize = self
             .player_feature_adders
-            .iter()
+            .iter() // iterate
             .map(|pfa| pfa.features_added() * player_count)
             .sum();
+		// flat map, map each feature to the vec
+		// .get column headers
+		// .chain with player feature count and iterate over those
+		// do all feature adders for one player, then next player
+		// .collect collect it into a vector .collect: vec<_> <- do a let binding
+		// have to return a result, anything that an error do a ? call
         Ok(global_feature_count + player_feature_count)
     }
 
@@ -77,6 +96,8 @@ impl<F> NDArrayCollector<F> {
                 self.frames_added,
             ))
         } else {
+			// put column in between these two thats a call to get column headers with a ?
+			// self.get_column_headers()?
             Ok((
                 self.replay_meta.ok_or("No replay meta")?,
                 ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
@@ -111,6 +132,7 @@ impl<F> Collector for NDArrayCollector<F> {
                     frame_number,
                     &mut self.data,
                 )?;
+
             }
         }
         self.frames_added += 1;
@@ -124,12 +146,10 @@ where
 {
     pub fn with_jump_availabilities() -> Self {
         NDArrayCollector::new(
-            vec![Box::new(&get_ball_rb_properties)],
-            vec![
-                Box::new(&get_player_rb_properties),
-                Box::new(&get_player_boost_level),
-                Box::new(&get_jump_availabilities),
-            ],
+            vec![build_ball_rigidbody_feature_adder()],
+            vec![build_player_rigidbody_feature_adder(),
+				build_player_boost_feature_adder(),
+				build_player_jump_feature_adder()],
         )
     }
 }
@@ -139,18 +159,20 @@ where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     fn default() -> Self {
+
         NDArrayCollector::new(
-            vec![Box::new(&get_ball_rb_properties)],
-            vec![
-                Box::new(&get_player_rb_properties),
-                Box::new(&get_player_boost_level),
-            ],
+            vec![build_ball_rigidbody_feature_adder()],
+            vec![build_player_rigidbody_feature_adder(),
+				build_player_boost_feature_adder()],
         )
     }
 }
 
+// did stuff here
+// important
 pub trait FeatureAdder<F> {
     fn features_added(&self) -> usize;
+	fn get_column_headers(&self) -> &[&str];
     fn add_features(
         &self,
         processor: &ReplayProcessor,
@@ -160,8 +182,10 @@ pub trait FeatureAdder<F> {
     ) -> ReplayProcessorResult<()>;
 }
 
+// features_added -> usize will always be the size of the array the function returns and is enforced so kinda unnecessary
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize;
+	fn get_column_headers(&self) -> &[&str];
     fn add_features(
         &self,
         player_id: &PlayerId,
@@ -172,7 +196,7 @@ pub trait PlayerFeatureAdder<F> {
     ) -> ReplayProcessorResult<()>;
 }
 
-impl<G, F, const N: usize> FeatureAdder<F> for G
+impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
 where
     G: Fn(&ReplayProcessor, &boxcars::Frame, usize) -> Result<[F; N], String>,
 {
@@ -187,11 +211,15 @@ where
         frame_count: usize,
         vector: &mut Vec<F>,
     ) -> ReplayProcessorResult<()> {
-        Ok(vector.extend(self(processor, frame, frame_count)?))
+        Ok(vector.extend(self.0(processor, frame, frame_count)?))
     }
+
+	fn get_column_headers(&self) -> &[&str] {
+		&self.1.as_slice()
+	}
 }
 
-impl<G, F, const N: usize> PlayerFeatureAdder<F> for G
+impl<G, F, const N: usize> PlayerFeatureAdder<F> for (G, &[&str; N])
 where
     G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize) -> Result<[F; N], String>,
 {
@@ -207,8 +235,12 @@ where
         frame_count: usize,
         vector: &mut Vec<F>,
     ) -> ReplayProcessorResult<()> {
-        Ok(vector.extend(self(player_id, processor, frame, frame_count)?))
+        Ok(vector.extend(self.0(player_id, processor, frame, frame_count)?))
     }
+
+	fn get_column_headers(&self) -> &[&str] {
+		&self.1.as_slice()
+	}
 }
 
 macro_rules! convert_all {
@@ -246,6 +278,8 @@ where
     let location = rigid_body.location;
     let (rx, ry, rz) =
         glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
+	// important
+
     convert_all!(
         convert,
         location.x,
@@ -287,6 +321,23 @@ where
     )
 }
 
+// important, immplementation stuff
+pub static BALL_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
+	"ball pos x", "ball pos y", "ball pos z",
+	"ball rotation x", "ball rotation y", "ball rotation z",
+	"ball linear velocity x", "ball linear velocity y", "ball linear velocity z",
+	"ball angular velocity x", "ball angular velocity y", "ball angular velocity z"
+];
+
+//pub static BALL_FEATURE_ADDER = (&get_ball_rb_properties, &BALL_COLUMN_NAMES);
+
+pub fn build_ball_rigidbody_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn FeatureAdder<F>>
+where <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+	//let feature_adder: &dyn FeatureAdder<F> = &BALL_FEATURE_ADDER;
+	Box::new((&get_ball_rb_properties::<F>, &BALL_RIGID_BODY_COLUMN_NAMES))
+}
+
 pub fn get_ball_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
@@ -296,6 +347,38 @@ where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     get_rigid_body_properties(processor.get_ball_rigid_body()?)
+}
+
+pub static PLAYER_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
+	"player pos x", "player pos y", "player pos z",
+	"player rotation x", "player rotation y", "player rotation z",
+	"player linear velocity x", "player linear velocity y", "player linear velocity z",
+	"player angular velocity x", "player angular velocity y", "player angular velocity z"
+];
+
+pub fn build_player_rigidbody_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
+where <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+	Box::new((&get_player_rb_properties::<F>, &PLAYER_RIGID_BODY_COLUMN_NAMES))
+}
+
+pub static PLAYER_BOOST_COLUMN_NAMES: [&str; 1] = ["player boost level"];
+
+pub fn build_player_boost_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
+where <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+	//Box::new((&get_player_rb_properties::<F>, &get_player_boost_level::<F>, &get_jump_availabilities::<F>, &PLAYER_COLUMN_NAMES_WITH_JUMP))
+	Box::new((&get_player_boost_level::<F>, &PLAYER_BOOST_COLUMN_NAMES))
+}
+
+pub static PLAYER_JUMP_COLUMN_NAMES: [&str; 3] = [
+	"player dodge active", "player jump active", "player double jump active"
+];
+
+pub fn build_player_jump_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
+where <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+	Box::new((&get_jump_availabilities, &PLAYER_JUMP_COLUMN_NAMES))
 }
 
 pub fn get_player_rb_properties<F: TryFrom<f32>>(
@@ -320,6 +403,7 @@ pub fn get_player_boost_level<F: TryFrom<f32>>(
     _frame: &boxcars::Frame,
     _frame_number: usize,
 ) -> Result<[F; 1], String>
+// ^ return array of length 1 of F's
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
