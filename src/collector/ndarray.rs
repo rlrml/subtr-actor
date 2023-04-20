@@ -1,5 +1,6 @@
 use ::ndarray;
 use boxcars;
+use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::*;
@@ -270,6 +271,33 @@ pub trait FeatureAdder<F> {
     ) -> ReplayProcessorResult<()>;
 }
 
+pub trait LengthCheckedFeatureAdder<F, const N: usize> {
+    fn get_column_headers_array(&self) -> &[&str; N];
+
+    fn get_features(
+        &self,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_count: usize,
+    ) -> Result<[F; N], String>;
+}
+
+impl<F, const N: usize> FeatureAdder<F> for dyn LengthCheckedFeatureAdder<F, N> {
+    fn add_features(
+        &self,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_count: usize,
+        vector: &mut Vec<F>,
+    ) -> ReplayProcessorResult<()> {
+        Ok(vector.extend(self.get_features(processor, frame, frame_count)?))
+    }
+
+    fn get_column_headers(&self) -> &[&str] {
+        self.get_column_headers_array()
+    }
+}
+
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -285,6 +313,35 @@ pub trait PlayerFeatureAdder<F> {
         frame_count: usize,
         vector: &mut Vec<F>,
     ) -> ReplayProcessorResult<()>;
+}
+
+pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
+    fn get_column_headers_array(&self) -> &[&str; N];
+
+    fn get_features(
+        &self,
+        player_id: &PlayerId,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_count: usize,
+    ) -> Result<[F; N], String>;
+}
+
+impl<F, const N: usize> PlayerFeatureAdder<F> for dyn LengthCheckedPlayerFeatureAdder<F, N> {
+    fn add_features(
+        &self,
+        player_id: &PlayerId,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_count: usize,
+        vector: &mut Vec<F>,
+    ) -> ReplayProcessorResult<()> {
+        Ok(vector.extend(self.get_features(player_id, processor, frame, frame_count)?))
+    }
+
+    fn get_column_headers(&self) -> &[&str] {
+        self.get_column_headers_array()
+    }
 }
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
@@ -480,10 +537,10 @@ where
 global_feature_adder!(
     build_ball_rigid_body_no_velocities_feature_adder,
     get_ball_rb_properties_no_velocities,
-    BALL_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES
+    BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES
 );
 
-pub static BALL_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES: [&str; 6] = [
+pub static BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES: [&str; 6] = [
     "Ball - pos x",
     "Ball - pos y",
     "Ball - pos z",
@@ -551,7 +608,7 @@ where
     }
 }
 
-pub static PLAYER_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES: [&str; 6] = [
+pub static PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES: [&str; 6] = [
     "pos x",
     "pos y",
     "pos z",
@@ -563,7 +620,7 @@ pub static PLAYER_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES: [&str; 6] = [
 player_feature_adder!(
     build_player_rigid_body_no_velocities_feature_adder,
     get_player_rb_properties_no_velocities,
-    PLAYER_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES
+    PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES
 );
 
 pub static PLAYER_BOOST_COLUMN_NAMES: [&str; 1] = ["boost level"];
