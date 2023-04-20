@@ -55,12 +55,6 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
             self.collector
                 .process_frame(processor, frame, frame_number)?;
             self.update_frame_times(frame);
-            println!(
-                "{} - {} = {}",
-                frame.time,
-                self.targeted_last_frame_time,
-                frame.time - self.targeted_last_frame_time
-            )
         }
         Ok(())
     }
