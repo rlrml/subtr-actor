@@ -14,7 +14,7 @@ fn main() {
 
     // println!("{:?}", replay.properties);
 
-    let mut collector = NDArrayCollector::<f32>::with_jump_availabilities();
+    let mut collector = NDArrayCollector::<f32>::with_jump_activities();
 
     FrameRateDecorator::new_from_fps(8.0, &mut collector)
         .process_replay(&replay)

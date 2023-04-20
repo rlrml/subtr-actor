@@ -227,11 +227,11 @@ impl<F: TryFrom<f32> + 'static> NDArrayCollector<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    pub fn with_jump_availabilities() -> Self {
+    pub fn with_jump_activities() -> Self {
         NDArrayCollector::new(
-            vec![build_ball_rigidbody_feature_adder()],
+            vec![build_ball_rigid_body_feature_adder()],
             vec![
-                build_player_rigidbody_feature_adder(),
+                build_player_rigid_body_feature_adder(),
                 build_player_boost_feature_adder(),
                 build_player_jump_feature_adder(),
             ],
@@ -245,9 +245,9 @@ where
 {
     fn default() -> Self {
         NDArrayCollector::new(
-            vec![build_ball_rigidbody_feature_adder()],
+            vec![build_ball_rigid_body_feature_adder()],
             vec![
-                build_player_rigidbody_feature_adder(),
+                build_player_rigid_body_feature_adder(),
                 build_player_boost_feature_adder(),
             ],
         )
@@ -361,8 +361,6 @@ where
     let location = rigid_body.location;
     let (rx, ry, rz) =
         glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
-    // important
-
     convert_all!(
         convert,
         location.x,
@@ -378,6 +376,20 @@ where
         angular_velocity.y,
         angular_velocity.z,
     )
+}
+
+pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
+    rigid_body: &boxcars::RigidBody,
+) -> Result<[F; 6], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let convert = string_error!("Error in rigid body float conversion {:?}");
+    let rotation = rigid_body.rotation;
+    let location = rigid_body.location;
+    let (rx, ry, rz) =
+        glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
+    convert_all!(convert, location.x, location.y, location.z, rx, ry, rz)
 }
 
 fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
@@ -404,6 +416,41 @@ where
     )
 }
 
+fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> Result<[F; 6], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all!(
+        string_error!("{:?}"),
+        // We use huge values for location instead of 0s so that hopefully any
+        // model built on this data can understand that the player is not
+        // actually on the field.
+        200000.0,
+        200000.0,
+        200000.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+}
+
+macro_rules! global_feature_adder {
+    ($cons_name:ident, $prop_getter:ident, $column_names:ident) => {
+        pub fn $cons_name<F: TryFrom<f32> + 'static>() -> Box<dyn FeatureAdder<F>>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            Box::new((&$prop_getter::<F>, &$column_names))
+        }
+    };
+}
+
+global_feature_adder!(
+    build_ball_rigid_body_feature_adder,
+    get_ball_rb_properties,
+    BALL_RIGID_BODY_COLUMN_NAMES
+);
+
 pub static BALL_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
     "Ball - pos x",
     "Ball - pos y",
@@ -419,13 +466,6 @@ pub static BALL_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
     "Ball - angular velocity z",
 ];
 
-pub fn build_ball_rigidbody_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn FeatureAdder<F>>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    Box::new((&get_ball_rb_properties::<F>, &BALL_RIGID_BODY_COLUMN_NAMES))
-}
-
 pub fn get_ball_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
@@ -435,6 +475,43 @@ where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     get_rigid_body_properties(processor.get_ball_rigid_body()?)
+}
+
+global_feature_adder!(
+    build_ball_rigid_body_no_velocities_feature_adder,
+    get_ball_rb_properties_no_velocities,
+    BALL_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES
+);
+
+pub static BALL_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES: [&str; 6] = [
+    "Ball - pos x",
+    "Ball - pos y",
+    "Ball - pos z",
+    "Ball - rotation x",
+    "Ball - rotation y",
+    "Ball - rotation z",
+];
+
+pub fn get_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _: usize,
+) -> Result<[F; 6], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
+}
+
+macro_rules! player_feature_adder {
+    ($cons_name:ident, $prop_getter:ident, $column_names:ident) => {
+        pub fn $cons_name<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            Box::new((&$prop_getter::<F>, &$column_names))
+        }
+    };
 }
 
 pub static PLAYER_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
@@ -452,36 +529,11 @@ pub static PLAYER_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
     "angular velocity z",
 ];
 
-pub fn build_player_rigidbody_feature_adder<F: TryFrom<f32> + 'static>(
-) -> Box<dyn PlayerFeatureAdder<F>>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    Box::new((
-        &get_player_rb_properties::<F>,
-        &PLAYER_RIGID_BODY_COLUMN_NAMES,
-    ))
-}
-
-pub static PLAYER_BOOST_COLUMN_NAMES: [&str; 1] = ["boost level"];
-
-pub fn build_player_boost_feature_adder<F: TryFrom<f32> + 'static>(
-) -> Box<dyn PlayerFeatureAdder<F>>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    Box::new((&get_player_boost_level::<F>, &PLAYER_BOOST_COLUMN_NAMES))
-}
-
-pub static PLAYER_JUMP_COLUMN_NAMES: [&str; 3] =
-    ["dodge active", "jump active", "double jump active"];
-
-pub fn build_player_jump_feature_adder<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    Box::new((&get_jump_availabilities, &PLAYER_JUMP_COLUMN_NAMES))
-}
+player_feature_adder!(
+    build_player_rigid_body_feature_adder,
+    get_player_rb_properties,
+    PLAYER_RIGID_BODY_COLUMN_NAMES
+);
 
 pub fn get_player_rb_properties<F: TryFrom<f32>>(
     player_id: &PlayerId,
@@ -498,6 +550,45 @@ where
         default_rb_state()
     }
 }
+
+pub static PLAYER_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES: [&str; 6] = [
+    "pos x",
+    "pos y",
+    "pos z",
+    "rotation x",
+    "rotation y",
+    "rotation z",
+];
+
+player_feature_adder!(
+    build_player_rigid_body_no_velocities_feature_adder,
+    get_player_rb_properties_no_velocities,
+    PLAYER_RIGID_BODY_COLUMN_NAMES_NO_VELOCITIES
+);
+
+pub static PLAYER_BOOST_COLUMN_NAMES: [&str; 1] = ["boost level"];
+
+pub fn get_player_rb_properties_no_velocities<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _: usize,
+) -> Result<[F; 6], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+        get_rigid_body_properties_no_velocities(rb)
+    } else {
+        default_rb_state_no_velocities()
+    }
+}
+
+player_feature_adder!(
+    build_player_boost_feature_adder,
+    get_player_boost_level,
+    PLAYER_BOOST_COLUMN_NAMES
+);
 
 pub fn get_player_boost_level<F: TryFrom<f32>>(
     player_id: &PlayerId,
@@ -517,7 +608,20 @@ where
     )
 }
 
-pub fn get_jump_availabilities<F: TryFrom<f32>>(
+player_feature_adder!(
+    build_player_jump_feature_adder,
+    get_jump_activities,
+    PLAYER_JUMP_COLUMN_NAMES
+);
+
+pub static PLAYER_JUMP_COLUMN_NAMES: [&str; 3] =
+    ["dodge active", "jump active", "double jump active"];
+
+pub fn get_f32(v: u8) -> Result<f32, String> {
+    TryFrom::try_from(v % 2).map_err(string_error!("{:?}"))
+}
+
+pub fn get_jump_activities<F: TryFrom<f32>>(
     player_id: &PlayerId,
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
@@ -526,8 +630,6 @@ pub fn get_jump_availabilities<F: TryFrom<f32>>(
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let get_f32 =
-        |b| -> Result<f32, String> { TryFrom::try_from(b % 2).map_err(string_error!("{:?}")) };
     convert_all!(
         string_error!("{:?}"),
         processor
@@ -543,4 +645,32 @@ where
             .and_then(get_f32)
             .unwrap_or(0.0),
     )
+}
+
+player_feature_adder!(
+    build_player_any_jump_feature_adder,
+    get_any_jump_active,
+    PLAYER_ANY_JUMP_COLUMN_NAMES
+);
+
+pub static PLAYER_ANY_JUMP_COLUMN_NAMES: [&str; 1] = ["any_jump_active"];
+
+pub fn get_any_jump_active<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _frame_number: usize,
+) -> Result<[F; 1], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let dodge_is_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 0;
+    let jump_is_active = processor.get_jump_active(player_id).unwrap_or(0) % 2 == 0;
+    let double_jump_is_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2 == 0;
+    let value = if dodge_is_active || jump_is_active || double_jump_is_active {
+        1.0
+    } else {
+        0.0
+    };
+    convert_all!(string_error!("{:?}"), value)
 }
