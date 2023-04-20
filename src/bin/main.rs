@@ -14,16 +14,18 @@ fn main() {
 
     // println!("{:?}", replay.properties);
 
-    let collector = NDArrayCollector::<f32>::with_jump_availabilities()
+    let mut collector = NDArrayCollector::<f32>::with_jump_availabilities();
+
+    FrameRateDecorator::new_from_fps(8.0, &mut collector)
         .process_replay(&replay)
         .unwrap();
 
-    let (player_infos, columns, array) = collector.get_meta_and_ndarray().unwrap();
+    let (meta, array) = collector.get_meta_and_ndarray().unwrap();
 
     for i in 0..array.shape()[1] {
         println!(
             "{}: {:?}",
-            columns[i],
+            (Vec::<String>::from(&meta.column_headers))[i],
             array
                 .slice(::ndarray::s![.., i])
                 .iter()
@@ -33,5 +35,6 @@ fn main() {
         );
     }
 
-    println!("{:?}", player_infos);
+    // println!("{:?}", meta);
+    println!("Array shape is {:?}", array.shape());
 }

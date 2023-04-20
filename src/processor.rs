@@ -289,7 +289,7 @@ impl<'a> ReplayProcessor<'a> {
         Err("Not yet implemented".to_string())
     }
 
-    fn process_long_enough_to_get_actor_ids(&mut self) -> ReplayProcessorResult<()> {
+    pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> ReplayProcessorResult<()> {
         let error_string = "10 seconds is enough".to_string();
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize| {
             // XXX: 10 seconds should be enough to find everyone, right?
