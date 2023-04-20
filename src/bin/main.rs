@@ -16,7 +16,11 @@ fn main() {
 
     let mut collector = NDArrayCollector::<f32>::from_strings(
         &["BallRigidBodyNoVelocities"],
-        &["PlayerRigidBodyNoVelocities"],
+        &[
+            "PlayerRigidBodyNoVelocities",
+            "PlayerBoost",
+            "PlayerAnyJump",
+        ],
     )
     .unwrap();
 
