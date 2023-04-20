@@ -2,6 +2,7 @@ use ::ndarray;
 use boxcars;
 use lazy_static::lazy_static;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::*;
 
@@ -75,8 +76,8 @@ impl From<&NDArrayColumnHeaders> for Vec<String> {
 }
 
 pub struct NDArrayCollector<F> {
-    feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
-    player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
+    feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
+    player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
     data: Vec<F>,
     replay_meta: Option<ReplayMeta>,
     frames_added: usize,
@@ -84,8 +85,8 @@ pub struct NDArrayCollector<F> {
 
 impl<F> NDArrayCollector<F> {
     pub fn new(
-        feature_adders: Vec<Box<dyn FeatureAdder<F>>>,
-        player_feature_adders: Vec<Box<dyn PlayerFeatureAdder<F>>>,
+        feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
+        player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
     ) -> Self {
         Self {
             feature_adders,
@@ -224,32 +225,41 @@ impl<F> Collector for NDArrayCollector<F> {
     }
 }
 
-impl<F: TryFrom<f32> + 'static> NDArrayCollector<F>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    pub fn with_jump_activities() -> Self {
-        NDArrayCollector::new(
-            vec![build_ball_rigid_body_feature_adder()],
-            vec![
-                build_player_rigid_body_feature_adder(),
-                build_player_boost_feature_adder(),
-                build_player_jump_feature_adder(),
-            ],
-        )
+impl NDArrayCollector<f32> {
+    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> Result<Self, String> {
+        let feature_adders: Vec<Arc<dyn FeatureAdder<f32> + Send + Sync>> = fa_names
+            .iter()
+            .map(|name| {
+                Ok(NAME_TO_GLOBAL_FEATURE_ADDER
+                    .get(name)
+                    .ok_or_else(|| format!("{:?} was not a recognized feature adder", name))?
+                    .clone())
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<f32> + Send + Sync>> = pfa_names
+            .iter()
+            .map(|name| {
+                Ok(NAME_TO_PLAYER_FEATURE_ADDER
+                    .get(name)
+                    .ok_or_else(|| format!("{:?} was not a recognized feature adder", name))?
+                    .clone())
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(Self::new(feature_adders, player_feature_adders))
     }
 }
 
-impl<F: TryFrom<f32> + 'static> Default for NDArrayCollector<F>
+impl<F: TryFrom<f32> + Send + Sync + 'static> Default for NDArrayCollector<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     fn default() -> Self {
         NDArrayCollector::new(
-            vec![build_ball_rigid_body_feature_adder()],
+            vec![BallRigidBody::arc_new()],
             vec![
-                build_player_rigid_body_feature_adder(),
-                build_player_boost_feature_adder(),
+                PlayerRigidBody::arc_new(),
+                PlayerBoost::arc_new(),
+                PlayerAnyJump::arc_new(),
             ],
         )
     }
@@ -282,22 +292,6 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     ) -> Result<[F; N], String>;
 }
 
-impl<F, const N: usize> FeatureAdder<F> for dyn LengthCheckedFeatureAdder<F, N> {
-    fn add_features(
-        &self,
-        processor: &ReplayProcessor,
-        frame: &boxcars::Frame,
-        frame_count: usize,
-        vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()> {
-        Ok(vector.extend(self.get_features(processor, frame, frame_count)?))
-    }
-
-    fn get_column_headers(&self) -> &[&str] {
-        self.get_column_headers_array()
-    }
-}
-
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -325,23 +319,6 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
         frame: &boxcars::Frame,
         frame_count: usize,
     ) -> Result<[F; N], String>;
-}
-
-impl<F, const N: usize> PlayerFeatureAdder<F> for dyn LengthCheckedPlayerFeatureAdder<F, N> {
-    fn add_features(
-        &self,
-        player_id: &PlayerId,
-        processor: &ReplayProcessor,
-        frame: &boxcars::Frame,
-        frame_count: usize,
-        vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()> {
-        Ok(vector.extend(self.get_features(player_id, processor, frame, frame_count)?))
-    }
-
-    fn get_column_headers(&self) -> &[&str] {
-        self.get_column_headers_array()
-    }
 }
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
@@ -491,24 +468,166 @@ where
     )
 }
 
+macro_rules! count_exprs {
+    () => {0usize};
+    ($val:expr $(, $vals:expr)*) => {1usize + count_exprs!($($vals),*)};
+}
+
 macro_rules! global_feature_adder {
-    ($cons_name:ident, $prop_getter:ident, $column_names:ident) => {
-        pub fn $cons_name<F: TryFrom<f32> + 'static>() -> Box<dyn FeatureAdder<F>>
+    ($struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+        _global_feature_adder!(
+            {count_exprs!($( $column_names ),*)},
+            $struct_name,
+            $prop_getter,
+            $column_variable,
+            $( $column_names ),*
+        );
+    }
+}
+
+macro_rules! _global_feature_adder {
+    ($count:expr, $struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+        pub struct $struct_name<F> {
+            _zero: std::marker::PhantomData<F>,
+        }
+
+        impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            pub fn new() -> Self {
+                Self {
+                    _zero: std::marker::PhantomData
+                }
+            }
+
+            pub fn arc_new() -> Arc<dyn FeatureAdder<F> + Send + Sync + 'static> {
+                Arc::new(Self::new())
+            }
+        }
+
+        pub static $column_variable: [&str; count_exprs!($( $column_names ),*)] = [
+            $( $column_names ),*
+        ];
+
+        impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
         where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
-            Box::new((&$prop_getter::<F>, &$column_names))
+            fn get_column_headers_array(&self) -> &[&str; $count] {
+                &$column_variable
+            }
+
+            fn get_features(
+                &self,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+            ) -> Result<[F; $count], String> {
+                $prop_getter(processor, frame, frame_count)
+            }
+        }
+
+        impl<F: TryFrom<f32>> FeatureAdder<F> for $struct_name<F>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug, {
+            fn add_features(
+                &self,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+                vector: &mut Vec<F>,
+            ) -> ReplayProcessorResult<()> {
+                Ok(vector.extend(self.get_features(processor, frame, frame_count)?))
+            }
+
+            fn get_column_headers(&self) -> &[&str] {
+                self.get_column_headers_array()
+            }
+        }
+    };
+}
+
+macro_rules! player_feature_adder {
+    ($struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+        _player_feature_adder!(
+            {count_exprs!($( $column_names ),*)},
+            $struct_name,
+            $prop_getter,
+            $column_variable,
+            $( $column_names ),*
+        );
+    }
+}
+
+macro_rules! _player_feature_adder {
+    ($count:expr, $struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+        pub struct $struct_name<F> {
+            _zero: std::marker::PhantomData<F>,
+        }
+
+        impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            pub fn new() -> Self {
+                Self {
+                    _zero: std::marker::PhantomData
+                }
+            }
+
+            pub fn arc_new() -> Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static> {
+                Arc::new(Self::new())
+            }
+        }
+
+        pub static $column_variable: [&str; count_exprs!($( $column_names ),*)] = [
+            $( $column_names ),*
+        ];
+
+        impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            fn get_column_headers_array(&self) -> &[&str; $count] {
+                &$column_variable
+            }
+
+            fn get_features(
+                &self,
+                player_id: &PlayerId,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+            ) -> Result<[F; $count], String> {
+                $prop_getter(player_id, processor, frame, frame_count)
+            }
+        }
+
+        impl<F: TryFrom<f32>> PlayerFeatureAdder<F> for $struct_name<F>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            fn add_features(
+                &self,
+                player_id: &PlayerId,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+                vector: &mut Vec<F>,
+            ) -> ReplayProcessorResult<()> {
+                Ok(vector.extend(self.get_features(player_id, processor, frame, frame_count)?))
+            }
+
+            fn get_column_headers(&self) -> &[&str] {
+                self.get_column_headers_array()
+            }
         }
     };
 }
 
 global_feature_adder!(
-    build_ball_rigid_body_feature_adder,
+    BallRigidBody,
     get_ball_rb_properties,
-    BALL_RIGID_BODY_COLUMN_NAMES
-);
-
-pub static BALL_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
+    BALL_RIGID_BODY_COLUMN_NAMES,
     "Ball - pos x",
     "Ball - pos y",
     "Ball - pos z",
@@ -521,7 +640,7 @@ pub static BALL_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
     "Ball - angular velocity x",
     "Ball - angular velocity y",
     "Ball - angular velocity z",
-];
+);
 
 pub fn get_ball_rb_properties<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
@@ -535,19 +654,16 @@ where
 }
 
 global_feature_adder!(
-    build_ball_rigid_body_no_velocities_feature_adder,
+    BallRigidBodyNoVelocities,
     get_ball_rb_properties_no_velocities,
-    BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES
-);
-
-pub static BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES: [&str; 6] = [
+    BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES,
     "Ball - pos x",
     "Ball - pos y",
     "Ball - pos z",
     "Ball - rotation x",
     "Ball - rotation y",
     "Ball - rotation z",
-];
+);
 
 pub fn get_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
@@ -560,18 +676,10 @@ where
     get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
 }
 
-macro_rules! player_feature_adder {
-    ($cons_name:ident, $prop_getter:ident, $column_names:ident) => {
-        pub fn $cons_name<F: TryFrom<f32> + 'static>() -> Box<dyn PlayerFeatureAdder<F>>
-        where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug,
-        {
-            Box::new((&$prop_getter::<F>, &$column_names))
-        }
-    };
-}
-
-pub static PLAYER_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
+player_feature_adder!(
+    PlayerRigidBody,
+    get_player_rb_properties,
+    PLAYER_RIGID_BODY_COLUMN_NAMES,
     "pos x",
     "pos y",
     "pos z",
@@ -584,12 +692,6 @@ pub static PLAYER_RIGID_BODY_COLUMN_NAMES: [&str; 12] = [
     "angular velocity x",
     "angular velocity y",
     "angular velocity z",
-];
-
-player_feature_adder!(
-    build_player_rigid_body_feature_adder,
-    get_player_rb_properties,
-    PLAYER_RIGID_BODY_COLUMN_NAMES
 );
 
 pub fn get_player_rb_properties<F: TryFrom<f32>>(
@@ -608,22 +710,17 @@ where
     }
 }
 
-pub static PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES: [&str; 6] = [
+player_feature_adder!(
+    PlayerRigidBodyNoVelocities,
+    get_player_rb_properties_no_velocities,
+    PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES,
     "pos x",
     "pos y",
     "pos z",
     "rotation x",
     "rotation y",
     "rotation z",
-];
-
-player_feature_adder!(
-    build_player_rigid_body_no_velocities_feature_adder,
-    get_player_rb_properties_no_velocities,
-    PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES
 );
-
-pub static PLAYER_BOOST_COLUMN_NAMES: [&str; 1] = ["boost level"];
 
 pub fn get_player_rb_properties_no_velocities<F: TryFrom<f32>>(
     player_id: &PlayerId,
@@ -642,9 +739,10 @@ where
 }
 
 player_feature_adder!(
-    build_player_boost_feature_adder,
+    PlayerBoost,
     get_player_boost_level,
-    PLAYER_BOOST_COLUMN_NAMES
+    PLAYER_BOOST_COLUMN_NAMES,
+    "boost level"
 );
 
 pub fn get_player_boost_level<F: TryFrom<f32>>(
@@ -666,13 +764,13 @@ where
 }
 
 player_feature_adder!(
-    build_player_jump_feature_adder,
+    PlayerJump,
     get_jump_activities,
-    PLAYER_JUMP_COLUMN_NAMES
+    PLAYER_JUMP_COLUMN_NAMES,
+    "dodge active",
+    "jump active",
+    "double jump active"
 );
-
-pub static PLAYER_JUMP_COLUMN_NAMES: [&str; 3] =
-    ["dodge active", "jump active", "double jump active"];
 
 pub fn get_f32(v: u8) -> Result<f32, String> {
     TryFrom::try_from(v % 2).map_err(string_error!("{:?}"))
@@ -705,12 +803,11 @@ where
 }
 
 player_feature_adder!(
-    build_player_any_jump_feature_adder,
+    PlayerAnyJump,
     get_any_jump_active,
-    PLAYER_ANY_JUMP_COLUMN_NAMES
+    PLAYER_ANY_JUMP_COLUMN_NAMES,
+    "any_jump_active"
 );
-
-pub static PLAYER_ANY_JUMP_COLUMN_NAMES: [&str; 1] = ["any_jump_active"];
 
 pub fn get_any_jump_active<F: TryFrom<f32>>(
     player_id: &PlayerId,
@@ -730,4 +827,41 @@ where
         0.0
     };
     convert_all!(string_error!("{:?}"), value)
+}
+
+lazy_static! {
+    static ref NAME_TO_GLOBAL_FEATURE_ADDER: std::collections::HashMap<&'static str, Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>> = {
+        let mut m: std::collections::HashMap<
+            &'static str,
+            Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>,
+        > = std::collections::HashMap::new();
+        macro_rules! insert_adder {
+            ($adder_name:ident ) => {
+                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new());
+            };
+        }
+        insert_adder!(BallRigidBody);
+        insert_adder!(BallRigidBodyNoVelocities);
+        m
+    };
+    static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<
+        &'static str,
+        Arc<dyn PlayerFeatureAdder<f32> + Send + Sync + 'static>,
+    > = {
+        let mut m: std::collections::HashMap<
+            &'static str,
+            Arc<dyn PlayerFeatureAdder<f32> + Send + Sync + 'static>,
+        > = std::collections::HashMap::new();
+        macro_rules! insert_adder {
+            ($adder_name:ident ) => {
+                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new());
+            };
+        }
+        insert_adder!(PlayerRigidBody);
+        insert_adder!(PlayerRigidBodyNoVelocities);
+        insert_adder!(PlayerBoost);
+        insert_adder!(PlayerJump);
+        insert_adder!(PlayerAnyJump);
+        m
+    };
 }
