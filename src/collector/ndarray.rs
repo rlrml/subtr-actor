@@ -19,31 +19,13 @@ macro_rules! string_error {
 pub struct NDArrayColumnHeaders {
     pub global_headers: Vec<String>,
     pub player_headers: Vec<String>,
-    pub player_infos_and_indices: Vec<(PlayerInfo, usize)>,
 }
 
 impl NDArrayColumnHeaders {
-    fn new(
-        global_headers: Vec<String>,
-        player_headers: Vec<String>,
-        player_infos: Vec<PlayerInfo>,
-    ) -> Self {
-        let global_header_count = global_headers.len();
-        let player_header_count = player_headers.len();
-        let player_infos_and_indices = player_infos
-            .into_iter()
-            .enumerate()
-            .map(|(player_index, player_info)| {
-                (
-                    player_info,
-                    player_index * player_header_count + global_header_count,
-                )
-            })
-            .collect();
+    pub fn new(global_headers: Vec<String>, player_headers: Vec<String>) -> Self {
         Self {
             global_headers,
             player_headers,
-            player_infos_and_indices,
         }
     }
 }
@@ -54,23 +36,22 @@ pub struct ReplayMetaWithHeaders {
     pub column_headers: NDArrayColumnHeaders,
 }
 
-impl From<&NDArrayColumnHeaders> for Vec<String> {
-    fn from(column_headers: &NDArrayColumnHeaders) -> Self {
-        column_headers
+impl ReplayMetaWithHeaders {
+    pub fn headers_vec(&self) -> Vec<String> {
+        self.column_headers
             .global_headers
             .iter()
             .cloned()
-            .chain(
-                column_headers
-                    .player_infos_and_indices
-                    .iter()
-                    .enumerate()
-                    .flat_map(move |(player_index, (info, _))| {
-                        column_headers.player_headers.iter().map(move |header| {
+            .chain(self.replay_meta.player_order().enumerate().flat_map(
+                move |(player_index, info)| {
+                    self.column_headers
+                        .player_headers
+                        .iter()
+                        .map(move |header| {
                             format!("Player {} ({}) - {}", player_index, info.name, header)
                         })
-                    }),
-            )
+                },
+            ))
             .collect()
     }
 }
@@ -116,9 +97,7 @@ impl<F> NDArrayCollector<F> {
         Ok(global_feature_count + player_feature_count)
     }
 
-    pub fn get_column_headers(&self) -> Result<NDArrayColumnHeaders, String> {
-        let replay_meta = self.replay_meta.as_ref().ok_or("Replay meta not yet set")?;
-        let player_infos = replay_meta.player_order().cloned().collect();
+    pub fn get_column_headers(&self) -> NDArrayColumnHeaders {
         let global_headers = self
             .feature_adders
             .iter()
@@ -137,11 +116,7 @@ impl<F> NDArrayCollector<F> {
                     .map(move |base_name| format!("{}", base_name))
             })
             .collect();
-        Ok(NDArrayColumnHeaders::new(
-            global_headers,
-            player_headers,
-            player_infos,
-        ))
+        NDArrayColumnHeaders::new(global_headers, player_headers)
     }
 
     pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
@@ -153,7 +128,6 @@ impl<F> NDArrayCollector<F> {
     ) -> Result<(ReplayMetaWithHeaders, ndarray::Array2<F>), String> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
-        let column_headers = self.get_column_headers()?;
         if self.data.len() != expected_length {
             Err(format!(
                 "Unexpected vector length: actual: {}, expected: {}, features: {}, rows: {}",
@@ -163,6 +137,7 @@ impl<F> NDArrayCollector<F> {
                 self.frames_added,
             ))
         } else {
+            let column_headers = self.get_column_headers();
             Ok((
                 ReplayMetaWithHeaders {
                     replay_meta: self.replay_meta.ok_or("No replay meta")?,
@@ -183,7 +158,7 @@ impl<F> NDArrayCollector<F> {
         self.maybe_set_replay_meta(&processor)?;
         Ok(ReplayMetaWithHeaders {
             replay_meta: self.replay_meta.as_ref().ok_or("No replay meta")?.clone(),
-            column_headers: self.get_column_headers()?,
+            column_headers: self.get_column_headers(),
         })
     }
 

@@ -33,7 +33,7 @@ fn main() {
     for i in 0..array.shape()[1] {
         println!(
             "{}: {:?}",
-            (Vec::<String>::from(&meta.column_headers))[i],
+            meta.headers_vec()[i],
             array
                 .slice(::ndarray::s![.., i])
                 .iter()
