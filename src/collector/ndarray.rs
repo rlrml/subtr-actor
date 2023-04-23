@@ -600,6 +600,27 @@ macro_rules! _player_feature_adder {
 }
 
 global_feature_adder!(
+    SecondsRemaining,
+    get_seconds_remaining,
+    SECONDS_REMAINING_COLUMN_NAMES,
+    "seconds remaining",
+);
+
+pub fn get_seconds_remaining<F: TryFrom<f32>>(
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _: usize,
+) -> Result<[F; 1], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all!(
+        string_error!("{:?}"),
+        processor.get_seconds_remaining()?.clone() as f32
+    )
+}
+
+global_feature_adder!(
     BallRigidBody,
     get_ball_rb_properties,
     BALL_RIGID_BODY_COLUMN_NAMES,
@@ -817,6 +838,7 @@ lazy_static! {
         }
         insert_adder!(BallRigidBody);
         insert_adder!(BallRigidBodyNoVelocities);
+        insert_adder!(SecondsRemaining);
         m
     };
     static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<
