@@ -1,9 +1,10 @@
 use boxcars;
+use serde::Serialize;
 use std::collections::HashMap;
 
-use crate::{processor::*, Collector};
+use crate::{processor::*, Collector, ReplayMeta};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BallFrame {
     Empty,
     Data { rigid_body: boxcars::RigidBody },
@@ -31,7 +32,7 @@ impl BallFrame {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum PlayerFrame {
     Empty,
     Data {
@@ -94,7 +95,7 @@ impl PlayerFrame {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerData {
     frames: Vec<PlayerFrame>,
 }
@@ -115,7 +116,7 @@ impl PlayerData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BallData {
     frames: Vec<BallFrame>,
 }
@@ -132,7 +133,7 @@ impl BallData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MetadataFrame {
     pub time: f32,
     pub seconds_remaining: i32,
@@ -151,19 +152,26 @@ impl MetadataFrame {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ReplayData {
-    ball_data: BallData,
-    players: HashMap<PlayerId, PlayerData>,
-    frame_metadata: Vec<MetadataFrame>,
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FrameData {
+    pub ball_data: BallData,
+    pub players: HashMap<PlayerId, PlayerData>,
+    pub metadata_frames: Vec<MetadataFrame>,
 }
 
-impl ReplayData {
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReplayData {
+    pub frame_data: FrameData,
+    pub meta: ReplayMeta,
+    pub demolish_infos: Vec<DemolishInfo>,
+}
+
+impl FrameData {
     fn new() -> Self {
-        ReplayData {
+        FrameData {
             ball_data: BallData { frames: Vec::new() },
             players: HashMap::new(),
-            frame_metadata: Vec::new(),
+            metadata_frames: Vec::new(),
         }
     }
 
@@ -173,8 +181,8 @@ impl ReplayData {
         ball_frame: BallFrame,
         player_frames: Vec<(PlayerId, PlayerFrame)>,
     ) -> ReplayProcessorResult<()> {
-        self.frame_metadata.push(frame_metadata);
-        let frame_number = self.frame_metadata.len();
+        self.metadata_frames.push(frame_metadata);
+        let frame_number = self.metadata_frames.len();
         self.ball_data.add_frame(frame_number, ball_frame);
         for (player_id, frame) in player_frames {
             self.players
@@ -186,15 +194,33 @@ impl ReplayData {
     }
 }
 
-pub struct ReplayDataCollector {
-    replay_data: ReplayData,
+pub struct FrameDataCollector {
+    frame_data: FrameData,
 }
 
-impl ReplayDataCollector {
+impl FrameDataCollector {
     pub fn new() -> Self {
-        ReplayDataCollector {
-            replay_data: ReplayData::new(),
+        FrameDataCollector {
+            frame_data: FrameData::new(),
         }
+    }
+
+    pub fn get_frame_data(self) -> FrameData {
+        self.frame_data
+    }
+
+    pub fn get_replay_data(
+        mut self,
+        replay: &boxcars::Replay,
+    ) -> ReplayProcessorResult<ReplayData> {
+        let mut processor = ReplayProcessor::new(replay)?;
+        processor.process(&mut self)?;
+        let meta = processor.get_replay_meta()?;
+        Ok(ReplayData {
+            meta,
+            demolish_infos: processor.demolishes,
+            frame_data: self.get_frame_data(),
+        })
     }
 
     fn get_player_frames(
@@ -214,7 +240,7 @@ impl ReplayDataCollector {
     }
 }
 
-impl Collector for ReplayDataCollector {
+impl Collector for FrameDataCollector {
     fn process_frame(
         &mut self,
         processor: &ReplayProcessor,
@@ -224,7 +250,7 @@ impl Collector for ReplayDataCollector {
         let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
         let ball_frame = BallFrame::new_from_processor(processor);
         let player_frames = self.get_player_frames(processor)?;
-        self.replay_data
+        self.frame_data
             .add_frame(metadata_frame, ball_frame, player_frames)?;
         Ok(())
     }

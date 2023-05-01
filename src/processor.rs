@@ -1,5 +1,6 @@
 use crate::*;
 use boxcars;
+use serde::Serialize;
 use std::collections::HashMap;
 
 pub static BALL_TYPES: [&str; 5] = [
@@ -156,6 +157,7 @@ impl ActorStateModeler {
 pub type PlayerId = boxcars::RemoteId;
 pub type ReplayProcessorResult<T> = Result<T, String>;
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DemolishInfo {
     pub time: f32,
     pub seconds_remaining: i32,
