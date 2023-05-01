@@ -104,8 +104,8 @@ impl PlayerData {
         Self { frames: Vec::new() }
     }
 
-    fn add_frame(&mut self, frame_number: usize, frame: PlayerFrame) {
-        let empty_frames_to_add = frame_number - self.frames.len();
+    fn add_frame(&mut self, frame_index: usize, frame: PlayerFrame) {
+        let empty_frames_to_add = frame_index - self.frames.len();
         if empty_frames_to_add > 0 {
             for _ in 0..empty_frames_to_add {
                 self.frames.push(PlayerFrame::Empty)
@@ -121,8 +121,8 @@ pub struct BallData {
 }
 
 impl BallData {
-    fn add_frame(&mut self, frame_number: usize, frame: BallFrame) {
-        let empty_frames_to_add = frame_number - self.frames.len();
+    fn add_frame(&mut self, frame_index: usize, frame: BallFrame) {
+        let empty_frames_to_add = frame_index - self.frames.len();
         if empty_frames_to_add > 0 {
             for _ in 0..empty_frames_to_add {
                 self.frames.push(BallFrame::Empty)
@@ -180,14 +180,14 @@ impl FrameData {
         ball_frame: BallFrame,
         player_frames: Vec<(PlayerId, PlayerFrame)>,
     ) -> ReplayProcessorResult<()> {
+        let frame_index = self.metadata_frames.len();
         self.metadata_frames.push(frame_metadata);
-        let frame_number = self.metadata_frames.len();
-        self.ball_data.add_frame(frame_number, ball_frame);
+        self.ball_data.add_frame(frame_index, ball_frame);
         for (player_id, frame) in player_frames {
             self.players
                 .get_entry(player_id)
                 .or_insert_with(|| PlayerData::new())
-                .add_frame(frame_number, frame)
+                .add_frame(frame_index, frame)
         }
         Ok(())
     }
