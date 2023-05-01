@@ -683,7 +683,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    fn get_player_id_from_car_id(
+    pub fn get_player_id_from_car_id(
         &self,
         actor_id: &boxcars::ActorId,
     ) -> ReplayProcessorResult<PlayerId> {
@@ -725,7 +725,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    fn get_active_demolish_fx(
+    pub fn get_active_demolish_fx(
         &self,
     ) -> ReplayProcessorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
         Ok(self

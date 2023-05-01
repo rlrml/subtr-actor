@@ -807,6 +807,38 @@ where
     convert_all!(string_error!("{:?}"), value)
 }
 
+player_feature_adder!(
+    PlayerDemolishedBy,
+    get_player_demolished_by,
+    "player_demolished_by"
+);
+
+pub fn get_player_demolished_by<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    _frame: &boxcars::Frame,
+    _frame_number: usize,
+) -> Result<[F; 1], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let car_actor_id = processor.get_car_actor_id(player_id)?;
+    let demolisher_index = processor
+        .get_active_demolish_fx()?
+        .find(|demolish_fx| demolish_fx.victim == car_actor_id)
+        .and_then(|demolish_fx| {
+            let demolisher_id = processor
+                .get_player_id_from_car_id(&demolish_fx.attacker)
+                .ok()?;
+            processor
+                .iter_player_ids_in_order()
+                .position(|player_id| player_id == &demolisher_id)
+        })
+        .and_then(|v| i32::try_from(v).ok())
+        .unwrap_or(-1);
+    convert_all!(string_error!("{:?}"), demolisher_index as f32)
+}
+
 lazy_static! {
     static ref NAME_TO_GLOBAL_FEATURE_ADDER: std::collections::HashMap<&'static str, Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>> = {
         let mut m: std::collections::HashMap<
@@ -841,6 +873,7 @@ lazy_static! {
         insert_adder!(PlayerBoost);
         insert_adder!(PlayerJump);
         insert_adder!(PlayerAnyJump);
+        insert_adder!(PlayerDemolishedBy);
         m
     };
 }
