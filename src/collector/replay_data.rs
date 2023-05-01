@@ -1,8 +1,7 @@
 use boxcars;
 use serde::Serialize;
-use std::collections::HashMap;
 
-use crate::{processor::*, Collector, ReplayMeta};
+use crate::{processor::*, Collector, ReplayMeta, VecMapEntry};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BallFrame {
@@ -155,7 +154,7 @@ impl MetadataFrame {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FrameData {
     pub ball_data: BallData,
-    pub players: HashMap<PlayerId, PlayerData>,
+    pub players: Vec<(PlayerId, PlayerData)>,
     pub metadata_frames: Vec<MetadataFrame>,
 }
 
@@ -170,7 +169,7 @@ impl FrameData {
     fn new() -> Self {
         FrameData {
             ball_data: BallData { frames: Vec::new() },
-            players: HashMap::new(),
+            players: Vec::new(),
             metadata_frames: Vec::new(),
         }
     }
@@ -186,7 +185,7 @@ impl FrameData {
         self.ball_data.add_frame(frame_number, ball_frame);
         for (player_id, frame) in player_frames {
             self.players
-                .entry(player_id)
+                .get_entry(player_id)
                 .or_insert_with(|| PlayerData::new())
                 .add_frame(frame_number, frame)
         }
@@ -194,13 +193,13 @@ impl FrameData {
     }
 }
 
-pub struct FrameDataCollector {
+pub struct ReplayDataCollector {
     frame_data: FrameData,
 }
 
-impl FrameDataCollector {
+impl ReplayDataCollector {
     pub fn new() -> Self {
-        FrameDataCollector {
+        ReplayDataCollector {
             frame_data: FrameData::new(),
         }
     }
@@ -240,7 +239,7 @@ impl FrameDataCollector {
     }
 }
 
-impl Collector for FrameDataCollector {
+impl Collector for ReplayDataCollector {
     fn process_frame(
         &mut self,
         processor: &ReplayProcessor,
