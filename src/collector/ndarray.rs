@@ -810,7 +810,7 @@ where
 player_feature_adder!(
     PlayerDemolishedBy,
     get_player_demolished_by,
-    "player_demolished_by"
+    "player demolished by"
 );
 
 pub fn get_player_demolished_by<F: TryFrom<f32>>(

@@ -20,11 +20,12 @@ fn main() {
             "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
+            "PlayerDemolishedBy",
         ],
     )
     .unwrap();
 
-    FrameRateDecorator::new_from_fps(8.0, &mut collector)
+    FrameRateDecorator::new_from_fps(10.0, &mut collector)
         .process_replay(&replay)
         .unwrap();
 
