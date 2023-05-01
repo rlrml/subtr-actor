@@ -449,19 +449,18 @@ macro_rules! count_exprs {
 }
 
 macro_rules! global_feature_adder {
-    ($struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
         _global_feature_adder!(
             {count_exprs!($( $column_names ),*)},
             $struct_name,
             $prop_getter,
-            $column_variable,
             $( $column_names ),*
         );
     }
 }
 
 macro_rules! _global_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+    ($count:expr, $struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -480,16 +479,18 @@ macro_rules! _global_feature_adder {
             }
         }
 
-        pub static $column_variable: [&str; count_exprs!($( $column_names ),*)] = [
-            $( $column_names ),*
-        ];
+        paste::paste! {
+            pub static [<$struct_name:snake:upper _COLUMN_NAMES>]: [&str; count_exprs!($( $column_names ),*)] = [
+                $( $column_names ),*
+            ];
+        }
 
         impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
         where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
             fn get_column_headers_array(&self) -> &[&str; $count] {
-                &$column_variable
+                &paste::paste!{[<$struct_name:snake:upper _COLUMN_NAMES>]}
             }
 
             fn get_features(
@@ -523,19 +524,18 @@ macro_rules! _global_feature_adder {
 }
 
 macro_rules! player_feature_adder {
-    ($struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
         _player_feature_adder!(
             {count_exprs!($( $column_names ),*)},
             $struct_name,
             $prop_getter,
-            $column_variable,
             $( $column_names ),*
         );
     }
 }
 
 macro_rules! _player_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:ident, $column_variable:ident, $( $column_names:expr ),* $(,)?) => {
+    ($count:expr, $struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -554,16 +554,18 @@ macro_rules! _player_feature_adder {
             }
         }
 
-        pub static $column_variable: [&str; count_exprs!($( $column_names ),*)] = [
-            $( $column_names ),*
-        ];
+        paste::paste! {
+            pub static  [<$struct_name:snake:upper _COLUMN_NAMES>] : [&str; count_exprs!($( $column_names ),*)] = [
+                $( $column_names ),*
+            ];
+        }
 
         impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
         where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
             fn get_column_headers_array(&self) -> &[&str; $count] {
-                &$column_variable
+                &paste::paste!{[<$struct_name:snake:upper _COLUMN_NAMES>]}
             }
 
             fn get_features(
@@ -599,12 +601,7 @@ macro_rules! _player_feature_adder {
     };
 }
 
-global_feature_adder!(
-    SecondsRemaining,
-    get_seconds_remaining,
-    SECONDS_REMAINING_COLUMN_NAMES,
-    "seconds remaining",
-);
+global_feature_adder!(SecondsRemaining, get_seconds_remaining, "seconds remaining",);
 
 pub fn get_seconds_remaining<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
@@ -623,7 +620,6 @@ where
 global_feature_adder!(
     BallRigidBody,
     get_ball_rb_properties,
-    BALL_RIGID_BODY_COLUMN_NAMES,
     "Ball - pos x",
     "Ball - pos y",
     "Ball - pos z",
@@ -652,7 +648,6 @@ where
 global_feature_adder!(
     BallRigidBodyNoVelocities,
     get_ball_rb_properties_no_velocities,
-    BALL_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES,
     "Ball - pos x",
     "Ball - pos y",
     "Ball - pos z",
@@ -675,7 +670,6 @@ where
 player_feature_adder!(
     PlayerRigidBody,
     get_player_rb_properties,
-    PLAYER_RIGID_BODY_COLUMN_NAMES,
     "pos x",
     "pos y",
     "pos z",
@@ -709,7 +703,6 @@ where
 player_feature_adder!(
     PlayerRigidBodyNoVelocities,
     get_player_rb_properties_no_velocities,
-    PLAYER_RIGID_BODY_NO_VELOCITIES_COLUMN_NAMES,
     "pos x",
     "pos y",
     "pos z",
@@ -734,12 +727,7 @@ where
     }
 }
 
-player_feature_adder!(
-    PlayerBoost,
-    get_player_boost_level,
-    PLAYER_BOOST_COLUMN_NAMES,
-    "boost level"
-);
+player_feature_adder!(PlayerBoost, get_player_boost_level, "boost level");
 
 pub fn get_player_boost_level<F: TryFrom<f32>>(
     player_id: &PlayerId,
@@ -762,7 +750,6 @@ where
 player_feature_adder!(
     PlayerJump,
     get_jump_activities,
-    PLAYER_JUMP_COLUMN_NAMES,
     "dodge active",
     "jump active",
     "double jump active"
@@ -798,12 +785,7 @@ where
     )
 }
 
-player_feature_adder!(
-    PlayerAnyJump,
-    get_any_jump_active,
-    PLAYER_ANY_JUMP_COLUMN_NAMES,
-    "any_jump_active"
-);
+player_feature_adder!(PlayerAnyJump, get_any_jump_active, "any_jump_active");
 
 pub fn get_any_jump_active<F: TryFrom<f32>>(
     player_id: &PlayerId,
