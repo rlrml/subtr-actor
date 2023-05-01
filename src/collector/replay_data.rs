@@ -140,7 +140,7 @@ pub struct MetadataFrame {
 
 impl MetadataFrame {
     fn new_from_processor(processor: &ReplayProcessor, time: f32) -> Result<Self, String> {
-        Ok(Self::new(time, *processor.get_seconds_remaining()?))
+        Ok(Self::new(time, processor.get_seconds_remaining()?))
     }
 
     fn new(time: f32, seconds_remaining: i32) -> Self {

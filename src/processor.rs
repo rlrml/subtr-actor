@@ -21,6 +21,8 @@ pub static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
 
 pub static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
 pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
+pub static DEMOLISH_GOAL_EXPLOSION_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishGoalExplosion";
+pub static DEMOLISH_KEY: &str = "TAGame.Car_TA:ReplicatedDemolish";
 pub static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
 pub static PLAYER_NAME_KEY: &str = "Engine.PlayerReplicationInfo:PlayerName";
@@ -33,6 +35,8 @@ pub static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";
 pub static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 
 pub static BOOST_USED_PER_SECOND: f32 = 80.0 / 0.93;
+
+pub static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 100;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
@@ -152,6 +156,16 @@ impl ActorStateModeler {
 pub type PlayerId = boxcars::RemoteId;
 pub type ReplayProcessorResult<T> = Result<T, String>;
 
+pub struct DemolishInfo {
+    pub time: f32,
+    pub seconds_remaining: i32,
+    pub frame: usize,
+    pub attacker: PlayerId,
+    pub victim: PlayerId,
+    pub attacker_velocity: boxcars::Vector3f,
+    pub victim_velocity: boxcars::Vector3f,
+}
+
 macro_rules! attribute_match {
     ($value:expr, $type:path, $err:expr) => {
         if let $type(value) = $value {
@@ -232,6 +246,8 @@ pub struct ReplayProcessor<'a> {
     pub car_to_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub demolishes: Vec<DemolishInfo>,
+    known_demolishes: Vec<(boxcars::DemolishFx, usize)>,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -259,6 +275,8 @@ impl<'a> ReplayProcessor<'a> {
             car_to_jump: HashMap::new(),
             car_to_double_jump: HashMap::new(),
             car_to_dodge: HashMap::new(),
+            demolishes: Vec::new(),
+            known_demolishes: Vec::new(),
         };
         // TODO: get rid of unwrap here and change return type to a result
         processor
@@ -277,6 +295,8 @@ impl<'a> ReplayProcessor<'a> {
         self.car_to_double_jump = HashMap::new();
         self.car_to_dodge = HashMap::new();
         self.actor_state = ActorStateModeler::new();
+        self.demolishes = Vec::new();
+        self.known_demolishes = Vec::new();
     }
 
     fn set_player_order_from_headers(&mut self) -> ReplayProcessorResult<()> {
@@ -351,6 +371,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame)?;
+            self.update_demolishes(frame, index)?;
             handler.process_frame(&self, frame, index)?;
         }
         // Make sure that we didn't encounter any players we did not know about
@@ -440,7 +461,9 @@ impl<'a> ReplayProcessor<'a> {
                                 $attr,
                                 $type
                             )?;
-                            $map.insert(
+                            let _key = $get_key(update.actor_id, value);
+                            let _new_value = $get_value(update.actor_id, value);
+                            let _old_value = $map.insert(
                                 $get_key(update.actor_id, value),
                                 $get_value(update.actor_id, value),
                             );
@@ -493,7 +516,7 @@ impl<'a> ReplayProcessor<'a> {
 
         for actor_id in frame.deleted_actors.iter() {
             self.player_to_car.remove(actor_id).map(|car_id| {
-                println!("Player actor {:?} deleted, car id: {:?}.", actor_id, car_id)
+                log::info!("Player actor {:?} deleted, car id: {:?}.", actor_id, car_id)
             });
         }
 
@@ -605,6 +628,117 @@ impl<'a> ReplayProcessor<'a> {
             derived_value,
             is_active,
         )
+    }
+
+    fn update_demolishes(
+        &mut self,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> ReplayProcessorResult<()> {
+        let new_demolishes: Vec<_> = self
+            .get_active_demolish_fx()?
+            .flat_map(|demolish_fx| {
+                if !self.demolish_is_known(&demolish_fx, index) {
+                    Some(demolish_fx.as_ref().clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for demolish in new_demolishes {
+            match self.build_demolish_info(&demolish, frame, index) {
+                Ok(demolish_info) => self.demolishes.push(demolish_info),
+                Err(e) => {
+                    log::warn!(
+                        "Error building demolish info {:?}, {:?}, {:?}",
+                        demolish,
+                        index,
+                        e
+                    );
+                }
+            }
+            self.known_demolishes.push((demolish, index))
+        }
+
+        Ok(())
+    }
+
+    fn build_demolish_info(
+        &self,
+        demolish_fx: &boxcars::DemolishFx,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> ReplayProcessorResult<DemolishInfo> {
+        let attacker = self.get_player_id_from_car_id(&demolish_fx.attacker)?;
+        let victim = self.get_player_id_from_car_id(&demolish_fx.victim)?;
+        Ok(DemolishInfo {
+            time: frame.time,
+            seconds_remaining: self.get_seconds_remaining()?,
+            frame: index,
+            attacker,
+            victim,
+            attacker_velocity: demolish_fx.attack_velocity.clone(),
+            victim_velocity: demolish_fx.victim_velocity.clone(),
+        })
+    }
+
+    fn get_player_id_from_car_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> ReplayProcessorResult<PlayerId> {
+        self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
+    }
+
+    fn get_player_id_from_actor_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> ReplayProcessorResult<PlayerId> {
+        for (player_id, player_actor_id) in self.player_to_actor_id.iter() {
+            if actor_id == player_actor_id {
+                return Ok(player_id.clone());
+            }
+        }
+        Err(format!("{:?} has no matching player id", actor_id,))
+    }
+
+    fn get_player_actor_id_from_car_actor_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
+        for (player_id, car_id) in self.player_to_car.iter() {
+            if actor_id == car_id {
+                return Ok(player_id.clone());
+            }
+        }
+        Err(format!("{:?} has no matching player id", actor_id,))
+    }
+
+    fn demolish_is_known(&self, demolish_fx: &boxcars::DemolishFx, frame_index: usize) -> bool {
+        self.known_demolishes.iter().any(|(existing, index)| {
+            existing == demolish_fx
+                && frame_index
+                    .checked_sub(*index)
+                    .or_else(|| index.checked_sub(frame_index))
+                    .unwrap()
+                    < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+        })
+    }
+
+    fn get_active_demolish_fx(
+        &self,
+    ) -> ReplayProcessorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
+        Ok(self
+            .iter_actors_by_type_err(CAR_TYPE)?
+            .flat_map(|(_actor_id, state)| {
+                get_attribute!(
+                    self,
+                    &state.attributes,
+                    DEMOLISH_GOAL_EXPLOSION_KEY,
+                    boxcars::Attribute::DemolishFx
+                )
+                .ok()
+            }))
     }
 
     // Actor functions
@@ -782,13 +916,14 @@ impl<'a> ReplayProcessor<'a> {
 
     // Properties
 
-    pub fn get_seconds_remaining(&self) -> Result<&i32, String> {
+    pub fn get_seconds_remaining(&self) -> Result<i32, String> {
         get_actor_attribute_matching!(
             self,
             self.get_metadata_actor_id()?,
             SECONDS_REMAINING_KEY,
             boxcars::Attribute::Int
         )
+        .cloned()
     }
 
     pub fn get_ignore_ball_syncing(&self) -> ReplayProcessorResult<bool> {
@@ -922,6 +1057,22 @@ impl<'a> ReplayProcessor<'a> {
                     .ok_or(format!("Couldn't map all attribute keys"))
             })
             .collect()
+    }
+
+    pub fn all_mappings_string(&self) -> String {
+        let pairs = [
+            ("player_to_car", &self.player_to_car),
+            ("player_to_team", &self.player_to_team),
+            ("car_to_boost", &self.car_to_boost),
+            ("car_to_jump", &self.car_to_jump),
+            ("car_to_double_jump", &self.car_to_double_jump),
+            ("car_to_dodge", &self.car_to_dodge),
+        ];
+        let strings: Vec<_> = pairs
+            .iter()
+            .map(|(map_name, map)| format!("{:?}: {:?}", map_name, map))
+            .collect();
+        strings.join("\n")
     }
 
     pub fn actor_state_string(&self, actor_id: &boxcars::ActorId) -> String {
