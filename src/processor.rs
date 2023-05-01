@@ -609,7 +609,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Actor functions
 
-    fn get_object_id_for_key(&self, name: &str) -> Result<&boxcars::ObjectId, String> {
+    fn get_object_id_for_key(&self, name: &str) -> ReplayProcessorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
             .ok_or(format!("Could not get object id for name {:?}", name))
@@ -628,7 +628,7 @@ impl<'a> ReplayProcessor<'a> {
             .unwrap_or_else(|| &EMPTY_ACTOR_IDS)
     }
 
-    fn get_actor_state(&self, actor_id: &boxcars::ActorId) -> Result<&ActorState, String> {
+    fn get_actor_state(&self, actor_id: &boxcars::ActorId) -> ReplayProcessorResult<&ActorState> {
         self.actor_state
             .actor_states
             .get(actor_id)
@@ -639,7 +639,7 @@ impl<'a> ReplayProcessor<'a> {
         &'b self,
         actor_id: &boxcars::ActorId,
         property: &'b str,
-    ) -> Result<&'b boxcars::Attribute, String> {
+    ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
         self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property)
     }
 
@@ -647,7 +647,7 @@ impl<'a> ReplayProcessor<'a> {
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, boxcars::Attribute>,
         property: &'b str,
-    ) -> Result<&'b boxcars::Attribute, String> {
+    ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
         let attribute_object_id = self
             .name_to_object_id
             .get(&property.to_string())
@@ -669,21 +669,27 @@ impl<'a> ReplayProcessor<'a> {
             .next()
     }
 
-    pub fn get_metadata_actor_id(&self) -> Result<&boxcars::ActorId, String> {
+    pub fn get_metadata_actor_id(&self) -> ReplayProcessorResult<&boxcars::ActorId> {
         self.get_actor_ids_by_type(GAME_TYPE)?
             .iter()
             .next()
             .ok_or("No game actor".to_string())
     }
 
-    pub fn get_player_actor_id(&self, player_id: &PlayerId) -> Result<boxcars::ActorId, String> {
+    pub fn get_player_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.player_to_actor_id
             .get(&player_id)
             .ok_or_else(|| format!("Could not find actor for player id {:?}", player_id))
             .cloned()
     }
 
-    pub fn get_car_actor_id(&self, player_id: &PlayerId) -> Result<boxcars::ActorId, String> {
+    pub fn get_car_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.player_to_car
             .get(&self.get_player_actor_id(player_id)?)
             .ok_or_else(|| format!("Car actor for player {:?} not found.", player_id))
@@ -695,28 +701,37 @@ impl<'a> ReplayProcessor<'a> {
         player_id: &PlayerId,
         map: &HashMap<boxcars::ActorId, boxcars::ActorId>,
         name: &str,
-    ) -> Result<boxcars::ActorId, String> {
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         map.get(&self.get_car_actor_id(player_id)?)
             .ok_or_else(|| format!("{} actor for player {:?} not found", name, player_id))
             .cloned()
     }
 
-    pub fn get_boost_actor_id(&self, player_id: &PlayerId) -> Result<boxcars::ActorId, String> {
+    pub fn get_boost_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_boost, "Boost")
     }
 
-    pub fn get_jump_actor_id(&self, player_id: &PlayerId) -> Result<boxcars::ActorId, String> {
+    pub fn get_jump_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_jump, "Jump")
     }
 
     pub fn get_double_jump_actor_id(
         &self,
         player_id: &PlayerId,
-    ) -> Result<boxcars::ActorId, String> {
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_double_jump, "Double Jump")
     }
 
-    pub fn get_dodge_actor_id(&self, player_id: &PlayerId) -> Result<boxcars::ActorId, String> {
+    pub fn get_dodge_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_dodge, "Dodge")
     }
 
@@ -733,7 +748,7 @@ impl<'a> ReplayProcessor<'a> {
     fn iter_actors_by_type_err(
         &self,
         name: &str,
-    ) -> Result<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>, String> {
+    ) -> ReplayProcessorResult<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>> {
         self.iter_actors_by_type(name)
             .ok_or_else(|| format!("Couldn't find object id for {}", name))
     }
@@ -776,7 +791,7 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
-    pub fn get_ignore_ball_syncing(&self) -> Result<bool, String> {
+    pub fn get_ignore_ball_syncing(&self) -> ReplayProcessorResult<bool> {
         self.ball_actor_id
             .ok_or("Ball actor not known".to_string())
             .and_then(|actor_id| {
@@ -790,7 +805,7 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
     }
 
-    pub fn get_ball_rigid_body(&self) -> Result<&boxcars::RigidBody, String> {
+    pub fn get_ball_rigid_body(&self) -> ReplayProcessorResult<&boxcars::RigidBody> {
         self.ball_actor_id
             .ok_or("Ball actor not known".to_string())
             .and_then(|actor_id| {
@@ -803,7 +818,7 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
-    pub fn get_player_name(&self, player_id: &PlayerId) -> Result<String, String> {
+    pub fn get_player_name(&self, player_id: &PlayerId) -> ReplayProcessorResult<String> {
         get_actor_attribute_matching!(
             self,
             &self.get_player_actor_id(player_id)?,
@@ -813,7 +828,7 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_player_team_key(&self, player_id: &PlayerId) -> Result<String, String> {
+    pub fn get_player_team_key(&self, player_id: &PlayerId) -> ReplayProcessorResult<String> {
         let team_actor_id = self
             .player_to_team
             .get(&self.get_player_actor_id(player_id)?)
@@ -828,7 +843,7 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
     }
 
-    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> Result<bool, String> {
+    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> ReplayProcessorResult<bool> {
         Ok(self
             .get_player_team_key(player_id)?
             .chars()
@@ -851,7 +866,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> Result<&f32, String> {
+    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> ReplayProcessorResult<&f32> {
         self.get_boost_actor_id(player_id).and_then(|actor_id| {
             let boost_state = self.get_actor_state(&actor_id)?;
             get_derived_attribute!(
@@ -862,7 +877,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> Result<u8, String> {
+    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> ReplayProcessorResult<u8> {
         get_actor_attribute_matching!(
             self,
             &actor_id,
@@ -872,22 +887,22 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_boost_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+    pub fn get_boost_active(&self, player_id: &PlayerId) -> ReplayProcessorResult<u8> {
         self.get_boost_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_jump_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+    pub fn get_jump_active(&self, player_id: &PlayerId) -> ReplayProcessorResult<u8> {
         self.get_jump_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> ReplayProcessorResult<u8> {
         self.get_double_jump_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_dodge_active(&self, player_id: &PlayerId) -> Result<u8, String> {
+    pub fn get_dodge_active(&self, player_id: &PlayerId) -> ReplayProcessorResult<u8> {
         self.get_dodge_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
@@ -897,17 +912,18 @@ impl<'a> ReplayProcessor<'a> {
     pub fn map_attribute_keys(
         &self,
         hash_map: &HashMap<boxcars::ObjectId, boxcars::Attribute>,
-    ) -> Result<HashMap<String, boxcars::Attribute>, ()> {
+    ) -> ReplayProcessorResult<HashMap<String, boxcars::Attribute>> {
         hash_map
             .iter()
             .map(|(k, v)| {
                 self.object_id_to_name
                     .get(k)
                     .map(|name| (name.clone(), v.clone()))
-                    .ok_or(())
+                    .ok_or(format!("Couldn't map all attribute keys"))
             })
             .collect()
     }
+
     pub fn actor_state_string(&self, actor_id: &boxcars::ActorId) -> String {
         format!(
             "{:?}",
