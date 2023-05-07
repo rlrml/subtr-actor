@@ -280,7 +280,6 @@ impl<'a> ReplayProcessor<'a> {
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
         };
-        // TODO: get rid of unwrap here and change return type to a result
         processor
             .set_player_order_from_headers()
             .or_else(|_| processor.set_player_order_from_frames())?;
