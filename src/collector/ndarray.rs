@@ -601,7 +601,7 @@ macro_rules! _player_feature_adder {
     };
 }
 
-global_feature_adder!(SecondsRemaining, get_seconds_remaining, "seconds remaining",);
+global_feature_adder!(SecondsRemaining, get_seconds_remaining, "seconds remaining");
 
 pub fn get_seconds_remaining<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
@@ -620,9 +620,9 @@ where
 global_feature_adder!(
     BallRigidBody,
     get_ball_rb_properties,
-    "Ball - pos x",
-    "Ball - pos y",
-    "Ball - pos z",
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
     "Ball - rotation x",
     "Ball - rotation y",
     "Ball - rotation z",
@@ -648,9 +648,9 @@ where
 global_feature_adder!(
     BallRigidBodyNoVelocities,
     get_ball_rb_properties_no_velocities,
-    "Ball - pos x",
-    "Ball - pos y",
-    "Ball - pos z",
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
     "Ball - rotation x",
     "Ball - rotation y",
     "Ball - rotation z",
@@ -670,9 +670,9 @@ where
 player_feature_adder!(
     PlayerRigidBody,
     get_player_rb_properties,
-    "pos x",
-    "pos y",
-    "pos z",
+    "position x",
+    "position y",
+    "position z",
     "rotation x",
     "rotation y",
     "rotation z",
@@ -703,9 +703,9 @@ where
 player_feature_adder!(
     PlayerRigidBodyNoVelocities,
     get_player_rb_properties_no_velocities,
-    "pos x",
-    "pos y",
-    "pos z",
+    "position x",
+    "position y",
+    "position z",
     "rotation x",
     "rotation y",
     "rotation z",
