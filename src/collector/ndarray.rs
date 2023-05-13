@@ -796,14 +796,14 @@ pub fn get_any_jump_active<F: TryFrom<f32>>(
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let dodge_is_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 0;
-    let jump_is_active = processor.get_jump_active(player_id).unwrap_or(0) % 2 == 0;
-    let double_jump_is_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2 == 0;
-    let value = if dodge_is_active || jump_is_active || double_jump_is_active {
-        1.0
-    } else {
-        0.0
-    };
+    let dodge_is_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2;
+    let jump_is_active = processor.get_jump_active(player_id).unwrap_or(0) % 2;
+    let double_jump_is_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2;
+    let value: f32 = [dodge_is_active, jump_is_active, double_jump_is_active]
+        .into_iter()
+        .enumerate()
+        .map(|(index, is_active)| (1 << index) * is_active)
+        .sum::<u8>() as f32;
     convert_all!(string_error!("{:?}"), value)
 }
 
