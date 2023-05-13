@@ -826,13 +826,16 @@ where
     let demolisher_index = processor
         .get_active_demolish_fx()?
         .find(|demolish_fx| demolish_fx.victim == car_actor_id)
-        .and_then(|demolish_fx| {
-            let demolisher_id = processor
-                .get_player_id_from_car_id(&demolish_fx.attacker)
-                .ok()?;
+        .map(|demolish_fx| {
             processor
-                .iter_player_ids_in_order()
-                .position(|player_id| player_id == &demolisher_id)
+                .get_player_id_from_car_id(&demolish_fx.attacker)
+                .ok()
+                .and_then(|demolisher_id| {
+                    processor
+                        .iter_player_ids_in_order()
+                        .position(|player_id| player_id == &demolisher_id)
+                })
+                .unwrap_or_else(|| processor.iter_player_ids_in_order().count())
         })
         .and_then(|v| i32::try_from(v).ok())
         .unwrap_or(-1);
