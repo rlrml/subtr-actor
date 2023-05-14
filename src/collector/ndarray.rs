@@ -389,16 +389,16 @@ where
 
 pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
-) -> Result<[F; 6], String>
+) -> Result<[F; 7], String>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     let convert = string_error!("Error in rigid body float conversion {:?}");
     let rotation = rigid_body.rotation;
     let location = rigid_body.location;
-    let (rx, ry, rz) =
-        glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
-    convert_all!(convert, location.x, location.y, location.z, rx, ry, rz)
+    convert_all!(
+        convert, location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
+    )
 }
 
 fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
@@ -425,7 +425,7 @@ where
     )
 }
 
-fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> Result<[F; 6], String>
+fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> Result<[F; 7], String>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -434,6 +434,7 @@ where
         // We use huge values for location instead of 0s so that hopefully any
         // model built on this data can understand that the player is not
         // actually on the field.
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -654,13 +655,14 @@ global_feature_adder!(
     "Ball - rotation x",
     "Ball - rotation y",
     "Ball - rotation z",
+    "Ball - rotation w",
 );
 
 pub fn get_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
     _: usize,
-) -> Result<[F; 6], String>
+) -> Result<[F; 7], String>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -709,6 +711,7 @@ player_feature_adder!(
     "rotation x",
     "rotation y",
     "rotation z",
+    "rotation w"
 );
 
 pub fn get_player_rb_properties_no_velocities<F: TryFrom<f32>>(
@@ -716,7 +719,7 @@ pub fn get_player_rb_properties_no_velocities<F: TryFrom<f32>>(
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
     _: usize,
-) -> Result<[F; 6], String>
+) -> Result<[F; 7], String>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
