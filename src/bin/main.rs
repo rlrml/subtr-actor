@@ -12,7 +12,7 @@ fn main() {
         .parse();
     let replay = parsing.unwrap();
 
-    // println!("{:?}", replay.properties);
+    println!("{:?}", replay.properties);
 
     let mut collector = NDArrayCollector::<f32>::from_strings(
         &["BallRigidBodyNoVelocities"],
@@ -33,14 +33,24 @@ fn main() {
 
     for i in 0..array.shape()[1] {
         println!(
-            "{}: {:?}",
+            "{}: ({:?}) - ({:?})",
             meta.headers_vec()[i],
             array
                 .slice(::ndarray::s![.., i])
                 .iter()
                 .cloned()
                 .map(float_ord::FloatOrd)
+                .min()
+                .unwrap()
+                .0,
+            array
+                .slice(::ndarray::s![.., i])
+                .iter()
+                .cloned()
+                .map(float_ord::FloatOrd)
                 .max()
+                .unwrap()
+                .0
         );
     }
 
