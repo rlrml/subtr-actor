@@ -38,18 +38,24 @@ pub struct ReplayMetaWithHeaders {
 
 impl ReplayMetaWithHeaders {
     pub fn headers_vec(&self) -> Vec<String> {
+        self.headers_vec_from(|_, _info, index| format!("Player {} - ", index))
+    }
+
+    pub fn headers_vec_from<F>(&self, player_prefix_getter: F) -> Vec<String>
+    where
+        F: Fn(&Self, &PlayerInfo, usize) -> String,
+    {
         self.column_headers
             .global_headers
             .iter()
             .cloned()
             .chain(self.replay_meta.player_order().enumerate().flat_map(
                 move |(player_index, info)| {
+                    let player_prefix = player_prefix_getter(self, info, player_index);
                     self.column_headers
                         .player_headers
                         .iter()
-                        .map(move |header| {
-                            format!("Player {} ({}) - {}", player_index, info.name, header)
-                        })
+                        .map(move |header| format!("{}{}", player_prefix, header))
                 },
             ))
             .collect()
