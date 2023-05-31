@@ -25,11 +25,48 @@ fn main() {
     )
     .unwrap();
 
-    FrameRateDecorator::new_from_fps(10.0, &mut collector)
+    FrameRateDecorator::new_from_fps(30.0, &mut collector)
         .process_replay(&replay)
         .unwrap();
 
     let (meta, array) = collector.get_meta_and_ndarray().unwrap();
+
+    let position_columns: Vec<_> = meta
+        .headers_vec()
+        .into_iter()
+        .enumerate()
+        .filter(|(_index, name)| name.contains("position"))
+        .collect();
+
+    println!("{:?}", position_columns);
+
+    let last: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+
+    let mut same_value_frames = 0;
+
+    for frame_index in 0..array.shape()[0] {
+        let mut do_print = false;
+        for (index, _column_name) in position_columns.iter() {
+            let last_value = last.get(&index).unwrap_or(&0.0);
+            let this_value = array.get((frame_index, *index)).unwrap();
+            if this_value == last_value {
+                do_print = true;
+            }
+        }
+        if do_print {
+            print!("{}", frame_index);
+            for (index, _column_name) in position_columns.iter() {
+                print!(" {}", array.get((frame_index, *index)).unwrap());
+            }
+            same_value_frames += 1;
+            println!("");
+        }
+    }
+
+    println!("");
+    println!("Total same value frames: {}", same_value_frames);
+
+    println!("Total frames {}", array.shape()[0]);
 
     for i in 0..array.shape()[1] {
         println!(
