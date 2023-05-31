@@ -41,7 +41,7 @@ pub static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 100;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
-    pub attributes: HashMap<boxcars::ObjectId, boxcars::Attribute>,
+    pub attributes: HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
     pub derived_attributes: HashMap<String, boxcars::Attribute>,
     pub object_id: boxcars::ObjectId,
     pub name_id: Option<i32>,
@@ -60,9 +60,10 @@ impl ActorState {
     fn update_attribute(
         &mut self,
         update: &boxcars::UpdatedAttribute,
-    ) -> Option<boxcars::Attribute> {
+        frame_index: usize,
+    ) -> Option<(boxcars::Attribute, usize)> {
         self.attributes
-            .insert(update.object_id, update.attribute.clone())
+            .insert(update.object_id, (update.attribute.clone(), frame_index))
     }
 }
 
@@ -79,7 +80,11 @@ impl ActorStateModeler {
         }
     }
 
-    fn process_frame(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
+    fn process_frame(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> ReplayProcessorResult<()> {
         if let Some(err) = frame
             .deleted_actors
             .iter()
@@ -99,7 +104,7 @@ impl ActorStateModeler {
         if let Some(err) = frame
             .updated_actors
             .iter()
-            .map(|u| self.update_attribute(u))
+            .map(|u| self.update_attribute(u, frame_index))
             .find(|r| r.is_err())
         {
             return err.map(|_| ());
@@ -129,10 +134,11 @@ impl ActorStateModeler {
     fn update_attribute(
         &mut self,
         update: &boxcars::UpdatedAttribute,
-    ) -> Result<Option<boxcars::Attribute>, String> {
+        frame_index: usize,
+    ) -> Result<Option<(boxcars::Attribute, usize)>, String> {
         self.actor_states
             .get_mut(&update.actor_id)
-            .map(|state| state.update_attribute(update))
+            .map(|state| state.update_attribute(update, frame_index))
             .ok_or_else(|| format!("Unable to find actor associated with update {:?}", update))
     }
 
@@ -192,6 +198,21 @@ macro_rules! get_attribute_errors_expected {
         $self
             .get_attribute($map, $prop, false)
             .and_then(|found| attribute_match!(found, $type, "".to_string()))
+    };
+}
+
+macro_rules! get_attribute_and_updated {
+    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+        $self
+            .get_attribute_and_updated($map, $prop)
+            .and_then(|(found, updated)| {
+                attribute_match!(
+                    found,
+                    $type,
+                    format!("Value for {:?} not of the expected type, {:?}", $prop, $map)
+                )
+                .map(|v| (v, updated))
+            })
     };
 }
 
@@ -373,7 +394,7 @@ impl<'a> ReplayProcessor<'a> {
             .iter()
             .enumerate()
         {
-            self.actor_state.process_frame(frame)?;
+            self.actor_state.process_frame(frame, index)?;
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame)?;
@@ -780,10 +801,18 @@ impl<'a> ReplayProcessor<'a> {
 
     fn get_attribute<'b>(
         &'b self,
-        map: &'b HashMap<boxcars::ObjectId, boxcars::Attribute>,
+        map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'b str,
         log_attribute_map_on_error: bool,
     ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
+        self.get_attribute_and_updated(map, property).map(|v| &v.0)
+    }
+
+    fn get_attribute_and_updated<'b>(
+        &'b self,
+        map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
+        property: &'b str,
+    ) -> ReplayProcessorResult<&'b (boxcars::Attribute, usize)> {
         let attribute_object_id = self
             .name_to_object_id
             .get(&property.to_string())
@@ -1000,14 +1029,62 @@ impl<'a> ReplayProcessor<'a> {
             == '0')
     }
 
+    fn get_frame(&self, frame_index: usize) -> ReplayProcessorResult<&boxcars::Frame> {
+        self.replay
+            .network_frames
+            .as_ref()
+            .ok_or("Replay has no network frames")?
+            .frames
+            .get(frame_index)
+            .ok_or("Frame index out of bounds".to_string())
+    }
+
+    fn interpolated_rigid_body(
+        &self,
+        rigid_body: &boxcars::RigidBody,
+        rb_frame_index: usize,
+        target_time: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let rb_frame = self.get_frame(rb_frame_index)?;
+        let interpolation_amount = target_time - rb_frame.time;
+        Ok(apply_velocities_to_rigid_body(
+            rigid_body,
+            interpolation_amount,
+        ))
+    }
+
+    pub fn get_interpolated_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        target_time: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let (current_rigid_body, frame_index) =
+            self.get_player_rigid_body_and_updated(player_id)?;
+        self.interpolated_rigid_body(&current_rigid_body, *frame_index, target_time)
+    }
+
     pub fn get_player_rigid_body(
         &self,
         player_id: &PlayerId,
-    ) -> Result<&boxcars::RigidBody, String> {
+    ) -> ReplayProcessorResult<&boxcars::RigidBody> {
         self.get_car_actor_id(player_id).and_then(|actor_id| {
             get_actor_attribute_matching!(
                 self,
                 &actor_id,
+                RIGID_BODY_STATE_KEY,
+                boxcars::Attribute::RigidBody
+            )
+        })
+    }
+
+    pub fn get_player_rigid_body_and_updated(
+        &self,
+        player_id: &PlayerId,
+    ) -> ReplayProcessorResult<(&boxcars::RigidBody, &usize)> {
+        self.get_car_actor_id(player_id).and_then(|actor_id| {
+            get_attribute_and_updated!(
+                self,
+                &self.get_actor_state(&actor_id)?.attributes,
                 RIGID_BODY_STATE_KEY,
                 boxcars::Attribute::RigidBody
             )
@@ -1059,11 +1136,11 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn map_attribute_keys(
         &self,
-        hash_map: &HashMap<boxcars::ObjectId, boxcars::Attribute>,
+        hash_map: &HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
     ) -> ReplayProcessorResult<HashMap<String, boxcars::Attribute>> {
         hash_map
             .iter()
-            .map(|(k, v)| {
+            .map(|(k, (v, _updated))| {
                 self.object_id_to_name
                     .get(k)
                     .map(|name| (name.clone(), v.clone()))

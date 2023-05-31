@@ -736,6 +736,34 @@ where
     }
 }
 
+player_feature_adder!(
+    InterpolatedPlayerRigidBodyNoVelocities,
+    get_interpolated_player_rb_properties_no_velocities,
+    "interpolated position x",
+    "interpolated position y",
+    "interpolated position z",
+    "interpolated rotation x",
+    "interpolated rotation y",
+    "interpolated rotation z",
+    "interpolated rotation w"
+);
+
+pub fn get_interpolated_player_rb_properties_no_velocities<F: TryFrom<f32>>(
+    player_id: &PlayerId,
+    processor: &ReplayProcessor,
+    frame: &boxcars::Frame,
+    _: usize,
+) -> Result<[F; 7], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    if let Ok(rb) = processor.get_interpolated_player_rigid_body(player_id, frame.time) {
+        get_rigid_body_properties_no_velocities(&rb)
+    } else {
+        default_rb_state_no_velocities()
+    }
+}
+
 player_feature_adder!(PlayerBoost, get_player_boost_level, "boost level");
 
 pub fn get_player_boost_level<F: TryFrom<f32>>(
@@ -882,6 +910,7 @@ lazy_static! {
         }
         insert_adder!(PlayerRigidBody);
         insert_adder!(PlayerRigidBodyNoVelocities);
+        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities);
         insert_adder!(PlayerBoost);
         insert_adder!(PlayerJump);
         insert_adder!(PlayerAnyJump);

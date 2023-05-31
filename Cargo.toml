@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-boxcars = { git = "https://github.com/IvanMalison/boxcars.git" }
+boxcars = "0.9.9"
 float-ord = "0.3.2"
 glam = "0.23.0"
 lazy_static = "1.4.0"

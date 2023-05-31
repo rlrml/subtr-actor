@@ -17,6 +17,7 @@ fn main() {
     let mut collector = NDArrayCollector::<f32>::from_strings(
         &["BallRigidBodyNoVelocities"],
         &[
+            "InterpolatedPlayerRigidBodyNoVelocities",
             "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
@@ -36,6 +37,7 @@ fn main() {
         .into_iter()
         .enumerate()
         .filter(|(_index, name)| name.contains("position"))
+        .filter(|(_index, name)| name.contains("Player 4"))
         .collect();
 
     println!("{:?}", position_columns);
@@ -57,11 +59,15 @@ fn main() {
                 last.insert(*index, (*this_value, 1));
             }
         }
-        if !same_as_last.is_empty() {
+        if true {
             println!("{:?}", same_as_last);
-            print!("{}", frame_index);
-            for (index, _column_name) in position_columns.iter() {
-                print!(" {}", array.get((frame_index, *index)).unwrap());
+            println!("{}", frame_index);
+            for (index, column_name) in position_columns.iter() {
+                println!(
+                    "{}: {}",
+                    column_name,
+                    array.get((frame_index, *index)).unwrap()
+                );
             }
             same_value_frames += 1;
             println!("");
