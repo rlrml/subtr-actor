@@ -1112,4 +1112,13 @@ impl<'a> ReplayProcessor<'a> {
             .collect();
         println!("{:?}", types);
     }
+
+    pub fn print_all_actors(&self) {
+        self.actor_state
+            .actor_states
+            .iter()
+            .for_each(|(actor_id, _actor_state)| {
+                println!("{:?}", self.actor_state_string(actor_id))
+            })
+    }
 }
