@@ -133,17 +133,14 @@ impl ActorStateModeler {
         self.actor_states
             .get_mut(&update.actor_id)
             .map(|state| state.update_attribute(update))
-            .ok_or(format!(
-                "Unable to find actor associated with update {:?}",
-                update
-            ))
+            .ok_or_else(|| format!("Unable to find actor associated with update {:?}", update))
     }
 
     fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> Result<ActorState, String> {
         let state = self
             .actor_states
             .remove(actor_id)
-            .ok_or(format!("Unabled to delete actor id {:?}", actor_id))?;
+            .ok_or_else(|| format!("Unabled to delete actor id {:?}", actor_id))?;
 
         self.actor_ids_by_type
             .entry(state.object_id)
@@ -180,11 +177,23 @@ macro_rules! attribute_match {
 
 macro_rules! get_attribute {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
-        $self.get_attribute($map, $prop).and_then(|found| {
+        $self.get_attribute($map, $prop, true).and_then(|found| {
             attribute_match!(
                 found,
                 $type,
                 format!("Value for {:?} not of the expected type, {:?}", $prop, $map)
+            )
+        })
+    };
+}
+
+macro_rules! get_attribute_errors_expected {
+    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+        $self.get_attribute($map, $prop, false).and_then(|found| {
+            attribute_match!(
+                found,
+                $type,
+                format!("Value for {:?} not of the expected type", $prop)
             )
         })
     };
@@ -208,7 +217,7 @@ macro_rules! get_actor_attribute_matching {
 macro_rules! get_derived_attribute {
     ($map:expr, $key:expr, $type:path) => {
         $map.get($key)
-            .ok_or(format!("No value for key: {:?}", $key))
+            .ok_or_else(|| format!("No value for key: {:?}", $key))
             .and_then(|found| {
                 attribute_match!(
                     found,
@@ -650,13 +659,8 @@ impl<'a> ReplayProcessor<'a> {
         for demolish in new_demolishes {
             match self.build_demolish_info(&demolish, frame, index) {
                 Ok(demolish_info) => self.demolishes.push(demolish_info),
-                Err(e) => {
-                    log::warn!(
-                        "Error building demolish info {:?}, {:?}, {:?}",
-                        demolish,
-                        index,
-                        e
-                    );
+                Err(_e) => {
+                    log::warn!("Error building demolish info");
                 }
             }
             self.known_demolishes.push((demolish, index))
@@ -732,7 +736,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(self
             .iter_actors_by_type_err(CAR_TYPE)?
             .flat_map(|(_actor_id, state)| {
-                get_attribute!(
+                get_attribute_errors_expected!(
                     self,
                     &state.attributes,
                     DEMOLISH_GOAL_EXPLOSION_KEY,
@@ -747,7 +751,7 @@ impl<'a> ReplayProcessor<'a> {
     fn get_object_id_for_key(&self, name: &str) -> ReplayProcessorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
-            .ok_or(format!("Could not get object id for name {:?}", name))
+            .ok_or_else(|| format!("Could not get object id for name {:?}", name))
     }
 
     fn get_actor_ids_by_type(&self, name: &str) -> Result<&[boxcars::ActorId], String> {
@@ -767,7 +771,7 @@ impl<'a> ReplayProcessor<'a> {
         self.actor_state
             .actor_states
             .get(actor_id)
-            .ok_or(format!("Actor id, {:?} not found", actor_id))
+            .ok_or_else(|| format!("Actor id, {:?} not found", actor_id))
     }
 
     fn get_actor_attribute<'b>(
@@ -775,24 +779,34 @@ impl<'a> ReplayProcessor<'a> {
         actor_id: &boxcars::ActorId,
         property: &'b str,
     ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
-        self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property)
+        self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property, false)
     }
 
     fn get_attribute<'b>(
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, boxcars::Attribute>,
         property: &'b str,
+        log_attribute_map_on_error: bool,
     ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
         let attribute_object_id = self
             .name_to_object_id
             .get(&property.to_string())
-            .ok_or(format!("Could not find object_id for {:?}", property))?;
-        map.get(attribute_object_id).ok_or(format!(
-            "Could not find {:?} with object id {:?} on {:?}",
-            property,
-            attribute_object_id,
-            self.map_attribute_keys(map)
-        ))
+            .ok_or_else(|| format!("Could not find object_id for {:?}", property))?;
+        map.get(attribute_object_id).ok_or_else(|| {
+            if log_attribute_map_on_error {
+                format!(
+                    "Could not find {:?} with object id {:?} on {:?}",
+                    property,
+                    attribute_object_id,
+                    self.map_attribute_keys(map)
+                )
+            } else {
+                format!(
+                    "Could not find {:?} with object id {:?}",
+                    property, attribute_object_id
+                )
+            }
+        })
     }
 
     fn find_ball_actor(&self) -> Option<boxcars::ActorId> {
@@ -808,7 +822,7 @@ impl<'a> ReplayProcessor<'a> {
         self.get_actor_ids_by_type(GAME_TYPE)?
             .iter()
             .next()
-            .ok_or("No game actor".to_string())
+            .ok_or_else(|| "No game actor".to_string())
     }
 
     pub fn get_player_actor_id(
@@ -968,14 +982,16 @@ impl<'a> ReplayProcessor<'a> {
         let team_actor_id = self
             .player_to_team
             .get(&self.get_player_actor_id(player_id)?)
-            .ok_or(format!("Player team unknown, {:?}", player_id))?;
+            .ok_or_else(|| format!("Player team unknown, {:?}", player_id))?;
         let state = self.get_actor_state(team_actor_id)?;
         self.object_id_to_name
             .get(&state.object_id)
-            .ok_or(format!(
-                "Team object id not known {:?}, for player {:?}",
-                state.object_id, player_id
-            ))
+            .ok_or_else(|| {
+                format!(
+                    "Team object id not known {:?}, for player {:?}",
+                    state.object_id, player_id
+                )
+            })
             .cloned()
     }
 
@@ -984,7 +1000,7 @@ impl<'a> ReplayProcessor<'a> {
             .get_player_team_key(player_id)?
             .chars()
             .last()
-            .ok_or(format!("Team name was empty for {:?}", player_id))?
+            .ok_or_else(|| format!("Team name was empty for {:?}", player_id))?
             == '0')
     }
 
@@ -1055,7 +1071,7 @@ impl<'a> ReplayProcessor<'a> {
                 self.object_id_to_name
                     .get(k)
                     .map(|name| (name.clone(), v.clone()))
-                    .ok_or(format!("Couldn't map all attribute keys"))
+                    .ok_or_else(|| format!("Couldn't map all attribute keys"))
             })
             .collect()
     }
