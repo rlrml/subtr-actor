@@ -40,20 +40,25 @@ fn main() {
 
     println!("{:?}", position_columns);
 
-    let last: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+    let mut last: std::collections::HashMap<usize, (f32, usize)> = std::collections::HashMap::new();
 
     let mut same_value_frames = 0;
 
     for frame_index in 0..array.shape()[0] {
-        let mut do_print = false;
-        for (index, _column_name) in position_columns.iter() {
-            let last_value = last.get(&index).unwrap_or(&0.0);
+        let mut same_as_last = Vec::new();
+        for (index, column_name) in position_columns.iter() {
+            let (last_value, same_count) = last.get(&index).unwrap_or(&(0.0, 1));
             let this_value = array.get((frame_index, *index)).unwrap();
             if this_value == last_value {
-                do_print = true;
+                let new_count = same_count + 1;
+                same_as_last.push((column_name, new_count));
+                last.insert(*index, (*last_value, same_count + 1));
+            } else {
+                last.insert(*index, (*this_value, 1));
             }
         }
-        if do_print {
+        if !same_as_last.is_empty() {
+            println!("{:?}", same_as_last);
             print!("{}", frame_index);
             for (index, _column_name) in position_columns.iter() {
                 print!(" {}", array.get((frame_index, *index)).unwrap());
