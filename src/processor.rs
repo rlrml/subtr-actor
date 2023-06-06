@@ -189,13 +189,9 @@ macro_rules! get_attribute {
 
 macro_rules! get_attribute_errors_expected {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
-        $self.get_attribute($map, $prop, false).and_then(|found| {
-            attribute_match!(
-                found,
-                $type,
-                format!("Value for {:?} not of the expected type", $prop)
-            )
-        })
+        $self
+            .get_attribute($map, $prop, false)
+            .and_then(|found| attribute_match!(found, $type, "".to_string()))
     };
 }
 
@@ -591,7 +587,7 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     fn get_current_boost_values(&self, actor_state: &ActorState) -> (u8, u8, u8, f32, bool) {
-        let amount_value = get_attribute!(
+        let amount_value = get_attribute_errors_expected!(
             self,
             &actor_state.attributes,
             BOOST_AMOUNT_KEY,
@@ -599,7 +595,7 @@ impl<'a> ReplayProcessor<'a> {
         )
         .cloned()
         .unwrap_or(0);
-        let active_value = get_attribute!(
+        let active_value = get_attribute_errors_expected!(
             self,
             &actor_state.attributes,
             COMPONENT_ACTIVE_KEY,
@@ -802,7 +798,7 @@ impl<'a> ReplayProcessor<'a> {
                 )
             } else {
                 format!(
-                    "Could not find {:?} with object id {:?}",
+                    "Could not find {} with object id {}",
                     property, attribute_object_id
                 )
             }

@@ -822,28 +822,28 @@ player_feature_adder!(
     "player demolished by"
 );
 
+const DEMOLISH_APPEARANCE_FRAME_COUNT: usize = 30;
+
 pub fn get_player_demolished_by<F: TryFrom<f32>>(
     player_id: &PlayerId,
     processor: &ReplayProcessor,
     _frame: &boxcars::Frame,
-    _frame_number: usize,
+    frame_number: usize,
 ) -> Result<[F; 1], String>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let car_actor_id = processor.get_car_actor_id(player_id)?;
     let demolisher_index = processor
-        .get_active_demolish_fx()?
-        .find(|demolish_fx| demolish_fx.victim == car_actor_id)
-        .map(|demolish_fx| {
+        .demolishes
+        .iter()
+        .find(|demolish_info| {
+            &demolish_info.victim == player_id
+                && frame_number - demolish_info.frame < DEMOLISH_APPEARANCE_FRAME_COUNT
+        })
+        .map(|demolish_info| {
             processor
-                .get_player_id_from_car_id(&demolish_fx.attacker)
-                .ok()
-                .and_then(|demolisher_id| {
-                    processor
-                        .iter_player_ids_in_order()
-                        .position(|player_id| player_id == &demolisher_id)
-                })
+                .iter_player_ids_in_order()
+                .position(|player_id| player_id == &demolish_info.attacker)
                 .unwrap_or_else(|| processor.iter_player_ids_in_order().count())
         })
         .and_then(|v| i32::try_from(v).ok())
