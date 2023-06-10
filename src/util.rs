@@ -223,7 +223,7 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
     }
 }
 
-pub fn require_ball_rigid_body_exists(
+pub fn ball_rigid_body_exists(
     processor: &ReplayProcessor,
     _f: &boxcars::Frame,
     _: usize,

@@ -1,7 +1,7 @@
 use boxcars;
 use serde::Serialize;
 
-use crate::{processor::*, Collector, ReplayMeta, VecMapEntry};
+use crate::{processor::*, Collector, ReplayMeta, TimeAdvance, VecMapEntry};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BallFrame {
@@ -245,12 +245,13 @@ impl Collector for ReplayDataCollector {
         processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         _frame_number: usize,
-    ) -> ReplayProcessorResult<()> {
+        _current_time: f32,
+    ) -> ReplayProcessorResult<TimeAdvance> {
         let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
         let ball_frame = BallFrame::new_from_processor(processor);
         let player_frames = self.get_player_frames(processor)?;
         self.frame_data
             .add_frame(metadata_frame, ball_frame, player_frames)?;
-        Ok(())
+        Ok(TimeAdvance::NextFrame)
     }
 }

@@ -338,12 +338,12 @@ impl<'a> ReplayProcessor<'a> {
 
     pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> ReplayProcessorResult<()> {
         let error_string = "10 seconds is enough".to_string();
-        let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize| {
+        let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
             if n > 10 * 30 {
                 Err(error_string.clone())
             } else {
-                Ok(())
+                Ok(TimeAdvance::NextFrame)
             }
         };
         let process_err = self.process(&mut handler).err();
@@ -385,6 +385,9 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     pub fn process<H: Collector>(&mut self, handler: &mut H) -> ReplayProcessorResult<()> {
+        // Initially, we set target_time to NextFrame to ensure the collector
+        // will process the first frame.
+        let mut target_time = TimeAdvance::NextFrame;
         for (index, frame) in self
             .replay
             .network_frames
@@ -394,12 +397,35 @@ impl<'a> ReplayProcessor<'a> {
             .iter()
             .enumerate()
         {
+            // Update the internal state of the processor based on the current frame
             self.actor_state.process_frame(frame, index)?;
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
             self.update_demolishes(frame, index)?;
-            handler.process_frame(&self, frame, index)?;
+
+            // Get the time to process for this frame. If target_time is set to
+            // NextFrame, we use the time of the current frame.
+            let mut current_time = match &target_time {
+                TimeAdvance::Time(t) => *t,
+                TimeAdvance::NextFrame => frame.time,
+            };
+
+            while current_time <= frame.time {
+                // Call the handler to process the frame and get the time for
+                // the next frame the handler wants to process
+                target_time = handler.process_frame(&self, frame, index, current_time)?;
+                // If the handler specified a specific time, update current_time
+                // to that time. If the handler specified NextFrame, we break
+                // out of the loop to move on to the next frame in the replay.
+                // This design allows the handler to have control over the frame
+                // rate, including the possibility of skipping frames.
+                if let TimeAdvance::Time(new_target) = target_time {
+                    current_time = new_target;
+                } else {
+                    break;
+                }
+            }
         }
         // Make sure that we didn't encounter any players we did not know about
         // at the beggining of the replay.
