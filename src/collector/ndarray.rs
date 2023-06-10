@@ -675,6 +675,31 @@ where
     get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
 }
 
+global_feature_adder!(
+    VelocityAddedBallRigidBodyNoVelocities,
+    get_interpolated_ball_rb_properties_no_velocities,
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
+    "Ball - rotation x",
+    "Ball - rotation y",
+    "Ball - rotation z",
+    "Ball - rotation w",
+);
+
+pub fn get_interpolated_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
+    processor: &ReplayProcessor,
+    frame: &boxcars::Frame,
+    _: usize,
+) -> Result<[F; 7], String>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    get_rigid_body_properties_no_velocities(
+        &processor.get_velocity_applied_ball_rigid_body(frame.time)?,
+    )
+}
+
 player_feature_adder!(
     PlayerRigidBody,
     get_player_rb_properties,
@@ -737,18 +762,18 @@ where
 }
 
 player_feature_adder!(
-    InterpolatedPlayerRigidBodyNoVelocities,
-    get_interpolated_player_rb_properties_no_velocities,
-    "interpolated position x",
-    "interpolated position y",
-    "interpolated position z",
-    "interpolated rotation x",
-    "interpolated rotation y",
-    "interpolated rotation z",
-    "interpolated rotation w"
+    VelocityAddedPlayerRigidBodyNoVelocities,
+    get_velocity_added_player_rb_properties_no_velocities,
+    "position x",
+    "position y",
+    "position z",
+    "va rotation x",
+    "va rotation y",
+    "va rotation z",
+    "va rotation w"
 );
 
-pub fn get_interpolated_player_rb_properties_no_velocities<F: TryFrom<f32>>(
+pub fn get_velocity_added_player_rb_properties_no_velocities<F: TryFrom<f32>>(
     player_id: &PlayerId,
     processor: &ReplayProcessor,
     frame: &boxcars::Frame,
@@ -757,7 +782,7 @@ pub fn get_interpolated_player_rb_properties_no_velocities<F: TryFrom<f32>>(
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    if let Ok(rb) = processor.get_interpolated_player_rigid_body(player_id, frame.time) {
+    if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, frame.time) {
         get_rigid_body_properties_no_velocities(&rb)
     } else {
         default_rb_state_no_velocities()
@@ -777,10 +802,7 @@ where
 {
     convert_all!(
         string_error!("{:?}"),
-        processor
-            .get_player_boost_level(player_id)
-            .cloned()
-            .unwrap_or(0.0)
+        processor.get_player_boost_level(player_id).unwrap_or(0.0)
     )
 }
 
@@ -892,6 +914,7 @@ lazy_static! {
         }
         insert_adder!(BallRigidBody);
         insert_adder!(BallRigidBodyNoVelocities);
+        insert_adder!(VelocityAddedBallRigidBodyNoVelocities);
         insert_adder!(SecondsRemaining);
         m
     };
@@ -910,7 +933,7 @@ lazy_static! {
         }
         insert_adder!(PlayerRigidBody);
         insert_adder!(PlayerRigidBodyNoVelocities);
-        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities);
+        insert_adder!(VelocityAddedPlayerRigidBodyNoVelocities);
         insert_adder!(PlayerBoost);
         insert_adder!(PlayerJump);
         insert_adder!(PlayerAnyJump);

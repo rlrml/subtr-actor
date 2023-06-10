@@ -59,14 +59,3 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
         Ok(())
     }
 }
-
-pub fn require_ball_rigid_body_exists(
-    processor: &ReplayProcessor,
-    _f: &boxcars::Frame,
-    _: usize,
-) -> Result<bool, String> {
-    Ok(processor
-        .get_ball_rigid_body()
-        .map(|rb| !rb.sleeping)
-        .unwrap_or(false))
-}

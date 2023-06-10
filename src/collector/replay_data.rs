@@ -63,7 +63,7 @@ impl PlayerFrame {
 
         Ok(Self::from_data(
             rigid_body,
-            *boost_amount,
+            boost_amount,
             boost_active,
             jump_active,
             double_jump_active,

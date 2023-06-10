@@ -42,7 +42,7 @@ pub static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 100;
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
     pub attributes: HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
-    pub derived_attributes: HashMap<String, boxcars::Attribute>,
+    pub derived_attributes: HashMap<String, (boxcars::Attribute, usize)>,
     pub object_id: boxcars::ObjectId,
     pub name_id: Option<i32>,
 }
@@ -237,7 +237,7 @@ macro_rules! get_derived_attribute {
             .ok_or_else(|| format!("No value for key: {:?}", $key))
             .and_then(|found| {
                 attribute_match!(
-                    found,
+                    found.0,
                     $type,
                     format!("Value for {:?} not of the expected type, {:?}", $key, $map)
                 )
@@ -397,7 +397,7 @@ impl<'a> ReplayProcessor<'a> {
             self.actor_state.process_frame(frame, index)?;
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
-            self.update_boost_amounts(frame)?;
+            self.update_boost_amounts(frame, index)?;
             self.update_demolishes(frame, index)?;
             handler.process_frame(&self, frame, index)?;
         }
@@ -565,7 +565,11 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn update_boost_amounts(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
+    fn update_boost_amounts(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> ReplayProcessorResult<()> {
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
@@ -597,11 +601,11 @@ impl<'a> ReplayProcessor<'a> {
 
             derived_attributes.insert(
                 LAST_BOOST_AMOUNT_KEY.to_string(),
-                boxcars::Attribute::Byte(new_last_value),
+                (boxcars::Attribute::Byte(new_last_value), frame_index),
             );
             derived_attributes.insert(
                 BOOST_AMOUNT_KEY.to_string(),
-                boxcars::Attribute::Float(current_value),
+                (boxcars::Attribute::Float(current_value), frame_index),
             );
         }
         Ok(())
@@ -632,7 +636,7 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
             .and_then(|v| {
                 attribute_match!(
-                    v,
+                    v.0,
                     boxcars::Attribute::Float,
                     "Expected bool for derived value"
                 )
@@ -643,6 +647,7 @@ impl<'a> ReplayProcessor<'a> {
                 .derived_attributes
                 .get(&LAST_BOOST_AMOUNT_KEY.to_string())
                 .cloned()
+                .map(|v| v.0)
                 .unwrap_or_else(|| boxcars::Attribute::Byte(amount_value)),
             boxcars::Attribute::Byte,
             "Expected byte value"
@@ -993,6 +998,29 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    pub fn get_ball_rigid_body_and_updated(
+        &self,
+    ) -> ReplayProcessorResult<(&boxcars::RigidBody, &usize)> {
+        self.ball_actor_id
+            .ok_or("Ball actor not known".to_string())
+            .and_then(|actor_id| {
+                get_attribute_and_updated!(
+                    self,
+                    &self.get_actor_state(&actor_id)?.attributes,
+                    RIGID_BODY_STATE_KEY,
+                    boxcars::Attribute::RigidBody
+                )
+            })
+    }
+
+    pub fn get_velocity_applied_ball_rigid_body(
+        &self,
+        target_time: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let (current_rigid_body, frame_index) = self.get_ball_rigid_body_and_updated()?;
+        self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
+    }
+
     pub fn get_player_name(&self, player_id: &PlayerId) -> ReplayProcessorResult<String> {
         get_actor_attribute_matching!(
             self,
@@ -1039,7 +1067,7 @@ impl<'a> ReplayProcessor<'a> {
             .ok_or("Frame index out of bounds".to_string())
     }
 
-    fn interpolated_rigid_body(
+    fn velocities_applied_rigid_body(
         &self,
         rigid_body: &boxcars::RigidBody,
         rb_frame_index: usize,
@@ -1051,16 +1079,6 @@ impl<'a> ReplayProcessor<'a> {
             rigid_body,
             interpolation_amount,
         ))
-    }
-
-    pub fn get_interpolated_player_rigid_body(
-        &self,
-        player_id: &PlayerId,
-        target_time: f32,
-    ) -> ReplayProcessorResult<boxcars::RigidBody> {
-        let (current_rigid_body, frame_index) =
-            self.get_player_rigid_body_and_updated(player_id)?;
-        self.interpolated_rigid_body(&current_rigid_body, *frame_index, target_time)
     }
 
     pub fn get_player_rigid_body(
@@ -1091,7 +1109,17 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> ReplayProcessorResult<&f32> {
+    pub fn get_velocity_applied_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        target_time: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let (current_rigid_body, frame_index) =
+            self.get_player_rigid_body_and_updated(player_id)?;
+        self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
+    }
+
+    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> ReplayProcessorResult<f32> {
         self.get_boost_actor_id(player_id).and_then(|actor_id| {
             let boost_state = self.get_actor_state(&actor_id)?;
             get_derived_attribute!(
