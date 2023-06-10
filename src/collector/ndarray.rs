@@ -542,6 +542,33 @@ macro_rules! count_exprs {
     ($val:expr $(, $vals:expr)*) => {1usize + count_exprs!($($vals),*)};
 }
 
+#[macro_export]
+macro_rules! build_global_feature_adder {
+    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+
+        #[derive(new)]
+        pub struct $struct_name<F> {
+            _zero: std::marker::PhantomData<F>,
+        }
+
+        impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            pub fn arc_new() -> Arc<dyn FeatureAdder<F> + Send + Sync + 'static> {
+                Arc::new(Self::new())
+            }
+        }
+
+        _global_feature_adder!(
+            {count_exprs!($( $column_names ),*)},
+            $struct_name,
+            $prop_getter,
+            $( $column_names ),*
+        );
+    }
+}
+
+#[macro_export]
 macro_rules! global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         _global_feature_adder!(
@@ -555,24 +582,6 @@ macro_rules! global_feature_adder {
 
 macro_rules! _global_feature_adder {
     ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        pub struct $struct_name<F> {
-            _zero: std::marker::PhantomData<F>,
-        }
-
-        impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug,
-        {
-            pub fn new() -> Self {
-                Self {
-                    _zero: std::marker::PhantomData
-                }
-            }
-
-            pub fn arc_new() -> Arc<dyn FeatureAdder<F> + Send + Sync + 'static> {
-                Arc::new(Self::new())
-            }
-        }
-
         paste::paste! {
             pub static [<$struct_name:snake:upper _COLUMN_NAMES>]: [&str; count_exprs!($( $column_names ),*)] = [
                 $( $column_names ),*
@@ -594,7 +603,7 @@ macro_rules! _global_feature_adder {
                 frame_count: usize,
                 current_time: f32,
             ) -> Result<[F; $count], String> {
-                $prop_getter(processor, frame, frame_count, current_time)
+                $prop_getter(self, processor, frame, frame_count, current_time)
             }
         }
 
@@ -602,19 +611,9 @@ macro_rules! _global_feature_adder {
     };
 }
 
-macro_rules! player_feature_adder {
+#[macro_export]
+macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        _player_feature_adder!(
-            {count_exprs!($( $column_names ),*)},
-            $struct_name,
-            $prop_getter,
-            $( $column_names ),*
-        );
-    }
-}
-
-macro_rules! _player_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -633,6 +632,29 @@ macro_rules! _player_feature_adder {
             }
         }
 
+        _player_feature_adder!(
+            {count_exprs!($( $column_names ),*)},
+            $struct_name,
+            $prop_getter,
+            $( $column_names ),*
+        );
+    }
+}
+
+#[macro_export]
+macro_rules! player_feature_adder {
+    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+        _player_feature_adder!(
+            {count_exprs!($( $column_names ),*)},
+            $struct_name,
+            $prop_getter,
+            $( $column_names ),*
+        );
+    }
+}
+
+macro_rules! _player_feature_adder {
+    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         paste::paste! {
             pub static  [<$struct_name:snake:upper _COLUMN_NAMES>] : [&str; count_exprs!($( $column_names ),*)] = [
                 $( $column_names ),*
@@ -655,7 +677,7 @@ macro_rules! _player_feature_adder {
                 frame_count: usize,
                 current_time: f32,
             ) -> Result<[F; $count], String> {
-                $prop_getter(player_id, processor, frame, frame_count, current_time)
+                $prop_getter(self, player_id, processor, frame, frame_count, current_time)
             }
         }
 
@@ -663,9 +685,9 @@ macro_rules! _player_feature_adder {
     };
 }
 
-global_feature_adder!(
+build_global_feature_adder!(
     SecondsRemaining,
-    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
         convert_all!(
             string_error!("{:?}"),
             processor.get_seconds_remaining()?.clone() as f32
@@ -674,17 +696,17 @@ global_feature_adder!(
     "seconds remaining"
 );
 
-global_feature_adder!(
+build_global_feature_adder!(
     CurrentTime,
-    |_processor, _frame, _index, current_time: f32| {
+    |_, _processor, _frame, _index, current_time: f32| {
         convert_all!(string_error!("{:?}"), current_time)
     },
     "current_time"
 );
 
-global_feature_adder!(
+build_global_feature_adder!(
     BallRigidBody,
-    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
         get_rigid_body_properties(processor.get_ball_rigid_body()?)
     },
     "Ball - position x",
@@ -701,9 +723,9 @@ global_feature_adder!(
     "Ball - angular velocity z",
 );
 
-global_feature_adder!(
+build_global_feature_adder!(
     BallRigidBodyNoVelocities,
-    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
         get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
     },
     "Ball - position x",
@@ -717,9 +739,9 @@ global_feature_adder!(
 
 // XXX: This approach seems to give some unexpected results with rotation
 // changes. There may be a unit mismatch or some other type of issue.
-global_feature_adder!(
+build_global_feature_adder!(
     VelocityAddedBallRigidBodyNoVelocities,
-    |processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+    |_, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
         get_rigid_body_properties_no_velocities(
             &processor.get_velocity_applied_ball_rigid_body(current_time)?,
         )
@@ -733,9 +755,9 @@ global_feature_adder!(
     "Ball - rotation w",
 );
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerRigidBody,
-    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_player_rigid_body(player_id) {
             get_rigid_body_properties(rb)
         } else {
@@ -756,9 +778,9 @@ player_feature_adder!(
     "angular velocity z",
 );
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerRigidBodyNoVelocities,
-    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_player_rigid_body(player_id) {
             get_rigid_body_properties_no_velocities(rb)
         } else {
@@ -776,9 +798,9 @@ player_feature_adder!(
 
 // XXX: This approach seems to give some unexpected results with rotation
 // changes. There may be a unit mismatch or some other type of issue.
-player_feature_adder!(
+build_player_feature_adder!(
     VelocityAddedPlayerRigidBodyNoVelocities,
-    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
         if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, current_time) {
             get_rigid_body_properties_no_velocities(&rb)
         } else {
@@ -794,9 +816,9 @@ player_feature_adder!(
     "rotation w"
 );
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerBoost,
-    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
         convert_all!(
             string_error!("{:?}"),
             processor.get_player_boost_level(player_id).unwrap_or(0.0)
@@ -809,9 +831,10 @@ pub fn get_f32(v: u8) -> Result<f32, String> {
     TryFrom::try_from(v % 2).map_err(string_error!("{:?}"))
 }
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerJump,
-    |player_id: &PlayerId,
+    |_,
+     player_id: &PlayerId,
      processor: &ReplayProcessor,
      _frame,
      _frame_number,
@@ -837,9 +860,10 @@ player_feature_adder!(
     "double jump active"
 );
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerAnyJump,
-    |player_id: &PlayerId,
+    |_,
+     player_id: &PlayerId,
      processor: &ReplayProcessor,
      _frame,
      _frame_number,
@@ -859,9 +883,10 @@ player_feature_adder!(
 
 const DEMOLISH_APPEARANCE_FRAME_COUNT: usize = 30;
 
-player_feature_adder!(
+build_player_feature_adder!(
     PlayerDemolishedBy,
-    |player_id: &PlayerId,
+    |_,
+     player_id: &PlayerId,
      processor: &ReplayProcessor,
      _frame,
      frame_number,

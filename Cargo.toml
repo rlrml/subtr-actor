@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 boxcars = "0.9.9"
+derive-new = "0.5.9"
 float-ord = "0.3.2"
 glam = "0.23.0"
 lazy_static = "1.4.0"
