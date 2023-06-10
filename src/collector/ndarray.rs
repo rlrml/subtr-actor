@@ -288,6 +288,37 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     ) -> Result<[F; N], String>;
 }
 
+macro_rules! impl_feature_adder {
+    ($struct_name:ident) => {
+        impl<F: TryFrom<f32>> FeatureAdder<F> for $struct_name<F>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            fn add_features(
+                &self,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+                current_time: f32,
+                vector: &mut Vec<F>,
+            ) -> ReplayProcessorResult<()> {
+                Ok(
+                    vector.extend(self.get_features(
+                        processor,
+                        frame,
+                        frame_count,
+                        current_time,
+                    )?),
+                )
+            }
+
+            fn get_column_headers(&self) -> &[&str] {
+                self.get_column_headers_array()
+            }
+        }
+    };
+}
+
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -317,6 +348,37 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
         frame_count: usize,
         current_time: f32,
     ) -> Result<[F; N], String>;
+}
+
+macro_rules! impl_player_feature_adder {
+    ($struct_name:ident) => {
+        impl<F: TryFrom<f32>> PlayerFeatureAdder<F> for $struct_name<F>
+        where
+            <F as TryFrom<f32>>::Error: std::fmt::Debug,
+        {
+            fn add_features(
+                &self,
+                player_id: &PlayerId,
+                processor: &ReplayProcessor,
+                frame: &boxcars::Frame,
+                frame_count: usize,
+                current_time: f32,
+                vector: &mut Vec<F>,
+            ) -> ReplayProcessorResult<()> {
+                Ok(vector.extend(self.get_features(
+                    player_id,
+                    processor,
+                    frame,
+                    frame_count,
+                    current_time,
+                )?))
+            }
+
+            fn get_column_headers(&self) -> &[&str] {
+                self.get_column_headers_array()
+            }
+        }
+    };
 }
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
@@ -481,7 +543,7 @@ macro_rules! count_exprs {
 }
 
 macro_rules! global_feature_adder {
-    ($struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         _global_feature_adder!(
             {count_exprs!($( $column_names ),*)},
             $struct_name,
@@ -492,7 +554,7 @@ macro_rules! global_feature_adder {
 }
 
 macro_rules! _global_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
+    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -536,29 +598,12 @@ macro_rules! _global_feature_adder {
             }
         }
 
-        impl<F: TryFrom<f32>> FeatureAdder<F> for $struct_name<F>
-        where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug, {
-            fn add_features(
-                &self,
-                processor: &ReplayProcessor,
-                frame: &boxcars::Frame,
-                frame_count: usize,
-                current_time: f32,
-                vector: &mut Vec<F>,
-            ) -> ReplayProcessorResult<()> {
-                Ok(vector.extend(self.get_features(processor, frame, frame_count, current_time)?))
-            }
-
-            fn get_column_headers(&self) -> &[&str] {
-                self.get_column_headers_array()
-            }
-        }
+        impl_feature_adder!($struct_name);
     };
 }
 
 macro_rules! player_feature_adder {
-    ($struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         _player_feature_adder!(
             {count_exprs!($( $column_names ),*)},
             $struct_name,
@@ -569,7 +614,7 @@ macro_rules! player_feature_adder {
 }
 
 macro_rules! _player_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:ident, $( $column_names:expr ),* $(,)?) => {
+    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -614,63 +659,34 @@ macro_rules! _player_feature_adder {
             }
         }
 
-        impl<F: TryFrom<f32>> PlayerFeatureAdder<F> for $struct_name<F>
-        where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug,
-        {
-            fn add_features(
-                &self,
-                player_id: &PlayerId,
-                processor: &ReplayProcessor,
-                frame: &boxcars::Frame,
-                frame_count: usize,
-                current_time: f32,
-                vector: &mut Vec<F>,
-            ) -> ReplayProcessorResult<()> {
-                Ok(vector.extend(self.get_features(player_id, processor, frame, frame_count, current_time)?))
-            }
-
-            fn get_column_headers(&self) -> &[&str] {
-                self.get_column_headers_array()
-            }
-        }
+        impl_player_feature_adder!($struct_name);
     };
 }
 
-global_feature_adder!(SecondsRemaining, get_seconds_remaining, "seconds remaining");
+global_feature_adder!(
+    SecondsRemaining,
+    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all!(
+            string_error!("{:?}"),
+            processor.get_seconds_remaining()?.clone() as f32
+        )
+    },
+    "seconds remaining"
+);
 
-pub fn get_seconds_remaining<F: TryFrom<f32>>(
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    _current_time: f32,
-) -> Result<[F; 1], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all!(
-        string_error!("{:?}"),
-        processor.get_seconds_remaining()?.clone() as f32
-    )
-}
-
-global_feature_adder!(CurrentTime, get_current_time, "current_time");
-
-pub fn get_current_time<F: TryFrom<f32>>(
-    _processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    current_time: f32,
-) -> Result<[F; 1], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all!(string_error!("{:?}"), current_time)
-}
+global_feature_adder!(
+    CurrentTime,
+    |_processor, _frame, _index, current_time: f32| {
+        convert_all!(string_error!("{:?}"), current_time)
+    },
+    "current_time"
+);
 
 global_feature_adder!(
     BallRigidBody,
-    get_ball_rb_properties,
+    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+        get_rigid_body_properties(processor.get_ball_rigid_body()?)
+    },
     "Ball - position x",
     "Ball - position y",
     "Ball - position z",
@@ -685,21 +701,11 @@ global_feature_adder!(
     "Ball - angular velocity z",
 );
 
-pub fn get_ball_rb_properties<F: TryFrom<f32>>(
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    _current_time: f32,
-) -> RigidBodyArrayResult<F>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    get_rigid_body_properties(processor.get_ball_rigid_body()?)
-}
-
 global_feature_adder!(
     BallRigidBodyNoVelocities,
-    get_ball_rb_properties_no_velocities,
+    |processor: &ReplayProcessor, _frame, _index, _current_time| {
+        get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
+    },
     "Ball - position x",
     "Ball - position y",
     "Ball - position z",
@@ -709,21 +715,15 @@ global_feature_adder!(
     "Ball - rotation w",
 );
 
-pub fn get_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    _current_time: f32,
-) -> Result<[F; 7], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
-}
-
+// XXX: This approach seems to give some unexpected results with rotation
+// changes. There may be a unit mismatch or some other type of issue.
 global_feature_adder!(
     VelocityAddedBallRigidBodyNoVelocities,
-    get_velocity_added_ball_rb_properties_no_velocities,
+    |processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+        get_rigid_body_properties_no_velocities(
+            &processor.get_velocity_applied_ball_rigid_body(current_time)?,
+        )
+    },
     "Ball - position x",
     "Ball - position y",
     "Ball - position z",
@@ -732,24 +732,16 @@ global_feature_adder!(
     "Ball - rotation z",
     "Ball - rotation w",
 );
-
-pub fn get_velocity_added_ball_rb_properties_no_velocities<F: TryFrom<f32>>(
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    current_time: f32,
-) -> Result<[F; 7], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    get_rigid_body_properties_no_velocities(
-        &processor.get_velocity_applied_ball_rigid_body(current_time)?,
-    )
-}
 
 player_feature_adder!(
     PlayerRigidBody,
-    get_player_rb_properties,
+    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+            get_rigid_body_properties(rb)
+        } else {
+            default_rb_state()
+        }
+    },
     "position x",
     "position y",
     "position z",
@@ -764,26 +756,15 @@ player_feature_adder!(
     "angular velocity z",
 );
 
-pub fn get_player_rb_properties<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _frame_number: usize,
-    _current_time: f32,
-) -> RigidBodyArrayResult<F>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    if let Ok(rb) = processor.get_player_rigid_body(player_id) {
-        get_rigid_body_properties(rb)
-    } else {
-        default_rb_state()
-    }
-}
-
 player_feature_adder!(
     PlayerRigidBodyNoVelocities,
-    get_player_rb_properties_no_velocities,
+    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+            get_rigid_body_properties_no_velocities(rb)
+        } else {
+            default_rb_state_no_velocities()
+        }
+    },
     "position x",
     "position y",
     "position z",
@@ -793,167 +774,117 @@ player_feature_adder!(
     "rotation w"
 );
 
-pub fn get_player_rb_properties_no_velocities<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    _current_time: f32,
-) -> Result<[F; 7], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    if let Ok(rb) = processor.get_player_rigid_body(player_id) {
-        get_rigid_body_properties_no_velocities(rb)
-    } else {
-        default_rb_state_no_velocities()
-    }
-}
-
+// XXX: This approach seems to give some unexpected results with rotation
+// changes. There may be a unit mismatch or some other type of issue.
 player_feature_adder!(
     VelocityAddedPlayerRigidBodyNoVelocities,
-    get_velocity_added_player_rb_properties_no_velocities,
+    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+        if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, current_time) {
+            get_rigid_body_properties_no_velocities(&rb)
+        } else {
+            default_rb_state_no_velocities()
+        }
+    },
     "position x",
     "position y",
     "position z",
-    "va rotation x",
-    "va rotation y",
-    "va rotation z",
-    "va rotation w"
+    "rotation x",
+    "rotation y",
+    "rotation z",
+    "rotation w"
 );
 
-pub fn get_velocity_added_player_rb_properties_no_velocities<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _: usize,
-    current_time: f32,
-) -> Result<[F; 7], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, current_time) {
-        get_rigid_body_properties_no_velocities(&rb)
-    } else {
-        default_rb_state_no_velocities()
-    }
-}
-
-player_feature_adder!(PlayerBoost, get_player_boost_level, "boost level");
-
-pub fn get_player_boost_level<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _frame_number: usize,
-    _current_time: f32,
-) -> Result<[F; 1], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all!(
-        string_error!("{:?}"),
-        processor.get_player_boost_level(player_id).unwrap_or(0.0)
-    )
-}
-
 player_feature_adder!(
-    PlayerJump,
-    get_jump_activities,
-    "dodge active",
-    "jump active",
-    "double jump active"
+    PlayerBoost,
+    |player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        convert_all!(
+            string_error!("{:?}"),
+            processor.get_player_boost_level(player_id).unwrap_or(0.0)
+        )
+    },
+    "boost level"
 );
 
 pub fn get_f32(v: u8) -> Result<f32, String> {
     TryFrom::try_from(v % 2).map_err(string_error!("{:?}"))
 }
 
-pub fn get_jump_activities<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _frame_number: usize,
-    _current_time: f32,
-) -> Result<[F; 3], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all!(
-        string_error!("{:?}"),
-        processor
-            .get_dodge_active(player_id)
-            .and_then(get_f32)
-            .unwrap_or(0.0),
-        processor
-            .get_jump_active(player_id)
-            .and_then(get_f32)
-            .unwrap_or(0.0),
-        processor
-            .get_double_jump_active(player_id)
-            .and_then(get_f32)
-            .unwrap_or(0.0),
-    )
-}
-
-player_feature_adder!(PlayerAnyJump, get_any_jump_active, "any_jump_active");
-
-pub fn get_any_jump_active<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    _frame_number: usize,
-    _current_time: f32,
-) -> Result<[F; 1], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    let dodge_is_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2;
-    let jump_is_active = processor.get_jump_active(player_id).unwrap_or(0) % 2;
-    let double_jump_is_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2;
-    let value: f32 = [dodge_is_active, jump_is_active, double_jump_is_active]
-        .into_iter()
-        .enumerate()
-        .map(|(index, is_active)| (1 << index) * is_active)
-        .sum::<u8>() as f32;
-    convert_all!(string_error!("{:?}"), value)
-}
+player_feature_adder!(
+    PlayerJump,
+    |player_id: &PlayerId,
+     processor: &ReplayProcessor,
+     _frame,
+     _frame_number,
+     _current_time: f32| {
+        convert_all!(
+            string_error!("{:?}"),
+            processor
+                .get_dodge_active(player_id)
+                .and_then(get_f32)
+                .unwrap_or(0.0),
+            processor
+                .get_jump_active(player_id)
+                .and_then(get_f32)
+                .unwrap_or(0.0),
+            processor
+                .get_double_jump_active(player_id)
+                .and_then(get_f32)
+                .unwrap_or(0.0),
+        )
+    },
+    "dodge active",
+    "jump active",
+    "double jump active"
+);
 
 player_feature_adder!(
-    PlayerDemolishedBy,
-    get_player_demolished_by,
-    "player demolished by"
+    PlayerAnyJump,
+    |player_id: &PlayerId,
+     processor: &ReplayProcessor,
+     _frame,
+     _frame_number,
+     _current_time: f32| {
+        let dodge_is_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2;
+        let jump_is_active = processor.get_jump_active(player_id).unwrap_or(0) % 2;
+        let double_jump_is_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2;
+        let value: f32 = [dodge_is_active, jump_is_active, double_jump_is_active]
+            .into_iter()
+            .enumerate()
+            .map(|(index, is_active)| (1 << index) * is_active)
+            .sum::<u8>() as f32;
+        convert_all!(string_error!("{:?}"), value)
+    },
+    "any_jump_active"
 );
 
 const DEMOLISH_APPEARANCE_FRAME_COUNT: usize = 30;
 
-pub fn get_player_demolished_by<F: TryFrom<f32>>(
-    player_id: &PlayerId,
-    processor: &ReplayProcessor,
-    _frame: &boxcars::Frame,
-    frame_number: usize,
-    _current_time: f32,
-) -> Result<[F; 1], String>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    let demolisher_index = processor
-        .demolishes
-        .iter()
-        .find(|demolish_info| {
-            &demolish_info.victim == player_id
-                && frame_number - demolish_info.frame < DEMOLISH_APPEARANCE_FRAME_COUNT
-        })
-        .map(|demolish_info| {
-            processor
-                .iter_player_ids_in_order()
-                .position(|player_id| player_id == &demolish_info.attacker)
-                .unwrap_or_else(|| processor.iter_player_ids_in_order().count())
-        })
-        .and_then(|v| i32::try_from(v).ok())
-        .unwrap_or(-1);
-    convert_all!(string_error!("{:?}"), demolisher_index as f32)
-}
+player_feature_adder!(
+    PlayerDemolishedBy,
+    |player_id: &PlayerId,
+     processor: &ReplayProcessor,
+     _frame,
+     frame_number,
+     _current_time: f32| {
+        let demolisher_index = processor
+            .demolishes
+            .iter()
+            .find(|demolish_info| {
+                &demolish_info.victim == player_id
+                    && frame_number - demolish_info.frame < DEMOLISH_APPEARANCE_FRAME_COUNT
+            })
+            .map(|demolish_info| {
+                processor
+                    .iter_player_ids_in_order()
+                    .position(|player_id| player_id == &demolish_info.attacker)
+                    .unwrap_or_else(|| processor.iter_player_ids_in_order().count())
+            })
+            .and_then(|v| i32::try_from(v).ok())
+            .unwrap_or(-1);
+        convert_all!(string_error!("{:?}"), demolisher_index as f32)
+    },
+    "player demolished by"
+);
 
 lazy_static! {
     static ref NAME_TO_GLOBAL_FEATURE_ADDER: std::collections::HashMap<&'static str, Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>> = {

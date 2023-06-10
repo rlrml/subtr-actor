@@ -191,6 +191,8 @@ pub fn apply_velocities_to_rigid_body(
 }
 
 fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> boxcars::Quaternion {
+    // XXX: This approach seems to give some unexpected results. There may be a
+    // unit mismatch or some other type of issue.
     let rbav = rigid_body
         .angular_velocity
         .unwrap_or_else(|| boxcars::Vector3f {

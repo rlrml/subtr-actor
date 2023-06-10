@@ -204,7 +204,7 @@ macro_rules! get_attribute_errors_expected {
 macro_rules! get_attribute_and_updated {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
         $self
-            .get_attribute_and_updated($map, $prop)
+            .get_attribute_and_updated($map, $prop, true)
             .and_then(|(found, updated)| {
                 attribute_match!(
                     found,
@@ -736,6 +736,8 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    // ID Mapping functions
+
     pub fn get_player_id_from_car_id(
         &self,
         actor_id: &boxcars::ActorId,
@@ -836,13 +838,15 @@ impl<'a> ReplayProcessor<'a> {
         property: &'b str,
         log_attribute_map_on_error: bool,
     ) -> ReplayProcessorResult<&'b boxcars::Attribute> {
-        self.get_attribute_and_updated(map, property).map(|v| &v.0)
+        self.get_attribute_and_updated(map, property, log_attribute_map_on_error)
+            .map(|v| &v.0)
     }
 
     fn get_attribute_and_updated<'b>(
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'b str,
+        log_attribute_map_on_error: bool,
     ) -> ReplayProcessorResult<&'b (boxcars::Attribute, usize)> {
         let attribute_object_id = self
             .name_to_object_id
@@ -940,7 +944,7 @@ impl<'a> ReplayProcessor<'a> {
         self.get_car_connected_actor_id(player_id, &self.car_to_dodge, "Dodge")
     }
 
-    // Actor iteration
+    // Actor iteration functions
 
     pub fn iter_player_ids_in_order(&self) -> impl Iterator<Item = &PlayerId> {
         self.team_zero.iter().chain(self.team_one.iter())
