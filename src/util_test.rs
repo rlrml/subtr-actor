@@ -1,4 +1,73 @@
 use super::*;
+use boxcars::Quaternion;
+use boxcars::Vector3f;
+
+#[test]
+fn test_get_interpolated_rigid_body() {
+    let start_body = boxcars::RigidBody {
+        sleeping: false,
+        location: Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        rotation: Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        linear_velocity: Some(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+        angular_velocity: Some(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+    };
+    let end_body = boxcars::RigidBody {
+        sleeping: true,
+        location: Vector3f {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        },
+        rotation: Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+            w: 0.0,
+        },
+        linear_velocity: Some(Vector3f {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        }),
+        angular_velocity: Some(Vector3f {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        }),
+    };
+    let start_time = 0.0f32;
+    let end_time = 1.0f32;
+    let time = 0.5f32;
+
+    let result = get_interpolated_rigid_body(&start_body, start_time, &end_body, end_time, time);
+
+    match result {
+        Ok(interpolated_body) => {
+            assert_eq!(interpolated_body.location.x, 0.5);
+            assert_eq!(interpolated_body.location.y, 0.5);
+            assert_eq!(interpolated_body.location.z, 0.5);
+            // Add further assertions for rotation, linear_velocity and angular_velocity as needed.
+        }
+        Err(e) => panic!("Interpolation failed: {}", e),
+    };
+}
 
 #[test]
 fn test_find_update_in_direction() {

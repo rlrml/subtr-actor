@@ -181,18 +181,6 @@ macro_rules! attribute_match {
     };
 }
 
-macro_rules! get_attribute {
-    ($self:ident, $map:expr, $prop:expr, $type:path) => {
-        $self.get_attribute($map, $prop, true).and_then(|found| {
-            attribute_match!(
-                found,
-                $type,
-                format!("Value for {:?} not of the expected type, {:?}", $prop, $map)
-            )
-        })
-    };
-}
-
 macro_rules! get_attribute_errors_expected {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
         $self

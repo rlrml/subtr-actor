@@ -701,7 +701,15 @@ build_global_feature_adder!(
     |_, _processor, _frame, _index, current_time: f32| {
         convert_all!(string_error!("{:?}"), current_time)
     },
-    "current_time"
+    "current time"
+);
+
+build_global_feature_adder!(
+    FrameTime,
+    |_, _processor, frame: &boxcars::Frame, _index, _current_time| {
+        convert_all!(string_error!("{:?}"), frame.time)
+    },
+    "frame time"
 );
 
 build_global_feature_adder!(
@@ -777,7 +785,6 @@ global_feature_adder!(
         processor
             .get_interpolated_ball_rigid_body(current_time, s.close_enough_to_frame_time)
             .map(|v| get_rigid_body_properties_no_velocities(&v))
-            .map_err(|e| println!("Encountered error {:?}", e))
             .unwrap_or_else(|_| default_rb_state_no_velocities())
     },
     "Ball - position x",
@@ -1003,6 +1010,7 @@ lazy_static! {
         insert_adder!(InterpolatedBallRigidBodyNoVelocities, 0.0);
         insert_adder!(SecondsRemaining);
         insert_adder!(CurrentTime);
+        insert_adder!(FrameTime);
         m
     };
     static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<

@@ -15,10 +15,14 @@ fn main() {
     println!("{:?}", replay.properties);
 
     let mut collector = NDArrayCollector::<f32>::from_strings(
-        &["InterpolatedBallRigidBodyNoVelocities"],
+        &[
+            "InterpolatedBallRigidBodyNoVelocities",
+            "FrameTime",
+            "CurrentTime",
+        ],
         &[
             "InterpolatedPlayerRigidBodyNoVelocities",
-            // "PlayerRigidBodyNoVelocities",
+            "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
             // "PlayerDemolishedBy",
@@ -26,23 +30,30 @@ fn main() {
     )
     .unwrap();
 
-    FrameRateDecorator::new_from_fps(30.0, &mut collector)
+    FrameRateDecorator::new_from_fps(100.0, &mut collector)
         .process_replay(&replay)
         .unwrap();
 
     let (meta, array) = collector.get_meta_and_ndarray().unwrap();
 
-    let position_columns: Vec<_> = meta
+    let mut display_columns: Vec<_> = meta
         .headers_vec()
+        .clone()
         .into_iter()
         .enumerate()
         .filter(|(_index, name)| name.contains("rotation"))
         .filter(|(_index, name)| name.contains("Player 4"))
         .collect();
 
-    println!("{:?}", position_columns);
+    display_columns.extend(
+        meta.headers_vec()
+            .clone()
+            .into_iter()
+            .enumerate()
+            .filter(|(_index, name)| name.contains("time")),
+    );
 
-    return;
+    println!("{:?}", display_columns);
 
     let mut last: std::collections::HashMap<usize, (f32, usize)> = std::collections::HashMap::new();
 
@@ -50,7 +61,7 @@ fn main() {
 
     for frame_index in 0..array.shape()[0] {
         let mut same_as_last = Vec::new();
-        for (index, column_name) in position_columns.iter() {
+        for (index, column_name) in display_columns.iter() {
             let (last_value, same_count) = last.get(&index).unwrap_or(&(0.0, 1));
             let this_value = array.get((frame_index, *index)).unwrap();
             if this_value == last_value {
@@ -64,7 +75,7 @@ fn main() {
         if true {
             println!("{:?}", same_as_last);
             println!("{}", frame_index);
-            for (index, column_name) in position_columns.iter() {
+            for (index, column_name) in display_columns.iter() {
                 println!(
                     "{}: {}",
                     column_name,

@@ -252,7 +252,7 @@ pub fn get_interpolated_rigid_body(
         ));
     }
 
-    let duration = start_time - end_time;
+    let duration = end_time - start_time;
     let interpolation_amount = (time - start_time) / duration;
     let start_position = util::vec_to_glam(&start_body.location);
     let end_position = util::vec_to_glam(&end_body.location);
