@@ -158,3 +158,142 @@ impl<K: PartialEq + Clone, V> VecMapEntry<K, V> for Vec<(K, V)> {
         }
     }
 }
+
+pub fn vec_to_glam(v: &boxcars::Vector3f) -> glam::f32::Vec3 {
+    glam::f32::Vec3::new(v.x, v.y, v.z)
+}
+
+pub fn glam_to_vec(v: &glam::f32::Vec3) -> boxcars::Vector3f {
+    boxcars::Vector3f {
+        x: v.x,
+        y: v.y,
+        z: v.z,
+    }
+}
+
+pub fn quat_to_glam(q: &boxcars::Quaternion) -> glam::Quat {
+    glam::Quat::from_xyzw(q.x, q.y, q.z, q.w)
+}
+
+pub fn glam_to_quat(rotation: &glam::Quat) -> boxcars::Quaternion {
+    boxcars::Quaternion {
+        x: rotation.x,
+        y: rotation.y,
+        z: rotation.z,
+        w: rotation.w,
+    }
+}
+
+pub fn apply_velocities_to_rigid_body(
+    rigid_body: &boxcars::RigidBody,
+    time_delta: f32,
+) -> boxcars::RigidBody {
+    let mut interpolated = rigid_body.clone();
+    if time_delta == 0.0 {
+        return interpolated;
+    }
+    let linear_velocity = interpolated.linear_velocity.unwrap_or(boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    });
+    let location = vec_to_glam(&rigid_body.location) + (time_delta * vec_to_glam(&linear_velocity));
+    interpolated.location = glam_to_vec(&location);
+    interpolated.rotation = apply_angular_velocity(rigid_body, time_delta);
+    interpolated
+}
+
+fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> boxcars::Quaternion {
+    // XXX: This approach seems to give some unexpected results. There may be a
+    // unit mismatch or some other type of issue.
+    let rbav = rigid_body
+        .angular_velocity
+        .unwrap_or_else(|| boxcars::Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        });
+    let angular_velocity = glam::Vec3::new(rbav.x, rbav.y, rbav.z);
+    let magnitude = angular_velocity.length();
+    let angular_velocity_unit_vector = angular_velocity.normalize_or_zero();
+
+    let mut rotation = glam::Quat::from_xyzw(
+        rigid_body.rotation.x,
+        rigid_body.rotation.y,
+        rigid_body.rotation.z,
+        rigid_body.rotation.w,
+    );
+
+    if angular_velocity_unit_vector.length() != 0.0 {
+        let delta_rotation =
+            glam::Quat::from_axis_angle(angular_velocity_unit_vector, magnitude * time_delta);
+        rotation *= delta_rotation;
+    }
+
+    boxcars::Quaternion {
+        x: rotation.x,
+        y: rotation.y,
+        z: rotation.z,
+        w: rotation.w,
+    }
+}
+
+pub fn get_interpolated_rigid_body(
+    start_body: &boxcars::RigidBody,
+    start_time: f32,
+    end_body: &boxcars::RigidBody,
+    end_time: f32,
+    time: f32,
+) -> ReplayProcessorResult<boxcars::RigidBody> {
+    if !(start_time <= time && time <= end_time) {
+        return Err(format!(
+            "start_time <= time && time <= end_time not satisfied {}, {}, {}",
+            start_time, time, end_time,
+        ));
+    }
+
+    let duration = start_time - end_time;
+    let interpolation_amount = (time - start_time) / duration;
+    let start_position = util::vec_to_glam(&start_body.location);
+    let end_position = util::vec_to_glam(&end_body.location);
+    let interpolated_location = start_position.lerp(end_position, interpolation_amount);
+    let start_rotation = quat_to_glam(&start_body.rotation);
+    let end_rotation = quat_to_glam(&end_body.rotation);
+    let interpolated_rotation = start_rotation.slerp(end_rotation, interpolation_amount);
+
+    Ok(boxcars::RigidBody {
+        location: glam_to_vec(&interpolated_location),
+        rotation: glam_to_quat(&interpolated_rotation),
+        sleeping: start_body.sleeping,
+        linear_velocity: start_body.linear_velocity,
+        angular_velocity: start_body.angular_velocity,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
+
+pub fn find_in_direction<T, F, R>(
+    items: &[T],
+    current_index: usize,
+    direction: SearchDirection,
+    predicate: F,
+) -> Option<(usize, R)>
+where
+    F: Fn(&T) -> Option<R>,
+{
+    let mut iter: Box<dyn Iterator<Item = (usize, &T)>> = match direction {
+        SearchDirection::Forward => Box::new(
+            items[current_index + 1..]
+                .iter()
+                .enumerate()
+                .map(move |(i, item)| (i + current_index + 1, item)),
+        ),
+        SearchDirection::Backward => Box::new(items[..current_index].iter().enumerate().rev()),
+    };
+
+    iter.find_map(|(i, item)| predicate(item).map(|res| (i, res)))
+}
