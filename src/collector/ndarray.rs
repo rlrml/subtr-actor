@@ -186,7 +186,7 @@ impl<F> Collector for NDArrayCollector<F> {
     ) -> ReplayProcessorResult<collector::TimeAdvance> {
         self.maybe_set_replay_meta(processor)?;
 
-        if !ball_rigid_body_exists(processor, frame, frame_number)? {
+        if !processor.ball_rigid_body_exists()? {
             return Ok(collector::TimeAdvance::NextFrame);
         }
 
@@ -755,6 +755,40 @@ build_global_feature_adder!(
     "Ball - rotation w",
 );
 
+#[derive(new)]
+pub struct InterpolatedBallRigidBodyNoVelocities<F> {
+    close_enough_to_frame_time: f32,
+    _zero: std::marker::PhantomData<F>,
+}
+
+impl<F> InterpolatedBallRigidBodyNoVelocities<F> {
+    pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
+        Arc::new(Self::new(close_enough_to_frame_time))
+    }
+}
+
+global_feature_adder!(
+    InterpolatedBallRigidBodyNoVelocities,
+    |s: &InterpolatedBallRigidBodyNoVelocities<F>,
+     processor: &ReplayProcessor,
+     _frame: &boxcars::Frame,
+     _index,
+     current_time: f32| {
+        processor
+            .get_interpolated_ball_rigid_body(current_time, s.close_enough_to_frame_time)
+            .map(|v| get_rigid_body_properties_no_velocities(&v))
+            .map_err(|e| println!("Encountered error {:?}", e))
+            .unwrap_or_else(|_| default_rb_state_no_velocities())
+    },
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
+    "Ball - rotation x",
+    "Ball - rotation y",
+    "Ball - rotation z",
+    "Ball - rotation w",
+);
+
 build_player_feature_adder!(
     PlayerRigidBody,
     |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
@@ -814,6 +848,44 @@ build_player_feature_adder!(
     "rotation y",
     "rotation z",
     "rotation w"
+);
+
+#[derive(new)]
+pub struct InterpolatedPlayerRigidBodyNoVelocities<F> {
+    close_enough_to_frame_time: f32,
+    _zero: std::marker::PhantomData<F>,
+}
+
+impl<F> InterpolatedPlayerRigidBodyNoVelocities<F> {
+    pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
+        Arc::new(Self::new(close_enough_to_frame_time))
+    }
+}
+
+player_feature_adder!(
+    InterpolatedPlayerRigidBodyNoVelocities,
+    |s: &InterpolatedPlayerRigidBodyNoVelocities<F>,
+     player_id: &PlayerId,
+     processor: &ReplayProcessor,
+     _frame: &boxcars::Frame,
+     _index,
+     current_time: f32| {
+        processor
+            .get_interpolated_player_rigid_body(
+                player_id,
+                current_time,
+                s.close_enough_to_frame_time,
+            )
+            .map(|v| get_rigid_body_properties_no_velocities(&v))
+            .unwrap_or_else(|_| default_rb_state_no_velocities())
+    },
+    "i position x",
+    "i position y",
+    "i position z",
+    "i rotation x",
+    "i rotation y",
+    "i rotation z",
+    "i rotation w"
 );
 
 build_player_feature_adder!(
@@ -918,13 +990,17 @@ lazy_static! {
             Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>,
         > = std::collections::HashMap::new();
         macro_rules! insert_adder {
-            ($adder_name:ident ) => {
-                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new());
+            ($adder_name:ident, $( $arguments:expr ),*) => {
+                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new($ ( $arguments ),*));
             };
+            ($adder_name:ident) => {
+                insert_adder!($adder_name,)
+            }
         }
         insert_adder!(BallRigidBody);
         insert_adder!(BallRigidBodyNoVelocities);
         insert_adder!(VelocityAddedBallRigidBodyNoVelocities);
+        insert_adder!(InterpolatedBallRigidBodyNoVelocities, 0.0);
         insert_adder!(SecondsRemaining);
         insert_adder!(CurrentTime);
         m
@@ -938,13 +1014,17 @@ lazy_static! {
             Arc<dyn PlayerFeatureAdder<f32> + Send + Sync + 'static>,
         > = std::collections::HashMap::new();
         macro_rules! insert_adder {
-            ($adder_name:ident ) => {
-                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new());
+            ($adder_name:ident, $( $arguments:expr ),*) => {
+                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new($ ( $arguments ),*));
+            };
+            ($adder_name:ident) => {
+                insert_adder!($adder_name,)
             };
         }
         insert_adder!(PlayerRigidBody);
         insert_adder!(PlayerRigidBodyNoVelocities);
         insert_adder!(VelocityAddedPlayerRigidBodyNoVelocities);
+        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities, 0.0);
         insert_adder!(PlayerBoost);
         insert_adder!(PlayerJump);
         insert_adder!(PlayerAnyJump);

@@ -15,13 +15,13 @@ fn main() {
     println!("{:?}", replay.properties);
 
     let mut collector = NDArrayCollector::<f32>::from_strings(
-        &["BallRigidBodyNoVelocities"],
+        &["InterpolatedBallRigidBodyNoVelocities"],
         &[
             "InterpolatedPlayerRigidBodyNoVelocities",
-            "PlayerRigidBodyNoVelocities",
+            // "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
-            "PlayerDemolishedBy",
+            // "PlayerDemolishedBy",
         ],
     )
     .unwrap();
@@ -36,11 +36,13 @@ fn main() {
         .headers_vec()
         .into_iter()
         .enumerate()
-        .filter(|(_index, name)| name.contains("position"))
+        .filter(|(_index, name)| name.contains("rotation"))
         .filter(|(_index, name)| name.contains("Player 4"))
         .collect();
 
     println!("{:?}", position_columns);
+
+    return;
 
     let mut last: std::collections::HashMap<usize, (f32, usize)> = std::collections::HashMap::new();
 

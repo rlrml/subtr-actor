@@ -496,6 +496,37 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    fn find_update_in_direction(
+        &self,
+        current_index: usize,
+        actor_id: &boxcars::ActorId,
+        object_id: &boxcars::ObjectId,
+        direction: SearchDirection,
+    ) -> ReplayProcessorResult<(boxcars::Attribute, usize)> {
+        let frames = self
+            .replay
+            .network_frames
+            .as_ref()
+            .ok_or("Replay has no network frames")?;
+
+        let predicate = |frame: &boxcars::Frame| {
+            frame
+                .updated_actors
+                .iter()
+                .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
+                .map(|update| &update.attribute)
+                .cloned()
+        };
+
+        match util::find_in_direction(&frames.frames, current_index, direction, predicate) {
+            Some((index, attribute)) => Ok((attribute, index)),
+            None => Err(format!(
+                "No update for {} of {} after {}",
+                actor_id, object_id, current_index
+            )),
+        }
+    }
+
     // Update functions
 
     fn update_mappings(&mut self, frame: &boxcars::Frame) -> ReplayProcessorResult<()> {
@@ -796,6 +827,82 @@ impl<'a> ReplayProcessor<'a> {
             }))
     }
 
+    // Interpolation Support functions
+
+    fn get_frame(&self, frame_index: usize) -> ReplayProcessorResult<&boxcars::Frame> {
+        self.replay
+            .network_frames
+            .as_ref()
+            .ok_or("Replay has no network frames")?
+            .frames
+            .get(frame_index)
+            .ok_or("Frame index out of bounds".to_string())
+    }
+
+    fn velocities_applied_rigid_body(
+        &self,
+        rigid_body: &boxcars::RigidBody,
+        rb_frame_index: usize,
+        target_time: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let rb_frame = self.get_frame(rb_frame_index)?;
+        let interpolation_amount = target_time - rb_frame.time;
+        Ok(apply_velocities_to_rigid_body(
+            rigid_body,
+            interpolation_amount,
+        ))
+    }
+
+    fn get_interpolated_actor_rigid_body(
+        &self,
+        actor_id: &boxcars::ActorId,
+        time: f32,
+        close_enough: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let (frame_body, frame_index) = self.get_actor_rigid_body(actor_id)?;
+        let frame_time = self.get_frame(*frame_index)?.time;
+        let time_and_frame_difference = time - frame_time;
+
+        if (time_and_frame_difference).abs() <= close_enough.abs() {
+            return Ok(frame_body.clone());
+        }
+
+        let search_direction = if time_and_frame_difference > 0.0 {
+            util::SearchDirection::Forward
+        } else {
+            util::SearchDirection::Backward
+        };
+
+        let object_id = self
+            .name_to_object_id
+            .get(RIGID_BODY_STATE_KEY)
+            .ok_or(format!(
+                "Could not find object_id for {:?}",
+                RIGID_BODY_STATE_KEY
+            ))?;
+
+        let (attribute, found_frame) =
+            self.find_update_in_direction(*frame_index, &actor_id, object_id, search_direction)?;
+        let found_time = self.get_frame(found_frame)?.time;
+
+        let found_body = attribute_match!(
+            attribute,
+            boxcars::Attribute::RigidBody,
+            "Expected rigid body"
+        )?;
+
+        if (found_time - time).abs() <= close_enough {
+            return Ok(found_body.clone());
+        }
+
+        let (start_body, start_time, end_body, end_time) = match search_direction {
+            util::SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
+            util::SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
+        };
+
+        util::get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
+    }
+
     // Actor functions
 
     fn get_object_id_for_key(&self, name: &str) -> ReplayProcessorResult<&boxcars::ObjectId> {
@@ -944,6 +1051,18 @@ impl<'a> ReplayProcessor<'a> {
         self.get_car_connected_actor_id(player_id, &self.car_to_dodge, "Dodge")
     }
 
+    pub fn get_actor_rigid_body(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> ReplayProcessorResult<(&boxcars::RigidBody, &usize)> {
+        get_attribute_and_updated!(
+            self,
+            &self.get_actor_state(&actor_id)?.attributes,
+            RIGID_BODY_STATE_KEY,
+            boxcars::Attribute::RigidBody
+        )
+    }
+
     // Actor iteration functions
 
     pub fn iter_player_ids_in_order(&self) -> impl Iterator<Item = &PlayerId> {
@@ -1018,14 +1137,14 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_ball_rigid_body(&self) -> ReplayProcessorResult<&boxcars::RigidBody> {
         self.ball_actor_id
             .ok_or("Ball actor not known".to_string())
-            .and_then(|actor_id| {
-                get_actor_attribute_matching!(
-                    self,
-                    &actor_id,
-                    RIGID_BODY_STATE_KEY,
-                    boxcars::Attribute::RigidBody
-                )
-            })
+            .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
+    }
+
+    pub fn ball_rigid_body_exists(&self) -> ReplayProcessorResult<bool> {
+        Ok(self
+            .get_ball_rigid_body()
+            .map(|rb| !rb.sleeping)
+            .unwrap_or(false))
     }
 
     pub fn get_ball_rigid_body_and_updated(
@@ -1049,6 +1168,17 @@ impl<'a> ReplayProcessor<'a> {
     ) -> ReplayProcessorResult<boxcars::RigidBody> {
         let (current_rigid_body, frame_index) = self.get_ball_rigid_body_and_updated()?;
         self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
+    }
+
+    pub fn get_interpolated_ball_rigid_body(
+        &self,
+        time: f32,
+        close_enough: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        let actor_id = self
+            .ball_actor_id
+            .ok_or("Ball actor not known".to_string())?;
+        self.get_interpolated_actor_rigid_body(&actor_id, time, close_enough)
     }
 
     pub fn get_player_name(&self, player_id: &PlayerId) -> ReplayProcessorResult<String> {
@@ -1087,42 +1217,12 @@ impl<'a> ReplayProcessor<'a> {
             == '0')
     }
 
-    fn get_frame(&self, frame_index: usize) -> ReplayProcessorResult<&boxcars::Frame> {
-        self.replay
-            .network_frames
-            .as_ref()
-            .ok_or("Replay has no network frames")?
-            .frames
-            .get(frame_index)
-            .ok_or("Frame index out of bounds".to_string())
-    }
-
-    fn velocities_applied_rigid_body(
-        &self,
-        rigid_body: &boxcars::RigidBody,
-        rb_frame_index: usize,
-        target_time: f32,
-    ) -> ReplayProcessorResult<boxcars::RigidBody> {
-        let rb_frame = self.get_frame(rb_frame_index)?;
-        let interpolation_amount = target_time - rb_frame.time;
-        Ok(apply_velocities_to_rigid_body(
-            rigid_body,
-            interpolation_amount,
-        ))
-    }
-
     pub fn get_player_rigid_body(
         &self,
         player_id: &PlayerId,
     ) -> ReplayProcessorResult<&boxcars::RigidBody> {
-        self.get_car_actor_id(player_id).and_then(|actor_id| {
-            get_actor_attribute_matching!(
-                self,
-                &actor_id,
-                RIGID_BODY_STATE_KEY,
-                boxcars::Attribute::RigidBody
-            )
-        })
+        self.get_car_actor_id(player_id)
+            .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
     pub fn get_player_rigid_body_and_updated(
@@ -1147,6 +1247,19 @@ impl<'a> ReplayProcessor<'a> {
         let (current_rigid_body, frame_index) =
             self.get_player_rigid_body_and_updated(player_id)?;
         self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
+    }
+
+    pub fn get_interpolated_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        time: f32,
+        close_enough: f32,
+    ) -> ReplayProcessorResult<boxcars::RigidBody> {
+        self.get_interpolated_actor_rigid_body(
+            &self.get_car_actor_id(player_id).unwrap(),
+            time,
+            close_enough,
+        )
     }
 
     pub fn get_player_boost_level(&self, player_id: &PlayerId) -> ReplayProcessorResult<f32> {

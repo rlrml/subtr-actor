@@ -1,7 +1,5 @@
 use crate::*;
 
-static EXPECTED_FRAME_LENGTH: f32 = 1.0 / 30.0;
-
 pub struct FrameRateDecorator<'a, C> {
     collector: &'a mut C,
     target_frame_duration: f32,
