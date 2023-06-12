@@ -14,7 +14,7 @@ more accessible and easier to manipulate.
 
 ### Overview of Key Components
 
-- **[`ReplayProcessor`]**: This struct is at the heart of subtr-actor's
+- **`[ReplayProcessor]`**: This struct is at the heart of subtr-actor's
 replay processing capabilities. In its main entry point,
 [`ReplayProcessor::process`], it pushes network frames from the
 [`boxcars::Replay`] that it is initialized with though an
