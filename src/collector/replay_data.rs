@@ -50,7 +50,7 @@ impl PlayerFrame {
         processor: &ReplayProcessor,
         player_id: &PlayerId,
         current_time: f32,
-    ) -> BoxcarsResult<Self> {
+    ) -> SubtActorResult<Self> {
         let rigid_body =
             processor.get_interpolated_player_rigid_body(player_id, current_time, 0.0)?;
 
@@ -142,7 +142,7 @@ pub struct MetadataFrame {
 }
 
 impl MetadataFrame {
-    fn new_from_processor(processor: &ReplayProcessor, time: f32) -> BoxcarsResult<Self> {
+    fn new_from_processor(processor: &ReplayProcessor, time: f32) -> SubtActorResult<Self> {
         Ok(Self::new(time, processor.get_seconds_remaining()?))
     }
 
@@ -182,7 +182,7 @@ impl FrameData {
         frame_metadata: MetadataFrame,
         ball_frame: BallFrame,
         player_frames: Vec<(PlayerId, PlayerFrame)>,
-    ) -> BoxcarsResult<()> {
+    ) -> SubtActorResult<()> {
         let frame_index = self.metadata_frames.len();
         self.metadata_frames.push(frame_metadata);
         self.ball_data.add_frame(frame_index, ball_frame);
@@ -211,7 +211,7 @@ impl ReplayDataCollector {
         self.frame_data
     }
 
-    pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> BoxcarsResult<ReplayData> {
+    pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
         let meta = processor.get_replay_meta()?;
@@ -226,7 +226,7 @@ impl ReplayDataCollector {
         &self,
         processor: &ReplayProcessor,
         current_time: f32,
-    ) -> BoxcarsResult<Vec<(PlayerId, PlayerFrame)>> {
+    ) -> SubtActorResult<Vec<(PlayerId, PlayerFrame)>> {
         Ok(processor
             .iter_player_ids_in_order()
             .map(|player_id| {
@@ -247,7 +247,7 @@ impl Collector for ReplayDataCollector {
         _frame: &boxcars::Frame,
         _frame_number: usize,
         current_time: f32,
-    ) -> BoxcarsResult<TimeAdvance> {
+    ) -> SubtActorResult<TimeAdvance> {
         let metadata_frame = MetadataFrame::new_from_processor(processor, current_time)?;
         let ball_frame = BallFrame::new_from_processor(processor, current_time);
         let player_frames = self.get_player_frames(processor, current_time)?;

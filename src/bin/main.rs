@@ -1,5 +1,5 @@
 use boxcars;
-use boxcars_frames::*;
+use subt_actor::*;
 
 use std::env;
 
@@ -17,24 +17,27 @@ fn main() {
     let mut collector = NDArrayCollector::<f32>::from_strings(
         &[
             "InterpolatedBallRigidBodyNoVelocities",
-            "FrameTime",
-            "CurrentTime",
+            // "BallRigidBodyNoVelocities",
+            // "FrameTime",
+            // "CurrentTime",
         ],
         &[
             "InterpolatedPlayerRigidBodyNoVelocities",
-            "PlayerRigidBodyNoVelocities",
+            // "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
-            // "PlayerDemolishedBy",
+            "PlayerDemolishedBy",
         ],
     )
     .unwrap();
 
-    FrameRateDecorator::new_from_fps(100.0, &mut collector)
+    FrameRateDecorator::new_from_fps(10.0, &mut collector)
         .process_replay(&replay)
         .unwrap();
 
     let (meta, array) = collector.get_meta_and_ndarray().unwrap();
+
+    return;
 
     let mut display_columns: Vec<_> = meta
         .headers_vec()

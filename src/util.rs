@@ -244,7 +244,7 @@ pub fn get_interpolated_rigid_body(
     end_body: &boxcars::RigidBody,
     end_time: f32,
     time: f32,
-) -> BoxcarsResult<boxcars::RigidBody> {
+) -> SubtActorResult<boxcars::RigidBody> {
     if !(start_time <= time && time <= end_time) {
         return BoxcarsError::new_result(BoxcarsErrorVariant::InterpolationTimeOrderError {
             start_time,

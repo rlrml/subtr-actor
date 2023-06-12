@@ -21,9 +21,9 @@ pub trait Collector: Sized {
         frame: &boxcars::Frame,
         frame_number: usize,
         target_time: f32,
-    ) -> BoxcarsResult<TimeAdvance>;
+    ) -> SubtActorResult<TimeAdvance>;
 
-    fn process_replay(mut self, replay: &boxcars::Replay) -> BoxcarsResult<Self> {
+    fn process_replay(mut self, replay: &boxcars::Replay) -> SubtActorResult<Self> {
         ReplayProcessor::new(replay)?.process(&mut self)?;
         Ok(self)
     }
@@ -31,7 +31,7 @@ pub trait Collector: Sized {
 
 impl<G> Collector for G
 where
-    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize, f32) -> BoxcarsResult<TimeAdvance>,
+    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtActorResult<TimeAdvance>,
 {
     fn process_frame(
         &mut self,
@@ -39,7 +39,7 @@ where
         frame: &boxcars::Frame,
         frame_number: usize,
         target_time: f32,
-    ) -> BoxcarsResult<TimeAdvance> {
+    ) -> SubtActorResult<TimeAdvance> {
         self(processor, frame, frame_number, target_time)
     }
 }

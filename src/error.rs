@@ -128,7 +128,7 @@ impl BoxcarsError {
     }
 }
 
-pub type BoxcarsResult<T> = Result<T, BoxcarsError>;
+pub type SubtActorResult<T> = Result<T, BoxcarsError>;
 
 pub fn attribute_to_tag(attribute: &Attribute) -> &str {
     match attribute {
