@@ -894,12 +894,8 @@ build_player_feature_adder!(
     "boost level"
 );
 
-fn _u8_get_f32(v: u8) -> Result<f32, anyhow::Error> {
-    Ok(TryFrom::try_from(v % 2)?)
-}
-
 fn u8_get_f32(v: u8) -> SubtActorResult<f32> {
-    _u8_get_f32(v).map_err(convert_float_conversion_error)
+    v.try_into().map_err(convert_float_conversion_error)
 }
 
 build_player_feature_adder!(
