@@ -10,17 +10,18 @@ pub enum BallFrame {
 }
 
 impl BallFrame {
-    fn new_from_processor(processor: &ReplayProcessor) -> Self {
+    fn new_from_processor(processor: &ReplayProcessor, current_time: f32) -> Self {
         if processor.get_ignore_ball_syncing().unwrap_or(false) {
             Self::Empty
-        } else if let Ok(rigid_body) = processor.get_ball_rigid_body() {
+        } else if let Ok(rigid_body) = processor.get_interpolated_ball_rigid_body(current_time, 0.0)
+        {
             Self::new_from_rigid_body(rigid_body)
         } else {
             Self::Empty
         }
     }
 
-    fn new_from_rigid_body(rigid_body: &boxcars::RigidBody) -> Self {
+    fn new_from_rigid_body(rigid_body: boxcars::RigidBody) -> Self {
         if rigid_body.sleeping {
             Self::Empty
         } else {
@@ -48,8 +49,10 @@ impl PlayerFrame {
     fn new_from_processor(
         processor: &ReplayProcessor,
         player_id: &PlayerId,
+        current_time: f32,
     ) -> BoxcarsResult<Self> {
-        let rigid_body = processor.get_player_rigid_body(player_id)?;
+        let rigid_body =
+            processor.get_interpolated_player_rigid_body(player_id, current_time, 0.0)?;
 
         if rigid_body.sleeping {
             return Ok(PlayerFrame::Empty);
@@ -72,7 +75,7 @@ impl PlayerFrame {
     }
 
     fn from_data(
-        rigid_body: &boxcars::RigidBody,
+        rigid_body: boxcars::RigidBody,
         boost_amount: f32,
         boost_active: bool,
         jump_active: bool,
@@ -83,7 +86,7 @@ impl PlayerFrame {
             Self::Empty
         } else {
             Self::Data {
-                rigid_body: rigid_body.clone(),
+                rigid_body,
                 boost_amount,
                 boost_active,
                 jump_active,
@@ -222,13 +225,14 @@ impl ReplayDataCollector {
     fn get_player_frames(
         &self,
         processor: &ReplayProcessor,
+        current_time: f32,
     ) -> BoxcarsResult<Vec<(PlayerId, PlayerFrame)>> {
         Ok(processor
             .iter_player_ids_in_order()
             .map(|player_id| {
                 (
                     player_id.clone(),
-                    PlayerFrame::new_from_processor(processor, player_id)
+                    PlayerFrame::new_from_processor(processor, player_id, current_time)
                         .unwrap_or_else(|_err| PlayerFrame::Empty),
                 )
             })
@@ -240,13 +244,13 @@ impl Collector for ReplayDataCollector {
     fn process_frame(
         &mut self,
         processor: &ReplayProcessor,
-        frame: &boxcars::Frame,
+        _frame: &boxcars::Frame,
         _frame_number: usize,
-        _current_time: f32,
+        current_time: f32,
     ) -> BoxcarsResult<TimeAdvance> {
-        let metadata_frame = MetadataFrame::new_from_processor(processor, frame.time)?;
-        let ball_frame = BallFrame::new_from_processor(processor);
-        let player_frames = self.get_player_frames(processor)?;
+        let metadata_frame = MetadataFrame::new_from_processor(processor, current_time)?;
+        let ball_frame = BallFrame::new_from_processor(processor, current_time);
+        let player_frames = self.get_player_frames(processor, current_time)?;
         self.frame_data
             .add_frame(metadata_frame, ball_frame, player_frames)?;
         Ok(TimeAdvance::NextFrame)
