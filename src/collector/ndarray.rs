@@ -79,8 +79,8 @@ impl<F> NDArrayCollector<F> {
         let player_count = self
             .replay_meta
             .as_ref()
-            .ok_or(BoxcarsError::new(
-                BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+            .ok_or(SubtActorError::new(
+                SubtActorErrorVariant::CouldNotBuildReplayMeta,
             ))?
             .player_count();
         let global_feature_count: usize = self
@@ -131,14 +131,14 @@ impl<F> NDArrayCollector<F> {
         let column_headers = self.get_column_headers();
         Ok((
             ReplayMetaWithHeaders {
-                replay_meta: self.replay_meta.ok_or(BoxcarsError::new(
-                    BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+                replay_meta: self.replay_meta.ok_or(SubtActorError::new(
+                    SubtActorErrorVariant::CouldNotBuildReplayMeta,
                 ))?,
                 column_headers,
             },
             ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
-                .map_err(BoxcarsErrorVariant::NDArrayShapeError)
-                .map_err(BoxcarsError::new)?,
+                .map_err(SubtActorErrorVariant::NDArrayShapeError)
+                .map_err(SubtActorError::new)?,
         ))
     }
 
@@ -153,8 +153,8 @@ impl<F> NDArrayCollector<F> {
             replay_meta: self
                 .replay_meta
                 .as_ref()
-                .ok_or(BoxcarsError::new(
-                    BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+                .ok_or(SubtActorError::new(
+                    SubtActorErrorVariant::CouldNotBuildReplayMeta,
                 ))?
                 .clone(),
             column_headers: self.get_column_headers(),
@@ -220,7 +220,7 @@ impl NDArrayCollector<f32> {
                 Ok(NAME_TO_GLOBAL_FEATURE_ADDER
                     .get(name)
                     .ok_or_else(|| {
-                        BoxcarsError::new(BoxcarsErrorVariant::UnknownFeatureAdderName(
+                        SubtActorError::new(SubtActorErrorVariant::UnknownFeatureAdderName(
                             name.to_string(),
                         ))
                     })?
@@ -233,7 +233,7 @@ impl NDArrayCollector<f32> {
                 Ok(NAME_TO_PLAYER_FEATURE_ADDER
                     .get(name)
                     .ok_or_else(|| {
-                        BoxcarsError::new(BoxcarsErrorVariant::UnknownFeatureAdderName(
+                        SubtActorError::new(SubtActorErrorVariant::UnknownFeatureAdderName(
                             name.to_string(),
                         ))
                     })?
@@ -429,8 +429,8 @@ where
     }
 }
 
-fn convert_float_conversion_error<T>(_: T) -> BoxcarsError {
-    BoxcarsError::new(BoxcarsErrorVariant::FloatConversionError)
+fn convert_float_conversion_error<T>(_: T) -> SubtActorError {
+    SubtActorError::new(SubtActorErrorVariant::FloatConversionError)
 }
 
 macro_rules! convert_all {

@@ -76,7 +76,7 @@ impl ActorStateModeler {
     fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> SubtActorResult<()> {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
-                return BoxcarsError::new_result(BoxcarsErrorVariant::ActorIdAlreadyExists {
+                return SubtActorError::new_result(SubtActorErrorVariant::ActorIdAlreadyExists {
                     actor_id: new_actor.actor_id.clone(),
                     object_id: new_actor.object_id.clone(),
                 });
@@ -101,7 +101,7 @@ impl ActorStateModeler {
             .get_mut(&update.actor_id)
             .map(|state| state.update_attribute(update, frame_index))
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::UpdatedActorIdDoesNotExist {
+                SubtActorError::new(SubtActorErrorVariant::UpdatedActorIdDoesNotExist {
                     update: update.clone(),
                 })
             })
@@ -109,7 +109,7 @@ impl ActorStateModeler {
 
     fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> SubtActorResult<ActorState> {
         let state = self.actor_states.remove(actor_id).ok_or_else(|| {
-            BoxcarsError::new(BoxcarsErrorVariant::NoStateForActorId {
+            SubtActorError::new(SubtActorErrorVariant::NoStateForActorId {
                 actor_id: actor_id.clone(),
             })
         })?;
@@ -144,7 +144,7 @@ macro_rules! attribute_match {
         if let $type(value) = attribute {
             Ok(value)
         } else {
-            BoxcarsError::new_result(BoxcarsErrorVariant::UnexpectedAttributeType {
+            SubtActorError::new_result(SubtActorErrorVariant::UnexpectedAttributeType {
                 expected_type: stringify!(path).to_string(),
                 actual_type: attribute_to_tag(&attribute).to_string(),
             })
@@ -180,7 +180,7 @@ macro_rules! get_derived_attribute {
     ($map:expr, $key:expr, $type:path) => {
         $map.get($key)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::DerivedKeyValueNotFound {
+                SubtActorError::new(SubtActorErrorVariant::DerivedKeyValueNotFound {
                     name: $key.to_string(),
                 })
             })
@@ -272,22 +272,22 @@ impl<'a> ReplayProcessor<'a> {
             .properties
             .iter()
             .find(|(key, _)| key == "PlayerStats")
-            .ok_or_else(|| BoxcarsError::new(BoxcarsErrorVariant::PlayerStatsHeaderNotFound))?;
+            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::PlayerStatsHeaderNotFound))?;
         // XXX: implementation incomplete
-        BoxcarsError::new_result(BoxcarsErrorVariant::PlayerStatsHeaderNotFound)
+        SubtActorError::new_result(SubtActorErrorVariant::PlayerStatsHeaderNotFound)
     }
 
     pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> SubtActorResult<()> {
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
             if n > 10 * 30 {
-                BoxcarsError::new_result(BoxcarsErrorVariant::FinishProcessingEarly)
+                SubtActorError::new_result(SubtActorErrorVariant::FinishProcessingEarly)
             } else {
                 Ok(TimeAdvance::NextFrame)
             }
         };
         let process_result = self.process(&mut handler);
-        if let Some(BoxcarsErrorVariant::FinishProcessingEarly) =
+        if let Some(SubtActorErrorVariant::FinishProcessingEarly) =
             process_result.as_ref().err().map(|e| e.variant.clone())
         {
             Ok(())
@@ -332,7 +332,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::NoNetworkFrames))?
+            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?
             .frames
             .iter()
             .enumerate()
@@ -379,7 +379,7 @@ impl<'a> ReplayProcessor<'a> {
             std::collections::HashSet::<_>::from_iter(self.iter_player_ids_in_order());
 
         if original_players != known_players {
-            return BoxcarsError::new_result(BoxcarsErrorVariant::InconsistentPlayerSet {
+            return SubtActorError::new_result(SubtActorErrorVariant::InconsistentPlayerSet {
                 found: known_players.into_iter().cloned().collect(),
                 original: original_players.into_iter().cloned().collect(),
             });
@@ -446,7 +446,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::NoNetworkFrames))?;
+            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?;
 
         let predicate = |frame: &boxcars::Frame| {
             frame
@@ -459,7 +459,7 @@ impl<'a> ReplayProcessor<'a> {
 
         match util::find_in_direction(&frames.frames, current_index, direction, predicate) {
             Some((index, attribute)) => Ok((attribute, index)),
-            None => BoxcarsError::new_result(BoxcarsErrorVariant::NoUpdateAfterFrame {
+            None => SubtActorError::new_result(SubtActorErrorVariant::NoUpdateAfterFrame {
                 actor_id: actor_id.clone(),
                 object_id: object_id.clone(),
                 frame_index: current_index,
@@ -713,7 +713,7 @@ impl<'a> ReplayProcessor<'a> {
                 return Ok(player_id.clone());
             }
         }
-        return BoxcarsError::new_result(BoxcarsErrorVariant::NoMatchingPlayerId {
+        return SubtActorError::new_result(SubtActorErrorVariant::NoMatchingPlayerId {
             actor_id: actor_id.clone(),
         });
     }
@@ -727,7 +727,7 @@ impl<'a> ReplayProcessor<'a> {
                 return Ok(player_id.clone());
             }
         }
-        return BoxcarsError::new_result(BoxcarsErrorVariant::NoMatchingPlayerId {
+        return SubtActorError::new_result(SubtActorErrorVariant::NoMatchingPlayerId {
             actor_id: actor_id.clone(),
         });
     }
@@ -765,11 +765,11 @@ impl<'a> ReplayProcessor<'a> {
         self.replay
             .network_frames
             .as_ref()
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::NoNetworkFrames))?
+            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?
             .frames
             .get(frame_index)
-            .ok_or(BoxcarsError::new(
-                BoxcarsErrorVariant::FrameIndexOutOfBounds,
+            .ok_or(SubtActorError::new(
+                SubtActorErrorVariant::FrameIndexOutOfBounds,
             ))
     }
 
@@ -832,7 +832,7 @@ impl<'a> ReplayProcessor<'a> {
     fn get_object_id_for_key(&self, name: &'static str) -> SubtActorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
-            .ok_or_else(|| BoxcarsError::new(BoxcarsErrorVariant::ObjectIdNotFound { name }))
+            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::ObjectIdNotFound { name }))
     }
 
     fn get_actor_ids_by_type(&self, name: &'static str) -> SubtActorResult<&[boxcars::ActorId]> {
@@ -850,7 +850,7 @@ impl<'a> ReplayProcessor<'a> {
 
     fn get_actor_state(&self, actor_id: &boxcars::ActorId) -> SubtActorResult<&ActorState> {
         self.actor_state.actor_states.get(actor_id).ok_or_else(|| {
-            BoxcarsError::new(BoxcarsErrorVariant::NoStateForActorId {
+            SubtActorError::new(SubtActorErrorVariant::NoStateForActorId {
                 actor_id: actor_id.clone(),
             })
         })
@@ -879,7 +879,7 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtActorResult<&'b (boxcars::Attribute, usize)> {
         let attribute_object_id = self.get_object_id_for_key(property)?;
         map.get(attribute_object_id).ok_or_else(|| {
-            BoxcarsError::new(BoxcarsErrorVariant::PropertyNotFoundInState { property })
+            SubtActorError::new(SubtActorErrorVariant::PropertyNotFoundInState { property })
         })
     }
 
@@ -893,22 +893,23 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     fn get_ball_actor(&self) -> SubtActorResult<boxcars::ActorId> {
-        self.ball_actor_id
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::BallActorNotFound))
+        self.ball_actor_id.ok_or(SubtActorError::new(
+            SubtActorErrorVariant::BallActorNotFound,
+        ))
     }
 
     pub fn get_metadata_actor_id(&self) -> SubtActorResult<&boxcars::ActorId> {
         self.get_actor_ids_by_type(GAME_TYPE)?
             .iter()
             .next()
-            .ok_or_else(|| BoxcarsError::new(BoxcarsErrorVariant::NoGameActor))
+            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::NoGameActor))
     }
 
     pub fn get_player_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
         self.player_to_actor_id
             .get(&player_id)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::ActorNotFound {
+                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
                     name: "ActorId",
                     player_id: player_id.clone(),
                 })
@@ -920,7 +921,7 @@ impl<'a> ReplayProcessor<'a> {
         self.player_to_car
             .get(&self.get_player_actor_id(player_id)?)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::ActorNotFound {
+                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
                     name: "Car",
                     player_id: player_id.clone(),
                 })
@@ -936,7 +937,7 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtActorResult<boxcars::ActorId> {
         map.get(&self.get_car_actor_id(player_id)?)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::ActorNotFound {
+                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
                     name,
                     player_id: player_id.clone(),
                 })
@@ -1042,7 +1043,9 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn get_ball_rigid_body(&self) -> SubtActorResult<&boxcars::RigidBody> {
         self.ball_actor_id
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::BallActorNotFound))
+            .ok_or(SubtActorError::new(
+                SubtActorErrorVariant::BallActorNotFound,
+            ))
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
@@ -1057,7 +1060,9 @@ impl<'a> ReplayProcessor<'a> {
         &self,
     ) -> SubtActorResult<(&boxcars::RigidBody, &usize)> {
         self.ball_actor_id
-            .ok_or(BoxcarsError::new(BoxcarsErrorVariant::BallActorNotFound))
+            .ok_or(SubtActorError::new(
+                SubtActorErrorVariant::BallActorNotFound,
+            ))
             .and_then(|actor_id| {
                 get_attribute_and_updated!(
                     self,
@@ -1099,7 +1104,7 @@ impl<'a> ReplayProcessor<'a> {
             .player_to_team
             .get(&self.get_player_actor_id(player_id)?)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::UnknownPlayerTeam {
+                SubtActorError::new(SubtActorErrorVariant::UnknownPlayerTeam {
                     player_id: player_id.clone(),
                 })
             })?;
@@ -1107,7 +1112,7 @@ impl<'a> ReplayProcessor<'a> {
         self.object_id_to_name
             .get(&state.object_id)
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::UnknownPlayerTeam {
+                SubtActorError::new(SubtActorErrorVariant::UnknownPlayerTeam {
                     player_id: player_id.clone(),
                 })
             })
@@ -1120,7 +1125,7 @@ impl<'a> ReplayProcessor<'a> {
             .chars()
             .last()
             .ok_or_else(|| {
-                BoxcarsError::new(BoxcarsErrorVariant::EmptyTeamName {
+                SubtActorError::new(SubtActorErrorVariant::EmptyTeamName {
                     player_id: player_id.clone(),
                 })
             })?

@@ -4,7 +4,7 @@ use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-pub enum BoxcarsErrorVariant {
+pub enum SubtActorErrorVariant {
     #[error("Replay has no network frames")]
     NoNetworkFrames,
 
@@ -110,25 +110,25 @@ pub enum BoxcarsErrorVariant {
 }
 
 #[derive(Debug)]
-pub struct BoxcarsError {
+pub struct SubtActorError {
     pub backtrace: Backtrace,
-    pub variant: BoxcarsErrorVariant,
+    pub variant: SubtActorErrorVariant,
 }
 
-impl BoxcarsError {
-    pub fn new(variant: BoxcarsErrorVariant) -> Self {
+impl SubtActorError {
+    pub fn new(variant: SubtActorErrorVariant) -> Self {
         Self {
             backtrace: Backtrace::capture(),
             variant,
         }
     }
 
-    pub fn new_result<T>(variant: BoxcarsErrorVariant) -> Result<T, Self> {
+    pub fn new_result<T>(variant: SubtActorErrorVariant) -> Result<T, Self> {
         Err(Self::new(variant))
     }
 }
 
-pub type SubtActorResult<T> = Result<T, BoxcarsError>;
+pub type SubtActorResult<T> = Result<T, SubtActorError>;
 
 pub fn attribute_to_tag(attribute: &Attribute) -> &str {
     match attribute {
