@@ -10,6 +10,7 @@ categories = ["parsing"]
 description = "Rocket League replay transformer"
 
 [dependencies]
+anyhow = "1.0.71"
 boxcars = "0.9.9"
 derive-new = "0.5.9"
 float-ord = "0.3.2"

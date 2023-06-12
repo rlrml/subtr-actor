@@ -82,8 +82,8 @@ impl ReplayMetaWithHeaders {
 /// It's main entrypoint is [`Self::get_meta_and_ndarray`], which provides
 /// [`ndarray::Array2`] along with column headers and replay metadata.
 pub struct NDArrayCollector<F> {
-    feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
-    player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
+    feature_adders: FeatureAdders<F>,
+    player_feature_adders: PlayerFeatureAdders<F>,
     data: Vec<F>,
     replay_meta: Option<ReplayMeta>,
     frames_added: usize,
@@ -108,8 +108,8 @@ impl<F> NDArrayCollector<F> {
     /// A new [`NDArrayCollector`] instance. This instance is initialized with
     /// empty data, no replay metadata and zero frames added.
     pub fn new(
-        feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
-        player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
+        feature_adders: FeatureAdders<F>,
+        player_feature_adders: PlayerFeatureAdders<F>,
     ) -> Self {
         Self {
             feature_adders,
@@ -369,6 +369,8 @@ pub trait FeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+pub type FeatureAdders<F> = Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>;
+
 /// This trait is stricter version of the [`FeatureAdder`] trait, enforcing at
 /// compile time that the number of features added is equal to the number of
 /// column headers provided. Implementations of this trait can be automatically
@@ -450,6 +452,8 @@ pub trait PlayerFeatureAdder<F> {
         vector: &mut Vec<F>,
     ) -> SubtrActorResult<()>;
 }
+
+pub type PlayerFeatureAdders<F> = Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>;
 
 /// This trait is a more strict version of the [`PlayerFeatureAdder`] trait,
 /// enforcing at compile time that the number of player-specific features added
