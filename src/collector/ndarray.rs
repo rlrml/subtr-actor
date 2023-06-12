@@ -1023,7 +1023,7 @@ lazy_static! {
         insert_adder!(PlayerRigidBody);
         insert_adder!(PlayerRigidBodyNoVelocities);
         insert_adder!(VelocityAddedPlayerRigidBodyNoVelocities);
-        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities, 0.0);
+        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities, 0.003);
         insert_adder!(PlayerBoost);
         insert_adder!(PlayerJump);
         insert_adder!(PlayerAnyJump);

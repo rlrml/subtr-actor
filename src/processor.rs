@@ -274,7 +274,7 @@ impl<'a> ReplayProcessor<'a> {
             .find(|(key, _)| key == "PlayerStats")
             .ok_or_else(|| BoxcarsError::new(BoxcarsErrorVariant::PlayerStatsHeaderNotFound))?;
         // XXX: implementation incomplete
-        Ok(())
+        BoxcarsError::new_result(BoxcarsErrorVariant::PlayerStatsHeaderNotFound)
     }
 
     pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> BoxcarsResult<()> {
