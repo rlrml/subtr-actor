@@ -3,6 +3,11 @@ use boxcars::Attribute;
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
+/// [`SubtrActorErrorVariant`] is an enumeration of all the specific error
+/// variants that can occur while processing game replays in the subtr-actor
+/// domain. These include errors related to network frames, frame indexing,
+/// player sets, actor states, object ids, team identities, and data types
+/// amongst others.
 #[derive(Error, Debug, Clone)]
 pub enum SubtrActorErrorVariant {
     #[error("Replay has no network frames")]
@@ -109,6 +114,8 @@ pub enum SubtrActorErrorVariant {
     UnknownFeatureAdderName(String),
 }
 
+/// [`SubtrActorError`] struct provides an error variant
+/// [`SubtrActorErrorVariant`] along with its backtrace.
 #[derive(Debug)]
 pub struct SubtrActorError {
     pub backtrace: Backtrace,

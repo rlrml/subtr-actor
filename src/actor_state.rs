@@ -8,9 +8,11 @@ use std::collections::HashMap;
 /// associated object id and name id.
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
-    /// A map of the actor's attributes with their corresponding object ids and frame indices.
+    /// A map of the actor's attributes with their corresponding object ids and
+    /// frame indices.
     pub attributes: HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
-    /// A map of the actor's derived attributes with their corresponding object ids and frame indices.
+    /// A map of the actor's derived attributes with their corresponding object
+    /// ids and frame indices.
     pub derived_attributes: HashMap<String, (boxcars::Attribute, usize)>,
     /// The object id associated with the actor.
     pub object_id: boxcars::ObjectId,
@@ -58,7 +60,8 @@ impl ActorState {
 }
 
 /// A struct modeling the states of multiple actors at a given point in time.
-/// Provides methods to update that state with successive frames from a boxcars::Replay.
+/// Provides methods to update that state with successive frames from a
+/// boxcars::Replay.
 pub struct ActorStateModeler {
     /// A map of actor states with their corresponding actor ids.
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,
@@ -67,11 +70,11 @@ pub struct ActorStateModeler {
 }
 
 impl ActorStateModeler {
-    /// Creates a new `ActorStateModeler`.
+    /// Creates a new [`ActorStateModeler`].
     ///
     /// # Returns
     ///
-    /// A new `ActorStateModeler` object.
+    /// A new [`ActorStateModeler`]. object.
     pub fn new() -> Self {
         Self {
             actor_states: HashMap::new(),
@@ -88,7 +91,7 @@ impl ActorStateModeler {
     ///
     /// # Returns
     ///
-    /// An empty result (`Ok(())`) on success, `SubtrActorError` on failure.
+    /// An empty result (`Ok(())`) on success, [`SubtrActorError`] on failure.
     pub fn process_frame(
         &mut self,
         frame: &boxcars::Frame,

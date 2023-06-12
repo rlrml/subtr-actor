@@ -11,38 +11,67 @@ macro_rules! fmt_err {
 
 pub type PlayerId = boxcars::RemoteId;
 
+/// [`DemolishInfo`] struct represents data related to a demolition event in the game.
+///
+/// Demolition events occur when one player 'demolishes' or 'destroys' another by
+/// hitting them at a sufficiently high speed. This results in the demolished player
+/// being temporarily removed from play.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DemolishInfo {
+    /// The exact game time (in seconds) at which the demolition event occurred.
     pub time: f32,
+    /// The remaining time in the match when the demolition event occurred.
     pub seconds_remaining: i32,
+    /// The frame number at which the demolition occurred.
     pub frame: usize,
+    /// The [`PlayerId`] of the player who initiated the demolition.
     pub attacker: PlayerId,
+    /// The [`PlayerId`] of the player who was demolished.
     pub victim: PlayerId,
+    /// The velocity of the attacker at the time of demolition.
     pub attacker_velocity: boxcars::Vector3f,
+    /// The velocity of the victim at the time of demolition.
     pub victim_velocity: boxcars::Vector3f,
 }
 
+/// [`ReplayMeta`] struct represents metadata about the replay being processed.
+///
+/// This includes information about the players in the match and all replay headers.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayMeta {
+    /// A vector of [`PlayerInfo`] instances representing the players on team zero.
     pub team_zero: Vec<PlayerInfo>,
+    /// A vector of [`PlayerInfo`] instances representing the players on team one.
     pub team_one: Vec<PlayerInfo>,
+    /// A vector of tuples containing the names and properties of all the headers in the replay.
     pub all_headers: Vec<(String, HeaderProp)>,
 }
 
 impl ReplayMeta {
+    /// Returns the total number of players involved in the game.
     pub fn player_count(&self) -> usize {
         self.team_one.len() + self.team_zero.len()
     }
 
+    /// Returns an iterator over the [`PlayerInfo`] instances representing the players,
+    /// in the order they are listed in the replay file.
     pub fn player_order(&self) -> impl Iterator<Item = &PlayerInfo> {
         self.team_zero.iter().chain(self.team_one.iter())
     }
 }
 
+/// [`PlayerInfo`] struct provides detailed information about a specific player in the replay.
+///
+/// This includes player's unique remote ID, player stats if available, and their name.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerInfo {
+    /// The unique remote ID of the player. This could be their online ID or local ID.
     pub remote_id: RemoteId,
+    /// An optional HashMap containing player-specific stats.
+    /// The keys of this HashMap are the names of the stats,
+    /// and the values are the corresponding `HeaderProp` instances.
     pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
+    /// The name of the player as represented in the replay.
     pub name: String,
 }
 

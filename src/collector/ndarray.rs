@@ -6,6 +6,16 @@ use std::sync::Arc;
 
 use crate::*;
 
+/// Represents the column headers in the collected data of an [`NDArrayCollector`].
+///
+/// # Fields
+///
+/// * `global_headers`: A list of strings that represent the global,
+/// player-independent features' column headers.
+/// * `player_headers`: A list of strings that represent the player-specific
+/// features' column headers.
+///
+/// Use [`Self::new`] to construct an instance of this struct.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NDArrayColumnHeaders {
     pub global_headers: Vec<String>,
@@ -21,6 +31,14 @@ impl NDArrayColumnHeaders {
     }
 }
 
+/// A struct that contains both the metadata of a replay and the associated
+/// column headers.
+///
+/// # Fields
+///
+/// * `replay_meta`: Contains metadata about a [`boxcars::Replay`].
+/// * `column_headers`: The [`NDArrayColumnHeaders`] associated with the data
+/// collected from the replay.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayMetaWithHeaders {
     pub replay_meta: ReplayMeta,
@@ -53,6 +71,16 @@ impl ReplayMetaWithHeaders {
     }
 }
 
+/// [`NDArrayCollector`] is a [`Collector`] which transforms frame-based replay
+/// data into a 2-dimensional array of type [`ndarray::Array2`], where each
+/// element is of a specified floating point type.
+///
+/// It's initialized with collections of [`FeatureAdder`] instances which
+/// extract global, player independent features for each frame, and
+/// [`PlayerFeatureAdder`], which add player specific features for each frame.
+///
+/// It's main entrypoint is [`Self::get_meta_and_ndarray`], which provides
+/// [`ndarray::Array2`] along with column headers and replay metadata.
 pub struct NDArrayCollector<F> {
     feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
     player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
@@ -62,6 +90,23 @@ pub struct NDArrayCollector<F> {
 }
 
 impl<F> NDArrayCollector<F> {
+    /// Creates a new instance of `NDArrayCollector`.
+    ///
+    /// # Arguments
+    ///
+    /// * `feature_adders` - A vector of [`Arc<dyn FeatureAdder<F>>`], each
+    /// implementing the [`FeatureAdder`] trait. These are used to add global
+    /// features to the replay data.
+    ///
+    /// * `player_feature_adders` - A vector of [`Arc<dyn PlayerFeatureAdder<F>>`],
+    /// each implementing the [`PlayerFeatureAdder`]
+    /// trait. These are used to add player-specific features to the replay
+    /// data.
+    ///
+    /// # Returns
+    ///
+    /// A new [`NDArrayCollector`] instance. This instance is initialized with
+    /// empty data, no replay metadata and zero frames added.
     pub fn new(
         feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>,
         player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>,
@@ -75,27 +120,13 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
-    fn try_get_frame_feature_count(&self) -> SubtrActorResult<usize> {
-        let player_count = self
-            .replay_meta
-            .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::CouldNotBuildReplayMeta,
-            ))?
-            .player_count();
-        let global_feature_count: usize = self
-            .feature_adders
-            .iter()
-            .map(|fa| fa.features_added())
-            .sum();
-        let player_feature_count: usize = self
-            .player_feature_adders
-            .iter() // iterate
-            .map(|pfa| pfa.features_added() * player_count)
-            .sum();
-        Ok(global_feature_count + player_feature_count)
-    }
-
+    /// Returns the column headers of the 2-dimensional array produced by the
+    /// [`NDArrayCollector`].
+    ///
+    /// # Returns
+    ///
+    /// An instance of [`NDArrayColumnHeaders`] representing the column headers
+    /// in the collected data.
     pub fn get_column_headers(&self) -> NDArrayColumnHeaders {
         let global_headers = self
             .feature_adders
@@ -118,10 +149,29 @@ impl<F> NDArrayCollector<F> {
         NDArrayColumnHeaders::new(global_headers, player_headers)
     }
 
+    /// This function consumes the [`NDArrayCollector`] instance and returns the
+    /// data collected as an [`ndarray::Array2`].
+    ///
+    /// # Returns
+    ///
+    /// A [`SubtrActorResult`] containing the collected data as an
+    /// [`ndarray::Array2`].
+    ///
+    /// This method is a shorthand for calling [`Self::get_meta_and_ndarray`]
+    /// and discarding the replay metadata and headers.
     pub fn get_ndarray(self) -> SubtrActorResult<ndarray::Array2<F>> {
         self.get_meta_and_ndarray().map(|a| a.1)
     }
 
+    /// Consumes the [`NDArrayCollector`] and returns the collected features as a
+    /// 2D ndarray, along with replay metadata and headers.
+    ///
+    /// # Returns
+    ///
+    /// A [`SubtrActorResult`] containing a tuple:
+    /// - [`ReplayMetaWithHeaders`]: The replay metadata along with the headers
+    /// for each column in the ndarray.
+    /// - [`ndarray::Array2<F>`]: The collected features as a 2D ndarray.
     pub fn get_meta_and_ndarray(
         self,
     ) -> SubtrActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
@@ -142,6 +192,21 @@ impl<F> NDArrayCollector<F> {
         ))
     }
 
+    /// Processes a [`boxcars::Replay`] and returns its metadata along with column headers.
+    ///
+    /// This method first processes the replay using a [`ReplayProcessor`]. It
+    /// then updates the `replay_meta` field if it's not already set, and
+    /// returns a clone of the `replay_meta` field along with column headers of
+    /// the data.
+    ///
+    /// # Arguments
+    ///
+    /// * `replay`: A reference to the [`boxcars::Replay`] to process.
+    ///
+    /// # Returns
+    ///
+    /// A `SubtrActorResult` containing a [`ReplayMetaWithHeaders`] that
+    /// includes the metadata of the replay and column headers.
     pub fn process_and_get_meta_and_headers(
         &mut self,
         replay: &boxcars::Replay,
@@ -159,6 +224,27 @@ impl<F> NDArrayCollector<F> {
                 .clone(),
             column_headers: self.get_column_headers(),
         })
+    }
+
+    fn try_get_frame_feature_count(&self) -> SubtrActorResult<usize> {
+        let player_count = self
+            .replay_meta
+            .as_ref()
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::CouldNotBuildReplayMeta,
+            ))?
+            .player_count();
+        let global_feature_count: usize = self
+            .feature_adders
+            .iter()
+            .map(|fa| fa.features_added())
+            .sum();
+        let player_feature_count: usize = self
+            .player_feature_adders
+            .iter() // iterate
+            .map(|pfa| pfa.features_added() * player_count)
+            .sum();
+        Ok(global_feature_count + player_feature_count)
     }
 
     fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {

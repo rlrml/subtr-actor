@@ -63,22 +63,22 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
     id
 }
 
-/// The `ReplayProcessor` struct is a pivotal component in [`subtr-actor`]'s
+/// The [`ReplayProcessor`] struct is a pivotal component in `subtr-actor`'s
 /// replay parsing pipeline. It is designed to process and traverse an actor
 /// graph of a Rocket League replay, and expose methods for collectors to gather
 /// specific data points as it progresses through the replay.
 ///
 /// The processor pushes frames from a replay through an [`ActorStateModeler`],
 /// which models the state all actors in the replay at a given point in time.
-/// The `ReplayProcessor` also maintains various mappings to allow efficient
+/// The [`ReplayProcessor`] also maintains various mappings to allow efficient
 /// lookup and traversal of the actor graph, thus assisting [`Collector`]
 /// instances in their data accumulation tasks.
 ///
 /// The primary method of this struct is [`process`](ReplayProcessor::process),
 /// which takes a collector and processes the replay. As it traverses the
-/// replay, it calls the `process_frame` method of the passed collector, passing
-/// the current frame along with its contextual data. This allows the collector
-/// to extract specific data from each frame as needed.
+/// replay, it calls the [`Collector::process_frame`] method of the passed
+/// collector, passing the current frame along with its contextual data. This
+/// allows the collector to extract specific data from each frame as needed.
 ///
 /// The [`ReplayProcessor`] also provides a number of helper methods for
 /// navigating the actor graph and extracting information, such as
@@ -114,8 +114,19 @@ pub struct ReplayProcessor<'a> {
 }
 
 impl<'a> ReplayProcessor<'a> {
-    // Initialization
-
+    /// Constructs a new [`ReplayProcessor`] instance with the provided replay.
+    ///
+    /// # Arguments
+    ///
+    /// * `replay` - A reference to the [`boxcars::Replay`] to be processed.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`SubtrActorResult`] of [`ReplayProcessor`]. In the process of
+    /// initialization, the [`ReplayProcessor`]: - Maps each object id in the
+    /// replay to its corresponding name. - Initializes empty state and
+    /// attribute maps. - Sets the player order from either replay headers or
+    /// frames, if available.
     pub fn new(replay: &'a boxcars::Replay) -> SubtrActorResult<Self> {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
@@ -149,6 +160,78 @@ impl<'a> ReplayProcessor<'a> {
         Ok(processor)
     }
 
+    /// [`Self::process`] takes a [`Collector`] as an argument and iterates over each frame in
+    /// the replay, updating the internal state of the processor and other
+    /// relevant mappings based on the current frame. It also fetches the
+    /// required information for each frame like ball id, boost amounts and
+    /// demolishes.
+    ///
+    /// The function uses a [`TimeAdvance`] mechanism to control the pace of frame
+    /// processing. [`TimeAdvance`] could either be a specific time or
+    /// [`TimeAdvance::NextFrame`], which indicates that the processing should
+    /// proceed to the next frame in the replay. This design allows the handler
+    /// to have control over the frame rate, including the possibility of
+    /// skipping frames.
+    ///
+    /// For each frame, [`Collector::process_frame`] of the collector is called, allowing the
+    /// collector to process the frame and gather data accordingly. The
+    /// collector may also specify a target time for the next frame it wants to
+    /// process.
+    ///
+    /// At the end of processing, it checks to make sure that no unknown players
+    /// were encountered during the replay. If any unknown players are found, an
+    /// error is returned.
+    pub fn process<H: Collector>(&mut self, handler: &mut H) -> SubtrActorResult<()> {
+        // Initially, we set target_time to NextFrame to ensure the collector
+        // will process the first frame.
+        let mut target_time = TimeAdvance::NextFrame;
+        for (index, frame) in self
+            .replay
+            .network_frames
+            .as_ref()
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?
+            .frames
+            .iter()
+            .enumerate()
+        {
+            // Update the internal state of the processor based on the current frame
+            self.actor_state.process_frame(frame, index)?;
+            self.update_mappings(frame)?;
+            self.update_ball_id(frame)?;
+            self.update_boost_amounts(frame, index)?;
+            self.update_demolishes(frame, index)?;
+
+            // Get the time to process for this frame. If target_time is set to
+            // NextFrame, we use the time of the current frame.
+            let mut current_time = match &target_time {
+                TimeAdvance::Time(t) => *t,
+                TimeAdvance::NextFrame => frame.time,
+            };
+
+            while current_time <= frame.time {
+                // Call the handler to process the frame and get the time for
+                // the next frame the handler wants to process
+                target_time = handler.process_frame(&self, frame, index, current_time)?;
+                // If the handler specified a specific time, update current_time
+                // to that time. If the handler specified NextFrame, we break
+                // out of the loop to move on to the next frame in the replay.
+                // This design allows the handler to have control over the frame
+                // rate, including the possibility of skipping frames.
+                if let TimeAdvance::Time(new_target) = target_time {
+                    current_time = new_target;
+                } else {
+                    break;
+                }
+            }
+        }
+        // Make sure that we didn't encounter any players we did not know about
+        // at the beggining of the replay.
+        self.check_player_id_set()
+    }
+
+    /// Reset the state of the [`ReplayProcessor`].
     pub fn reset(&mut self) {
         self.player_to_car = HashMap::new();
         self.player_to_team = HashMap::new();
@@ -236,80 +319,6 @@ impl<'a> ReplayProcessor<'a> {
 
         self.reset();
         Ok(())
-    }
-
-    /// This is the primary method of [`ReplayProcessor`] used for processing
-    /// the replay data.
-    ///
-    /// It takes a [`Collector`](crate::Collector) as an
-    /// argument and iterates over each frame in the replay, updating the
-    /// internal state of the processor and other relevant mappings based on the
-    /// current frame. It also fetches the required information for each frame
-    /// like ball id, boost amounts and demolishes.
-    ///
-    /// The function uses a `target_time` mechanism to control the pace of frame
-    /// processing. `target_time` could either be a specific time or
-    /// [`TimeAdvance::NextFrame`], which indicates that the processing should
-    /// proceed to the next frame in the replay. This design allows the handler
-    /// to have control over the frame rate, including the possibility of
-    /// skipping frames.
-    ///
-    /// For each frame, `process_frame` of the collector is called, allowing the
-    /// collector to process the frame and gather data accordingly. The
-    /// collector may also specify a target time for the next frame it wants to
-    /// process.
-    ///
-    /// At the end of processing, it checks to make sure that no unknown players
-    /// were encountered during the replay. If any unknown players are found, an
-    /// error is returned.
-    pub fn process<H: Collector>(&mut self, handler: &mut H) -> SubtrActorResult<()> {
-        // Initially, we set target_time to NextFrame to ensure the collector
-        // will process the first frame.
-        let mut target_time = TimeAdvance::NextFrame;
-        for (index, frame) in self
-            .replay
-            .network_frames
-            .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::NoNetworkFrames,
-            ))?
-            .frames
-            .iter()
-            .enumerate()
-        {
-            // Update the internal state of the processor based on the current frame
-            self.actor_state.process_frame(frame, index)?;
-            self.update_mappings(frame)?;
-            self.update_ball_id(frame)?;
-            self.update_boost_amounts(frame, index)?;
-            self.update_demolishes(frame, index)?;
-
-            // Get the time to process for this frame. If target_time is set to
-            // NextFrame, we use the time of the current frame.
-            let mut current_time = match &target_time {
-                TimeAdvance::Time(t) => *t,
-                TimeAdvance::NextFrame => frame.time,
-            };
-
-            while current_time <= frame.time {
-                // Call the handler to process the frame and get the time for
-                // the next frame the handler wants to process
-                target_time = handler.process_frame(&self, frame, index, current_time)?;
-                // If the handler specified a specific time, update current_time
-                // to that time. If the handler specified NextFrame, we break
-                // out of the loop to move on to the next frame in the replay.
-                // This design allows the handler to have control over the frame
-                // rate, including the possibility of skipping frames.
-                if let TimeAdvance::Time(new_target) = target_time {
-                    current_time = new_target;
-                } else {
-                    break;
-                }
-            }
-        }
-        // Make sure that we didn't encounter any players we did not know about
-        // at the beggining of the replay.
-        self.check_player_id_set()
     }
 
     fn check_player_id_set(&self) -> SubtrActorResult<()> {
@@ -667,8 +676,6 @@ impl<'a> ReplayProcessor<'a> {
     /// * Boost active value (1 if active, 0 otherwise)
     /// * Derived boost amount
     /// * Whether the boost is active (true if active, false otherwise)
-    ///
-    /// [`ActorState`]: crate::ActorState
     fn get_current_boost_values(&self, actor_state: &ActorState) -> (u8, u8, u8, f32, bool) {
         let amount_value = get_attribute_errors_expected!(
             self,
@@ -801,6 +808,8 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    /// Provides an iterator over the active demolition effects,
+    /// [`boxcars::DemolishFx`], in the current frame.
     pub fn get_active_demolish_fx(
         &self,
     ) -> SubtrActorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
@@ -981,7 +990,7 @@ impl<'a> ReplayProcessor<'a> {
             .next()
     }
 
-    fn get_ball_actor(&self) -> SubtrActorResult<boxcars::ActorId> {
+    pub fn get_ball_actor_id(&self) -> SubtrActorResult<boxcars::ActorId> {
         self.ball_actor_id.ok_or(SubtrActorError::new(
             SubtrActorErrorVariant::BallActorNotFound,
         ))
@@ -1122,7 +1131,7 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Returns a boolean indicating whether ball syncing is ignored.
     pub fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
-        let actor_id = self.get_ball_actor()?;
+        let actor_id = self.get_ball_actor_id()?;
         get_actor_attribute_matching!(
             self,
             &actor_id,
@@ -1186,7 +1195,7 @@ impl<'a> ReplayProcessor<'a> {
         time: f32,
         close_enough: f32,
     ) -> SubtrActorResult<boxcars::RigidBody> {
-        self.get_interpolated_actor_rigid_body(&self.get_ball_actor()?, time, close_enough)
+        self.get_interpolated_actor_rigid_body(&self.get_ball_actor_id()?, time, close_enough)
     }
 
     /// Returns the name of the specified player.
