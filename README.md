@@ -3,7 +3,7 @@
 
 ## subtr-actor
 
-[subtr-actor](crate) is a versatile library designed to facilitate the
+[`subtr-actor`][1] is a versatile library designed to facilitate the
 process of working with and extracting data from Rocket League replays.
 Utilizing the powerful [boxcars] library for parsing, subtr-actor
 simplifies the underlying actor-based structure of replay files, making them
@@ -90,7 +90,7 @@ fn get_ndarray_with_info_from_replay_filepath(
 }
 ```
 
-[crate]: https://docs.rs/subtr-actor
+[1]: https://docs.rs/subtr-actor
 [subtr-actor]: https://crates.io/crates/subtr-actor
 [Workflow Status]: https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22
 [boxcars]: https://docs.rs/boxcars/latest/boxcars/
