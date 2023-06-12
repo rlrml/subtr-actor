@@ -205,7 +205,7 @@ impl<F> NDArrayCollector<F> {
     ///
     /// # Returns
     ///
-    /// A `SubtrActorResult` containing a [`ReplayMetaWithHeaders`] that
+    /// A [`SubtrActorResult`] containing a [`ReplayMetaWithHeaders`] that
     /// includes the metadata of the replay and column headers.
     pub fn process_and_get_meta_and_headers(
         &mut self,
@@ -580,10 +580,9 @@ macro_rules! count_exprs {
 ///
 /// # Example
 ///
-/// ```
-/// use subtr_actor::*;
+/// ```ignore
 /// build_global_feature_adder!(
-///     SecondsRemaining,
+///     SecondsRemainingExample,
 ///     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
 ///         convert_all_floats!(processor.get_seconds_remaining()?.clone() as f32)
 ///     },
@@ -612,8 +611,7 @@ macro_rules! build_global_feature_adder {
             }
         }
 
-        _global_feature_adder!(
-            {count_exprs!($( $column_names ),*)},
+        global_feature_adder!(
             $struct_name,
             $prop_getter,
             $( $column_names ),*
@@ -693,7 +691,7 @@ macro_rules! _global_feature_adder {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// build_player_feature_adder!(
 ///     PlayerJump,
 ///     |_,
@@ -722,6 +720,7 @@ macro_rules! _global_feature_adder {
 ///     "double jump active"
 /// );
 /// ```
+
 ///
 /// This will create a struct named `PlayerJump` and implement necessary
 /// traits to calculate features using the provided closure. The player-specific
@@ -813,6 +812,8 @@ macro_rules! _player_feature_adder {
     };
 }
 
+/// Unconditionally convert any error into a [`SubtrActorError`] of with the
+/// [`SubtrActorErrorVariant::FloatConversionError`] variant.
 pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
     SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
 }
@@ -827,19 +828,6 @@ pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
 /// Subsequent arguments should be expressions that implement the [`TryInto`]
 /// trait, with the type they're being converted into being the one used in
 /// the `Ok` variant of the return value.
-///
-/// # Example
-///
-/// ```
-/// use subtr_actor::*;
-///
-/// convert_all!(
-///     convert_float_conversion_error,
-///     42.0,
-///     0.0,
-///     1.234,
-/// );
-/// ```
 #[macro_export]
 macro_rules! convert_all {
     ($err:expr, $( $item:expr ),* $(,)?) => {{
@@ -852,17 +840,23 @@ macro_rules! convert_all {
 /// A convenience macro that uses the [`convert_all`] macro with the
 /// [`convert_float_conversion_error`] function for error handling.
 ///
-/// Each item provided is attempted to be converted into a floating point number.
-/// If any of the conversions fail, it short-circuits and returns the error.
+/// Each item provided is attempted to be converted into a floating point
+/// number. If any of the conversions fail, it short-circuits and returns the
+/// error. This macro must be used in the context of a function that returns a
+/// [`Result`] because it uses the ? operator. It is primarily useful for
+/// defining function like the one shown in the example below that are generic
+/// in some parameter that can implements [`TryFrom`].
 ///
 /// # Example
 ///
 /// ```
-/// convert_all_floats!(
-///     42.0,
-///     0.0,
-///     1.234,
-/// );
+/// use subtr_actor::*;
+///
+/// pub fn some_constant_function<F: TryFrom<f32>>(
+///     rigid_body: &boxcars::RigidBody,
+/// ) -> SubtrActorResult<[F; 3]> {
+///     convert_all_floats!(42.0, 0.0, 1.234)
+/// }
 /// ```
 #[macro_export]
 macro_rules! convert_all_floats {
