@@ -41,7 +41,7 @@
 //! instances that are provided to its constructor ([`NDArrayCollector::new`]).
 //! Extending the exact behavior of [`NDArrayCollector`] is thus possible with
 //! user defined [`FeatureAdder`] and [`PlayerFeatureAdder`], which is made easy
-//! with the [`build_global_feature_adder`] and [`build_player_feature_adder`]
+//! with the [`build_global_feature_adder!`] and [`build_player_feature_adder!`]
 //! macros. The [`::ndarray::Array2`] produced by [`NDArrayCollector`] is ideal
 //! for use with machine learning libraries like pytorch and tensorflow.
 //!

@@ -47,7 +47,7 @@ frame can be configured with the [`FeatureAdder`] and [`PlayerFeatureAdder`]
 instances that are provided to its constructor ([`NDArrayCollector::new`]).
 Extending the exact behavior of [`NDArrayCollector`] is thus possible with
 user defined [`FeatureAdder`] and [`PlayerFeatureAdder`], which is made easy
-with the [`build_global_feature_adder`] and [`build_player_feature_adder`]
+with the [`build_global_feature_adder!`] and [`build_player_feature_adder!`]
 macros. The [`::ndarray::Array2`] produced by [`NDArrayCollector`] is ideal
 for use with machine learning libraries like pytorch and tensorflow.
 
@@ -93,4 +93,25 @@ fn get_ndarray_with_info_from_replay_filepath(
 }
 ```
 
-License: MIT
+[crate]: https://docs.rs/subtr-actor
+[subtr-actor]: https://crates.io/crates/subtr-actor
+[Workflow Status]: https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22
+[boxcars]: https://docs.rs/boxcars/latest/boxcars/
+[ReplayProcessor]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayProcessor.html
+[ReplayProcessor::process]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayProcessor.html#method.process
+[boxcars::Replay]: https://docs.rs/boxcars/latest/boxcars/struct.Replay.html
+[ActorStateModeler]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ActorStateModeler.html
+[Collector]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html
+[TimeAdvance]: https://docs.rs/subtr-actor/latest/subtr_actor/enum.TimeAdvance.html
+[FrameRateDecorator]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.FrameRateDecorator.html
+[NDArrayCollector]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html
+[::ndarray::Array2]: https://docs.rs/ndarray/latest/ndarray/struct.Array2.html
+[FeatureAdder]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.FeatureAdder.html
+[PlayerFeatureAdder]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.PlayerFeatureAdder.html
+[NDArrayCollector::new]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html#method.new
+[build_global_feature_adder!]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_global_feature_adder.html
+[build_player_feature_adder!]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_player_feature_adder.html
+[ReplayData]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayData.html
+[serde::Serialize]: https://docs.rs/serde/latest/serde/trait.Serialize.html
+[ReplayMetaWithHeaders]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayMetaWithHeaders.html
+[Collector::process_replay]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html#tymethod.process_replay
