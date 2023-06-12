@@ -1,3 +1,4 @@
+mod actor_state;
 mod collector;
 mod constants;
 mod error;
@@ -7,6 +8,7 @@ mod util;
 #[cfg(test)]
 mod util_test;
 
+pub use crate::actor_state::*;
 pub use crate::collector::*;
 pub use crate::constants::*;
 pub use crate::error::*;

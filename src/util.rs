@@ -10,6 +10,19 @@ macro_rules! fmt_err {
     };
 }
 
+pub type PlayerId = boxcars::RemoteId;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DemolishInfo {
+    pub time: f32,
+    pub seconds_remaining: i32,
+    pub frame: usize,
+    pub attacker: PlayerId,
+    pub victim: PlayerId,
+    pub attacker_velocity: boxcars::Vector3f,
+    pub victim_velocity: boxcars::Vector3f,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayMeta {
     pub team_zero: Vec<PlayerInfo>,
