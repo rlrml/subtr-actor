@@ -1,1 +1,4 @@
 /target
+*.replay
+perf.data
+flamegraph.svg
