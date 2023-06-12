@@ -90,6 +90,7 @@ fn get_ndarray_with_info_from_replay_filepath(
 
     Ok(collector.get_meta_and_ndarray().map_err(|e| e.variant)?)
 }
+```
 
 
 [1]: https://docs.rs/subtr-actor/latest/subtr_actor/
