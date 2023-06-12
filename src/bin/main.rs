@@ -12,18 +12,10 @@ fn main() {
         .parse();
     let replay = parsing.unwrap();
 
-    println!("{:?}", replay.properties);
-
     let mut collector = NDArrayCollector::<f32>::from_strings(
-        &[
-            "InterpolatedBallRigidBodyNoVelocities",
-            // "BallRigidBodyNoVelocities",
-            // "FrameTime",
-            // "CurrentTime",
-        ],
+        &["InterpolatedBallRigidBodyNoVelocities"],
         &[
             "InterpolatedPlayerRigidBodyNoVelocities",
-            // "PlayerRigidBodyNoVelocities",
             "PlayerBoost",
             "PlayerAnyJump",
             "PlayerDemolishedBy",
@@ -36,64 +28,6 @@ fn main() {
         .unwrap();
 
     let (meta, array) = collector.get_meta_and_ndarray().unwrap();
-
-    return;
-
-    let mut display_columns: Vec<_> = meta
-        .headers_vec()
-        .clone()
-        .into_iter()
-        .enumerate()
-        .filter(|(_index, name)| name.contains("rotation"))
-        .filter(|(_index, name)| name.contains("Player 4"))
-        .collect();
-
-    display_columns.extend(
-        meta.headers_vec()
-            .clone()
-            .into_iter()
-            .enumerate()
-            .filter(|(_index, name)| name.contains("time")),
-    );
-
-    println!("{:?}", display_columns);
-
-    let mut last: std::collections::HashMap<usize, (f32, usize)> = std::collections::HashMap::new();
-
-    let mut same_value_frames = 0;
-
-    for frame_index in 0..array.shape()[0] {
-        let mut same_as_last = Vec::new();
-        for (index, column_name) in display_columns.iter() {
-            let (last_value, same_count) = last.get(&index).unwrap_or(&(0.0, 1));
-            let this_value = array.get((frame_index, *index)).unwrap();
-            if this_value == last_value {
-                let new_count = same_count + 1;
-                same_as_last.push((column_name, new_count));
-                last.insert(*index, (*last_value, same_count + 1));
-            } else {
-                last.insert(*index, (*this_value, 1));
-            }
-        }
-        if true {
-            println!("{:?}", same_as_last);
-            println!("{}", frame_index);
-            for (index, column_name) in display_columns.iter() {
-                println!(
-                    "{}: {}",
-                    column_name,
-                    array.get((frame_index, *index)).unwrap()
-                );
-            }
-            same_value_frames += 1;
-            println!("");
-        }
-    }
-
-    println!("");
-    println!("Total same value frames: {}", same_value_frames);
-
-    println!("Total frames {}", array.shape()[0]);
 
     for i in 0..array.shape()[1] {
         println!(
@@ -118,6 +52,5 @@ fn main() {
         );
     }
 
-    // println!("{:?}", meta);
     println!("Array shape is {:?}", array.shape());
 }
