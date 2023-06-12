@@ -53,8 +53,6 @@ to get a serializable to e.g. json (though [`serde::Serialize`][18])
 representation of the replay. The representation differs from what you might
 get from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
 objects, but instead something more natural where the data associated with
-
-
 each entity in the game is grouped together.
 
 ### Example
@@ -92,24 +90,23 @@ fn get_ndarray_with_info_from_replay_filepath(
 }
 ```
 
-
 [1]: https://docs.rs/subtr-actor/latest/subtr_actor/
 [2]: https://docs.rs/boxcars/latest/boxcars/
 [3]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayProcessor.html
-[4]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayProcessor.html#tymethod.process
+[4]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayProcessor.html#method.process
 [5]: https://docs.rs/boxcars/latest/boxcars/struct.Replay.html
 [6]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ActorStateModeler.html
 [7]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html
 [8]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.TimeAdvance.html
 [9]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.FrameRateDecorator.html
 [10]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html
-[11]: https://docs.rs/ndarray/latest/ndarray/struct.Array2.html
+[11]: https://docs.rs/ndarray/latest/ndarray/type.Array2.html
 [12]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.FeatureAdder.html
 [13]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.PlayerFeatureAdder.html
-[14]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html#tymethod.new
+[14]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html#method.new
 [15]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_global_feature_adder.html
 [16]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_player_feature_adder.html
 [17]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayData.html
 [18]: https://docs.rs/serde/latest/serde/trait.Serialize.html
 [19]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayMetaWithHeaders.html
-[20]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html#tymethod.process_replay.html
+[20]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html#method.process_replay
