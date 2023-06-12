@@ -3,11 +3,11 @@
 
 ## subtr-actor
 
-[`subtr-actor`][1] is a versatile library designed to facilitate the
-process of working with and extracting data from Rocket League replays.
-Utilizing the powerful [`boxcars`][2] library for parsing, subtr-actor
-simplifies the underlying actor-based structure of replay files, making them
-more accessible and easier to manipulate.
+[`subtr-actor`][1] is a versatile library designed to facilitate the process of
+working with and extracting data from Rocket League replays. Utilizing the
+powerful [`boxcars`][2] library for parsing, subtr-actor simplifies (or
+'subtracts', as hinted by its name) the underlying actor-based structure of
+replay files, making them more accessible and easier to manipulate.
 
 ### Overview of Key Components
 
