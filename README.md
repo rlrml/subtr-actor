@@ -1,5 +1,7 @@
 # subtr-actor
 
+[![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor)
+
 ## subtr-actor
 
 [`subtr-actor`](crate) is a versatile library designed to facilitate the process of
