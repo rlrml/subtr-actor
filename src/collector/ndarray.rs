@@ -581,6 +581,7 @@ macro_rules! count_exprs {
 /// # Example
 ///
 /// ```
+/// use subtr_actor::*;
 /// build_global_feature_adder!(
 ///     SecondsRemaining,
 ///     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
@@ -606,8 +607,8 @@ macro_rules! build_global_feature_adder {
         impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
-            pub fn arc_new() -> Arc<dyn FeatureAdder<F> + Send + Sync + 'static> {
-                Arc::new(Self::new())
+            pub fn arc_new() -> std::sync::Arc<dyn FeatureAdder<F> + Send + Sync + 'static> {
+                std::sync::Arc::new(Self::new())
             }
         }
 
@@ -742,8 +743,8 @@ macro_rules! build_player_feature_adder {
                 }
             }
 
-            pub fn arc_new() -> Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static> {
-                Arc::new(Self::new())
+            pub fn arc_new() -> std::sync::Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static> {
+                std::sync::Arc::new(Self::new())
             }
         }
 
@@ -830,6 +831,8 @@ pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
 /// # Example
 ///
 /// ```
+/// use subtr_actor::*;
+///
 /// convert_all!(
 ///     convert_float_conversion_error,
 ///     42.0,

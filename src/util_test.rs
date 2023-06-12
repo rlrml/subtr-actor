@@ -65,7 +65,7 @@ fn test_get_interpolated_rigid_body() {
             assert_eq!(interpolated_body.location.z, 0.5);
             // Add further assertions for rotation, linear_velocity and angular_velocity as needed.
         }
-        Err(e) => panic!("Interpolation failed: {}", e),
+        Err(e) => panic!("Interpolation failed: {:?}", e),
     };
 }
 
