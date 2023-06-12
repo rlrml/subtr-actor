@@ -244,12 +244,13 @@ pub fn get_interpolated_rigid_body(
     end_body: &boxcars::RigidBody,
     end_time: f32,
     time: f32,
-) -> ReplayProcessorResult<boxcars::RigidBody> {
+) -> BoxcarsResult<boxcars::RigidBody> {
     if !(start_time <= time && time <= end_time) {
-        return Err(format!(
-            "start_time <= time && time <= end_time not satisfied {}, {}, {}",
-            start_time, time, end_time,
-        ));
+        return BoxcarsError::new_result(BoxcarsErrorVariant::InterpolationTimeOrderError {
+            start_time,
+            time,
+            end_time,
+        });
     }
 
     let duration = end_time - start_time;

@@ -1,5 +1,6 @@
 mod collector;
 mod constants;
+mod error;
 mod processor;
 mod util;
 
@@ -7,6 +8,8 @@ mod util;
 mod util_test;
 
 pub use crate::collector::*;
+pub use crate::constants::*;
+pub use crate::error::*;
 pub use crate::processor::*;
 pub use crate::util::*;
 

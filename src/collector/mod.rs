@@ -6,7 +6,7 @@ pub use self::ndarray::*;
 pub use decorator::*;
 pub use replay_data::*;
 
-use crate::{processor::ReplayProcessor, ReplayProcessorResult};
+use crate::*;
 use boxcars;
 
 pub enum TimeAdvance {
@@ -21,9 +21,9 @@ pub trait Collector: Sized {
         frame: &boxcars::Frame,
         frame_number: usize,
         target_time: f32,
-    ) -> ReplayProcessorResult<TimeAdvance>;
+    ) -> BoxcarsResult<TimeAdvance>;
 
-    fn process_replay(mut self, replay: &boxcars::Replay) -> ReplayProcessorResult<Self> {
+    fn process_replay(mut self, replay: &boxcars::Replay) -> BoxcarsResult<Self> {
         ReplayProcessor::new(replay)?.process(&mut self)?;
         Ok(self)
     }
@@ -31,7 +31,7 @@ pub trait Collector: Sized {
 
 impl<G> Collector for G
 where
-    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize, f32) -> ReplayProcessorResult<TimeAdvance>,
+    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize, f32) -> BoxcarsResult<TimeAdvance>,
 {
     fn process_frame(
         &mut self,
@@ -39,7 +39,7 @@ where
         frame: &boxcars::Frame,
         frame_number: usize,
         target_time: f32,
-    ) -> ReplayProcessorResult<TimeAdvance> {
+    ) -> BoxcarsResult<TimeAdvance> {
         self(processor, frame, frame_number, target_time)
     }
 }

@@ -6,15 +6,6 @@ use std::sync::Arc;
 
 use crate::*;
 
-macro_rules! string_error {
-	($format:expr) => {
-		string_error!($format,)
-	};
-    ($format:expr, $( $arg:expr ),* $(,)?) => {
-        |e| format!($format, $( $arg, )* e)
-    };
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NDArrayColumnHeaders {
     pub global_headers: Vec<String>,
@@ -84,11 +75,13 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
-    fn try_get_frame_feature_count(&self) -> Result<usize, String> {
+    fn try_get_frame_feature_count(&self) -> BoxcarsResult<usize> {
         let player_count = self
             .replay_meta
             .as_ref()
-            .ok_or("Replay meta not yet set")?
+            .ok_or(BoxcarsError::new(
+                BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+            ))?
             .player_count();
         let global_feature_count: usize = self
             .feature_adders
@@ -125,50 +118,50 @@ impl<F> NDArrayCollector<F> {
         NDArrayColumnHeaders::new(global_headers, player_headers)
     }
 
-    pub fn get_ndarray(self) -> Result<ndarray::Array2<F>, String> {
+    pub fn get_ndarray(self) -> BoxcarsResult<ndarray::Array2<F>> {
         self.get_meta_and_ndarray().map(|a| a.1)
     }
 
     pub fn get_meta_and_ndarray(
         self,
-    ) -> Result<(ReplayMetaWithHeaders, ndarray::Array2<F>), String> {
+    ) -> BoxcarsResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
-        if self.data.len() != expected_length {
-            Err(format!(
-                "Unexpected vector length: actual: {}, expected: {}, features: {}, rows: {}",
-                self.data.len(),
-                expected_length,
-                features_per_row,
-                self.frames_added,
-            ))
-        } else {
-            let column_headers = self.get_column_headers();
-            Ok((
-                ReplayMetaWithHeaders {
-                    replay_meta: self.replay_meta.ok_or("No replay meta")?,
-                    column_headers,
-                },
-                ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
-                    .map_err(string_error!("Error building array from vec {:?}",))?,
-            ))
-        }
+        assert!(self.data.len() == expected_length);
+        let column_headers = self.get_column_headers();
+        Ok((
+            ReplayMetaWithHeaders {
+                replay_meta: self.replay_meta.ok_or(BoxcarsError::new(
+                    BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+                ))?,
+                column_headers,
+            },
+            ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
+                .map_err(BoxcarsErrorVariant::NDArrayShapeError)
+                .map_err(BoxcarsError::new)?,
+        ))
     }
 
     pub fn process_and_get_meta_and_headers(
         &mut self,
         replay: &boxcars::Replay,
-    ) -> ReplayProcessorResult<ReplayMetaWithHeaders> {
+    ) -> BoxcarsResult<ReplayMetaWithHeaders> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process_long_enough_to_get_actor_ids()?;
         self.maybe_set_replay_meta(&processor)?;
         Ok(ReplayMetaWithHeaders {
-            replay_meta: self.replay_meta.as_ref().ok_or("No replay meta")?.clone(),
+            replay_meta: self
+                .replay_meta
+                .as_ref()
+                .ok_or(BoxcarsError::new(
+                    BoxcarsErrorVariant::CouldNotBuildReplayMeta,
+                ))?
+                .clone(),
             column_headers: self.get_column_headers(),
         })
     }
 
-    fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> ReplayProcessorResult<()> {
+    fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> BoxcarsResult<()> {
         if let None = self.replay_meta {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
@@ -183,7 +176,7 @@ impl<F> Collector for NDArrayCollector<F> {
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
-    ) -> ReplayProcessorResult<collector::TimeAdvance> {
+    ) -> BoxcarsResult<collector::TimeAdvance> {
         self.maybe_set_replay_meta(processor)?;
 
         if !processor.ball_rigid_body_exists()? {
@@ -220,25 +213,33 @@ impl<F> Collector for NDArrayCollector<F> {
 }
 
 impl NDArrayCollector<f32> {
-    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> Result<Self, String> {
+    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> BoxcarsResult<Self> {
         let feature_adders: Vec<Arc<dyn FeatureAdder<f32> + Send + Sync>> = fa_names
             .iter()
             .map(|name| {
                 Ok(NAME_TO_GLOBAL_FEATURE_ADDER
                     .get(name)
-                    .ok_or_else(|| format!("{:?} was not a recognized feature adder", name))?
+                    .ok_or_else(|| {
+                        BoxcarsError::new(BoxcarsErrorVariant::UnknownFeatureAdderName(
+                            name.to_string(),
+                        ))
+                    })?
                     .clone())
             })
-            .collect::<Result<Vec<_>, String>>()?;
+            .collect::<BoxcarsResult<Vec<_>>>()?;
         let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<f32> + Send + Sync>> = pfa_names
             .iter()
             .map(|name| {
                 Ok(NAME_TO_PLAYER_FEATURE_ADDER
                     .get(name)
-                    .ok_or_else(|| format!("{:?} was not a recognized feature adder", name))?
+                    .ok_or_else(|| {
+                        BoxcarsError::new(BoxcarsErrorVariant::UnknownFeatureAdderName(
+                            name.to_string(),
+                        ))
+                    })?
                     .clone())
             })
-            .collect::<Result<Vec<_>, String>>()?;
+            .collect::<BoxcarsResult<Vec<_>>>()?;
         Ok(Self::new(feature_adders, player_feature_adders))
     }
 }
@@ -273,7 +274,7 @@ pub trait FeatureAdder<F> {
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()>;
+    ) -> BoxcarsResult<()>;
 }
 
 pub trait LengthCheckedFeatureAdder<F, const N: usize> {
@@ -285,7 +286,7 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
-    ) -> Result<[F; N], String>;
+    ) -> BoxcarsResult<[F; N]>;
 }
 
 macro_rules! impl_feature_adder {
@@ -301,7 +302,7 @@ macro_rules! impl_feature_adder {
                 frame_count: usize,
                 current_time: f32,
                 vector: &mut Vec<F>,
-            ) -> ReplayProcessorResult<()> {
+            ) -> BoxcarsResult<()> {
                 Ok(
                     vector.extend(self.get_features(
                         processor,
@@ -334,7 +335,7 @@ pub trait PlayerFeatureAdder<F> {
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()>;
+    ) -> BoxcarsResult<()>;
 }
 
 pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
@@ -347,7 +348,7 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
-    ) -> Result<[F; N], String>;
+    ) -> BoxcarsResult<[F; N]>;
 }
 
 macro_rules! impl_player_feature_adder {
@@ -364,7 +365,7 @@ macro_rules! impl_player_feature_adder {
                 frame_count: usize,
                 current_time: f32,
                 vector: &mut Vec<F>,
-            ) -> ReplayProcessorResult<()> {
+            ) -> BoxcarsResult<()> {
                 Ok(vector.extend(self.get_features(
                     player_id,
                     processor,
@@ -383,7 +384,7 @@ macro_rules! impl_player_feature_adder {
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&ReplayProcessor, &boxcars::Frame, usize, f32) -> Result<[F; N], String>,
+    G: Fn(&ReplayProcessor, &boxcars::Frame, usize, f32) -> BoxcarsResult<[F; N]>,
 {
     fn add_features(
         &self,
@@ -392,7 +393,7 @@ where
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()> {
+    ) -> BoxcarsResult<()> {
         Ok(vector.extend(self.0(processor, frame, frame_count, current_time)?))
     }
 
@@ -403,7 +404,7 @@ where
 
 impl<G, F, const N: usize> PlayerFeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize, f32) -> Result<[F; N], String>,
+    G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize, f32) -> BoxcarsResult<[F; N]>,
 {
     fn add_features(
         &self,
@@ -413,7 +414,7 @@ where
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> ReplayProcessorResult<()> {
+    ) -> BoxcarsResult<()> {
         Ok(vector.extend(self.0(
             player_id,
             processor,
@@ -428,12 +429,22 @@ where
     }
 }
 
+fn convert_float_conversion_error<T>(_: T) -> BoxcarsError {
+    BoxcarsError::new(BoxcarsErrorVariant::FloatConversionError)
+}
+
 macro_rules! convert_all {
     ($err:expr, $( $item:expr ),* $(,)?) => {{
 		Ok([
 			$( $item.try_into().map_err($err)? ),*
 		])
 	}};
+}
+
+macro_rules! convert_all_floats {
+    ($( $item:expr ),* $(,)?) => {{
+        convert_all!(convert_float_conversion_error, $( $item ),*)
+    }};
 }
 
 fn or_zero_boxcars_3f() -> boxcars::Vector3f {
@@ -444,7 +455,7 @@ fn or_zero_boxcars_3f() -> boxcars::Vector3f {
     }
 }
 
-type RigidBodyArrayResult<F> = Result<[F; 12], String>;
+type RigidBodyArrayResult<F> = BoxcarsResult<[F; 12]>;
 
 pub fn get_rigid_body_properties<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
@@ -452,7 +463,6 @@ pub fn get_rigid_body_properties<F: TryFrom<f32>>(
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let convert = string_error!("Error in rigid body float conversion {:?}");
     let linear_velocity = rigid_body
         .linear_velocity
         .unwrap_or_else(or_zero_boxcars_3f);
@@ -463,8 +473,7 @@ where
     let location = rigid_body.location;
     let (rx, ry, rz) =
         glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
-    convert_all!(
-        convert,
+    convert_all_floats!(
         location.x,
         location.y,
         location.z,
@@ -482,15 +491,14 @@ where
 
 pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
-) -> Result<[F; 7], String>
+) -> BoxcarsResult<[F; 7]>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let convert = string_error!("Error in rigid body float conversion {:?}");
     let rotation = rigid_body.rotation;
     let location = rigid_body.location;
-    convert_all!(
-        convert, location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
+    convert_all_floats!(
+        location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
     )
 }
 
@@ -499,7 +507,7 @@ where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     convert_all!(
-        string_error!("{:?}"),
+        convert_float_conversion_error,
         // We use huge values for location instead of 0s so that hopefully any
         // model built on this data can understand that the player is not
         // actually on the field.
@@ -518,23 +526,11 @@ where
     )
 }
 
-fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> Result<[F; 7], String>
+fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> BoxcarsResult<[F; 7]>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    convert_all!(
-        string_error!("{:?}"),
-        // We use huge values for location instead of 0s so that hopefully any
-        // model built on this data can understand that the player is not
-        // actually on the field.
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
+    convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
 }
 
 macro_rules! count_exprs {
@@ -602,7 +598,7 @@ macro_rules! _global_feature_adder {
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
-            ) -> Result<[F; $count], String> {
+            ) -> BoxcarsResult<[F; $count]> {
                 $prop_getter(self, processor, frame, frame_count, current_time)
             }
         }
@@ -676,7 +672,7 @@ macro_rules! _player_feature_adder {
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
-            ) -> Result<[F; $count], String> {
+            ) -> BoxcarsResult<[F; $count]> {
                 $prop_getter(self, player_id, processor, frame, frame_count, current_time)
             }
         }
@@ -688,26 +684,21 @@ macro_rules! _player_feature_adder {
 build_global_feature_adder!(
     SecondsRemaining,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        convert_all!(
-            string_error!("{:?}"),
-            processor.get_seconds_remaining()?.clone() as f32
-        )
+        convert_all_floats!(processor.get_seconds_remaining()?.clone() as f32)
     },
     "seconds remaining"
 );
 
 build_global_feature_adder!(
     CurrentTime,
-    |_, _processor, _frame, _index, current_time: f32| {
-        convert_all!(string_error!("{:?}"), current_time)
-    },
+    |_, _processor, _frame, _index, current_time: f32| { convert_all_floats!(current_time) },
     "current time"
 );
 
 build_global_feature_adder!(
     FrameTime,
     |_, _processor, frame: &boxcars::Frame, _index, _current_time| {
-        convert_all!(string_error!("{:?}"), frame.time)
+        convert_all_floats!(frame.time)
     },
     "frame time"
 );
@@ -898,16 +889,17 @@ player_feature_adder!(
 build_player_feature_adder!(
     PlayerBoost,
     |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
-        convert_all!(
-            string_error!("{:?}"),
-            processor.get_player_boost_level(player_id).unwrap_or(0.0)
-        )
+        convert_all_floats!(processor.get_player_boost_level(player_id).unwrap_or(0.0))
     },
     "boost level"
 );
 
-pub fn get_f32(v: u8) -> Result<f32, String> {
-    TryFrom::try_from(v % 2).map_err(string_error!("{:?}"))
+fn _u8_get_f32(v: u8) -> Result<f32, anyhow::Error> {
+    Ok(TryFrom::try_from(v % 2)?)
+}
+
+fn u8_get_f32(v: u8) -> BoxcarsResult<f32> {
+    _u8_get_f32(v).map_err(convert_float_conversion_error)
 }
 
 build_player_feature_adder!(
@@ -918,19 +910,18 @@ build_player_feature_adder!(
      _frame,
      _frame_number,
      _current_time: f32| {
-        convert_all!(
-            string_error!("{:?}"),
+        convert_all_floats!(
             processor
                 .get_dodge_active(player_id)
-                .and_then(get_f32)
+                .and_then(u8_get_f32)
                 .unwrap_or(0.0),
             processor
                 .get_jump_active(player_id)
-                .and_then(get_f32)
+                .and_then(u8_get_f32)
                 .unwrap_or(0.0),
             processor
                 .get_double_jump_active(player_id)
-                .and_then(get_f32)
+                .and_then(u8_get_f32)
                 .unwrap_or(0.0),
         )
     },
@@ -955,7 +946,7 @@ build_player_feature_adder!(
             .enumerate()
             .map(|(index, is_active)| (1 << index) * is_active)
             .sum::<u8>() as f32;
-        convert_all!(string_error!("{:?}"), value)
+        convert_all_floats!(value)
     },
     "any_jump_active"
 );
@@ -985,7 +976,7 @@ build_player_feature_adder!(
             })
             .and_then(|v| i32::try_from(v).ok())
             .unwrap_or(-1);
-        convert_all!(string_error!("{:?}"), demolisher_index as f32)
+        convert_all_floats!(demolisher_index as f32)
     },
     "player demolished by"
 );
