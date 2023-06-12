@@ -75,12 +75,12 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
-    fn try_get_frame_feature_count(&self) -> SubtActorResult<usize> {
+    fn try_get_frame_feature_count(&self) -> SubtrActorResult<usize> {
         let player_count = self
             .replay_meta
             .as_ref()
-            .ok_or(SubtActorError::new(
-                SubtActorErrorVariant::CouldNotBuildReplayMeta,
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::CouldNotBuildReplayMeta,
             ))?
             .player_count();
         let global_feature_count: usize = self
@@ -118,34 +118,34 @@ impl<F> NDArrayCollector<F> {
         NDArrayColumnHeaders::new(global_headers, player_headers)
     }
 
-    pub fn get_ndarray(self) -> SubtActorResult<ndarray::Array2<F>> {
+    pub fn get_ndarray(self) -> SubtrActorResult<ndarray::Array2<F>> {
         self.get_meta_and_ndarray().map(|a| a.1)
     }
 
     pub fn get_meta_and_ndarray(
         self,
-    ) -> SubtActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
+    ) -> SubtrActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
         let features_per_row = self.try_get_frame_feature_count()?;
         let expected_length = features_per_row * self.frames_added;
         assert!(self.data.len() == expected_length);
         let column_headers = self.get_column_headers();
         Ok((
             ReplayMetaWithHeaders {
-                replay_meta: self.replay_meta.ok_or(SubtActorError::new(
-                    SubtActorErrorVariant::CouldNotBuildReplayMeta,
+                replay_meta: self.replay_meta.ok_or(SubtrActorError::new(
+                    SubtrActorErrorVariant::CouldNotBuildReplayMeta,
                 ))?,
                 column_headers,
             },
             ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
-                .map_err(SubtActorErrorVariant::NDArrayShapeError)
-                .map_err(SubtActorError::new)?,
+                .map_err(SubtrActorErrorVariant::NDArrayShapeError)
+                .map_err(SubtrActorError::new)?,
         ))
     }
 
     pub fn process_and_get_meta_and_headers(
         &mut self,
         replay: &boxcars::Replay,
-    ) -> SubtActorResult<ReplayMetaWithHeaders> {
+    ) -> SubtrActorResult<ReplayMetaWithHeaders> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process_long_enough_to_get_actor_ids()?;
         self.maybe_set_replay_meta(&processor)?;
@@ -153,15 +153,15 @@ impl<F> NDArrayCollector<F> {
             replay_meta: self
                 .replay_meta
                 .as_ref()
-                .ok_or(SubtActorError::new(
-                    SubtActorErrorVariant::CouldNotBuildReplayMeta,
+                .ok_or(SubtrActorError::new(
+                    SubtrActorErrorVariant::CouldNotBuildReplayMeta,
                 ))?
                 .clone(),
             column_headers: self.get_column_headers(),
         })
     }
 
-    fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtActorResult<()> {
+    fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
         if let None = self.replay_meta {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
@@ -176,7 +176,7 @@ impl<F> Collector for NDArrayCollector<F> {
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
-    ) -> SubtActorResult<collector::TimeAdvance> {
+    ) -> SubtrActorResult<collector::TimeAdvance> {
         self.maybe_set_replay_meta(processor)?;
 
         if !processor.ball_rigid_body_exists()? {
@@ -213,33 +213,33 @@ impl<F> Collector for NDArrayCollector<F> {
 }
 
 impl NDArrayCollector<f32> {
-    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> SubtActorResult<Self> {
+    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
         let feature_adders: Vec<Arc<dyn FeatureAdder<f32> + Send + Sync>> = fa_names
             .iter()
             .map(|name| {
                 Ok(NAME_TO_GLOBAL_FEATURE_ADDER
                     .get(name)
                     .ok_or_else(|| {
-                        SubtActorError::new(SubtActorErrorVariant::UnknownFeatureAdderName(
+                        SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
                             name.to_string(),
                         ))
                     })?
                     .clone())
             })
-            .collect::<SubtActorResult<Vec<_>>>()?;
+            .collect::<SubtrActorResult<Vec<_>>>()?;
         let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<f32> + Send + Sync>> = pfa_names
             .iter()
             .map(|name| {
                 Ok(NAME_TO_PLAYER_FEATURE_ADDER
                     .get(name)
                     .ok_or_else(|| {
-                        SubtActorError::new(SubtActorErrorVariant::UnknownFeatureAdderName(
+                        SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
                             name.to_string(),
                         ))
                     })?
                     .clone())
             })
-            .collect::<SubtActorResult<Vec<_>>>()?;
+            .collect::<SubtrActorResult<Vec<_>>>()?;
         Ok(Self::new(feature_adders, player_feature_adders))
     }
 }
@@ -274,7 +274,7 @@ pub trait FeatureAdder<F> {
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> SubtActorResult<()>;
+    ) -> SubtrActorResult<()>;
 }
 
 pub trait LengthCheckedFeatureAdder<F, const N: usize> {
@@ -286,7 +286,7 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
-    ) -> SubtActorResult<[F; N]>;
+    ) -> SubtrActorResult<[F; N]>;
 }
 
 macro_rules! impl_feature_adder {
@@ -302,7 +302,7 @@ macro_rules! impl_feature_adder {
                 frame_count: usize,
                 current_time: f32,
                 vector: &mut Vec<F>,
-            ) -> SubtActorResult<()> {
+            ) -> SubtrActorResult<()> {
                 Ok(
                     vector.extend(self.get_features(
                         processor,
@@ -335,7 +335,7 @@ pub trait PlayerFeatureAdder<F> {
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> SubtActorResult<()>;
+    ) -> SubtrActorResult<()>;
 }
 
 pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
@@ -348,7 +348,7 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
-    ) -> SubtActorResult<[F; N]>;
+    ) -> SubtrActorResult<[F; N]>;
 }
 
 macro_rules! impl_player_feature_adder {
@@ -365,7 +365,7 @@ macro_rules! impl_player_feature_adder {
                 frame_count: usize,
                 current_time: f32,
                 vector: &mut Vec<F>,
-            ) -> SubtActorResult<()> {
+            ) -> SubtrActorResult<()> {
                 Ok(vector.extend(self.get_features(
                     player_id,
                     processor,
@@ -384,7 +384,7 @@ macro_rules! impl_player_feature_adder {
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtActorResult<[F; N]>,
+    G: Fn(&ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
 {
     fn add_features(
         &self,
@@ -393,7 +393,7 @@ where
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> SubtActorResult<()> {
+    ) -> SubtrActorResult<()> {
         Ok(vector.extend(self.0(processor, frame, frame_count, current_time)?))
     }
 
@@ -404,7 +404,7 @@ where
 
 impl<G, F, const N: usize> PlayerFeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtActorResult<[F; N]>,
+    G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
 {
     fn add_features(
         &self,
@@ -414,7 +414,7 @@ where
         frame_count: usize,
         current_time: f32,
         vector: &mut Vec<F>,
-    ) -> SubtActorResult<()> {
+    ) -> SubtrActorResult<()> {
         Ok(vector.extend(self.0(
             player_id,
             processor,
@@ -429,8 +429,8 @@ where
     }
 }
 
-fn convert_float_conversion_error<T>(_: T) -> SubtActorError {
-    SubtActorError::new(SubtActorErrorVariant::FloatConversionError)
+fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
+    SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
 }
 
 macro_rules! convert_all {
@@ -455,7 +455,7 @@ fn or_zero_boxcars_3f() -> boxcars::Vector3f {
     }
 }
 
-type RigidBodyArrayResult<F> = SubtActorResult<[F; 12]>;
+type RigidBodyArrayResult<F> = SubtrActorResult<[F; 12]>;
 
 pub fn get_rigid_body_properties<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
@@ -491,7 +491,7 @@ where
 
 pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
-) -> SubtActorResult<[F; 7]>
+) -> SubtrActorResult<[F; 7]>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -526,7 +526,7 @@ where
     )
 }
 
-fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtActorResult<[F; 7]>
+fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtrActorResult<[F; 7]>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
@@ -598,7 +598,7 @@ macro_rules! _global_feature_adder {
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
-            ) -> SubtActorResult<[F; $count]> {
+            ) -> SubtrActorResult<[F; $count]> {
                 $prop_getter(self, processor, frame, frame_count, current_time)
             }
         }
@@ -672,7 +672,7 @@ macro_rules! _player_feature_adder {
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
-            ) -> SubtActorResult<[F; $count]> {
+            ) -> SubtrActorResult<[F; $count]> {
                 $prop_getter(self, player_id, processor, frame, frame_count, current_time)
             }
         }
@@ -894,7 +894,7 @@ build_player_feature_adder!(
     "boost level"
 );
 
-fn u8_get_f32(v: u8) -> SubtActorResult<f32> {
+fn u8_get_f32(v: u8) -> SubtrActorResult<f32> {
     v.try_into().map_err(convert_float_conversion_error)
 }
 

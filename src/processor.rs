@@ -8,7 +8,7 @@ macro_rules! attribute_match {
         if let $type(value) = attribute {
             Ok(value)
         } else {
-            SubtActorError::new_result(SubtActorErrorVariant::UnexpectedAttributeType {
+            SubtrActorError::new_result(SubtrActorErrorVariant::UnexpectedAttributeType {
                 expected_type: stringify!(path).to_string(),
                 actual_type: attribute_to_tag(&attribute).to_string(),
             })
@@ -44,7 +44,7 @@ macro_rules! get_derived_attribute {
     ($map:expr, $key:expr, $type:path) => {
         $map.get($key)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::DerivedKeyValueNotFound {
+                SubtrActorError::new(SubtrActorErrorVariant::DerivedKeyValueNotFound {
                     name: $key.to_string(),
                 })
             })
@@ -84,7 +84,7 @@ pub struct ReplayProcessor<'a> {
 
 impl<'a> ReplayProcessor<'a> {
     // Initialization
-    pub fn new(replay: &'a boxcars::Replay) -> SubtActorResult<Self> {
+    pub fn new(replay: &'a boxcars::Replay) -> SubtrActorResult<Self> {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
         for (id, name) in replay.objects.iter().enumerate() {
@@ -130,28 +130,30 @@ impl<'a> ReplayProcessor<'a> {
         self.known_demolishes = Vec::new();
     }
 
-    fn set_player_order_from_headers(&mut self) -> SubtActorResult<()> {
+    fn set_player_order_from_headers(&mut self) -> SubtrActorResult<()> {
         let _player_stats = self
             .replay
             .properties
             .iter()
             .find(|(key, _)| key == "PlayerStats")
-            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::PlayerStatsHeaderNotFound))?;
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PlayerStatsHeaderNotFound)
+            })?;
         // XXX: implementation incomplete
-        SubtActorError::new_result(SubtActorErrorVariant::PlayerStatsHeaderNotFound)
+        SubtrActorError::new_result(SubtrActorErrorVariant::PlayerStatsHeaderNotFound)
     }
 
-    pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> SubtActorResult<()> {
+    pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> SubtrActorResult<()> {
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
             if n > 10 * 30 {
-                SubtActorError::new_result(SubtActorErrorVariant::FinishProcessingEarly)
+                SubtrActorError::new_result(SubtrActorErrorVariant::FinishProcessingEarly)
             } else {
                 Ok(TimeAdvance::NextFrame)
             }
         };
         let process_result = self.process(&mut handler);
-        if let Some(SubtActorErrorVariant::FinishProcessingEarly) =
+        if let Some(SubtrActorErrorVariant::FinishProcessingEarly) =
             process_result.as_ref().err().map(|e| e.variant.clone())
         {
             Ok(())
@@ -160,7 +162,7 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
-    fn set_player_order_from_frames(&mut self) -> SubtActorResult<()> {
+    fn set_player_order_from_frames(&mut self) -> SubtrActorResult<()> {
         self.process_long_enough_to_get_actor_ids()?;
         let result: Result<HashMap<PlayerId, bool>, _> = self
             .player_to_actor_id
@@ -188,7 +190,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    pub fn process<H: Collector>(&mut self, handler: &mut H) -> SubtActorResult<()> {
+    pub fn process<H: Collector>(&mut self, handler: &mut H) -> SubtrActorResult<()> {
         // Initially, we set target_time to NextFrame to ensure the collector
         // will process the first frame.
         let mut target_time = TimeAdvance::NextFrame;
@@ -196,7 +198,9 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?
             .frames
             .iter()
             .enumerate()
@@ -236,14 +240,14 @@ impl<'a> ReplayProcessor<'a> {
         self.check_player_id_set()
     }
 
-    fn check_player_id_set(&self) -> SubtActorResult<()> {
+    fn check_player_id_set(&self) -> SubtrActorResult<()> {
         let known_players =
             std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys());
         let original_players =
             std::collections::HashSet::<_>::from_iter(self.iter_player_ids_in_order());
 
         if original_players != known_players {
-            return SubtActorError::new_result(SubtActorErrorVariant::InconsistentPlayerSet {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::InconsistentPlayerSet {
                 found: known_players.into_iter().cloned().collect(),
                 original: original_players.into_iter().cloned().collect(),
             });
@@ -252,14 +256,14 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
-    pub fn process_and_get_replay_meta(&mut self) -> SubtActorResult<ReplayMeta> {
+    pub fn process_and_get_replay_meta(&mut self) -> SubtrActorResult<ReplayMeta> {
         if self.player_to_actor_id.is_empty() {
             self.process_long_enough_to_get_actor_ids()?;
         }
         self.get_replay_meta()
     }
 
-    pub fn get_replay_meta(&self) -> SubtActorResult<ReplayMeta> {
+    pub fn get_replay_meta(&self) -> SubtrActorResult<ReplayMeta> {
         let empty_player_stats = Vec::new();
         let player_stats = if let Some((_, boxcars::HeaderProp::Array(per_player))) = self
             .replay
@@ -288,9 +292,9 @@ impl<'a> ReplayProcessor<'a> {
                 remote_id: player_id.clone(),
             })
         };
-        let team_zero: SubtActorResult<Vec<PlayerInfo>> =
+        let team_zero: SubtrActorResult<Vec<PlayerInfo>> =
             self.team_zero.iter().map(get_player_info).collect();
-        let team_one: SubtActorResult<Vec<PlayerInfo>> =
+        let team_one: SubtrActorResult<Vec<PlayerInfo>> =
             self.team_one.iter().map(get_player_info).collect();
         Ok(ReplayMeta {
             team_zero: team_zero?,
@@ -305,12 +309,14 @@ impl<'a> ReplayProcessor<'a> {
         actor_id: &boxcars::ActorId,
         object_id: &boxcars::ObjectId,
         direction: SearchDirection,
-    ) -> SubtActorResult<(boxcars::Attribute, usize)> {
+    ) -> SubtrActorResult<(boxcars::Attribute, usize)> {
         let frames = self
             .replay
             .network_frames
             .as_ref()
-            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?;
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?;
 
         let predicate = |frame: &boxcars::Frame| {
             frame
@@ -323,7 +329,7 @@ impl<'a> ReplayProcessor<'a> {
 
         match util::find_in_direction(&frames.frames, current_index, direction, predicate) {
             Some((index, attribute)) => Ok((attribute, index)),
-            None => SubtActorError::new_result(SubtActorErrorVariant::NoUpdateAfterFrame {
+            None => SubtrActorError::new_result(SubtrActorErrorVariant::NoUpdateAfterFrame {
                 actor_id: actor_id.clone(),
                 object_id: object_id.clone(),
                 frame_index: current_index,
@@ -333,7 +339,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Update functions
 
-    fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtActorResult<()> {
+    fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
                 ($map:expr, $actor_type:expr, $attr:expr, $get_key: expr, $get_value: expr, $type:path) => {{
@@ -411,7 +417,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn update_ball_id(&mut self, frame: &boxcars::Frame) -> SubtActorResult<()> {
+    fn update_ball_id(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         // XXX: This assumes there is only ever one ball, which is safe (I think?)
         if let Some(actor_id) = self.ball_actor_id {
             if frame.deleted_actors.contains(&actor_id) {
@@ -430,7 +436,7 @@ impl<'a> ReplayProcessor<'a> {
         &mut self,
         frame: &boxcars::Frame,
         frame_index: usize,
-    ) -> SubtActorResult<()> {
+    ) -> SubtrActorResult<()> {
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
@@ -515,7 +521,7 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
-    fn update_demolishes(&mut self, frame: &boxcars::Frame, index: usize) -> SubtActorResult<()> {
+    fn update_demolishes(&mut self, frame: &boxcars::Frame, index: usize) -> SubtrActorResult<()> {
         let new_demolishes: Vec<_> = self
             .get_active_demolish_fx()?
             .flat_map(|demolish_fx| {
@@ -545,7 +551,7 @@ impl<'a> ReplayProcessor<'a> {
         demolish_fx: &boxcars::DemolishFx,
         frame: &boxcars::Frame,
         index: usize,
-    ) -> SubtActorResult<DemolishInfo> {
+    ) -> SubtrActorResult<DemolishInfo> {
         let attacker = self.get_player_id_from_car_id(&demolish_fx.attacker)?;
         let victim = self.get_player_id_from_car_id(&demolish_fx.victim)?;
         Ok(DemolishInfo {
@@ -564,20 +570,20 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_player_id_from_car_id(
         &self,
         actor_id: &boxcars::ActorId,
-    ) -> SubtActorResult<PlayerId> {
+    ) -> SubtrActorResult<PlayerId> {
         self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
     }
 
     fn get_player_id_from_actor_id(
         &self,
         actor_id: &boxcars::ActorId,
-    ) -> SubtActorResult<PlayerId> {
+    ) -> SubtrActorResult<PlayerId> {
         for (player_id, player_actor_id) in self.player_to_actor_id.iter() {
             if actor_id == player_actor_id {
                 return Ok(player_id.clone());
             }
         }
-        return SubtActorError::new_result(SubtActorErrorVariant::NoMatchingPlayerId {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::NoMatchingPlayerId {
             actor_id: actor_id.clone(),
         });
     }
@@ -585,13 +591,13 @@ impl<'a> ReplayProcessor<'a> {
     fn get_player_actor_id_from_car_actor_id(
         &self,
         actor_id: &boxcars::ActorId,
-    ) -> SubtActorResult<boxcars::ActorId> {
+    ) -> SubtrActorResult<boxcars::ActorId> {
         for (player_id, car_id) in self.player_to_car.iter() {
             if actor_id == car_id {
                 return Ok(player_id.clone());
             }
         }
-        return SubtActorError::new_result(SubtActorErrorVariant::NoMatchingPlayerId {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::NoMatchingPlayerId {
             actor_id: actor_id.clone(),
         });
     }
@@ -609,7 +615,7 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn get_active_demolish_fx(
         &self,
-    ) -> SubtActorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
+    ) -> SubtrActorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
         Ok(self
             .iter_actors_by_type_err(CAR_TYPE)?
             .flat_map(|(_actor_id, state)| {
@@ -625,15 +631,17 @@ impl<'a> ReplayProcessor<'a> {
 
     // Interpolation Support functions
 
-    fn get_frame(&self, frame_index: usize) -> SubtActorResult<&boxcars::Frame> {
+    fn get_frame(&self, frame_index: usize) -> SubtrActorResult<&boxcars::Frame> {
         self.replay
             .network_frames
             .as_ref()
-            .ok_or(SubtActorError::new(SubtActorErrorVariant::NoNetworkFrames))?
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?
             .frames
             .get(frame_index)
-            .ok_or(SubtActorError::new(
-                SubtActorErrorVariant::FrameIndexOutOfBounds,
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::FrameIndexOutOfBounds,
             ))
     }
 
@@ -642,7 +650,7 @@ impl<'a> ReplayProcessor<'a> {
         rigid_body: &boxcars::RigidBody,
         rb_frame_index: usize,
         target_time: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         let rb_frame = self.get_frame(rb_frame_index)?;
         let interpolation_amount = target_time - rb_frame.time;
         Ok(apply_velocities_to_rigid_body(
@@ -656,7 +664,7 @@ impl<'a> ReplayProcessor<'a> {
         actor_id: &boxcars::ActorId,
         time: f32,
         close_enough: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         let (frame_body, frame_index) = self.get_actor_rigid_body(actor_id)?;
         let frame_time = self.get_frame(*frame_index)?.time;
         let time_and_frame_difference = time - frame_time;
@@ -693,13 +701,13 @@ impl<'a> ReplayProcessor<'a> {
 
     // Actor functions
 
-    fn get_object_id_for_key(&self, name: &'static str) -> SubtActorResult<&boxcars::ObjectId> {
+    fn get_object_id_for_key(&self, name: &'static str) -> SubtrActorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
-            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::ObjectIdNotFound { name }))
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
     }
 
-    fn get_actor_ids_by_type(&self, name: &'static str) -> SubtActorResult<&[boxcars::ActorId]> {
+    fn get_actor_ids_by_type(&self, name: &'static str) -> SubtrActorResult<&[boxcars::ActorId]> {
         self.get_object_id_for_key(name)
             .map(|object_id| self.get_actor_ids_by_object_id(object_id))
     }
@@ -712,9 +720,9 @@ impl<'a> ReplayProcessor<'a> {
             .unwrap_or_else(|| &EMPTY_ACTOR_IDS)
     }
 
-    fn get_actor_state(&self, actor_id: &boxcars::ActorId) -> SubtActorResult<&ActorState> {
+    fn get_actor_state(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<&ActorState> {
         self.actor_state.actor_states.get(actor_id).ok_or_else(|| {
-            SubtActorError::new(SubtActorErrorVariant::NoStateForActorId {
+            SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
                 actor_id: actor_id.clone(),
             })
         })
@@ -724,7 +732,7 @@ impl<'a> ReplayProcessor<'a> {
         &'b self,
         actor_id: &boxcars::ActorId,
         property: &'static str,
-    ) -> SubtActorResult<&'b boxcars::Attribute> {
+    ) -> SubtrActorResult<&'b boxcars::Attribute> {
         self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property)
     }
 
@@ -732,7 +740,7 @@ impl<'a> ReplayProcessor<'a> {
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'static str,
-    ) -> SubtActorResult<&'b boxcars::Attribute> {
+    ) -> SubtrActorResult<&'b boxcars::Attribute> {
         self.get_attribute_and_updated(map, property).map(|v| &v.0)
     }
 
@@ -740,10 +748,10 @@ impl<'a> ReplayProcessor<'a> {
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'static str,
-    ) -> SubtActorResult<&'b (boxcars::Attribute, usize)> {
+    ) -> SubtrActorResult<&'b (boxcars::Attribute, usize)> {
         let attribute_object_id = self.get_object_id_for_key(property)?;
         map.get(attribute_object_id).ok_or_else(|| {
-            SubtActorError::new(SubtActorErrorVariant::PropertyNotFoundInState { property })
+            SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState { property })
         })
     }
 
@@ -756,24 +764,24 @@ impl<'a> ReplayProcessor<'a> {
             .next()
     }
 
-    fn get_ball_actor(&self) -> SubtActorResult<boxcars::ActorId> {
-        self.ball_actor_id.ok_or(SubtActorError::new(
-            SubtActorErrorVariant::BallActorNotFound,
+    fn get_ball_actor(&self) -> SubtrActorResult<boxcars::ActorId> {
+        self.ball_actor_id.ok_or(SubtrActorError::new(
+            SubtrActorErrorVariant::BallActorNotFound,
         ))
     }
 
-    pub fn get_metadata_actor_id(&self) -> SubtActorResult<&boxcars::ActorId> {
+    pub fn get_metadata_actor_id(&self) -> SubtrActorResult<&boxcars::ActorId> {
         self.get_actor_ids_by_type(GAME_TYPE)?
             .iter()
             .next()
-            .ok_or_else(|| SubtActorError::new(SubtActorErrorVariant::NoGameActor))
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))
     }
 
-    pub fn get_player_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
+    pub fn get_player_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
         self.player_to_actor_id
             .get(&player_id)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
                     name: "ActorId",
                     player_id: player_id.clone(),
                 })
@@ -781,11 +789,11 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
     }
 
-    pub fn get_car_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
+    pub fn get_car_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
         self.player_to_car
             .get(&self.get_player_actor_id(player_id)?)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
                     name: "Car",
                     player_id: player_id.clone(),
                 })
@@ -798,10 +806,10 @@ impl<'a> ReplayProcessor<'a> {
         player_id: &PlayerId,
         map: &HashMap<boxcars::ActorId, boxcars::ActorId>,
         name: &'static str,
-    ) -> SubtActorResult<boxcars::ActorId> {
+    ) -> SubtrActorResult<boxcars::ActorId> {
         map.get(&self.get_car_actor_id(player_id)?)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::ActorNotFound {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
                     name,
                     player_id: player_id.clone(),
                 })
@@ -809,29 +817,29 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
     }
 
-    pub fn get_boost_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
+    pub fn get_boost_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_boost, "Boost")
     }
 
-    pub fn get_jump_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
+    pub fn get_jump_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_jump, "Jump")
     }
 
     pub fn get_double_jump_actor_id(
         &self,
         player_id: &PlayerId,
-    ) -> SubtActorResult<boxcars::ActorId> {
+    ) -> SubtrActorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_double_jump, "Double Jump")
     }
 
-    pub fn get_dodge_actor_id(&self, player_id: &PlayerId) -> SubtActorResult<boxcars::ActorId> {
+    pub fn get_dodge_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
         self.get_car_connected_actor_id(player_id, &self.car_to_dodge, "Dodge")
     }
 
     pub fn get_actor_rigid_body(
         &self,
         actor_id: &boxcars::ActorId,
-    ) -> SubtActorResult<(&boxcars::RigidBody, &usize)> {
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
         get_attribute_and_updated!(
             self,
             &self.get_actor_state(&actor_id)?.attributes,
@@ -853,7 +861,7 @@ impl<'a> ReplayProcessor<'a> {
     fn iter_actors_by_type_err(
         &self,
         name: &'static str,
-    ) -> SubtActorResult<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>> {
+    ) -> SubtrActorResult<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>> {
         Ok(self.iter_actors_by_object_id(self.get_object_id_for_key(name)?))
     }
 
@@ -884,7 +892,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Properties
 
-    pub fn get_seconds_remaining(&self) -> SubtActorResult<i32> {
+    pub fn get_seconds_remaining(&self) -> SubtrActorResult<i32> {
         get_actor_attribute_matching!(
             self,
             self.get_metadata_actor_id()?,
@@ -894,7 +902,7 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_ignore_ball_syncing(&self) -> SubtActorResult<bool> {
+    pub fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
         let actor_id = self.get_ball_actor()?;
         get_actor_attribute_matching!(
             self,
@@ -905,15 +913,15 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_ball_rigid_body(&self) -> SubtActorResult<&boxcars::RigidBody> {
+    pub fn get_ball_rigid_body(&self) -> SubtrActorResult<&boxcars::RigidBody> {
         self.ball_actor_id
-            .ok_or(SubtActorError::new(
-                SubtActorErrorVariant::BallActorNotFound,
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::BallActorNotFound,
             ))
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
-    pub fn ball_rigid_body_exists(&self) -> SubtActorResult<bool> {
+    pub fn ball_rigid_body_exists(&self) -> SubtrActorResult<bool> {
         Ok(self
             .get_ball_rigid_body()
             .map(|rb| !rb.sleeping)
@@ -922,10 +930,10 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn get_ball_rigid_body_and_updated(
         &self,
-    ) -> SubtActorResult<(&boxcars::RigidBody, &usize)> {
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
         self.ball_actor_id
-            .ok_or(SubtActorError::new(
-                SubtActorErrorVariant::BallActorNotFound,
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::BallActorNotFound,
             ))
             .and_then(|actor_id| {
                 get_attribute_and_updated!(
@@ -940,7 +948,7 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_velocity_applied_ball_rigid_body(
         &self,
         target_time: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         let (current_rigid_body, frame_index) = self.get_ball_rigid_body_and_updated()?;
         self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
     }
@@ -949,11 +957,11 @@ impl<'a> ReplayProcessor<'a> {
         &self,
         time: f32,
         close_enough: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         self.get_interpolated_actor_rigid_body(&self.get_ball_actor()?, time, close_enough)
     }
 
-    pub fn get_player_name(&self, player_id: &PlayerId) -> SubtActorResult<String> {
+    pub fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         get_actor_attribute_matching!(
             self,
             &self.get_player_actor_id(player_id)?,
@@ -963,12 +971,12 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_player_team_key(&self, player_id: &PlayerId) -> SubtActorResult<String> {
+    pub fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         let team_actor_id = self
             .player_to_team
             .get(&self.get_player_actor_id(player_id)?)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::UnknownPlayerTeam {
+                SubtrActorError::new(SubtrActorErrorVariant::UnknownPlayerTeam {
                     player_id: player_id.clone(),
                 })
             })?;
@@ -976,20 +984,20 @@ impl<'a> ReplayProcessor<'a> {
         self.object_id_to_name
             .get(&state.object_id)
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::UnknownPlayerTeam {
+                SubtrActorError::new(SubtrActorErrorVariant::UnknownPlayerTeam {
                     player_id: player_id.clone(),
                 })
             })
             .cloned()
     }
 
-    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtActorResult<bool> {
+    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
         Ok(self
             .get_player_team_key(player_id)?
             .chars()
             .last()
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::EmptyTeamName {
+                SubtrActorError::new(SubtrActorErrorVariant::EmptyTeamName {
                     player_id: player_id.clone(),
                 })
             })?
@@ -999,7 +1007,7 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_player_rigid_body(
         &self,
         player_id: &PlayerId,
-    ) -> SubtActorResult<&boxcars::RigidBody> {
+    ) -> SubtrActorResult<&boxcars::RigidBody> {
         self.get_car_actor_id(player_id)
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
@@ -1007,7 +1015,7 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_player_rigid_body_and_updated(
         &self,
         player_id: &PlayerId,
-    ) -> SubtActorResult<(&boxcars::RigidBody, &usize)> {
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
         self.get_car_actor_id(player_id).and_then(|actor_id| {
             get_attribute_and_updated!(
                 self,
@@ -1022,7 +1030,7 @@ impl<'a> ReplayProcessor<'a> {
         &self,
         player_id: &PlayerId,
         target_time: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         let (current_rigid_body, frame_index) =
             self.get_player_rigid_body_and_updated(player_id)?;
         self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
@@ -1033,7 +1041,7 @@ impl<'a> ReplayProcessor<'a> {
         player_id: &PlayerId,
         time: f32,
         close_enough: f32,
-    ) -> SubtActorResult<boxcars::RigidBody> {
+    ) -> SubtrActorResult<boxcars::RigidBody> {
         self.get_interpolated_actor_rigid_body(
             &self.get_car_actor_id(player_id).unwrap(),
             time,
@@ -1041,7 +1049,7 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
-    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtActorResult<f32> {
+    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
         self.get_boost_actor_id(player_id).and_then(|actor_id| {
             let boost_state = self.get_actor_state(&actor_id)?;
             get_derived_attribute!(
@@ -1053,7 +1061,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> SubtActorResult<u8> {
+    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<u8> {
         get_actor_attribute_matching!(
             self,
             &actor_id,
@@ -1063,22 +1071,22 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
-    pub fn get_boost_active(&self, player_id: &PlayerId) -> SubtActorResult<u8> {
+    pub fn get_boost_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
         self.get_boost_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_jump_active(&self, player_id: &PlayerId) -> SubtActorResult<u8> {
+    pub fn get_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
         self.get_jump_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> SubtActorResult<u8> {
+    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
         self.get_double_jump_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
-    pub fn get_dodge_active(&self, player_id: &PlayerId) -> SubtActorResult<u8> {
+    pub fn get_dodge_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
         self.get_dodge_actor_id(player_id)
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }

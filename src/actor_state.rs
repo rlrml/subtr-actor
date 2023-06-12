@@ -47,7 +47,7 @@ impl ActorStateModeler {
         &mut self,
         frame: &boxcars::Frame,
         frame_index: usize,
-    ) -> SubtActorResult<()> {
+    ) -> SubtrActorResult<()> {
         if let Some(err) = frame
             .deleted_actors
             .iter()
@@ -75,10 +75,10 @@ impl ActorStateModeler {
         Ok(())
     }
 
-    pub fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> SubtActorResult<()> {
+    pub fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> SubtrActorResult<()> {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
-                return SubtActorError::new_result(SubtActorErrorVariant::ActorIdAlreadyExists {
+                return SubtrActorError::new_result(SubtrActorErrorVariant::ActorIdAlreadyExists {
                     actor_id: new_actor.actor_id.clone(),
                     object_id: new_actor.object_id.clone(),
                 });
@@ -98,20 +98,20 @@ impl ActorStateModeler {
         &mut self,
         update: &boxcars::UpdatedAttribute,
         frame_index: usize,
-    ) -> SubtActorResult<Option<(boxcars::Attribute, usize)>> {
+    ) -> SubtrActorResult<Option<(boxcars::Attribute, usize)>> {
         self.actor_states
             .get_mut(&update.actor_id)
             .map(|state| state.update_attribute(update, frame_index))
             .ok_or_else(|| {
-                SubtActorError::new(SubtActorErrorVariant::UpdatedActorIdDoesNotExist {
+                SubtrActorError::new(SubtrActorErrorVariant::UpdatedActorIdDoesNotExist {
                     update: update.clone(),
                 })
             })
     }
 
-    pub fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> SubtActorResult<ActorState> {
+    pub fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> SubtrActorResult<ActorState> {
         let state = self.actor_states.remove(actor_id).ok_or_else(|| {
-            SubtActorError::new(SubtActorErrorVariant::NoStateForActorId {
+            SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
                 actor_id: actor_id.clone(),
             })
         })?;

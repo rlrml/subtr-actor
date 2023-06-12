@@ -4,7 +4,7 @@ use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-pub enum SubtActorErrorVariant {
+pub enum SubtrActorErrorVariant {
     #[error("Replay has no network frames")]
     NoNetworkFrames,
 
@@ -110,25 +110,25 @@ pub enum SubtActorErrorVariant {
 }
 
 #[derive(Debug)]
-pub struct SubtActorError {
+pub struct SubtrActorError {
     pub backtrace: Backtrace,
-    pub variant: SubtActorErrorVariant,
+    pub variant: SubtrActorErrorVariant,
 }
 
-impl SubtActorError {
-    pub fn new(variant: SubtActorErrorVariant) -> Self {
+impl SubtrActorError {
+    pub fn new(variant: SubtrActorErrorVariant) -> Self {
         Self {
             backtrace: Backtrace::capture(),
             variant,
         }
     }
 
-    pub fn new_result<T>(variant: SubtActorErrorVariant) -> Result<T, Self> {
+    pub fn new_result<T>(variant: SubtrActorErrorVariant) -> Result<T, Self> {
         Err(Self::new(variant))
     }
 }
 
-pub type SubtActorResult<T> = Result<T, SubtActorError>;
+pub type SubtrActorResult<T> = Result<T, SubtrActorError>;
 
 pub fn attribute_to_tag(attribute: &Attribute) -> &str {
     match attribute {

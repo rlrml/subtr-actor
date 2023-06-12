@@ -25,7 +25,7 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
-    ) -> SubtActorResult<TimeAdvance> {
+    ) -> SubtrActorResult<TimeAdvance> {
         let original_advance =
             self.collector
                 .process_frame(processor, frame, frame_number, current_time)?;
