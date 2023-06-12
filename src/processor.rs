@@ -63,6 +63,37 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
     id
 }
 
+/// The `ReplayProcessor` struct is a pivotal component in [`subtr-actor`]'s
+/// replay parsing pipeline. It is designed to process and traverse an actor
+/// graph of a Rocket League replay, and expose methods for collectors to gather
+/// specific data points as it progresses through the replay.
+///
+/// The processor pushes frames from a replay through an [`ActorStateModeler`],
+/// which models the state all actors in the replay at a given point in time.
+/// The `ReplayProcessor` also maintains various mappings to allow efficient
+/// lookup and traversal of the actor graph, thus assisting [`Collector`]
+/// instances in their data accumulation tasks.
+///
+/// The primary method of this struct is [`process`](ReplayProcessor::process),
+/// which takes a collector and processes the replay. As it traverses the
+/// replay, it calls the `process_frame` method of the passed collector, passing
+/// the current frame along with its contextual data. This allows the collector
+/// to extract specific data from each frame as needed.
+///
+/// The [`ReplayProcessor`] also provides a number of helper methods for
+/// navigating the actor graph and extracting information, such as
+/// [`get_ball_rigid_body`](ReplayProcessor::get_ball_rigid_body),
+/// [`get_player_name`](ReplayProcessor::get_player_name),
+/// [`get_player_team_key`](ReplayProcessor::get_player_team_key),
+/// [`get_player_is_team_0`](ReplayProcessor::get_player_is_team_0), and
+/// [`get_player_rigid_body`](ReplayProcessor::get_player_rigid_body).
+///
+/// # See Also
+///
+/// * [`ActorStateModeler`]: A struct used to model the states of multiple
+/// actors at a given point in time.
+/// * [`Collector`]: A trait implemented by objects that wish to collect data as
+/// the `ReplayProcessor` processes a replay.
 pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
     pub actor_state: ActorStateModeler,
@@ -144,7 +175,23 @@ impl<'a> ReplayProcessor<'a> {
         SubtrActorError::new_result(SubtrActorErrorVariant::PlayerStatsHeaderNotFound)
     }
 
-    pub(crate) fn process_long_enough_to_get_actor_ids(&mut self) -> SubtrActorResult<()> {
+    /// Processes the replay until it has gathered enough information to map
+    /// players to their actor IDs.
+    ///
+    /// This function is designed to ensure that each player that participated
+    /// in the game is associated with a corresponding actor ID. It runs the
+    /// processing operation for approximately the first 10 seconds of the
+    /// replay (10 * 30 frames), as this time span is generally sufficient to
+    /// identify all players.
+    ///
+    /// Note that this function is particularly necessary because the headers of
+    /// replays sometimes omit some players.
+    ///
+    /// # Errors
+    ///
+    /// If any error other than `FinishProcessingEarly` occurs during the processing operation,
+    /// it is propagated up by this function.
+    pub fn process_long_enough_to_get_actor_ids(&mut self) -> SubtrActorResult<()> {
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
             if n > 10 * 30 {
@@ -191,6 +238,30 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// This is the primary method of [`ReplayProcessor`] used for processing
+    /// the replay data.
+    ///
+    /// It takes a [`Collector`](crate::Collector) as an
+    /// argument and iterates over each frame in the replay, updating the
+    /// internal state of the processor and other relevant mappings based on the
+    /// current frame. It also fetches the required information for each frame
+    /// like ball id, boost amounts and demolishes.
+    ///
+    /// The function uses a `target_time` mechanism to control the pace of frame
+    /// processing. `target_time` could either be a specific time or
+    /// [`TimeAdvance::NextFrame`], which indicates that the processing should
+    /// proceed to the next frame in the replay. This design allows the handler
+    /// to have control over the frame rate, including the possibility of
+    /// skipping frames.
+    ///
+    /// For each frame, `process_frame` of the collector is called, allowing the
+    /// collector to process the frame and gather data accordingly. The
+    /// collector may also specify a target time for the next frame it wants to
+    /// process.
+    ///
+    /// At the end of processing, it checks to make sure that no unknown players
+    /// were encountered during the replay. If any unknown players are found, an
+    /// error is returned.
     pub fn process<H: Collector>(&mut self, handler: &mut H) -> SubtrActorResult<()> {
         // Initially, we set target_time to NextFrame to ensure the collector
         // will process the first frame.
@@ -257,6 +328,14 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
+    /// Processes the replay enough to get the actor IDs and then retrieves the replay metadata.
+    ///
+    /// This method is a convenience function that combines the functionalities
+    /// of
+    /// [`process_long_enough_to_get_actor_ids`](Self::process_long_enough_to_get_actor_ids)
+    /// and [`get_replay_meta`](Self::get_replay_meta) into a single operation.
+    /// It's meant to be used when you don't necessarily want to process the
+    /// whole replay and need only the replay's metadata.
     pub fn process_and_get_replay_meta(&mut self) -> SubtrActorResult<ReplayMeta> {
         if self.player_to_actor_id.is_empty() {
             self.process_long_enough_to_get_actor_ids()?;
@@ -264,6 +343,12 @@ impl<'a> ReplayProcessor<'a> {
         self.get_replay_meta()
     }
 
+    /// Retrieves the replay metadata.
+    ///
+    /// This function collects information about each player in the replay and
+    /// groups them by team. For each player, it gets the player's name and
+    /// statistics. All this information is then wrapped into a [`ReplayMeta`]
+    /// object along with the properties from the replay.
     pub fn get_replay_meta(&self) -> SubtrActorResult<ReplayMeta> {
         let empty_player_stats = Vec::new();
         let player_stats = if let Some((_, boxcars::HeaderProp::Array(per_player))) = self
@@ -304,7 +389,42 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    fn find_update_in_direction(
+    /// Searches for the next or previous update for a specified actor and
+    /// object in the replay's network frames.
+    ///
+    /// This method uses the [`find_in_direction`](util::find_in_direction)
+    /// function to search through the network frames of the replay to find the
+    /// next (or previous, depending on the direction provided) attribute update
+    /// for a specified actor and object.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_index` - The index of the network frame from where the search should start.
+    /// * `actor_id` - The ID of the actor for which the update is being searched.
+    /// * `object_id` - The ID of the object associated with the actor for which
+    /// the update is being searched.
+    /// * `direction` - The direction of search, specified as either
+    /// [`SearchDirection::Backward`] or [`SearchDirection::Forward`].
+    ///
+    /// # Returns
+    ///
+    /// If a matching update is found, this function returns a
+    /// [`SubtrActorResult`] tuple containing the found attribute and its index
+    /// in the replay's network frames.
+    ///
+    /// # Errors
+    ///
+    /// If no matching update is found, or if the replay has no network frames,
+    /// this function returns a [`SubtrActorError`]. Specifically, it returns
+    /// `NoUpdateAfterFrame` error variant if no update is found after the
+    /// specified frame, or `NoNetworkFrames` if the replay lacks network
+    /// frames.
+    ///
+    /// [`SearchDirection::Backward`]: enum.SearchDirection.html#variant.Backward
+    /// [`SearchDirection::Forward`]: enum.SearchDirection.html#variant.Forward
+    /// [`SubtrActorResult`]: type.SubtrActorResult.html
+    /// [`SubtrActorError`]: struct.SubtrActorError.html
+    pub fn find_update_in_direction(
         &self,
         current_index: usize,
         actor_id: &boxcars::ActorId,
@@ -340,6 +460,34 @@ impl<'a> ReplayProcessor<'a> {
 
     // Update functions
 
+    /// This method is responsible for updating various mappings that are used
+    /// to track and link different actors in the replay.
+    ///
+    /// The replay data is a stream of [`boxcars::Frame`] objects that contain
+    /// information about the game at a specific point in time. These frames
+    /// contain updates for different actors, and the goal of this method is to
+    /// maintain and update the mappings for these actors as the frames are
+    /// processed.
+    ///
+    /// The method loops over each `updated_actors` field in the
+    /// [`boxcars::Frame`]. For each updated actor, it checks whether the
+    /// actor's object ID matches the object ID of various keys in the actor
+    /// state. If a match is found, the corresponding map is updated with a new
+    /// entry linking the actor ID to the value of the attribute in the replay
+    /// frame.
+    ///
+    /// The mappings updated are:
+    /// - `player_to_actor_id`: maps a player's [`boxcars::UniqueId`] to their actor ID.
+    /// - `player_to_team`: maps a player's actor ID to their team actor ID.
+    /// - `player_to_car`: maps a player's actor ID to their car actor ID.
+    /// - `car_to_boost`: maps a car's actor ID to its associated boost actor ID.
+    /// - `car_to_dodge`: maps a car's actor ID to its associated dodge actor ID.
+    /// - `car_to_jump`: maps a car's actor ID to its associated jump actor ID.
+    /// - `car_to_double_jump`: maps a car's actor ID to its associated double jump actor ID.
+    ///
+    /// The function also handles the deletion of actors. When an actor is
+    /// deleted, the function removes the actor's ID from the `player_to_car`
+    /// mapping.
     fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {

@@ -57,7 +57,8 @@ impl ActorState {
     }
 }
 
-/// A struct modeling the states of multiple actors.
+/// A struct modeling the states of multiple actors at a given point in time.
+/// Provides methods to update that state with successive frames from a boxcars::Replay.
 pub struct ActorStateModeler {
     /// A map of actor states with their corresponding actor ids.
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,

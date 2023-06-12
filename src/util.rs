@@ -130,11 +130,11 @@ fn get_prop(prop: &str, props: &Vec<(String, HeaderProp)>) -> Result<(String, He
         .cloned()
 }
 
-pub trait VecMapEntry<K: PartialEq, V> {
+pub(crate) trait VecMapEntry<K: PartialEq, V> {
     fn get_entry(&mut self, key: K) -> Entry<K, V>;
 }
 
-pub enum Entry<'a, K: PartialEq, V> {
+pub(crate) enum Entry<'a, K: PartialEq, V> {
     Occupied(OccupiedEntry<'a, K, V>),
     Vacant(VacantEntry<'a, K, V>),
 }
@@ -151,11 +151,11 @@ impl<'a, K: PartialEq, V> Entry<'a, K, V> {
     }
 }
 
-pub struct OccupiedEntry<'a, K: PartialEq, V> {
+pub(crate) struct OccupiedEntry<'a, K: PartialEq, V> {
     entry: &'a mut (K, V),
 }
 
-pub struct VacantEntry<'a, K: PartialEq, V> {
+pub(crate) struct VacantEntry<'a, K: PartialEq, V> {
     vec: &'a mut Vec<(K, V)>,
     key: K,
 }
@@ -250,7 +250,7 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
     }
 }
 
-/// Interpolates between two RigidBody states based on the provided time.
+/// Interpolates between two [`boxcars::RigidBody`] states based on the provided time.
 ///
 /// # Arguments
 ///
@@ -262,7 +262,7 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
 ///
 /// # Returns
 ///
-/// A new `RigidBody` that represents the interpolated state at the specified time.
+/// A new [`boxcars::RigidBody`] that represents the interpolated state at the specified time.
 pub fn get_interpolated_rigid_body(
     start_body: &boxcars::RigidBody,
     start_time: f32,
@@ -303,15 +303,15 @@ pub enum SearchDirection {
     Backward,
 }
 
-/// Searches for an item in a list in a specified direction and returns the first item that
-/// matches the provided predicate.
+/// Searches for an item in a slice in a specified direction and returns the
+/// first item that matches the provided predicate.
 ///
 /// # Arguments
 ///
 /// * `items` - The list of items to search.
 /// * `current_index` - The index to start the search from.
 /// * `direction` - The direction to search in.
-/// * `predicate` - A function that takes an item and returns an `Option<R>`.
+/// * `predicate` - A function that takes an item and returns an [`Option<R>`].
 ///   When this function returns `Some(R)`, the item is considered a match.
 ///
 /// # Returns
