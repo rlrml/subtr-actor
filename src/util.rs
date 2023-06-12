@@ -3,7 +3,6 @@ use serde::Serialize;
 
 use crate::*;
 
-#[macro_export]
 macro_rules! fmt_err {
     ($( $item:expr ),* $(,)?) => {
         Err(format!($( $item ),*))
@@ -251,6 +250,19 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
     }
 }
 
+/// Interpolates between two RigidBody states based on the provided time.
+///
+/// # Arguments
+///
+/// * `start_body` - The initial `RigidBody` state.
+/// * `start_time` - The timestamp of the initial `RigidBody` state.
+/// * `end_body` - The final `RigidBody` state.
+/// * `end_time` - The timestamp of the final `RigidBody` state.
+/// * `time` - The desired timestamp to interpolate to.
+///
+/// # Returns
+///
+/// A new `RigidBody` that represents the interpolated state at the specified time.
 pub fn get_interpolated_rigid_body(
     start_body: &boxcars::RigidBody,
     start_time: f32,
@@ -284,12 +296,27 @@ pub fn get_interpolated_rigid_body(
     })
 }
 
+/// Enum to define the direction of searching within a collection.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum SearchDirection {
     Forward,
     Backward,
 }
 
+/// Searches for an item in a list in a specified direction and returns the first item that
+/// matches the provided predicate.
+///
+/// # Arguments
+///
+/// * `items` - The list of items to search.
+/// * `current_index` - The index to start the search from.
+/// * `direction` - The direction to search in.
+/// * `predicate` - A function that takes an item and returns an `Option<R>`.
+///   When this function returns `Some(R)`, the item is considered a match.
+///
+/// # Returns
+///
+/// Returns a tuple of the index and the result `R` of the predicate for the first item that matches.
 pub fn find_in_direction<T, F, R>(
     items: &[T],
     current_index: usize,

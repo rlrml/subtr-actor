@@ -2,15 +2,32 @@ use crate::*;
 use boxcars;
 use std::collections::HashMap;
 
+/// A struct representing the state of an actor.
+///
+/// This includes both attributes and derived attributes, along with the
+/// associated object id and name id.
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
+    /// A map of the actor's attributes with their corresponding object ids and frame indices.
     pub attributes: HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
+    /// A map of the actor's derived attributes with their corresponding object ids and frame indices.
     pub derived_attributes: HashMap<String, (boxcars::Attribute, usize)>,
+    /// The object id associated with the actor.
     pub object_id: boxcars::ObjectId,
+    /// Optional name id associated with the actor.
     pub name_id: Option<i32>,
 }
 
 impl ActorState {
+    /// Creates a new `ActorState` from a given `NewActor`.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_actor` - The new actor to initialize the state from.
+    ///
+    /// # Returns
+    ///
+    /// A new `ActorState` object.
     fn new(new_actor: &boxcars::NewActor) -> Self {
         Self {
             attributes: HashMap::new(),
@@ -20,6 +37,16 @@ impl ActorState {
         }
     }
 
+    /// Updates an attribute in the `ActorState`.
+    ///
+    /// # Arguments
+    ///
+    /// * `update` - The updated attribute.
+    /// * `frame_index` - The index of the frame at which the update occurs.
+    ///
+    /// # Returns
+    ///
+    /// An optional tuple of the updated attribute and its frame index.
     fn update_attribute(
         &mut self,
         update: &boxcars::UpdatedAttribute,
@@ -30,12 +57,20 @@ impl ActorState {
     }
 }
 
+/// A struct modeling the states of multiple actors.
 pub struct ActorStateModeler {
+    /// A map of actor states with their corresponding actor ids.
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,
+    /// A map of actor ids with their corresponding object ids.
     pub actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
 }
 
 impl ActorStateModeler {
+    /// Creates a new `ActorStateModeler`.
+    ///
+    /// # Returns
+    ///
+    /// A new `ActorStateModeler` object.
     pub fn new() -> Self {
         Self {
             actor_states: HashMap::new(),
@@ -43,6 +78,16 @@ impl ActorStateModeler {
         }
     }
 
+    /// Processes a frame, including handling of new, updated, and deleted actors.
+    ///
+    /// # Arguments
+    ///
+    /// * `frame` - The frame to be processed.
+    /// * `frame_index` - The index of the frame to be processed.
+    ///
+    /// # Returns
+    ///
+    /// An empty result (`Ok(())`) on success, `SubtrActorError` on failure.
     pub fn process_frame(
         &mut self,
         frame: &boxcars::Frame,

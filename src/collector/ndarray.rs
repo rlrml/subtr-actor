@@ -260,6 +260,13 @@ where
     }
 }
 
+/// This trait acts as an abstraction over a feature adder, and is primarily
+/// used to allow for heterogeneous collections of feature adders in the
+/// [`NDArrayCollector`](NDArrayCollector). While it provides methods for adding
+/// features and retrieving column headers, it is generally recommended to
+/// implement the [`LengthCheckedFeatureAdder`](LengthCheckedFeatureAdder) trait
+/// instead, which provides compile-time guarantees about the number of features
+/// returned.
 pub trait FeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -277,6 +284,12 @@ pub trait FeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+/// This trait is a more strict version of the [`FeatureAdder`](FeatureAdder)
+/// trait, enforcing at compile time that the number of features added is equal
+/// to the number of column headers provided.
+/// Implementations of this trait can be automatically adapted to the
+/// [`FeatureAdder`](FeatureAdder) trait using the
+/// [`impl_feature_adder!`](crate::impl_feature_adder) macro.
 pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     fn get_column_headers_array(&self) -> &[&str; N];
 
@@ -289,6 +302,18 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     ) -> SubtrActorResult<[F; N]>;
 }
 
+/// A macro to provide an automatic implementation of the
+/// [`FeatureAdder`](FeatureAdder) trait for types that implement
+/// [`LengthCheckedFeatureAdder`](LengthCheckedFeatureAdder). This allows you to
+/// take advantage of the compile-time guarantees provided by
+/// [`LengthCheckedFeatureAdder`](LengthCheckedFeatureAdder), while still being
+/// able to use your type in contexts that require a
+/// [`FeatureAdder`](FeatureAdder) object. This macro is used to bridge the gap
+/// between the two traits, as Rust's type system does not currently provide a
+/// way to prove to the compiler that there will always be exactly one
+/// implementation of [`LengthCheckedFeatureAdder`](LengthCheckedFeatureAdder)
+/// for each type.
+#[macro_export]
 macro_rules! impl_feature_adder {
     ($struct_name:ident) => {
         impl<F: TryFrom<f32>> FeatureAdder<F> for $struct_name<F>
@@ -320,6 +345,14 @@ macro_rules! impl_feature_adder {
     };
 }
 
+/// This trait acts as an abstraction over a player-specific feature adder, and
+/// is primarily used to allow for heterogeneous collections of player feature
+/// adders in the [`NDArrayCollector`](crate::NDArrayCollector). While it
+/// provides methods for adding player-specific features and retrieving column
+/// headers, it is generally recommended to implement the
+/// [`LengthCheckedPlayerFeatureAdder`](LengthCheckedPlayerFeatureAdder) trait
+/// instead, which provides compile-time guarantees about the number of features
+/// returned.
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -338,6 +371,12 @@ pub trait PlayerFeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+/// This trait is a more strict version of the
+/// [`PlayerFeatureAdder`](PlayerFeatureAdder) trait, enforcing at compile time
+/// that the number of player-specific features added is equal to the number of
+/// column headers provided. Implementations of this trait can be automatically
+/// adapted to the [`PlayerFeatureAdder`](PlayerFeatureAdder) trait using the
+/// [`impl_player_feature_adder!`](crate::impl_player_feature_adder) macro.
 pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
     fn get_column_headers_array(&self) -> &[&str; N];
 
@@ -351,6 +390,19 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
     ) -> SubtrActorResult<[F; N]>;
 }
 
+/// A macro to provide an automatic implementation of the
+/// [`PlayerFeatureAdder`](PlayerFeatureAdder) trait for types that implement
+/// [`LengthCheckedPlayerFeatureAdder`](LengthCheckedPlayerFeatureAdder). This
+/// allows you to take advantage of the compile-time guarantees provided by
+/// [`LengthCheckedPlayerFeatureAdder`](LengthCheckedPlayerFeatureAdder), while
+/// still being able to use your type in contexts that require a
+/// [`PlayerFeatureAdder`](PlayerFeatureAdder) object. This macro is used to
+/// bridge the gap between the two traits, as Rust's type system does not
+/// currently provide a way to prove to the compiler that there will always be
+/// exactly one implementation of
+/// [`LengthCheckedPlayerFeatureAdder`](LengthCheckedPlayerFeatureAdder) for
+/// each type.
+#[macro_export]
 macro_rules! impl_player_feature_adder {
     ($struct_name:ident) => {
         impl<F: TryFrom<f32>> PlayerFeatureAdder<F> for $struct_name<F>
@@ -429,115 +481,44 @@ where
     }
 }
 
-fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
-    SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
-}
-
-macro_rules! convert_all {
-    ($err:expr, $( $item:expr ),* $(,)?) => {{
-		Ok([
-			$( $item.try_into().map_err($err)? ),*
-		])
-	}};
-}
-
-macro_rules! convert_all_floats {
-    ($( $item:expr ),* $(,)?) => {{
-        convert_all!(convert_float_conversion_error, $( $item ),*)
-    }};
-}
-
-fn or_zero_boxcars_3f() -> boxcars::Vector3f {
-    boxcars::Vector3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    }
-}
-
-type RigidBodyArrayResult<F> = SubtrActorResult<[F; 12]>;
-
-pub fn get_rigid_body_properties<F: TryFrom<f32>>(
-    rigid_body: &boxcars::RigidBody,
-) -> RigidBodyArrayResult<F>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    let linear_velocity = rigid_body
-        .linear_velocity
-        .unwrap_or_else(or_zero_boxcars_3f);
-    let angular_velocity = rigid_body
-        .angular_velocity
-        .unwrap_or_else(or_zero_boxcars_3f);
-    let rotation = rigid_body.rotation;
-    let location = rigid_body.location;
-    let (rx, ry, rz) =
-        glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
-    convert_all_floats!(
-        location.x,
-        location.y,
-        location.z,
-        rx,
-        ry,
-        rz,
-        linear_velocity.x,
-        linear_velocity.y,
-        linear_velocity.z,
-        angular_velocity.x,
-        angular_velocity.y,
-        angular_velocity.z,
-    )
-}
-
-pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
-    rigid_body: &boxcars::RigidBody,
-) -> SubtrActorResult<[F; 7]>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    let rotation = rigid_body.rotation;
-    let location = rigid_body.location;
-    convert_all_floats!(
-        location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
-    )
-}
-
-fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all!(
-        convert_float_conversion_error,
-        // We use huge values for location instead of 0s so that hopefully any
-        // model built on this data can understand that the player is not
-        // actually on the field.
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-}
-
-fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtrActorResult<[F; 7]>
-where
-    <F as TryFrom<f32>>::Error: std::fmt::Debug,
-{
-    convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
-}
-
 macro_rules! count_exprs {
     () => {0usize};
     ($val:expr $(, $vals:expr)*) => {1usize + count_exprs!($($vals),*)};
 }
 
+/// This macro creates a global feature adder struct and implements the
+/// necessary traits to add the calculated features to the data matrix. The
+/// macro exports a struct with the same name as passed in the parameter. The
+/// number of column names and the length of the feature array returned by
+/// `$prop_getter` are checked at compile time to ensure they match, in line
+/// with the [`LengthCheckedFeatureAdder`](LengthCheckedFeatureAdder) trait. The
+/// output struct also provides an implementation of the
+/// [`FeatureAdder`](FeatureAdder) trait via the
+/// [`impl_feature_adder!`](impl_feature_adder) macro, allowing it to be used in
+/// contexts where a `FeatureAdder` object is required.
+///
+/// # Parameters
+///
+/// * `$struct_name`: The name of the struct to be created.
+/// * `$prop_getter`: The function or closure used to calculate the features.
+/// * `$( $column_names:expr ),*`: A comma-separated list of column names as strings.
+///
+/// # Example
+///
+/// ```
+/// build_global_feature_adder!(
+///     SecondsRemaining,
+///     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+///         convert_all_floats!(processor.get_seconds_remaining()?.clone() as f32)
+///     },
+///     "seconds remaining"
+/// );
+/// ```
+///
+/// This will create a struct named `SecondsRemaining` and implement necessary
+/// traits to calculate features using the provided closure. The feature will be
+/// added under the column name "seconds remaining". Note, however, that it is
+/// possible to add more than one feature with each feature adder
 #[macro_export]
 macro_rules! build_global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -564,6 +545,18 @@ macro_rules! build_global_feature_adder {
     }
 }
 
+/// This macro is a convenience wrapper around the `_global_feature_adder`
+/// macro. It is used to implement necessary traits for an existing struct to
+/// add the calculated features to the data matrix. This macro is particularly
+/// useful when the feature adder needs to be instantiated with specific
+/// parameters. The number of column names and the length of the feature array
+/// returned by `$prop_getter` are checked at compile time to ensure they match.
+///
+/// # Parameters
+///
+/// * `$struct_name`: The name of the existing struct.
+/// * `$prop_getter`: The function or closure used to calculate the features.
+/// * `$( $column_names:expr ),*`: A comma-separated list of column names as strings.
 #[macro_export]
 macro_rules! global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -607,6 +600,60 @@ macro_rules! _global_feature_adder {
     };
 }
 
+/// This macro creates a player feature adder struct and implements the
+/// necessary traits to add the calculated player-specific features to the data
+/// matrix. The macro exports a struct with the same name as passed in the
+/// parameter. The number of column names and the length of the feature array
+/// returned by `$prop_getter` are checked at compile time to ensure they match,
+/// in line with the
+/// [`LengthCheckedPlayerFeatureAdder`](LengthCheckedPlayerFeatureAdder) trait.
+/// The output struct also provides an implementation of the
+/// [`PlayerFeatureAdder`](PlayerFeatureAdder) trait via the
+/// [`impl_player_feature_adder!`](impl_player_feature_adder) macro, allowing it
+/// to be used in contexts where a `PlayerFeatureAdder` object is required.
+///
+/// # Parameters
+///
+/// * `$struct_name`: The name of the struct to be created.
+/// * `$prop_getter`: The function or closure used to calculate the features.
+/// * `$( $column_names:expr ),*`: A comma-separated list of column names as strings.
+///
+/// # Example
+///
+/// ```
+/// build_player_feature_adder!(
+///     PlayerJump,
+///     |_,
+///      player_id: &PlayerId,
+///      processor: &ReplayProcessor,
+///      _frame,
+///      _frame_number,
+///      _current_time: f32| {
+///         convert_all_floats!(
+///             processor
+///                 .get_dodge_active(player_id)
+///                 .and_then(u8_get_f32)
+///                 .unwrap_or(0.0),
+///             processor
+///                 .get_jump_active(player_id)
+///                 .and_then(u8_get_f32)
+///                 .unwrap_or(0.0),
+///             processor
+///                 .get_double_jump_active(player_id)
+///                 .and_then(u8_get_f32)
+///                 .unwrap_or(0.0),
+///         )
+///     },
+///     "dodge active",
+///     "jump active",
+///     "double jump active"
+/// );
+/// ```
+///
+/// This will create a struct named `PlayerJump` and implement necessary
+/// traits to calculate features using the provided closure. The player-specific
+/// features will be added under the column names "dodge active",
+/// "jump active", and "double jump active" respectively.
 #[macro_export]
 macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -637,6 +684,19 @@ macro_rules! build_player_feature_adder {
     }
 }
 
+/// This macro is a convenience wrapper around the `_player_feature_adder`
+/// macro. It is used to implement necessary traits for an existing struct to
+/// add the calculated player-specific features to the data matrix. This macro
+/// is particularly useful when the feature adder needs to be instantiated with
+/// specific parameters. The number of column names and the length of the
+/// feature array returned by `$prop_getter` are checked at compile time to
+/// ensure they match.
+///
+/// # Parameters
+///
+/// * `$struct_name`: The name of the existing struct.
+/// * `$prop_getter`: The function or closure used to calculate the features.
+/// * `$( $column_names:expr ),*`: A comma-separated list of column names as strings.
 #[macro_export]
 macro_rules! player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -679,6 +739,175 @@ macro_rules! _player_feature_adder {
 
         impl_player_feature_adder!($struct_name);
     };
+}
+
+pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
+    SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
+}
+
+/// A macro that tries to convert each provided item into a type. If any of
+/// the conversions fail, it short-circuits and returns the error.
+///
+/// The first argument `$err` is a closure that accepts an error and returns a
+/// `SubtrActorResult`. It is used to map any conversion errors into a `SubtrActorResult`.
+///
+/// Subsequent arguments should be expressions that implement the `TryInto`
+/// trait, with the type they're being converted into being the one used in
+/// the `Ok` variant of the return value.
+///
+/// # Example
+///
+/// ```
+/// convert_all!(
+///     convert_float_conversion_error,
+///     42.0,
+///     0.0,
+///     1.234,
+/// );
+/// ```
+#[macro_export]
+macro_rules! convert_all {
+    ($err:expr, $( $item:expr ),* $(,)?) => {{
+		Ok([
+			$( $item.try_into().map_err($err)? ),*
+		])
+	}};
+}
+
+/// A convenience macro that uses the `convert_all` macro with the
+/// `convert_float_conversion_error` function for error handling.
+///
+/// Each item provided is attempted to be converted into a floating point number.
+/// If any of the conversions fail, it short-circuits and returns the error.
+///
+/// # Example
+///
+/// ```
+/// convert_all_floats!(
+///     42.0,
+///     0.0,
+///     1.234,
+/// );
+/// ```
+#[macro_export]
+macro_rules! convert_all_floats {
+    ($( $item:expr ),* $(,)?) => {{
+        convert_all!(convert_float_conversion_error, $( $item ),*)
+    }};
+}
+
+fn or_zero_boxcars_3f() -> boxcars::Vector3f {
+    boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    }
+}
+
+type RigidBodyArrayResult<F> = SubtrActorResult<[F; 12]>;
+
+/// Extracts the location, rotation, linear velocity and angular velocity from a
+/// `boxcars::RigidBody` and converts them to a type implementing `TryFrom<f32>`.
+///
+/// If any of the components of the rigid body are not set (`None`), they are
+/// treated as zero.
+///
+/// The returned array contains twelve elements in the following order: x, y, z
+/// location, x, y, z rotation (as Euler angles), x, y, z linear velocity, x, y,
+/// z angular velocity.
+///
+/// # Errors
+///
+/// This function will return an error if any of the conversions fail.
+///
+/// # Example
+///
+/// ```
+/// let result = get_rigid_body_properties(&rigid_body);
+/// assert!(result.is_ok());
+/// ```
+pub fn get_rigid_body_properties<F: TryFrom<f32>>(
+    rigid_body: &boxcars::RigidBody,
+) -> RigidBodyArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let linear_velocity = rigid_body
+        .linear_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let angular_velocity = rigid_body
+        .angular_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let rotation = rigid_body.rotation;
+    let location = rigid_body.location;
+    let (rx, ry, rz) =
+        glam::quat(rotation.x, rotation.y, rotation.z, rotation.w).to_euler(glam::EulerRot::XYZ);
+    convert_all_floats!(
+        location.x,
+        location.y,
+        location.z,
+        rx,
+        ry,
+        rz,
+        linear_velocity.x,
+        linear_velocity.y,
+        linear_velocity.z,
+        angular_velocity.x,
+        angular_velocity.y,
+        angular_velocity.z,
+    )
+}
+
+/// Extracts the location and rotation from a `boxcars::RigidBody` and converts
+/// them to a type implementing `TryFrom<f32>`.
+///
+/// If any of the components of the rigid body are not set (`None`), they are
+/// treated as zero.
+///
+/// The returned array contains seven elements in the following order: x, y, z
+/// location, x, y, z, w rotation.
+pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
+    rigid_body: &boxcars::RigidBody,
+) -> SubtrActorResult<[F; 7]>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let rotation = rigid_body.rotation;
+    let location = rigid_body.location;
+    convert_all_floats!(
+        location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
+    )
+}
+
+fn default_rb_state<F: TryFrom<f32>>() -> RigidBodyArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all!(
+        convert_float_conversion_error,
+        // We use huge values for location instead of 0s so that hopefully any
+        // model built on this data can understand that the player is not
+        // actually on the field.
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+}
+
+fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtrActorResult<[F; 7]>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
 }
 
 build_global_feature_adder!(

@@ -84,6 +84,7 @@ pub struct ReplayProcessor<'a> {
 
 impl<'a> ReplayProcessor<'a> {
     // Initialization
+
     pub fn new(replay: &'a boxcars::Replay) -> SubtrActorResult<Self> {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
@@ -432,6 +433,26 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Updates the boost amounts for all the actors in a given frame.
+    ///
+    /// This function works by iterating over all the actors of a particular boost type.
+    /// For each actor, it retrieves the current boost value. If the actor's boost value
+    /// hasn't been updated, it continues using the derived boost value from the last frame.
+    /// If the actor's boost is active, it subtracts from the current boost value according
+    /// to the frame delta and the constant `BOOST_USED_PER_SECOND`.
+    ///
+    /// The updated boost values are then stored in the actor's derived attributes.
+    ///
+    /// # Arguments
+    ///
+    /// * `frame` - A reference to the [`Frame`] in which the boost amounts are to be updated.
+    /// * `frame_index` - The index of the frame in the replay.
+    ///
+    /// # Returns
+    ///
+    /// This function returns an empty `Result`, where the error type is `SubtrActorResult<()>`.
+    ///
+    /// [`Frame`]: boxcars::Frame
     fn update_boost_amounts(
         &mut self,
         frame: &boxcars::Frame,
@@ -478,6 +499,28 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Gets the current boost values for a given actor state.
+    ///
+    /// This function retrieves the current boost amount, whether the boost is active,
+    /// the derived boost amount, and the last known boost amount from the actor's state.
+    /// The derived value is retrieved from the actor's derived attributes, while
+    /// the other values are retrieved directly from the actor's attributes.
+    ///
+    /// # Arguments
+    ///
+    /// * `actor_state` - A reference to the actor's [`ActorState`] from which
+    /// the boost values are to be retrieved.
+    ///
+    /// # Returns
+    ///
+    /// This function returns a tuple consisting of the following:
+    /// * Current boost amount
+    /// * Last known boost amount
+    /// * Boost active value (1 if active, 0 otherwise)
+    /// * Derived boost amount
+    /// * Whether the boost is active (true if active, false otherwise)
+    ///
+    /// [`ActorState`]: crate::ActorState
     fn get_current_boost_values(&self, actor_state: &ActorState) -> (u8, u8, u8, f32, bool) {
         let amount_value = get_attribute_errors_expected!(
             self,
@@ -567,10 +610,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // ID Mapping functions
 
-    pub fn get_player_id_from_car_id(
-        &self,
-        actor_id: &boxcars::ActorId,
-    ) -> SubtrActorResult<PlayerId> {
+    fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
         self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
     }
 
@@ -659,7 +699,36 @@ impl<'a> ReplayProcessor<'a> {
         ))
     }
 
-    fn get_interpolated_actor_rigid_body(
+    /// This function first retrieves the actor's [`RigidBody`] at the current frame.
+    /// If the time difference between the current frame and the provided time is
+    /// within the `close_enough` threshold, the function returns the current frame's
+    /// [`RigidBody`].
+    ///
+    /// If the [`RigidBody`] at the exact time is not available, the function searches
+    /// in the appropriate direction (either forwards or backwards in time) to find
+    /// another [`RigidBody`] to interpolate from. If the found [`RigidBody`]'s time is
+    /// within the `close_enough` threshold, it is returned.
+    ///
+    /// Otherwise, it interpolates between the two [`RigidBody`]s (from the
+    /// current frame and the found frame) to produce a [`RigidBody`] for the
+    /// specified time. This is done using the [`get_interpolated_rigid_body`]
+    /// function from the `util` module.
+    ///
+    /// # Arguments
+    ///
+    /// * `actor_id` - The ID of the actor whose [`RigidBody`] is to be retrieved.
+    /// * `time` - The time at which the actor's [`RigidBody`] is to be retrieved.
+    /// * `close_enough` - The acceptable threshold for time difference when
+    ///   determining if a [`RigidBody`] is close enough to the desired time to not
+    ///   require interpolation.
+    ///
+    /// # Returns
+    ///
+    /// A [`RigidBody`] for the actor at the specified time.
+    ///
+    /// [`RigidBody`]: boxcars::RigidBody
+    /// [`get_interpolated_rigid_body`]: util::get_interpolated_rigid_body
+    pub fn get_interpolated_actor_rigid_body(
         &self,
         actor_id: &boxcars::ActorId,
         time: f32,
@@ -892,6 +961,7 @@ impl<'a> ReplayProcessor<'a> {
 
     // Properties
 
+    /// Returns the remaining time in seconds in the game as an `i32`.
     pub fn get_seconds_remaining(&self) -> SubtrActorResult<i32> {
         get_actor_attribute_matching!(
             self,
@@ -902,6 +972,7 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    /// Returns a boolean indicating whether ball syncing is ignored.
     pub fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
         let actor_id = self.get_ball_actor()?;
         get_actor_attribute_matching!(
@@ -913,6 +984,7 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    /// Returns a reference to the [`RigidBody`](boxcars::RigidBody) of the ball.
     pub fn get_ball_rigid_body(&self) -> SubtrActorResult<&boxcars::RigidBody> {
         self.ball_actor_id
             .ok_or(SubtrActorError::new(
@@ -921,6 +993,8 @@ impl<'a> ReplayProcessor<'a> {
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
+    /// Returns a boolean indicating whether the ball's
+    /// [`RigidBody`](boxcars::RigidBody) exists and is not sleeping.
     pub fn ball_rigid_body_exists(&self) -> SubtrActorResult<bool> {
         Ok(self
             .get_ball_rigid_body()
@@ -928,6 +1002,8 @@ impl<'a> ReplayProcessor<'a> {
             .unwrap_or(false))
     }
 
+    /// Returns a reference to the ball's [`RigidBody`](boxcars::RigidBody) and
+    /// its last updated frame.
     pub fn get_ball_rigid_body_and_updated(
         &self,
     ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
@@ -945,6 +1021,8 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    /// Returns a [`RigidBody`](boxcars::RigidBody) of the ball with applied
+    /// velocity at the target time.
     pub fn get_velocity_applied_ball_rigid_body(
         &self,
         target_time: f32,
@@ -953,6 +1031,8 @@ impl<'a> ReplayProcessor<'a> {
         self.velocities_applied_rigid_body(&current_rigid_body, *frame_index, target_time)
     }
 
+    /// Returns an interpolated [`RigidBody`](boxcars::RigidBody) of the ball at
+    /// a specified time.
     pub fn get_interpolated_ball_rigid_body(
         &self,
         time: f32,
@@ -961,6 +1041,7 @@ impl<'a> ReplayProcessor<'a> {
         self.get_interpolated_actor_rigid_body(&self.get_ball_actor()?, time, close_enough)
     }
 
+    /// Returns the name of the specified player.
     pub fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         get_actor_attribute_matching!(
             self,
@@ -971,6 +1052,7 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    /// Returns the team key for the specified player.
     pub fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         let team_actor_id = self
             .player_to_team
@@ -991,6 +1073,7 @@ impl<'a> ReplayProcessor<'a> {
             .cloned()
     }
 
+    /// Determines if the player is on team 0.
     pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
         Ok(self
             .get_player_team_key(player_id)?
@@ -1004,6 +1087,7 @@ impl<'a> ReplayProcessor<'a> {
             == '0')
     }
 
+    /// Returns a reference to the [`RigidBody`](boxcars::RigidBody) of the player's car.
     pub fn get_player_rigid_body(
         &self,
         player_id: &PlayerId,
@@ -1012,6 +1096,9 @@ impl<'a> ReplayProcessor<'a> {
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
+    /// Returns the most recent update to the [`RigidBody`](boxcars::RigidBody)
+    /// of the player's car along with the index of the frame in which it was
+    /// updated.
     pub fn get_player_rigid_body_and_updated(
         &self,
         player_id: &PlayerId,
