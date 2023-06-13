@@ -67,7 +67,7 @@ fn get_json(filepath: std::path::PathBuf) -> anyhow::Result<String> {
         .must_parse_network_data()
         .on_error_check_crc()
         .parse()?;
-    Ok(ReplayDataCollector::new()
+    Ok(subtr_actor::ReplayDataCollector::new()
         .get_replay_data(&replay)
         .map_err(|e| e.variant)?
         .as_json()?)
@@ -139,9 +139,7 @@ bindings for other languages since those languages may not be able to access
 rust structs an instantiate them easily or at all.
 
 ```rust
-pub static DEFAULT_GLOBAL_FEATURE_ADDERS: [&str; 1] = ["
-
-BallRigidBody"];
+pub static DEFAULT_GLOBAL_FEATURE_ADDERS: [&str; 1] = ["BallRigidBody"];
 
 pub static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
     ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
