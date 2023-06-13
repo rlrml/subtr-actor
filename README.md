@@ -185,12 +185,12 @@ fn build_ndarray_collector(
 [12]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/trait.FeatureAdder.html
 [13]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/trait.PlayerFeatureAdder.html
 [14]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.NDArrayCollector.html#method.new
-[15]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/macro.build_global_feature_adder.html
-[16]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/macro.build_player_feature_adder.html
-[17]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayData.html
+[15]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_global_feature_adder.html
+[16]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_player_feature_adder.html
+[17]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/replay_data/struct.ReplayData.html
 [18]: https://docs.rs/serde/latest/serde/trait.Serialize.html
-[19]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayMetaWithHeaders.html
+[19]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.ReplayMetaWithHeaders.html
 [20]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/trait.Collector.html#method.process_replay
 [21]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.NDArrayCollector.html#method.from_strings
-[22]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.InterpolatedPlayerRigidBodyNoVelocities.html
+[22]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.InterpolatedPlayerRigidBodyNoVelocities.html
 [23]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html
