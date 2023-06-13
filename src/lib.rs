@@ -53,7 +53,25 @@
 //! objects, but instead something more natural where the data associated with
 //! each entity in the game is grouped together.
 //!
-//! ## Example
+//! ## Examples
+//!
+//! ### Getting JSON
+//!
+//! ```
+//! fn get_json(filepath: std::path::PathBuf) -> anyhow::Result<String> {
+//!     let data = std::fs::read(filepath.as_path())?;
+//!     let replay = boxcars::ParserBuilder::new(&data)
+//!         .must_parse_network_data()
+//!         .on_error_check_crc()
+//!         .parse()?;
+//!     Ok(ReplayDataCollector::new()
+//!         .get_replay_data(&replay)
+//!         .map_err(|e| e.variant)?
+//!         .as_json()?)
+//! }
+//! ```
+//!
+//! ### Getting a [`::ndarray::Array2`]
 //!
 //! In the following example, we demonstrate how to use [`boxcars`],
 //! [`NDArrayCollector`] and [`FrameRateDecorator`] to write a function that
@@ -85,6 +103,66 @@
 //!         .map_err(|e| e.variant)?;
 //!
 //!     Ok(collector.get_meta_and_ndarray().map_err(|e| e.variant)?)
+//! }
+//!
+//! fn get_ndarray_with_default_feature_adders(
+//!     filepath: std::path::PathBuf,
+//! ) -> anyhow::Result<(ReplayMetaWithHeaders, ::ndarray::Array2<f32>)> {
+//!     get_ndarray_with_info_from_replay_filepath(
+//!         filepath,
+//!         vec![
+//!             InterpolatedBallRigidBodyNoVelocities::arc_new(0.003),
+//!             CurrentTime::arc_new(),
+//!         ],
+//!         vec![
+//!             InterpolatedPlayerRigidBodyNoVelocities::arc_new(0.003),
+//!             PlayerBoost::arc_new(),
+//!             PlayerAnyJump::arc_new(),
+//!             PlayerDemolishedBy::arc_new(),
+//!         ],
+//!         Some(30.0),
+//!     )
+//! }
+//! ```
+//!
+//! ### Using [`NDArrayCollector::from_strings`]
+//!
+//! In the second function we see the use of feature adders like
+//! [`InterpolatedPlayerRigidBodyNoVelocities`]. The feature adders that are
+//! included with [`subtr_actor`](crate) can all be found in the
+//! [`crate::collector::ndarray`] module. It is also possible to access these
+//! feature adders by name with strings, which can be useful when implementing
+//! bindings for other languages since those languages may not be able to access
+//! rust structs an instantiate them easily or at all.
+//!
+//! ```
+//! pub static DEFAULT_GLOBAL_FEATURE_ADDERS: [&str; 1] = ["BallRigidBody"];
+//!
+//! pub static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
+//!     ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
+//!
+//! fn build_ndarray_collector(
+//!     global_feature_adders: Option<Vec<String>>,
+//!     player_feature_adders: Option<Vec<String>>,
+//! ) -> subtr_actor::SubtrActorResult<subtr_actor::NDArrayCollector<f32>> {
+//!     let global_feature_adders = global_feature_adders.unwrap_or_else(|| {
+//!         DEFAULT_GLOBAL_FEATURE_ADDERS
+//!             .iter()
+//!             .map(|i| i.to_string())
+//!             .collect()
+//!     });
+//!     let player_feature_adders = player_feature_adders.unwrap_or_else(|| {
+//!         DEFAULT_PLAYER_FEATURE_ADDERS
+//!             .iter()
+//!             .map(|i| i.to_string())
+//!             .collect()
+//!     });
+//!     let global_feature_adders: Vec<&str> = global_feature_adders.iter().map(|s| &s[..]).collect();
+//!     let player_feature_adders: Vec<&str> = player_feature_adders.iter().map(|s| &s[..]).collect();
+//!     subtr_actor::NDArrayCollector::<f32>::from_strings(
+//!         &global_feature_adders,
+//!         &player_feature_adders,
+//!     )
 //! }
 //! ```
 

@@ -3,11 +3,12 @@
 
 ## subtr-actor
 
-[`subtr-actor`][1] is a versatile library designed to facilitate the processes
-of working with and extracting data from Rocket League replays. Utilizing the
-powerful [`boxcars`][2] library for parsing, subtr-actor simplifies (or
-'subtracts', as hinted by its name) the underlying actor-based structure of
-replay files, making them more accessible and easier to manipulate.
+[`subtr-actor`][1] is a versatile library designed to facilitate the
+processes of working with and extracting data from Rocket League replays.
+Utilizing the powerful [`boxcars`][2] library for parsing, subtr-actor
+simplifies (or 'subtracts', as hinted by its name) the underlying
+actor-based structure of replay files, making them more accessible and
+easier to manipulate.
 
 ### Overview of Key Components
 
@@ -55,12 +56,30 @@ get from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
 objects, but instead something more natural where the data associated with
 each entity in the game is grouped together.
 
-### Example
+### Examples
+
+#### Getting JSON
+
+```rust
+fn get_json(filepath: std::path::PathBuf) -> anyhow::Result<String> {
+    let data = std::fs::read(filepath.as_path())?;
+    let replay = boxcars::ParserBuilder::new(&data)
+        .must_parse_network_data()
+        .on_error_check_crc()
+        .parse()?;
+    Ok(ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .map_err(|e| e.variant)?
+        .as_json()?)
+}
+```
+
+#### Getting a [`::ndarray::Array2`][11]
 
 In the following example, we demonstrate how to use [`boxcars`][2],
 [`NDArrayCollector`][10] and [`FrameRateDecorator`][9] to write a function that
 takes a replay filepath and collections of features adders and returns a
-[`ReplayMetaWithHeaders`][19] along with a [`::ndarray::Array2`][11]. The resulting
+[`ReplayMetaWithHeaders`][19] along with a [`::ndarray::Array2`][11] . The resulting
 [`::ndarray::Array2`][11] would be appropriate for use in a machine learning
 context. Note that [`ReplayProcessor`][3] is also used implicitly here in the
 [`Collector::process_replay`][20]
@@ -88,6 +107,68 @@ fn get_ndarray_with_info_from_replay_filepath(
 
     Ok(collector.get_meta_and_ndarray().map_err(|e| e.variant)?)
 }
+
+fn get_ndarray_with_default_feature_adders(
+    filepath: std::path::PathBuf,
+) -> anyhow::Result<(ReplayMetaWithHeaders, ::ndarray::Array2<f32>)> {
+    get_ndarray_with_info_from_replay_filepath(
+        filepath,
+        vec![
+            InterpolatedBallRigidBodyNoVelocities::arc_new(0.003),
+            CurrentTime::arc_new(),
+        ],
+        vec![
+            InterpolatedPlayerRigidBodyNoVelocities::arc_new(0.003),
+            PlayerBoost::arc_new(),
+            PlayerAnyJump::arc_new(),
+            PlayerDemolishedBy::arc_new(),
+        ],
+        Some(30.0),
+    )
+}
+```
+
+#### Using [`NDArrayCollector::from_strings`][21]
+
+In the second function we see the use of feature adders like
+[`InterpolatedPlayerRigidBodyNoVelocities`][22]. The feature adders that are
+included with [`subtr_actor`][1] can all be found in the
+[`crate::collector::ndarray`][23] module. It is also possible to access these
+feature adders by name with strings, which can be useful when implementing
+bindings for other languages since those languages may not be able to access
+rust structs an instantiate them easily or at all.
+
+```rust
+pub static DEFAULT_GLOBAL_FEATURE_ADDERS: [&str; 1] = ["
+
+BallRigidBody"];
+
+pub static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
+    ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
+
+fn build_ndarray_collector(
+    global_feature_adders: Option<Vec<String>>,
+    player_feature_adders: Option<Vec<String>>,
+) -> subtr_actor::SubtrActorResult<subtr_actor::NDArrayCollector<f32>> {
+    let global_feature_adders = global_feature_adders.unwrap_or_else(|| {
+        DEFAULT_GLOBAL_FEATURE_ADDERS
+            .iter()
+            .map(|i| i.to_string())
+            .collect()
+    });
+    let player_feature_adders = player_feature_adders.unwrap_or_else(|| {
+        DEFAULT_PLAYER_FEATURE_ADDERS
+            .iter()
+            .map(|i| i.to_string())
+            .collect()
+    });
+    let global_feature_adders: Vec<&str> = global_feature_adders.iter().map(|s| &s[..]).collect();
+    let player_feature_adders: Vec<&str> = player_feature_adders.iter().map(|s| &s[..]).collect();
+    subtr_actor::NDArrayCollector::<f32>::from_strings(
+        &global_feature_adders,
+        &player_feature_adders,
+    )
+}
 ```
 
 [1]: https://docs.rs/subtr-actor/latest/subtr_actor/
@@ -110,3 +191,6 @@ fn get_ndarray_with_info_from_replay_filepath(
 [18]: https://docs.rs/serde/latest/serde/trait.Serialize.html
 [19]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.ReplayMetaWithHeaders.html
 [20]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.Collector.html#method.process_replay
+[21]: https://docs.rs/subtr-actor/latest/subtr_actor/struct.NDArrayCollector.html#method.from_strings
+[22]: https://docs.rs/subtr-actor/latest/subtr_actor/trait.InterpolatedPlayerRigidBodyNoVelocities.html
+[23]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html
