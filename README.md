@@ -49,7 +49,7 @@ with the [`build_global_feature_adder!`][15] and [`build_player_feature_adder!`]
 macros. The [`::ndarray::Array2`][11] produced by [`NDArrayCollector`][10] is ideal
 for use with machine learning libraries like pytorch and tensorflow.
 
-- **[`ReplayData`][17]**: This [`Collector`][7] implementation provides an easy way
+- **[`ReplayDataCollector`][17]**: This [`Collector`][7] implementation provides an easy way
 to get a serializable to e.g. json (though [`serde::Serialize`][18])
 representation of the replay. The representation differs from what you might
 get from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
@@ -187,7 +187,7 @@ fn build_ndarray_collector(
 [14]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.NDArrayCollector.html#method.new
 [15]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_global_feature_adder.html
 [16]: https://docs.rs/subtr-actor/latest/subtr_actor/macro.build_player_feature_adder.html
-[17]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/replay_data/struct.ReplayData.html
+[17]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/replay_data/struct.ReplayDataCollector.html
 [18]: https://docs.rs/serde/latest/serde/trait.Serialize.html
 [19]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/struct.ReplayMetaWithHeaders.html
 [20]: https://docs.rs/subtr-actor/latest/subtr_actor/collector/trait.Collector.html#method.process_replay

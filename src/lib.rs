@@ -46,7 +46,7 @@
 //! macros. The [`::ndarray::Array2`] produced by [`NDArrayCollector`] is ideal
 //! for use with machine learning libraries like pytorch and tensorflow.
 //!
-//! - **[`ReplayData`]**: This [`Collector`] implementation provides an easy way
+//! - **[`ReplayDataCollector`]**: This [`Collector`] implementation provides an easy way
 //! to get a serializable to e.g. json (though [`serde::Serialize`])
 //! representation of the replay. The representation differs from what you might
 //! get from e.g. raw [`boxcars`] in that it is not a complicated graph of actor
