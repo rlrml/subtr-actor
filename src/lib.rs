@@ -64,7 +64,7 @@
 //!         .must_parse_network_data()
 //!         .on_error_check_crc()
 //!         .parse()?;
-//!     Ok(ReplayDataCollector::new()
+//!     Ok(subtr_actor::ReplayDataCollector::new()
 //!         .get_replay_data(&replay)
 //!         .map_err(|e| e.variant)?
 //!         .as_json()?)
