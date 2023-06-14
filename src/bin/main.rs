@@ -3,12 +3,6 @@ use subtr_actor::*;
 
 use std::env;
 
-build_global_feature_adder!(
-    CurrentTime,
-    |_, _processor, _frame, _index, current_time: f32| { convert_all_floats!(current_time) },
-    "current time"
-);
-
 fn main() {
     let args: Vec<_> = env::args().collect();
     let data = std::fs::read(&args[1]).unwrap();
