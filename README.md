@@ -20,8 +20,8 @@ replay processing capabilities. In its main entry point,
 provided as an argument as it does so. The [`Collector`][7] is provided with a
 reference to the [`ReplayProcessor`][3] each time the it is invoked, which
 allows it to use the suite of helper methods which greatly assist in the
-navigation of the actor graph and the retrieval of information about the
-current game state.
+navigation of the actor graph and the retrieval of information about the current
+game state.
 
 - **[`Collector`][7]**: This trait outlines the blueprint for data collection
 from replays. The [`Collector`][7] interfaces with a [`ReplayProcessor`][3],
@@ -49,12 +49,12 @@ with the [`build_global_feature_adder!`][15] and [`build_player_feature_adder!`]
 macros. The [`::ndarray::Array2`][11] produced by [`NDArrayCollector`][10] is ideal
 for use with machine learning libraries like pytorch and tensorflow.
 
-- **[`ReplayDataCollector`][17]**: This [`Collector`][7] implementation provides an easy way
-to get a serializable to e.g. json (though [`serde::Serialize`][18])
-representation of the replay. The representation differs from what you might
-get from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
-objects, but instead something more natural where the data associated with
-each entity in the game is grouped together.
+- **[`ReplayDataCollector`][17]**: This [`Collector`][7] implementation provides
+an easy way to get a serializable to e.g. json (though [`serde::Serialize`][18])
+representation of the replay. The representation differs from what you might get
+from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
+objects, but instead something more natural where the data associated with each
+entity in the game is grouped together.
 
 ### Examples
 
