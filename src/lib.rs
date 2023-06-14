@@ -46,8 +46,8 @@
 //! macros. The [`::ndarray::Array2`] produced by [`NDArrayCollector`] is ideal
 //! for use with machine learning libraries like pytorch and tensorflow.
 //!
-//! - **[`ReplayDataCollector`]**: This [`Collector`] implementation provides an easy way
-//! to get a serializable to e.g. json (though [`serde::Serialize`])
+//! - **[`ReplayDataCollector`]**: This [`Collector`] implementation provides an
+//! easy way to get a serializable to e.g. json (though [`serde::Serialize`])
 //! representation of the replay. The representation differs from what you might
 //! get from e.g. raw [`boxcars`] in that it is not a complicated graph of actor
 //! objects, but instead something more natural where the data associated with
@@ -127,9 +127,9 @@
 //!
 //! ### Using [`NDArrayCollector::from_strings`]
 //!
-//! In the second function we see the use of feature adders like
-//! [`InterpolatedPlayerRigidBodyNoVelocities`]. The feature adders that are
-//! included with [`subtr_actor`](crate) can all be found in the
+//! In the second function in the example above, we see the use of feature
+//! adders like [`InterpolatedPlayerRigidBodyNoVelocities`]. The feature adders
+//! that are included with [`subtr_actor`](crate) can all be found in the
 //! [`crate::collector::ndarray`] module. It is also possible to access these
 //! feature adders by name with strings, which can be useful when implementing
 //! bindings for other languages since those languages may not be able to access

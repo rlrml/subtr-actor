@@ -160,23 +160,23 @@ impl<'a> ReplayProcessor<'a> {
         Ok(processor)
     }
 
-    /// [`Self::process`] takes a [`Collector`] as an argument and iterates over each frame in
-    /// the replay, updating the internal state of the processor and other
-    /// relevant mappings based on the current frame. It also fetches the
-    /// required information for each frame like ball id, boost amounts and
-    /// demolishes.
+    /// [`Self::process`] takes a [`Collector`] as an argument and iterates over
+    /// each frame in the replay, updating the internal state of the processor
+    /// and other relevant mappings based on the current frame.
     ///
-    /// The function uses a [`TimeAdvance`] mechanism to control the pace of frame
-    /// processing. [`TimeAdvance`] could either be a specific time or
-    /// [`TimeAdvance::NextFrame`], which indicates that the processing should
-    /// proceed to the next frame in the replay. This design allows the handler
-    /// to have control over the frame rate, including the possibility of
-    /// skipping frames.
-    ///
-    /// For each frame, [`Collector::process_frame`] of the collector is called, allowing the
-    /// collector to process the frame and gather data accordingly. The
-    /// collector may also specify a target time for the next frame it wants to
-    /// process.
+    /// After each a frame is processed, [`Collector::process_frame`] of the
+    /// collector is called. The [`TimeAdvance`] return value of this call into
+    /// [`Collector::process_frame`] is used to determine what happens next: in
+    /// the case of [`TimeAdvance::Time`], the notion of current time is
+    /// advanced by the provided amount, and only the timestamp of the frame is
+    /// exceeded, do we process the next frame. This mechanism allows fine
+    /// grained control of frame processing, and the frequency of invocations of
+    /// the [`Collector`]. If time is advanced by less than the delay between
+    /// frames, the collector will be called more than once per frame, and can
+    /// use functions like [`Self::get_interpolated_player_rigid_body`] to get
+    /// values that are interpolated between frames. Its also possible to skip
+    /// over frames by providing time advance values that are sufficiently
+    /// large.
     ///
     /// At the end of processing, it checks to make sure that no unknown players
     /// were encountered during the replay. If any unknown players are found, an
@@ -226,8 +226,12 @@ impl<'a> ReplayProcessor<'a> {
                 }
             }
         }
-        // Make sure that we didn't encounter any players we did not know about
-        // at the beggining of the replay.
+        // TODO: This should probably not be mandatory. Also it really only
+        // checks that the set is the same at the end as it was in the
+        // beggining. There could still be issue in the intervening frames that
+        // are not detected.
+        // Make sure that we didn't encounter any players we
+        // did not know about at the beggining of the replay.
         self.check_player_id_set()
     }
 
@@ -321,7 +325,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn check_player_id_set(&self) -> SubtrActorResult<()> {
+    pub fn check_player_id_set(&self) -> SubtrActorResult<()> {
         let known_players =
             std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys());
         let original_players =
