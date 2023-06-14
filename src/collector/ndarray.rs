@@ -579,7 +579,9 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use subtr_actor::*;
+///
 /// build_global_feature_adder!(
 ///     SecondsRemainingExample,
 ///     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
@@ -597,7 +599,7 @@ where
 macro_rules! build_global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
 
-        #[derive(new)]
+        #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -632,42 +634,35 @@ macro_rules! build_global_feature_adder {
 #[macro_export]
 macro_rules! global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+        macro_rules! _global_feature_adder {
+            ($count:ident) => {
+                impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
+                where
+                    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+                {
+                    fn get_column_headers_array(&self) -> &[&str; $count] {
+                        &[$( $column_names ),*]
+                    }
+
+                    fn get_features(
+                        &self,
+                        processor: &ReplayProcessor,
+                        frame: &boxcars::Frame,
+                        frame_count: usize,
+                        current_time: f32,
+                    ) -> SubtrActorResult<[F; $count]> {
+                        $prop_getter(self, processor, frame, frame_count, current_time)
+                    }
+                }
+
+                impl_feature_adder!($struct_name);
+            };
+        }
         paste::paste! {
             const [<$struct_name:snake:upper _LENGTH>]: usize = [$($column_names),*].len();
-            _global_feature_adder!(
-                [<$struct_name:snake:upper _LENGTH>],
-                $struct_name,
-                $prop_getter,
-                $( $column_names ),*
-            );
+            _global_feature_adder!([<$struct_name:snake:upper _LENGTH>]);
         }
     }
-}
-
-macro_rules! _global_feature_adder {
-    ($count:ident, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-
-        impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
-        where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug,
-        {
-            fn get_column_headers_array(&self) -> &[&str; $count] {
-                &[$( $column_names ),*]
-            }
-
-            fn get_features(
-                &self,
-                processor: &ReplayProcessor,
-                frame: &boxcars::Frame,
-                frame_count: usize,
-                current_time: f32,
-            ) -> SubtrActorResult<[F; $count]> {
-                $prop_getter(self, processor, frame, frame_count, current_time)
-            }
-        }
-
-        impl_feature_adder!($struct_name);
-    };
 }
 
 /// This macro creates a player feature adder struct and implements the
@@ -688,7 +683,13 @@ macro_rules! _global_feature_adder {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use subtr_actor::*;
+///
+/// fn u8_get_f32(v: u8) -> SubtrActorResult<f32> {
+///    v.try_into().map_err(convert_float_conversion_error)
+/// }
+///
 /// build_player_feature_adder!(
 ///     PlayerJump,
 ///     |_,
@@ -725,6 +726,7 @@ macro_rules! _global_feature_adder {
 #[macro_export]
 macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+        #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -732,12 +734,6 @@ macro_rules! build_player_feature_adder {
         impl<F: Sync + Send + TryFrom<f32> + 'static> $struct_name<F> where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
-            pub fn new() -> Self {
-                Self {
-                    _zero: std::marker::PhantomData
-                }
-            }
-
             pub fn arc_new() -> std::sync::Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static> {
                 std::sync::Arc::new(Self::new())
             }
@@ -766,43 +762,36 @@ macro_rules! build_player_feature_adder {
 #[macro_export]
 macro_rules! player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        // count headers at compile time
+        macro_rules! _player_feature_adder {
+            ($count:ident) => {
+                impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
+                where
+                    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+                {
+                    fn get_column_headers_array(&self) -> &[&str; $count] {
+                        &[$( $column_names ),*]
+                    }
+
+                    fn get_features(
+                        &self,
+                        player_id: &PlayerId,
+                        processor: &ReplayProcessor,
+                        frame: &boxcars::Frame,
+                        frame_count: usize,
+                        current_time: f32,
+                    ) -> SubtrActorResult<[F; $count]> {
+                        $prop_getter(self, player_id, processor, frame, frame_count, current_time)
+                    }
+                }
+
+                impl_player_feature_adder!($struct_name);
+            };
+        }
         paste::paste! {
             const [<$struct_name:snake:upper _LENGTH>]: usize = [$($column_names),*].len();
-            _player_feature_adder!(
-                [<$struct_name:snake:upper _LENGTH>],
-                $struct_name,
-                $prop_getter,
-                $( $column_names ),*
-            );
+            _player_feature_adder!([<$struct_name:snake:upper _LENGTH>]);
         }
     }
-}
-
-macro_rules! _player_feature_adder {
-    ($count:ident, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
-        where
-            <F as TryFrom<f32>>::Error: std::fmt::Debug,
-        {
-            fn get_column_headers_array(&self) -> &[&str; $count] {
-                &[$( $column_names ),*]
-            }
-
-            fn get_features(
-                &self,
-                player_id: &PlayerId,
-                processor: &ReplayProcessor,
-                frame: &boxcars::Frame,
-                frame_count: usize,
-                current_time: f32,
-            ) -> SubtrActorResult<[F; $count]> {
-                $prop_getter(self, player_id, processor, frame, frame_count, current_time)
-            }
-        }
-
-        impl_player_feature_adder!($struct_name);
-    };
 }
 
 /// Unconditionally convert any error into a [`SubtrActorError`] of with the
@@ -811,16 +800,16 @@ pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
     SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
 }
 
-/// A macro that tries to convert each provided item into a type. If any of
-/// the conversions fail, it short-circuits and returns the error.
+/// A macro that tries to convert each provided item into a type. If any of the
+/// conversions fail, it short-circuits and returns the error.
 ///
 /// The first argument `$err` is a closure that accepts an error and returns a
 /// [`SubtrActorResult`]. It is used to map any conversion errors into a
 /// [`SubtrActorResult`].
 ///
 /// Subsequent arguments should be expressions that implement the [`TryInto`]
-/// trait, with the type they're being converted into being the one used in
-/// the `Ok` variant of the return value.
+/// trait, with the type they're being converted into being the one used in the
+/// `Ok` variant of the return value.
 #[macro_export]
 macro_rules! convert_all {
     ($err:expr, $( $item:expr ),* $(,)?) => {{
@@ -909,8 +898,8 @@ where
     )
 }
 
-/// Extracts the location and rotation from a [`boxcars::RigidBody`] and converts
-/// them to a type implementing [`TryFrom<f32>`].
+/// Extracts the location and rotation from a [`boxcars::RigidBody`] and
+/// converts them to a type implementing [`TryFrom<f32>`].
 ///
 /// If any of the components of the rigid body are not set (`None`), they are
 /// treated as zero.

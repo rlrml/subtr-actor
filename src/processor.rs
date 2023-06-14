@@ -2,6 +2,17 @@ use crate::*;
 use boxcars;
 use std::collections::HashMap;
 
+/// Attempts to match an attribute value with the given type.
+///
+/// # Arguments
+///
+/// * `$value` - An expression that yields the attribute value.
+/// * `$type` - The expected enum path.
+///
+/// If the attribute matches the specified type, it is returned wrapped in an
+/// [`Ok`] variant of a [`Result`]. If the attribute doesn't match, it results in an
+/// [`Err`] variant with a [`SubtrActorError`], specifying the expected type and
+/// the actual type.
 macro_rules! attribute_match {
     ($value:expr, $type:path $(,)?) => {{
         let attribute = $value;
@@ -16,6 +27,14 @@ macro_rules! attribute_match {
     }};
 }
 
+/// Obtains an attribute from a map and ensures it matches the expected type.
+///
+/// # Arguments
+///
+/// * `$self` - The struct or instance on which the function is invoked.
+/// * `$map` - The data map.
+/// * `$prop` - The attribute key.
+/// * `$type` - The expected enum path.
 macro_rules! get_attribute_errors_expected {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
         $self
@@ -24,6 +43,18 @@ macro_rules! get_attribute_errors_expected {
     };
 }
 
+/// Obtains an attribute and its updated status from a map and ensures the
+/// attribute matches the expected type.
+///
+/// # Arguments
+///
+/// * `$self` - The struct or instance on which the function is invoked.
+/// * `$map` - The data map.
+/// * `$prop` - The attribute key.
+/// * `$type` - The expected enum path.
+///
+/// It returns a [`Result`] with a tuple of the matched attribute and its updated
+/// status, after invoking [`attribute_match!`] on the found attribute.
 macro_rules! get_attribute_and_updated {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
         $self
@@ -32,6 +63,14 @@ macro_rules! get_attribute_and_updated {
     };
 }
 
+/// Obtains an actor attribute and ensures it matches the expected type.
+///
+/// # Arguments
+///
+/// * `$self` - The struct or instance on which the function is invoked.
+/// * `$actor` - The actor identifier.
+/// * `$prop` - The attribute key.
+/// * `$type` - The expected enum path.
 macro_rules! get_actor_attribute_matching {
     ($self:ident, $actor:expr, $prop:expr, $type:path) => {
         $self
@@ -40,6 +79,14 @@ macro_rules! get_actor_attribute_matching {
     };
 }
 
+/// Obtains a derived attribute from a map and ensures it matches the expected
+/// type.
+///
+/// # Arguments
+///
+/// * `$map` - The data map.
+/// * `$key` - The attribute key.
+/// * `$type` - The expected enum path.
 macro_rules! get_derived_attribute {
     ($map:expr, $key:expr, $type:path) => {
         $map.get($key)
@@ -276,8 +323,8 @@ impl<'a> ReplayProcessor<'a> {
     ///
     /// # Errors
     ///
-    /// If any error other than `FinishProcessingEarly` occurs during the processing operation,
-    /// it is propagated up by this function.
+    /// If any error other than `FinishProcessingEarly` occurs during the
+    /// processing operation, it is propagated up by this function.
     pub fn process_long_enough_to_get_actor_ids(&mut self) -> SubtrActorResult<()> {
         let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
@@ -596,23 +643,20 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Updates the boost amounts for all the actors in a given frame.
     ///
-    /// This function works by iterating over all the actors of a particular boost type.
-    /// For each actor, it retrieves the current boost value. If the actor's boost value
-    /// hasn't been updated, it continues using the derived boost value from the last frame.
-    /// If the actor's boost is active, it subtracts from the current boost value according
-    /// to the frame delta and the constant `BOOST_USED_PER_SECOND`.
+    /// This function works by iterating over all the actors of a particular
+    /// boost type. For each actor, it retrieves the current boost value. If the
+    /// actor's boost value hasn't been updated, it continues using the derived
+    /// boost value from the last frame. If the actor's boost is active, it
+    /// subtracts from the current boost value according to the frame delta and
+    /// the constant `BOOST_USED_PER_SECOND`.
     ///
-    /// The updated boost values are then stored in the actor's derived attributes.
+    /// The updated boost values are then stored in the actor's derived
+    /// attributes.
     ///
     /// # Arguments
     ///
     /// * `frame` - A reference to the [`Frame`] in which the boost amounts are to be updated.
     /// * `frame_index` - The index of the frame in the replay.
-    ///
-    /// # Returns
-    ///
-    /// This function returns an empty `Result`, where the error type is `SubtrActorResult<()>`.
-    ///
     /// [`Frame`]: boxcars::Frame
     fn update_boost_amounts(
         &mut self,
@@ -860,15 +904,16 @@ impl<'a> ReplayProcessor<'a> {
         ))
     }
 
-    /// This function first retrieves the actor's [`RigidBody`] at the current frame.
-    /// If the time difference between the current frame and the provided time is
-    /// within the `close_enough` threshold, the function returns the current frame's
-    /// [`RigidBody`].
+    /// This function first retrieves the actor's [`RigidBody`] at the current
+    /// frame. If the time difference between the current frame and the provided
+    /// time is within the `close_enough` threshold, the function returns the
+    /// current frame's [`RigidBody`].
     ///
-    /// If the [`RigidBody`] at the exact time is not available, the function searches
-    /// in the appropriate direction (either forwards or backwards in time) to find
-    /// another [`RigidBody`] to interpolate from. If the found [`RigidBody`]'s time is
-    /// within the `close_enough` threshold, it is returned.
+    /// If the [`RigidBody`] at the exact time is not available, the function
+    /// searches in the appropriate direction (either forwards or backwards in
+    /// time) to find another [`RigidBody`] to interpolate from. If the found
+    /// [`RigidBody`]'s time is within the `close_enough` threshold, it is
+    /// returned.
     ///
     /// Otherwise, it interpolates between the two [`RigidBody`]s (from the
     /// current frame and the found frame) to produce a [`RigidBody`] for the
