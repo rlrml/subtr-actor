@@ -561,11 +561,6 @@ where
     }
 }
 
-macro_rules! count_exprs {
-    () => {0usize};
-    ($val:expr $(, $vals:expr)*) => {1usize + count_exprs!($($vals),*)};
-}
-
 /// This macro creates a global [`FeatureAdder`] struct and implements the
 /// necessary traits to add the calculated features to the data matrix. The
 /// macro exports a struct with the same name as passed in the parameter. The
@@ -637,29 +632,27 @@ macro_rules! build_global_feature_adder {
 #[macro_export]
 macro_rules! global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        _global_feature_adder!(
-            {count_exprs!($( $column_names ),*)},
-            $struct_name,
-            $prop_getter,
-            $( $column_names ),*
-        );
+        paste::paste! {
+            const [<$struct_name:snake:upper _LENGTH>]: usize = [$($column_names),*].len();
+            _global_feature_adder!(
+                [<$struct_name:snake:upper _LENGTH>],
+                $struct_name,
+                $prop_getter,
+                $( $column_names ),*
+            );
+        }
     }
 }
 
 macro_rules! _global_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        paste::paste! {
-            pub static [<$struct_name:snake:upper _COLUMN_NAMES>]: [&str; count_exprs!($( $column_names ),*)] = [
-                $( $column_names ),*
-            ];
-        }
+    ($count:ident, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
 
         impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
         where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
             fn get_column_headers_array(&self) -> &[&str; $count] {
-                &paste::paste!{[<$struct_name:snake:upper _COLUMN_NAMES>]}
+                &[$( $column_names ),*]
             }
 
             fn get_features(
@@ -724,7 +717,6 @@ macro_rules! _global_feature_adder {
 ///     "double jump active"
 /// );
 /// ```
-
 ///
 /// This will create a struct named `PlayerJump` and implement necessary
 /// traits to calculate features using the provided closure. The player-specific
@@ -751,8 +743,7 @@ macro_rules! build_player_feature_adder {
             }
         }
 
-        _player_feature_adder!(
-            {count_exprs!($( $column_names ),*)},
+        player_feature_adder!(
             $struct_name,
             $prop_getter,
             $( $column_names ),*
@@ -775,29 +766,27 @@ macro_rules! build_player_feature_adder {
 #[macro_export]
 macro_rules! player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        _player_feature_adder!(
-            {count_exprs!($( $column_names ),*)},
-            $struct_name,
-            $prop_getter,
-            $( $column_names ),*
-        );
+        // count headers at compile time
+        paste::paste! {
+            const [<$struct_name:snake:upper _LENGTH>]: usize = [$($column_names),*].len();
+            _player_feature_adder!(
+                [<$struct_name:snake:upper _LENGTH>],
+                $struct_name,
+                $prop_getter,
+                $( $column_names ),*
+            );
+        }
     }
 }
 
 macro_rules! _player_feature_adder {
-    ($count:expr, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        paste::paste! {
-            pub static  [<$struct_name:snake:upper _COLUMN_NAMES>] : [&str; count_exprs!($( $column_names ),*)] = [
-                $( $column_names ),*
-            ];
-        }
-
+    ($count:ident, $struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
         impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
         where
             <F as TryFrom<f32>>::Error: std::fmt::Debug,
         {
             fn get_column_headers_array(&self) -> &[&str; $count] {
-                &paste::paste!{[<$struct_name:snake:upper _COLUMN_NAMES>]}
+                &[$( $column_names ),*]
             }
 
             fn get_features(
