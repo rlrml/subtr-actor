@@ -1,8 +1,9 @@
 use crate::*;
 use ::ndarray;
 use boxcars;
-pub use derive_new::*;
+pub use derive_new;
 use lazy_static::lazy_static;
+pub use paste;
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -599,7 +600,7 @@ where
 macro_rules! build_global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
 
-        #[derive(new)]
+        #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -726,7 +727,7 @@ macro_rules! global_feature_adder {
 #[macro_export]
 macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        #[derive(new)]
+        #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -1023,7 +1024,7 @@ build_global_feature_adder!(
     "Ball - rotation w",
 );
 
-#[derive(new)]
+#[derive(derive_new::new)]
 pub struct InterpolatedBallRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
     _zero: std::marker::PhantomData<F>,
@@ -1117,7 +1118,7 @@ build_player_feature_adder!(
     "rotation w"
 );
 
-#[derive(new)]
+#[derive(derive_new::new)]
 pub struct InterpolatedPlayerRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
     _zero: std::marker::PhantomData<F>,
