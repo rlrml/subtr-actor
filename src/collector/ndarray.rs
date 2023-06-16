@@ -1,10 +1,10 @@
+use crate::*;
 use ::ndarray;
 use boxcars;
+pub use derive_new::*;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::sync::Arc;
-
-use crate::*;
 
 /// Represents the column headers in the collected data of an [`NDArrayCollector`].
 ///
@@ -599,7 +599,7 @@ where
 macro_rules! build_global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
 
-        #[derive(derive_new::new)]
+        #[derive(new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
@@ -726,7 +726,7 @@ macro_rules! global_feature_adder {
 #[macro_export]
 macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
-        #[derive(derive_new::new)]
+        #[derive(new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
         }
