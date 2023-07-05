@@ -273,13 +273,7 @@ impl<'a> ReplayProcessor<'a> {
                 }
             }
         }
-        // TODO: This should probably not be mandatory. Also it really only
-        // checks that the set is the same at the end as it was in the
-        // beggining. There could still be issue in the intervening frames that
-        // are not detected.
-        // Make sure that we didn't encounter any players we
-        // did not know about at the beggining of the replay.
-        self.check_player_id_set()
+        Ok(())
     }
 
     /// Reset the state of the [`ReplayProcessor`].
@@ -346,13 +340,15 @@ impl<'a> ReplayProcessor<'a> {
 
     fn set_player_order_from_frames(&mut self) -> SubtrActorResult<()> {
         self.process_long_enough_to_get_actor_ids()?;
-        let result: Result<HashMap<PlayerId, bool>, _> = self
+        let player_to_team_0: HashMap<PlayerId, bool> = self
             .player_to_actor_id
             .keys()
-            .map(|player_id| Ok((player_id.clone(), self.get_player_is_team_0(player_id)?)))
+            .filter_map(|player_id| {
+                self.get_player_is_team_0(player_id)
+                    .ok()
+                    .map(|is_team_0| (player_id.clone(), is_team_0))
+            })
             .collect();
-
-        let player_to_team_0 = result?;
 
         let (team_zero, team_one): (Vec<_>, Vec<_>) = player_to_team_0
             .keys()
