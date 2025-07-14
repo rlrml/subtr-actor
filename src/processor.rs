@@ -614,9 +614,9 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         for actor_id in frame.deleted_actors.iter() {
-            self.player_to_car.remove(actor_id).map(|car_id| {
-                log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}.")
-            });
+            self.player_to_car
+                .remove(actor_id)
+                .map(|car_id| log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}."));
         }
 
         Ok(())
@@ -721,14 +721,22 @@ impl<'a> ReplayProcessor<'a> {
     /// * Derived boost amount
     /// * Whether the boost is active (true if active, false otherwise)
     fn get_current_boost_values(&self, actor_state: &ActorState) -> (u8, u8, u8, f32, bool) {
-        let amount_value = get_attribute_errors_expected!(
-            self,
-            &actor_state.attributes,
-            BOOST_AMOUNT_KEY,
-            boxcars::Attribute::Byte
-        )
-        .cloned()
-        .unwrap_or(0);
+        // Try to get boost amount from ReplicatedBoost attribute first (new format)
+        let amount_value = if let Ok(boxcars::Attribute::ReplicatedBoost(replicated_boost)) =
+            self.get_attribute(&actor_state.attributes, BOOST_REPLICATED_KEY)
+        {
+            replicated_boost.boost_amount
+        } else {
+            // Fall back to ReplicatedBoostAmount (old format)
+            get_attribute_errors_expected!(
+                self,
+                &actor_state.attributes,
+                BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Byte
+            )
+            .cloned()
+            .unwrap_or(0)
+        };
         let active_value = get_attribute_errors_expected!(
             self,
             &actor_state.attributes,
