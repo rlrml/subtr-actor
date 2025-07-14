@@ -84,8 +84,7 @@ pub fn find_player_stats(
         .iter()
         .find(|player_stats| matches_stats(player_id, name, player_stats))
         .ok_or(format!(
-            "Player not found {:?} {:?}",
-            player_id, all_player_stats
+            "Player not found {player_id:?} {all_player_stats:?}"
         ))?
         .iter()
         .cloned()
@@ -229,7 +228,7 @@ pub fn apply_velocities_to_rigid_body(
     rigid_body: &boxcars::RigidBody,
     time_delta: f32,
 ) -> boxcars::RigidBody {
-    let mut interpolated = rigid_body.clone();
+    let mut interpolated = *rigid_body;
     if time_delta == 0.0 {
         return interpolated;
     }
@@ -249,7 +248,7 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
     // unit mismatch or some other type of issue.
     let rbav = rigid_body
         .angular_velocity
-        .unwrap_or_else(|| boxcars::Vector3f {
+        .unwrap_or(boxcars::Vector3f {
             x: 0.0,
             y: 0.0,
             z: 0.0,

@@ -69,6 +69,12 @@ pub struct ActorStateModeler {
     pub actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
 }
 
+impl Default for ActorStateModeler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActorStateModeler {
     /// Creates a new [`ActorStateModeler`].
     ///
@@ -128,8 +134,8 @@ impl ActorStateModeler {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
                 return SubtrActorError::new_result(SubtrActorErrorVariant::ActorIdAlreadyExists {
-                    actor_id: new_actor.actor_id.clone(),
-                    object_id: new_actor.object_id.clone(),
+                    actor_id: new_actor.actor_id,
+                    object_id: new_actor.object_id,
                 });
             }
         } else {
@@ -137,7 +143,7 @@ impl ActorStateModeler {
                 .insert(new_actor.actor_id, ActorState::new(new_actor));
             self.actor_ids_by_type
                 .entry(new_actor.object_id)
-                .or_insert_with(|| Vec::new())
+                .or_default()
                 .push(new_actor.actor_id)
         }
         Ok(())
@@ -161,13 +167,13 @@ impl ActorStateModeler {
     pub fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> SubtrActorResult<ActorState> {
         let state = self.actor_states.remove(actor_id).ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
-                actor_id: actor_id.clone(),
+                actor_id: *actor_id,
             })
         })?;
 
         self.actor_ids_by_type
             .entry(state.object_id)
-            .or_insert_with(|| Vec::new())
+            .or_default()
             .retain(|x| x != actor_id);
 
         Ok(state)

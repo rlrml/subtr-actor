@@ -48,7 +48,7 @@ pub struct ReplayMetaWithHeaders {
 
 impl ReplayMetaWithHeaders {
     pub fn headers_vec(&self) -> Vec<String> {
-        self.headers_vec_from(|_, _info, index| format!("Player {} - ", index))
+        self.headers_vec_from(|_, _info, index| format!("Player {index} - "))
     }
 
     pub fn headers_vec_from<F>(&self, player_prefix_getter: F) -> Vec<String>
@@ -65,7 +65,7 @@ impl ReplayMetaWithHeaders {
                     self.column_headers
                         .player_headers
                         .iter()
-                        .map(move |header| format!("{}{}", player_prefix, header))
+                        .map(move |header| format!("{player_prefix}{header}"))
                 },
             ))
             .collect()
@@ -135,7 +135,7 @@ impl<F> NDArrayCollector<F> {
             .flat_map(move |fa| {
                 fa.get_column_headers()
                     .iter()
-                    .map(move |column_name| format!("{}", column_name))
+                    .map(move |column_name| column_name.to_string())
             })
             .collect();
         let player_headers = self
@@ -144,7 +144,7 @@ impl<F> NDArrayCollector<F> {
             .flat_map(move |pfa| {
                 pfa.get_column_headers()
                     .iter()
-                    .map(move |base_name| format!("{}", base_name))
+                    .map(move |base_name| base_name.to_string())
             })
             .collect();
         NDArrayColumnHeaders::new(global_headers, player_headers)
@@ -249,7 +249,7 @@ impl<F> NDArrayCollector<F> {
     }
 
     fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
-        if let None = self.replay_meta {
+        if self.replay_meta.is_none() {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
         Ok(())
@@ -527,11 +527,12 @@ where
         current_time: f32,
         vector: &mut Vec<F>,
     ) -> SubtrActorResult<()> {
-        Ok(vector.extend(self.0(processor, frame, frame_count, current_time)?))
+        vector.extend(self.0(processor, frame, frame_count, current_time)?);
+        Ok(())
     }
 
     fn get_column_headers(&self) -> &[&str] {
-        &self.1.as_slice()
+        self.1.as_slice()
     }
 }
 
@@ -548,17 +549,18 @@ where
         current_time: f32,
         vector: &mut Vec<F>,
     ) -> SubtrActorResult<()> {
-        Ok(vector.extend(self.0(
+        vector.extend(self.0(
             player_id,
             processor,
             frame,
             frame_count,
             current_time,
-        )?))
+        )?);
+        Ok(())
     }
 
     fn get_column_headers(&self) -> &[&str] {
-        &self.1.as_slice()
+        self.1.as_slice()
     }
 }
 
