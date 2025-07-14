@@ -1,4 +1,6 @@
 /target
 *.replay
+*.replay.zip
 perf.data
+perf.data.old
 flamegraph.svg
