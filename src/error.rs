@@ -180,5 +180,8 @@ pub fn attribute_to_tag(attribute: &Attribute) -> &str {
         Attribute::QWord(_) => "AttributeTag::QWordString",
         Attribute::PrivateMatch(_) => "AttributeTag::PrivateMatchSettings",
         Attribute::Rotation(_) => "AttributeTag::RotationTag",
+        Attribute::DemolishExtended(_) => "AttributeTag::DemolishExtended",
+        Attribute::ReplicatedBoost(_) => "AttributeTag::ReplicatedBoost",
+        Attribute::LogoData(_) => "AttributeTag::LogoData",
     }
 }
