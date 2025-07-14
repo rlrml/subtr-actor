@@ -26,7 +26,7 @@ impl BallFrame {
             Self::Empty
         } else {
             Self::Data {
-                rigid_body: rigid_body.clone(),
+                rigid_body,
             }
         }
     }
@@ -195,7 +195,7 @@ impl FrameData {
         for (player_id, frame) in player_frames {
             self.players
                 .get_entry(player_id)
-                .or_insert_with(|| PlayerData::new())
+                .or_insert_with(PlayerData::new)
                 .add_frame(frame_index, frame)
         }
         Ok(())
@@ -204,6 +204,12 @@ impl FrameData {
 
 pub struct ReplayDataCollector {
     frame_data: FrameData,
+}
+
+impl Default for ReplayDataCollector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ReplayDataCollector {
@@ -239,7 +245,7 @@ impl ReplayDataCollector {
                 (
                     player_id.clone(),
                     PlayerFrame::new_from_processor(processor, player_id, current_time)
-                        .unwrap_or_else(|_err| PlayerFrame::Empty),
+                        .unwrap_or(PlayerFrame::Empty),
                 )
             })
             .collect())
