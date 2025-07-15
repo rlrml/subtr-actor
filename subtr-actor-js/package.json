@@ -1,7 +1,7 @@
 {
-  "name": "subtr-actor-wasm",
-  "version": "0.1.0",
-  "description": "WASM bindings for subtr-actor - Rocket League replay processing",
+  "name": "subtr-actor",
+  "version": "0.1.6",
+  "description": "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis",
   "main": "pkg/subtr_actor_wasm.js",
   "types": "pkg/subtr_actor_wasm.d.ts",
   "files": [
@@ -12,8 +12,9 @@
     "build:nodejs": "wasm-pack build --target nodejs --out-dir pkg-node",
     "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
     "test": "wasm-pack test --headless --firefox",
-    "pack": "wasm-pack pack",
-    "publish": "wasm-pack publish"
+    "pack": "npm run build && npm pack pkg/",
+    "publish": "npm run build && npm publish pkg/",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",

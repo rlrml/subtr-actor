@@ -1,10 +1,10 @@
 [package]
-name = "subtr-actor-wasm"
-version = "0.1.0"
+name = "subtr-actor"
+version = "0.1.6"
 edition = "2021"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
-description = "WASM bindings for subtr-actor"
+description = "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis"
 repository = "https://github.com/rlrml/subtr-actor"
 
 [lib]
@@ -27,4 +27,7 @@ features = [
 ]
 
 [package.metadata.wasm-pack.profile.release]
+wee-alloc = false
+
+[package.metadata.wasm-pack.profile.dev]
 wee-alloc = false

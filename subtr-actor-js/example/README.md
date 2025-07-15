@@ -1,6 +1,6 @@
 # Rocket League Replay Analyzer - Example
 
-This is an example web application demonstrating the subtr-actor WASM bindings for analyzing Rocket League replay files in the browser.
+This is an example web application demonstrating the subtr-actor JavaScript bindings for analyzing Rocket League replay files in the browser.
 
 ## Features
 
@@ -23,7 +23,7 @@ This is an example web application demonstrating the subtr-actor WASM bindings f
 1. **Clone the repository and navigate to the example:**
    ```bash
    git clone https://github.com/rlrml/subtr-actor.git
-   cd subtr-actor/wasm-bindings/example
+   cd subtr-actor/subtr-actor-js/example
    ```
 
 2. **Install dependencies:**
@@ -31,14 +31,14 @@ This is an example web application demonstrating the subtr-actor WASM bindings f
    yarn install
    ```
 
-3. **Build the WASM bindings (CRITICAL):**
+3. **Build the JavaScript bindings (CRITICAL):**
    ```bash
    yarn build-wasm
    ```
 
    **⚠️ IMPORTANT:** This step is **required** before running the example. It:
    - Builds the Rust code into WebAssembly
-   - Creates the `../pkg/` directory with WASM bindings
+   - Creates the `../pkg/` directory with JavaScript bindings
    - Generates `subtr_actor_wasm.js` and `subtr_actor_wasm_bg.wasm` files
    - The example imports from `../../pkg/subtr_actor_wasm.js` and will fail without this step
 
@@ -62,7 +62,7 @@ yarn dev-with-wasm
 **"Failed to resolve import" errors:**
 - Make sure you ran `yarn build-wasm` successfully
 - Check that `../pkg/subtr_actor_wasm.js` exists
-- The WASM build creates files in the parent directory that the example depends on
+- The JavaScript binding build creates files in the parent directory that the example depends on
 
 ## Usage
 

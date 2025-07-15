@@ -367,8 +367,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "subtr-actor-wasm"
-version = "0.1.0"
+name = "subtr-actor-js"
+version = "0.1.6"
 dependencies = [
  "boxcars",
  "console_error_panic_hook",

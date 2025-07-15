@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "wasm-bindings"]
+members = [".", "subtr-actor-js"]
 
 [package]
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
