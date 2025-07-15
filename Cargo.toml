@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "js"]
+
 [package]
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"

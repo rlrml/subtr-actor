@@ -1,0 +1,13 @@
+src/
+target/
+example/
+tests/
+Cargo.toml
+Cargo.lock
+.git/
+.gitignore
+*.replay
+*.replay.zip
+perf.data
+perf.data.old
+flamegraph.svg
