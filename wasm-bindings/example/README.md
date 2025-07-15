@@ -5,7 +5,7 @@ This is an example web application demonstrating the subtr-actor WASM bindings f
 ## Features
 
 - 🚀 **WebAssembly Powered** - Fast replay processing using Rust/WASM
-- 📊 **Interactive Visualizations** - Charts showing ball movement and game statistics  
+- 📊 **Interactive Visualizations** - Charts showing ball movement and game statistics
 - 📁 **Drag & Drop Interface** - Easy file upload with progress tracking
 - 🎮 **Comprehensive Analysis** - Player stats, game metadata, and raw data viewing
 - 📱 **Responsive Design** - Works on desktop and mobile devices
@@ -31,10 +31,16 @@ This is an example web application demonstrating the subtr-actor WASM bindings f
    yarn install
    ```
 
-3. **Build the WASM bindings:**
+3. **Build the WASM bindings (CRITICAL):**
    ```bash
    yarn build-wasm
    ```
+
+   **⚠️ IMPORTANT:** This step is **required** before running the example. It:
+   - Builds the Rust code into WebAssembly
+   - Creates the `../pkg/` directory with WASM bindings
+   - Generates `subtr_actor_wasm.js` and `subtr_actor_wasm_bg.wasm` files
+   - The example imports from `../../pkg/subtr_actor_wasm.js` and will fail without this step
 
 4. **Start the development server:**
    ```bash
@@ -50,6 +56,13 @@ This is an example web application demonstrating the subtr-actor WASM bindings f
 ```bash
 yarn dev-with-wasm
 ```
+
+### Troubleshooting
+
+**"Failed to resolve import" errors:**
+- Make sure you ran `yarn build-wasm` successfully
+- Check that `../pkg/subtr_actor_wasm.js` exists
+- The WASM build creates files in the parent directory that the example depends on
 
 ## Usage
 

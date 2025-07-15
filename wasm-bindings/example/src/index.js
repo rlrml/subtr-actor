@@ -89,12 +89,26 @@ class ReplayAnalyzer {
 
         const obj = {};
         for (const [key, value] of map) {
-            obj[key] =
+            if (
                 typeof value === "object" &&
                 value &&
                 typeof value.get === "function"
-                    ? this.mapToObject(value)
-                    : value;
+            ) {
+                // It's a Map, recursively convert
+                obj[key] = this.mapToObject(value);
+            } else if (Array.isArray(value)) {
+                // It's an array, convert each element if needed
+                obj[key] = value.map((item) =>
+                    typeof item === "object" &&
+                    item &&
+                    typeof item.get === "function"
+                        ? this.mapToObject(item)
+                        : item,
+                );
+            } else {
+                // It's a primitive value
+                obj[key] = value;
+            }
         }
         return obj;
     }
@@ -176,11 +190,30 @@ class ReplayAnalyzer {
     displayResults(results) {
         document.getElementById("results").style.display = "block";
 
-        this.displayStats(results);
-        this.displayGameInfo(results);
-        this.displayBallChart(results.ndarrayResult);
-        this.displayPlayerStats(results);
-        this.displayRawData(results.ndarrayResult);
+        // Hide the stats section at the top
+        const statsCard = document.querySelector('.card h2');
+        if (statsCard && statsCard.textContent.includes('Replay Statistics')) {
+            statsCard.parentElement.style.display = 'none';
+        }
+
+        // Hide all the other tabs and show only playback
+        document.querySelectorAll('.tab').forEach(tab => {
+            if (tab.dataset.tab !== 'playback') {
+                tab.style.display = 'none';
+            } else {
+                tab.classList.add('active');
+            }
+        });
+
+        document.querySelectorAll('.tab-content').forEach(content => {
+            if (content.id !== 'playback') {
+                content.style.display = 'none';
+            } else {
+                content.classList.add('active');
+            }
+        });
+
+        this.setupPlayback(results);
     }
 
     displayStats(results) {
@@ -242,7 +275,6 @@ class ReplayAnalyzer {
                     <div class="stat-label">Data Columns</div>
                 </div>
             </div>
-            
             <h4>Players:</h4>
             <ul>
                 ${(metadata.replay_meta.players || [])
@@ -474,6 +506,372 @@ class ReplayAnalyzer {
         if (uploadArea.innerHTML.includes("error")) {
             location.reload();
         }
+    }
+
+    setupPlayback(results) {
+        const { ndarrayResult, metadata } = results;
+        const data = ndarrayResult.array_data;
+        const globalHeaders =
+            ndarrayResult.metadata.column_headers.global_headers;
+        const playerHeaders =
+            ndarrayResult.metadata.column_headers.player_headers;
+
+        // Extract position data for ball and players
+        this.playbackData = this.extractPositionData(
+            data,
+            globalHeaders,
+            playerHeaders,
+            metadata,
+        );
+
+        // Initialize playback controls
+        this.initializePlaybackControls();
+
+        // Set up player elements in SVG using real team data
+        const realPlayers = [];
+
+        // Add team_zero players
+        if (metadata.replay_meta.team_zero) {
+            metadata.replay_meta.team_zero.forEach((player) => {
+                realPlayers.push({
+                    name: player.name || `Team 0 Player`,
+                    team: 0,
+                });
+            });
+        }
+
+        // Add team_one players
+        if (metadata.replay_meta.team_one) {
+            metadata.replay_meta.team_one.forEach((player) => {
+                realPlayers.push({
+                    name: player.name || `Team 1 Player`,
+                    team: 1,
+                });
+            });
+        }
+
+        console.log("Real players with teams:", realPlayers);
+        this.setupPlayerElements(realPlayers);
+
+        // Set initial frame
+        this.currentFrame = 0;
+        this.isPlaying = false;
+        this.playbackSpeed = 1;
+        this.updatePlaybackFrame();
+    }
+
+    extractPositionData(data, globalHeaders, playerHeaders, metadata) {
+        // Debug: Log the headers to see what we're working with
+        console.log("Global headers:", globalHeaders);
+        console.log("Player headers:", playerHeaders);
+        console.log(
+            "Players metadata team_zero:",
+            metadata.replay_meta.team_zero,
+        );
+        console.log(
+            "Players metadata team_one:",
+            metadata.replay_meta.team_one,
+        );
+
+        // Find ball position indices - looking for "Ball - position x" format
+        const ballXIndex = globalHeaders.findIndex(
+            (h) =>
+                h.includes("Ball - position x") ||
+                h.includes("Ball position x"),
+        );
+        const ballYIndex = globalHeaders.findIndex(
+            (h) =>
+                h.includes("Ball - position y") ||
+                h.includes("Ball position y"),
+        );
+        const ballZIndex = globalHeaders.findIndex(
+            (h) =>
+                h.includes("Ball - position z") ||
+                h.includes("Ball position z"),
+        );
+
+        console.log("Ball indices:", { ballXIndex, ballYIndex, ballZIndex });
+
+        // Extract player position indices
+        // The player headers show the template for one player
+        // But the actual data contains multiple players worth of data
+
+        console.log("Player headers length:", playerHeaders.length);
+        console.log(
+            "Total data columns expected:",
+            globalHeaders.length + playerHeaders.length,
+        );
+
+        // Calculate actual number of players from the data row length
+        const playerDataSize = playerHeaders.length; // 14 properties per player
+        const playerDataColumns = data[0].length - globalHeaders.length; // Total columns minus global columns
+        const numPlayers = Math.floor(playerDataColumns / playerDataSize);
+
+        console.log(
+            `Calculated ${numPlayers} players from ${playerDataColumns} player data columns (${playerDataSize} properties each)`,
+        );
+
+        const playerPositions = [];
+
+        // Create players based on calculated number
+        for (let playerIndex = 0; playerIndex < numPlayers; playerIndex++) {
+            const baseOffset = playerIndex * playerDataSize;
+            const posXIndex = baseOffset + 0; // position x offset within player data
+            const posYIndex = baseOffset + 1; // position y offset within player data
+            const posZIndex = baseOffset + 2; // position z offset within player data
+
+            playerPositions.push({
+                name: `Player ${playerIndex}`,
+                team: playerIndex % 2, // Alternate teams
+                posXIndex: globalHeaders.length + posXIndex,
+                posYIndex: globalHeaders.length + posYIndex,
+                posZIndex: globalHeaders.length + posZIndex,
+            });
+        }
+
+        console.log("Player positions configuration:", playerPositions);
+
+        // Process each frame
+        const frames = data.map((row, frameIndex) => {
+            const ballData = {
+                x: ballXIndex !== -1 ? row[ballXIndex] : 0,
+                y: ballYIndex !== -1 ? row[ballYIndex] : 0,
+                z: ballZIndex !== -1 ? row[ballZIndex] : 0,
+            };
+
+            const playersData = playerPositions.map((playerInfo) => ({
+                name: playerInfo.name,
+                team: playerInfo.team,
+                x: playerInfo.posXIndex !== -1 ? row[playerInfo.posXIndex] : 0,
+                y: playerInfo.posYIndex !== -1 ? row[playerInfo.posYIndex] : 0,
+                z: playerInfo.posZIndex !== -1 ? row[playerInfo.posZIndex] : 0,
+            }));
+
+            // Debug first frame
+            if (frameIndex === 0) {
+                console.log("First frame ball data:", ballData);
+                console.log("First frame players data:", playersData);
+                console.log("Row data length:", row.length);
+            }
+
+            const frame = {
+                ball: ballData,
+                players: playersData,
+            };
+            return frame;
+        });
+
+        return frames;
+    }
+
+    setupPlayerElements(players) {
+        const svg = document.getElementById("playbackSvg");
+
+        // Remove existing player elements
+        svg.querySelectorAll(".player-car").forEach((el) => el.remove());
+
+        // Add player elements
+        if (players && players.length > 0) {
+            players.forEach((player, index) => {
+                const playerElement = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "circle",
+                );
+                playerElement.setAttribute("id", `player-${index}`);
+                playerElement.setAttribute(
+                    "class",
+                    `player-car team-${player.team}`,
+                );
+                playerElement.setAttribute("r", "25");
+                playerElement.setAttribute("cx", "4000");
+                playerElement.setAttribute("cy", "2000");
+                svg.appendChild(playerElement);
+
+                // Add player name label
+                const nameLabel = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "text",
+                );
+                nameLabel.setAttribute("id", `player-name-${index}`);
+                nameLabel.setAttribute("x", "4000");
+                nameLabel.setAttribute("y", "2000");
+                nameLabel.setAttribute("text-anchor", "middle");
+                nameLabel.setAttribute("font-size", "96");
+                nameLabel.setAttribute("fill", "white");
+                nameLabel.setAttribute("font-weight", "bold");
+                nameLabel.textContent = player.name;
+                svg.appendChild(nameLabel);
+            });
+        }
+    }
+
+    initializePlaybackControls() {
+        const playPauseBtn = document.getElementById("playPauseBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const speedSlider = document.getElementById("speedSlider");
+        const speedValue = document.getElementById("speedValue");
+        const timelineSlider = document.getElementById("timelineSlider");
+
+        // Set up timeline slider
+        if (this.playbackData && this.playbackData.length > 0) {
+            timelineSlider.max = this.playbackData.length - 1;
+            timelineSlider.value = 0;
+
+            // Update total time display
+            const totalTime = document.getElementById("totalTime");
+            const durationSeconds = this.playbackData.length / 10; // Assuming 10 FPS
+            totalTime.textContent = this.formatTime(durationSeconds);
+        } else {
+            // No playback data available
+            timelineSlider.max = 0;
+            timelineSlider.value = 0;
+            const totalTime = document.getElementById("totalTime");
+            totalTime.textContent = "0:00";
+        }
+
+        // Event listeners
+        playPauseBtn.addEventListener("click", () => this.togglePlayback());
+        resetBtn.addEventListener("click", () => this.resetPlayback());
+
+        speedSlider.addEventListener("input", (e) => {
+            this.playbackSpeed = parseFloat(e.target.value);
+            speedValue.textContent = `${this.playbackSpeed}x`;
+        });
+
+        timelineSlider.addEventListener("input", (e) => {
+            this.currentFrame = parseInt(e.target.value);
+            this.updatePlaybackFrame();
+        });
+    }
+
+    togglePlayback() {
+        const playPauseBtn = document.getElementById("playPauseBtn");
+
+        if (this.isPlaying) {
+            this.isPlaying = false;
+            playPauseBtn.textContent = "Play";
+            if (this.playbackInterval) {
+                clearInterval(this.playbackInterval);
+            }
+        } else {
+            this.isPlaying = true;
+            playPauseBtn.textContent = "Pause";
+            this.startPlayback();
+        }
+    }
+
+    startPlayback() {
+        const frameRate = 10; // 10 FPS
+        const interval = 1000 / frameRate / this.playbackSpeed;
+
+        this.playbackInterval = setInterval(() => {
+            this.currentFrame++;
+
+            if (this.currentFrame >= this.playbackData.length) {
+                this.currentFrame = this.playbackData.length - 1;
+                this.togglePlayback(); // Stop playback at end
+                return;
+            }
+
+            this.updatePlaybackFrame();
+        }, interval);
+    }
+
+    resetPlayback() {
+        this.currentFrame = 0;
+        this.isPlaying = false;
+        document.getElementById("playPauseBtn").textContent = "Play";
+
+        if (this.playbackInterval) {
+            clearInterval(this.playbackInterval);
+        }
+
+        this.updatePlaybackFrame();
+    }
+
+    updatePlaybackFrame() {
+        if (
+            !this.playbackData ||
+            this.currentFrame >= this.playbackData.length
+        ) {
+            return;
+        }
+
+        const frame = this.playbackData[this.currentFrame];
+
+        // Update ball position
+        const ball = document.getElementById("ball");
+        if (ball && frame.ball) {
+            // Swap X and Y coordinates - game X becomes SVG Y, game Y becomes SVG X
+            const ballSvgX = this.convertYPosition(frame.ball.y);
+            const ballSvgY = this.convertXPosition(frame.ball.x);
+
+            // Debug ball position on first few frames
+            if (this.currentFrame < 5) {
+                console.log(
+                    `Frame ${this.currentFrame}: Ball game coords (${frame.ball.x}, ${frame.ball.y}) -> SVG coords (${ballSvgX}, ${ballSvgY})`,
+                );
+            }
+
+            ball.setAttribute("cx", ballSvgX);
+            ball.setAttribute("cy", ballSvgY);
+        }
+
+        // Update player positions
+        frame.players.forEach((player, index) => {
+            const playerElement = document.getElementById(`player-${index}`);
+            const nameLabel = document.getElementById(`player-name-${index}`);
+
+            if (playerElement && nameLabel) {
+                // Swap X and Y coordinates - game X becomes SVG Y, game Y becomes SVG X
+                const playerSvgX = this.convertYPosition(player.y);
+                const playerSvgY = this.convertXPosition(player.x);
+
+                // Debug player position on first few frames
+                if (this.currentFrame < 5) {
+                    console.log(
+                        `Frame ${this.currentFrame}: Player ${index} game coords (${player.x}, ${player.y}) -> SVG coords (${playerSvgX}, ${playerSvgY})`,
+                    );
+                }
+
+                playerElement.setAttribute("cx", playerSvgX);
+                playerElement.setAttribute("cy", playerSvgY);
+                nameLabel.setAttribute("x", playerSvgX);
+                nameLabel.setAttribute("y", playerSvgY - 50); // Position name above player
+            }
+        });
+
+        // Update timeline
+        const timelineSlider = document.getElementById("timelineSlider");
+        const currentTime = document.getElementById("currentTime");
+
+        timelineSlider.value = this.currentFrame;
+        const currentSeconds = this.currentFrame / 10; // Assuming 10 FPS
+        currentTime.textContent = this.formatTime(currentSeconds);
+    }
+
+    convertXPosition(gameX) {
+        // Convert game coordinates to SVG coordinates
+        // In Rocket League, X runs along the length of the field (goals at ends)
+        // SVG field is 8000 units wide, so X maps to SVG Y
+        // Rocket League field is approximately 10000 units long (-5000 to 5000)
+        // SVG field is 4000 units tall (0 to 4000)
+        return 2000 + gameX * 0.4; // Center at 2000, scale to fit height
+    }
+
+    convertYPosition(gameY) {
+        // Convert game coordinates to SVG coordinates
+        // In Rocket League, Y runs across the width of the field
+        // SVG field is 4000 units tall, so Y maps to SVG X
+        // Rocket League field is approximately 8000 units wide (-4000 to 4000)
+        // SVG field is 8000 units wide (0 to 8000)
+        return 4000 - gameY * 0.8; // Center at 4000, flip and scale
+    }
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
     }
 }
 

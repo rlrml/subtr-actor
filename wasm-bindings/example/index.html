@@ -271,6 +271,66 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9ff;
+            border-radius: 8px;
+        }
+
+        .playback-controls label {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .playback-controls input[type="range"] {
+            width: 100px;
+        }
+
+        .playback-timeline {
+            margin-bottom: 20px;
+        }
+
+        .playback-timeline input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .timeline-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .playback-field {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #2a5234;
+        }
+
+        .playback-field svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .player-car {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .team-0 {
+            fill: #4a90e2;
+        }
+
+        .team-1 {
+            fill: #f5a623;
+        }
     </style>
 </head>
 <body>
@@ -311,6 +371,7 @@
                     <div class="tab active" data-tab="overview">Overview</div>
                     <div class="tab" data-tab="ball-data">Ball Movement</div>
                     <div class="tab" data-tab="player-data">Player Data</div>
+                    <div class="tab" data-tab="playback">Playback</div>
                     <div class="tab" data-tab="raw-data">Raw Data</div>
                 </div>
 
@@ -329,6 +390,39 @@
                 <div class="tab-content" id="player-data">
                     <h3>Player Statistics</h3>
                     <div id="playerStats"></div>
+                </div>
+
+                <div class="tab-content" id="playback">
+                    <h3>Replay Playback</h3>
+                    <div class="playback-controls">
+                        <button class="btn" id="playPauseBtn">Play</button>
+                        <button class="btn" id="resetBtn">Reset</button>
+                        <label for="speedSlider">Speed:</label>
+                        <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                        <span id="speedValue">1x</span>
+                    </div>
+                    <div class="playback-timeline">
+                        <input type="range" id="timelineSlider" min="0" max="100" value="0">
+                        <div class="timeline-info">
+                            <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                        </div>
+                    </div>
+                    <div class="playback-field">
+                        <svg id="playbackSvg" width="800" height="400" viewBox="-800 -400 9600 4800">
+                            <!-- Field background -->
+                            <rect x="0" y="0" width="8000" height="4000" fill="#2a5234" stroke="#ffffff" stroke-width="40"/>
+                            <!-- Center line -->
+                            <line x1="4000" y1="0" x2="4000" y2="4000" stroke="#ffffff" stroke-width="20"/>
+                            <!-- Center circle -->
+                            <circle cx="4000" cy="2000" r="600" fill="none" stroke="#ffffff" stroke-width="20"/>
+                            <!-- Goals -->
+                            <rect x="0" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
+                            <rect x="7800" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
+                            <!-- Ball -->
+                            <circle id="ball" cx="4000" cy="2000" r="30" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+                            <!-- Players will be added dynamically -->
+                        </svg>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="raw-data">
