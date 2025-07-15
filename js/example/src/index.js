@@ -5,8 +5,8 @@ import init, {
     get_replay_meta,
     get_column_headers,
     get_replay_frames_data,
-} from "rl-replay-subtr-actor";
-import wasmUrl from "rl-replay-subtr-actor/rl_replay_subtr_actor_bg.wasm?url";
+} from "../../pkg/rl_replay_subtr_actor";
+import wasmUrl from "../../pkg/rl_replay_subtr_actor_bg.wasm?url";
 
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
@@ -158,12 +158,10 @@ class ReplayAnalyzer {
             // Get basic info and convert from Map to plain object
             const info = this.mapToObject(get_replay_info(replayData));
 
-            this.updateProgress(60, "Processing numerical data...");
+            this.updateProgress(60, "Processing frame data...");
 
-            // Get NDArray data and convert from Map to plain object
-            const ndarrayResult = this.mapToObject(
-                get_ndarray_with_info(replayData, null, null, 10.0),
-            );
+            // Get structured frame data using ReplayDataCollector at 60 FPS
+            const frameData = this.mapToObject(get_replay_frames_data(replayData, 60.0));
 
             this.updateProgress(80, "Getting metadata...");
 
@@ -175,7 +173,7 @@ class ReplayAnalyzer {
             // Display results
             this.displayResults({
                 info,
-                ndarrayResult,
+                frameData,
                 metadata,
                 fileName: file.name,
                 fileSize: file.size,
@@ -192,25 +190,25 @@ class ReplayAnalyzer {
         document.getElementById("results").style.display = "block";
 
         // Hide the stats section at the top
-        const statsCard = document.querySelector('.card h2');
-        if (statsCard && statsCard.textContent.includes('Replay Statistics')) {
-            statsCard.parentElement.style.display = 'none';
+        const statsCard = document.querySelector(".card h2");
+        if (statsCard && statsCard.textContent.includes("Replay Statistics")) {
+            statsCard.parentElement.style.display = "none";
         }
 
         // Hide all the other tabs and show only playback
-        document.querySelectorAll('.tab').forEach(tab => {
-            if (tab.dataset.tab !== 'playback') {
-                tab.style.display = 'none';
+        document.querySelectorAll(".tab").forEach((tab) => {
+            if (tab.dataset.tab !== "playback") {
+                tab.style.display = "none";
             } else {
-                tab.classList.add('active');
+                tab.classList.add("active");
             }
         });
 
-        document.querySelectorAll('.tab-content').forEach(content => {
-            if (content.id !== 'playback') {
-                content.style.display = 'none';
+        document.querySelectorAll(".tab-content").forEach((content) => {
+            if (content.id !== "playback") {
+                content.style.display = "none";
             } else {
-                content.classList.add('active');
+                content.classList.add("active");
             }
         });
 
@@ -238,7 +236,7 @@ class ReplayAnalyzer {
                     metadata.replay_meta.game_length_seconds,
                 ),
             },
-            { label: "Data Points", value: results.ndarrayResult.shape[0] },
+            { label: "Data Points", value: results.frameData.frame_data.metadata_frames.length },
         ];
 
         statsGrid.innerHTML = stats
@@ -272,8 +270,8 @@ class ReplayAnalyzer {
                     <div class="stat-label">Team 1 Score</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${metadata.column_headers.global_headers.length + metadata.column_headers.player_headers.length}</div>
-                    <div class="stat-label">Data Columns</div>
+                    <div class="stat-value">${results.frameData.frame_data.metadata_frames.length}</div>
+                    <div class="stat-label">Frame Count</div>
                 </div>
             </div>
             <h4>Players:</h4>
@@ -510,55 +508,574 @@ class ReplayAnalyzer {
     }
 
     setupPlayback(results) {
-        const { ndarrayResult, metadata } = results;
-        const data = ndarrayResult.array_data;
-        const globalHeaders =
-            ndarrayResult.metadata.column_headers.global_headers;
-        const playerHeaders =
-            ndarrayResult.metadata.column_headers.player_headers;
+        const { frameData, metadata } = results;
 
-        // Extract position data for ball and players
-        this.playbackData = this.extractPositionData(
-            data,
-            globalHeaders,
-            playerHeaders,
-            metadata,
+        // Transform subtr-actor data to ballchasing.com player format
+        const adaptedData = this.adaptFrameData(frameData);
+
+        // Store the adapted data globally for the player
+        window.replayData = adaptedData;
+
+        // Initialize the ballchasing.com player
+        this.initializeBallchasingPlayer();
+    }
+
+    adaptFrameData(frameData) {
+        const { frame_data, meta } = frameData;
+        const { ball_data, players, metadata_frames } = frame_data;
+
+        // Calculate timing based on metadata frames
+        const frameRate = 60; // Using 60 FPS for smooth playback
+        const maxTime = metadata_frames.length / frameRate;
+
+        // Extract ball data from frame data
+        const ballData = {
+            start: 0,
+            end: maxTime,
+            times: metadata_frames.map((_, i) => i / frameRate),
+            pos: [],
+            quat: [],
+        };
+
+        // Fill ball position and quaternion data from ball_data.frames
+        ball_data.frames.forEach((ballFrame) => {
+            if (ballFrame.Data && ballFrame.Data.rigid_body) {
+                const rb = ballFrame.Data.rigid_body;
+                ballData.pos.push(rb.location.x, rb.location.y, rb.location.z);
+                ballData.quat.push(rb.rotation.x, rb.rotation.y, rb.rotation.z, rb.rotation.w);
+            } else {
+                // Empty frame
+                ballData.pos.push(0, 0, 0);
+                ballData.quat.push(0, 0, 0, 1);
+            }
+        });
+
+        // Extract player data
+        const adaptedPlayers = [];
+        
+        players.forEach(([playerId, playerData], playerIndex) => {
+            // Get player name and team from metadata
+            let playerName = `Player ${playerIndex}`;
+            let team = playerIndex % 2 === 0 ? "blue" : "orange";
+
+            // Try to get real player info from meta
+            const allPlayers = [
+                ...(meta.team_zero || []),
+                ...(meta.team_one || []),
+            ];
+
+            if (allPlayers[playerIndex]) {
+                playerName = allPlayers[playerIndex].name || playerName;
+                team = allPlayers[playerIndex].team === 0 ? "blue" : "orange";
+            }
+
+            const adaptedPlayer = {
+                player: playerName,
+                team: team,
+                color: team === "blue" ? 0x209cee : 0xff9f43,
+                cars: [
+                    {
+                        start: 0,
+                        end: maxTime,
+                        times: metadata_frames.map((_, i) => i / frameRate),
+                        pos: [],
+                        quat: [],
+                    },
+                ],
+                boost_amount: {
+                    times: metadata_frames.map((_, i) => i / frameRate),
+                    values: [],
+                },
+                boost_state: {
+                    start: [],
+                    end: [],
+                },
+                tracks: {},
+                events: {},
+            };
+
+            // Fill player position, quaternion, and boost data
+            playerData.frames.forEach((playerFrame) => {
+                if (playerFrame.Data && playerFrame.Data.rigid_body) {
+                    const rb = playerFrame.Data.rigid_body;
+                    adaptedPlayer.cars[0].pos.push(rb.location.x, rb.location.y, rb.location.z);
+                    adaptedPlayer.cars[0].quat.push(rb.rotation.x, rb.rotation.y, rb.rotation.z, rb.rotation.w);
+                    adaptedPlayer.boost_amount.values.push(Math.floor(playerFrame.Data.boost_amount * 100));
+                } else {
+                    // Empty frame
+                    adaptedPlayer.cars[0].pos.push(0, 0, 0);
+                    adaptedPlayer.cars[0].quat.push(0, 0, 0, 1);
+                    adaptedPlayer.boost_amount.values.push(0);
+                }
+            });
+
+            adaptedPlayers.push(adaptedPlayer);
+        });
+
+        // Create the adapted data structure
+        const adaptedData = {
+            map: meta.map_name || "unknown",
+            map_type: "soccar", // Default to soccar for now
+            max_time: maxTime,
+            ball_type: "sphere",
+            balls: [ballData],
+            players: adaptedPlayers,
+            countdowns: [],
+            rem_seconds: {
+                times: [],
+                rem_seconds: [],
+            },
+            blue_score: {
+                times: [],
+                score: [],
+            },
+            orange_score: {
+                times: [],
+                score: [],
+            },
+            boost_pads: [],
+            ticks: [],
+        };
+
+        // Debug: Final verification of adapted data structure
+        console.log("Final adapted data structure:", {
+            playersCount: adaptedData.players.length,
+            firstPlayerBoost: adaptedData.players[0]?.boost_amount,
+            ballDataLength: adaptedData.balls[0]?.times.length,
+        });
+
+        return adaptedData;
+    }
+
+    initializeBallchasingPlayer() {
+        // Load required dependencies for the ballchasing.com player
+        this.loadPlayerDependencies()
+            .then(() => {
+                // Show the player container and hide the simple playback
+                document.getElementById("player-container").style.display =
+                    "block";
+                document.getElementById("simple-playback").style.display =
+                    "none";
+                document.getElementById("details-watch").style.display =
+                    "block";
+
+                // Initialize the settings and player
+                const settings = window.Settings({
+                    "player.autoplay": false,
+                    "cars.colors.simple": false,
+                    "cars.name.hide": false,
+                    "cars.bam.hide": true,
+                    "boost.pads.hide": true,
+                    "cars.boost.trail.hide": true,
+                    "cars.trails": false,
+                    "ball.trail": false,
+                    "trail.duration": 1,
+                });
+
+                // Create the player
+                try {
+                    const player = window.ReplayPlayer({
+                        settings: settings,
+                        slave: null,
+                    });
+
+                    console.log("Ballchasing.com player initialized successfully!");
+                } catch (error) {
+                    console.error("Error initializing ballchasing.com player:", error);
+                    console.error("Stack trace:", error.stack);
+                    throw error; // Re-throw to trigger the catch block
+                }
+            })
+            .catch((error) => {
+                console.error("Failed to load ballchasing.com player:", error);
+                // Keep the simple playback as fallback
+                console.log("Using simple playback as fallback");
+            });
+    }
+
+    async loadThreeJS() {
+        // Load Three.js
+        if (!window.THREE) {
+            await this.loadScript(
+                "https://cdnjs.cloudflare.com/ajax/libs/three.js/r116/three.min.js",
+            );
+        }
+    }
+
+    initializeCustom3DPlayer() {
+        const container = document.getElementById("player");
+        const adaptedData = window.replayData;
+
+        // Create the 3D scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2a5234); // Field green
+
+        // Create camera
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            container.clientWidth / container.clientHeight,
+            0.1,
+            10000,
         );
+        camera.position.set(0, -3000, 2000);
+        camera.lookAt(0, 0, 0);
 
-        // Initialize playback controls
-        this.initializePlaybackControls();
+        // Create renderer
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
 
-        // Set up player elements in SVG using real team data
-        const realPlayers = [];
+        // Create field
+        this.createField(scene);
 
-        // Add team_zero players
-        if (metadata.replay_meta.team_zero) {
-            metadata.replay_meta.team_zero.forEach((player) => {
-                realPlayers.push({
-                    name: player.name || `Team 0 Player`,
-                    team: 0,
-                });
+        // Create ball
+        const ballGeometry = new THREE.SphereGeometry(93, 16, 16);
+        const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const ball = new THREE.Mesh(ballGeometry, ballMaterial);
+        ball.castShadow = true;
+        scene.add(ball);
+
+        // Create players
+        const players = [];
+        adaptedData.players.forEach((playerData, index) => {
+            const playerGeometry = new THREE.BoxGeometry(200, 400, 80);
+            const playerMaterial = new THREE.MeshLambertMaterial({
+                color: playerData.team === "blue" ? 0x209cee : 0xff9f43,
             });
+            const player = new THREE.Mesh(playerGeometry, playerMaterial);
+            player.castShadow = true;
+            scene.add(player);
+            players.push(player);
+        });
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(0, 0, 1000);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Animation variables
+        let currentFrame = 0;
+        let isPlaying = false;
+        let animationId;
+
+        // Animation function
+        const animate = () => {
+            if (isPlaying && adaptedData.balls.length > 0) {
+                const ballData = adaptedData.balls[0];
+                const frameIndex = Math.floor(currentFrame);
+
+                if (frameIndex < ballData.times.length) {
+                    // Update ball position
+                    const ballPosIndex = frameIndex * 3;
+                    ball.position.set(
+                        ballData.pos[ballPosIndex] || 0,
+                        ballData.pos[ballPosIndex + 1] || 0,
+                        ballData.pos[ballPosIndex + 2] || 0,
+                    );
+
+                    // Update player positions
+                    adaptedData.players.forEach((playerData, index) => {
+                        if (
+                            playerData.cars &&
+                            playerData.cars.length > 0 &&
+                            players[index]
+                        ) {
+                            const carData = playerData.cars[0];
+                            const playerPosIndex = frameIndex * 3;
+                            if (playerPosIndex < carData.pos.length) {
+                                players[index].position.set(
+                                    carData.pos[playerPosIndex] || 0,
+                                    carData.pos[playerPosIndex + 1] || 0,
+                                    carData.pos[playerPosIndex + 2] || 0,
+                                );
+                            }
+                        }
+                    });
+
+                    currentFrame += 0.1; // Slow down playback
+                    if (currentFrame >= ballData.times.length) {
+                        isPlaying = false;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+            animationId = requestAnimationFrame(animate);
+        };
+
+        // Start animation
+        animate();
+
+        // Set up controls
+        const playPauseBtn = document.getElementById("play-pause");
+        const seekBar = document.getElementById("seekbar");
+
+        playPauseBtn.addEventListener("click", () => {
+            isPlaying = !isPlaying;
+            playPauseBtn.querySelector("i").className = isPlaying
+                ? "fa fa-pause"
+                : "fa fa-play";
+        });
+
+        seekBar.addEventListener("input", (e) => {
+            const progress = parseFloat(e.target.value) / 1000;
+            if (adaptedData.balls.length > 0) {
+                currentFrame = progress * adaptedData.balls[0].times.length;
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener("resize", () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        console.log("Custom 3D player setup complete");
+    }
+
+    createField(scene) {
+        // Create field geometry
+        const fieldGeometry = new THREE.PlaneGeometry(8240, 10280);
+        const fieldMaterial = new THREE.MeshLambertMaterial({
+            color: 0x2a5234,
+        });
+        const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+        field.rotation.x = -Math.PI / 2;
+        field.receiveShadow = true;
+        scene.add(field);
+
+        // Create field lines
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+        // Center line
+        const centerLineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -5140, 1),
+            new THREE.Vector3(0, 5140, 1),
+        ]);
+        const centerLine = new THREE.Line(centerLineGeometry, lineMaterial);
+        scene.add(centerLine);
+
+        // Center circle
+        const centerCircleGeometry = new THREE.RingGeometry(900, 920, 64);
+        const centerCircleMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+        });
+        const centerCircle = new THREE.Mesh(
+            centerCircleGeometry,
+            centerCircleMaterial,
+        );
+        centerCircle.rotation.x = -Math.PI / 2;
+        centerCircle.position.z = 1;
+        scene.add(centerCircle);
+
+        // Goals
+        const goalGeometry = new THREE.BoxGeometry(1900, 20, 800);
+        const goalMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+        const goal1 = new THREE.Mesh(goalGeometry, goalMaterial);
+        goal1.position.set(0, 5140, 400);
+        scene.add(goal1);
+
+        const goal2 = new THREE.Mesh(goalGeometry, goalMaterial);
+        goal2.position.set(0, -5140, 400);
+        scene.add(goal2);
+    }
+
+    addCookieFunctions() {
+        // Add cookie functions that the ballchasing.com player expects
+        window.readCookie = function (name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(";");
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === " ") c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0)
+                    return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        };
+
+        window.createCookie = function (name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + value + expires + "; path=/";
+        };
+    }
+
+    addMissingDOMElements() {
+        // Add shader elements that the player expects - must be added BEFORE the player script loads
+        if (!document.getElementById("particle-vertex-shader")) {
+            const vertexShader = document.createElement("script");
+            vertexShader.id = "particle-vertex-shader";
+            vertexShader.type = "x-shader/x-vertex";
+            vertexShader.textContent = `
+                attribute float size;
+                attribute float age;
+                varying float vAge;
+                void main() {
+                    vAge = age;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `;
+            document.head.appendChild(vertexShader);
         }
 
-        // Add team_one players
-        if (metadata.replay_meta.team_one) {
-            metadata.replay_meta.team_one.forEach((player) => {
-                realPlayers.push({
-                    name: player.name || `Team 1 Player`,
-                    team: 1,
-                });
-            });
+        if (!document.getElementById("particle-fragment-shader")) {
+            const fragmentShader = document.createElement("script");
+            fragmentShader.id = "particle-fragment-shader";
+            fragmentShader.type = "x-shader/x-fragment";
+            fragmentShader.textContent = `
+                uniform sampler2D texture;
+                varying float vAge;
+                void main() {
+                    gl_FragColor = vec4(color, vAge) * texture2D(texture, gl_PointCoord);
+                }
+            `;
+            document.head.appendChild(fragmentShader);
         }
 
-        console.log("Real players with teams:", realPlayers);
-        this.setupPlayerElements(realPlayers);
+        // Create the missing texture by creating a simple white circle
+        this.createParticleTexture();
+    }
 
-        // Set initial frame
-        this.currentFrame = 0;
-        this.isPlaying = false;
-        this.playbackSpeed = 1;
-        this.updatePlaybackFrame();
+    createParticleTexture() {
+        // Create a canvas to generate the particle texture
+        const canvas = document.createElement("canvas");
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext("2d");
+
+        // Create a white circle with alpha falloff
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 30;
+
+        const gradient = ctx.createRadialGradient(
+            centerX,
+            centerY,
+            0,
+            centerX,
+            centerY,
+            radius,
+        );
+        gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+        gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.5)");
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Create a texture from the canvas
+        if (window.THREE && window.THREE.TextureLoader) {
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+
+            // Mock the texture paths that the player expects
+            const originalLoad = THREE.TextureLoader.prototype.load;
+            THREE.TextureLoader.prototype.load = function (
+                url,
+                onLoad,
+                onProgress,
+                onError,
+            ) {
+                if (
+                    url === "/static/textures/solid-particle.png" ||
+                    url === "/static/textures/lensflare0_alpha.png"
+                ) {
+                    if (onLoad) onLoad(texture);
+                    return texture;
+                }
+                return originalLoad.call(
+                    this,
+                    url,
+                    onLoad,
+                    onProgress,
+                    onError,
+                );
+            };
+        }
+    }
+
+    async loadPlayerDependencies() {
+        // Load Three.js (use r116 which is more compatible with the ballchasing.com player)
+        if (!window.THREE) {
+            await this.loadScript(
+                "https://cdnjs.cloudflare.com/ajax/libs/three.js/r116/three.min.js",
+            );
+        }
+
+        // Create a simple Stats mock if Stats.js fails to load
+        if (!window.Stats) {
+            try {
+                await this.loadScript(
+                    "https://unpkg.com/stats.js@0.17.0/build/stats.min.js",
+                );
+            } catch (e) {
+                console.warn("Stats.js failed to load, creating mock");
+                window.Stats = function () {
+                    return {
+                        begin: function () {},
+                        end: function () {},
+                        showPanel: function () {},
+                        dom: document.createElement("div"),
+                    };
+                };
+            }
+        }
+
+        // Create a simple hotkeys mock if hotkeys.js fails to load
+        if (!window.hotkeys) {
+            try {
+                await this.loadScript(
+                    "https://unpkg.com/hotkeys-js@3.8.1/dist/hotkeys.min.js",
+                );
+            } catch (e) {
+                console.warn("Hotkeys.js failed to load, creating mock");
+                window.hotkeys = function (keys, callback) {
+                    document.addEventListener("keydown", function (e) {
+                        if (keys.includes(e.key.toLowerCase())) {
+                            callback(e, { key: e.key });
+                        }
+                    });
+                };
+            }
+        }
+
+        // CRITICAL: Add DOM elements and mock functions BEFORE loading the player script
+        this.addCookieFunctions();
+        this.addMissingDOMElements();
+
+        // Load the player script
+        await this.loadScript("./src/player.js");
+    }
+
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = () => {
+                console.log(`Successfully loaded: ${src}`);
+                resolve();
+            };
+            script.onerror = (error) => {
+                console.error(`Failed to load: ${src}`, error);
+                reject(error);
+            };
+            document.head.appendChild(script);
+        });
     }
 
     extractPositionData(data, globalHeaders, playerHeaders, metadata) {

@@ -331,6 +331,139 @@
         .team-1 {
             fill: #f5a623;
         }
+        /* Ballchasing.com player styles */
+        #player-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        #player {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #player-controls {
+            position: relative;
+            background: #f8f9ff;
+            padding: 10px;
+            border-radius: 0 0 8px 8px;
+        }
+
+        #player-controls input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: space-between;
+        }
+
+        #game-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        #countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+        }
+
+        .ticks {
+            position: relative;
+            height: 4px;
+            background: #ddd;
+            margin-bottom: 5px;
+        }
+
+        .ticks .tick {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: #667eea;
+        }
+
+        .txt {
+            position: absolute;
+            font-size: 12px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* Hidden watcher template */
+        #watcher-template {
+            display: none;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+        }
+
+        .modal.is-active {
+            display: block;
+        }
+
+        .modal-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+
+        .modal-close, .delete {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -352,7 +485,7 @@
                     Choose File
                 </button>
             </div>
-            
+
             <div class="progress-bar" id="progressBar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
@@ -394,34 +527,62 @@
 
                 <div class="tab-content" id="playback">
                     <h3>Replay Playback</h3>
-                    <div class="playback-controls">
-                        <button class="btn" id="playPauseBtn">Play</button>
-                        <button class="btn" id="resetBtn">Reset</button>
-                        <label for="speedSlider">Speed:</label>
-                        <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
-                        <span id="speedValue">1x</span>
-                    </div>
-                    <div class="playback-timeline">
-                        <input type="range" id="timelineSlider" min="0" max="100" value="0">
-                        <div class="timeline-info">
-                            <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                    <div id="player-container" style="display: none;">
+                        <div id="player"></div>
+                        <div id="player-controls">
+                            <div class="ticks"></div>
+                            <input type="range" id="seekbar" min="0" max="1000" value="0">
+                            <div class="player-info">
+                                <span id="current-time">0:00</span> / <span id="total-time">0:00</span>
+                                <button id="play-pause" class="btn">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                                <button id="cameraSwitcher" class="btn">Camera</button>
+                                <button id="full-screen" class="btn">Fullscreen</button>
+                                <button id="playback-speed-up" class="btn">Speed+</button>
+                                <button id="playback-speed-dn" class="btn">Speed-</button>
+                                <span id="playback-speed-value">1x</span>
+                            </div>
                         </div>
+                        <div id="game-info">
+                            <div id="blue-score">0</div>
+                            <div id="rem-seconds">5:00</div>
+                            <div id="orange-score">0</div>
+                        </div>
+                        <div id="countdown"></div>
                     </div>
-                    <div class="playback-field">
-                        <svg id="playbackSvg" width="800" height="400" viewBox="-800 -400 9600 4800">
-                            <!-- Field background -->
-                            <rect x="0" y="0" width="8000" height="4000" fill="#2a5234" stroke="#ffffff" stroke-width="40"/>
-                            <!-- Center line -->
-                            <line x1="4000" y1="0" x2="4000" y2="4000" stroke="#ffffff" stroke-width="20"/>
-                            <!-- Center circle -->
-                            <circle cx="4000" cy="2000" r="600" fill="none" stroke="#ffffff" stroke-width="20"/>
-                            <!-- Goals -->
-                            <rect x="0" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
-                            <rect x="7800" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
-                            <!-- Ball -->
-                            <circle id="ball" cx="4000" cy="2000" r="30" fill="#ffffff" stroke="#333333" stroke-width="2"/>
-                            <!-- Players will be added dynamically -->
-                        </svg>
+
+                    <!-- Fallback simple player -->
+                    <div id="simple-playback" style="display: block;">
+                        <div class="playback-controls">
+                            <button class="btn" id="playPauseBtn">Play</button>
+                            <button class="btn" id="resetBtn">Reset</button>
+                            <label for="speedSlider">Speed:</label>
+                            <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                            <span id="speedValue">1x</span>
+                        </div>
+                        <div class="playback-timeline">
+                            <input type="range" id="timelineSlider" min="0" max="100" value="0">
+                            <div class="timeline-info">
+                                <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                            </div>
+                        </div>
+                        <div class="playback-field">
+                            <svg id="playbackSvg" width="800" height="400" viewBox="-800 -400 9600 4800">
+                                <!-- Field background -->
+                                <rect x="0" y="0" width="8000" height="4000" fill="#2a5234" stroke="#ffffff" stroke-width="40"/>
+                                <!-- Center line -->
+                                <line x1="4000" y1="0" x2="4000" y2="4000" stroke="#ffffff" stroke-width="20"/>
+                                <!-- Center circle -->
+                                <circle cx="4000" cy="2000" r="600" fill="none" stroke="#ffffff" stroke-width="20"/>
+                                <!-- Goals -->
+                                <rect x="0" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
+                                <rect x="7800" y="1400" width="200" height="1200" fill="none" stroke="#ffffff" stroke-width="20"/>
+                                <!-- Ball -->
+                                <circle id="ball" cx="4000" cy="2000" r="30" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+                                <!-- Players will be added dynamically -->
+                            </svg>
+                        </div>
                     </div>
                 </div>
 
@@ -436,6 +597,65 @@
         </div>
     </div>
 
+    <!-- Add a details-watch container for the player to size properly -->
+    <div id="details-watch" style="width: 100%; max-width: 800px; margin: 0 auto; display: none;">
+        <div class="watchers"></div>
+    </div>
+
+    <!-- Hidden elements for ballchasing.com player -->
+    <div id="watcher-template" style="display: none;">
+        <div class="watcher">
+            <a href="#" target="_blank">
+                <img src="" alt="avatar" width="20" height="20">
+                <span></span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Modal templates -->
+    <div id="player-shortcuts-popup" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <h3>Keyboard Shortcuts</h3>
+            <ul>
+                <li><strong>X</strong> - Play/Pause</li>
+                <li><strong>Left/Right</strong> - Seek backward/forward</li>
+                <li><strong>Shift+Left/Right</strong> - Seek backward/forward (10s)</li>
+                <li><strong>W/Z</strong> - Increase playback speed</li>
+                <li><strong>S</strong> - Decrease playback speed</li>
+                <li><strong>C</strong> - Switch camera</li>
+                <li><strong>H</strong> - Go to beginning</li>
+                <li><strong>L</strong> - Go to end</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="session-broken" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <h3>Session Broken</h3>
+            <p>The connection to the session has been lost.</p>
+        </div>
+    </div>
+
+    <div id="session-over" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <h3>Session Over</h3>
+            <p>The session has ended.</p>
+        </div>
+    </div>
+
+    <!-- Load jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <!-- Load Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- Load our main script -->
     <script type="module" src="./src/index.js"></script>
 </body>
 </html>
