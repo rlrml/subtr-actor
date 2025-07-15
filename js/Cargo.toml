@@ -1,6 +1,6 @@
 [package]
-name = "subtr-actor"
-version = "0.1.6"
+name = "rl-replay-subtr-actor"
+version = "0.1.7"
 edition = "2021"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"

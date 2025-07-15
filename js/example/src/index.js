@@ -5,7 +5,7 @@ import init, {
     get_replay_meta,
     get_column_headers,
     get_replay_frames_data,
-} from "../../pkg/subtr_actor_wasm.js";
+} from "../../pkg/rl_replay_subtr_actor.js";
 
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);

@@ -1,4 +1,4 @@
-# subtr-actor-wasm
+# rl-replay-subtr-actor
 
 WebAssembly bindings for [subtr-actor](https://crates.io/crates/subtr-actor), a Rocket League replay processing library.
 
@@ -7,7 +7,7 @@ This package provides the same functionality as the Python bindings but for Java
 ## Installation
 
 ```bash
-npm install subtr-actor-wasm
+npm install rl-replay-subtr-actor
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ import init, {
     get_replay_frames_data, 
     validate_replay, 
     get_replay_info 
-} from 'subtr-actor-wasm';
+} from 'rl-replay-subtr-actor';
 
 async function analyzeReplay() {
     // Initialize the WASM module
@@ -82,7 +82,7 @@ const {
     get_replay_frames_data, 
     validate_replay, 
     get_replay_info 
-} = require('subtr-actor-wasm');
+} = require('rl-replay-subtr-actor');
 const fs = require('fs');
 
 // Read replay file
@@ -229,7 +229,7 @@ Requirements:
 ```bash
 # Clone the repository
 git clone https://github.com/rlrml/subtr-actor.git
-cd subtr-actor/wasm-bindings
+cd subtr-actor/js
 
 # Build for web
 npm run build

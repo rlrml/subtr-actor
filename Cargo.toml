@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "subtr-actor-js"]
+members = [".", "js"]
 
 [package]
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]

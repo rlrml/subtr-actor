@@ -1,9 +1,9 @@
 {
-  "name": "subtr-actor",
-  "version": "0.1.6",
+  "name": "rl-replay-subtr-actor",
+  "version": "0.1.7",
   "description": "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis",
-  "main": "pkg/subtr_actor_wasm.js",
-  "types": "pkg/subtr_actor_wasm.d.ts",
+  "main": "pkg/rl_replay_subtr_actor.js",
+  "types": "pkg/rl_replay_subtr_actor.d.ts",
   "files": [
     "pkg/*"
   ],
@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rlrml/subtr-actor.git"
+    "url": "git+https://github.com/rlrml/subtr-actor.git"
   },
   "keywords": [
     "rocket-league",
