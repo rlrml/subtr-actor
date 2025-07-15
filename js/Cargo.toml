@@ -1,9 +1,9 @@
 [package]
 name = "rl-replay-subtr-actor"
-version = "0.1.7"
-edition = "2021"
-authors = ["Ivan Malison <ivanmalison@gmail.com>"]
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 description = "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis"
 repository = "https://github.com/rlrml/subtr-actor"
 

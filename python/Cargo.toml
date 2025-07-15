@@ -1,17 +1,17 @@
 [package]
 name = "subtr-actor-py"
-version = "0.1.4"
-authors = ["Ivan Malison <IvanMalison@gmail.com>"]
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 
 [dependencies]
-boxcars = "0.9.9"
-subtr-actor = { git = "https://github.com/rlrml/subtr-actor.git", branch = "works_with_spectators" }
-numpy = "0.18.0"
+boxcars = "*"
+subtr-actor = { path = ".." }
+numpy = "0.22.0"
 serde_json = "1.0.52"
 
 [dependencies.pyo3]
-version = "0.18.2"
+version = "0.22.0"
 features = ["extension-module"]
 
 [lib]

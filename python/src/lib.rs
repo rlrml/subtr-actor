@@ -23,12 +23,12 @@ fn replay_from_data(data: &[u8]) -> PyResult<boxcars::Replay> {
 
 #[pymodule]
 #[pyo3(name = "subtr_actor")]
-fn subtr_actor_module(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_wrapped(wrap_pyfunction!(parse_replay))?;
-    m.add_wrapped(wrap_pyfunction!(get_ndarray_with_info_from_replay_filepath))?;
-    m.add_wrapped(wrap_pyfunction!(get_replay_meta))?;
-    m.add_wrapped(wrap_pyfunction!(get_column_headers))?;
-    m.add_wrapped(wrap_pyfunction!(get_replay_frames_data))?;
+fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(parse_replay, m)?)?;
+    m.add_function(wrap_pyfunction!(get_ndarray_with_info_from_replay_filepath, m)?)?;
+    m.add_function(wrap_pyfunction!(get_replay_meta, m)?)?;
+    m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
+    m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
     Ok(())
 }
 
@@ -106,6 +106,7 @@ static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
 /// features. If there was an error reading the file or processing the replay,
 /// this will be an Err variant with the Python error.
 #[pyfunction]
+#[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None, fps=None))]
 fn get_ndarray_with_info_from_replay_filepath<'p>(
     py: Python<'p>,
     filepath: PathBuf,
@@ -132,7 +133,7 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
         &serde_json::to_value(&replay_meta_with_headers).map_err(to_py_error)?,
     );
 
-    let python_nd_array = rust_nd_array.into_pyarray(py);
+    let python_nd_array = rust_nd_array.into_pyarray_bound(py);
     Ok((python_replay_meta, python_nd_array).into_py(py))
 }
 
@@ -161,6 +162,7 @@ fn build_ndarray_collector(
 }
 
 #[pyfunction]
+#[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None))]
 fn get_replay_meta<'p>(
     py: Python<'p>,
     filepath: PathBuf,
@@ -184,6 +186,7 @@ fn get_replay_meta<'p>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (global_feature_adders=None, player_feature_adders=None))]
 fn get_column_headers<'p>(
     py: Python<'p>,
     global_feature_adders: Option<Vec<String>>,

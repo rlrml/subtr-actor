@@ -1,17 +1,16 @@
 [tool.poetry]
 name = "subtr-actor-py"
-version = "0.1.4"
+version = "0.1.7"
 description = "Python bindings for the Rocket League replay processing library subtr-actor."
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/rlrml/subtr-actor-py"
-packages = [{include = "subtr_actor", from="subtr_actor"}]
+repository = "https://github.com/rlrml/subtr-actor"
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 wheel = "*"
 maturin = "^0.14.2"
 pytest = "*"

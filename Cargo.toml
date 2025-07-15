@@ -1,13 +1,21 @@
 [workspace]
-members = [".", "js"]
+members = [".", "js", "python"]
+resolver = "2"
 
-[package]
+[workspace.package]
+version = "0.1.7"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
-name = "subtr-actor"
-version = "0.1.6"
-edition = "2021"
 repository = "https://github.com/rlrml/subtr-actor"
+edition = "2021"
+
+[package]
+name = "subtr-actor"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
 keywords = ["rocket-league"]
 categories = ["parsing"]
 description = "Rocket League replay transformer"
