@@ -5,7 +5,8 @@ import init, {
     get_replay_meta,
     get_column_headers,
     get_replay_frames_data,
-} from "../../pkg/rl_replay_subtr_actor.js";
+} from "rl-replay-subtr-actor";
+import wasmUrl from "rl-replay-subtr-actor/rl_replay_subtr_actor_bg.wasm?url";
 
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
@@ -19,7 +20,7 @@ class ReplayAnalyzer {
 
     async initialize() {
         try {
-            await init();
+            await init(wasmUrl);
             this.wasmInitialized = true;
             console.log("🚀 WASM module loaded successfully!");
         } catch (error) {

@@ -7,6 +7,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    exclude: ['subtr-actor-wasm']
-  }
+    exclude: ['rl-replay-subtr-actor']
+  },
+  assetsInclude: ['**/*.wasm']
 });

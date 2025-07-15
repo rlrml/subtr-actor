@@ -14,7 +14,8 @@
   "dependencies": {
     "chart.js": "^4.4.0",
     "chartjs-adapter-date-fns": "^3.0.0",
-    "date-fns": "^3.0.0"
+    "date-fns": "^3.0.0",
+    "rl-replay-subtr-actor": "^0.1.7"
   },
   "devDependencies": {
     "vite": "^5.0.0",
