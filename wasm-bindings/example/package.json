@@ -1,0 +1,31 @@
+{
+  "name": "subtr-actor-example",
+  "version": "1.0.0",
+  "description": "Example web application demonstrating subtr-actor WASM bindings",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build-wasm": "cd .. && wasm-pack build --target web --out-dir pkg",
+    "dev-with-wasm": "yarn build-wasm && yarn dev"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^3.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "rocket-league",
+    "wasm",
+    "replay-analysis",
+    "webassembly"
+  ],
+  "author": "subtr-actor team",
+  "license": "MIT"
+}
