@@ -1249,6 +1249,47 @@ build_player_feature_adder!(
     "player demolished by"
 );
 
+build_player_feature_adder!(
+    PlayerRigidBodyQuaternions,
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+            let rotation = rb.rotation;
+            let location = rb.location;
+            convert_all_floats!(
+                location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
+            )
+        } else {
+            convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        }
+    },
+    "position x",
+    "position y",
+    "position z",
+    "quaternion x",
+    "quaternion y",
+    "quaternion z",
+    "quaternion w"
+);
+
+build_global_feature_adder!(
+    BallRigidBodyQuaternions,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        let rb = processor.get_ball_rigid_body()?;
+        let rotation = rb.rotation;
+        let location = rb.location;
+        convert_all_floats!(
+            location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
+        )
+    },
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
+    "Ball - quaternion x",
+    "Ball - quaternion y",
+    "Ball - quaternion z",
+    "Ball - quaternion w"
+);
+
 lazy_static! {
     static ref NAME_TO_GLOBAL_FEATURE_ADDER: std::collections::HashMap<&'static str, Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>> = {
         let mut m: std::collections::HashMap<
@@ -1265,6 +1306,7 @@ lazy_static! {
         }
         insert_adder!(BallRigidBody);
         insert_adder!(BallRigidBodyNoVelocities);
+        insert_adder!(BallRigidBodyQuaternions);
         insert_adder!(VelocityAddedBallRigidBodyNoVelocities);
         insert_adder!(InterpolatedBallRigidBodyNoVelocities, 0.0);
         insert_adder!(SecondsRemaining);
@@ -1290,6 +1332,7 @@ lazy_static! {
         }
         insert_adder!(PlayerRigidBody);
         insert_adder!(PlayerRigidBodyNoVelocities);
+        insert_adder!(PlayerRigidBodyQuaternions);
         insert_adder!(VelocityAddedPlayerRigidBodyNoVelocities);
         insert_adder!(InterpolatedPlayerRigidBodyNoVelocities, 0.003);
         insert_adder!(PlayerBoost);
