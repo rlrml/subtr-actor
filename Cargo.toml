@@ -1,0 +1,19 @@
+[package]
+name = "subtr-actor-py"
+version = "0.1.4"
+authors = ["Ivan Malison <IvanMalison@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+boxcars = "0.9.9"
+subtr-actor = { git = "https://github.com/rlrml/subtr-actor.git", branch = "works_with_spectators" }
+numpy = "0.18.0"
+serde_json = "1.0.52"
+
+[dependencies.pyo3]
+version = "0.18.2"
+features = ["extension-module"]
+
+[lib]
+name = "subtr_actor"
+crate-type = ["cdylib"]
