@@ -246,13 +246,11 @@ pub fn apply_velocities_to_rigid_body(
 fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> boxcars::Quaternion {
     // XXX: This approach seems to give some unexpected results. There may be a
     // unit mismatch or some other type of issue.
-    let rbav = rigid_body
-        .angular_velocity
-        .unwrap_or(boxcars::Vector3f {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        });
+    let rbav = rigid_body.angular_velocity.unwrap_or(boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    });
     let angular_velocity = glam::Vec3::new(rbav.x, rbav.y, rbav.z);
     let magnitude = angular_velocity.length();
     let angular_velocity_unit_vector = angular_velocity.normalize_or_zero();

@@ -25,7 +25,10 @@ fn replay_from_data(data: &[u8]) -> PyResult<boxcars::Replay> {
 #[pyo3(name = "subtr_actor")]
 fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_replay, m)?)?;
-    m.add_function(wrap_pyfunction!(get_ndarray_with_info_from_replay_filepath, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        get_ndarray_with_info_from_replay_filepath,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(get_replay_meta, m)?)?;
     m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
     m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
