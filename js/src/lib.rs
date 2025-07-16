@@ -44,15 +44,34 @@ pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// Get NDArray data with metadata from replay data
+// Default feature adders (same as Python bindings)
+const DEFAULT_GLOBAL_FEATURE_ADDERS: &[&str] = &["BallRigidBody"];
+const DEFAULT_PLAYER_FEATURE_ADDERS: &[&str] = &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
+
+fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
+    boxcars::ParserBuilder::new(data)
+        .must_parse_network_data()
+        .on_error_check_crc()
+        .parse()
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse replay: {}", e)))
+}
+
+/// Parse a replay file and return the raw replay data as JavaScript object
+#[wasm_bindgen]
+pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+    let replay_value = serde_json::to_value(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay: {}", e)))?;
+
+    serde_wasm_bindgen::to_value(&replay_value)
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+}
+
+/// Get NDArray data with metadata from replay data
 #[wasm_bindgen]
 pub fn get_ndarray_with_info(
     data: &[u8],
-    global_feature_adders: Option<Vec<String>>,
-    player_feature_adders: Option<Vec<String>>,
-    fps: Option<f32>,
-) -> Result<JsValue, JsValue> {
-    let replay = parse_replay_from_data(data)?;
-
+    global_feature_adders: Option<Vec<String>>
     let mut collector = build_ndarray_collector(global_feature_adders, player_feature_adders)?;
 
     // Use FrameRateDecorator with specified FPS (default 10.0)
