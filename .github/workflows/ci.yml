@@ -42,8 +42,5 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
-    - name: Run boost values tests specifically
-      run: cargo test --test boost_values_test --verbose
-
     - name: Build release
       run: cargo build --release --verbose
