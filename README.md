@@ -1,4 +1,4 @@
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-activly--developed-brightgreen.svg)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 # subtr-actor
 
 ## subtr-actor
@@ -15,10 +15,10 @@ easier to manipulate.
 - **[`ReplayProcessor`][3]**: This struct is at the heart of subtr-actor's
 replay processing capabilities. In its main entry point,
 [`ReplayProcessor::process`][4], it pushes network frames from the
-[`boxcars::Replay`][5] that it is initialized with though an
+[`boxcars::Replay`][5] that it is initialized with through an
 [`ActorStateModeler`][6] instance, calling the [`Collector`][7] instance that is
 provided as an argument as it does so. The [`Collector`][7] is provided with a
-reference to the [`ReplayProcessor`][3] each time the it is invoked, which
+reference to the [`ReplayProcessor`][3] each time it is invoked, which
 allows it to use the suite of helper methods which greatly assist in the
 navigation of the actor graph and the retrieval of information about the current
 game state.
@@ -38,7 +38,7 @@ the replay processing.
 
 [`subtr-actor`][1] also includes implementations of the [`Collector`][7] trait:
 
-- **[`NDArrayCollector`][10]**: This [`Collector`][7] implementations translates
+- **[`NDArrayCollector`][10]**: This [`Collector`][7] implementation translates
 frame-based replay data into a 2 dimensional array in the form of a
 [`::ndarray::Array2`][11] instance. The exact data that is recorded in each
 frame can be configured with the [`FeatureAdder`][12] and [`PlayerFeatureAdder`][13]
@@ -50,7 +50,7 @@ macros. The [`::ndarray::Array2`][11] produced by [`NDArrayCollector`][10] is id
 for use with machine learning libraries like pytorch and tensorflow.
 
 - **[`ReplayDataCollector`][17]**: This [`Collector`][7] implementation provides
-an easy way to get a serializable to e.g. json (though [`serde::Serialize`][18])
+an easy way to get a serializable representation to e.g. json (through [`serde::Serialize`][18])
 representation of the replay. The representation differs from what you might get
 from e.g. raw [`boxcars`][2] in that it is not a complicated graph of actor
 objects, but instead something more natural where the data associated with each
@@ -78,11 +78,11 @@ fn get_json(filepath: std::path::PathBuf) -> anyhow::Result<String> {
 
 In the following example, we demonstrate how to use [`boxcars`][2],
 [`NDArrayCollector`][10] and [`FrameRateDecorator`][9] to write a function that
-takes a replay filepath and collections of features adders and returns a
+takes a replay filepath and collections of feature adders and returns a
 [`ReplayMetaWithHeaders`][19] along with a [`::ndarray::Array2`][11] . The resulting
 [`::ndarray::Array2`][11] would be appropriate for use in a machine learning
 context. Note that [`ReplayProcessor`][3] is also used implicitly here in the
-[`Collector::process_replay`][20]
+[`Collector::process_replay`][20].
 
 ```rust
 use subtr_actor::*;
