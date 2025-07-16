@@ -22,21 +22,19 @@
 //! ```rust,no_run
 //! use subtr_actor::collector::replay_data::ReplayDataCollector;
 //! use boxcars::ParserBuilder;
-//! use subtr_actor::SubtrActorError;
 //!
-//! fn main() -> Result<(), SubtrActorError> {
-//!     let data = std::fs::read("replay.replay")?;
-//!     let replay = ParserBuilder::new(&data).parse()?;
+//! fn main() {
+//!     let data = std::fs::read("replay.replay").unwrap();
+//!     let replay = ParserBuilder::new(&data).parse().unwrap();
 //!
 //!     let collector = ReplayDataCollector::new();
-//!     let replay_data = collector.get_replay_data(&replay)?;
+//!     let replay_data = collector.get_replay_data(&replay).unwrap();
 //!
 //!     // Access frame-by-frame data
 //!     for metadata_frame in &replay_data.frame_data.metadata_frames {
 //!         println!("Time: {:.2}s, Remaining: {}s",
 //!                  metadata_frame.time, metadata_frame.seconds_remaining);
 //!     }
-//!     Ok(())
 //! }
 //! ```
 
@@ -479,13 +477,12 @@ pub struct FrameData {
 /// ```rust,no_run
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
-/// use subtr_actor::SubtrActorError;
 ///
-/// fn main() -> Result<(), SubtrActorError> {
-///     let data = std::fs::read("replay.replay")?;
-///     let replay = ParserBuilder::new(&data).parse()?;
+/// fn main() {
+///     let data = std::fs::read("replay.replay").unwrap();
+///     let replay = ParserBuilder::new(&data).parse().unwrap();
 ///     let collector = ReplayDataCollector::new();
-///     let replay_data = collector.get_replay_data(&replay)?;
+///     let replay_data = collector.get_replay_data(&replay).unwrap();
 ///
 ///     // Access replay metadata
 ///     println!("Team 0 players: {}", replay_data.meta.team_zero.len());
@@ -495,7 +492,6 @@ pub struct FrameData {
 ///
 ///     // Access demolition events
 ///     println!("Total demolitions: {}", replay_data.demolish_infos.len());
-///     Ok(())
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -521,18 +517,16 @@ impl ReplayData {
     /// ```rust,no_run
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
-    /// use subtr_actor::SubtrActorError;
-    ///
-    /// fn main() -> Result<(), SubtrActorError> {
-    ///     let data = std::fs::read("replay.replay")?;
-    ///     let replay = ParserBuilder::new(&data).parse()?;
+        ///
+    /// fn main() {
+    ///     let data = std::fs::read("replay.replay").unwrap();
+    ///     let replay = ParserBuilder::new(&data).parse().unwrap();
     ///     let collector = ReplayDataCollector::new();
-    ///     let replay_data = collector.get_replay_data(&replay)?;
+    ///     let replay_data = collector.get_replay_data(&replay).unwrap();
     ///
     ///     let json_string = replay_data.as_json().unwrap();
     ///     println!("Replay as JSON: {}", json_string);
-    ///     Ok(())
-    /// }
+        /// }
     /// ```
     pub fn as_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
@@ -634,21 +628,19 @@ impl FrameData {
 /// ```rust,no_run
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
-/// use subtr_actor::SubtrActorError;
 ///
-/// fn main() -> Result<(), SubtrActorError> {
-///     let data = std::fs::read("replay.replay")?;
-///     let replay = ParserBuilder::new(&data).parse()?;
+/// fn main() {
+///     let data = std::fs::read("replay.replay").unwrap();
+///     let replay = ParserBuilder::new(&data).parse().unwrap();
 ///
 ///     let collector = ReplayDataCollector::new();
-///     let replay_data = collector.get_replay_data(&replay)?;
+///     let replay_data = collector.get_replay_data(&replay).unwrap();
 ///
 ///     // Process the extracted data
 ///     for (frame_idx, metadata) in replay_data.frame_data.metadata_frames.iter().enumerate() {
 ///         println!("Frame {}: Time={:.2}s, Remaining={}s",
 ///                  frame_idx, metadata.time, metadata.seconds_remaining);
 ///     }
-///     Ok(())
 /// }
 /// ```
 ///
@@ -717,18 +709,16 @@ impl ReplayDataCollector {
     /// ```rust,no_run
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
-    /// use subtr_actor::SubtrActorError;
-    ///
-    /// fn main() -> Result<(), SubtrActorError> {
-    ///     let data = std::fs::read("replay.replay")?;
-    ///     let replay = ParserBuilder::new(&data).parse()?;
+        ///
+    /// fn main() {
+    ///     let data = std::fs::read("replay.replay").unwrap();
+    ///     let replay = ParserBuilder::new(&data).parse().unwrap();
     ///
     ///     let collector = ReplayDataCollector::new();
-    ///     let replay_data = collector.get_replay_data(&replay)?;
+    ///     let replay_data = collector.get_replay_data(&replay).unwrap();
     ///
     ///     println!("Processed {} frames", replay_data.frame_data.frame_count());
-    ///     Ok(())
-    /// }
+        /// }
     /// ```
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
