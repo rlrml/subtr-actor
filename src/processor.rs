@@ -138,9 +138,9 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
 /// # See Also
 ///
 /// * [`ActorStateModeler`]: A struct used to model the states of multiple
-/// actors at a given point in time.
+///   actors at a given point in time.
 /// * [`Collector`]: A trait implemented by objects that wish to collect data as
-/// the `ReplayProcessor` processes a replay.
+///   the `ReplayProcessor` processes a replay.
 pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
     pub actor_state: ActorStateModeler,
@@ -458,9 +458,9 @@ impl<'a> ReplayProcessor<'a> {
     /// * `current_index` - The index of the network frame from where the search should start.
     /// * `actor_id` - The ID of the actor for which the update is being searched.
     /// * `object_id` - The ID of the object associated with the actor for which
-    /// the update is being searched.
+    ///   the update is being searched.
     /// * `direction` - The direction of search, specified as either
-    /// [`SearchDirection::Backward`] or [`SearchDirection::Forward`].
+    ///   [`SearchDirection::Backward`] or [`SearchDirection::Forward`].
     ///
     /// # Returns
     ///
@@ -593,7 +593,7 @@ impl<'a> ReplayProcessor<'a> {
                 self.player_to_actor_id,
                 PLAYER_TYPE,
                 UNIQUE_ID_KEY,
-                |_, unique_id: &Box<boxcars::UniqueId>| unique_id.remote_id.clone(),
+                |_, unique_id: &boxcars::UniqueId| unique_id.remote_id.clone(),
                 use_update_actor,
                 boxcars::Attribute::UniqueId
             );
@@ -614,9 +614,9 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         for actor_id in frame.deleted_actors.iter() {
-            self.player_to_car
-                .remove(actor_id)
-                .map(|car_id| log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}."));
+            if let Some(car_id) = self.player_to_car.remove(actor_id) {
+                log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}.");
+            }
         }
 
         Ok(())
@@ -653,7 +653,7 @@ impl<'a> ReplayProcessor<'a> {
     ///
     /// * `frame` - A reference to the [`Frame`] in which the boost amounts are to be updated.
     /// * `frame_index` - The index of the frame in the replay.
-    /// [`Frame`]: boxcars::Frame
+    ///   [`Frame`]: boxcars::Frame
     fn update_boost_amounts(
         &mut self,
         frame: &boxcars::Frame,
@@ -710,7 +710,7 @@ impl<'a> ReplayProcessor<'a> {
     /// # Arguments
     ///
     /// * `actor_state` - A reference to the actor's [`ActorState`] from which
-    /// the boost values are to be retrieved.
+    ///   the boost values are to be retrieved.
     ///
     /// # Returns
     ///
@@ -748,14 +748,14 @@ impl<'a> ReplayProcessor<'a> {
         let is_active = active_value % 2 == 1;
         let derived_value = actor_state
             .derived_attributes
-            .get(&BOOST_AMOUNT_KEY.to_string())
+            .get(BOOST_AMOUNT_KEY)
             .cloned()
             .and_then(|v| attribute_match!(v.0, boxcars::Attribute::Float).ok())
             .unwrap_or(0.0);
         let last_boost_amount = attribute_match!(
             actor_state
                 .derived_attributes
-                .get(&LAST_BOOST_AMOUNT_KEY.to_string())
+                .get(LAST_BOOST_AMOUNT_KEY)
                 .cloned()
                 .map(|v| v.0)
                 .unwrap_or_else(|| boxcars::Attribute::Byte(amount_value)),

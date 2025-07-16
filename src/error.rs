@@ -135,6 +135,7 @@ impl SubtrActorError {
     }
 }
 
+#[allow(clippy::result_large_err)]
 pub type SubtrActorResult<T> = Result<T, SubtrActorError>;
 
 pub fn attribute_to_tag(attribute: &Attribute) -> &str {

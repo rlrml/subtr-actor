@@ -232,6 +232,7 @@ impl PlayerFrame {
     ///
     /// Returns [`Empty`](PlayerFrame::Empty) if the rigid body is sleeping,
     /// otherwise returns [`Data`](PlayerFrame::Data) with all provided information.
+    #[allow(clippy::too_many_arguments)]
     fn from_data(
         rigid_body: boxcars::RigidBody,
         boost_amount: f32,

@@ -12,9 +12,9 @@ use std::sync::Arc;
 /// # Fields
 ///
 /// * `global_headers`: A list of strings that represent the global,
-/// player-independent features' column headers.
+///   player-independent features' column headers.
 /// * `player_headers`: A list of strings that represent the player-specific
-/// features' column headers.
+///   features' column headers.
 ///
 /// Use [`Self::new`] to construct an instance of this struct.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -39,7 +39,7 @@ impl NDArrayColumnHeaders {
 ///
 /// * `replay_meta`: Contains metadata about a [`boxcars::Replay`].
 /// * `column_headers`: The [`NDArrayColumnHeaders`] associated with the data
-/// collected from the replay.
+///   collected from the replay.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayMetaWithHeaders {
     pub replay_meta: ReplayMeta,
@@ -96,13 +96,13 @@ impl<F> NDArrayCollector<F> {
     /// # Arguments
     ///
     /// * `feature_adders` - A vector of [`Arc<dyn FeatureAdder<F>>`], each
-    /// implementing the [`FeatureAdder`] trait. These are used to add global
-    /// features to the replay data.
+    ///   implementing the [`FeatureAdder`] trait. These are used to add global
+    ///   features to the replay data.
     ///
     /// * `player_feature_adders` - A vector of [`Arc<dyn PlayerFeatureAdder<F>>`],
-    /// each implementing the [`PlayerFeatureAdder`]
-    /// trait. These are used to add player-specific features to the replay
-    /// data.
+    ///   each implementing the [`PlayerFeatureAdder`]
+    ///   trait. These are used to add player-specific features to the replay
+    ///   data.
     ///
     /// # Returns
     ///
@@ -171,7 +171,7 @@ impl<F> NDArrayCollector<F> {
     ///
     /// A [`SubtrActorResult`] containing a tuple:
     /// - [`ReplayMetaWithHeaders`]: The replay metadata along with the headers
-    /// for each column in the ndarray.
+    ///   for each column in the ndarray.
     /// - [`ndarray::Array2<F>`]: The collected features as a 2D ndarray.
     pub fn get_meta_and_ndarray(
         self,
@@ -1167,7 +1167,7 @@ build_player_feature_adder!(
 );
 
 fn u8_get_f32(v: u8) -> SubtrActorResult<f32> {
-    v.try_into().map_err(convert_float_conversion_error)
+    Ok(v.into())
 }
 
 build_player_feature_adder!(

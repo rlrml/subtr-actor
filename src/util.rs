@@ -106,7 +106,7 @@ fn matches_stats(player_id: &RemoteId, name: &String, props: &Vec<(String, Heade
     }
 }
 
-fn name_matches(name: &String, props: &Vec<(String, HeaderProp)>) -> bool {
+fn name_matches(name: &String, props: &[(String, HeaderProp)]) -> bool {
     if let Ok((_, HeaderProp::Str(stat_name))) = get_prop("Name", props) {
         *name == stat_name
     } else {
@@ -114,7 +114,7 @@ fn name_matches(name: &String, props: &Vec<(String, HeaderProp)>) -> bool {
     }
 }
 
-fn online_id_matches(id: u64, props: &Vec<(String, HeaderProp)>) -> bool {
+fn online_id_matches(id: u64, props: &[(String, HeaderProp)]) -> bool {
     if let Ok((_, HeaderProp::QWord(props_id))) = get_prop("OnlineID", props) {
         id == props_id
     } else {
@@ -150,7 +150,7 @@ fn platform_matches(
     }
 }
 
-fn get_prop(prop: &str, props: &Vec<(String, HeaderProp)>) -> Result<(String, HeaderProp), String> {
+fn get_prop(prop: &str, props: &[(String, HeaderProp)]) -> Result<(String, HeaderProp), String> {
     props
         .iter()
         .find(|(attr, _)| attr == prop)
