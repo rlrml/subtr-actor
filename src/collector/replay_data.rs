@@ -517,7 +517,7 @@ impl ReplayData {
     /// ```rust,no_run
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
-        ///
+    ///
     /// fn main() {
     ///     let data = std::fs::read("replay.replay").unwrap();
     ///     let replay = ParserBuilder::new(&data).parse().unwrap();
@@ -526,7 +526,7 @@ impl ReplayData {
     ///
     ///     let json_string = replay_data.as_json().unwrap();
     ///     println!("Replay as JSON: {}", json_string);
-        /// }
+    /// }
     /// ```
     pub fn as_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
@@ -709,7 +709,7 @@ impl ReplayDataCollector {
     /// ```rust,no_run
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
-        ///
+    ///
     /// fn main() {
     ///     let data = std::fs::read("replay.replay").unwrap();
     ///     let replay = ParserBuilder::new(&data).parse().unwrap();
@@ -718,7 +718,7 @@ impl ReplayDataCollector {
     ///     let replay_data = collector.get_replay_data(&replay).unwrap();
     ///
     ///     println!("Processed {} frames", replay_data.frame_data.frame_count());
-        /// }
+    /// }
     /// ```
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
