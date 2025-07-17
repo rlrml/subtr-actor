@@ -19,11 +19,11 @@
 //!
 //! # Example Usage
 //!
-//! ```rust,no_run
+//! ```rust
 //! use subtr_actor::collector::replay_data::ReplayDataCollector;
 //! use boxcars::ParserBuilder;
 //!
-//! let data = std::fs::read("replay.replay").unwrap();
+//! let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
 //! let replay = ParserBuilder::new(&data).parse().unwrap();
 //!
 //! let collector = ReplayDataCollector::new();
@@ -472,11 +472,11 @@ pub struct FrameData {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```rust
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
 ///
-/// let data = std::fs::read("replay.replay").unwrap();
+/// let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
 /// let replay = ParserBuilder::new(&data).parse().unwrap();
 /// let collector = ReplayDataCollector::new();
 /// let replay_data = collector.get_replay_data(&replay).unwrap();
@@ -510,11 +510,11 @@ impl ReplayData {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
     ///
-    /// let data = std::fs::read("replay.replay").unwrap();
+    /// let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
     /// let replay = ParserBuilder::new(&data).parse().unwrap();
     /// let collector = ReplayDataCollector::new();
     /// let replay_data = collector.get_replay_data(&replay).unwrap();
@@ -619,11 +619,11 @@ impl FrameData {
 /// The collector is designed to be used with the [`ReplayProcessor`] to extract
 /// comprehensive replay data:
 ///
-/// ```rust,no_run
+/// ```rust
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
 ///
-/// let data = std::fs::read("replay.replay").unwrap();
+/// let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
 /// let replay = ParserBuilder::new(&data).parse().unwrap();
 ///
 /// let collector = ReplayDataCollector::new();
@@ -698,11 +698,11 @@ impl ReplayDataCollector {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
     ///
-    /// let data = std::fs::read("replay.replay").unwrap();
+    /// let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
     /// let replay = ParserBuilder::new(&data).parse().unwrap();
     ///
     /// let collector = ReplayDataCollector::new();
