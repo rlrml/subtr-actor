@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script to build and publish the Python package to PyPI
 # This script assumes you have maturin and twine installed
