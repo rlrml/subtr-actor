@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wasm-pack build:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run pack)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "Bash(node:*)",
+      "Bash(npm pack:*)",
+      "Bash(npm publish:*)",
+      "Bash(cargo clean:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": []
+  }
+}
