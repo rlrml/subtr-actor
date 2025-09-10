@@ -5,7 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-boxcars = "*"
+boxcars = "0.10.4"
 subtr-actor = { path = ".." }
 numpy = "0.22.0"
 serde_json = "1.0.52"
