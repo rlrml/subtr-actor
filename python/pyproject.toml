@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "subtr-actor-py"
-version = "0.1.8"
+version = "0.1.9"
 description = "Python bindings for the Rocket League replay processing library subtr-actor."
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
