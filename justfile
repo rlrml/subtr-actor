@@ -27,7 +27,7 @@ test-python:
 # Publish Python package to PyPI
 publish-python: build-python
     cd python && maturin build --release
-    cd python && twine upload dist/subtr_actor_py-*.whl
+    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload dist/subtr_actor_py-*.whl
 
 # Publish JavaScript package to npm
 publish-js: build-js
