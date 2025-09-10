@@ -26,9 +26,8 @@ test-python:
 
 # Publish Python package to PyPI (builds sdist for cross-platform compatibility)
 publish-python:
-    cd python && rm -rf dist/*
     cd python && maturin build --release --sdist
-    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload dist/*
+    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload ../target/wheels/*
 
 # Publish JavaScript package to npm
 publish-js: build-js
