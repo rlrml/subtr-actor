@@ -24,10 +24,11 @@ test:
 test-python:
     cd python && pytest
 
-# Publish Python package to PyPI
-publish-python: build-python
-    cd python && maturin build --release
-    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload dist/subtr_actor_py-*.whl
+# Publish Python package to PyPI (builds sdist for cross-platform compatibility)
+publish-python:
+    cd python && rm -rf dist/*
+    cd python && maturin build --release --sdist
+    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload dist/*
 
 # Publish JavaScript package to npm
 publish-js: build-js
