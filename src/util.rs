@@ -159,7 +159,7 @@ fn get_prop(prop: &str, props: &[(String, HeaderProp)]) -> Result<(String, Heade
 }
 
 pub(crate) trait VecMapEntry<K: PartialEq, V> {
-    fn get_entry(&mut self, key: K) -> Entry<K, V>;
+    fn get_entry(&mut self, key: K) -> Entry<'_, K, V>;
 }
 
 pub(crate) enum Entry<'a, K: PartialEq, V> {
@@ -189,7 +189,7 @@ pub(crate) struct VacantEntry<'a, K: PartialEq, V> {
 }
 
 impl<K: PartialEq + Clone, V> VecMapEntry<K, V> for Vec<(K, V)> {
-    fn get_entry(&mut self, key: K) -> Entry<K, V> {
+    fn get_entry(&mut self, key: K) -> Entry<'_, K, V> {
         match self.iter_mut().position(|(k, _)| k == &key) {
             Some(index) => Entry::Occupied(OccupiedEntry {
                 entry: &mut self[index],
