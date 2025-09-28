@@ -29,7 +29,7 @@ fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
         .must_parse_network_data()
         .on_error_check_crc()
         .parse()
-        .map_err(|e| JsValue::from_str(&format!("Failed to parse replay: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse replay: {e}")))
 }
 
 /// Parse a replay file and return the raw replay data as JavaScript object
@@ -37,10 +37,10 @@ fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
 pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
     let replay_value = serde_json::to_value(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay: {}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay: {e}")))?;
 
     serde_wasm_bindgen::to_value(&replay_value)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get NDArray data with metadata from replay data
@@ -59,15 +59,15 @@ pub fn get_ndarray_with_info(
         FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector);
 
     let mut processor = ReplayProcessor::new(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {e:?}")))?;
 
     processor
         .process(&mut decorated_collector)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
 
     let (replay_meta_with_headers, ndarray) = collector
         .get_meta_and_ndarray()
-        .map_err(|e| JsValue::from_str(&format!("Failed to get data: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to get data: {e:?}")))?;
 
     // Convert ndarray to nested Vec for JavaScript
     let shape = ndarray.shape();
@@ -80,7 +80,7 @@ pub fn get_ndarray_with_info(
     });
 
     serde_wasm_bindgen::to_value(&result)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get only the replay metadata (without processing frames)
@@ -96,10 +96,10 @@ pub fn get_replay_meta(
 
     let replay_meta = collector
         .process_and_get_meta_and_headers(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to get metadata: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to get metadata: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&replay_meta)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get column headers for the NDArray (useful for understanding the data structure)
@@ -112,7 +112,7 @@ pub fn get_column_headers(
     let headers = collector.get_column_headers();
 
     serde_wasm_bindgen::to_value(&headers)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get structured frame data using ReplayDataCollector
@@ -127,11 +127,11 @@ pub fn get_replay_frames_data(data: &[u8], fps: Option<f32>) -> Result<JsValue, 
         FrameRateDecorator::new_from_fps(fps.unwrap_or(60.0), &mut collector);
 
     let mut processor = ReplayProcessor::new(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {e:?}")))?;
 
     processor
         .process(&mut decorated_collector)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
 
     // Get the frame data from the collector
     let frame_data = collector.get_frame_data();
@@ -139,7 +139,7 @@ pub fn get_replay_frames_data(data: &[u8], fps: Option<f32>) -> Result<JsValue, 
     // Get metadata and demolishes from the processor
     let meta = processor
         .get_replay_meta()
-        .map_err(|e| JsValue::from_str(&format!("Failed to get replay meta: {:?}", e)))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to get replay meta: {e:?}")))?;
 
     let replay_data = ReplayData {
         frame_data,
@@ -148,7 +148,7 @@ pub fn get_replay_frames_data(data: &[u8], fps: Option<f32>) -> Result<JsValue, 
     };
 
     serde_wasm_bindgen::to_value(&replay_data)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Validate that a replay file can be parsed
@@ -164,7 +164,7 @@ pub fn validate_replay(data: &[u8]) -> Result<JsValue, JsValue> {
             "error": e.as_string().unwrap_or_else(|| "Unknown error".to_string())
         })),
     }
-    .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+    .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get basic replay information (version, etc.)
@@ -181,7 +181,7 @@ pub fn get_replay_info(data: &[u8]) -> Result<JsValue, JsValue> {
     });
 
     serde_wasm_bindgen::to_value(&info)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 fn build_ndarray_collector(
@@ -205,5 +205,5 @@ fn build_ndarray_collector(
     let player_strs: Vec<&str> = player_feature_adders.iter().map(|s| s.as_str()).collect();
 
     NDArrayCollector::<f32>::from_strings(&global_strs, &player_strs)
-        .map_err(|e| JsValue::from_str(&format!("Failed to build collector: {:?}", e)))
+        .map_err(|e| JsValue::from_str(&format!("Failed to build collector: {e:?}")))
 }

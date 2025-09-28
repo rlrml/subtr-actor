@@ -1,3 +1,5 @@
+#![allow(clippy::useless_conversion)]
+
 use numpy::pyo3::IntoPy;
 use numpy::IntoPyArray;
 use pyo3::prelude::*;
@@ -7,6 +9,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use subtr_actor::*;
 
+#[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn parse_replay<'p>(py: Python<'p>, data: &[u8]) -> PyResult<PyObject> {
     let replay = serde_json::to_value(replay_from_data(data)?).map_err(to_py_error)?;
@@ -36,11 +39,11 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 fn to_py_error<E: std::error::Error>(e: E) -> PyErr {
-    PyErr::new::<exceptions::PyException, _>(format!("{}", e))
+    PyErr::new::<exceptions::PyException, _>(format!("{e}"))
 }
 
 fn handle_frames_exception(e: subtr_actor::SubtrActorError) -> PyErr {
-    PyErr::new::<exceptions::PyException, _>(format!("{:?} {}", e.variant, e.backtrace.to_string()))
+    PyErr::new::<exceptions::PyException, _>(format!("{:?} {}", e.variant, e.backtrace))
 }
 
 fn convert_to_py(py: Python, value: &Value) -> PyObject {
@@ -108,6 +111,7 @@ static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
 /// * A Python tuple containing metadata about the replay and the ndarray of
 /// features. If there was an error reading the file or processing the replay,
 /// this will be an Err variant with the Python error.
+#[allow(clippy::useless_conversion)]
 #[pyfunction]
 #[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None, fps=None))]
 fn get_ndarray_with_info_from_replay_filepath<'p>(
@@ -140,6 +144,7 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
     Ok((python_replay_meta, python_nd_array).into_py(py))
 }
 
+#[allow(clippy::result_large_err)]
 fn build_ndarray_collector(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
@@ -164,6 +169,7 @@ fn build_ndarray_collector(
     )
 }
 
+#[allow(clippy::useless_conversion)]
 #[pyfunction]
 #[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None))]
 fn get_replay_meta<'p>(
@@ -188,6 +194,7 @@ fn get_replay_meta<'p>(
     ))
 }
 
+#[allow(clippy::useless_conversion)]
 #[pyfunction]
 #[pyo3(signature = (global_feature_adders=None, player_feature_adders=None))]
 fn get_column_headers<'p>(
@@ -204,6 +211,7 @@ fn get_column_headers<'p>(
     ))
 }
 
+#[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<PyObject> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;

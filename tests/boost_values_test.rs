@@ -29,7 +29,7 @@ impl Collector for BoostTracker {
         _current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
         // Sample at specified intervals
-        if frame_number % self.sample_interval == 0 {
+        if frame_number.is_multiple_of(self.sample_interval) {
             // Get all player IDs by checking the processor's internal mappings
             for player_id in processor.iter_player_ids_in_order() {
                 match processor.get_player_boost_level(player_id) {
