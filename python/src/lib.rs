@@ -12,6 +12,7 @@ use subtr_actor::*;
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn parse_replay<'p>(py: Python<'p>, data: &[u8]) -> PyResult<PyObject> {
+
     let replay = serde_json::to_value(replay_from_data(data)?).map_err(to_py_error)?;
     Ok(convert_to_py(py, &replay))
 }

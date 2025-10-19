@@ -9,6 +9,26 @@ macro_rules! fmt_err {
     };
 }
 
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct BoostPickupInfo {
+    /// Time in seconds when the pickup occurred
+    pub time: f32,
+    /// Frame index
+    pub frame: usize,
+    /// Actor ID of the boost pad
+    pub pad_actor: i32,
+    /// Actor ID of the car that picked it up
+    pub car_actor: i32,
+    /// World position of the pad (if known)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pad_location: Option<boxcars::Vector3f>,
+    /// Detected pad type ("small" or "large")
+    pub pad_type: String,
+}
+
+
+
 pub type PlayerId = boxcars::RemoteId;
 
 /// [`DemolishInfo`] struct represents data related to a demolition event in the game.

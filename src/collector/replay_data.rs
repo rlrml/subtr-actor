@@ -498,6 +498,8 @@ pub struct ReplayData {
     pub meta: ReplayMeta,
     /// Information about all demolition events that occurred during the replay
     pub demolish_infos: Vec<DemolishInfo>,
+    /// Information about all the picked up boost during the replay.
+    pub boost_pickups: Vec<BoostPickupInfo>,
 }
 
 impl ReplayData {
@@ -717,6 +719,7 @@ impl ReplayDataCollector {
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes,
+            boost_pickups: processor.boost_pickups,
             frame_data: self.get_frame_data(),
         })
     }
