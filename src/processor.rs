@@ -158,6 +158,9 @@ pub struct ReplayProcessor<'a> {
     pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub demolishes: Vec<DemolishInfo>,
     known_demolishes: Vec<(boxcars::DemolishFx, usize)>,
+    pub boost_pickups: Vec<BoostPickupInfo>,
+    pub boost_pad_positions: HashMap<i32, boxcars::Vector3f>,
+
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -199,6 +202,8 @@ impl<'a> ReplayProcessor<'a> {
             car_to_dodge: HashMap::new(),
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
+            boost_pickups: Vec::new(),
+            boost_pad_positions: HashMap::new(),
         };
         processor
             .set_player_order_from_headers()
@@ -249,6 +254,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
             self.update_demolishes(frame, index)?;
+            self.update_boost_pad_tracking(frame, index)?;
 
             // Get the time to process for this frame. If target_time is set to
             // NextFrame, we use the time of the current frame.
@@ -288,6 +294,8 @@ impl<'a> ReplayProcessor<'a> {
         self.actor_state = ActorStateModeler::new();
         self.demolishes = Vec::new();
         self.known_demolishes = Vec::new();
+        self.boost_pickups = Vec::new();
+        self.boost_pad_positions = HashMap::new();
     }
 
     fn set_player_order_from_headers(&mut self) -> SubtrActorResult<()> {
@@ -772,7 +780,8 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     fn update_demolishes(&mut self, frame: &boxcars::Frame, index: usize) -> SubtrActorResult<()> {
-        let new_demolishes: Vec<_> = self
+        // Existing path: DemolishFx from ReplicatedDemolishGoalExplosion
+        let new_demolishes_fx: Vec<_> = self
             .get_active_demolish_fx()?
             .flat_map(|demolish_fx| {
                 if !self.demolish_is_known(demolish_fx, index) {
@@ -783,7 +792,7 @@ impl<'a> ReplayProcessor<'a> {
             })
             .collect();
 
-        for demolish in new_demolishes {
+        for demolish in new_demolishes_fx {
             match self.build_demolish_info(&demolish, frame, index) {
                 Ok(demolish_info) => self.demolishes.push(demolish_info),
                 Err(_e) => {
@@ -793,8 +802,262 @@ impl<'a> ReplayProcessor<'a> {
             self.known_demolishes.push((demolish, index))
         }
 
+        // New path: consider DemolishExtended and Demolish attribute updates directly from this frame
+        for update in frame.updated_actors.iter() {
+            // ────────────────────────────────────────────────
+            // ① ORIGINAL LOGIC (object_id–based)
+            // ────────────────────────────────────────────────
+            let demolish_ext_id = self.name_to_object_id.get(DEMOLISH_EXTENDED_KEY);
+            let demolish_id = self.name_to_object_id.get(DEMOLISH_KEY);
+
+            let is_demolish_key = demolish_ext_id
+                .map(|id| &update.object_id == id)
+                .unwrap_or(false)
+                || demolish_id
+                .map(|id| &update.object_id == id)
+                .unwrap_or(false);
+
+            if is_demolish_key {
+                match &update.attribute {
+                    boxcars::Attribute::DemolishExtended(ext) => {
+                        if let Ok(info) =
+                            self.build_demolish_info_from_extended(ext.as_ref(), frame, index)
+                        {
+                            if !self.demolish_pair_recently_recorded(&info.attacker, &info.victim, index) {
+
+                                log::debug!(
+                                    "[DEMO-OBJ] frame {}: attacker {:?} → victim {:?}",
+                                    index,
+                                    info.attacker,
+                                    info.victim
+                                );
+                                self.demolishes.push(info);
+                            }
+                        }
+                    }
+                    boxcars::Attribute::Demolish(basic) => {
+                        if let Ok(info) =
+                            self.build_demolish_info_from_basic(basic.as_ref(), frame, index)
+                        {
+                            if !self.demolish_pair_recently_recorded(&info.attacker, &info.victim, index) {
+
+                                log::debug!(
+                                    "[DEMO-OBJ] frame {}: attacker {:?} → victim {:?}",
+                                    index,
+                                    info.attacker,
+                                    info.victim
+                                );
+                                self.demolishes.push(info);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+
+            // ────────────────────────────────────────────────
+            // ② NEW LOGIC (fallback direct type match)
+            // ────────────────────────────────────────────────
+            match &update.attribute {
+                boxcars::Attribute::DemolishExtended(ext) => {
+                    if let Ok(info) = self.build_demolish_info_from_extended(ext.as_ref(), frame, index) {
+                        if !self.demolish_pair_recently_recorded(&info.attacker, &info.victim, index) {
+
+                            log::debug!(
+                                "[DEMO-DIRECT] frame {}: attacker {:?} → victim {:?}",
+                                index,
+                                info.attacker,
+                                info.victim
+                            );
+                            self.demolishes.push(info);
+                        }
+                    }
+                }
+                boxcars::Attribute::Demolish(basic) => {
+                    if let Ok(info) = self.build_demolish_info_from_basic(basic.as_ref(), frame, index) {
+                        if !self.demolish_pair_recently_recorded(&info.attacker, &info.victim, index) {
+
+                            log::debug!(
+                                "[DEMO-DIRECT] frame {}: attacker {:?} → victim {:?}",
+                                index,
+                                info.attacker,
+                                info.victim
+                            );
+                            self.demolishes.push(info);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+
+
         Ok(())
     }
+
+    fn update_boost_pad_tracking(
+        &mut self,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> SubtrActorResult<()> {
+        // 1️⃣ Detect and register boost pad spawns
+        for na in frame.new_actors.iter() {
+            if let Some(name) = self.actor_state.get_object_name(na.object_id) {
+                if name.contains("Pickup_Boost_TA") {
+                    if let Some(loc) = &na.initial_trajectory.location {
+                        let locf = boxcars::Vector3f {
+                            x: loc.x as f32,
+                            y: loc.y as f32,
+                            z: loc.z as f32,
+                        };
+
+                        self.boost_pad_positions.insert(na.actor_id.0 as i32, locf);
+                        log::debug!(
+                        "[BOOST-PAD] Spawned pad {} at ({:.0}, {:.0}, {:.0})",
+                        na.actor_id.0, locf.x, locf.y, locf.z
+                    );
+                    }
+                }
+            }
+        }
+
+        // 2️⃣ Detect boost pickups & related updates
+        for update in frame.updated_actors.iter() {
+            let Some(name) = self.actor_state.get_object_name(update.object_id) else {
+                continue;
+            };
+
+            // -- (a) Direct pickup events
+            if name.contains("VehiclePickup_Boost_TA") {
+                match &update.attribute {
+                    // Newer variant (u8)
+                    boxcars::Attribute::PickupNew(pn) if pn.picked_up == 1 => {
+                        if let Some(instigator) = pn.instigator {
+                            let car_actor = i32::from(instigator);
+                            let pad_actor = update.actor_id.0 as i32;
+
+                            if !self.boost_pair_recently_recorded(&car_actor, &pad_actor, index) {
+                                self.boost_pickups.push(BoostPickupInfo {
+                                    time: frame.time,
+                                    frame: index,
+                                    car_actor,
+                                    pad_actor,
+                                    pad_location: self
+                                        .boost_pad_positions
+                                        .get(&pad_actor)
+                                        .cloned(),
+                                    pad_type: "boost".to_string(),
+                                });
+
+                                log::debug!(
+                                "[BOOST PICKUP] Car {} picked up pad {} at {:.2}s (PickupNew)",
+                                car_actor,
+                                pad_actor,
+                                frame.time
+                            );
+                            }
+                        }
+                    }
+
+                    // Older variant (bool)
+                    boxcars::Attribute::Pickup(p) if p.picked_up => {
+                        if let Some(instigator) = p.instigator {
+                            let car_actor = i32::from(instigator);
+                            let pad_actor = update.actor_id.0 as i32;
+
+                            if !self.boost_pair_recently_recorded(&car_actor, &pad_actor, index) {
+                                self.boost_pickups.push(BoostPickupInfo {
+                                    time: frame.time,
+                                    frame: index,
+                                    car_actor,
+                                    pad_actor,
+                                    pad_location: self
+                                        .boost_pad_positions
+                                        .get(&pad_actor)
+                                        .cloned(),
+                                    pad_type: "boost".to_string(),
+                                });
+
+                                log::debug!(
+                                "[BOOST PICKUP] Car {} picked up pad {} at {:.2}s (Pickup)",
+                                car_actor,
+                                pad_actor,
+                                frame.time
+                            );
+                            }
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+
+            // -- (b) Pad deactivation / reactivation
+            if name.contains("Pickup_Boost_TA") {
+                if let boxcars::Attribute::ActiveActor(a) = &update.attribute {
+                    let pad_id = update.actor_id.0 as i32;
+                    if !a.active {
+                        // Pad was deactivated => pickup
+                        if let Some(loc) = self.boost_pad_positions.get(&pad_id) {
+                            self.boost_pickups.push(BoostPickupInfo {
+                                time: frame.time,
+                                frame: index,
+                                car_actor: -1,
+                                pad_actor: pad_id,
+                                pad_location: Some(*loc),
+                                pad_type: "boost".to_string(),
+                            });
+
+                            log::debug!(
+                            "[BOOST PAD] Pad {} deactivated (pickup) at {:.2}s",
+                            pad_id,
+                            frame.time
+                        );
+                        }
+                    } else {
+                        // Reactivated (respawn)
+                        log::debug!(
+                        "[BOOST PAD] Pad {} reactivated (respawn) at {:.2}s",
+                        pad_id,
+                        frame.time
+                    );
+                    }
+                }
+            }
+
+            // -- (c) CarComponent_Boost_TA (boost amount replication)
+            if name.contains("CarComponent_Boost_TA") {
+                if let boxcars::Attribute::ReplicatedBoost(rb) = &update.attribute {
+                    let car_id = update.actor_id.0 as i32;
+                    let boost_val = rb.boost_amount; // u8 (0–255)
+
+                    if boost_val >= 250 {
+                        log::debug!(
+                        "[CAR BOOST] Car {} at {:.2}s has {} boost (possible pickup)",
+                        car_id,
+                        frame.time,
+                        boost_val
+                    );
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+
+
+    fn boost_pair_recently_recorded(&self, car_actor: &i32, pad_actor: &i32, frame_index: usize) -> bool {
+        self.boost_pickups.iter().rev().take(10).any(|b|
+            b.car_actor == *car_actor &&
+            b.pad_actor == *pad_actor &&
+            frame_index.saturating_sub(b.frame) < 10
+        )
+    }
+
 
     fn build_demolish_info(
         &self,
@@ -812,6 +1075,44 @@ impl<'a> ReplayProcessor<'a> {
             victim,
             attacker_velocity: demolish_fx.attack_velocity,
             victim_velocity: demolish_fx.victim_velocity,
+        })
+    }
+
+    fn build_demolish_info_from_extended(
+        &self,
+        demolish_ext: &boxcars::DemolishExtended,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> SubtrActorResult<DemolishInfo> {
+        let attacker = self.get_player_id_from_car_id(&demolish_ext.attacker.actor)?;
+        let victim = self.get_player_id_from_car_id(&demolish_ext.victim.actor)?;
+        Ok(DemolishInfo {
+            time: frame.time,
+            seconds_remaining: self.get_seconds_remaining()?,
+            frame: index,
+            attacker,
+            victim,
+            attacker_velocity: demolish_ext.attacker_velocity,
+            victim_velocity: demolish_ext.victim_velocity,
+        })
+    }
+
+    fn build_demolish_info_from_basic(
+        &self,
+        demolish: &boxcars::Demolish,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> SubtrActorResult<DemolishInfo> {
+        let attacker = self.get_player_id_from_car_id(&demolish.attacker)?;
+        let victim = self.get_player_id_from_car_id(&demolish.victim)?;
+        Ok(DemolishInfo {
+            time: frame.time,
+            seconds_remaining: self.get_seconds_remaining()?,
+            frame: index,
+            attacker,
+            victim,
+            attacker_velocity: boxcars::Vector3f { x: 0.0, y: 0.0, z: 0.0 },
+            victim_velocity: boxcars::Vector3f { x: 0.0, y: 0.0, z: 0.0 },
         })
     }
 
@@ -855,6 +1156,23 @@ impl<'a> ReplayProcessor<'a> {
                 && frame_index
                     .checked_sub(*index)
                     .or_else(|| index.checked_sub(frame_index))
+                    .unwrap()
+                    < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+        })
+    }
+
+    fn demolish_pair_recently_recorded(
+        &self,
+        attacker: &PlayerId,
+        victim: &PlayerId,
+        frame_index: usize,
+    ) -> bool {
+        self.demolishes.iter().rev().any(|info| {
+            info.attacker == *attacker
+                && info.victim == *victim
+                && frame_index
+                    .checked_sub(info.frame)
+                    .or_else(|| info.frame.checked_sub(frame_index))
                     .unwrap()
                     < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
         })

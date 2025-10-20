@@ -2,17 +2,16 @@ use crate::*;
 use boxcars;
 use std::collections::HashMap;
 
+
 /// A struct representing the state of an actor.
 ///
 /// This includes both attributes and derived attributes, along with the
 /// associated object id and name id.
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
-    /// A map of the actor's attributes with their corresponding object ids and
-    /// frame indices.
+    /// A map of the actor's attributes with their corresponding object ids and frame indices.
     pub attributes: HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
-    /// A map of the actor's derived attributes with their corresponding object
-    /// ids and frame indices.
+    /// A map of the actor's derived attributes with their corresponding object ids and frame indices.
     pub derived_attributes: HashMap<String, (boxcars::Attribute, usize)>,
     /// The object id associated with the actor.
     pub object_id: boxcars::ObjectId,
@@ -62,11 +61,15 @@ impl ActorState {
 /// A struct modeling the states of multiple actors at a given point in time.
 /// Provides methods to update that state with successive frames from a
 /// boxcars::Replay.
+/// Models all actor states across the entire replay.
+/// Handles creation, update, and deletion of actors as frames are processed.
 pub struct ActorStateModeler {
     /// A map of actor states with their corresponding actor ids.
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,
     /// A map of actor ids with their corresponding object ids.
     pub actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
+    /// Optional mapping from object id to readable name (used for debugging / filtering)
+    pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
 }
 
 impl Default for ActorStateModeler {
@@ -85,6 +88,7 @@ impl ActorStateModeler {
         Self {
             actor_states: HashMap::new(),
             actor_ids_by_type: HashMap::new(),
+            object_id_to_name: HashMap::new(),
         }
     }
 
@@ -98,11 +102,18 @@ impl ActorStateModeler {
     /// # Returns
     ///
     /// An empty result (`Ok(())`) on success, [`SubtrActorError`] on failure.
+    /// Retrieves the readable name of an object id if available.
+    pub fn get_object_name(&self, object_id: boxcars::ObjectId) -> Option<&str> {
+        self.object_id_to_name.get(&object_id).map(|s| s.as_str())
+    }
+
+    /// Processes one frame worth of actor updates.
     pub fn process_frame(
         &mut self,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
+        // Handle deleted actors
         if let Some(err) = frame
             .deleted_actors
             .iter()
@@ -111,6 +122,8 @@ impl ActorStateModeler {
         {
             return err.map(|_| ());
         }
+
+        // Handle new actors
         if let Some(err) = frame
             .new_actors
             .iter()
@@ -119,6 +132,8 @@ impl ActorStateModeler {
         {
             return err;
         }
+
+        // Handle updated actors
         if let Some(err) = frame
             .updated_actors
             .iter()
@@ -127,9 +142,16 @@ impl ActorStateModeler {
         {
             return err.map(|_| ());
         }
+
         Ok(())
     }
 
+
+
+
+
+
+    /// Registers a newly spawned actor.
     pub fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> SubtrActorResult<()> {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
@@ -149,6 +171,7 @@ impl ActorStateModeler {
         Ok(())
     }
 
+    /// Updates an actor's attributes for the current frame.
     pub fn update_attribute(
         &mut self,
         update: &boxcars::UpdatedAttribute,
@@ -164,6 +187,7 @@ impl ActorStateModeler {
             })
     }
 
+    /// Removes an actor once it is deleted.
     pub fn delete_actor(&mut self, actor_id: &boxcars::ActorId) -> SubtrActorResult<ActorState> {
         let state = self.actor_states.remove(actor_id).ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
