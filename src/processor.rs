@@ -254,6 +254,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
             self.update_demolishes(frame, index)?;
+            self.update_boost_pad_tracking(frame, index)?;
 
             // Get the time to process for this frame. If target_time is set to
             // NextFrame, we use the time of the current frame.
@@ -802,83 +803,7 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         // New path: consider DemolishExtended and Demolish attribute updates directly from this frame
-        // ---- DEMOLISH DETECTION + BOOST PAD TRACKING (DUAL LOGIC, FOR CURRENT BOXCARS) ----
         for update in frame.updated_actors.iter() {
-
-            // =========================================
-            // BOOST PAD DETECTION
-            // =========================================
-
-            // Capture boost pad positions dynamically (map-agnostic)
-            for na in frame.new_actors.iter() {
-                if let Some(name) = self.actor_state.get_object_name(na.object_id) {
-                    if name.contains("TAGame.Pickup_Boost_TA") {
-                        // Handle trajectory safely (location is Option<Vector3i>)
-                        if let Some(loc) = &na.initial_trajectory.location {
-                            // Convert Vector3i (integers) → Vector3f (floats)
-                            let locf = boxcars::Vector3f {
-                                x: loc.x as f32,
-                                y: loc.y as f32,
-                                z: loc.z as f32,
-                            };
-
-                            // Store pad position in HashMap<i32, Vector3f>
-                            self.boost_pad_positions.insert(na.actor_id.0 as i32, locf);
-
-                            // Log for debugging
-                            log::debug!(
-                                "[BOOST-PAD] Spawned pad {} at ({:.0}, {:.0}, {:.0})",
-                                na.actor_id.0,
-                                locf.x,
-                                locf.y,
-                                locf.z
-                            );
-                        }
-                    }
-                }
-            }
-
-
-
-            // =========================================
-            // BOOST PICKUP DETECTION (FINAL)
-            // =========================================
-            for update in frame.updated_actors.iter() {
-                if let Some(name) = self.actor_state.get_object_name(update.object_id) {
-
-                    // --- CASE 1: Pickup event ---
-                    if name.contains("VehiclePickup_TA") {
-                        if let boxcars::Attribute::PickupNew(pn) = &update.attribute {
-                            if pn.picked_up == 1 {
-                                if let Some(instigator) = pn.instigator {
-                                    let car_actor = i32::from(instigator);
-
-                                    // link this pickup back to pad if possible
-                                    // (optional - we only know a pickup happened)
-                                    log::debug!(
-                                        "[BOOST PICKUP] Car {} triggered VehiclePickup_TA at frame {} ({}s)",
-                                        car_actor,
-                                        index,
-                                        frame.time
-                                    );
-                                }
-                            }
-                        }
-                    }
-
-                    // --- CASE 2: Boost level changes ---
-                    else if name.contains("CarComponent_Boost_TA") {
-                        if let boxcars::Attribute::ReplicatedBoost(rb) = &update.attribute {
-                            log::debug!(
-                                "[BOOST STATE] CarComponent_Boost_TA: boost_amount={}",
-                                rb.boost_amount
-                            );
-                        }
-                    }
-                }
-            }
-
-
             // ────────────────────────────────────────────────
             // ① ORIGINAL LOGIC (object_id–based)
             // ────────────────────────────────────────────────
@@ -889,8 +814,8 @@ impl<'a> ReplayProcessor<'a> {
                 .map(|id| &update.object_id == id)
                 .unwrap_or(false)
                 || demolish_id
-                    .map(|id| &update.object_id == id)
-                    .unwrap_or(false);
+                .map(|id| &update.object_id == id)
+                .unwrap_or(false);
 
             if is_demolish_key {
                 match &update.attribute {
@@ -971,6 +896,159 @@ impl<'a> ReplayProcessor<'a> {
 
         Ok(())
     }
+
+    fn update_boost_pad_tracking(
+        &mut self,
+        frame: &boxcars::Frame,
+        index: usize,
+    ) -> SubtrActorResult<()> {
+        // 1️⃣ Detect and register boost pad spawns
+        for na in frame.new_actors.iter() {
+            if let Some(name) = self.actor_state.get_object_name(na.object_id) {
+                if name.contains("Pickup_Boost_TA") {
+                    if let Some(loc) = &na.initial_trajectory.location {
+                        let locf = boxcars::Vector3f {
+                            x: loc.x as f32,
+                            y: loc.y as f32,
+                            z: loc.z as f32,
+                        };
+
+                        self.boost_pad_positions.insert(na.actor_id.0 as i32, locf);
+                        log::debug!(
+                        "[BOOST-PAD] Spawned pad {} at ({:.0}, {:.0}, {:.0})",
+                        na.actor_id.0, locf.x, locf.y, locf.z
+                    );
+                    }
+                }
+            }
+        }
+
+        // 2️⃣ Detect boost pickups & related updates
+        for update in frame.updated_actors.iter() {
+            let Some(name) = self.actor_state.get_object_name(update.object_id) else {
+                continue;
+            };
+
+            // -- (a) Direct pickup events
+            if name.contains("VehiclePickup_Boost_TA") {
+                match &update.attribute {
+                    // Newer variant (u8)
+                    boxcars::Attribute::PickupNew(pn) if pn.picked_up == 1 => {
+                        if let Some(instigator) = pn.instigator {
+                            let car_actor = i32::from(instigator);
+                            let pad_actor = update.actor_id.0 as i32;
+
+                            if !self.boost_pair_recently_recorded(&car_actor, &pad_actor, index) {
+                                self.boost_pickups.push(BoostPickupInfo {
+                                    time: frame.time,
+                                    frame: index,
+                                    car_actor,
+                                    pad_actor,
+                                    pad_location: self
+                                        .boost_pad_positions
+                                        .get(&pad_actor)
+                                        .cloned(),
+                                    pad_type: "boost".to_string(),
+                                });
+
+                                log::debug!(
+                                "[BOOST PICKUP] Car {} picked up pad {} at {:.2}s (PickupNew)",
+                                car_actor,
+                                pad_actor,
+                                frame.time
+                            );
+                            }
+                        }
+                    }
+
+                    // Older variant (bool)
+                    boxcars::Attribute::Pickup(p) if p.picked_up => {
+                        if let Some(instigator) = p.instigator {
+                            let car_actor = i32::from(instigator);
+                            let pad_actor = update.actor_id.0 as i32;
+
+                            if !self.boost_pair_recently_recorded(&car_actor, &pad_actor, index) {
+                                self.boost_pickups.push(BoostPickupInfo {
+                                    time: frame.time,
+                                    frame: index,
+                                    car_actor,
+                                    pad_actor,
+                                    pad_location: self
+                                        .boost_pad_positions
+                                        .get(&pad_actor)
+                                        .cloned(),
+                                    pad_type: "boost".to_string(),
+                                });
+
+                                log::debug!(
+                                "[BOOST PICKUP] Car {} picked up pad {} at {:.2}s (Pickup)",
+                                car_actor,
+                                pad_actor,
+                                frame.time
+                            );
+                            }
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+
+            // -- (b) Pad deactivation / reactivation
+            if name.contains("Pickup_Boost_TA") {
+                if let boxcars::Attribute::ActiveActor(a) = &update.attribute {
+                    let pad_id = update.actor_id.0 as i32;
+                    if !a.active {
+                        // Pad was deactivated => pickup
+                        if let Some(loc) = self.boost_pad_positions.get(&pad_id) {
+                            self.boost_pickups.push(BoostPickupInfo {
+                                time: frame.time,
+                                frame: index,
+                                car_actor: -1,
+                                pad_actor: pad_id,
+                                pad_location: Some(*loc),
+                                pad_type: "boost".to_string(),
+                            });
+
+                            log::debug!(
+                            "[BOOST PAD] Pad {} deactivated (pickup) at {:.2}s",
+                            pad_id,
+                            frame.time
+                        );
+                        }
+                    } else {
+                        // Reactivated (respawn)
+                        log::debug!(
+                        "[BOOST PAD] Pad {} reactivated (respawn) at {:.2}s",
+                        pad_id,
+                        frame.time
+                    );
+                    }
+                }
+            }
+
+            // -- (c) CarComponent_Boost_TA (boost amount replication)
+            if name.contains("CarComponent_Boost_TA") {
+                if let boxcars::Attribute::ReplicatedBoost(rb) = &update.attribute {
+                    let car_id = update.actor_id.0 as i32;
+                    let boost_val = rb.boost_amount; // u8 (0–255)
+
+                    if boost_val >= 250 {
+                        log::debug!(
+                        "[CAR BOOST] Car {} at {:.2}s has {} boost (possible pickup)",
+                        car_id,
+                        frame.time,
+                        boost_val
+                    );
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+
 
     fn boost_pair_recently_recorded(&self, car_actor: &i32, pad_actor: &i32, frame_index: usize) -> bool {
         self.boost_pickups.iter().rev().take(10).any(|b|

@@ -145,6 +145,7 @@ pub fn get_replay_frames_data(data: &[u8], fps: Option<f32>) -> Result<JsValue, 
         frame_data,
         meta,
         demolish_infos: processor.demolishes,
+        boost_pickups: processor.boost_pickups
     };
 
     serde_wasm_bindgen::to_value(&replay_data)

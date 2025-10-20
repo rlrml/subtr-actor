@@ -1,9 +1,12 @@
 use crate::*;
 use boxcars;
 use std::collections::HashMap;
-use crate::constants::BOOST_PAD_CLASS; // ✅ make sure the constant is imported
 
-/// Represents the state of an individual actor (ball, car, pad, etc.)
+
+/// A struct representing the state of an actor.
+///
+/// This includes both attributes and derived attributes, along with the
+/// associated object id and name id.
 #[derive(PartialEq, Debug, Clone)]
 pub struct ActorState {
     /// A map of the actor's attributes with their corresponding object ids and frame indices.
@@ -18,6 +21,14 @@ pub struct ActorState {
 
 impl ActorState {
     /// Creates a new `ActorState` from a given `NewActor`.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_actor` - The new actor to initialize the state from.
+    ///
+    /// # Returns
+    ///
+    /// A new `ActorState` object.
     fn new(new_actor: &boxcars::NewActor) -> Self {
         Self {
             attributes: HashMap::new(),
@@ -28,6 +39,15 @@ impl ActorState {
     }
 
     /// Updates an attribute in the `ActorState`.
+    ///
+    /// # Arguments
+    ///
+    /// * `update` - The updated attribute.
+    /// * `frame_index` - The index of the frame at which the update occurs.
+    ///
+    /// # Returns
+    ///
+    /// An optional tuple of the updated attribute and its frame index.
     fn update_attribute(
         &mut self,
         update: &boxcars::UpdatedAttribute,
@@ -38,12 +58,15 @@ impl ActorState {
     }
 }
 
+/// A struct modeling the states of multiple actors at a given point in time.
+/// Provides methods to update that state with successive frames from a
+/// boxcars::Replay.
 /// Models all actor states across the entire replay.
 /// Handles creation, update, and deletion of actors as frames are processed.
 pub struct ActorStateModeler {
-    /// A map of actor states keyed by their actor id.
+    /// A map of actor states with their corresponding actor ids.
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,
-    /// A map of object ids to the actor ids that belong to them.
+    /// A map of actor ids with their corresponding object ids.
     pub actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
     /// Optional mapping from object id to readable name (used for debugging / filtering)
     pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
@@ -57,6 +80,10 @@ impl Default for ActorStateModeler {
 
 impl ActorStateModeler {
     /// Creates a new [`ActorStateModeler`].
+    ///
+    /// # Returns
+    ///
+    /// A new [`ActorStateModeler`]. object.
     pub fn new() -> Self {
         Self {
             actor_states: HashMap::new(),
@@ -65,6 +92,16 @@ impl ActorStateModeler {
         }
     }
 
+    /// Processes a frame, including handling of new, updated, and deleted actors.
+    ///
+    /// # Arguments
+    ///
+    /// * `frame` - The frame to be processed.
+    /// * `frame_index` - The index of the frame to be processed.
+    ///
+    /// # Returns
+    ///
+    /// An empty result (`Ok(())`) on success, [`SubtrActorError`] on failure.
     /// Retrieves the readable name of an object id if available.
     pub fn get_object_name(&self, object_id: boxcars::ObjectId) -> Option<&str> {
         self.object_id_to_name.get(&object_id).map(|s| s.as_str())
@@ -109,47 +146,27 @@ impl ActorStateModeler {
         Ok(())
     }
 
+
+
+
+
+
     /// Registers a newly spawned actor.
     pub fn new_actor(&mut self, new_actor: &boxcars::NewActor) -> SubtrActorResult<()> {
         if let Some(state) = self.actor_states.get(&new_actor.actor_id) {
             if state.object_id != new_actor.object_id {
-                return SubtrActorError::new_result(
-                    SubtrActorErrorVariant::ActorIdAlreadyExists {
-                        actor_id: new_actor.actor_id,
-                        object_id: new_actor.object_id,
-                    },
-                );
+                return SubtrActorError::new_result(SubtrActorErrorVariant::ActorIdAlreadyExists {
+                    actor_id: new_actor.actor_id,
+                    object_id: new_actor.object_id,
+                });
             }
         } else {
-            // Insert into actor state tracking
             self.actor_states
                 .insert(new_actor.actor_id, ActorState::new(new_actor));
-
             self.actor_ids_by_type
                 .entry(new_actor.object_id)
                 .or_default()
-                .push(new_actor.actor_id);
-
-            // ---- BOOST PAD SPAWN DETECTION ----
-            if let Some(name) = self.get_object_name(new_actor.object_id) {
-                if name.contains(BOOST_PAD_CLASS) {
-                    if let Some(loc) = &new_actor.initial_trajectory.location {
-                        let locf = boxcars::Vector3f {
-                            x: loc.x as f32,
-                            y: loc.y as f32,
-                            z: loc.z as f32,
-                        };
-                        log::debug!(
-                            "[BOOST-PAD] Spawned pad {} at ({:.0}, {:.0}, {:.0})",
-                            new_actor.actor_id.0,
-                            locf.x,
-                            locf.y,
-                            locf.z
-                        );
-                        // Optionally: self.boost_pad_positions.insert(new_actor.actor_id.0 as i32, locf);
-                    }
-                }
-            }
+                .push(new_actor.actor_id)
         }
         Ok(())
     }
