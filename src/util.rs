@@ -11,6 +11,64 @@ macro_rules! fmt_err {
 
 pub type PlayerId = boxcars::RemoteId;
 
+/// Represents which demolition format a replay uses
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemolishFormat {
+    /// Old format (pre-September 2024): ReplicatedDemolishGoalExplosion
+    Fx,
+    /// New format (September 2024+): ReplicatedDemolishExtended
+    Extended,
+}
+
+/// Enum representing different demolition attribute formats across Rocket League versions.
+///
+/// Rocket League changed the demolition data structure around September 2024 (v2.43+),
+/// moving from `DemolishFx` to `DemolishExtended`. This enum allows the parser to handle
+/// both formats for compatibility with replays from all versions.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DemolishAttribute {
+    /// Old format: Used in replays before September 2024 (RL v2.43)
+    /// Attribute key: `TAGame.Car_TA:ReplicatedDemolishGoalExplosion`
+    Fx(boxcars::DemolishFx),
+    /// New format: Used in replays from September 2024 onwards (RL v2.43+)
+    /// Attribute key: `TAGame.Car_TA:ReplicatedDemolishExtended`
+    Extended(boxcars::DemolishExtended),
+}
+
+impl DemolishAttribute {
+    /// Get the attacker's ActorId regardless of the demolition format
+    pub fn attacker_actor_id(&self) -> boxcars::ActorId {
+        match self {
+            DemolishAttribute::Fx(fx) => fx.attacker,
+            DemolishAttribute::Extended(ext) => ext.attacker.actor,
+        }
+    }
+
+    /// Get the victim's ActorId regardless of the demolition format
+    pub fn victim_actor_id(&self) -> boxcars::ActorId {
+        match self {
+            DemolishAttribute::Fx(fx) => fx.victim,
+            DemolishAttribute::Extended(ext) => ext.victim.actor,
+        }
+    }
+
+    /// Get the attacker's velocity regardless of the demolition format
+    pub fn attacker_velocity(&self) -> boxcars::Vector3f {
+        match self {
+            DemolishAttribute::Fx(fx) => fx.attack_velocity,
+            DemolishAttribute::Extended(ext) => ext.attacker_velocity,
+        }
+    }
+
+    /// Get the victim's velocity regardless of the demolition format
+    pub fn victim_velocity(&self) -> boxcars::Vector3f {
+        match self {
+            DemolishAttribute::Fx(fx) => fx.victim_velocity,
+            DemolishAttribute::Extended(ext) => ext.victim_velocity,
+        }
+    }
+}
+
 /// [`DemolishInfo`] struct represents data related to a demolition event in the game.
 ///
 /// Demolition events occur when one player 'demolishes' or 'destroys' another by
