@@ -22,7 +22,7 @@ description = "Rocket League replay transformer"
 
 [dependencies]
 anyhow = "1.0.98"
-boxcars = "0.10.4"
+boxcars = "0.10.10"
 derive-new = "0.7.0"
 float-ord = "0.3.2"
 glam = "0.30.4"
