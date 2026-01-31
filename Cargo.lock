@@ -388,7 +388,7 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rl-replay-subtr-actor"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "boxcars",
  "console_error_panic_hook",
@@ -475,7 +475,7 @@ checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
 
 [[package]]
 name = "subtr-actor"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "boxcars",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-py"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "boxcars",
  "numpy",

@@ -1,6 +1,6 @@
 [project]
 name = "subtr-actor-py"
-version = "0.1.10"
+version = "0.1.11"
 description = "Python bindings for the Rocket League replay processing library subtr-actor."
 authors = [{ name = "Ivan Malison", email = "ivanmalison@gmail.com" }]
 license = { text = "MIT" }
