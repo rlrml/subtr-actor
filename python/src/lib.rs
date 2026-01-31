@@ -1,6 +1,5 @@
 #![allow(clippy::useless_conversion)]
 
-use numpy::pyo3::IntoPy;
 use numpy::IntoPyArray;
 use pyo3::prelude::*;
 use pyo3::*;
@@ -11,7 +10,7 @@ use subtr_actor::*;
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-fn parse_replay<'p>(py: Python<'p>, data: &[u8]) -> PyResult<PyObject> {
+fn parse_replay<'p>(py: Python<'p>, data: &[u8]) -> PyResult<Py<PyAny>> {
     let replay = serde_json::to_value(replay_from_data(data)?).map_err(to_py_error)?;
     Ok(convert_to_py(py, &replay))
 }
@@ -46,27 +45,45 @@ fn handle_frames_exception(e: subtr_actor::SubtrActorError) -> PyErr {
     PyErr::new::<exceptions::PyException, _>(format!("{:?} {}", e.variant, e.backtrace))
 }
 
-fn convert_to_py(py: Python, value: &Value) -> PyObject {
+fn convert_to_py(py: Python, value: &Value) -> Py<PyAny> {
     match value {
         Value::Null => py.None(),
-        Value::Bool(b) => b.into_py(py),
+        Value::Bool(b) => b.into_pyobject(py).unwrap().into_any().unbind(),
         Value::Number(n) => match n {
-            n if n.is_u64() => n.as_u64().unwrap().into_py(py),
-            n if n.is_i64() => n.as_i64().unwrap().into_py(py),
-            n if n.is_f64() => n.as_f64().unwrap().into_py(py),
+            n if n.is_u64() => n
+                .as_u64()
+                .unwrap()
+                .into_pyobject(py)
+                .unwrap()
+                .into_any()
+                .unbind(),
+            n if n.is_i64() => n
+                .as_i64()
+                .unwrap()
+                .into_pyobject(py)
+                .unwrap()
+                .into_any()
+                .unbind(),
+            n if n.is_f64() => n
+                .as_f64()
+                .unwrap()
+                .into_pyobject(py)
+                .unwrap()
+                .into_any()
+                .unbind(),
             _ => py.None(),
         },
-        Value::String(s) => s.into_py(py),
+        Value::String(s) => s.into_pyobject(py).unwrap().into_any().unbind(),
         Value::Array(list) => {
-            let list: Vec<PyObject> = list.iter().map(|e| convert_to_py(py, e)).collect();
-            list.into_py(py)
+            let list: Vec<Py<PyAny>> = list.iter().map(|e| convert_to_py(py, e)).collect();
+            list.into_pyobject(py).unwrap().into_any().unbind()
         }
         Value::Object(m) => {
             let mut map = BTreeMap::new();
             m.iter().for_each(|(k, v)| {
                 map.insert(k, convert_to_py(py, v));
             });
-            map.into_py(py)
+            map.into_pyobject(py).unwrap().into_any().unbind()
         }
     }
 }
@@ -120,7 +137,7 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
     fps: Option<f32>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
@@ -140,8 +157,11 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
         &serde_json::to_value(&replay_meta_with_headers).map_err(to_py_error)?,
     );
 
-    let python_nd_array = rust_nd_array.into_pyarray_bound(py);
-    Ok((python_replay_meta, python_nd_array).into_py(py))
+    let python_nd_array = rust_nd_array.into_pyarray(py);
+    Ok((python_replay_meta, python_nd_array)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
 }
 
 #[allow(clippy::result_large_err)]
@@ -177,7 +197,7 @@ fn get_replay_meta<'p>(
     filepath: PathBuf,
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
@@ -201,7 +221,7 @@ fn get_column_headers<'p>(
     py: Python<'p>,
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let header_info = build_ndarray_collector(global_feature_adders, player_feature_adders)
         .map_err(handle_frames_exception)?
         .get_column_headers();
@@ -213,7 +233,7 @@ fn get_column_headers<'p>(
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<PyObject> {
+fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
