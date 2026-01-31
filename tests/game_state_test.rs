@@ -95,7 +95,7 @@ fn test_game_state_with_replay() {
     for row in array.rows() {
         let countdown = row[countdown_idx] as i32;
         assert!(
-            countdown >= 0 && countdown <= 3,
+            (0..=3).contains(&countdown),
             "Countdown should be 0-3, got {}",
             countdown
         );

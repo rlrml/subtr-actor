@@ -967,12 +967,7 @@ build_global_feature_adder!(
     "current time"
 );
 
-/// Game state indicator for kickoff detection and game phase tracking.
-///
-/// Known values:
-/// - 55: Kickoff/Countdown state (players frozen, waiting for countdown)
-/// - 58: Active play (players can move)
-/// - 86: Goal scored (replay mode)
+// Game state indicator for kickoff detection and game phase tracking.
 build_global_feature_adder!(
     ReplicatedStateName,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
@@ -981,14 +976,7 @@ build_global_feature_adder!(
     "game state"
 );
 
-/// Countdown timer for kickoff detection.
-///
-/// During kickoff:
-/// - 3: Countdown starts (players frozen)
-/// - 2, 1: Countdown continues
-/// - 0: Countdown ends, players can move
-///
-/// Returns 0 when not in countdown.
+// Countdown timer for kickoff detection (3->0 during kickoff).
 build_global_feature_adder!(
     ReplicatedGameStateTimeRemaining,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
@@ -999,9 +987,7 @@ build_global_feature_adder!(
     "kickoff countdown"
 );
 
-/// Whether the ball has been hit in the current play.
-///
-/// Resets to 0 at start of each kickoff, becomes 1 when any player touches the ball.
+// Whether the ball has been hit in the current play.
 build_global_feature_adder!(
     BallHasBeenHit,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
