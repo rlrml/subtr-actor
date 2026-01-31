@@ -1182,6 +1182,54 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    /// Returns the current game state as an `i32`.
+    ///
+    /// Known values:
+    /// - 55: Kickoff/Countdown state (players frozen, waiting for countdown)
+    /// - 58: Active play (players can move)
+    /// - 86: Goal scored (replay mode)
+    pub fn get_replicated_state_name(&self) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_STATE_NAME_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    /// Returns the game state time remaining (countdown timer) as an `i32`.
+    ///
+    /// During kickoff:
+    /// - 3: Countdown starts (players frozen)
+    /// - 2, 1: Countdown continues
+    /// - 0: Countdown ends (players can move)
+    ///
+    /// This is useful for detecting when players transition from frozen to movable.
+    pub fn get_replicated_game_state_time_remaining(&self) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_GAME_STATE_TIME_REMAINING_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    /// Returns whether the ball has been hit in the current play.
+    ///
+    /// This resets to false at the start of each kickoff and becomes true
+    /// once any player touches the ball.
+    pub fn get_ball_has_been_hit(&self) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            BALL_HAS_BEEN_HIT_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
     /// Returns a boolean indicating whether ball syncing is ignored.
     pub fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
         let actor_id = self.get_ball_actor_id()?;

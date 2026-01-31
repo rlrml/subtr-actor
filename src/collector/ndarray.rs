@@ -967,6 +967,47 @@ build_global_feature_adder!(
     "current time"
 );
 
+/// Game state indicator for kickoff detection and game phase tracking.
+///
+/// Known values:
+/// - 55: Kickoff/Countdown state (players frozen, waiting for countdown)
+/// - 58: Active play (players can move)
+/// - 86: Goal scored (replay mode)
+build_global_feature_adder!(
+    ReplicatedStateName,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(processor.get_replicated_state_name().unwrap_or(0) as f32)
+    },
+    "game state"
+);
+
+/// Countdown timer for kickoff detection.
+///
+/// During kickoff:
+/// - 3: Countdown starts (players frozen)
+/// - 2, 1: Countdown continues
+/// - 0: Countdown ends, players can move
+///
+/// Returns 0 when not in countdown.
+build_global_feature_adder!(
+    ReplicatedGameStateTimeRemaining,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(processor.get_replicated_game_state_time_remaining().unwrap_or(0) as f32)
+    },
+    "kickoff countdown"
+);
+
+/// Whether the ball has been hit in the current play.
+///
+/// Resets to 0 at start of each kickoff, becomes 1 when any player touches the ball.
+build_global_feature_adder!(
+    BallHasBeenHit,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(if processor.get_ball_has_been_hit().unwrap_or(false) { 1.0 } else { 0.0 })
+    },
+    "ball has been hit"
+);
+
 build_global_feature_adder!(
     FrameTime,
     |_, _processor, frame: &boxcars::Frame, _index, _current_time| {
@@ -1312,6 +1353,9 @@ lazy_static! {
         insert_adder!(SecondsRemaining);
         insert_adder!(CurrentTime);
         insert_adder!(FrameTime);
+        insert_adder!(ReplicatedStateName);
+        insert_adder!(ReplicatedGameStateTimeRemaining);
+        insert_adder!(BallHasBeenHit);
         m
     };
     static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<
