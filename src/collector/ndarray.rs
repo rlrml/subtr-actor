@@ -967,6 +967,39 @@ build_global_feature_adder!(
     "current time"
 );
 
+// Game state indicator for kickoff detection and game phase tracking.
+build_global_feature_adder!(
+    ReplicatedStateName,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(processor.get_replicated_state_name().unwrap_or(0) as f32)
+    },
+    "game state"
+);
+
+// Countdown timer for kickoff detection (3->0 during kickoff).
+build_global_feature_adder!(
+    ReplicatedGameStateTimeRemaining,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(processor
+            .get_replicated_game_state_time_remaining()
+            .unwrap_or(0) as f32)
+    },
+    "kickoff countdown"
+);
+
+// Whether the ball has been hit in the current play.
+build_global_feature_adder!(
+    BallHasBeenHit,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        convert_all_floats!(if processor.get_ball_has_been_hit().unwrap_or(false) {
+            1.0
+        } else {
+            0.0
+        })
+    },
+    "ball has been hit"
+);
+
 build_global_feature_adder!(
     FrameTime,
     |_, _processor, frame: &boxcars::Frame, _index, _current_time| {
@@ -1312,6 +1345,9 @@ lazy_static! {
         insert_adder!(SecondsRemaining);
         insert_adder!(CurrentTime);
         insert_adder!(FrameTime);
+        insert_adder!(ReplicatedStateName);
+        insert_adder!(ReplicatedGameStateTimeRemaining);
+        insert_adder!(BallHasBeenHit);
         m
     };
     static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<
