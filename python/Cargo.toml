@@ -6,9 +6,12 @@ edition.workspace = true
 
 [dependencies]
 boxcars = "0.10.10"
-subtr-actor = { path = ".." }
 numpy = "0.27.1"
 serde_json = "1.0"
+
+[dependencies.subtr-actor]
+path = ".."
+version = "0.1.10"
 
 [dependencies.pyo3]
 version = "0.27.2"

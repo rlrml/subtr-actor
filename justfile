@@ -24,6 +24,10 @@ test:
 test-python:
     cd python && pytest
 
+# Publish main Rust crate to crates.io
+publish-rust:
+    cargo publish -p subtr-actor
+
 # Publish Python package to PyPI (builds sdist for cross-platform compatibility)
 publish-python:
     cd python && maturin build --release --sdist
@@ -31,7 +35,11 @@ publish-python:
 
 # Publish JavaScript package to npm
 publish-js: build-js
-    cd js && npm publish
+    cd js/pkg && npm publish
+
+# Publish all packages in correct order (Rust first, then bindings)
+publish-all: publish-rust publish-python publish-js
+    @echo "All packages published successfully!"
 
 # Clean build artifacts
 clean:
@@ -53,9 +61,14 @@ clippy:
     cargo clippy -- -D warnings
 
 # Version bump (requires version as argument)
+# Updates workspace version and subtr-actor dependency in bindings, tags and pushes
 bump version:
     sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' Cargo.toml
     sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' python/pyproject.toml
     sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/package.json
+    sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' js/Cargo.toml
+    sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' python/Cargo.toml
     git add -A
     git commit -m "Bump version to {{version}}"
+    git tag -a "v{{version}}" -m "Release v{{version}}"
+    git push && git push --tags

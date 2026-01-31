@@ -225,21 +225,49 @@ Available feature adder strings for customizing data collection:
 Requirements:
 - Rust toolchain
 - wasm-pack
+- just (command runner)
 
 ```bash
 # Clone the repository
 git clone https://github.com/rlrml/subtr-actor.git
-cd subtr-actor/js
+cd subtr-actor
 
-# Build for web
-npm run build
-
-# Build for Node.js
-npm run build:nodejs
-
-# Build for bundlers (webpack, etc.)
-npm run build:bundler
+# Build the WASM package
+just build-js
 ```
+
+### Monorepo Dependency Management
+
+This package is part of the [subtr-actor](https://github.com/rlrml/subtr-actor) monorepo. The Cargo.toml uses a dual dependency specification:
+
+```toml
+[dependencies.subtr-actor]
+path = ".."
+version = "0.1.10"
+```
+
+This allows:
+- **Local development**: Cargo uses the `path` dependency, so changes to the main `subtr-actor` crate are immediately available for testing
+- **Publishing**: crates.io/npm strips the `path` and uses the `version`, ensuring the published package depends on the published crate
+
+Use `just bump <version>` to update all versions in sync (workspace version and dependency versions).
+
+### Publishing
+
+To publish all packages in the correct order:
+
+```bash
+just publish-all  # Publishes: Rust crate → Python bindings → JS bindings
+```
+
+Or publish individually:
+
+```bash
+just publish-rust   # Publish main Rust crate first
+just publish-js     # Then publish JS bindings
+```
+
+**Important**: The main `subtr-actor` Rust crate must be published to crates.io before publishing the bindings, as the published bindings depend on the published crate version.
 
 ## TypeScript Support
 
