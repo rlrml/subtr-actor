@@ -25,7 +25,8 @@ pub static PLAYER_NAME_KEY: &str = "Engine.PlayerReplicationInfo:PlayerName";
 pub static RIGID_BODY_STATE_KEY: &str = "TAGame.RBActor_TA:ReplicatedRBState";
 pub static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
 pub static REPLICATED_STATE_NAME_KEY: &str = "TAGame.GameEvent_TA:ReplicatedStateName";
-pub static REPLICATED_GAME_STATE_TIME_REMAINING_KEY: &str = "TAGame.GameEvent_TA:ReplicatedGameStateTimeRemaining";
+pub static REPLICATED_GAME_STATE_TIME_REMAINING_KEY: &str =
+    "TAGame.GameEvent_TA:ReplicatedGameStateTimeRemaining";
 pub static BALL_HAS_BEEN_HIT_KEY: &str = "TAGame.GameEvent_Soccar_TA:bBallHasBeenHit";
 pub static TEAM_KEY: &str = "Engine.PlayerReplicationInfo:Team";
 pub static UNIQUE_ID_KEY: &str = "Engine.PlayerReplicationInfo:UniqueId";

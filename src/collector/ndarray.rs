@@ -992,7 +992,9 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     ReplicatedGameStateTimeRemaining,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        convert_all_floats!(processor.get_replicated_game_state_time_remaining().unwrap_or(0) as f32)
+        convert_all_floats!(processor
+            .get_replicated_game_state_time_remaining()
+            .unwrap_or(0) as f32)
     },
     "kickoff countdown"
 );
@@ -1003,7 +1005,11 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     BallHasBeenHit,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        convert_all_floats!(if processor.get_ball_has_been_hit().unwrap_or(false) { 1.0 } else { 0.0 })
+        convert_all_floats!(if processor.get_ball_has_been_hit().unwrap_or(false) {
+            1.0
+        } else {
+            0.0
+        })
     },
     "ball has been hit"
 );
