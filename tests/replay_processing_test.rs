@@ -3,12 +3,13 @@ use subtr_actor::*;
 
 /// Helper to parse a replay file
 fn parse_replay(path: &str) -> boxcars::Replay {
-    let data = std::fs::read(path).expect(&format!("Failed to read replay file: {}", path));
+    let data =
+        std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {}", path));
     boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
         .must_parse_network_data()
         .parse()
-        .expect(&format!("Failed to parse replay: {}", path))
+        .unwrap_or_else(|_| panic!("Failed to parse replay: {}", path))
 }
 
 /// Test that all sample replays can be parsed and processed without errors
@@ -47,7 +48,7 @@ fn test_replay_data_collector_multiple_replays() {
 
         let replay_data = collector
             .get_replay_data(&replay)
-            .expect(&format!("Failed to get replay data for {}", path));
+            .unwrap_or_else(|_| panic!("Failed to get replay data for {}", path));
 
         // Verify we got meaningful data
         assert!(
@@ -177,7 +178,7 @@ fn test_frame_rate_decorator() {
 
         FrameRateDecorator::new_from_fps(fps, &mut collector)
             .process_replay(&replay)
-            .expect(&format!("Should process at {} fps", fps));
+            .unwrap_or_else(|_| panic!("Should process at {} fps", fps));
 
         let (_, array) = collector
             .get_meta_and_ndarray()
