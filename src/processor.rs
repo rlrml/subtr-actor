@@ -1590,19 +1590,20 @@ impl<'a> ReplayProcessor<'a> {
             ("car_to_double_jump", &self.car_to_double_jump),
             ("car_to_dodge", &self.car_to_dodge),
         ];
-        let strings: Vec<_> = pairs
+        let mut strings: Vec<_> = pairs
             .iter()
             .map(|(map_name, map)| format!("{map_name:?}: {map:?}"))
             .collect();
+        strings.push(format!("name_to_object_id: {:?}", &self.name_to_object_id));
         strings.join("\n")
     }
 
     pub fn actor_state_string(&self, actor_id: &boxcars::ActorId) -> String {
-        format!(
-            "{:?}",
-            self.get_actor_state(actor_id)
-                .map(|s| self.map_attribute_keys(&s.attributes))
-        )
+        if let Ok(actor_state) = self.get_actor_state(actor_id) {
+            format!("{:?}", self.map_attribute_keys(&actor_state.attributes))
+        } else {
+            String::from("error")
+        }
     }
 
     pub fn print_actors_by_id<'b>(&self, actor_ids: impl Iterator<Item = &'b boxcars::ActorId>) {
@@ -1620,7 +1621,7 @@ impl<'a> ReplayProcessor<'a> {
         self.iter_actors_by_type(actor_type)
             .unwrap()
             .for_each(|(_actor_id, state)| {
-                println!("{:?}", self.map_attribute_keys(&state.attributes));
+                log::debug!("{:?}", self.map_attribute_keys(&state.attributes));
             });
     }
 
@@ -1631,15 +1632,21 @@ impl<'a> ReplayProcessor<'a> {
             .keys()
             .filter_map(|id| self.object_id_to_name.get(id))
             .collect();
-        println!("{types:?}");
+        log::debug!("{types:?}");
     }
 
     pub fn print_all_actors(&self) {
         self.actor_state
             .actor_states
             .iter()
-            .for_each(|(actor_id, _actor_state)| {
-                println!("{:?}", self.actor_state_string(actor_id))
-            })
+            .for_each(|(actor_id, actor_state)| {
+                log::debug!(
+                    "{}: {:?}",
+                    self.object_id_to_name
+                        .get(&actor_state.object_id)
+                        .unwrap_or(&String::from("unknown")),
+                    self.actor_state_string(actor_id)
+                )
+            });
     }
 }
