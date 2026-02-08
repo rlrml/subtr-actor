@@ -158,7 +158,8 @@ pub struct ReplayProcessor<'a> {
     pub car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub demolishes: Vec<DemolishInfo>,
-    known_demolishes: Vec<(boxcars::DemolishFx, usize)>,
+    known_demolishes: Vec<(DemolishAttribute, usize)>,
+    demolish_format: Option<DemolishFormat>,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -201,6 +202,7 @@ impl<'a> ReplayProcessor<'a> {
             car_to_dodge: HashMap::new(),
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
+            demolish_format: None,
         };
         processor
             .set_player_order_from_headers()
@@ -291,6 +293,7 @@ impl<'a> ReplayProcessor<'a> {
         self.actor_state = ActorStateModeler::new();
         self.demolishes = Vec::new();
         self.known_demolishes = Vec::new();
+        self.demolish_format = None;
     }
 
     fn set_player_order_from_headers(&mut self) -> SubtrActorResult<()> {
@@ -785,26 +788,40 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
-    fn update_demolishes(&mut self, frame: &boxcars::Frame, index: usize) -> SubtrActorResult<()> {
-        let new_demolishes: Vec<_> = self
-            .get_active_demolish_fx()?
-            .flat_map(|demolish_fx| {
-                if !self.demolish_is_known(demolish_fx, index) {
-                    Some(*demolish_fx.as_ref())
-                } else {
-                    None
-                }
-            })
-            .collect();
+    fn update_demolishes(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        if self.demolish_format.is_none() {
+            self.demolish_format = self.detect_demolish_format();
+        }
+
+        let new_demolishes: Vec<_> = self.get_active_demos()?.collect();
 
         for demolish in new_demolishes {
-            match self.build_demolish_info(&demolish, frame, index) {
+            if self.demolish_is_known(&demolish, frame_index) {
+                continue;
+            }
+            self.known_demolishes.push((demolish.clone(), frame_index));
+            match self.build_demolish_info(&demolish, frame, frame_index) {
                 Ok(demolish_info) => self.demolishes.push(demolish_info),
                 Err(_e) => {
-                    log::warn!("Error building demolish info");
+                    log::warn!(
+                        "Error building demolish info: {}; \
+                         attacker_car={}, victim_car={}, attacker={}, victim={}",
+                        _e.variant,
+                        demolish.attacker_actor_id(),
+                        demolish.victim_actor_id(),
+                        self.car_to_player
+                            .get(&demolish.attacker_actor_id())
+                            .unwrap_or(&boxcars::ActorId(-1)),
+                        self.car_to_player
+                            .get(&demolish.victim_actor_id())
+                            .unwrap_or(&boxcars::ActorId(-1)),
+                    );
                 }
             }
-            self.known_demolishes.push((demolish, index))
         }
 
         Ok(())
@@ -812,26 +829,28 @@ impl<'a> ReplayProcessor<'a> {
 
     fn build_demolish_info(
         &self,
-        demolish_fx: &boxcars::DemolishFx,
+        demo: &DemolishAttribute,
         frame: &boxcars::Frame,
-        index: usize,
+        frame_index: usize,
     ) -> SubtrActorResult<DemolishInfo> {
-        let attacker = self.get_player_id_from_car_id(&demolish_fx.attacker)?;
-        let victim = self.get_player_id_from_car_id(&demolish_fx.victim)?;
+        let attacker = self.get_player_id_from_car_id(&demo.attacker_actor_id())?;
+        let victim = self.get_player_id_from_car_id(&demo.victim_actor_id())?;
+        let (current_rigid_body, _) = self.get_player_rigid_body_and_updated(&victim)?;
         Ok(DemolishInfo {
             time: frame.time,
             seconds_remaining: self.get_seconds_remaining()?,
-            frame: index,
+            frame: frame_index,
             attacker,
             victim,
-            attacker_velocity: demolish_fx.attack_velocity,
-            victim_velocity: demolish_fx.victim_velocity,
+            attacker_velocity: demo.attacker_velocity(),
+            victim_velocity: demo.victim_velocity(),
+            victim_location: current_rigid_body.location,
         })
     }
 
     // ID Mapping functions
 
-    fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
+    pub fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
         self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
     }
 
@@ -863,32 +882,80 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
-    fn demolish_is_known(&self, demolish_fx: &boxcars::DemolishFx, frame_index: usize) -> bool {
-        self.known_demolishes.iter().any(|(existing, index)| {
-            existing == demolish_fx
-                && frame_index
-                    .checked_sub(*index)
-                    .or_else(|| index.checked_sub(frame_index))
-                    .unwrap()
-                    < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
-        })
+    fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
+        self.known_demolishes
+            .iter()
+            .any(|(existing, existing_frame_index)| {
+                existing == demo
+                    && frame_index
+                        .checked_sub(*existing_frame_index)
+                        .or_else(|| existing_frame_index.checked_sub(frame_index))
+                        .unwrap()
+                        < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+            })
     }
 
-    /// Provides an iterator over the active demolition effects,
-    /// [`boxcars::DemolishFx`], in the current frame.
-    pub fn get_active_demolish_fx(
+    /// Returns the detected demolition format, if any demolitions have been encountered.
+    pub fn get_demolish_format(&self) -> Option<DemolishFormat> {
+        self.demolish_format
+    }
+
+    /// Detects which demolition format this replay uses by checking car actor attributes.
+    pub fn detect_demolish_format(&self) -> Option<DemolishFormat> {
+        let actors = self.iter_actors_by_type_err(CAR_TYPE).ok()?;
+        for (_actor_id, state) in actors {
+            if get_attribute_errors_expected!(
+                self,
+                &state.attributes,
+                DEMOLISH_EXTENDED_KEY,
+                boxcars::Attribute::DemolishExtended
+            )
+            .is_ok()
+            {
+                return Some(DemolishFormat::Extended);
+            }
+            if get_attribute_errors_expected!(
+                self,
+                &state.attributes,
+                DEMOLISH_GOAL_EXPLOSION_KEY,
+                boxcars::Attribute::DemolishFx
+            )
+            .is_ok()
+            {
+                return Some(DemolishFormat::Fx);
+            }
+        }
+        None
+    }
+
+    /// Provides an iterator over the active demolition events in the current frame.
+    ///
+    /// Uses the cached `demolish_format` to determine which attribute to check.
+    pub fn get_active_demos(
         &self,
-    ) -> SubtrActorResult<impl Iterator<Item = &Box<boxcars::DemolishFx>>> {
-        Ok(self
-            .iter_actors_by_type_err(CAR_TYPE)?
-            .flat_map(|(_actor_id, state)| {
-                get_attribute_errors_expected!(
+    ) -> SubtrActorResult<impl Iterator<Item = DemolishAttribute> + '_> {
+        let format = self.demolish_format;
+        let actors: Vec<_> = self.iter_actors_by_type_err(CAR_TYPE)?.collect();
+        Ok(actors
+            .into_iter()
+            .filter_map(move |(_actor_id, state)| match format {
+                Some(DemolishFormat::Extended) => get_attribute_errors_expected!(
+                    self,
+                    &state.attributes,
+                    DEMOLISH_EXTENDED_KEY,
+                    boxcars::Attribute::DemolishExtended
+                )
+                .ok()
+                .map(|demo| DemolishAttribute::Extended(**demo)),
+                Some(DemolishFormat::Fx) => get_attribute_errors_expected!(
                     self,
                     &state.attributes,
                     DEMOLISH_GOAL_EXPLOSION_KEY,
                     boxcars::Attribute::DemolishFx
                 )
                 .ok()
+                .map(|demo| DemolishAttribute::Fx(**demo)),
+                None => None,
             }))
     }
 
