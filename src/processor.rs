@@ -885,7 +885,10 @@ impl<'a> ReplayProcessor<'a> {
 
     // ID Mapping functions
 
-    pub fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
+    pub fn get_player_id_from_car_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<PlayerId> {
         self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
     }
 
@@ -907,14 +910,11 @@ impl<'a> ReplayProcessor<'a> {
         &self,
         actor_id: &boxcars::ActorId,
     ) -> SubtrActorResult<boxcars::ActorId> {
-        self.car_to_player
-            .get(actor_id)
-            .copied()
-            .ok_or_else(|| {
-                SubtrActorError::new(SubtrActorErrorVariant::NoMatchingPlayerId {
-                    actor_id: *actor_id,
-                })
+        self.car_to_player.get(actor_id).copied().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::NoMatchingPlayerId {
+                actor_id: *actor_id,
             })
+        })
     }
 
     fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
@@ -1096,13 +1096,19 @@ impl<'a> ReplayProcessor<'a> {
 
     // Actor functions
 
-    pub fn get_object_id_for_key(&self, name: &'static str) -> SubtrActorResult<&boxcars::ObjectId> {
+    pub fn get_object_id_for_key(
+        &self,
+        name: &'static str,
+    ) -> SubtrActorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
     }
 
-    pub fn get_actor_ids_by_type(&self, name: &'static str) -> SubtrActorResult<&[boxcars::ActorId]> {
+    pub fn get_actor_ids_by_type(
+        &self,
+        name: &'static str,
+    ) -> SubtrActorResult<&[boxcars::ActorId]> {
         self.get_object_id_for_key(name)
             .map(|object_id| self.get_actor_ids_by_object_id(object_id))
     }
