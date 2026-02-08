@@ -13,6 +13,7 @@ use std::collections::HashMap;
 /// [`Ok`] variant of a [`Result`]. If the attribute doesn't match, it results in an
 /// [`Err`] variant with a [`SubtrActorError`], specifying the expected type and
 /// the actual type.
+#[macro_export]
 macro_rules! attribute_match {
     ($value:expr, $type:path $(,)?) => {{
         let attribute = $value;
@@ -35,6 +36,7 @@ macro_rules! attribute_match {
 /// * `$map` - The data map.
 /// * `$prop` - The attribute key.
 /// * `$type` - The expected enum path.
+#[macro_export]
 macro_rules! get_attribute_errors_expected {
     ($self:ident, $map:expr, $prop:expr, $type:path) => {
         $self
@@ -1061,13 +1063,13 @@ impl<'a> ReplayProcessor<'a> {
 
     // Actor functions
 
-    fn get_object_id_for_key(&self, name: &'static str) -> SubtrActorResult<&boxcars::ObjectId> {
+    pub fn get_object_id_for_key(&self, name: &'static str) -> SubtrActorResult<&boxcars::ObjectId> {
         self.name_to_object_id
             .get(name)
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
     }
 
-    fn get_actor_ids_by_type(&self, name: &'static str) -> SubtrActorResult<&[boxcars::ActorId]> {
+    pub fn get_actor_ids_by_type(&self, name: &'static str) -> SubtrActorResult<&[boxcars::ActorId]> {
         self.get_object_id_for_key(name)
             .map(|object_id| self.get_actor_ids_by_object_id(object_id))
     }
@@ -1096,7 +1098,7 @@ impl<'a> ReplayProcessor<'a> {
         self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property)
     }
 
-    fn get_attribute<'b>(
+    pub fn get_attribute<'b>(
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'static str,
@@ -1104,7 +1106,7 @@ impl<'a> ReplayProcessor<'a> {
         self.get_attribute_and_updated(map, property).map(|v| &v.0)
     }
 
-    fn get_attribute_and_updated<'b>(
+    pub fn get_attribute_and_updated<'b>(
         &'b self,
         map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
         property: &'static str,
