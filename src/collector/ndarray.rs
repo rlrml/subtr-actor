@@ -266,10 +266,6 @@ impl<F> Collector for NDArrayCollector<F> {
     ) -> SubtrActorResult<collector::TimeAdvance> {
         self.maybe_set_replay_meta(processor)?;
 
-        if !processor.ball_rigid_body_exists()? {
-            return Ok(collector::TimeAdvance::NextFrame);
-        }
-
         for feature_adder in self.feature_adders.iter() {
             feature_adder.add_features(
                 processor,
@@ -956,7 +952,7 @@ where
 build_global_feature_adder!(
     SecondsRemaining,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        convert_all_floats!(processor.get_seconds_remaining()?.clone() as f32)
+        convert_all_floats!(processor.get_seconds_remaining().unwrap_or(0) as f32)
     },
     "seconds remaining"
 );
@@ -1011,7 +1007,10 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     BallRigidBody,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        get_rigid_body_properties(processor.get_ball_rigid_body()?)
+        processor
+            .get_ball_rigid_body()
+            .and_then(|rb| get_rigid_body_properties(rb))
+            .or_else(|_| default_rb_state())
     },
     "Ball - position x",
     "Ball - position y",
@@ -1030,7 +1029,10 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     BallRigidBodyNoVelocities,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        get_rigid_body_properties_no_velocities(processor.get_ball_rigid_body()?)
+        processor
+            .get_ball_rigid_body()
+            .and_then(|rb| get_rigid_body_properties_no_velocities(rb))
+            .or_else(|_| default_rb_state_no_velocities())
     },
     "Ball - position x",
     "Ball - position y",
@@ -1046,9 +1048,10 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     VelocityAddedBallRigidBodyNoVelocities,
     |_, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
-        get_rigid_body_properties_no_velocities(
-            &processor.get_velocity_applied_ball_rigid_body(current_time)?,
-        )
+        processor
+            .get_velocity_applied_ball_rigid_body(current_time)
+            .and_then(|rb| get_rigid_body_properties_no_velocities(&rb))
+            .or_else(|_| default_rb_state_no_velocities())
     },
     "Ball - position x",
     "Ball - position y",
@@ -1307,12 +1310,17 @@ build_player_feature_adder!(
 build_global_feature_adder!(
     BallRigidBodyQuaternions,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
-        let rb = processor.get_ball_rigid_body()?;
-        let rotation = rb.rotation;
-        let location = rb.location;
-        convert_all_floats!(
-            location.x, location.y, location.z, rotation.x, rotation.y, rotation.z, rotation.w
-        )
+        match processor.get_ball_rigid_body() {
+            Ok(rb) => {
+                let rotation = rb.rotation;
+                let location = rb.location;
+                convert_all_floats!(
+                    location.x, location.y, location.z,
+                    rotation.x, rotation.y, rotation.z, rotation.w
+                )
+            }
+            Err(_) => convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        }
     },
     "Ball - position x",
     "Ball - position y",
