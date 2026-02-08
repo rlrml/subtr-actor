@@ -18,6 +18,7 @@ pub static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
 pub static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
 pub static BOOST_REPLICATED_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoost";
 pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
+pub static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
 pub static DEMOLISH_GOAL_EXPLOSION_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishGoalExplosion";
 pub static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
@@ -36,4 +37,4 @@ pub static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 
 pub static BOOST_USED_PER_SECOND: f32 = 80.0 / 0.93;
 
-pub static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 100;
+pub static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 150;
