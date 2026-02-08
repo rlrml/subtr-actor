@@ -92,6 +92,8 @@ fn test_game_state_with_replay() {
     assert!(!unique_states.is_empty(), "Should have game state values");
 
     // Verify countdown values are in valid range 0-3
+    let mut ball_hit_true_count = 0usize;
+    let mut ball_hit_false_count = 0usize;
     for row in array.rows() {
         let countdown = row[countdown_idx] as i32;
         assert!(
@@ -106,5 +108,23 @@ fn test_game_state_with_replay() {
             "Ball hit should be 0 or 1, got {}",
             ball_hit
         );
+        if ball_hit == 1.0 {
+            ball_hit_true_count += 1;
+        } else {
+            ball_hit_false_count += 1;
+        }
     }
+
+    // Regression test for https://github.com/rlrml/subtr-actor/issues/16
+    // BallHasBeenHit should be 0 during kickoff and 1 after the ball is hit.
+    // Previously it was always 1 because NDArrayCollector skipped frames where
+    // the ball rigid body didn't exist, which coincided with kickoff (when
+    // BallHasBeenHit is false).
+    assert!(
+        ball_hit_true_count > 0 && ball_hit_false_count > 0,
+        "BallHasBeenHit should contain both 0 and 1 values across a full replay, \
+         got {} true and {} false",
+        ball_hit_true_count,
+        ball_hit_false_count
+    );
 }
