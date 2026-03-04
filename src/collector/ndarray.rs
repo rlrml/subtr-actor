@@ -1315,8 +1315,8 @@ build_global_feature_adder!(
                 let rotation = rb.rotation;
                 let location = rb.location;
                 convert_all_floats!(
-                    location.x, location.y, location.z,
-                    rotation.x, rotation.y, rotation.z, rotation.w
+                    location.x, location.y, location.z, rotation.x, rotation.y, rotation.z,
+                    rotation.w
                 )
             }
             Err(_) => convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
