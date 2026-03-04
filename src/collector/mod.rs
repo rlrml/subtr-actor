@@ -23,7 +23,7 @@ pub enum TimeAdvance {
 /// [`ReplayProcessor`] for access to additional replay data and context. It
 /// determines the pace of replay progression via the [`TimeAdvance`] return
 /// value.
-pub trait Collector: Sized {
+pub trait Collector {
     /// Process a single frame from a replay.
     ///
     /// # Arguments
@@ -55,7 +55,10 @@ pub trait Collector: Sized {
     ///
     /// Returns the [`Collector`] itself, potentially modified by the processing
     /// of the replay.
-    fn process_replay(mut self, replay: &boxcars::Replay) -> SubtrActorResult<Self> {
+    fn process_replay(mut self, replay: &boxcars::Replay) -> SubtrActorResult<Self>
+    where
+        Self: Sized,
+    {
         ReplayProcessor::new(replay)?.process(&mut self)?;
         Ok(self)
     }
