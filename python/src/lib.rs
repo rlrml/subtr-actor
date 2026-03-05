@@ -93,6 +93,57 @@ static DEFAULT_GLOBAL_FEATURE_ADDERS: [&str; 1] = ["BallRigidBody"];
 static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
     ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
 
+enum NDArrayDType {
+    Float16,
+    Float32,
+    Float64,
+}
+
+fn parse_ndarray_dtype(dtype: Option<String>) -> PyResult<NDArrayDType> {
+    match dtype {
+        None => Ok(NDArrayDType::Float32),
+        Some(dtype) => match dtype.trim().to_ascii_lowercase().as_str() {
+            "f16" | "float16" | "half" => Ok(NDArrayDType::Float16),
+            "f32" | "float32" => Ok(NDArrayDType::Float32),
+            "f64" | "float64" | "double" => Ok(NDArrayDType::Float64),
+            invalid => Err(PyErr::new::<exceptions::PyValueError, _>(format!(
+                "Unsupported dtype '{invalid}'. Expected one of: f16, float16, half, f32, float32, f64, float64, double"
+            ))),
+        },
+    }
+}
+
+fn get_ndarray_with_info_for_type<'p, F>(
+    py: Python<'p>,
+    replay: &boxcars::Replay,
+    global_feature_adders: Option<Vec<String>>,
+    player_feature_adders: Option<Vec<String>>,
+    fps: Option<f32>,
+) -> PyResult<(Py<PyAny>, Py<PyAny>)>
+where
+    F: TryFrom<f32> + Send + Sync + 'static + numpy::Element,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let mut collector = build_ndarray_collector::<F>(global_feature_adders, player_feature_adders)
+        .map_err(handle_frames_exception)?;
+
+    FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector)
+        .process_replay(replay)
+        .map_err(handle_frames_exception)?;
+
+    let (replay_meta_with_headers, rust_nd_array) = collector
+        .get_meta_and_ndarray()
+        .map_err(handle_frames_exception)?;
+
+    let python_replay_meta = convert_to_py(
+        py,
+        &serde_json::to_value(&replay_meta_with_headers).map_err(to_py_error)?,
+    );
+    let python_nd_array = rust_nd_array.into_pyarray(py).into_any().unbind();
+
+    Ok((python_replay_meta, python_nd_array))
+}
+
 /// Convert a replay file to a `numpy` ndarray with additional metadata in Python.
 ///
 /// This function takes a replay file path, reads the file and processes it. It
@@ -130,34 +181,51 @@ static DEFAULT_PLAYER_FEATURE_ADDERS: [&str; 3] =
 /// this will be an Err variant with the Python error.
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None, fps=None))]
+#[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None, fps=None, dtype=None))]
 fn get_ndarray_with_info_from_replay_filepath<'p>(
     py: Python<'p>,
     filepath: PathBuf,
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
     fps: Option<f32>,
+    dtype: Option<String>,
 ) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
-    let mut collector = build_ndarray_collector(global_feature_adders, player_feature_adders)
-        .map_err(handle_frames_exception)?;
+    let (python_replay_meta, python_nd_array) = match parse_ndarray_dtype(dtype)? {
+        NDArrayDType::Float16 => {
+            let (python_replay_meta, python_nd_array) = get_ndarray_with_info_for_type::<f32>(
+                py,
+                &replay,
+                global_feature_adders,
+                player_feature_adders,
+                fps,
+            )?;
+            let np = py.import("numpy")?;
+            let float16 = np.getattr("float16")?;
+            let casted_nd_array = python_nd_array
+                .bind(py)
+                .call_method1("astype", (float16,))?
+                .unbind();
+            Ok((python_replay_meta, casted_nd_array))
+        }
+        NDArrayDType::Float32 => get_ndarray_with_info_for_type::<f32>(
+            py,
+            &replay,
+            global_feature_adders,
+            player_feature_adders,
+            fps,
+        ),
+        NDArrayDType::Float64 => get_ndarray_with_info_for_type::<f64>(
+            py,
+            &replay,
+            global_feature_adders,
+            player_feature_adders,
+            fps,
+        ),
+    }?;
 
-    FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector)
-        .process_replay(&replay)
-        .map_err(handle_frames_exception)?;
-
-    let (replay_meta_with_headers, rust_nd_array) = collector
-        .get_meta_and_ndarray()
-        .map_err(handle_frames_exception)?;
-
-    let python_replay_meta = convert_to_py(
-        py,
-        &serde_json::to_value(&replay_meta_with_headers).map_err(to_py_error)?,
-    );
-
-    let python_nd_array = rust_nd_array.into_pyarray(py);
     Ok((python_replay_meta, python_nd_array)
         .into_pyobject(py)?
         .into_any()
@@ -165,10 +233,14 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
 }
 
 #[allow(clippy::result_large_err)]
-fn build_ndarray_collector(
+fn build_ndarray_collector<F>(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
-) -> subtr_actor::SubtrActorResult<subtr_actor::NDArrayCollector<f32>> {
+) -> subtr_actor::SubtrActorResult<subtr_actor::NDArrayCollector<F>>
+where
+    F: TryFrom<f32> + Send + Sync + 'static,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
     let global_feature_adders = global_feature_adders.unwrap_or_else(|| {
         DEFAULT_GLOBAL_FEATURE_ADDERS
             .iter()
@@ -183,7 +255,7 @@ fn build_ndarray_collector(
     });
     let global_feature_adders: Vec<&str> = global_feature_adders.iter().map(|s| &s[..]).collect();
     let player_feature_adders: Vec<&str> = player_feature_adders.iter().map(|s| &s[..]).collect();
-    subtr_actor::NDArrayCollector::<f32>::from_strings(
+    subtr_actor::NDArrayCollector::<F>::from_strings_typed(
         &global_feature_adders,
         &player_feature_adders,
     )
@@ -201,8 +273,9 @@ fn get_replay_meta<'p>(
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
-    let mut collector = build_ndarray_collector(global_feature_adders, player_feature_adders)
-        .map_err(handle_frames_exception)?;
+    let mut collector =
+        build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
+            .map_err(handle_frames_exception)?;
 
     let replay_meta = collector
         .process_and_get_meta_and_headers(&replay)
@@ -222,7 +295,7 @@ fn get_column_headers<'p>(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
 ) -> PyResult<Py<PyAny>> {
-    let header_info = build_ndarray_collector(global_feature_adders, player_feature_adders)
+    let header_info = build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
         .map_err(handle_frames_exception)?
         .get_column_headers();
     Ok(convert_to_py(

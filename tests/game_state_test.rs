@@ -98,15 +98,13 @@ fn test_game_state_with_replay() {
         let countdown = row[countdown_idx] as i32;
         assert!(
             (0..=3).contains(&countdown),
-            "Countdown should be 0-3, got {}",
-            countdown
+            "Countdown should be 0-3, got {countdown}",
         );
 
         let ball_hit = row[ball_hit_idx];
         assert!(
             ball_hit == 0.0 || ball_hit == 1.0,
-            "Ball hit should be 0 or 1, got {}",
-            ball_hit
+            "Ball hit should be 0 or 1, got {ball_hit}",
         );
         if ball_hit == 1.0 {
             ball_hit_true_count += 1;
@@ -123,8 +121,32 @@ fn test_game_state_with_replay() {
     assert!(
         ball_hit_true_count > 0 && ball_hit_false_count > 0,
         "BallHasBeenHit should contain both 0 and 1 values across a full replay, \
-         got {} true and {} false",
-        ball_hit_true_count,
-        ball_hit_false_count
+         got {ball_hit_true_count} true and {ball_hit_false_count} false",
     );
+}
+
+#[test]
+fn test_ndarray_collector_from_strings_supports_f64() {
+    let replay_path = "assets/replays/old_boost_format.replay";
+    let data = std::fs::read(replay_path).expect("Failed to read replay file");
+    let replay = boxcars::ParserBuilder::new(&data[..])
+        .always_check_crc()
+        .must_parse_network_data()
+        .parse()
+        .expect("Failed to parse replay");
+
+    let collector = NDArrayCollector::<f64>::from_strings_typed(
+        &["BallRigidBody", "CurrentTime"],
+        &["PlayerBoost", "PlayerAnyJump"],
+    )
+    .expect("Should create f64 collector from feature names");
+
+    let (_, array) = collector
+        .process_replay(&replay)
+        .expect("Failed to process replay")
+        .get_meta_and_ndarray()
+        .expect("Failed to get ndarray");
+
+    assert!(array.nrows() > 0, "Should have extracted frames");
+    assert!(array.ncols() > 0, "Should have feature columns");
 }

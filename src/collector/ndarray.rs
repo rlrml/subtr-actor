@@ -2,7 +2,6 @@ use crate::*;
 use ::ndarray;
 use boxcars;
 pub use derive_new;
-use lazy_static::lazy_static;
 pub use paste;
 use serde::Serialize;
 use std::sync::Arc;
@@ -295,35 +294,97 @@ impl<F> Collector for NDArrayCollector<F> {
     }
 }
 
-impl NDArrayCollector<f32> {
-    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
-        let feature_adders: Vec<Arc<dyn FeatureAdder<f32> + Send + Sync>> = fa_names
+fn global_feature_adder_from_name<F>(
+    name: &str,
+) -> Option<Arc<dyn FeatureAdder<F> + Send + Sync + 'static>>
+where
+    F: TryFrom<f32> + Send + Sync + 'static,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    match name {
+        "BallRigidBody" => Some(BallRigidBody::<F>::arc_new()),
+        "BallRigidBodyNoVelocities" => Some(BallRigidBodyNoVelocities::<F>::arc_new()),
+        "BallRigidBodyQuaternions" => Some(BallRigidBodyQuaternions::<F>::arc_new()),
+        "VelocityAddedBallRigidBodyNoVelocities" => {
+            Some(VelocityAddedBallRigidBodyNoVelocities::<F>::arc_new())
+        }
+        "InterpolatedBallRigidBodyNoVelocities" => {
+            Some(InterpolatedBallRigidBodyNoVelocities::<F>::arc_new(0.0))
+        }
+        "SecondsRemaining" => Some(SecondsRemaining::<F>::arc_new()),
+        "CurrentTime" => Some(CurrentTime::<F>::arc_new()),
+        "FrameTime" => Some(FrameTime::<F>::arc_new()),
+        "ReplicatedStateName" => Some(ReplicatedStateName::<F>::arc_new()),
+        "ReplicatedGameStateTimeRemaining" => {
+            Some(ReplicatedGameStateTimeRemaining::<F>::arc_new())
+        }
+        "BallHasBeenHit" => Some(BallHasBeenHit::<F>::arc_new()),
+        _ => None,
+    }
+}
+
+fn player_feature_adder_from_name<F>(
+    name: &str,
+) -> Option<Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static>>
+where
+    F: TryFrom<f32> + Send + Sync + 'static,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    match name {
+        "PlayerRigidBody" => Some(PlayerRigidBody::<F>::arc_new()),
+        "PlayerRigidBodyNoVelocities" => Some(PlayerRigidBodyNoVelocities::<F>::arc_new()),
+        "PlayerRigidBodyQuaternions" => Some(PlayerRigidBodyQuaternions::<F>::arc_new()),
+        "VelocityAddedPlayerRigidBodyNoVelocities" => {
+            Some(VelocityAddedPlayerRigidBodyNoVelocities::<F>::arc_new())
+        }
+        "InterpolatedPlayerRigidBodyNoVelocities" => {
+            Some(InterpolatedPlayerRigidBodyNoVelocities::<F>::arc_new(0.003))
+        }
+        "PlayerBoost" => Some(PlayerBoost::<F>::arc_new()),
+        "PlayerJump" => Some(PlayerJump::<F>::arc_new()),
+        "PlayerAnyJump" => Some(PlayerAnyJump::<F>::arc_new()),
+        "PlayerDemolishedBy" => Some(PlayerDemolishedBy::<F>::arc_new()),
+        _ => None,
+    }
+}
+
+impl<F> NDArrayCollector<F>
+where
+    F: TryFrom<f32> + Send + Sync + 'static,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    /// Builds an [`NDArrayCollector`] from feature-adder names for an explicit
+    /// output type `F`.
+    pub fn from_strings_typed(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
+        let feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>> = fa_names
             .iter()
             .map(|name| {
-                Ok(NAME_TO_GLOBAL_FEATURE_ADDER
-                    .get(name)
-                    .ok_or_else(|| {
-                        SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
-                            name.to_string(),
-                        ))
-                    })?
-                    .clone())
+                global_feature_adder_from_name(name).ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
+                        name.to_string(),
+                    ))
+                })
             })
             .collect::<SubtrActorResult<Vec<_>>>()?;
-        let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<f32> + Send + Sync>> = pfa_names
+        let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>> = pfa_names
             .iter()
             .map(|name| {
-                Ok(NAME_TO_PLAYER_FEATURE_ADDER
-                    .get(name)
-                    .ok_or_else(|| {
-                        SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
-                            name.to_string(),
-                        ))
-                    })?
-                    .clone())
+                player_feature_adder_from_name(name).ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::UnknownFeatureAdderName(
+                        name.to_string(),
+                    ))
+                })
             })
             .collect::<SubtrActorResult<Vec<_>>>()?;
         Ok(Self::new(feature_adders, player_feature_adders))
+    }
+}
+
+impl NDArrayCollector<f32> {
+    /// Backward-compatible shorthand for string-based collector construction
+    /// using `f32` output features.
+    pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
+        Self::from_strings_typed(fa_names, pfa_names)
     }
 }
 
@@ -1330,59 +1391,3 @@ build_global_feature_adder!(
     "Ball - quaternion z",
     "Ball - quaternion w"
 );
-
-lazy_static! {
-    static ref NAME_TO_GLOBAL_FEATURE_ADDER: std::collections::HashMap<&'static str, Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>> = {
-        let mut m: std::collections::HashMap<
-            &'static str,
-            Arc<dyn FeatureAdder<f32> + Send + Sync + 'static>,
-        > = std::collections::HashMap::new();
-        macro_rules! insert_adder {
-            ($adder_name:ident, $( $arguments:expr ),*) => {
-                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new($ ( $arguments ),*));
-            };
-            ($adder_name:ident) => {
-                insert_adder!($adder_name,)
-            }
-        }
-        insert_adder!(BallRigidBody);
-        insert_adder!(BallRigidBodyNoVelocities);
-        insert_adder!(BallRigidBodyQuaternions);
-        insert_adder!(VelocityAddedBallRigidBodyNoVelocities);
-        insert_adder!(InterpolatedBallRigidBodyNoVelocities, 0.0);
-        insert_adder!(SecondsRemaining);
-        insert_adder!(CurrentTime);
-        insert_adder!(FrameTime);
-        insert_adder!(ReplicatedStateName);
-        insert_adder!(ReplicatedGameStateTimeRemaining);
-        insert_adder!(BallHasBeenHit);
-        m
-    };
-    static ref NAME_TO_PLAYER_FEATURE_ADDER: std::collections::HashMap<
-        &'static str,
-        Arc<dyn PlayerFeatureAdder<f32> + Send + Sync + 'static>,
-    > = {
-        let mut m: std::collections::HashMap<
-            &'static str,
-            Arc<dyn PlayerFeatureAdder<f32> + Send + Sync + 'static>,
-        > = std::collections::HashMap::new();
-        macro_rules! insert_adder {
-            ($adder_name:ident, $( $arguments:expr ),*) => {
-                m.insert(stringify!($adder_name), $adder_name::<f32>::arc_new($ ( $arguments ),*));
-            };
-            ($adder_name:ident) => {
-                insert_adder!($adder_name,)
-            };
-        }
-        insert_adder!(PlayerRigidBody);
-        insert_adder!(PlayerRigidBodyNoVelocities);
-        insert_adder!(PlayerRigidBodyQuaternions);
-        insert_adder!(VelocityAddedPlayerRigidBodyNoVelocities);
-        insert_adder!(InterpolatedPlayerRigidBodyNoVelocities, 0.003);
-        insert_adder!(PlayerBoost);
-        insert_adder!(PlayerJump);
-        insert_adder!(PlayerAnyJump);
-        insert_adder!(PlayerDemolishedBy);
-        m
-    };
-}

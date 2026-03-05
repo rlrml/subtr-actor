@@ -3,13 +3,12 @@ use subtr_actor::*;
 
 /// Helper to parse a replay file
 fn parse_replay(path: &str) -> boxcars::Replay {
-    let data =
-        std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {}", path));
+    let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
     boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
         .must_parse_network_data()
         .parse()
-        .unwrap_or_else(|_| panic!("Failed to parse replay: {}", path))
+        .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
 }
 
 /// Test that all sample replays can be parsed and processed without errors
@@ -27,8 +26,7 @@ fn test_all_replays_parse_successfully() {
         let replay = parse_replay(path);
         assert!(
             replay.network_frames.is_some(),
-            "Replay {} should have network frames",
-            path
+            "Replay {path} should have network frames",
         );
     }
 }
@@ -48,18 +46,16 @@ fn test_replay_data_collector_multiple_replays() {
 
         let replay_data = collector
             .get_replay_data(&replay)
-            .unwrap_or_else(|_| panic!("Failed to get replay data for {}", path));
+            .unwrap_or_else(|_| panic!("Failed to get replay data for {path}"));
 
         // Verify we got meaningful data
         assert!(
             replay_data.frame_data.frame_count() > 0,
-            "Replay {} should have frames",
-            path
+            "Replay {path} should have frames",
         );
         assert!(
             replay_data.frame_data.duration() > 0.0,
-            "Replay {} should have positive duration",
-            path
+            "Replay {path} should have positive duration",
         );
 
         // Verify JSON serialization works
@@ -129,8 +125,7 @@ fn test_ndarray_collector_all_global_features() {
         headers
             .iter()
             .any(|h| h.to_lowercase().contains("ball") || h.contains("Ball")),
-        "Should have ball-related headers, got: {:?}",
-        headers
+        "Should have ball-related headers, got: {headers:?}",
     );
 }
 
@@ -178,13 +173,13 @@ fn test_frame_rate_decorator() {
 
         FrameRateDecorator::new_from_fps(fps, &mut collector)
             .process_replay(&replay)
-            .unwrap_or_else(|_| panic!("Should process at {} fps", fps));
+            .unwrap_or_else(|_| panic!("Should process at {fps} fps"));
 
         let (_, array) = collector
             .get_meta_and_ndarray()
             .expect("Should get ndarray");
 
-        assert!(array.nrows() > 0, "Should have rows at {} fps", fps);
+        assert!(array.nrows() > 0, "Should have rows at {fps} fps");
     }
 }
 

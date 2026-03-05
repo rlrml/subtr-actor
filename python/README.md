@@ -21,7 +21,8 @@ meta, ndarray = subtr_actor.get_ndarray_with_info_from_replay_filepath(
     "path/to/replay.replay",
     global_feature_adders=["BallRigidBody"],  # optional
     player_feature_adders=["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],  # optional
-    fps=10.0  # optional, default is 10.0
+    fps=10.0,  # optional, default is 10.0
+    dtype="float16"  # optional: float16|float32|float64 (default float32)
 )
 
 # Get column headers to understand the ndarray structure
@@ -42,7 +43,7 @@ frames_data = subtr_actor.get_replay_frames_data("path/to/replay.replay")
 ### `parse_replay(data: bytes) -> dict`
 Parse raw replay bytes and return the complete replay structure.
 
-### `get_ndarray_with_info_from_replay_filepath(filepath, global_feature_adders=None, player_feature_adders=None, fps=None) -> tuple[dict, numpy.ndarray]`
+### `get_ndarray_with_info_from_replay_filepath(filepath, global_feature_adders=None, player_feature_adders=None, fps=None, dtype=None) -> tuple[dict, numpy.ndarray]`
 Process a replay file and return metadata plus a numpy ndarray of features.
 
 **Parameters:**
@@ -50,6 +51,7 @@ Process a replay file and return metadata plus a numpy ndarray of features.
 - `global_feature_adders` - List of global feature names (default: `["BallRigidBody"]`)
 - `player_feature_adders` - List of player feature names (default: `["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]`)
 - `fps` - Frames per second for processing (default: 10.0)
+- `dtype` - Output ndarray dtype string: `float16`/`f16`, `float32`/`f32`, `float64`/`f64` (default: `float32`)
 
 ### `get_replay_meta(filepath, global_feature_adders=None, player_feature_adders=None) -> dict`
 Get replay metadata without processing frame data (faster than full processing).
