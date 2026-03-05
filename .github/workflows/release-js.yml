@@ -28,6 +28,21 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Preflight npm auth
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Missing NPM_TOKEN secret. Add it in repo Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          npm whoami --registry=https://registry.npmjs.org >/dev/null
+          echo "npm auth preflight passed."
+
       - name: Build WASM package
         working-directory: js
         run: wasm-pack build --target bundler --out-dir pkg

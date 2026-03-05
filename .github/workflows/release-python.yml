@@ -98,6 +98,50 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Preflight release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          wheels=(dist/*.whl)
+          sdists=(dist/*.tar.gz)
+
+          if [[ ${#wheels[@]} -eq 0 ]]; then
+            echo "No wheel artifacts found in dist/."
+            exit 1
+          fi
+
+          if [[ ${#sdists[@]} -eq 0 ]]; then
+            echo "No source distribution artifact found in dist/."
+            exit 1
+          fi
+
+          echo "Artifact preflight passed."
+
+      - name: Preflight PyPI trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "Missing GitHub OIDC request environment. Ensure this job has 'permissions: id-token: write'."
+            exit 1
+          fi
+
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=pypi")"
+
+          token="$(python -c 'import json,sys; print(json.load(sys.stdin).get("value",""))' <<<"$response")"
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to mint OIDC token for audience 'pypi'. Check PyPI trusted publisher settings."
+            exit 1
+          fi
+
+          echo "PyPI trusted publishing preflight passed."
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
