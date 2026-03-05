@@ -1,6 +1,6 @@
 # subtr-actor
 
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm](https://img.shields.io/npm/v/rl-replay-subtr-actor?style=flat-square)](https://www.npmjs.com/package/rl-replay-subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
 A powerful Rust library for processing and analyzing Rocket League replay files. Built on top of the [boxcars](https://docs.rs/boxcars/) parser, subtr-actor simplifies the complex actor-based structure of replay files into easy-to-use data formats.
 
