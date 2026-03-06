@@ -116,36 +116,16 @@ pub fn get_column_headers(
 }
 
 /// Get structured frame data using ReplayDataCollector
+/// This matches Python behavior - no FPS resampling, so goal frame numbers align
 #[wasm_bindgen]
-pub fn get_replay_frames_data(data: &[u8], fps: Option<f32>) -> Result<JsValue, JsValue> {
+pub fn get_replay_frames_data(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let mut collector = ReplayDataCollector::new();
-
-    // Use FrameRateDecorator with specified FPS (default 60.0)
-    let mut decorated_collector =
-        FrameRateDecorator::new_from_fps(fps.unwrap_or(60.0), &mut collector);
-
-    let mut processor = ReplayProcessor::new(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {e:?}")))?;
-
-    processor
-        .process(&mut decorated_collector)
+    // Process without FPS resampling to match Python behavior
+    // This ensures goal frame numbers in all_headers align with the returned frame data
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
-
-    // Get the frame data from the collector
-    let frame_data = collector.get_frame_data();
-
-    // Get metadata and demolishes from the processor
-    let meta = processor
-        .get_replay_meta()
-        .map_err(|e| JsValue::from_str(&format!("Failed to get replay meta: {e:?}")))?;
-
-    let replay_data = ReplayData {
-        frame_data,
-        meta,
-        demolish_infos: processor.demolishes,
-    };
 
     serde_wasm_bindgen::to_value(&replay_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
