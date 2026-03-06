@@ -70,6 +70,8 @@ See the [subtr-actor documentation](https://docs.rs/subtr-actor/latest/subtr_act
 
 **Common player features:** `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerDoubleJump`
 
+`PlayerBoost` is exposed in raw replay units (`0-255`), not `0-100` percent.
+
 ## Building from Source
 
 Requirements:

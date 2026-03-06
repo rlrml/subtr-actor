@@ -1260,7 +1260,7 @@ build_player_feature_adder!(
     |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
         convert_all_floats!(processor.get_player_boost_level(player_id).unwrap_or(0.0))
     },
-    "boost level"
+    "boost level (raw replay units)"
 );
 
 fn u8_get_f32(v: u8) -> SubtrActorResult<f32> {

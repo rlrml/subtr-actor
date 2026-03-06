@@ -696,7 +696,7 @@ impl<'a> ReplayProcessor<'a> {
     /// actor's boost value hasn't been updated, it continues using the derived
     /// boost value from the last frame. If the actor's boost is active, it
     /// subtracts from the current boost value according to the frame delta and
-    /// the constant `BOOST_USED_PER_SECOND`.
+    /// the constant `BOOST_USED_RAW_UNITS_PER_SECOND`.
     ///
     /// The updated boost values are then stored in the actor's derived
     /// attributes.
@@ -725,7 +725,7 @@ impl<'a> ReplayProcessor<'a> {
                     actor_amount_value.into()
                 };
                 if is_active {
-                    current_value -= frame.delta * BOOST_USED_PER_SECOND;
+                    current_value -= frame.delta * BOOST_USED_RAW_UNITS_PER_SECOND;
                 }
                 (*actor_id, current_value.max(0.0), actor_amount_value)
             })
@@ -1527,6 +1527,10 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
+    /// Returns the player's boost amount in raw replay units (`0.0..=255.0`).
+    ///
+    /// Use [`boost_amount_to_percent`] or [`ReplayProcessor::get_player_boost_percentage`]
+    /// if you need a `0.0..=100.0` percentage value.
     pub fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
         self.get_boost_actor_id(player_id).and_then(|actor_id| {
             let boost_state = self.get_actor_state(&actor_id)?;
@@ -1537,6 +1541,12 @@ impl<'a> ReplayProcessor<'a> {
             )
             .cloned()
         })
+    }
+
+    /// Returns the player's boost amount as a percentage (`0.0..=100.0`).
+    pub fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_player_boost_level(player_id)
+            .map(boost_amount_to_percent)
     }
 
     pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<u8> {

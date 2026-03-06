@@ -128,7 +128,7 @@ pub enum PlayerFrame {
     Data {
         /// The player's rigid body containing position, rotation, and velocity information
         rigid_body: boxcars::RigidBody,
-        /// The player's current boost amount (0.0 to 1.0)
+        /// The player's current boost amount in raw replay units (0.0 to 255.0)
         boost_amount: f32,
         /// Whether the player is actively using boost
         boost_active: bool,
@@ -215,7 +215,7 @@ impl PlayerFrame {
     /// # Arguments
     ///
     /// * `rigid_body` - The player's rigid body physics information
-    /// * `boost_amount` - The player's current boost level (0.0 to 1.0)
+    /// * `boost_amount` - The player's current boost level in raw replay units (0.0 to 255.0)
     /// * `boost_active` - Whether the player is actively using boost
     /// * `jump_active` - Whether the player is actively jumping
     /// * `double_jump_active` - Whether the player is performing a double jump

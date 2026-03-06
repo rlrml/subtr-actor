@@ -215,7 +215,7 @@ Available feature adder strings for customizing data collection:
 
 **Player Features:**
 - `"PlayerRigidBody"` - Player position, velocity, rotation
-- `"PlayerBoost"` - Boost amount and usage
+- `"PlayerBoost"` - Boost amount and usage in raw replay units (`0-255`)
 - `"PlayerAnyJump"` - Jump state
 - `"PlayerDoubleJump"` - Double jump state
 - And many more... (see [subtr-actor documentation](https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html))
