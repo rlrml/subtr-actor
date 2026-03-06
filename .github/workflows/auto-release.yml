@@ -1,0 +1,58 @@
+name: Auto Release on Merge
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  check-and-release:
+    name: Check for version bump and release
+    runs-on: ubuntu-latest
+    # Only run on actual merges, not direct pushes of workflow files
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-release]')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep -m1 'version = "' Cargo.toml | sed 's/.*version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.get_version.outputs.version }} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.get_version.outputs.version }} does not exist"
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.get_version.outputs.version }}" -m "Release v${{ steps.get_version.outputs.version }}"
+          git push origin "v${{ steps.get_version.outputs.version }}"
+          echo "Created and pushed tag v${{ steps.get_version.outputs.version }}"
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_tag.outputs.exists }}" == "true" ]; then
+            echo "### No Release Needed" >> $GITHUB_STEP_SUMMARY
+            echo "Tag v${{ steps.get_version.outputs.version }} already exists." >> $GITHUB_STEP_SUMMARY
+            echo "To trigger a new release, bump the version in Cargo.toml." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Release Triggered" >> $GITHUB_STEP_SUMMARY
+            echo "Created tag v${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "This will trigger the release workflows for JS, Python, and Rust packages." >> $GITHUB_STEP_SUMMARY
+          fi
