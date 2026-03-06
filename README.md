@@ -2,34 +2,36 @@
 
 [![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm](https://img.shields.io/npm/v/rl-replay-subtr-actor?style=flat-square)](https://www.npmjs.com/package/rl-replay-subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
-A powerful Rust library for processing and analyzing Rocket League replay files. Built on top of the [boxcars](https://docs.rs/boxcars/) parser, subtr-actor simplifies the complex actor-based structure of replay files into easy-to-use data formats.
+`subtr-actor` turns Rocket League replay files into data that is easier to work with than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
-## What is subtr-actor?
+It supports two main workflows:
 
-subtr-actor transforms Rocket League replay files into structured data that's perfect for:
+- structured replay data for inspection, export, and analysis
+- dense numeric arrays for ML and other downstream pipelines
 
-- **Data analysis** - Extract detailed player statistics, ball movement, and game events
-- **Machine learning** - Generate training datasets from replay data
-- **Research** - Study player behavior and game dynamics
-- **Visualization** - Create custom replay viewers and analysis tools
+The core crate is written in Rust, with bindings for Python and JavaScript.
 
-## Key Features
+## Packages
 
-- 🚀 **High-performance processing** - Efficiently handles large replay files
-- 📊 **Multiple output formats** - JSON, NumPy arrays, and custom data structures
-- 🎯 **Frame-by-frame precision** - Access every detail of gameplay
-- 🔌 **Language bindings** - Use from JavaScript, Python, or Rust
-- 🧩 **Extensible architecture** - Add custom data extractors and processors
+- Rust: [`subtr-actor`](https://crates.io/crates/subtr-actor)
+- Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
+- JavaScript / WASM: [`rl-replay-subtr-actor`](https://www.npmjs.com/package/rl-replay-subtr-actor)
+
+## What It Gives You
+
+- A higher-level replay model built from `boxcars`
+- Frame-by-frame structured game state via `ReplayDataCollector`
+- Configurable numeric feature extraction via `NDArrayCollector`
+- Frame-rate resampling with `FrameRateDecorator`
+- The same replay-processing model across Rust, Python, and JS
 
 ## Installation
 
 ### Rust
 
-Add to your `Cargo.toml`:
-
 ```toml
 [dependencies]
-subtr-actor = "0.1.8"
+subtr-actor = "0.1.15"
 ```
 
 ### Python
@@ -38,7 +40,7 @@ subtr-actor = "0.1.8"
 pip install subtr-actor-py
 ```
 
-### JavaScript/Node.js
+### JavaScript
 
 ```bash
 npm install rl-replay-subtr-actor
@@ -46,43 +48,40 @@ npm install rl-replay-subtr-actor
 
 ## Quick Start
 
-### Extract JSON data (Rust)
+### Rust: get structured replay data
 
 ```rust
-use subtr_actor::ReplayDataCollector;
 use boxcars::ParserBuilder;
+use subtr_actor::ReplayDataCollector;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load and parse replay file
-    let data = std::fs::read("my_replay.replay")?;
+fn main() -> anyhow::Result<()> {
+    let data = std::fs::read("example.replay")?;
     let replay = ParserBuilder::new(&data)
         .must_parse_network_data()
+        .on_error_check_crc()
         .parse()?;
 
-    // Extract structured data
-    let collector = ReplayDataCollector::new();
-    let replay_data = collector.get_replay_data(&replay)?;
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .map_err(|e| e.variant)?;
 
-    // Convert to JSON
-    let json = replay_data.as_json()?;
-    println!("{}", json);
-
+    println!("{}", replay_data.as_json()?);
     Ok(())
 }
 ```
 
-### Generate ML training data (Rust)
+### Rust: build an ndarray for ML
 
 ```rust
 use subtr_actor::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = std::fs::read("my_replay.replay")?;
-    let replay = ParserBuilder::new(&data)
+fn main() -> anyhow::Result<()> {
+    let data = std::fs::read("example.replay")?;
+    let replay = boxcars::ParserBuilder::new(&data)
         .must_parse_network_data()
+        .on_error_check_crc()
         .parse()?;
 
-    // Configure data extraction
     let mut collector = NDArrayCollector::new(
         vec![
             InterpolatedBallRigidBodyNoVelocities::arc_new(0.003),
@@ -95,177 +94,99 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     );
 
-    // Process at 30 FPS
     FrameRateDecorator::new_from_fps(30.0, &mut collector)
-        .process_replay(&replay)?;
+        .process_replay(&replay)
+        .map_err(|e| e.variant)?;
 
-    let (meta, array) = collector.get_meta_and_ndarray()?;
-    println!("Generated {}×{} training matrix", array.nrows(), array.ncols());
-
+    let (meta, array) = collector.get_meta_and_ndarray().map_err(|e| e.variant)?;
+    println!("rows={} cols={}", array.nrows(), array.ncols());
+    println!("players={}", meta.replay_meta.player_stats.len());
     Ok(())
 }
 ```
 
-### Python Example
+### Python
 
 ```python
-import subtr_actor_py
+import subtr_actor
 
-# Load replay and extract data
-with open("my_replay.replay", "rb") as f:
-    replay_data = f.read()
+meta, ndarray = subtr_actor.get_ndarray_with_info_from_replay_filepath(
+    "example.replay",
+    global_feature_adders=["BallRigidBody"],
+    player_feature_adders=["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
+    fps=10.0,
+    dtype="float32",
+)
 
-result = subtr_actor_py.get_replay_data(replay_data)
-print(f"Found {len(result['players'])} players")
+print(ndarray.shape)
+print(meta["column_headers"]["player_headers"][:5])
 ```
 
-### JavaScript Example
+### JavaScript
 
 ```javascript
-import * as subtrActor from 'rl-replay-subtr-actor';
+import init, { get_ndarray_with_info } from 'rl-replay-subtr-actor';
 
-// Load replay file
-const replayData = await fetch('my_replay.replay')
-    .then(r => r.arrayBuffer())
-    .then(buffer => new Uint8Array(buffer));
+await init();
 
-// Extract structured data
-const result = subtrActor.get_replay_data(replayData);
-console.log(`Replay duration: ${result.duration} seconds`);
+const replayData = new Uint8Array(await fetch('example.replay').then((r) => r.arrayBuffer()));
+const result = get_ndarray_with_info(
+  replayData,
+  ['BallRigidBody'],
+  ['PlayerRigidBody', 'PlayerBoost', 'PlayerAnyJump'],
+  10.0
+);
+
+console.log(result.shape);
+console.log(result.metadata.column_headers.player_headers.slice(0, 5));
 ```
 
 ## Core Concepts
 
-### ReplayProcessor
-The heart of subtr-actor's processing pipeline. It handles the complex task of navigating through replay frames and maintaining game state.
+### `ReplayDataCollector`
 
-### Collectors
-Pluggable data extractors that define what information to extract from replays:
+Use this when you want a serializable, frame-by-frame representation of the replay without dealing directly with the low-level actor graph.
 
-- **`ReplayDataCollector`** - Extracts comprehensive replay data as JSON-serializable structures
-- **`NDArrayCollector`** - Generates numerical arrays perfect for machine learning
-- **Custom collectors** - Implement the `Collector` trait for specialized data extraction
+### `NDArrayCollector`
 
-### Feature Adders
-Configurable extractors that specify exactly what data to capture:
+Use this when you want numeric features in a 2D matrix. You choose which global and player features to include, either by constructing feature adders directly in Rust or by referring to them by string names in bindings.
 
-- **Global features** - Ball position, game time, score
-- **Player features** - Position, boost, controls, team info
-- **Custom features** - Implement `FeatureAdder` or `PlayerFeatureAdder` traits
+### `FrameRateDecorator`
 
-## Advanced Usage
+Use this to resample replay processing to a fixed FPS before collecting data.
 
-### Custom Feature Extraction
+## Common Feature Names
 
-```rust
-use subtr_actor::*;
+These are useful when working through the Python or JavaScript bindings:
 
-// Create custom feature adders
-build_global_feature_adder!(
-    CustomBallFeature,
-    f32,
-    3, // Output 3 values
-    |processor, _time| {
-        // Extract custom ball data
-        let ball_data = processor.get_ball_data();
-        Ok(vec![ball_data.x, ball_data.y, ball_data.z])
-    }
-);
-```
+- Global: `BallRigidBody`, `CurrentTime`, `SecondsRemaining`
+- Player: `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerDoubleJump`
 
-### Frame Rate Control
+`PlayerBoost` is exposed in raw replay units (`0-255`), not percentage.
 
-```rust
-// Process at custom frame rate
-let mut collector = ReplayDataCollector::new();
-FrameRateDecorator::new_from_fps(60.0, &mut collector)
-    .process_replay(&replay)?;
-```
+## Documentation
 
-### String-based Configuration
+- Rust API docs: <https://docs.rs/subtr-actor>
+- Python package README: [python/README.md](./python/README.md)
+- JavaScript package README: [js/README.md](./js/README.md)
+- Release notes and process: [RELEASING.md](./RELEASING.md)
 
-Useful for language bindings or configuration files:
-
-```rust
-let collector = NDArrayCollector::<f32>::from_strings(
-    &["BallRigidBody", "CurrentTime"],
-    &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]
-)?;
-```
-
-## Data Structures
-
-### ReplayData
-```rust
-pub struct ReplayData {
-    pub frame_data: FrameData,      // Frame-by-frame game data
-    pub meta: ReplayMeta,           // Player info, game settings
-    pub demolish_infos: Vec<DemolishInfo>, // Demolition events
-}
-```
-
-### FrameData
-```rust
-pub struct FrameData {
-    pub ball_data: BallData,        // Ball position/physics over time
-    pub players: Vec<(PlayerId, PlayerData)>, // Player data by ID
-    pub metadata_frames: Vec<MetadataFrame>,  // Game state metadata
-}
-```
-
-## Language Bindings
-
-### Python (`subtr-actor-py`)
-- Full API access through Python functions
-- NumPy integration for data analysis
-- Ideal for data science workflows
-
-### JavaScript (`rl-replay-subtr-actor`)
-- WebAssembly-based for high performance
-- Works in browsers and Node.js
-- Perfect for web applications
-
-## Performance Tips
-
-1. **Use appropriate frame rates** - Higher FPS = more data but slower processing
-2. **Select only needed features** - Fewer feature adders = faster processing
-3. **Batch processing** - Process multiple replays in parallel
-4. **Memory management** - Consider streaming for very large datasets
-
-## Contributing
-
-We welcome contributions! Please check our [issues](https://github.com/rlrml/subtr-actor/issues) for ways to help.
-
-### Development Setup
+## Development
 
 ```bash
-git clone https://github.com/rlrml/subtr-actor.git
-cd subtr-actor
-cargo build
-cargo test
+just build
+just test
+just fmt
+just clippy
 ```
 
-### Building Language Bindings
+Bindings:
 
 ```bash
-# Python
-cd python && poetry build
-
-# JavaScript
-cd js && npm run build
+just build-python
+just build-js
 ```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Related Projects
-
-- [boxcars](https://github.com/nickbabcock/boxcars) - The underlying replay parser
-- [ballchasing.com](https://ballchasing.com/) - Replay analysis platform
-
-## Support
-
-- 📚 [Documentation](https://docs.rs/subtr-actor)
-- 🐛 [Issue Tracker](https://github.com/rlrml/subtr-actor/issues)
-- 💬 [Discussions](https://github.com/rlrml/subtr-actor/discussions)
+MIT
