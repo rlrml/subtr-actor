@@ -50,7 +50,7 @@ Option B: **API Token**
 
 ### 1. Update Version Numbers
 
-Update the version in all three places:
+Update the version everywhere release metadata is sourced:
 
 ```bash
 # Cargo.toml (workspace.package.version)
@@ -59,8 +59,15 @@ sed -i 's/version = "0.1.10"/version = "0.1.11"/' Cargo.toml
 # python/pyproject.toml
 sed -i 's/version = "0.1.10"/version = "0.1.11"/' python/pyproject.toml
 
+# python/Cargo.toml and js/Cargo.toml dependency constraints
+sed -i '/\\[dependencies\\.subtr-actor\\]/,/^\\[/{s/version = "0.1.10"/version = "0.1.11"/}' python/Cargo.toml
+sed -i '/\\[dependencies\\.subtr-actor\\]/,/^\\[/{s/version = "0.1.10"/version = "0.1.11"/}' js/Cargo.toml
+
 # js/package.json
 sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/package.json
+
+# Cargo.lock
+cargo metadata --format-version 1 >/dev/null
 ```
 
 Or use the justfile helper:
@@ -71,7 +78,7 @@ just bump 0.1.11
 ### 2. Commit and Tag
 
 ```bash
-git add Cargo.toml python/pyproject.toml js/package.json
+git add Cargo.toml Cargo.lock python/pyproject.toml python/Cargo.toml js/package.json js/Cargo.toml
 git commit -m "Release v0.1.11"
 git tag v0.1.11
 git push origin master --tags

@@ -14,10 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check release metadata consistency
+        run: python3 scripts/check_release_versions.py
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      - name: Check lockfile
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh

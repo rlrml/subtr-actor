@@ -92,6 +92,11 @@ jobs:
       id-token: write  # For trusted publishing
 
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Check release metadata consistency
+        run: python3 scripts/check_release_versions.py
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:

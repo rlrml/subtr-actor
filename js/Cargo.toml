@@ -21,7 +21,7 @@ boxcars = "0.10.10"
 
 [dependencies.subtr-actor]
 path = ".."
-version = "0.1.14"
+version = "0.1.15"
 
 [dependencies.web-sys]
 version = "0.3.85"

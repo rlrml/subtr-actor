@@ -20,6 +20,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check release metadata consistency
+        run: python3 scripts/check_release_versions.py
+
+      - name: Check lockfile
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
       - name: Get version from Cargo.toml
         id: get_version
         run: |

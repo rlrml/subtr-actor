@@ -21,6 +21,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Check release metadata consistency
+        run: python3 scripts/check_release_versions.py
+
+      - name: Check lockfile
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
       - name: Preflight crates.io publish
         id: preflight
         shell: bash

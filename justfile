@@ -68,6 +68,7 @@ bump version:
     sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/package.json
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' js/Cargo.toml
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' python/Cargo.toml
+    cargo metadata --format-version 1 > /dev/null
     git add -A
     git commit -m "Bump version to {{version}}"
     git tag -a "v{{version}}" -m "Release v{{version}}"
