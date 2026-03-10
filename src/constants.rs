@@ -38,6 +38,7 @@ pub static REPLICATED_SCORED_ON_TEAM_KEY: &str =
 pub static RIGID_BODY_STATE_KEY: &str = "TAGame.RBActor_TA:ReplicatedRBState";
 pub static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
 pub static TEAM_GAME_SCORE_KEY: &str = "TAGame.Team_Soccar_TA:GameScore";
+pub static TEAM_INFO_SCORE_KEY: &str = "Engine.TeamInfo:Score";
 pub static REPLICATED_STATE_NAME_KEY: &str = "TAGame.GameEvent_TA:ReplicatedStateName";
 pub static REPLICATED_GAME_STATE_TIME_REMAINING_KEY: &str =
     "TAGame.GameEvent_TA:ReplicatedGameStateTimeRemaining";

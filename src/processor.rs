@@ -1137,7 +1137,9 @@ impl<'a> ReplayProcessor<'a> {
                 Ok(1) => true,
                 _ => continue,
             };
-            let observed_scores = self.get_team_scores().ok();
+            let observed_scores = self
+                .goal_score_tuple_from_frame(frame, scoring_team_is_team_0)
+                .or_else(|| self.get_team_scores().ok());
             let scorer = self.goal_scorer_from_frame(frame, scoring_team_is_team_0);
 
             if self.goal_event_is_duplicate(
@@ -1214,6 +1216,48 @@ impl<'a> ReplayProcessor<'a> {
             .count() as i32
             + i32::from(!scoring_team_is_team_0);
         (Some(team_zero_goals), Some(team_one_goals))
+    }
+
+    fn goal_score_tuple_from_frame(
+        &self,
+        frame: &boxcars::Frame,
+        scoring_team_is_team_0: bool,
+    ) -> Option<(i32, i32)> {
+        let team_zero_actor_id = self.get_team_actor_id_for_side(true).ok()?;
+        let team_one_actor_id = self.get_team_actor_id_for_side(false).ok()?;
+        let team_game_score_key = self
+            .get_object_id_for_key(TEAM_GAME_SCORE_KEY)
+            .ok()
+            .copied();
+        let team_info_score_key = self
+            .get_object_id_for_key(TEAM_INFO_SCORE_KEY)
+            .ok()
+            .copied();
+        let (Some(mut team_zero_score), Some(mut team_one_score)) =
+            self.derived_goal_score_tuple(scoring_team_is_team_0)
+        else {
+            return None;
+        };
+        let mut saw_score_update = false;
+
+        for update in &frame.updated_actors {
+            let is_score_update = Some(update.object_id) == team_game_score_key
+                || Some(update.object_id) == team_info_score_key;
+            if !is_score_update {
+                continue;
+            }
+            let boxcars::Attribute::Int(score) = update.attribute else {
+                continue;
+            };
+            saw_score_update = true;
+            if update.actor_id == team_zero_actor_id {
+                team_zero_score = score;
+            } else if update.actor_id == team_one_actor_id {
+                team_one_score = score;
+            }
+        }
+
+        saw_score_update.then_some((team_zero_score, team_one_score))
     }
 
     fn goal_scorer_from_frame(
