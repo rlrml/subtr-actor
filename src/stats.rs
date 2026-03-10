@@ -79,6 +79,7 @@ pub struct StatsSample {
     pub active_demos: Vec<DemoEventSample>,
     pub boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
+    pub player_stat_events: Vec<PlayerStatEvent>,
     pub goal_events: Vec<GoalEvent>,
 }
 
@@ -174,6 +175,7 @@ impl StatsSample {
             active_demos,
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
             touch_events: processor.current_frame_touch_events().to_vec(),
+            player_stat_events: processor.current_frame_player_stat_events().to_vec(),
             goal_events: processor.current_frame_goal_events().to_vec(),
         })
     }
@@ -807,7 +809,7 @@ impl CoreTeamStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum TimelineEventKind {
     Goal,
     Shot,
@@ -936,6 +938,24 @@ impl StatsReducer for MatchStatsReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         self.pending_goal_events
             .extend(sample.goal_events.iter().cloned());
+        let mut processor_event_counts: HashMap<(PlayerId, TimelineEventKind), i32> =
+            HashMap::new();
+        for event in &sample.player_stat_events {
+            let kind = match event.kind {
+                PlayerStatEventKind::Shot => TimelineEventKind::Shot,
+                PlayerStatEventKind::Save => TimelineEventKind::Save,
+                PlayerStatEventKind::Assist => TimelineEventKind::Assist,
+            };
+            self.timeline.push(TimelineEvent {
+                time: event.time,
+                kind,
+                player_id: Some(event.player.clone()),
+                is_team_0: Some(event.is_team_0),
+            });
+            *processor_event_counts
+                .entry((event.player.clone(), kind))
+                .or_default() += 1;
+        }
 
         for player in &sample.players {
             self.player_teams
@@ -963,32 +983,47 @@ impl StatsReducer for MatchStatsReducer {
             let save_delta = current_stats.saves - previous_stats.saves;
             let assist_delta = current_stats.assists - previous_stats.assists;
             let goal_delta = current_stats.goals - previous_stats.goals;
+            let shot_fallback_delta = shot_delta
+                - processor_event_counts
+                    .get(&(player.player_id.clone(), TimelineEventKind::Shot))
+                    .copied()
+                    .unwrap_or(0);
+            let save_fallback_delta = save_delta
+                - processor_event_counts
+                    .get(&(player.player_id.clone(), TimelineEventKind::Save))
+                    .copied()
+                    .unwrap_or(0);
+            let assist_fallback_delta = assist_delta
+                - processor_event_counts
+                    .get(&(player.player_id.clone(), TimelineEventKind::Assist))
+                    .copied()
+                    .unwrap_or(0);
 
-            if shot_delta > 0 {
+            if shot_fallback_delta > 0 {
                 self.emit_timeline_events(
                     sample.time,
                     TimelineEventKind::Shot,
                     &player.player_id,
                     player.is_team_0,
-                    shot_delta,
+                    shot_fallback_delta,
                 );
             }
-            if save_delta > 0 {
+            if save_fallback_delta > 0 {
                 self.emit_timeline_events(
                     sample.time,
                     TimelineEventKind::Save,
                     &player.player_id,
                     player.is_team_0,
-                    save_delta,
+                    save_fallback_delta,
                 );
             }
-            if assist_delta > 0 {
+            if assist_fallback_delta > 0 {
                 self.emit_timeline_events(
                     sample.time,
                     TimelineEventKind::Assist,
                     &player.player_id,
                     player.is_team_0,
-                    assist_delta,
+                    assist_fallback_delta,
                 );
             }
             if goal_delta > 0 {

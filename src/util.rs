@@ -117,6 +117,22 @@ pub struct GoalEvent {
     pub team_one_score: Option<i32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum PlayerStatEventKind {
+    Shot,
+    Save,
+    Assist,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PlayerStatEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub kind: PlayerStatEventKind,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TouchEvent {
     pub time: f32,
@@ -353,19 +369,16 @@ pub(crate) fn touch_candidate_rank(
         return None;
     }
 
-    let relative_velocity = vec_to_glam(
-        &player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+    let relative_velocity =
+        vec_to_glam(&player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
             x: 0.0,
             y: 0.0,
             z: 0.0,
-        }),
-    ) - vec_to_glam(
-        &ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+        })) - vec_to_glam(&ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
             x: 0.0,
             y: 0.0,
             z: 0.0,
-        }),
-    );
+        }));
     let relative_speed_squared = relative_velocity.length_squared();
     let closest_time = if relative_speed_squared > f32::EPSILON {
         (-relative_position.dot(relative_velocity) / relative_speed_squared)

@@ -177,6 +177,25 @@ fn test_processor_extracts_exact_goal_events() {
             .any(|event| event.player.is_some()),
         "Expected at least some exact goal events to resolve a scorer directly from frame updates"
     );
+    let goal_scores: Vec<(i32, i32)> = processor
+        .goal_events
+        .iter()
+        .filter_map(|event| event.team_zero_score.zip(event.team_one_score))
+        .collect();
+    assert_eq!(
+        goal_scores.len(),
+        processor.goal_events.len(),
+        "Expected exact goal events in rlcs.replay to carry score tuples for score-aware dedupe"
+    );
+    for window in goal_scores.windows(2) {
+        let previous_total = window[0].0 + window[0].1;
+        let current_total = window[1].0 + window[1].1;
+        assert_eq!(
+            current_total,
+            previous_total + 1,
+            "Expected deduplicated goal events to advance the total score by exactly one"
+        );
+    }
 }
 
 #[test]
@@ -209,6 +228,72 @@ fn test_processor_extracts_touch_events() {
 }
 
 #[test]
+fn test_processor_extracts_player_stat_events() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for player stat events");
+
+    let replay_meta = processor
+        .get_replay_meta()
+        .expect("Expected replay metadata after processing");
+    let total_shots = replay_meta
+        .player_order()
+        .filter_map(|player| player.stats.as_ref())
+        .filter_map(|stats| match stats.get("Shots") {
+            Some(boxcars::HeaderProp::Int(value)) => Some(*value),
+            _ => None,
+        })
+        .sum::<i32>() as usize;
+    let total_saves = replay_meta
+        .player_order()
+        .filter_map(|player| player.stats.as_ref())
+        .filter_map(|stats| match stats.get("Saves") {
+            Some(boxcars::HeaderProp::Int(value)) => Some(*value),
+            _ => None,
+        })
+        .sum::<i32>() as usize;
+    let total_assists = replay_meta
+        .player_order()
+        .filter_map(|player| player.stats.as_ref())
+        .filter_map(|stats| match stats.get("Assists") {
+            Some(boxcars::HeaderProp::Int(value)) => Some(*value),
+            _ => None,
+        })
+        .sum::<i32>() as usize;
+
+    assert_eq!(
+        processor
+            .player_stat_events
+            .iter()
+            .filter(|event| event.kind == PlayerStatEventKind::Shot)
+            .count(),
+        total_shots,
+        "Expected one emitted shot event per replay-header shot"
+    );
+    assert_eq!(
+        processor
+            .player_stat_events
+            .iter()
+            .filter(|event| event.kind == PlayerStatEventKind::Save)
+            .count(),
+        total_saves,
+        "Expected one emitted save event per replay-header save"
+    );
+    assert_eq!(
+        processor
+            .player_stat_events
+            .iter()
+            .filter(|event| event.kind == PlayerStatEventKind::Assist)
+            .count(),
+        total_assists,
+        "Expected one emitted assist event per replay-header assist"
+    );
+}
+
+#[test]
 fn test_touch_attribution_usually_matches_goal_scorer() {
     let replay = parse_replay("assets/replays/test/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
@@ -219,7 +304,11 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
 
     let mut matched = 0usize;
     let mut total_with_scorer = 0usize;
-    for goal_event in processor.goal_events.iter().filter(|event| event.player.is_some()) {
+    for goal_event in processor
+        .goal_events
+        .iter()
+        .filter(|event| event.player.is_some())
+    {
         total_with_scorer += 1;
         let last_touch = processor.touch_events.iter().rev().find(|touch| {
             touch.frame <= goal_event.frame

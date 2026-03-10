@@ -105,6 +105,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -128,6 +129,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -151,6 +153,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -252,6 +255,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -277,6 +281,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: vec![GoalEvent {
                 time: 1.25,
                 frame: 2,
@@ -322,6 +327,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -349,6 +355,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: vec![GoalEvent {
                 time: 1.5,
                 frame: 2,
@@ -367,6 +374,101 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
         .expect("Expected a goal timeline event");
     assert_eq!(goal_event.player_id.as_ref(), Some(&scorer));
     assert!((goal_event.time - 1.5).abs() < 0.001);
+}
+
+#[test]
+fn test_match_stats_reducer_prefers_processor_stat_events_without_double_counting() {
+    let player_id = epic_id("stat-event-player");
+    let mut reducer = MatchStatsReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![sample_player(player_id.clone(), true)],
+            active_demos: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                match_shots: Some(1),
+                match_saves: Some(1),
+                match_assists: Some(1),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: vec![
+                PlayerStatEvent {
+                    time: 1.5,
+                    frame: 2,
+                    player: player_id.clone(),
+                    is_team_0: true,
+                    kind: PlayerStatEventKind::Shot,
+                },
+                PlayerStatEvent {
+                    time: 1.6,
+                    frame: 2,
+                    player: player_id.clone(),
+                    is_team_0: true,
+                    kind: PlayerStatEventKind::Save,
+                },
+                PlayerStatEvent {
+                    time: 1.7,
+                    frame: 2,
+                    player: player_id.clone(),
+                    is_team_0: true,
+                    kind: PlayerStatEventKind::Assist,
+                },
+            ],
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let shot_events = reducer
+        .timeline()
+        .iter()
+        .filter(|event| event.kind == TimelineEventKind::Shot)
+        .count();
+    let save_events = reducer
+        .timeline()
+        .iter()
+        .filter(|event| event.kind == TimelineEventKind::Save)
+        .count();
+    let assist_events = reducer
+        .timeline()
+        .iter()
+        .filter(|event| event.kind == TimelineEventKind::Assist)
+        .count();
+
+    assert_eq!(shot_events, 1);
+    assert_eq!(save_events, 1);
+    assert_eq!(assist_events, 1);
 }
 
 #[test]
@@ -414,6 +516,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -437,6 +540,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -460,6 +564,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -600,6 +705,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
                 team_is_team_0: true,
                 player: Some(team_zero_id.clone()),
             }],
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -620,6 +726,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -645,6 +752,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
                 team_is_team_0: false,
                 player: Some(team_one_id.clone()),
             }],
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -665,6 +773,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -729,6 +838,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -752,6 +862,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -775,6 +886,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -832,6 +944,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -885,6 +998,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -938,6 +1052,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -980,6 +1095,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1010,6 +1126,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1057,6 +1174,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1087,6 +1205,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1144,6 +1263,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1197,6 +1317,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1250,6 +1371,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1308,6 +1430,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1361,6 +1484,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1414,6 +1538,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1446,6 +1571,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1465,6 +1591,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1503,6 +1630,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
                 team_is_team_0: true,
                 player: Some(team_zero.player_id.clone()),
             }],
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1523,6 +1651,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1548,6 +1677,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
                 team_is_team_0: false,
                 player: Some(team_one.player_id.clone()),
             }],
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1568,6 +1698,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             active_demos: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
         .unwrap();
@@ -1606,6 +1737,7 @@ fn test_demo_reducer_counts_events_and_dedupes_consecutive_frames() {
                 }],
                 boost_pad_events: Vec::new(),
                 touch_events: Vec::new(),
+                player_stat_events: Vec::new(),
                 goal_events: Vec::new(),
             })
             .unwrap();

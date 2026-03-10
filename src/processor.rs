@@ -165,6 +165,9 @@ pub struct ReplayProcessor<'a> {
     current_frame_touch_events: Vec<TouchEvent>,
     pub goal_events: Vec<GoalEvent>,
     current_frame_goal_events: Vec<GoalEvent>,
+    pub player_stat_events: Vec<PlayerStatEvent>,
+    current_frame_player_stat_events: Vec<PlayerStatEvent>,
+    player_stat_counters: HashMap<(PlayerId, PlayerStatEventKind), i32>,
     pub demolishes: Vec<DemolishInfo>,
     known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
@@ -214,6 +217,9 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_touch_events: Vec::new(),
             goal_events: Vec::new(),
             current_frame_goal_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            current_frame_player_stat_events: Vec::new(),
+            player_stat_counters: HashMap::new(),
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
             demolish_format: None,
@@ -269,6 +275,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
             self.update_goal_events(frame, index)?;
+            self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
 
             // Get the time to process for this frame. If target_time is set to
@@ -324,6 +331,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
             self.update_goal_events(frame, index)?;
+            self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
 
             for collector in collectors.iter_mut() {
@@ -350,6 +358,9 @@ impl<'a> ReplayProcessor<'a> {
         self.current_frame_touch_events = Vec::new();
         self.goal_events = Vec::new();
         self.current_frame_goal_events = Vec::new();
+        self.player_stat_events = Vec::new();
+        self.current_frame_player_stat_events = Vec::new();
+        self.player_stat_counters = HashMap::new();
         self.demolishes = Vec::new();
         self.known_demolishes = Vec::new();
         self.demolish_format = None;
@@ -1039,7 +1050,9 @@ impl<'a> ReplayProcessor<'a> {
     ) -> Option<PlayerId> {
         const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
 
-        let ball_rigid_body = self.get_velocity_applied_ball_rigid_body(target_time).ok()?;
+        let ball_rigid_body = self
+            .get_velocity_applied_ball_rigid_body(target_time)
+            .ok()?;
         self.iter_player_ids_in_order()
             .filter(|player_id| {
                 self.get_player_is_team_0(player_id).ok() == Some(touch_team_is_team_0)
@@ -1097,8 +1110,6 @@ impl<'a> ReplayProcessor<'a> {
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
-        const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
-
         self.current_frame_goal_events.clear();
 
         let ball_explosion_data = self
@@ -1126,23 +1137,20 @@ impl<'a> ReplayProcessor<'a> {
                 Ok(1) => true,
                 _ => continue,
             };
-            let (team_zero_score, team_one_score) = self
-                .get_team_scores()
-                .map(|(team_zero, team_one)| (Some(team_zero), Some(team_one)))
-                .unwrap_or((None, None));
+            let observed_scores = self.get_team_scores().ok();
             let scorer = self.goal_scorer_from_frame(frame, scoring_team_is_team_0);
 
-            if self
-                .goal_events
-                .last()
-                .map(|event| {
-                    event.scoring_team_is_team_0 == scoring_team_is_team_0
-                        && (frame.time - event.time).abs() <= GOAL_EVENT_DEDUPE_WINDOW_SECONDS
-                })
-                .unwrap_or(false)
-            {
+            if self.goal_event_is_duplicate(
+                frame.time,
+                scoring_team_is_team_0,
+                observed_scores.map(|scores| scores.0),
+                observed_scores.map(|scores| scores.1),
+            ) {
                 continue;
             }
+            let (team_zero_score, team_one_score) = observed_scores
+                .map(|(team_zero, team_one)| (Some(team_zero), Some(team_one)))
+                .unwrap_or_else(|| self.derived_goal_score_tuple(scoring_team_is_team_0));
 
             let event = GoalEvent {
                 time: frame.time,
@@ -1157,6 +1165,55 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         Ok(())
+    }
+
+    fn goal_event_is_duplicate(
+        &self,
+        frame_time: f32,
+        scoring_team_is_team_0: bool,
+        team_zero_score: Option<i32>,
+        team_one_score: Option<i32>,
+    ) -> bool {
+        const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
+
+        self.goal_events
+            .last()
+            .map(|event| {
+                match (
+                    team_zero_score,
+                    team_one_score,
+                    event.team_zero_score,
+                    event.team_one_score,
+                ) {
+                    (
+                        Some(team_zero),
+                        Some(team_one),
+                        Some(prev_team_zero),
+                        Some(prev_team_one),
+                    ) => team_zero == prev_team_zero && team_one == prev_team_one,
+                    _ => {
+                        event.scoring_team_is_team_0 == scoring_team_is_team_0
+                            && (frame_time - event.time).abs() <= GOAL_EVENT_DEDUPE_WINDOW_SECONDS
+                    }
+                }
+            })
+            .unwrap_or(false)
+    }
+
+    fn derived_goal_score_tuple(&self, scoring_team_is_team_0: bool) -> (Option<i32>, Option<i32>) {
+        let team_zero_goals = self
+            .goal_events
+            .iter()
+            .filter(|event| event.scoring_team_is_team_0)
+            .count() as i32
+            + i32::from(scoring_team_is_team_0);
+        let team_one_goals = self
+            .goal_events
+            .iter()
+            .filter(|event| !event.scoring_team_is_team_0)
+            .count() as i32
+            + i32::from(!scoring_team_is_team_0);
+        (Some(team_zero_goals), Some(team_one_goals))
     }
 
     fn goal_scorer_from_frame(
@@ -1180,6 +1237,59 @@ impl<'a> ReplayProcessor<'a> {
             })
             .max_by_key(|(_, goals)| *goals)
             .map(|(player_id, _)| player_id)
+    }
+
+    fn update_player_stat_events(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        self.current_frame_player_stat_events.clear();
+        let match_shots_key = self.get_object_id_for_key(MATCH_SHOTS_KEY).ok().copied();
+        let match_saves_key = self.get_object_id_for_key(MATCH_SAVES_KEY).ok().copied();
+        let match_assists_key = self.get_object_id_for_key(MATCH_ASSISTS_KEY).ok().copied();
+
+        for update in &frame.updated_actors {
+            let (kind, new_value) = match update.attribute {
+                boxcars::Attribute::Int(value) if Some(update.object_id) == match_shots_key => {
+                    (PlayerStatEventKind::Shot, value)
+                }
+                boxcars::Attribute::Int(value) if Some(update.object_id) == match_saves_key => {
+                    (PlayerStatEventKind::Save, value)
+                }
+                boxcars::Attribute::Int(value) if Some(update.object_id) == match_assists_key => {
+                    (PlayerStatEventKind::Assist, value)
+                }
+                _ => continue,
+            };
+            let Some(player_id) = self.get_player_id_from_actor_id(&update.actor_id).ok() else {
+                continue;
+            };
+            let Ok(is_team_0) = self.get_player_is_team_0(&player_id) else {
+                continue;
+            };
+            let previous_value = self
+                .player_stat_counters
+                .get(&(player_id.clone(), kind))
+                .copied()
+                .unwrap_or(0);
+            let delta = new_value - previous_value;
+            self.player_stat_counters
+                .insert((player_id.clone(), kind), new_value);
+            for _ in 0..delta.max(0) {
+                let event = PlayerStatEvent {
+                    time: frame.time,
+                    frame: frame_index,
+                    player: player_id.clone(),
+                    is_team_0,
+                    kind,
+                };
+                self.current_frame_player_stat_events.push(event.clone());
+                self.player_stat_events.push(event);
+            }
+        }
+
+        Ok(())
     }
 
     fn try_push_demolish(
@@ -1287,6 +1397,10 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn current_frame_goal_events(&self) -> &[GoalEvent] {
         &self.current_frame_goal_events
+    }
+
+    pub fn current_frame_player_stat_events(&self) -> &[PlayerStatEvent] {
+        &self.current_frame_player_stat_events
     }
 
     /// Detects which demolition format this replay uses by checking car actor attributes.
