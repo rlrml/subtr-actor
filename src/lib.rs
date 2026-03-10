@@ -169,6 +169,7 @@
 //! ```
 
 pub mod actor_state;
+pub mod ballchasing;
 pub mod collector;
 pub mod constants;
 pub mod error;

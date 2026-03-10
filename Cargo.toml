@@ -29,6 +29,7 @@ glam = "0.31.0"
 log = "0.4.27"
 ndarray = "0.17.2"
 paste = "1.0.15"
+reqwest = { version = "0.12.15", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.140"
 thiserror = "2.0.12"
