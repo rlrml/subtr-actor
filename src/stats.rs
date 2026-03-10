@@ -77,6 +77,7 @@ pub struct StatsSample {
     pub ball: Option<BallSample>,
     pub players: Vec<PlayerSample>,
     pub active_demos: Vec<DemoEventSample>,
+    pub demo_events: Vec<DemolishInfo>,
     pub boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
     pub player_stat_events: Vec<PlayerStatEvent>,
@@ -173,6 +174,7 @@ impl StatsSample {
             ball,
             players,
             active_demos,
+            demo_events: Vec::new(),
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
             touch_events: processor.current_frame_touch_events().to_vec(),
             player_stat_events: processor.current_frame_player_stat_events().to_vec(),
@@ -235,6 +237,7 @@ pub struct ReducerCollector<R> {
     reducer: R,
     last_sample_time: Option<f32>,
     replay_meta_initialized: bool,
+    last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
     last_player_stat_event_count: usize,
@@ -247,6 +250,7 @@ impl<R> ReducerCollector<R> {
             reducer,
             last_sample_time: None,
             replay_meta_initialized: false,
+            last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
             last_player_stat_event_count: 0,
@@ -292,6 +296,8 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
         let mut sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        sample.active_demos.clear();
+        sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
         sample.boost_pad_events =
             processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
         sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
@@ -300,6 +306,7 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
         sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
         self.reducer.on_sample(&sample)?;
         self.last_sample_time = Some(current_time);
+        self.last_demolish_count = processor.demolishes.len();
         self.last_boost_pad_event_count = processor.boost_pad_events.len();
         self.last_touch_event_count = processor.touch_events.len();
         self.last_player_stat_event_count = processor.player_stat_events.len();
@@ -1171,41 +1178,65 @@ impl StatsReducer for DemoReducer {
                 .insert(player.player_id.clone(), player.is_team_0);
         }
 
+        if !sample.demo_events.is_empty() {
+            for demo in &sample.demo_events {
+                self.record_demo(&demo.attacker, &demo.victim, demo.time, demo.frame);
+            }
+            return Ok(());
+        }
+
         for demo in &sample.active_demos {
-            if !self.should_count_demo(&demo.attacker, &demo.victim, sample.frame_number) {
-                continue;
-            }
-
-            self.player_stats
-                .entry(demo.attacker.clone())
-                .or_default()
-                .demos_inflicted += 1;
-            self.player_stats
-                .entry(demo.victim.clone())
-                .or_default()
-                .demos_taken += 1;
-
-            match self.player_teams.get(&demo.attacker).copied() {
-                Some(true) => self.team_zero_stats.demos_inflicted += 1,
-                Some(false) => self.team_one_stats.demos_inflicted += 1,
-                None => {}
-            }
-
-            self.timeline.push(TimelineEvent {
-                time: sample.time,
-                kind: TimelineEventKind::Kill,
-                player_id: Some(demo.attacker.clone()),
-                is_team_0: self.player_teams.get(&demo.attacker).copied(),
-            });
-            self.timeline.push(TimelineEvent {
-                time: sample.time,
-                kind: TimelineEventKind::Death,
-                player_id: Some(demo.victim.clone()),
-                is_team_0: self.player_teams.get(&demo.victim).copied(),
-            });
+            self.record_demo(
+                &demo.attacker,
+                &demo.victim,
+                sample.time,
+                sample.frame_number,
+            );
         }
 
         Ok(())
+    }
+}
+
+impl DemoReducer {
+    fn record_demo(
+        &mut self,
+        attacker: &PlayerId,
+        victim: &PlayerId,
+        time: f32,
+        frame_number: usize,
+    ) {
+        if !self.should_count_demo(attacker, victim, frame_number) {
+            return;
+        }
+
+        self.player_stats
+            .entry(attacker.clone())
+            .or_default()
+            .demos_inflicted += 1;
+        self.player_stats
+            .entry(victim.clone())
+            .or_default()
+            .demos_taken += 1;
+
+        match self.player_teams.get(attacker).copied() {
+            Some(true) => self.team_zero_stats.demos_inflicted += 1,
+            Some(false) => self.team_one_stats.demos_inflicted += 1,
+            None => {}
+        }
+
+        self.timeline.push(TimelineEvent {
+            time,
+            kind: TimelineEventKind::Kill,
+            player_id: Some(attacker.clone()),
+            is_team_0: self.player_teams.get(attacker).copied(),
+        });
+        self.timeline.push(TimelineEvent {
+            time,
+            kind: TimelineEventKind::Death,
+            player_id: Some(victim.clone()),
+            is_team_0: self.player_teams.get(victim).copied(),
+        });
     }
 }
 
