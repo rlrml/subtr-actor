@@ -1678,18 +1678,11 @@ impl BoostStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BoostReducerConfig {
     pub include_non_live_pickups: bool,
 }
 
-impl Default for BoostReducerConfig {
-    fn default() -> Self {
-        Self {
-            include_non_live_pickups: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct BoostReducer {

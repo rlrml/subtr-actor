@@ -7,7 +7,7 @@ use crate::*;
 use serde_json::Value;
 
 pub fn parse_replay_bytes(data: &[u8]) -> anyhow::Result<boxcars::Replay> {
-    boxcars::ParserBuilder::new(&data[..])
+    boxcars::ParserBuilder::new(data)
         .always_check_crc()
         .must_parse_network_data()
         .parse()
