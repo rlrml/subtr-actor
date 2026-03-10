@@ -81,6 +81,9 @@ pub struct StatsSample {
     pub goal_events: Vec<GoalEvent>,
 }
 
+const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
+const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
+
 impl StatsSample {
     fn from_processor(
         processor: &ReplayProcessor,
@@ -172,6 +175,18 @@ impl StatsSample {
             touch_events: processor.current_frame_touch_events().to_vec(),
             goal_events: processor.current_frame_goal_events().to_vec(),
         })
+    }
+
+    /// Returns whether time-based stats should treat this sample as live play.
+    ///
+    /// We exclude frozen kickoff countdown frames and post-goal replay frames,
+    /// but keep unknown states live so we do not accidentally discard stats
+    /// from replay variants whose state enum values we have not catalogued yet.
+    pub fn is_live_play(&self) -> bool {
+        !matches!(
+            self.game_state,
+            Some(GAME_STATE_KICKOFF_COUNTDOWN | GAME_STATE_GOAL_SCORED_REPLAY)
+        )
     }
 }
 
@@ -317,6 +332,7 @@ impl PowerslideReducer {
 
 impl StatsReducer for PowerslideReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let live_play = sample.is_live_play();
         for player in &sample.players {
             let previous_active = self
                 .last_active
@@ -333,12 +349,12 @@ impl StatsReducer for PowerslideReducer {
                 &mut self.team_one_stats
             };
 
-            if player.powerslide_active {
+            if live_play && player.powerslide_active {
                 stats.total_duration += sample.dt;
                 team_stats.total_duration += sample.dt;
             }
 
-            if player.powerslide_active && !previous_active {
+            if live_play && player.powerslide_active && !previous_active {
                 stats.press_count += 1;
                 team_stats.press_count += 1;
             }
@@ -392,6 +408,9 @@ impl PressureReducer {
 
 impl StatsReducer for PressureReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        if !sample.is_live_play() {
+            return Ok(());
+        }
         if let Some(ball) = &sample.ball {
             if ball.position().y < 0.0 {
                 self.team_zero_side_duration += sample.dt;
@@ -446,6 +465,7 @@ impl PossessionReducer {
 
 impl StatsReducer for PossessionReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let live_play = sample.is_live_play();
         let active_team_before_sample = if sample.touch_events.is_empty() {
             self.current_team_is_team_0
                 .or(sample.possession_team_is_team_0)
@@ -453,12 +473,14 @@ impl StatsReducer for PossessionReducer {
             self.current_team_is_team_0
         };
 
-        if let Some(possession_team_is_team_0) = active_team_before_sample {
-            self.stats.tracked_time += sample.dt;
-            if possession_team_is_team_0 {
-                self.stats.team_zero_time += sample.dt;
-            } else {
-                self.stats.team_one_time += sample.dt;
+        if live_play {
+            if let Some(possession_team_is_team_0) = active_team_before_sample {
+                self.stats.tracked_time += sample.dt;
+                if possession_team_is_team_0 {
+                    self.stats.team_zero_time += sample.dt;
+                } else {
+                    self.stats.team_one_time += sample.dt;
+                }
             }
         }
 
@@ -865,7 +887,13 @@ impl MatchStatsReducer {
         }
     }
 
-    fn take_goal_event_time(&mut self, is_team_0: bool) -> Option<f32> {
+    fn take_goal_event_time(&mut self, player_id: &PlayerId, is_team_0: bool) -> Option<f32> {
+        if let Some(index) = self.pending_goal_events.iter().position(|event| {
+            event.scoring_team_is_team_0 == is_team_0 && event.player.as_ref() == Some(player_id)
+        }) {
+            return Some(self.pending_goal_events.remove(index).time);
+        }
+
         self.pending_goal_events
             .iter()
             .position(|event| event.scoring_team_is_team_0 == is_team_0)
@@ -965,7 +993,7 @@ impl StatsReducer for MatchStatsReducer {
             if goal_delta > 0 {
                 for _ in 0..goal_delta.max(0) {
                     let goal_time = self
-                        .take_goal_event_time(player.is_team_0)
+                        .take_goal_event_time(&player.player_id, player.is_team_0)
                         .unwrap_or(sample.time);
                     self.timeline.push(TimelineEvent {
                         time: goal_time,
@@ -1225,6 +1253,7 @@ impl MovementReducer {
 
 impl StatsReducer for MovementReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let live_play = sample.is_live_play();
         if sample.dt == 0.0 {
             for player in &sample.players {
                 if let Some(position) = player.position() {
@@ -1252,37 +1281,39 @@ impl StatsReducer for MovementReducer {
                 &mut self.team_one_stats
             };
 
-            stats.tracked_time += sample.dt;
-            stats.speed_integral += speed * sample.dt;
-            team_stats.tracked_time += sample.dt;
-            team_stats.speed_integral += speed * sample.dt;
+            if live_play {
+                stats.tracked_time += sample.dt;
+                stats.speed_integral += speed * sample.dt;
+                team_stats.tracked_time += sample.dt;
+                team_stats.speed_integral += speed * sample.dt;
 
-            if let Some(previous_position) = self.previous_positions.get(&player.player_id) {
-                let distance = position.distance(*previous_position);
-                stats.total_distance += distance;
-                team_stats.total_distance += distance;
-            }
+                if let Some(previous_position) = self.previous_positions.get(&player.player_id) {
+                    let distance = position.distance(*previous_position);
+                    stats.total_distance += distance;
+                    team_stats.total_distance += distance;
+                }
 
-            if speed >= SUPERSONIC_SPEED_THRESHOLD {
-                stats.time_supersonic_speed += sample.dt;
-                team_stats.time_supersonic_speed += sample.dt;
-            } else if speed >= BOOST_SPEED_THRESHOLD {
-                stats.time_boost_speed += sample.dt;
-                team_stats.time_boost_speed += sample.dt;
-            } else {
-                stats.time_slow_speed += sample.dt;
-                team_stats.time_slow_speed += sample.dt;
-            }
+                if speed >= SUPERSONIC_SPEED_THRESHOLD {
+                    stats.time_supersonic_speed += sample.dt;
+                    team_stats.time_supersonic_speed += sample.dt;
+                } else if speed >= BOOST_SPEED_THRESHOLD {
+                    stats.time_boost_speed += sample.dt;
+                    team_stats.time_boost_speed += sample.dt;
+                } else {
+                    stats.time_slow_speed += sample.dt;
+                    team_stats.time_slow_speed += sample.dt;
+                }
 
-            if position.z <= GROUND_Z_THRESHOLD {
-                stats.time_on_ground += sample.dt;
-                team_stats.time_on_ground += sample.dt;
-            } else if position.z >= HIGH_AIR_Z_THRESHOLD {
-                stats.time_high_air += sample.dt;
-                team_stats.time_high_air += sample.dt;
-            } else {
-                stats.time_low_air += sample.dt;
-                team_stats.time_low_air += sample.dt;
+                if position.z <= GROUND_Z_THRESHOLD {
+                    stats.time_on_ground += sample.dt;
+                    team_stats.time_on_ground += sample.dt;
+                } else if position.z >= HIGH_AIR_Z_THRESHOLD {
+                    stats.time_high_air += sample.dt;
+                    team_stats.time_high_air += sample.dt;
+                } else {
+                    stats.time_low_air += sample.dt;
+                    team_stats.time_low_air += sample.dt;
+                }
             }
 
             self.previous_positions
@@ -1427,6 +1458,7 @@ impl StatsReducer for PositioningReducer {
             return Ok(());
         };
         let ball_position = ball.position();
+        let live_play = sample.is_live_play();
         let possession_team_before_sample = if sample.touch_events.is_empty() {
             self.current_possession_team_is_team_0
                 .or(sample.possession_team_is_team_0)
@@ -1445,111 +1477,117 @@ impl StatsReducer for PositioningReducer {
                 .entry(player.player_id.clone())
                 .or_default();
 
-            stats.tracked_time += sample.dt;
-            stats.sum_distance_to_ball += position.distance(ball_position) * sample.dt;
+            if live_play {
+                stats.tracked_time += sample.dt;
+                stats.sum_distance_to_ball += position.distance(ball_position) * sample.dt;
 
-            if possession_team_before_sample == Some(player.is_team_0) {
-                stats.time_has_possession += sample.dt;
-                stats.sum_distance_to_ball_has_possession +=
-                    position.distance(ball_position) * sample.dt;
-            } else if possession_team_before_sample.is_some() {
-                stats.time_no_possession += sample.dt;
-                stats.sum_distance_to_ball_no_possession +=
-                    position.distance(ball_position) * sample.dt;
-            }
+                if possession_team_before_sample == Some(player.is_team_0) {
+                    stats.time_has_possession += sample.dt;
+                    stats.sum_distance_to_ball_has_possession +=
+                        position.distance(ball_position) * sample.dt;
+                } else if possession_team_before_sample.is_some() {
+                    stats.time_no_possession += sample.dt;
+                    stats.sum_distance_to_ball_no_possession +=
+                        position.distance(ball_position) * sample.dt;
+                }
 
-            if normalized_position_y < -FIELD_THIRD_LENGTH_Y {
-                stats.time_defensive_third += sample.dt;
-            } else if normalized_position_y > FIELD_THIRD_LENGTH_Y {
-                stats.time_offensive_third += sample.dt;
-            } else {
-                stats.time_neutral_third += sample.dt;
-            }
+                if normalized_position_y < -FIELD_THIRD_LENGTH_Y {
+                    stats.time_defensive_third += sample.dt;
+                } else if normalized_position_y > FIELD_THIRD_LENGTH_Y {
+                    stats.time_offensive_third += sample.dt;
+                } else {
+                    stats.time_neutral_third += sample.dt;
+                }
 
-            if normalized_position_y < 0.0 {
-                stats.time_defensive_half += sample.dt;
-            } else {
-                stats.time_offensive_half += sample.dt;
-            }
+                if normalized_position_y < 0.0 {
+                    stats.time_defensive_half += sample.dt;
+                } else {
+                    stats.time_offensive_half += sample.dt;
+                }
 
-            if normalized_position_y < normalized_ball_y {
-                stats.time_behind_ball += sample.dt;
-            } else {
-                stats.time_in_front_of_ball += sample.dt;
+                if normalized_position_y < normalized_ball_y {
+                    stats.time_behind_ball += sample.dt;
+                } else {
+                    stats.time_in_front_of_ball += sample.dt;
+                }
             }
         }
 
-        for is_team_0 in [true, false] {
-            let team_players: Vec<_> = sample
-                .players
-                .iter()
-                .filter(|player| player.is_team_0 == is_team_0)
-                .filter_map(|player| player.position().map(|position| (player, position)))
-                .collect();
-
-            if team_players.is_empty() {
-                continue;
-            }
-
-            for (player, position) in &team_players {
-                let teammate_distance_sum: f32 = team_players
+        if live_play {
+            for is_team_0 in [true, false] {
+                let team_players: Vec<_> = sample
+                    .players
                     .iter()
-                    .filter(|(other_player, _)| other_player.player_id != player.player_id)
-                    .map(|(_, other_position)| position.distance(*other_position))
-                    .sum();
-                let teammate_count = team_players.len().saturating_sub(1);
-                if teammate_count > 0 {
-                    let stats = self
-                        .player_stats
-                        .entry(player.player_id.clone())
-                        .or_default();
-                    stats.sum_distance_to_teammates +=
-                        teammate_distance_sum * sample.dt / teammate_count as f32;
+                    .filter(|player| player.is_team_0 == is_team_0)
+                    .filter_map(|player| player.position().map(|position| (player, position)))
+                    .collect();
+
+                if team_players.is_empty() {
+                    continue;
                 }
-            }
 
-            if let Some((most_back_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
-                normalized_y(is_team_0, *a)
-                    .partial_cmp(&normalized_y(is_team_0, *b))
-                    .unwrap()
-            }) {
-                self.player_stats
-                    .entry(most_back_player.player_id.clone())
-                    .or_default()
-                    .time_most_back += sample.dt;
-            }
+                for (player, position) in &team_players {
+                    let teammate_distance_sum: f32 = team_players
+                        .iter()
+                        .filter(|(other_player, _)| other_player.player_id != player.player_id)
+                        .map(|(_, other_position)| position.distance(*other_position))
+                        .sum();
+                    let teammate_count = team_players.len().saturating_sub(1);
+                    if teammate_count > 0 {
+                        let stats = self
+                            .player_stats
+                            .entry(player.player_id.clone())
+                            .or_default();
+                        stats.sum_distance_to_teammates +=
+                            teammate_distance_sum * sample.dt / teammate_count as f32;
+                    }
+                }
 
-            if let Some((most_forward_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
-                normalized_y(is_team_0, *a)
-                    .partial_cmp(&normalized_y(is_team_0, *b))
-                    .unwrap()
-            }) {
-                self.player_stats
-                    .entry(most_forward_player.player_id.clone())
-                    .or_default()
-                    .time_most_forward += sample.dt;
-            }
+                if let Some((most_back_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
+                    normalized_y(is_team_0, *a)
+                        .partial_cmp(&normalized_y(is_team_0, *b))
+                        .unwrap()
+                }) {
+                    self.player_stats
+                        .entry(most_back_player.player_id.clone())
+                        .or_default()
+                        .time_most_back += sample.dt;
+                }
 
-            if let Some((closest_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
-                a.distance(ball_position)
-                    .partial_cmp(&b.distance(ball_position))
-                    .unwrap()
-            }) {
-                self.player_stats
-                    .entry(closest_player.player_id.clone())
-                    .or_default()
-                    .time_closest_to_ball += sample.dt;
-            }
+                if let Some((most_forward_player, _)) =
+                    team_players.iter().max_by(|(_, a), (_, b)| {
+                        normalized_y(is_team_0, *a)
+                            .partial_cmp(&normalized_y(is_team_0, *b))
+                            .unwrap()
+                    })
+                {
+                    self.player_stats
+                        .entry(most_forward_player.player_id.clone())
+                        .or_default()
+                        .time_most_forward += sample.dt;
+                }
 
-            if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
-                a.distance(ball_position)
-                    .partial_cmp(&b.distance(ball_position))
-                    .unwrap()
-            }) {
-                self.player_stats
-                    .entry(farthest_player.player_id.clone())
-                    .or_default()
-                    .time_farthest_from_ball += sample.dt;
+                if let Some((closest_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
+                    a.distance(ball_position)
+                        .partial_cmp(&b.distance(ball_position))
+                        .unwrap()
+                }) {
+                    self.player_stats
+                        .entry(closest_player.player_id.clone())
+                        .or_default()
+                        .time_closest_to_ball += sample.dt;
+                }
+
+                if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
+                    a.distance(ball_position)
+                        .partial_cmp(&b.distance(ball_position))
+                        .unwrap()
+                }) {
+                    self.player_stats
+                        .entry(farthest_player.player_id.clone())
+                        .or_default()
+                        .time_farthest_from_ball += sample.dt;
+                }
             }
         }
 
@@ -1640,8 +1678,22 @@ impl BoostStats {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BoostReducerConfig {
+    pub include_non_live_pickups: bool,
+}
+
+impl Default for BoostReducerConfig {
+    fn default() -> Self {
+        Self {
+            include_non_live_pickups: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct BoostReducer {
+    config: BoostReducerConfig,
     player_stats: HashMap<PlayerId, BoostStats>,
     team_zero_stats: BoostStats,
     team_one_stats: BoostStats,
@@ -1664,7 +1716,14 @@ struct PendingBoostPickup {
 
 impl BoostReducer {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_config(BoostReducerConfig::default())
+    }
+
+    pub fn with_config(config: BoostReducerConfig) -> Self {
+        Self {
+            config,
+            ..Self::default()
+        }
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
@@ -1812,6 +1871,7 @@ impl BoostReducer {
 
 impl StatsReducer for BoostReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let live_play = sample.is_live_play();
         let mut current_boost_amounts = Vec::new();
 
         for player in &sample.players {
@@ -1829,39 +1889,43 @@ impl StatsReducer for BoostReducer {
                 &mut self.team_one_stats
             };
 
-            stats.tracked_time += sample.dt;
-            stats.boost_integral += boost_amount * sample.dt;
-            team_stats.tracked_time += sample.dt;
-            team_stats.boost_integral += boost_amount * sample.dt;
+            if live_play {
+                stats.tracked_time += sample.dt;
+                stats.boost_integral += boost_amount * sample.dt;
+                team_stats.tracked_time += sample.dt;
+                team_stats.boost_integral += boost_amount * sample.dt;
 
-            if boost_amount <= 0.0 {
-                stats.time_zero_boost += sample.dt;
-                team_stats.time_zero_boost += sample.dt;
-            }
-            if boost_amount >= BOOST_MAX_AMOUNT {
-                stats.time_hundred_boost += sample.dt;
-                team_stats.time_hundred_boost += sample.dt;
-            }
+                if boost_amount <= 0.0 {
+                    stats.time_zero_boost += sample.dt;
+                    team_stats.time_zero_boost += sample.dt;
+                }
+                if boost_amount >= BOOST_MAX_AMOUNT {
+                    stats.time_hundred_boost += sample.dt;
+                    team_stats.time_hundred_boost += sample.dt;
+                }
 
-            let boost_pct = boost_amount_to_percent(boost_amount);
-            if boost_pct < 25.0 {
-                stats.time_boost_0_25 += sample.dt;
-                team_stats.time_boost_0_25 += sample.dt;
-            } else if boost_pct < 50.0 {
-                stats.time_boost_25_50 += sample.dt;
-                team_stats.time_boost_25_50 += sample.dt;
-            } else if boost_pct < 75.0 {
-                stats.time_boost_50_75 += sample.dt;
-                team_stats.time_boost_50_75 += sample.dt;
-            } else {
-                stats.time_boost_75_100 += sample.dt;
-                team_stats.time_boost_75_100 += sample.dt;
-            }
+                let boost_pct = boost_amount_to_percent(boost_amount);
+                if boost_pct < 25.0 {
+                    stats.time_boost_0_25 += sample.dt;
+                    team_stats.time_boost_0_25 += sample.dt;
+                } else if boost_pct < 50.0 {
+                    stats.time_boost_25_50 += sample.dt;
+                    team_stats.time_boost_25_50 += sample.dt;
+                } else if boost_pct < 75.0 {
+                    stats.time_boost_50_75 += sample.dt;
+                    team_stats.time_boost_50_75 += sample.dt;
+                } else {
+                    stats.time_boost_75_100 += sample.dt;
+                    team_stats.time_boost_75_100 += sample.dt;
+                }
 
-            if player.boost_active && player.speed().unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD {
-                let supersonic_usage = BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt;
-                stats.amount_used_while_supersonic += supersonic_usage;
-                team_stats.amount_used_while_supersonic += supersonic_usage;
+                if player.boost_active
+                    && player.speed().unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                {
+                    let supersonic_usage = BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt;
+                    stats.amount_used_while_supersonic += supersonic_usage;
+                    team_stats.amount_used_while_supersonic += supersonic_usage;
+                }
             }
             current_boost_amounts.push((player.player_id.clone(), boost_amount));
         }
@@ -1869,6 +1933,9 @@ impl StatsReducer for BoostReducer {
         for event in &sample.boost_pad_events {
             match event.kind {
                 BoostPadEventKind::PickedUp { sequence } => {
+                    if !live_play && !self.config.include_non_live_pickups {
+                        continue;
+                    }
                     if !self
                         .seen_pickup_sequences
                         .insert((event.pad_id.clone(), sequence))

@@ -170,6 +170,13 @@ fn test_processor_extracts_exact_goal_events() {
         total_goals as usize,
         "Expected one deduplicated goal event per scored goal"
     );
+    assert!(
+        processor
+            .goal_events
+            .iter()
+            .any(|event| event.player.is_some()),
+        "Expected at least some exact goal events to resolve a scorer directly from frame updates"
+    );
 }
 
 #[test]

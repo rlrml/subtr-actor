@@ -87,7 +87,7 @@
 | Shots on timeline | Match shot counters on player state | Emit timeline events when per-player shot counters increment | Event-driven-ish reconstruction from counters | `Available` |
 | Saves on timeline | Match save counters on player state | Emit timeline events when per-player save counters increment | Event-driven-ish reconstruction from counters | `Available` |
 | Assists on timeline | Match assist counters on player state | Emit timeline events when per-player assist counters increment | Event-driven-ish reconstruction from counters | `Available` |
-| Goals on timeline | Exact ball goal explosion events plus player goal counters | Extract exact goal timestamps from `Ball_TA:ReplicatedExplosionData`, then attach scorer identity when per-player goal counters increment | Exact event time plus scorer reconstruction | `Available` |
+| Goals on timeline | Exact ball goal explosion events plus `PRI_TA:MatchGoals` frame updates | Extract exact goal timestamps from `Ball_TA:ReplicatedExplosionData` and derive scorer identity from same-frame `PRI_TA:MatchGoals` updates when present | Exact event time plus replay-frame scorer derivation | `Available` |
 | Goals conceded while last defender | Team score deltas plus positional role at concession time | Determine defender ordering at the scoring frame and attribute conceded goals to the most-back defender | Event-driven plus sampled state | `Available` |
 | Amount collected / amount stolen | Exact boost pad pickup events plus canonical standard-soccar pad layout matching | Pad pickups are extracted exactly from `VehiclePickup_TA:NewReplicatedPickupData`; for standard soccar, side classification is derived from the matched canonical pad position instead of raw player position. Outside canonical matches, we fall back to per-pad observed pickup centroids with a midfield neutral tolerance | Event-driven | `Available` |
 | Big pads collected / Small pads collected | Exact boost pad pickup events plus replay-observed pad cooldown | Pad size is inferred exactly from that pad's observed respawn cadence (`~4s` vs `~10s`) and then cached per pad id | Event-driven | `Available` |
@@ -107,7 +107,6 @@
 - If nonstandard-map parity matters, replace the current observed-centroid fallback with a dedicated per-map pad layout source
 - Improve goal event extraction further:
   - replace current replay-mode dedupe window with a stronger replay-state signal if we find one
-  - derive scorer directly from replay events instead of attaching it from later player goal counters
 - Consider a normalized sample struct for reducers:
   - time
   - dt

@@ -1128,6 +1128,7 @@ impl<'a> ReplayProcessor<'a> {
                 .get_team_scores()
                 .map(|(team_zero, team_one)| (Some(team_zero), Some(team_one)))
                 .unwrap_or((None, None));
+            let scorer = self.goal_scorer_from_frame(frame, scoring_team_is_team_0);
 
             if self
                 .goal_events
@@ -1145,6 +1146,7 @@ impl<'a> ReplayProcessor<'a> {
                 time: frame.time,
                 frame: frame_index,
                 scoring_team_is_team_0,
+                player: scorer,
                 team_zero_score,
                 team_one_score,
             };
@@ -1153,6 +1155,29 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         Ok(())
+    }
+
+    fn goal_scorer_from_frame(
+        &self,
+        frame: &boxcars::Frame,
+        scoring_team_is_team_0: bool,
+    ) -> Option<PlayerId> {
+        let match_goals_key = *self.get_object_id_for_key(MATCH_GOALS_KEY).ok()?;
+
+        frame
+            .updated_actors
+            .iter()
+            .filter(|update| update.object_id == match_goals_key)
+            .filter_map(|update| {
+                let boxcars::Attribute::Int(goals) = update.attribute else {
+                    return None;
+                };
+                let player_id = self.get_player_id_from_actor_id(&update.actor_id).ok()?;
+                let is_team_0 = self.get_player_is_team_0(&player_id).ok()?;
+                (is_team_0 == scoring_team_is_team_0).then_some((player_id, goals))
+            })
+            .max_by_key(|(_, goals)| *goals)
+            .map(|(player_id, _)| player_id)
     }
 
     fn try_push_demolish(
