@@ -235,6 +235,10 @@ pub struct ReducerCollector<R> {
     reducer: R,
     last_sample_time: Option<f32>,
     replay_meta_initialized: bool,
+    last_boost_pad_event_count: usize,
+    last_touch_event_count: usize,
+    last_player_stat_event_count: usize,
+    last_goal_event_count: usize,
 }
 
 impl<R> ReducerCollector<R> {
@@ -243,6 +247,10 @@ impl<R> ReducerCollector<R> {
             reducer,
             last_sample_time: None,
             replay_meta_initialized: false,
+            last_boost_pad_event_count: 0,
+            last_touch_event_count: 0,
+            last_player_stat_event_count: 0,
+            last_goal_event_count: 0,
         }
     }
 
@@ -283,9 +291,19 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        let mut sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        sample.boost_pad_events =
+            processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
+        sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
+        sample.player_stat_events =
+            processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
+        sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
         self.reducer.on_sample(&sample)?;
         self.last_sample_time = Some(current_time);
+        self.last_boost_pad_event_count = processor.boost_pad_events.len();
+        self.last_touch_event_count = processor.touch_events.len();
+        self.last_player_stat_event_count = processor.player_stat_events.len();
+        self.last_goal_event_count = processor.goal_events.len();
 
         Ok(TimeAdvance::NextFrame)
     }
@@ -1072,6 +1090,12 @@ impl StatsReducer for MatchStatsReducer {
 
             self.previous_team_scores = Some((team_zero_score, team_one_score));
         }
+
+        self.timeline.sort_by(|a, b| {
+            a.time
+                .partial_cmp(&b.time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(())
     }

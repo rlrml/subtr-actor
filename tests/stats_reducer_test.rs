@@ -235,6 +235,29 @@ fn test_match_stats_reducer_builds_core_stats_and_timeline() {
 }
 
 #[test]
+fn test_match_stats_reducer_keeps_exact_timeline_under_sampling() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let full = ReducerCollector::new(MatchStatsReducer::new())
+        .process_replay(&replay)
+        .expect("Failed to process replay with full match stats reducer")
+        .into_inner();
+
+    let mut sampled_collector = ReducerCollector::new(MatchStatsReducer::new());
+    FrameRateDecorator::new_from_fps(1.0, &mut sampled_collector)
+        .process_replay(&replay)
+        .expect("Failed to process replay with sampled match stats reducer");
+    let sampled = sampled_collector.into_inner();
+
+    assert_eq!(sampled.team_zero_stats(), full.team_zero_stats());
+    assert_eq!(sampled.team_one_stats(), full.team_one_stats());
+    assert_eq!(
+        sampled.timeline(),
+        full.timeline(),
+        "Expected buffered event delivery to preserve exact timeline events under sampling"
+    );
+}
+
+#[test]
 fn test_match_stats_reducer_prefers_exact_goal_event_times() {
     let player_id = epic_id("goal-scorer");
     let mut reducer = MatchStatsReducer::new();
