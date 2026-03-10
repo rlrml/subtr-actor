@@ -1,10 +1,12 @@
 pub mod decorator;
 pub mod ndarray;
 pub mod replay_data;
+pub mod stats_timeline;
 
 pub use self::ndarray::*;
 pub use decorator::*;
 pub use replay_data::*;
+pub use stats_timeline::*;
 
 use crate::*;
 use boxcars;

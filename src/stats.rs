@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use boxcars;
 use boxcars::HeaderProp;
+use serde::Serialize;
 
 use crate::*;
 
@@ -85,7 +86,7 @@ const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
 const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
 
 impl StatsSample {
-    fn from_processor(
+    pub(crate) fn from_processor(
         processor: &ReplayProcessor,
         frame_number: usize,
         current_time: f32,
@@ -288,7 +289,7 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PowerslideStats {
     pub total_duration: f32,
     pub press_count: u32,
@@ -422,7 +423,7 @@ impl StatsReducer for PressureReducer {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
     pub team_zero_time: f32,
@@ -767,7 +768,7 @@ impl StatsReducer for SettingsReducer {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct CorePlayerStats {
     pub score: i32,
     pub goals: i32,
@@ -787,7 +788,7 @@ impl CorePlayerStats {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct CoreTeamStats {
     pub score: i32,
     pub goals: i32,
@@ -806,7 +807,7 @@ impl CoreTeamStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum TimelineEventKind {
     Goal,
     Shot,
@@ -816,7 +817,7 @@ pub enum TimelineEventKind {
     Death,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TimelineEvent {
     pub time: f32,
     pub kind: TimelineEventKind,
@@ -1043,13 +1044,13 @@ impl StatsReducer for MatchStatsReducer {
 
 const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct DemoPlayerStats {
     pub demos_inflicted: u32,
     pub demos_taken: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct DemoTeamStats {
     pub demos_inflicted: u32,
 }
@@ -1149,7 +1150,7 @@ impl StatsReducer for DemoReducer {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MovementStats {
     pub tracked_time: f32,
     pub total_distance: f32,
@@ -1324,7 +1325,7 @@ impl StatsReducer for MovementReducer {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PositioningStats {
     pub tracked_time: f32,
     pub sum_distance_to_teammates: f32,
@@ -1603,7 +1604,7 @@ impl StatsReducer for PositioningReducer {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct BoostStats {
     pub tracked_time: f32,
     pub boost_integral: f32,
@@ -1682,7 +1683,6 @@ impl BoostStats {
 pub struct BoostReducerConfig {
     pub include_non_live_pickups: bool,
 }
-
 
 #[derive(Debug, Clone, Default)]
 pub struct BoostReducer {
