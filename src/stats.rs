@@ -1972,6 +1972,23 @@ impl BoostReducer {
             team_stats.overfill_from_stolen += overfill;
         }
     }
+
+    fn interval_fraction_in_boost_range(
+        start_boost: f32,
+        end_boost: f32,
+        min_boost: f32,
+        max_boost: f32,
+    ) -> f32 {
+        if (end_boost - start_boost).abs() <= f32::EPSILON {
+            return ((start_boost >= min_boost) && (start_boost < max_boost)) as i32 as f32;
+        }
+
+        let t_at_min = (min_boost - start_boost) / (end_boost - start_boost);
+        let t_at_max = (max_boost - start_boost) / (end_boost - start_boost);
+        let interval_start = t_at_min.min(t_at_max).max(0.0);
+        let interval_end = t_at_min.max(t_at_max).min(1.0);
+        (interval_end - interval_start).max(0.0)
+    }
 }
 
 impl StatsReducer for BoostReducer {
@@ -2006,10 +2023,11 @@ impl StatsReducer for BoostReducer {
             };
 
             if live_play {
+                let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 stats.tracked_time += sample.dt;
-                stats.boost_integral += boost_amount * sample.dt;
+                stats.boost_integral += average_boost_amount * sample.dt;
                 team_stats.tracked_time += sample.dt;
-                team_stats.boost_integral += boost_amount * sample.dt;
+                team_stats.boost_integral += average_boost_amount * sample.dt;
 
                 if boost_amount <= 0.0 {
                     stats.time_zero_boost += sample.dt;
@@ -2020,20 +2038,42 @@ impl StatsReducer for BoostReducer {
                     team_stats.time_hundred_boost += sample.dt;
                 }
 
-                let boost_pct = boost_amount_to_percent(boost_amount);
-                if boost_pct < 25.0 {
-                    stats.time_boost_0_25 += sample.dt;
-                    team_stats.time_boost_0_25 += sample.dt;
-                } else if boost_pct < 50.0 {
-                    stats.time_boost_25_50 += sample.dt;
-                    team_stats.time_boost_25_50 += sample.dt;
-                } else if boost_pct < 75.0 {
-                    stats.time_boost_50_75 += sample.dt;
-                    team_stats.time_boost_50_75 += sample.dt;
-                } else {
-                    stats.time_boost_75_100 += sample.dt;
-                    team_stats.time_boost_75_100 += sample.dt;
-                }
+                let time_boost_0_25 = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        0.0,
+                        boost_percent_to_amount(25.0),
+                    );
+                let time_boost_25_50 = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        boost_percent_to_amount(25.0),
+                        boost_percent_to_amount(50.0),
+                    );
+                let time_boost_50_75 = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        boost_percent_to_amount(50.0),
+                        boost_percent_to_amount(75.0),
+                    );
+                let time_boost_75_100 = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        boost_percent_to_amount(75.0),
+                        BOOST_MAX_AMOUNT + 1.0,
+                    );
+                stats.time_boost_0_25 += time_boost_0_25;
+                team_stats.time_boost_0_25 += time_boost_0_25;
+                stats.time_boost_25_50 += time_boost_25_50;
+                team_stats.time_boost_25_50 += time_boost_25_50;
+                stats.time_boost_50_75 += time_boost_50_75;
+                team_stats.time_boost_50_75 += time_boost_50_75;
+                stats.time_boost_75_100 += time_boost_75_100;
+                team_stats.time_boost_75_100 += time_boost_75_100;
 
                 if player.boost_active
                     && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
