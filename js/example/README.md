@@ -1,187 +1,83 @@
-# Rocket League Replay Analyzer - Example
+# Replay Viewer Example
 
-This is an example web application demonstrating the subtr-actor JavaScript bindings for analyzing Rocket League replay files in the browser.
+This is a Vite-based example app for the JavaScript binding. It loads a `.replay` file in the browser, validates it, converts the structured replay data into the shape expected by the ballchasing.com viewer, and renders a 3D replay player.
 
-## Features
+## What It Demonstrates
 
-- 🚀 **WebAssembly Powered** - Fast replay processing using Rust/WASM
-- 📊 **Interactive Visualizations** - Charts showing ball movement and game statistics
-- 📁 **Drag & Drop Interface** - Easy file upload with progress tracking
-- 🎮 **Comprehensive Analysis** - Player stats, game metadata, and raw data viewing
-- 📱 **Responsive Design** - Works on desktop and mobile devices
+- browser-side replay parsing with the WASM binding
+- file upload via drag and drop or file picker
+- replay validation and metadata extraction
+- conversion from `get_replay_frames_data()` output into a viewer-friendly format
+- integration with the ballchasing.com player scripts
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 18 or newer
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/)
 
 ## Quick Start
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [Yarn](https://yarnpkg.com/) package manager
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/) for building WASM bindings
-
-### Installation
-
-1. **Clone the repository and navigate to the example:**
-   ```bash
-   git clone https://github.com/rlrml/subtr-actor.git
-   cd subtr-actor/subtr-actor-js/example
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   yarn install
-   ```
-
-3. **Build the JavaScript bindings (CRITICAL):**
-   ```bash
-   yarn build-wasm
-   ```
-
-   **⚠️ IMPORTANT:** This step is **required** before running the example. It:
-   - Builds the Rust code into WebAssembly
-   - Creates the `../pkg/` directory with JavaScript bindings
-   - Generates `subtr_actor_wasm.js` and `subtr_actor_wasm_bg.wasm` files
-   - The example imports from `../../pkg/subtr_actor_wasm.js` and will fail without this step
-
-4. **Start the development server:**
-   ```bash
-   yarn dev
-   ```
-
-5. **Open your browser:**
-   - Navigate to `http://localhost:5173`
-   - Upload a `.replay` file to start analyzing!
-
-### Alternative: Build and run in one command
+From the repository root:
 
 ```bash
-yarn dev-with-wasm
+cd js/example
+npm install
+npm run build-wasm
+npm run dev
 ```
 
-### Troubleshooting
+Open `http://localhost:5173`, then drop in a `.replay` file.
 
-**"Failed to resolve import" errors:**
-- Make sure you ran `yarn build-wasm` successfully
-- Check that `../pkg/subtr_actor_wasm.js` exists
-- The JavaScript binding build creates files in the parent directory that the example depends on
+`npm run build-wasm` is required before the app can start cleanly. It builds the web-target WASM package into `js/pkg/`, which this example imports directly.
 
-## Usage
+## Scripts
 
-1. **Open the web application** in your browser
-2. **Drag and drop** a Rocket League `.replay` file onto the upload area, or **click to browse** for a file
-3. **Wait for processing** - the app will validate, parse, and analyze the replay
-4. **Explore the results** using the different tabs:
-   - **Overview**: Game information and player list
-   - **Ball Movement**: Interactive chart showing ball position over time
-   - **Player Data**: Individual player statistics and performance metrics
-   - **Raw Data**: First 10 rows of the processed numerical data
-
-## What the App Demonstrates
-
-### WASM Functions Used
-
-- `validate_replay()` - Ensures the file is a valid replay
-- `get_replay_info()` - Extracts basic replay metadata
-- `get_ndarray_with_info()` - Processes the replay into numerical arrays for analysis
-- `get_replay_meta()` - Gets detailed metadata including player information
-
-### Data Visualization
-
-- **Ball Position Chart**: Shows the ball's movement on the field using Chart.js
-- **Statistics Dashboard**: Key metrics like game duration, player count, file size
-- **Player Analytics**: Individual player stats including boost usage
-- **Raw Data Table**: Direct view of the processed numerical data
-
-### Technical Features
-
-- **Progress Tracking**: Real-time progress updates during processing
-- **Error Handling**: User-friendly error messages for invalid files
-- **Responsive UI**: Clean, modern interface that works on all devices
-- **Performance**: Efficient processing of large replay files
-
-## File Structure
-
-```
-example/
-├── index.html          # Main HTML page with UI
-├── src/
-│   └── index.js        # JavaScript application logic
-├── package.json        # Dependencies and scripts
-├── vite.config.js      # Vite bundler configuration
-└── README.md          # This file
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run build-wasm
+npm run dev-with-wasm
 ```
 
-## Customization
+## How It Works
 
-### Adding New Visualizations
+1. `src/index.js` initializes the WASM package from `../pkg/`.
+2. The app validates the uploaded replay with `validate_replay()`.
+3. It collects lightweight metadata with `get_replay_info()` and `get_replay_meta()`.
+4. It loads full structured frame data with `get_replay_frames_data()`.
+5. It adapts the replay into the viewer format expected by `src/player.js`.
 
-You can extend the app by adding new charts or analysis views:
+## Relevant Files
 
-1. Add a new tab in `index.html`
-2. Create the visualization logic in `src/index.js`
-3. Use additional WASM functions like `get_replay_frames_data()` for more detailed analysis
-
-### Modifying Feature Extractors
-
-The app uses default feature extractors, but you can customize them:
-
-```javascript
-// Custom feature configuration
-const customResult = get_ndarray_with_info(
-    replayData,
-    ['BallRigidBody', 'GameTime'],           // global features
-    ['PlayerRigidBody', 'PlayerBoost'],      // player features
-    30.0                                     // higher FPS for more detail
-);
+```text
+js/example/
+├── index.html
+├── package.json
+├── src/index.js
+├── src/player.js
+└── vite.config.js
 ```
-
-### Styling Changes
-
-The CSS is embedded in `index.html` and uses CSS Grid and modern features. You can:
-- Modify colors by changing the gradient values
-- Adjust the responsive grid layouts
-- Add new animations or transitions
-
-## Performance Notes
-
-- **File Size**: The app can handle replay files up to several MB
-- **Processing Time**: Depends on replay length and complexity (typically 1-5 seconds)
-- **Memory Usage**: Larger replays will use more browser memory
-- **Browser Support**: Requires WebAssembly support (all modern browsers)
 
 ## Troubleshooting
 
-### Common Issues
+### Import or WASM initialization errors
 
-**"WASM module not initialized"**
-- Make sure `yarn build-wasm` was run successfully
-- Check that the `pkg/` directory exists with WASM files
+- Run `npm run build-wasm` again.
+- Confirm that `js/pkg/` contains the generated JS and `.wasm` files.
+- Make sure `wasm-pack` is on your `PATH`.
 
-**"Invalid replay file"**
-- Ensure you're uploading a `.replay` file from Rocket League
-- Some very old or corrupted replays may not be supported
+### Invalid replay errors
 
-**Charts not displaying**
-- Check browser console for JavaScript errors
-- Ensure Chart.js loaded correctly
+- Use a Rocket League `.replay` file.
+- Some corrupted or very old replays may fail parsing.
 
-**Development server won't start**
-- Make sure you have Node.js 18+ installed
-- Try `yarn install` to reinstall dependencies
+### Viewer assets fail to load
 
-### Getting Help
+- Check the browser console for network errors from CDN-hosted dependencies.
+- Reload after confirming your network allows requests to `cdnjs.cloudflare.com` and `unpkg.com`.
 
-- Check the browser developer console for detailed error messages
-- Refer to the main [subtr-actor documentation](https://docs.rs/subtr-actor/)
-- Open an issue on [GitHub](https://github.com/rlrml/subtr-actor/issues)
+## Notes
 
-## Next Steps
-
-This example provides a foundation for building more sophisticated replay analysis tools. Consider adding:
-
-- **Timeline scrubbing** to view game state at specific moments
-- **Heatmaps** showing player positioning over time
-- **Advanced statistics** like boost efficiency or ball possession
-- **Comparison tools** for analyzing multiple replays
-- **Export functionality** to save analysis results
-
-Happy analyzing! 🚗⚽
+- The app currently uses the web-target JS package build, not the repo-local bundler target from `just build-js`.
+- The example is useful as an integration reference, but the main package README under [`js/README.md`](../README.md) is the better starting point for library consumers.

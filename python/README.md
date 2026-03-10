@@ -13,116 +13,113 @@ pip install subtr-actor-py
 ```python
 import subtr_actor
 
-# Parse a replay file to get raw replay data
-replay = subtr_actor.parse_replay(open("path/to/replay.replay", "rb").read())
+replay_path = "path/to/replay.replay"
 
-# Get numerical data as numpy ndarray (useful for ML)
+# Parse raw replay bytes into the full replay structure.
+with open(replay_path, "rb") as replay_file:
+    replay = subtr_actor.parse_replay(replay_file.read())
+
+# Build a numpy ndarray plus metadata.
 meta, ndarray = subtr_actor.get_ndarray_with_info_from_replay_filepath(
-    "path/to/replay.replay",
-    global_feature_adders=["BallRigidBody"],  # optional
-    player_feature_adders=["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],  # optional
-    fps=10.0,  # optional, default is 10.0
-    dtype="float16"  # optional: float16|float32|float64 (default float32)
+    replay_path,
+    global_feature_adders=["BallRigidBody", "SecondsRemaining"],
+    player_feature_adders=["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
+    fps=10.0,
+    dtype="float32",
 )
 
-# Get column headers to understand the ndarray structure
 headers = subtr_actor.get_column_headers(
-    global_feature_adders=["BallRigidBody"],
-    player_feature_adders=["PlayerRigidBody", "PlayerBoost"]
+    global_feature_adders=["BallRigidBody", "SecondsRemaining"],
+    player_feature_adders=["PlayerRigidBody", "PlayerBoost"],
 )
 
-# Get replay metadata without processing all frames (faster)
-meta = subtr_actor.get_replay_meta("path/to/replay.replay")
+replay_meta = subtr_actor.get_replay_meta(replay_path)
+frames_data = subtr_actor.get_replay_frames_data(replay_path)
 
-# Get structured frame-by-frame data
-frames_data = subtr_actor.get_replay_frames_data("path/to/replay.replay")
+print(ndarray.shape)
+print(headers["player_headers"][:5])
+print(replay_meta["map_name"])
 ```
 
-## API Reference
+## API Surface
 
 ### `parse_replay(data: bytes) -> dict`
-Parse raw replay bytes and return the complete replay structure.
+
+Parse raw replay bytes and return the full replay structure as Python data.
 
 ### `get_ndarray_with_info_from_replay_filepath(filepath, global_feature_adders=None, player_feature_adders=None, fps=None, dtype=None) -> tuple[dict, numpy.ndarray]`
-Process a replay file and return metadata plus a numpy ndarray of features.
 
-**Parameters:**
-- `filepath` - Path to the replay file
-- `global_feature_adders` - List of global feature names (default: `["BallRigidBody"]`)
-- `player_feature_adders` - List of player feature names (default: `["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]`)
-- `fps` - Frames per second for processing (default: 10.0)
-- `dtype` - Output ndarray dtype string: `float16`/`f16`, `float32`/`f32`, `float64`/`f64` (default: `float32`)
+Process a replay file and return metadata plus a `numpy.ndarray`.
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `global_feature_adders`: list of global feature names, default `["BallRigidBody"]`
+- `player_feature_adders`: list of player feature names, default `["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]`
+- `fps`: target FPS for resampling, default `10.0`
+- `dtype`: output dtype string. Supported values are `float16`/`f16`/`half`, `float32`/`f32`, and `float64`/`f64`/`double`
 
 ### `get_replay_meta(filepath, global_feature_adders=None, player_feature_adders=None) -> dict`
-Get replay metadata without processing frame data (faster than full processing).
+
+Get replay metadata and ndarray headers without materializing the full ndarray.
 
 ### `get_column_headers(global_feature_adders=None, player_feature_adders=None) -> dict`
-Get column header information for understanding ndarray structure.
+
+Get header information for the configured ndarray layout.
 
 ### `get_replay_frames_data(filepath) -> dict`
-Get structured frame-by-frame game state data.
+
+Get structured frame-by-frame game state data with no FPS resampling.
 
 ## Feature Adders
 
-See the [subtr-actor documentation](https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html) for available feature adder names.
+See the [subtr-actor ndarray docs](https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html) for the full list of feature-adder names.
 
-**Common global features:** `BallRigidBody`, `GameTime`
+Common global features:
 
-**Common player features:** `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerDoubleJump`
+- `BallRigidBody`
+- `CurrentTime`
+- `SecondsRemaining`
+
+Common player features:
+
+- `PlayerRigidBody`
+- `PlayerBoost`
+- `PlayerAnyJump`
+- `PlayerDoubleJump`
 
 `PlayerBoost` is exposed in raw replay units (`0-255`), not `0-100` percent.
 
-## Building from Source
+## Development
 
-Requirements:
-- Rust toolchain
-- maturin
-- just (command runner)
+Repository-level compile check:
 
 ```bash
-# Clone the repository
-git clone https://github.com/rlrml/subtr-actor.git
-cd subtr-actor
-
-# Build the Python package
 just build-python
-
-# Or for development (editable install)
-cd python && maturin develop
 ```
 
-### Monorepo Dependency Management
+For an importable local Python environment, use `maturin develop` from the `python/` directory:
 
-This package is part of the [subtr-actor](https://github.com/rlrml/subtr-actor) monorepo. The Cargo.toml uses a dual dependency specification:
+```bash
+cd python
+uv sync --group dev
+uv run maturin develop
+uv run pytest
+```
+
+If you are not using `uv`, install `maturin`, `pytest`, and `numpy` in a virtual environment and run `maturin develop` directly.
+
+## Publishing Notes
+
+This binding depends on the workspace crate via:
 
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.1.10"
+version = "0.1.17"
 ```
 
-This allows:
-- **Local development**: Cargo uses the `path` dependency, so changes to the main `subtr-actor` crate are immediately available for testing
-- **Publishing**: crates.io/PyPI strips the `path` and uses the `version`, ensuring the published package depends on the published crate
-
-Use `just bump <version>` to update all versions in sync (workspace version and dependency versions).
-
-### Publishing
-
-To publish all packages in the correct order:
-
-```bash
-just publish-all  # Publishes: Rust crate -> Python bindings -> JS bindings
-```
-
-Or publish individually:
-
-```bash
-just publish-rust    # Publish main Rust crate first
-just publish-python  # Then publish Python bindings
-```
-
-**Important**: The main `subtr-actor` Rust crate must be published to crates.io before publishing the bindings, as the published bindings depend on the published crate version.
+That keeps local development wired to the workspace crate while still pinning the published dependency version. Use `just bump <version>` to update the workspace and binding versions together.
 
 ## License
 

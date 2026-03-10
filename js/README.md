@@ -2,7 +2,7 @@
 
 WebAssembly bindings for [subtr-actor](https://crates.io/crates/subtr-actor), a Rocket League replay processing library.
 
-This package provides the same functionality as the Python bindings but for JavaScript/TypeScript environments.
+This package mirrors the Python binding at a JavaScript/TypeScript-friendly boundary: pass replay bytes in, get structured data or ndarray-like output back.
 
 ## Installation
 
@@ -10,268 +10,196 @@ This package provides the same functionality as the Python bindings but for Java
 npm install rl-replay-subtr-actor
 ```
 
+## Runtime Support
+
+The published npm package is the web-target ESM build produced by `wasm-pack`. It is the right fit for browsers and bundlers.
+
+If you need a Node-specific build from the repository, build it yourself with:
+
+```bash
+npm --prefix js install
+npm --prefix js run build:nodejs
+```
+
+That generates `js/pkg-node/`.
+
 ## Usage
 
-### Web/Browser
+### Browser / bundler
 
 ```javascript
-import init, { 
-    parse_replay, 
-    get_ndarray_with_info, 
-    get_replay_meta, 
-    get_column_headers, 
-    get_replay_frames_data, 
-    validate_replay, 
-    get_replay_info 
-} from 'rl-replay-subtr-actor';
+import init, {
+  get_column_headers,
+  get_ndarray_with_info,
+  get_replay_frames_data,
+  get_replay_info,
+  get_replay_meta,
+  validate_replay,
+} from "rl-replay-subtr-actor";
 
-async function analyzeReplay() {
-    // Initialize the WASM module
-    await init();
-    
-    // Load replay file (e.g., from file input)
-    const fileInput = document.getElementById('replay-file');
-    const file = fileInput.files[0];
-    const arrayBuffer = await file.arrayBuffer();
-    const replayData = new Uint8Array(arrayBuffer);
-    
-    try {
-        // Validate the replay first
-        const validation = validate_replay(replayData);
-        if (!validation.valid) {
-            console.error('Invalid replay:', validation.error);
-            return;
-        }
-        
-        // Get basic replay information
-        const info = get_replay_info(replayData);
-        console.log('Replay info:', info);
-        
-        // Get column headers (useful for understanding data structure)
-        const headers = get_column_headers();
-        console.log('Column headers:', headers);
-        
-        // Option 1: Get numerical data as NDArray
-        const ndarrayResult = get_ndarray_with_info(replayData, null, null, 10.0);
-        console.log('NDArray data:', ndarrayResult.array_data);
-        console.log('NDArray shape:', ndarrayResult.shape);
-        console.log('Metadata:', ndarrayResult.metadata);
-        
-        // Option 2: Get structured frame data
-        const frameData = get_replay_frames_data(replayData);
-        console.log('Frame data:', frameData);
-        
-        // Option 3: Get just metadata without processing frames
-        const metadata = get_replay_meta(replayData);
-        console.log('Metadata only:', metadata);
-        
-    } catch (error) {
-        console.error('Error processing replay:', error);
-    }
-}
-```
+await init();
 
-### Node.js
-
-```javascript
-const { 
-    parse_replay, 
-    get_ndarray_with_info, 
-    get_replay_meta, 
-    get_column_headers, 
-    get_replay_frames_data, 
-    validate_replay, 
-    get_replay_info 
-} = require('rl-replay-subtr-actor');
-const fs = require('fs');
-
-// Read replay file
-const replayData = fs.readFileSync('path/to/replay.replay');
-
-try {
-    // Validate and get basic info
-    const validation = validate_replay(replayData);
-    if (!validation.valid) {
-        console.error('Invalid replay:', validation.error);
-        return;
-    }
-    
-    const info = get_replay_info(replayData);
-    console.log('Replay info:', info);
-    
-    // Get NDArray data with custom feature adders and FPS
-    const result = get_ndarray_with_info(
-        replayData,
-        ['BallRigidBody'],                           // global features
-        ['PlayerRigidBody', 'PlayerBoost'],         // player features  
-        30.0                                        // FPS
-    );
-    
-    console.log('Array data shape:', result.shape);
-    console.log('First few rows:', result.array_data.slice(0, 5));
-    
-    // Get structured frame data
-    const frameData = get_replay_frames_data(replayData);
-    console.log('Number of frames:', frameData.frames.length);
-    
-} catch (error) {
-    console.error('Error:', error);
-}
-```
-
-### Advanced Usage with Custom Feature Adders
-
-```javascript
-// Get available column headers for different configurations
-const defaultHeaders = get_column_headers();
-console.log('Default headers:', defaultHeaders);
-
-const customHeaders = get_column_headers(
-    ['BallRigidBody', 'GameTime'],           // global features
-    ['PlayerRigidBody', 'PlayerBoost', 'PlayerAnyJump', 'PlayerDoubleJump']  // player features
+const replayData = new Uint8Array(
+  await fetch("/example.replay").then((response) => response.arrayBuffer())
 );
-console.log('Custom headers:', customHeaders);
 
-// Process with custom configuration
-const customResult = get_ndarray_with_info(
-    replayData,
-    ['BallRigidBody', 'GameTime'],
-    ['PlayerRigidBody', 'PlayerBoost', 'PlayerAnyJump'],
-    60.0  // High FPS for detailed analysis
+const validation = validate_replay(replayData);
+if (!validation.valid) {
+  throw new Error(validation.error ?? "Replay is not valid");
+}
+
+const info = get_replay_info(replayData);
+const headers = get_column_headers(
+  ["BallRigidBody", "SecondsRemaining"],
+  ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]
 );
+const ndarrayResult = get_ndarray_with_info(
+  replayData,
+  ["BallRigidBody", "SecondsRemaining"],
+  ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
+  10.0
+);
+const metadata = get_replay_meta(replayData);
+const frameData = get_replay_frames_data(replayData);
+
+console.log(info);
+console.log(headers.player_headers.slice(0, 5));
+console.log(ndarrayResult.shape);
+console.log(metadata.replay_meta.player_stats.length);
+console.log(frameData.meta.map_name);
 ```
 
-## API Reference
+## API Surface
 
-### Core Functions
+### `validate_replay(data: Uint8Array)`
 
-#### `validate_replay(data: Uint8Array): {valid: boolean, message?: string, error?: string}`
-Validates that the replay file can be parsed successfully.
+Validate that replay bytes can be parsed successfully.
 
-#### `get_replay_info(data: Uint8Array): object`
-Gets basic replay information including version numbers and property counts.
+Return shape:
 
-#### `parse_replay(data: Uint8Array): object`
-Parses the raw replay data and returns the complete boxcars Replay structure.
+```javascript
+{ valid: true, message: "Replay is valid" }
+```
 
-### NDArray Functions (Numerical Data)
+or:
 
-#### `get_ndarray_with_info(data: Uint8Array, globalFeatures?: string[], playerFeatures?: string[], fps?: number): object`
-Returns numerical data suitable for machine learning analysis.
+```javascript
+{ valid: false, error: "..." }
+```
 
-**Parameters:**
-- `data` - Replay file data
-- `globalFeatures` - Array of global feature names (default: `["BallRigidBody"]`)
-- `playerFeatures` - Array of player feature names (default: `["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]`)
-- `fps` - Frames per second for processing (default: 10.0)
+### `get_replay_info(data: Uint8Array)`
 
-**Returns:**
+Return lightweight replay metadata including version numbers and property counts.
+
+### `parse_replay(data: Uint8Array)`
+
+Parse raw replay bytes and return the full replay structure as plain JS data.
+
+### `get_ndarray_with_info(data, globalFeatureAdders?, playerFeatureAdders?, fps?)`
+
+Return numerical replay data suitable for analysis or ML.
+
+Defaults:
+
+- global features: `["BallRigidBody"]`
+- player features: `["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]`
+- FPS: `10.0`
+
+Return shape:
+
 ```javascript
 {
-    metadata: {
-        replay_meta: { /* replay metadata */ },
-        column_headers: {
-            global_headers: string[],
-            player_headers: string[]
-        }
+  metadata: {
+    replay_meta: { /* replay metadata */ },
+    column_headers: {
+      global_headers: string[],
+      player_headers: string[],
     },
-    array_data: number[][],  // 2D array of numerical data
-    shape: number[]          // [rows, columns]
+  },
+  array_data: number[][],
+  shape: number[],
 }
 ```
 
-#### `get_replay_meta(data: Uint8Array, globalFeatures?: string[], playerFeatures?: string[]): object`
-Gets only the metadata without processing frame data (faster).
+### `get_replay_meta(data, globalFeatureAdders?, playerFeatureAdders?)`
 
-#### `get_column_headers(globalFeatures?: string[], playerFeatures?: string[]): object`
-Gets column headers for understanding the data structure.
+Return replay metadata plus column headers without building the full ndarray.
 
-### Structured Data Functions
+### `get_column_headers(globalFeatureAdders?, playerFeatureAdders?)`
 
-#### `get_replay_frames_data(data: Uint8Array): object`
-Returns structured frame-by-frame data with full game state information.
+Return only the ndarray header layout for a given feature configuration.
 
-**Returns:**
-```javascript
-{
-    frames: [
-        {
-            time: number,
-            actors: { /* actor state data */ },
-            // ... other frame data
-        }
-    ],
-    // ... other replay data
-}
-```
+### `get_replay_frames_data(data)`
 
-### Feature Adders
+Return structured frame-by-frame data from `ReplayDataCollector`. This path does not do FPS resampling.
 
-Available feature adder strings for customizing data collection:
+## Common Feature Names
 
-**Global Features:**
-- `"BallRigidBody"` - Ball position, velocity, rotation
-- `"GameTime"` - Game time information
+See the [subtr-actor ndarray docs](https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html) for the full list.
 
-**Player Features:**
-- `"PlayerRigidBody"` - Player position, velocity, rotation
-- `"PlayerBoost"` - Boost amount and usage in raw replay units (`0-255`)
-- `"PlayerAnyJump"` - Jump state
-- `"PlayerDoubleJump"` - Double jump state
-- And many more... (see [subtr-actor documentation](https://docs.rs/subtr-actor/latest/subtr_actor/collector/ndarray/index.html))
+Common global features:
+
+- `"BallRigidBody"`
+- `"CurrentTime"`
+- `"SecondsRemaining"`
+
+Common player features:
+
+- `"PlayerRigidBody"`
+- `"PlayerBoost"`
+- `"PlayerAnyJump"`
+- `"PlayerDoubleJump"`
+
+`"PlayerBoost"` is exposed in raw replay units (`0-255`), not percentage.
 
 ## Building from Source
 
 Requirements:
+
 - Rust toolchain
-- wasm-pack
-- just (command runner)
+- `wasm-pack`
+- `just`
+- `npm`
+
+Repository-local bundler build:
 
 ```bash
-# Clone the repository
-git clone https://github.com/rlrml/subtr-actor.git
-cd subtr-actor
-
-# Build the WASM package
 just build-js
 ```
 
-### Monorepo Dependency Management
+Publishable web build from `js/package.json`:
 
-This package is part of the [subtr-actor](https://github.com/rlrml/subtr-actor) monorepo. The Cargo.toml uses a dual dependency specification:
+```bash
+npm --prefix js install
+npm --prefix js run build
+```
+
+Other package targets:
+
+```bash
+npm --prefix js run build:nodejs
+npm --prefix js run build:bundler
+```
+
+Tests:
+
+```bash
+npm --prefix js test
+```
+
+The example app under [`js/example`](./example/README.md) uses the web target and expects `js/pkg/` to be built with `wasm-pack build --target web --out-dir pkg`.
+
+## Publishing Notes
+
+This binding depends on the workspace crate via:
 
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.1.10"
+version = "0.1.17"
 ```
 
-This allows:
-- **Local development**: Cargo uses the `path` dependency, so changes to the main `subtr-actor` crate are immediately available for testing
-- **Publishing**: crates.io/npm strips the `path` and uses the `version`, ensuring the published package depends on the published crate
-
-Use `just bump <version>` to update all versions in sync (workspace version and dependency versions).
-
-### Publishing
-
-To publish all packages in the correct order:
-
-```bash
-just publish-all  # Publishes: Rust crate → Python bindings → JS bindings
-```
-
-Or publish individually:
-
-```bash
-just publish-rust   # Publish main Rust crate first
-just publish-js     # Then publish JS bindings
-```
-
-**Important**: The main `subtr-actor` Rust crate must be published to crates.io before publishing the bindings, as the published bindings depend on the published crate version.
-
-## TypeScript Support
-
-The package includes TypeScript definitions. All functions return proper JavaScript objects (not strings), making them easy to use with TypeScript.
+That keeps local development wired to the workspace crate while still pinning the published crate version. Use `just bump <version>` to update the versions together.
 
 ## License
 

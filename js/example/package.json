@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "build-wasm": "cd .. && wasm-pack build --target web --out-dir pkg",
-    "dev-with-wasm": "yarn build-wasm && yarn dev"
+    "dev-with-wasm": "npm run build-wasm && npm run dev"
   },
   "dependencies": {
     "chart.js": "^4.4.0",

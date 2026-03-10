@@ -2,7 +2,7 @@
 
 [![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm](https://img.shields.io/npm/v/rl-replay-subtr-actor?style=flat-square)](https://www.npmjs.com/package/rl-replay-subtr-actor) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
-`subtr-actor` turns Rocket League replay files into data that is easier to work with than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
+`subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
 It supports two main workflows:
 
@@ -17,13 +17,13 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM: [`rl-replay-subtr-actor`](https://www.npmjs.com/package/rl-replay-subtr-actor)
 
-## What It Gives You
+## What You Get
 
 - A higher-level replay model built from `boxcars`
 - Frame-by-frame structured game state via `ReplayDataCollector`
 - Configurable numeric feature extraction via `NDArrayCollector`
 - Frame-rate resampling with `FrameRateDecorator`
-- The same replay-processing model across Rust, Python, and JS
+- A similar replay-processing model across Rust, Python, and JS
 
 ## Installation
 
@@ -31,7 +31,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 ```toml
 [dependencies]
-subtr-actor = "0.1.15"
+subtr-actor = "0.1.17"
 ```
 
 ### Python
@@ -112,7 +112,7 @@ import subtr_actor
 
 meta, ndarray = subtr_actor.get_ndarray_with_info_from_replay_filepath(
     "example.replay",
-    global_feature_adders=["BallRigidBody"],
+    global_feature_adders=["BallRigidBody", "SecondsRemaining"],
     player_feature_adders=["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
     fps=10.0,
     dtype="float32",
@@ -125,15 +125,23 @@ print(meta["column_headers"]["player_headers"][:5])
 ### JavaScript
 
 ```javascript
-import init, { get_ndarray_with_info } from 'rl-replay-subtr-actor';
+import init, { get_ndarray_with_info, validate_replay } from "rl-replay-subtr-actor";
 
 await init();
 
-const replayData = new Uint8Array(await fetch('example.replay').then((r) => r.arrayBuffer()));
+const replayData = new Uint8Array(
+  await fetch("example.replay").then((response) => response.arrayBuffer())
+);
+
+const validation = validate_replay(replayData);
+if (!validation.valid) {
+  throw new Error(validation.error ?? "Replay is not valid");
+}
+
 const result = get_ndarray_with_info(
   replayData,
-  ['BallRigidBody'],
-  ['PlayerRigidBody', 'PlayerBoost', 'PlayerAnyJump'],
+  ["BallRigidBody", "SecondsRemaining"],
+  ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
   10.0
 );
 
@@ -149,7 +157,7 @@ Use this when you want a serializable, frame-by-frame representation of the repl
 
 ### `NDArrayCollector`
 
-Use this when you want numeric features in a 2D matrix. You choose which global and player features to include, either by constructing feature adders directly in Rust or by referring to them by string names in bindings.
+Use this when you want numeric features in a 2D matrix. In Rust you construct feature adders directly; in the Python and JS bindings you provide feature-adder names as strings.
 
 ### `FrameRateDecorator`
 
@@ -169,6 +177,7 @@ These are useful when working through the Python or JavaScript bindings:
 - Rust API docs: <https://docs.rs/subtr-actor>
 - Python package README: [python/README.md](./python/README.md)
 - JavaScript package README: [js/README.md](./js/README.md)
+- Example app: [js/example/README.md](./js/example/README.md)
 - Release notes and process: [RELEASING.md](./RELEASING.md)
 
 ## Development
@@ -186,6 +195,8 @@ Bindings:
 just build-python
 just build-js
 ```
+
+`just build-js` builds the repo-local bundler target into `js/pkg`. To build the web-target package that matches `npm publish`, run `npm --prefix js install` once and then `npm --prefix js run build`.
 
 ## License
 
