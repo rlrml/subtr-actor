@@ -767,6 +767,47 @@ fn test_positioning_reducer_collects_distances_and_percent_buckets() {
 }
 
 #[test]
+fn test_positioning_reducer_uses_field_marking_thirds_boundary() {
+    let player_id = epic_id("positioning-thirds-boundary");
+    let mut reducer = PositioningReducer::new();
+    let ball = BallSample {
+        rigid_body: sample_rigid_body(0.0, 0.0, 0.0),
+    };
+
+    for (frame_number, y) in [(1, 2000.0), (2, 3000.0), (3, -3000.0)] {
+        reducer
+            .on_sample(&StatsSample {
+                frame_number,
+                time: frame_number as f32,
+                dt: 1.0,
+                seconds_remaining: Some(100 - frame_number as i32),
+                game_state: Some(0),
+                team_zero_score: None,
+                team_one_score: None,
+                possession_team_is_team_0: None,
+                scored_on_team_is_team_0: None,
+                ball: Some(ball.clone()),
+                players: vec![PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, y, 17.0)),
+                    ..sample_player(player_id.clone(), true)
+                }],
+                active_demos: Vec::new(),
+                demo_events: Vec::new(),
+                boost_pad_events: Vec::new(),
+                touch_events: Vec::new(),
+                player_stat_events: Vec::new(),
+                goal_events: Vec::new(),
+            })
+            .unwrap();
+    }
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.time_neutral_third, 1.0);
+    assert_eq!(stats.time_offensive_third, 1.0);
+    assert_eq!(stats.time_defensive_third, 1.0);
+}
+
+#[test]
 fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets() {
     let mut reducer = PositioningReducer::new();
     let team_zero_id = epic_id("team-zero-positioning");
