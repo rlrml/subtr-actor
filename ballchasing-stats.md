@@ -46,7 +46,7 @@
 | Demos taken by player | `ReplayProcessor.demolishes`, `get_active_demos` | Count victim occurrences by player | None | `Available` |
 | Kills, Deaths on timeline | Same demolish events | Emit timeline events from demolish timestamps | None | `Available` |
 | Team touch events | `TAGame.Ball_TA:HitTeamNum` updates | Extract exact touch timestamps from `HitTeamNum` attribute updates; these include same-team consecutive touches, not just possession changes | None | `Available` |
-| Player touch attribution | Exact team touch events plus nearest-car heuristic | Attach the nearest player on the touching team at the touch frame when the ball/car distance is reasonable | None | `Partial` |
+| Player touch attribution | Exact team touch events plus motion-aware car ranking | Use velocity-applied ball/car states at the touch frame and rank touching-team players by short-window closest approach to the ball; this is still heuristic, but more faithful than raw nearest-car distance | None | `Partial` |
 | Ball has been hit | `get_ball_has_been_hit` | Useful kickoff-phase signal, but not enough for possession/touches by itself | None | `Available` |
 
 ## Existing Time-Integrated Signals
@@ -104,7 +104,6 @@
   - per-touch player
   - touch timestamp
   - team in possession after touch
-- If nonstandard-map parity matters, replace the current observed-centroid fallback with a dedicated per-map pad layout source
 - Improve goal event extraction further:
   - replace current replay-mode dedupe window with a stronger replay-state signal if we find one
 - Consider a normalized sample struct for reducers:

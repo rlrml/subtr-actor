@@ -208,6 +208,44 @@ fn test_processor_extracts_touch_events() {
     );
 }
 
+#[test]
+fn test_touch_attribution_usually_matches_goal_scorer() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for touch attribution quality");
+
+    let mut matched = 0usize;
+    let mut total_with_scorer = 0usize;
+    for goal_event in processor.goal_events.iter().filter(|event| event.player.is_some()) {
+        total_with_scorer += 1;
+        let last_touch = processor.touch_events.iter().rev().find(|touch| {
+            touch.frame <= goal_event.frame
+                && touch.team_is_team_0 == goal_event.scoring_team_is_team_0
+                && touch.player.is_some()
+        });
+        if last_touch
+            .and_then(|touch| touch.player.as_ref())
+            .zip(goal_event.player.as_ref())
+            .map(|(touch_player, scorer)| touch_player == scorer)
+            .unwrap_or(false)
+        {
+            matched += 1;
+        }
+    }
+
+    assert!(
+        total_with_scorer > 0,
+        "Expected the replay to expose at least one goal scorer for attribution comparison"
+    );
+    assert!(
+        matched * 2 >= total_with_scorer,
+        "Expected motion-aware touch attribution to match the replay-derived goal scorer for a majority of scorable goals, matched {matched}/{total_with_scorer}"
+    );
+}
+
 /// Regression: new-format demolish payloads still need car->player resolution even
 /// when same-frame cleanup clears the player link to `ActorId(-1)`.
 #[test]

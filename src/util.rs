@@ -334,6 +334,53 @@ pub fn apply_velocities_to_rigid_body(
     interpolated
 }
 
+/// Ranks how plausible it is that `player_body` was the car that touched the
+/// ball near the current frame, using constant-velocity closest approach.
+///
+/// The frame's ball state can already be slightly post-contact, so we do not
+/// just compare current distance. Instead we look for the minimum ball/car
+/// separation over a short window centered slightly before the frame time.
+pub(crate) fn touch_candidate_rank(
+    ball_body: &boxcars::RigidBody,
+    player_body: &boxcars::RigidBody,
+) -> Option<(f32, f32)> {
+    const TOUCH_LOOKBACK_SECONDS: f32 = 0.12;
+    const TOUCH_LOOKAHEAD_SECONDS: f32 = 0.03;
+
+    let relative_position = vec_to_glam(&player_body.location) - vec_to_glam(&ball_body.location);
+    let current_distance = relative_position.length();
+    if !current_distance.is_finite() {
+        return None;
+    }
+
+    let relative_velocity = vec_to_glam(
+        &player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+    ) - vec_to_glam(
+        &ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+    );
+    let relative_speed_squared = relative_velocity.length_squared();
+    let closest_time = if relative_speed_squared > f32::EPSILON {
+        (-relative_position.dot(relative_velocity) / relative_speed_squared)
+            .clamp(-TOUCH_LOOKBACK_SECONDS, TOUCH_LOOKAHEAD_SECONDS)
+    } else {
+        0.0
+    };
+    let closest_distance = (relative_position + relative_velocity * closest_time).length();
+    if !closest_distance.is_finite() {
+        return None;
+    }
+
+    Some((closest_distance, current_distance))
+}
+
 fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> boxcars::Quaternion {
     // XXX: This approach seems to give some unexpected results. There may be a
     // unit mismatch or some other type of issue.

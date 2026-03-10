@@ -1032,27 +1032,29 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    fn estimate_touching_player(&self, touch_team_is_team_0: bool) -> Option<PlayerId> {
+    fn estimate_touching_player(
+        &self,
+        touch_team_is_team_0: bool,
+        target_time: f32,
+    ) -> Option<PlayerId> {
         const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
 
-        let ball_position = vec_to_glam(&self.get_ball_rigid_body().ok()?.location);
+        let ball_rigid_body = self.get_velocity_applied_ball_rigid_body(target_time).ok()?;
         self.iter_player_ids_in_order()
             .filter(|player_id| {
                 self.get_player_is_team_0(player_id).ok() == Some(touch_team_is_team_0)
             })
             .filter_map(|player_id| {
-                self.get_player_rigid_body(player_id)
+                self.get_velocity_applied_player_rigid_body(player_id, target_time)
                     .ok()
-                    .map(|rigid_body| {
-                        (
-                            player_id.clone(),
-                            ball_position.distance(vec_to_glam(&rigid_body.location)),
-                        )
+                    .and_then(|rigid_body| {
+                        touch_candidate_rank(&ball_rigid_body, &rigid_body)
+                            .map(|rank| (player_id.clone(), rank))
                     })
             })
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .and_then(|(player_id, distance)| {
-                (distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(player_id)
+            .and_then(|(player_id, (closest_distance, _current_distance))| {
+                (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(player_id)
             })
     }
 
@@ -1081,7 +1083,7 @@ impl<'a> ReplayProcessor<'a> {
                 time: frame.time,
                 frame: frame_index,
                 team_is_team_0,
-                player: self.estimate_touching_player(team_is_team_0),
+                player: self.estimate_touching_player(team_is_team_0, frame.time),
             };
             self.current_frame_touch_events.push(event.clone());
             self.touch_events.push(event);
