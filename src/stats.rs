@@ -1804,6 +1804,7 @@ pub struct BoostReducer {
     known_pad_sizes: HashMap<String, BoostPadSize>,
     known_pad_indices: HashMap<String, usize>,
     pending_pickups: HashMap<String, PendingBoostPickup>,
+    unavailable_pads: HashSet<String>,
     seen_pickup_sequences: HashSet<(String, u8)>,
     pickup_frames: HashMap<(String, PlayerId), usize>,
 }
@@ -2039,6 +2040,9 @@ impl StatsReducer for BoostReducer {
                     if !live_play && !self.config.include_non_live_pickups {
                         continue;
                     }
+                    if self.unavailable_pads.contains(&event.pad_id) {
+                        continue;
+                    }
                     let Some(player_id) = &event.player else {
                         continue;
                     };
@@ -2053,6 +2057,7 @@ impl StatsReducer for BoostReducer {
                     {
                         continue;
                     }
+                    self.unavailable_pads.insert(event.pad_id.clone());
                     let Some(player) = sample
                         .players
                         .iter()
@@ -2087,6 +2092,7 @@ impl StatsReducer for BoostReducer {
                     }
                 }
                 BoostPadEventKind::Available => {
+                    self.unavailable_pads.remove(&event.pad_id);
                     let Some(pending_pickup) = self.pending_pickups.remove(&event.pad_id) else {
                         continue;
                     };
