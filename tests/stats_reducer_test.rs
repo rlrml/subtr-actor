@@ -1421,6 +1421,8 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
 
     let stats = reducer.player_stats().get(&player_id).unwrap();
     assert!((stats.average_boost_amount() - 127.5).abs() < 1e-4);
+    assert!((stats.time_zero_boost - (1.0 / 255.0)).abs() < 1e-4);
+    assert!((stats.time_hundred_boost - (1.0 / 255.0)).abs() < 1e-4);
     assert!((stats.time_boost_0_25 - 0.25).abs() < 1e-4);
     assert!((stats.time_boost_25_50 - 0.25).abs() < 1e-4);
     assert!((stats.time_boost_50_75 - 0.25).abs() < 1e-4);

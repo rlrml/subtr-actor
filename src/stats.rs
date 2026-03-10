@@ -549,6 +549,8 @@ const HIGH_AIR_Z_THRESHOLD: f32 = 642.775;
 // closely than a literal geometric third of the full playable length.
 const FIELD_THIRD_LENGTH_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
+const BOOST_ZERO_BAND_RAW: f32 = 1.0;
+const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
 const STANDARD_PAD_MATCH_RADIUS: f32 = 400.0;
 const BOOST_PAD_MIDFIELD_TOLERANCE_Y: f32 = 128.0;
 const BOOST_PAD_SMALL_Z: f32 = 70.0;
@@ -2028,14 +2030,24 @@ impl StatsReducer for BoostReducer {
                 team_stats.tracked_time += sample.dt;
                 team_stats.boost_integral += average_boost_amount * sample.dt;
 
-                if boost_amount <= 0.0 {
-                    stats.time_zero_boost += sample.dt;
-                    team_stats.time_zero_boost += sample.dt;
-                }
-                if boost_amount >= BOOST_MAX_AMOUNT {
-                    stats.time_hundred_boost += sample.dt;
-                    team_stats.time_hundred_boost += sample.dt;
-                }
+                let time_zero_boost = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        0.0,
+                        BOOST_ZERO_BAND_RAW,
+                    );
+                let time_hundred_boost = sample.dt
+                    * Self::interval_fraction_in_boost_range(
+                        previous_boost_amount,
+                        boost_amount,
+                        BOOST_FULL_BAND_MIN_RAW,
+                        BOOST_MAX_AMOUNT + 1.0,
+                    );
+                stats.time_zero_boost += time_zero_boost;
+                team_stats.time_zero_boost += time_zero_boost;
+                stats.time_hundred_boost += time_hundred_boost;
+                team_stats.time_hundred_boost += time_hundred_boost;
 
                 let time_boost_0_25 = sample.dt
                     * Self::interval_fraction_in_boost_range(
