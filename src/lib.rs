@@ -175,6 +175,7 @@ pub mod constants;
 pub mod error;
 pub mod processor;
 pub mod stats;
+pub mod stats_export;
 pub mod util;
 
 #[cfg(test)]
@@ -186,4 +187,5 @@ pub use crate::constants::*;
 pub use crate::error::*;
 pub use crate::processor::*;
 pub use crate::stats::*;
+pub use crate::stats_export::*;
 pub use crate::util::*;
