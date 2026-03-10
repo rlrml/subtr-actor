@@ -122,8 +122,7 @@ fn test_find_update_in_direction() {
 fn test_touch_candidate_rank_prefers_recent_closest_approach() {
     let ball = sample_rigid_body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     let near_but_static = sample_rigid_body(120.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-    let slightly_farther_but_recently_closer =
-        sample_rigid_body(180.0, 0.0, 0.0, 1500.0, 0.0, 0.0);
+    let slightly_farther_but_recently_closer = sample_rigid_body(180.0, 0.0, 0.0, 1500.0, 0.0, 0.0);
 
     let near_rank = touch_candidate_rank(&ball, &near_but_static).unwrap();
     let recent_rank = touch_candidate_rank(&ball, &slightly_farther_but_recently_closer).unwrap();

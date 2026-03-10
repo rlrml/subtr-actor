@@ -99,6 +99,18 @@ fn test_replay_data_exposes_powerslide_activity() {
         powerslide_false_count > 0,
         "Expected rlcs.replay to contain at least one non-powerslide frame"
     );
+    assert!(
+        !replay_data.touch_events.is_empty(),
+        "Expected replay data to expose exact touch events"
+    );
+    assert!(
+        !replay_data.goal_events.is_empty(),
+        "Expected replay data to expose exact goal events"
+    );
+    assert!(
+        !replay_data.player_stat_events.is_empty(),
+        "Expected replay data to expose exact player stat events"
+    );
 }
 
 #[test]

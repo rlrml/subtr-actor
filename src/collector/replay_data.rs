@@ -485,6 +485,10 @@ pub struct FrameData {
 /// * `frame_data` - All frame-by-frame data including ball, player, and metadata information
 /// * `meta` - Replay metadata including player information, game settings, and statistics
 /// * `demolish_infos` - Information about all demolition events that occurred during the replay
+/// * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
+/// * `touch_events` - Exact team touch events plus attributed player when available
+/// * `player_stat_events` - Exact shot/save/assist counter increment events
+/// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
 ///
 /// # Example
 ///
@@ -514,6 +518,14 @@ pub struct ReplayData {
     pub meta: ReplayMeta,
     /// Information about all demolition events that occurred during the replay
     pub demolish_infos: Vec<DemolishInfo>,
+    /// Exact boost pad pickup and availability events observed during the replay
+    pub boost_pad_events: Vec<BoostPadEvent>,
+    /// Exact touch events observed during the replay
+    pub touch_events: Vec<TouchEvent>,
+    /// Exact player stat counter increments observed during the replay
+    pub player_stat_events: Vec<PlayerStatEvent>,
+    /// Exact goal events observed during the replay
+    pub goal_events: Vec<GoalEvent>,
 }
 
 impl ReplayData {
@@ -733,6 +745,10 @@ impl ReplayDataCollector {
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes,
+            boost_pad_events: processor.boost_pad_events,
+            touch_events: processor.touch_events,
+            player_stat_events: processor.player_stat_events,
+            goal_events: processor.goal_events,
             frame_data: self.get_frame_data(),
         })
     }
