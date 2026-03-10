@@ -545,10 +545,9 @@ const GROUND_Z_THRESHOLD: f32 = 20.0;
 // Ballchasing's high-air bucket lines up more closely with goal-height-scale
 // aerials than with generic "off the ground" time.
 const HIGH_AIR_Z_THRESHOLD: f32 = 642.775;
-const FIELD_HALF_LENGTH_Y: f32 = 5120.0;
-// Ballchasing's thirds split tracks the standard soccar field markings more
+// Ballchasing's thirds split tracks the standard soccar lane markings more
 // closely than a literal geometric third of the full playable length.
-const FIELD_THIRD_LENGTH_Y: f32 = FIELD_HALF_LENGTH_Y / 2.0;
+const FIELD_THIRD_LENGTH_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const STANDARD_PAD_MATCH_RADIUS: f32 = 400.0;
 const BOOST_PAD_MIDFIELD_TOLERANCE_Y: f32 = 128.0;
