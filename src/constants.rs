@@ -17,15 +17,23 @@ pub static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
 
 pub static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
 pub static BOOST_REPLICATED_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoost";
+pub static BALL_HIT_TEAM_NUM_KEY: &str = "TAGame.Ball_TA:HitTeamNum";
 pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
 pub static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
 pub static DEMOLISH_GOAL_EXPLOSION_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishGoalExplosion";
 pub static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
-pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
 pub static HANDBRAKE_KEY: &str = "TAGame.Vehicle_TA:bReplicatedHandbrake";
+pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
+pub static MATCH_ASSISTS_KEY: &str = "TAGame.PRI_TA:MatchAssists";
+pub static MATCH_GOALS_KEY: &str = "TAGame.PRI_TA:MatchGoals";
+pub static MATCH_SAVES_KEY: &str = "TAGame.PRI_TA:MatchSaves";
+pub static MATCH_SCORE_KEY: &str = "TAGame.PRI_TA:MatchScore";
+pub static MATCH_SHOTS_KEY: &str = "TAGame.PRI_TA:MatchShots";
 pub static PLAYER_NAME_KEY: &str = "Engine.PlayerReplicationInfo:PlayerName";
+pub static REPLICATED_SCORED_ON_TEAM_KEY: &str = "TAGame.GameEvent_Soccar_TA:ReplicatedScoredOnTeam";
 pub static RIGID_BODY_STATE_KEY: &str = "TAGame.RBActor_TA:ReplicatedRBState";
 pub static SECONDS_REMAINING_KEY: &str = "TAGame.GameEvent_Soccar_TA:SecondsRemaining";
+pub static TEAM_GAME_SCORE_KEY: &str = "TAGame.Team_Soccar_TA:GameScore";
 pub static REPLICATED_STATE_NAME_KEY: &str = "TAGame.GameEvent_TA:ReplicatedStateName";
 pub static REPLICATED_GAME_STATE_TIME_REMAINING_KEY: &str =
     "TAGame.GameEvent_TA:ReplicatedGameStateTimeRemaining";

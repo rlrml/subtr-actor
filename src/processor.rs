@@ -1519,6 +1519,20 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    fn get_player_int_stat(
+        &self,
+        player_id: &PlayerId,
+        key: &'static str,
+    ) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_actor_id(player_id)?,
+            key,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
     /// Returns the team key for the specified player.
     pub fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         let team_actor_id = self
@@ -1552,6 +1566,40 @@ impl<'a> ReplayProcessor<'a> {
                 })
             })?
             == '0')
+    }
+
+    fn get_team_actor_id_for_side(&self, is_team_0: bool) -> SubtrActorResult<boxcars::ActorId> {
+        let player_id = if is_team_0 {
+            self.team_zero.first()
+        } else {
+            self.team_one.first()
+        }
+        .ok_or(SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))?;
+
+        self.player_to_team
+            .get(&self.get_player_actor_id(player_id)?)
+            .copied()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name: "Team",
+                    player_id: player_id.clone(),
+                })
+            })
+    }
+
+    pub fn get_team_score(&self, is_team_0: bool) -> SubtrActorResult<i32> {
+        let team_actor_id = self.get_team_actor_id_for_side(is_team_0)?;
+        get_actor_attribute_matching!(
+            self,
+            &team_actor_id,
+            TEAM_GAME_SCORE_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_team_scores(&self) -> SubtrActorResult<(i32, i32)> {
+        Ok((self.get_team_score(true)?, self.get_team_score(false)?))
     }
 
     /// Returns a reference to the [`RigidBody`](boxcars::RigidBody) of the player's car.
@@ -1633,6 +1681,47 @@ impl<'a> ReplayProcessor<'a> {
     pub fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
         self.get_player_boost_level(player_id)
             .map(boost_amount_to_percent)
+    }
+
+    pub fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_ASSISTS_KEY)
+    }
+
+    pub fn get_player_match_goals(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_GOALS_KEY)
+    }
+
+    pub fn get_player_match_saves(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SAVES_KEY)
+    }
+
+    pub fn get_player_match_score(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SCORE_KEY)
+    }
+
+    pub fn get_player_match_shots(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SHOTS_KEY)
+    }
+
+    pub fn get_ball_hit_team_num(&self) -> SubtrActorResult<u8> {
+        let ball_actor_id = self.get_ball_actor_id()?;
+        get_actor_attribute_matching!(
+            self,
+            &ball_actor_id,
+            BALL_HIT_TEAM_NUM_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    pub fn get_scored_on_team_num(&self) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_SCORED_ON_TEAM_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
     }
 
     pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<u8> {

@@ -173,6 +173,7 @@ pub mod collector;
 pub mod constants;
 pub mod error;
 pub mod processor;
+pub mod stats;
 pub mod util;
 
 #[cfg(test)]
@@ -183,4 +184,5 @@ pub use crate::collector::*;
 pub use crate::constants::*;
 pub use crate::error::*;
 pub use crate::processor::*;
+pub use crate::stats::*;
 pub use crate::util::*;
