@@ -542,9 +542,10 @@ const CAR_MAX_SPEED: f32 = 2300.0;
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const GROUND_Z_THRESHOLD: f32 = 20.0;
-// Ballchasing's high-air bucket lines up more closely with goal-height-scale
-// aerials than with generic "off the ground" time.
-const HIGH_AIR_Z_THRESHOLD: f32 = 642.775;
+const BALL_RADIUS_Z: f32 = 92.75;
+// Ballchasing's high-air bucket lines up better with the car center clearing a
+// crossbar-height ball than with plain goal height.
+const HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 // Ballchasing's thirds split tracks the standard soccar lane markings more
 // closely than a literal geometric third of the full playable length.
 const FIELD_THIRD_LENGTH_Y: f32 = BOOST_PAD_SIDE_LANE_Y;

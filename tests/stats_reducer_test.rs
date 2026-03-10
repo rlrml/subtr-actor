@@ -713,7 +713,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
 }
 
 #[test]
-fn test_movement_reducer_uses_goal_height_for_high_air_bucket() {
+fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
     let player_id = epic_id("movement-air-buckets");
     let mut reducer = MovementReducer::new();
 
@@ -757,7 +757,7 @@ fn test_movement_reducer_uses_goal_height_for_high_air_bucket() {
             scored_on_team_is_team_0: None,
             ball: None,
             players: vec![PlayerSample {
-                rigid_body: Some(sample_rigid_body(0.0, 0.0, 700.0)),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 800.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
