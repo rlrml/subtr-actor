@@ -10,6 +10,13 @@ pub struct ReplayStatsTimeline {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DynamicReplayStatsTimeline {
+    pub replay_meta: ReplayMeta,
+    pub timeline_events: Vec<TimelineEvent>,
+    pub frames: Vec<DynamicReplayStatsFrame>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayStatsFrame {
     pub frame_number: usize,
     pub time: f32,
@@ -24,12 +31,31 @@ pub struct ReplayStatsFrame {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DynamicReplayStatsFrame {
+    pub frame_number: usize,
+    pub time: f32,
+    pub dt: f32,
+    pub seconds_remaining: Option<i32>,
+    pub game_state: Option<i32>,
+    pub is_live_play: bool,
+    pub possession: Vec<ExportedStat>,
+    pub team_zero: DynamicTeamStatsSnapshot,
+    pub team_one: DynamicTeamStatsSnapshot,
+    pub players: Vec<DynamicPlayerStatsSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TeamStatsSnapshot {
     pub core: CoreTeamStats,
     pub boost: BoostStats,
     pub movement: MovementStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoTeamStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DynamicTeamStatsSnapshot {
+    pub stats: Vec<ExportedStat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -43,6 +69,68 @@ pub struct PlayerStatsSnapshot {
     pub positioning: PositioningStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoPlayerStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DynamicPlayerStatsSnapshot {
+    pub player_id: PlayerId,
+    pub name: String,
+    pub is_team_0: bool,
+    pub stats: Vec<ExportedStat>,
+}
+
+impl StatFieldProvider for TeamStatsSnapshot {
+    fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
+        self.core.visit_stat_fields(visitor);
+        self.boost.visit_stat_fields(visitor);
+        self.movement.visit_stat_fields(visitor);
+        self.powerslide.visit_stat_fields(visitor);
+        self.demo.visit_stat_fields(visitor);
+    }
+}
+
+impl StatFieldProvider for PlayerStatsSnapshot {
+    fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
+        self.core.visit_stat_fields(visitor);
+        self.boost.visit_stat_fields(visitor);
+        self.movement.visit_stat_fields(visitor);
+        self.positioning.visit_stat_fields(visitor);
+        self.powerslide.visit_stat_fields(visitor);
+        self.demo.visit_stat_fields(visitor);
+    }
+}
+
+impl ReplayStatsFrame {
+    pub fn into_dynamic(self) -> DynamicReplayStatsFrame {
+        DynamicReplayStatsFrame {
+            frame_number: self.frame_number,
+            time: self.time,
+            dt: self.dt,
+            seconds_remaining: self.seconds_remaining,
+            game_state: self.game_state,
+            is_live_play: self.is_live_play,
+            possession: self.possession.stat_fields(),
+            team_zero: DynamicTeamStatsSnapshot {
+                stats: self.team_zero.stat_fields(),
+            },
+            team_one: DynamicTeamStatsSnapshot {
+                stats: self.team_one.stat_fields(),
+            },
+            players: self
+                .players
+                .into_iter()
+                .map(|player| {
+                    let stats = player.stat_fields();
+                    DynamicPlayerStatsSnapshot {
+                        player_id: player.player_id,
+                        name: player.name,
+                        is_team_0: player.is_team_0,
+                        stats,
+                    }
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -102,6 +190,15 @@ impl StatsTimelineCollector {
         Ok(self.into_timeline())
     }
 
+    pub fn get_dynamic_replay_data(
+        mut self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
+        let mut processor = ReplayProcessor::new(replay)?;
+        processor.process(&mut self)?;
+        Ok(self.into_dynamic_timeline())
+    }
+
     pub fn into_timeline(self) -> ReplayStatsTimeline {
         let replay_meta = self
             .replay_meta
@@ -113,6 +210,24 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             frames: self.frames,
+        }
+    }
+
+    pub fn into_dynamic_timeline(self) -> DynamicReplayStatsTimeline {
+        let replay_meta = self
+            .replay_meta
+            .expect("replay metadata should be initialized before building a stats timeline");
+        let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
+        timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
+        timeline_events.sort_by(|left, right| left.time.total_cmp(&right.time));
+        DynamicReplayStatsTimeline {
+            replay_meta,
+            timeline_events,
+            frames: self
+                .frames
+                .into_iter()
+                .map(ReplayStatsFrame::into_dynamic)
+                .collect(),
         }
     }
 

@@ -9,6 +9,13 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
 }
 
+fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a ExportedStat {
+    fields
+        .iter()
+        .find(|field| field.descriptor.domain == domain && field.descriptor.name == name)
+        .unwrap_or_else(|| panic!("Missing field {domain}.{name}"))
+}
+
 #[test]
 fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let replay = parse_replay("assets/replays/test/rlcs.replay");
@@ -163,5 +170,53 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
             .windows(2)
             .all(|events| events[1].time >= events[0].time),
         "Expected emitted timeline events to be time sorted"
+    );
+}
+
+#[test]
+fn test_stats_timeline_collector_can_export_dynamic_stats() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let typed_timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected typed stats timeline data");
+    let dynamic_timeline = StatsTimelineCollector::new()
+        .get_dynamic_replay_data(&replay)
+        .expect("Expected dynamic stats timeline data");
+
+    let typed_frame = typed_timeline
+        .frames
+        .last()
+        .expect("Expected typed final frame");
+    let dynamic_frame = dynamic_timeline
+        .frames
+        .last()
+        .expect("Expected dynamic final frame");
+
+    assert_eq!(
+        find_field(&dynamic_frame.possession, "possession", "team_zero_time").value,
+        StatValue::Float(typed_frame.possession.team_zero_time)
+    );
+    assert_eq!(
+        find_field(&dynamic_frame.team_zero.stats, "core", "goals").value,
+        StatValue::Signed(typed_frame.team_zero.core.goals)
+    );
+
+    let typed_player = typed_frame
+        .players
+        .first()
+        .expect("Expected at least one player");
+    let dynamic_player = dynamic_frame
+        .players
+        .iter()
+        .find(|player| player.player_id == typed_player.player_id)
+        .expect("Expected matching dynamic player");
+
+    assert_eq!(
+        find_field(&dynamic_player.stats, "positioning", "percent_behind_ball").value,
+        StatValue::Float(typed_player.positioning.behind_ball_pct())
+    );
+    assert_eq!(
+        find_field(&dynamic_player.stats, "movement", "total_distance").value,
+        StatValue::Float(typed_player.movement.total_distance)
     );
 }
