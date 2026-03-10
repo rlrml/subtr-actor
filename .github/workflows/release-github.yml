@@ -1,0 +1,70 @@
+name: Release GitHub
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: true
+
+jobs:
+  publish:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            tag_name="${GITHUB_REF_NAME}"
+          else
+            tag_name="v${{ github.event.inputs.version }}"
+          fi
+
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag_name#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release notes from changelog
+        run: |
+          python3 scripts/extract_release_notes.py "${{ steps.release.outputs.version }}" > release-notes.md
+
+      - name: Create or update GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release edit "${TAG_NAME}" \
+              --title "${TAG_NAME}" \
+              --notes-file release-notes.md
+            echo "Updated GitHub release ${TAG_NAME}."
+          else
+            gh release create "${TAG_NAME}" \
+              --verify-tag \
+              --title "${TAG_NAME}" \
+              --notes-file release-notes.md
+            echo "Created GitHub release ${TAG_NAME}."
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### GitHub Release Published"
+            echo "Created or updated the release page for ${{ steps.release.outputs.tag_name }}."
+          } >> "$GITHUB_STEP_SUMMARY"

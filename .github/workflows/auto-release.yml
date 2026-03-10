@@ -83,6 +83,7 @@ jobs:
           dispatch "release-rust.yml" "{\"ref\":\"${TAG_NAME}\",\"inputs\":{\"version\":\"${VERSION}\"}}"
           dispatch "release-python.yml" "{\"ref\":\"${TAG_NAME}\",\"inputs\":{\"version\":\"${VERSION}\"}}"
           dispatch "release-js.yml" "{\"ref\":\"${TAG_NAME}\"}"
+          dispatch "release-github.yml" "{\"ref\":\"${TAG_NAME}\",\"inputs\":{\"version\":\"${VERSION}\"}}"
 
           echo "Dispatched release workflows for ${TAG_NAME}"
 
@@ -98,6 +99,6 @@ jobs:
             {
               echo "### Release Triggered"
               echo "Created tag v${{ steps.get_version.outputs.version }}"
-              echo "Dispatched the JS, Python, and Rust release workflows for that tag."
+              echo "Dispatched the GitHub, JS, Python, and Rust release workflows for that tag."
             } >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -1,6 +1,6 @@
 # Releasing subtr-actor
 
-This document describes how to release new versions of subtr-actor to crates.io, PyPI, and npm.
+This document describes how to release new versions of subtr-actor to GitHub Releases, crates.io, PyPI, and npm.
 
 ## Overview
 
@@ -12,6 +12,13 @@ The project publishes three packages:
 ## Automated Releases (GitHub Actions)
 
 When you push a tag starting with `v` (e.g., `v0.1.11`), the following workflows run automatically:
+
+### GitHub (`release-github.yml`)
+Creates or updates the GitHub Release page for the tag using the matching
+section from `CHANGELOG.md`.
+
+### Rust (`release-rust.yml`)
+Publishes the Rust crate to crates.io.
 
 ### Python (`release-python.yml`)
 Builds wheels for multiple platforms:
@@ -87,8 +94,10 @@ git push origin master --tags
 ### 3. Monitor the Release
 
 - Go to the repository's Actions tab
-- Watch the `Release Python` and `Release JavaScript` workflows
+- Watch the `Release GitHub`, `Release Rust`, `Release Python`, and `Release JavaScript` workflows
 - Once complete, verify packages are available:
+  - https://github.com/rlrml/subtr-actor/releases
+  - https://crates.io/crates/subtr-actor
   - https://pypi.org/project/subtr-actor-py/
   - https://www.npmjs.com/package/rl-replay-subtr-actor
 
