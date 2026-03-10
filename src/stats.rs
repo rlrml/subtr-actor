@@ -545,7 +545,7 @@ fn push_mirror_xy(
     push_mirror_x(pads, x, y, z, size);
 }
 
-fn standard_soccar_boost_pad_layout() -> Vec<(glam::Vec3, BoostPadSize)> {
+fn build_standard_soccar_boost_pad_layout() -> Vec<(glam::Vec3, BoostPadSize)> {
     let mut pads = Vec::with_capacity(34);
 
     push_mirror_y(
@@ -630,7 +630,11 @@ fn standard_soccar_boost_pad_layout() -> Vec<(glam::Vec3, BoostPadSize)> {
 }
 
 static STANDARD_SOCCAR_BOOST_PAD_LAYOUT: LazyLock<Vec<(glam::Vec3, BoostPadSize)>> =
-    LazyLock::new(standard_soccar_boost_pad_layout);
+    LazyLock::new(build_standard_soccar_boost_pad_layout);
+
+pub fn standard_soccar_boost_pad_layout() -> &'static [(glam::Vec3, BoostPadSize)] {
+    STANDARD_SOCCAR_BOOST_PAD_LAYOUT.as_slice()
+}
 
 fn normalized_y(is_team_0: bool, position: glam::Vec3) -> f32 {
     if is_team_0 {
