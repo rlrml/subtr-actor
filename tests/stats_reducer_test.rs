@@ -261,6 +261,45 @@ fn test_powerslide_reducer_requires_ground_contact() {
 }
 
 #[test]
+fn test_powerslide_reducer_allows_small_suspension_height() {
+    let player_id = epic_id("powerslide-suspension-height");
+    let mut reducer = PowerslideReducer::new();
+    let mut player = sample_player(player_id.clone(), true);
+    player.powerslide_active = true;
+    player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 30.0));
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.5,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![player],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .expect("Low-hover handbrake sample should not fail");
+
+    let stats = reducer
+        .player_stats()
+        .get(&player_id)
+        .expect("Player should have powerslide stats");
+    assert_eq!(stats.press_count, 1);
+    assert_eq!(stats.total_duration, 0.5);
+}
+
+#[test]
 fn test_pressure_reducer_tracks_ball_side_time() {
     let replay = parse_replay("assets/replays/test/rlcs.replay");
     let reducer = ReducerCollector::new(PressureReducer::new())

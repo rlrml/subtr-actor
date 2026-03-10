@@ -367,7 +367,7 @@ impl PowerslideReducer {
         player.powerslide_active
             && player
                 .position()
-                .map(|position| position.z <= GROUND_Z_THRESHOLD)
+                .map(|position| position.z <= POWERSLIDE_MAX_Z_THRESHOLD)
                 .unwrap_or(false)
     }
 }
@@ -542,6 +542,7 @@ const CAR_MAX_SPEED: f32 = 2300.0;
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const GROUND_Z_THRESHOLD: f32 = 20.0;
+const POWERSLIDE_MAX_Z_THRESHOLD: f32 = 40.0;
 const BALL_RADIUS_Z: f32 = 92.75;
 // Ballchasing's high-air bucket lines up better with the car center clearing a
 // crossbar-height ball than with plain goal height.
