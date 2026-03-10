@@ -51,7 +51,7 @@ jobs:
 
       - name: Build WASM package
         working-directory: js
-        run: wasm-pack build --target bundler --out-dir pkg
+        run: wasm-pack build --target web --out-dir pkg
 
       - name: Publish to npm
         working-directory: js/pkg
