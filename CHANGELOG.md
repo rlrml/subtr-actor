@@ -6,6 +6,8 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.1.17 - 2026-03-10
+
 - Fix demolition extraction when same-frame replay cleanup clears a car's
   `Engine.Pawn:PlayerReplicationInfo` link to `ActorId(-1)`.
 - Continue collecting demolitions from raw frame updates when same-frame actor
