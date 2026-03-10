@@ -96,6 +96,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -118,6 +119,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -144,6 +146,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(58),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -183,6 +186,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
             dt: 0.5,
             seconds_remaining: Some(100),
             game_state: Some(0),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -209,6 +213,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
             dt: 0.5,
             seconds_remaining: Some(99),
             game_state: Some(0),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -344,6 +349,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -366,6 +372,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(1),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -415,6 +422,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -440,6 +448,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(1),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -490,6 +499,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -512,6 +522,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -608,6 +619,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -633,6 +645,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -658,6 +671,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(58),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -693,6 +707,7 @@ fn test_movement_reducer_uses_goal_height_for_high_air_bucket() {
             dt: 1.0,
             seconds_remaining: Some(100),
             game_state: Some(0),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -718,6 +733,7 @@ fn test_movement_reducer_uses_goal_height_for_high_air_bucket() {
             dt: 1.0,
             seconds_remaining: Some(99),
             game_state: Some(0),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -782,6 +798,7 @@ fn test_positioning_reducer_uses_field_marking_thirds_boundary() {
                 dt: 1.0,
                 seconds_remaining: Some(100 - frame_number as i32),
                 game_state: Some(0),
+                ball_has_been_hit: None,
                 team_zero_score: None,
                 team_one_score: None,
                 possession_team_is_team_0: None,
@@ -900,6 +917,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
@@ -928,6 +946,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
@@ -950,6 +969,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
@@ -978,6 +998,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
@@ -1041,6 +1062,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1066,6 +1088,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1091,6 +1114,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: Some(58),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1126,6 +1150,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1175,6 +1200,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1230,6 +1256,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             dt: 10.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1297,6 +1324,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1329,6 +1357,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
             dt: 10.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1365,6 +1394,172 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
 }
 
 #[test]
+fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
+    let player_id = epic_id("boost-pre-touch-kickoff");
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 0.0,
+            dt: 1.0,
+            seconds_remaining: Some(300),
+            game_state: Some(58),
+            ball_has_been_hit: Some(false),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(200.0),
+                boost_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 0.0,
+                frame: 1,
+                pad_id: "VehiclePickup_Boost_TA_63".to_string(),
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 1 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 10.0,
+            dt: 10.0,
+            seconds_remaining: Some(290),
+            game_state: Some(58),
+            ball_has_been_hit: Some(true),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 10.0,
+                frame: 2,
+                pad_id: "VehiclePickup_Boost_TA_63".to_string(),
+                player: None,
+                kind: BoostPadEventKind::Available,
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer
+        .player_stats()
+        .get(&player_id)
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(stats.amount_collected, 0.0);
+    assert_eq!(stats.tracked_time, 10.0);
+}
+
+#[test]
+fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
+    let player_id = epic_id("boost-duplicate-pickup-payload");
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(200.0),
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![
+                BoostPadEvent {
+                    time: 1.0,
+                    frame: 1,
+                    pad_id: "VehiclePickup_Boost_TA_63".to_string(),
+                    player: Some(player_id.clone()),
+                    kind: BoostPadEventKind::PickedUp { sequence: 1 },
+                },
+                BoostPadEvent {
+                    time: 1.0,
+                    frame: 1,
+                    pad_id: "VehiclePickup_Boost_TA_63".to_string(),
+                    player: Some(player_id.clone()),
+                    kind: BoostPadEventKind::PickedUp { sequence: 2 },
+                },
+            ],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 11.0,
+            dt: 10.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 11.0,
+                frame: 2,
+                pad_id: "VehiclePickup_Boost_TA_63".to_string(),
+                player: None,
+                kind: BoostPadEventKind::Available,
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.big_pads_collected, 1);
+    assert_eq!(stats.amount_collected, 55.0);
+}
+
+#[test]
 fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
     let player_id = epic_id("boost-non-live-pickup-opt-in");
     let mut reducer = BoostReducer::with_config(BoostReducerConfig {
@@ -1378,6 +1573,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: Some(55),
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1410,6 +1606,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
             dt: 10.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1452,6 +1649,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1501,6 +1699,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1556,6 +1755,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             dt: 10.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1622,6 +1822,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1671,6 +1872,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1726,6 +1928,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             dt: 10.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
@@ -1793,6 +1996,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             dt: 1.5,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
@@ -1814,6 +2018,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             dt: 0.5,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
@@ -1849,6 +2054,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             dt: 0.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
@@ -1877,6 +2083,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
@@ -1899,6 +2106,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
@@ -1927,6 +2135,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
@@ -1961,6 +2170,7 @@ fn test_demo_reducer_counts_events_and_dedupes_consecutive_frames() {
                 dt: 0.1,
                 seconds_remaining: None,
                 game_state: None,
+                ball_has_been_hit: None,
                 team_zero_score: None,
                 team_one_score: None,
                 possession_team_is_team_0: None,

@@ -70,6 +70,7 @@ pub struct StatsSample {
     pub dt: f32,
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
+    pub ball_has_been_hit: Option<bool>,
     pub team_zero_score: Option<i32>,
     pub team_one_score: Option<i32>,
     pub possession_team_is_team_0: Option<bool>,
@@ -167,6 +168,7 @@ impl StatsSample {
             dt,
             seconds_remaining: processor.get_seconds_remaining().ok(),
             game_state: processor.get_replicated_state_name().ok(),
+            ball_has_been_hit: processor.get_ball_has_been_hit().ok(),
             team_zero_score: team_scores.map(|scores| scores.0),
             team_one_score: team_scores.map(|scores| scores.1),
             possession_team_is_team_0,
@@ -188,10 +190,14 @@ impl StatsSample {
     /// but keep unknown states live so we do not accidentally discard stats
     /// from replay variants whose state enum values we have not catalogued yet.
     pub fn is_live_play(&self) -> bool {
-        !matches!(
+        if matches!(
             self.game_state,
             Some(GAME_STATE_KICKOFF_COUNTDOWN | GAME_STATE_GOAL_SCORED_REPLAY)
-        )
+        ) {
+            return false;
+        }
+
+        !matches!(self.ball_has_been_hit, Some(false))
     }
 }
 
@@ -1799,6 +1805,7 @@ pub struct BoostReducer {
     known_pad_indices: HashMap<String, usize>,
     pending_pickups: HashMap<String, PendingBoostPickup>,
     seen_pickup_sequences: HashSet<(String, u8)>,
+    pickup_frames: HashMap<(String, PlayerId), usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -2032,16 +2039,20 @@ impl StatsReducer for BoostReducer {
                     if !live_play && !self.config.include_non_live_pickups {
                         continue;
                     }
+                    let Some(player_id) = &event.player else {
+                        continue;
+                    };
+                    let pickup_key = (event.pad_id.clone(), player_id.clone());
+                    if self.pickup_frames.get(&pickup_key).copied() == Some(event.frame) {
+                        continue;
+                    }
+                    self.pickup_frames.insert(pickup_key, event.frame);
                     if !self
                         .seen_pickup_sequences
                         .insert((event.pad_id.clone(), sequence))
                     {
                         continue;
                     }
-
-                    let Some(player_id) = &event.player else {
-                        continue;
-                    };
                     let Some(player) = sample
                         .players
                         .iter()
