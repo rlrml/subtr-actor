@@ -66,6 +66,41 @@ fn test_replay_data_collector_multiple_replays() {
     }
 }
 
+#[test]
+fn test_replay_data_exposes_powerslide_activity() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for rlcs.replay");
+
+    let mut powerslide_true_count = 0usize;
+    let mut powerslide_false_count = 0usize;
+
+    for (_, player_data) in &replay_data.frame_data.players {
+        for frame in player_data.frames() {
+            if let PlayerFrame::Data {
+                powerslide_active, ..
+            } = frame
+            {
+                if *powerslide_active {
+                    powerslide_true_count += 1;
+                } else {
+                    powerslide_false_count += 1;
+                }
+            }
+        }
+    }
+
+    assert!(
+        powerslide_true_count > 0,
+        "Expected rlcs.replay to contain at least one powerslide-active frame"
+    );
+    assert!(
+        powerslide_false_count > 0,
+        "Expected rlcs.replay to contain at least one non-powerslide frame"
+    );
+}
+
 /// Regression: new-format demolish payloads still need car->player resolution even
 /// when same-frame cleanup clears the player link to `ActorId(-1)`.
 #[test]

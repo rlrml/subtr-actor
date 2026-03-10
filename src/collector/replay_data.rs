@@ -132,6 +132,8 @@ pub enum PlayerFrame {
         boost_amount: f32,
         /// Whether the player is actively using boost
         boost_active: bool,
+        /// Whether the player is actively powersliding / holding handbrake
+        powerslide_active: bool,
         /// Whether the player is actively jumping
         jump_active: bool,
         /// Whether the player is performing a double jump
@@ -185,6 +187,7 @@ impl PlayerFrame {
 
         let boost_amount = processor.get_player_boost_level(player_id)?;
         let boost_active = processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1;
+        let powerslide_active = processor.get_powerslide_active(player_id).unwrap_or(false);
         let jump_active = processor.get_jump_active(player_id).unwrap_or(0) % 2 == 1;
         let double_jump_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2 == 1;
         let dodge_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1;
@@ -201,6 +204,7 @@ impl PlayerFrame {
             rigid_body,
             boost_amount,
             boost_active,
+            powerslide_active,
             jump_active,
             double_jump_active,
             dodge_active,
@@ -217,6 +221,7 @@ impl PlayerFrame {
     /// * `rigid_body` - The player's rigid body physics information
     /// * `boost_amount` - The player's current boost level in raw replay units (0.0 to 255.0)
     /// * `boost_active` - Whether the player is actively using boost
+    /// * `powerslide_active` - Whether the player is actively powersliding
     /// * `jump_active` - Whether the player is actively jumping
     /// * `double_jump_active` - Whether the player is performing a double jump
     /// * `dodge_active` - Whether the player is performing a dodge maneuver
@@ -233,6 +238,7 @@ impl PlayerFrame {
         rigid_body: boxcars::RigidBody,
         boost_amount: f32,
         boost_active: bool,
+        powerslide_active: bool,
         jump_active: bool,
         double_jump_active: bool,
         dodge_active: bool,
@@ -247,6 +253,7 @@ impl PlayerFrame {
                 rigid_body,
                 boost_amount,
                 boost_active,
+                powerslide_active,
                 jump_active,
                 double_jump_active,
                 dodge_active,

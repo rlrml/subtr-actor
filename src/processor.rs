@@ -1665,6 +1665,21 @@ impl<'a> ReplayProcessor<'a> {
             .and_then(|actor_id| self.get_component_active(&actor_id))
     }
 
+    /// Returns whether the player's car has handbrake engaged.
+    ///
+    /// Rocket League replays expose this as `bReplicatedHandbrake` on the car
+    /// actor. This corresponds to the powerslide control input used by
+    /// Ballchasing's powerslide duration and press-count stats.
+    pub fn get_powerslide_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_car_actor_id(player_id)?,
+            HANDBRAKE_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
     // Debugging
 
     pub fn map_attribute_keys(
