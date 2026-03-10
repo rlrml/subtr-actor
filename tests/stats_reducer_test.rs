@@ -125,6 +125,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             ball: None,
             players: vec![PlayerSample {
                 powerslide_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -150,6 +151,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             ball: None,
             players: vec![PlayerSample {
                 powerslide_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -164,6 +166,76 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
     let stats = reducer.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.total_duration, 1.0);
     assert_eq!(stats.press_count, 0);
+}
+
+#[test]
+fn test_powerslide_reducer_requires_ground_contact() {
+    let player_id = epic_id("powerslide-ground-contact");
+    let mut reducer = PowerslideReducer::new();
+    let mut airborne_player = sample_player(player_id.clone(), true);
+    airborne_player.powerslide_active = true;
+    airborne_player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 200.0));
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.5,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![airborne_player],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .expect("Airborne handbrake sample should not fail");
+
+    let mut grounded_player = sample_player(player_id.clone(), true);
+    grounded_player.powerslide_active = true;
+    grounded_player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 17.0));
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 1.5,
+            dt: 0.5,
+            seconds_remaining: Some(99),
+            game_state: Some(0),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![grounded_player],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .expect("Grounded handbrake sample should not fail");
+
+    let stats = reducer
+        .player_stats()
+        .get(&player_id)
+        .expect("Player should have powerslide stats");
+    assert_eq!(
+        stats.press_count, 1,
+        "Expected only grounded powerslide activation to count as a press"
+    );
+    assert_eq!(
+        stats.total_duration, 0.5,
+        "Expected only grounded powerslide time to be accumulated"
+    );
 }
 
 #[test]
@@ -607,6 +679,67 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
     let stats = reducer.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.tracked_time, 1.0);
     assert!((stats.total_distance - 10.0).abs() < 0.001);
+}
+
+#[test]
+fn test_movement_reducer_uses_goal_height_for_high_air_bucket() {
+    let player_id = epic_id("movement-air-buckets");
+    let mut reducer = MovementReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 300.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: Some(99),
+            game_state: Some(0),
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 700.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.time_low_air, 1.0);
+    assert_eq!(stats.time_high_air, 1.0);
+    assert_eq!(stats.time_on_ground, 0.0);
 }
 
 #[test]

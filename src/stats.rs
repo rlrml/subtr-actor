@@ -356,12 +356,21 @@ impl PowerslideReducer {
     pub fn team_one_stats(&self) -> &PowerslideStats {
         &self.team_one_stats
     }
+
+    fn is_effective_powerslide(player: &PlayerSample) -> bool {
+        player.powerslide_active
+            && player
+                .position()
+                .map(|position| position.z <= GROUND_Z_THRESHOLD)
+                .unwrap_or(false)
+    }
 }
 
 impl StatsReducer for PowerslideReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = sample.is_live_play();
         for player in &sample.players {
+            let effective_powerslide = Self::is_effective_powerslide(player);
             let previous_active = self
                 .last_active
                 .get(&player.player_id)
@@ -377,18 +386,18 @@ impl StatsReducer for PowerslideReducer {
                 &mut self.team_one_stats
             };
 
-            if live_play && player.powerslide_active {
+            if live_play && effective_powerslide {
                 stats.total_duration += sample.dt;
                 team_stats.total_duration += sample.dt;
             }
 
-            if live_play && player.powerslide_active && !previous_active {
+            if live_play && effective_powerslide && !previous_active {
                 stats.press_count += 1;
                 team_stats.press_count += 1;
             }
 
             self.last_active
-                .insert(player.player_id.clone(), player.powerslide_active);
+                .insert(player.player_id.clone(), effective_powerslide);
         }
         Ok(())
     }
@@ -527,7 +536,9 @@ const CAR_MAX_SPEED: f32 = 2300.0;
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const GROUND_Z_THRESHOLD: f32 = 20.0;
-const HIGH_AIR_Z_THRESHOLD: f32 = 300.0;
+// Ballchasing's high-air bucket lines up more closely with goal-height-scale
+// aerials than with generic "off the ground" time.
+const HIGH_AIR_Z_THRESHOLD: f32 = 642.775;
 const FIELD_HALF_LENGTH_Y: f32 = 5120.0;
 const FIELD_THIRD_LENGTH_Y: f32 = FIELD_HALF_LENGTH_Y * 2.0 / 3.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
