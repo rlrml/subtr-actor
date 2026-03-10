@@ -14,10 +14,10 @@
 
 ## Implemented Reducers
 
-- `MatchStatsReducer`: score, goals, assists, saves, shots, shooting percentage, goal timeline, shot/save/assist timeline, goals conceded while last defender
+- `MatchStatsReducer`: score, goals, assists, saves, shots, shooting percentage, exact goal timeline, exact shot/save/assist timeline, goals conceded while last defender
 - `DemoReducer`: demos inflicted by team and player, demos taken by player, kill timeline, death timeline
 - `PressureReducer`: time and percentage of ball-side pressure
-- `PossessionReducer`: team possession time and percentage using the current last-hit-team signal
+- `PossessionReducer`: team possession time and percentage using exact team-touch boundaries
 - `BoostReducer`: boost amount buckets, BPM, exact pad pickup counts and pad-size classification, collected/stolen amounts, overfill, supersonic boost usage
 - `PositioningReducer`: teammate distance, ball distance, back/forward role percentages, thirds/halves, closest/farthest to ball, behind/in front of ball
 - `MovementReducer`: distance, average speed, speed buckets, ground/air buckets, team aggregates
@@ -62,7 +62,7 @@
 | Percent in defensive / offensive half | Player positions | Bucket field half per sample, integrate `dt` | Needs a stable sample policy | `Available` |
 | Percent closest to ball / farthest from ball | Player-ball distances | Rank teammates by ball distance per sample, integrate `dt` | Needs a stable sample policy | `Available` |
 | Percent behind ball / in front of ball | Player and ball positions | Classify by attack-direction-relative position, integrate `dt` | Needs a stable sample policy | `Available` |
-| Average distance to ball / has possession / no possession | Player-ball distances plus possession owner | Integrate distance over `dt` in global and possession-conditioned buckets; current implementation uses last-hit team as the possession owner | Needs possession event/source for exact parity | `Partial` |
+| Average distance to ball / has possession / no possession | Player-ball distances plus possession owner | Integrate distance over `dt` in global and possession-conditioned buckets using exact team-touch boundaries; player-level possession ownership is still heuristic | Needs replay-native player touch ownership for exact player parity | `Partial` |
 | Total distance traveled | Player rigid bodies | Sum distance deltas between successive positions | Prefer full frame deltas | `Available` |
 | Average speed (uu/s), Average speed (% of max) | Player velocities or distance over time | Integrate speed over `dt`; normalize by max car speed for percent | Prefer full frame deltas | `Available` |
 | Time / percent at slow, boost, supersonic speed | Player speed buckets | Bucket speed per sample, integrate `dt`; report seconds or percentages | Prefer full frame deltas | `Available` |
@@ -82,12 +82,12 @@
 
 | Stat(s) | Source needed | Computation plan | Sampling | Processor status |
 | --- | --- | --- | --- | --- |
-| Possession | Ball touch ownership per player/team | Exact team-touch timestamps are now available from `HitTeamNum` updates. Current reducer still uses the sampled last-hit-team signal, and player ownership remains heuristic rather than replay-native | Event-driven plus `dt` for exact parity | `Partial` |
+| Possession | Ball touch ownership per player/team | Exact team-touch timestamps are available from `HitTeamNum` updates and reducers now buffer those events across sampled frames. Player ownership remains heuristic rather than replay-native | Event-driven plus `dt` for exact team parity | `Partial` |
 | Pressure (time ball is in each side) | Ball position | Classify ball side per sample and integrate `dt` | Prefer full frame deltas | `Available` |
-| Shots on timeline | Match shot counters on player state | Emit timeline events when per-player shot counters increment | Event-driven-ish reconstruction from counters | `Available` |
-| Saves on timeline | Match save counters on player state | Emit timeline events when per-player save counters increment | Event-driven-ish reconstruction from counters | `Available` |
-| Assists on timeline | Match assist counters on player state | Emit timeline events when per-player assist counters increment | Event-driven-ish reconstruction from counters | `Available` |
-| Goals on timeline | Exact ball goal explosion events plus `PRI_TA:MatchGoals` frame updates | Extract exact goal timestamps from `Ball_TA:ReplicatedExplosionData` and derive scorer identity from same-frame `PRI_TA:MatchGoals` updates when present | Exact event time plus replay-frame scorer derivation | `Available` |
+| Shots on timeline | Exact `PRI_TA:MatchShots` counter increment events | Emit shot events directly from replay counter increments and buffer them across sampled frames | Exact event time from replay frame updates | `Available` |
+| Saves on timeline | Exact `PRI_TA:MatchSaves` counter increment events | Emit save events directly from replay counter increments and buffer them across sampled frames | Exact event time from replay frame updates | `Available` |
+| Assists on timeline | Exact `PRI_TA:MatchAssists` counter increment events | Emit assist events directly from replay counter increments and buffer them across sampled frames | Exact event time from replay frame updates | `Available` |
+| Goals on timeline | Exact ball goal explosion events plus `PRI_TA:MatchGoals` frame updates | Extract exact goal timestamps from `Ball_TA:ReplicatedExplosionData`, derive scorer identity from same-frame `PRI_TA:MatchGoals` updates when present, and synthesize cumulative score tuples when live team scores are absent | Exact event time plus replay-frame scorer derivation | `Available` |
 | Goals conceded while last defender | Team score deltas plus positional role at concession time | Determine defender ordering at the scoring frame and attribute conceded goals to the most-back defender | Event-driven plus sampled state | `Available` |
 | Amount collected / amount stolen | Exact boost pad pickup events plus canonical standard-soccar pad layout matching | Pad pickups are extracted exactly from `VehiclePickup_TA:NewReplicatedPickupData`; for standard soccar, side classification is derived from the matched canonical pad position instead of raw player position. Outside canonical matches, we fall back to per-pad observed pickup centroids with a midfield neutral tolerance | Event-driven | `Available` |
 | Big pads collected / Small pads collected | Exact boost pad pickup events plus replay-observed pad cooldown | Pad size is inferred exactly from that pad's observed respawn cadence (`~4s` vs `~10s`) and then cached per pad id | Event-driven | `Available` |
@@ -106,6 +106,7 @@
   - team in possession after touch
 - Improve goal event extraction further:
   - replace current replay-mode dedupe window with a stronger replay-state signal if we find one
+- Continue making reducer inputs sampling-invariant by buffering exact replay events between sampled collector invocations
 - Consider a normalized sample struct for reducers:
   - time
   - dt
