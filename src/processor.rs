@@ -583,13 +583,26 @@ impl<'a> ReplayProcessor<'a> {
     /// - `car_to_jump`: maps a car's actor ID to its associated jump actor ID.
     /// - `car_to_double_jump`: maps a car's actor ID to its associated double jump actor ID.
     ///
+    /// Some links support an optional *skip value*: when the update's value equals the
+    /// skip value, the map is not updated. This is used for `car_to_player` with skip
+    /// value [`ActorId(-1)`](boxcars::ActorId). On demolition frames the replay can set
+    /// the victim car's `Engine.Pawn:PlayerReplicationInfo` link to `-1`; if we applied
+    /// that update we would overwrite the existing car-to-player mapping and lose the
+    /// victim's identity when building demolish info. Skipping the `-1` update keeps
+    /// the last valid mapping so victim lookup still succeeds.
+    ///
+    /// Be careful with directionality here: `player_to_car` is `player actor -> car
+    /// actor`, while `car_to_player` must remain `car actor -> player actor`. Demolish
+    /// payloads resolve through `get_player_id_from_car_id`, so reversing `car_to_player`
+    /// breaks demolition extraction even when the replay contains valid demolish events.
+    ///
     /// The function also handles the deletion of actors. When an actor is
     /// deleted, the function removes the actor's ID from the `player_to_car`
     /// mapping.
     fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_type:expr, $attr:expr, $get_key: expr, $get_value: expr, $type:path) => {{
+                ($map:expr, $actor_type:expr, $attr:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
                     if &update.object_id == self.get_object_id_for_key(&$attr)? {
                         if self
                             .get_actor_ids_by_type($actor_type)?
@@ -604,16 +617,15 @@ impl<'a> ReplayProcessor<'a> {
                             )?;
                             let _key = $get_key(update.actor_id, value);
                             let _new_value = $get_value(update.actor_id, value);
-                            let _old_value = $map.insert(
-                                $get_key(update.actor_id, value),
-                                $get_value(update.actor_id, value),
-                            );
+                            if true $(&& _new_value != $skip)? {
+                                let _ = $map.insert(_key, _new_value);
+                            }
                         }
                     }
                 }};
             }
             macro_rules! maintain_actor_link {
-                ($map:expr, $actor_type:expr, $attr:expr) => {
+                ($map:expr, $actor_type:expr, $attr:expr $(, skip_value $skip:expr)?) => {
                     maintain_link!(
                         $map,
                         $actor_type,
@@ -623,6 +635,7 @@ impl<'a> ReplayProcessor<'a> {
                         get_actor_id_from_active_actor,
                         use_update_actor,
                         boxcars::Attribute::ActiveActor
+                        $(, skip_value $skip)?
                     )
                 };
             }
@@ -649,15 +662,17 @@ impl<'a> ReplayProcessor<'a> {
                 boxcars::Attribute::ActiveActor
             );
             maintain_actor_link!(self.player_to_car, CAR_TYPE, PLAYER_REPLICATION_KEY);
-            // Reverse of player_to_car. Not cleaned up on deletion so it
-            // persists after car destruction (needed for demolition tracking).
+            // `car_to_player` is intentionally the reverse of `player_to_car`:
+            // key = car actor, value = player actor. We still skip `ActorId(-1)`
+            // so same-frame demolition cleanup does not erase the last valid owner.
             maintain_link!(
                 self.car_to_player,
                 CAR_TYPE,
                 PLAYER_REPLICATION_KEY,
                 use_update_actor,
                 get_actor_id_from_active_actor,
-                boxcars::Attribute::ActiveActor
+                boxcars::Attribute::ActiveActor,
+                skip_value boxcars::ActorId(-1)
             );
             maintain_vehicle_key_link!(self.car_to_boost, BOOST_TYPE);
             maintain_vehicle_key_link!(self.car_to_dodge, DODGE_TYPE);
@@ -823,6 +838,20 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
+    /// Updates demolition state for the current frame from actor state and raw updates.
+    ///
+    /// Demolitions are collected from two sources. First, from car actor state via
+    /// [`get_active_demos`](Self::get_active_demos), which finds demolish attributes
+    /// that have been applied to actors. Second, from `frame.updated_actors` in case
+    /// the victim car was deleted in the same frame: the modeler removes deleted actors
+    /// before applying updates, so the demolish attribute never enters actor state and
+    /// would otherwise be missed. When that happens we resolve the victim location from
+    /// the actor state deleted earlier in the same frame instead of fabricating origin.
+    /// [`try_push_demolish`](Self::try_push_demolish) deduplicates and pushes results
+    /// into `self.demolishes`. The actor IDs carried by demolish events are resolved
+    /// through `car_to_player`, so that map must stay keyed by car actor ID and must
+    /// not be overwritten when the replay sets the victim's player link to `-1` on
+    /// demolition frames.
     fn update_demolishes(
         &mut self,
         frame: &boxcars::Frame,
@@ -835,31 +864,48 @@ impl<'a> ReplayProcessor<'a> {
         let new_demolishes: Vec<_> = self.get_active_demos()?.collect();
 
         for demolish in new_demolishes {
-            if self.demolish_is_known(&demolish, frame_index) {
-                continue;
-            }
-            self.known_demolishes.push((demolish.clone(), frame_index));
-            match self.build_demolish_info(&demolish, frame, frame_index) {
-                Ok(demolish_info) => self.demolishes.push(demolish_info),
-                Err(_e) => {
-                    log::warn!(
-                        "Error building demolish info: {}; \
-                         attacker_car={}, victim_car={}, attacker={}, victim={}",
-                        _e.variant,
-                        demolish.attacker_actor_id(),
-                        demolish.victim_actor_id(),
-                        self.car_to_player
-                            .get(&demolish.attacker_actor_id())
-                            .unwrap_or(&boxcars::ActorId(-1)),
-                        self.car_to_player
-                            .get(&demolish.victim_actor_id())
-                            .unwrap_or(&boxcars::ActorId(-1)),
-                    );
+            self.try_push_demolish(&demolish, frame, frame_index);
+        }
+
+        for update in &frame.updated_actors {
+            let demolish = match &update.attribute {
+                boxcars::Attribute::DemolishExtended(d) => {
+                    self.demolish_format = Some(DemolishFormat::Extended);
+                    Some(DemolishAttribute::Extended(**d))
                 }
+                boxcars::Attribute::DemolishFx(d) => {
+                    self.demolish_format = Some(DemolishFormat::Fx);
+                    Some(DemolishAttribute::Fx(**d))
+                }
+                _ => None,
+            };
+            if let Some(demolish) = demolish {
+                self.try_push_demolish(&demolish, frame, frame_index);
             }
         }
 
         Ok(())
+    }
+
+    fn try_push_demolish(
+        &mut self,
+        demolish: &DemolishAttribute,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) {
+        if self.demolish_is_known(demolish, frame_index) {
+            return;
+        }
+        self.known_demolishes.push((demolish.clone(), frame_index));
+        if let Ok(info) = self.build_demolish_info(demolish, frame, frame_index) {
+            self.demolishes.push(info);
+        } else {
+            log::warn!(
+                "Error building demolish info: attacker_car={:?}, victim_car={:?}",
+                demolish.attacker_actor_id(),
+                demolish.victim_actor_id(),
+            );
+        }
     }
 
     fn build_demolish_info(
@@ -870,7 +916,8 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<DemolishInfo> {
         let attacker = self.get_player_id_from_car_id(&demo.attacker_actor_id())?;
         let victim = self.get_player_id_from_car_id(&demo.victim_actor_id())?;
-        let (current_rigid_body, _) = self.get_player_rigid_body_and_updated(&victim)?;
+        let (current_rigid_body, _) =
+            self.get_player_rigid_body_and_updated_or_recently_deleted(&victim)?;
         Ok(DemolishInfo {
             time: frame.time,
             seconds_remaining: self.get_seconds_remaining()?,
@@ -1129,6 +1176,21 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    fn get_actor_state_or_recently_deleted(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<&ActorState> {
+        self.actor_state
+            .actor_states
+            .get(actor_id)
+            .or_else(|| self.actor_state.recently_deleted_actor_states.get(actor_id))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
+                    actor_id: *actor_id,
+                })
+            })
+    }
+
     fn get_actor_attribute<'b>(
         &'b self,
         actor_id: &boxcars::ActorId,
@@ -1244,6 +1306,20 @@ impl<'a> ReplayProcessor<'a> {
         get_attribute_and_updated!(
             self,
             &self.get_actor_state(actor_id)?.attributes,
+            RIGID_BODY_STATE_KEY,
+            boxcars::Attribute::RigidBody
+        )
+    }
+
+    pub fn get_actor_rigid_body_or_recently_deleted(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        get_attribute_and_updated!(
+            self,
+            &self
+                .get_actor_state_or_recently_deleted(actor_id)?
+                .attributes,
             RIGID_BODY_STATE_KEY,
             boxcars::Attribute::RigidBody
         )
@@ -1502,6 +1578,16 @@ impl<'a> ReplayProcessor<'a> {
                 boxcars::Attribute::RigidBody
             )
         })
+    }
+
+    /// Returns the player's car rigid body, falling back to an actor deleted
+    /// earlier in the current frame when same-frame cleanup has already removed it.
+    pub fn get_player_rigid_body_and_updated_or_recently_deleted(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        self.get_car_actor_id(player_id)
+            .and_then(|actor_id| self.get_actor_rigid_body_or_recently_deleted(&actor_id))
     }
 
     pub fn get_velocity_applied_player_rigid_body(

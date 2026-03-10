@@ -67,6 +67,12 @@ pub struct ActorStateModeler {
     pub actor_states: HashMap<boxcars::ActorId, ActorState>,
     /// A map of actor ids with their corresponding object ids.
     pub actor_ids_by_type: HashMap<boxcars::ObjectId, Vec<boxcars::ActorId>>,
+    /// Actor states deleted while processing the current frame.
+    ///
+    /// This preserves last-known attributes long enough for code that runs after
+    /// deletion, such as same-frame demolition extraction, to still inspect the
+    /// removed actor.
+    pub recently_deleted_actor_states: HashMap<boxcars::ActorId, ActorState>,
 }
 
 impl Default for ActorStateModeler {
@@ -85,6 +91,7 @@ impl ActorStateModeler {
         Self {
             actor_states: HashMap::new(),
             actor_ids_by_type: HashMap::new(),
+            recently_deleted_actor_states: HashMap::new(),
         }
     }
 
@@ -103,6 +110,7 @@ impl ActorStateModeler {
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
+        self.recently_deleted_actor_states.clear();
         if let Some(err) = frame
             .deleted_actors
             .iter()
@@ -175,6 +183,9 @@ impl ActorStateModeler {
             .entry(state.object_id)
             .or_default()
             .retain(|x| x != actor_id);
+
+        self.recently_deleted_actor_states
+            .insert(*actor_id, state.clone());
 
         Ok(state)
     }

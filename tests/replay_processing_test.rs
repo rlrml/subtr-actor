@@ -66,6 +66,30 @@ fn test_replay_data_collector_multiple_replays() {
     }
 }
 
+/// Regression: new-format demolish payloads still need car->player resolution even
+/// when same-frame cleanup clears the player link to `ActorId(-1)`.
+#[test]
+fn test_new_demolition_format_replay_has_demolishes() {
+    let replay = parse_replay("assets/replays/test/new_demolition_format.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for new_demolition_format.replay");
+
+    assert_eq!(
+        replay_data.demolish_infos.len(),
+        10,
+        "Expected 10 demolitions in new_demolition_format.replay"
+    );
+    assert!(
+        replay_data.demolish_infos.iter().all(|info| {
+            info.victim_location.x != 0.0
+                || info.victim_location.y != 0.0
+                || info.victim_location.z != 0.0
+        }),
+        "Expected deleted-victim demolitions to keep a real last-known location instead of origin"
+    );
+}
+
 /// Test NDArrayCollector with default feature adders
 #[test]
 fn test_ndarray_collector_default_features() {
