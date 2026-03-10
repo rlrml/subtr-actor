@@ -1982,6 +1982,11 @@ impl StatsReducer for BoostReducer {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
+            let previous_boost_amount = self
+                .previous_boost_amounts
+                .get(&player.player_id)
+                .copied()
+                .unwrap_or(boost_amount);
 
             let stats = self
                 .player_stats
@@ -2026,7 +2031,9 @@ impl StatsReducer for BoostReducer {
                 if player.boost_active
                     && player.speed().unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
                 {
-                    let supersonic_usage = BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt;
+                    let supersonic_usage = (previous_boost_amount - boost_amount)
+                        .max(0.0)
+                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt);
                     stats.amount_used_while_supersonic += supersonic_usage;
                     team_stats.amount_used_while_supersonic += supersonic_usage;
                 }
