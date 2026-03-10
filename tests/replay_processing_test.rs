@@ -208,6 +208,26 @@ fn test_processor_extracts_exact_goal_events() {
             "Expected deduplicated goal events to advance the total score by exactly one"
         );
     }
+    let mut previous_score = (0, 0);
+    for event in &processor.goal_events {
+        let (team_zero_score, team_one_score) = event
+            .team_zero_score
+            .zip(event.team_one_score)
+            .expect("Expected all goal events to carry score tuples");
+        let expected_scoring_team = if team_zero_score == previous_score.0 + 1 {
+            Some(true)
+        } else if team_one_score == previous_score.1 + 1 {
+            Some(false)
+        } else {
+            None
+        };
+        assert_eq!(
+            expected_scoring_team,
+            Some(event.scoring_team_is_team_0),
+            "Expected goal side to agree with score tuple progression"
+        );
+        previous_score = (team_zero_score, team_one_score);
+    }
 }
 
 #[test]
