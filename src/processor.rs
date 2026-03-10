@@ -1047,7 +1047,7 @@ impl<'a> ReplayProcessor<'a> {
         &self,
         touch_team_is_team_0: bool,
         target_time: f32,
-    ) -> Option<PlayerId> {
+    ) -> Option<(PlayerId, f32)> {
         const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
 
         let ball_rigid_body = self
@@ -1067,7 +1067,8 @@ impl<'a> ReplayProcessor<'a> {
             })
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .and_then(|(player_id, (closest_distance, _current_distance))| {
-                (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(player_id)
+                (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD)
+                    .then_some((player_id, closest_distance))
             })
     }
 
@@ -1092,11 +1093,13 @@ impl<'a> ReplayProcessor<'a> {
                 1 => false,
                 _ => continue,
             };
+            let estimated_player = self.estimate_touching_player(team_is_team_0, frame.time);
             let event = TouchEvent {
                 time: frame.time,
                 frame: frame_index,
                 team_is_team_0,
-                player: self.estimate_touching_player(team_is_team_0, frame.time),
+                player: estimated_player.as_ref().map(|(player, _)| player.clone()),
+                closest_approach_distance: estimated_player.map(|(_, distance)| distance),
             };
             self.current_frame_touch_events.push(event.clone());
             self.touch_events.push(event);

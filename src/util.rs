@@ -139,6 +139,7 @@ pub struct TouchEvent {
     pub frame: usize,
     pub team_is_team_0: bool,
     pub player: Option<PlayerId>,
+    pub closest_approach_distance: Option<f32>,
 }
 
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.

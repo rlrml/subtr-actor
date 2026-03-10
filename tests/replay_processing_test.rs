@@ -233,6 +233,14 @@ fn test_processor_extracts_touch_events() {
     assert!(
         processor
             .touch_events
+            .iter()
+            .filter_map(|event| event.closest_approach_distance)
+            .all(|distance| distance <= 700.0),
+        "Expected attributed touch distances to respect the heuristic threshold"
+    );
+    assert!(
+        processor
+            .touch_events
             .windows(2)
             .any(|window| window[0].team_is_team_0 == window[1].team_is_team_0),
         "Expected same-team consecutive touch events, not just team changes"
