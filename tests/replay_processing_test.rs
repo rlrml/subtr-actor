@@ -189,6 +189,31 @@ fn test_processor_extracts_exact_goal_events() {
             .any(|event| event.player.is_some()),
         "Expected at least some exact goal events to resolve a scorer directly from frame updates"
     );
+    let scorer_count = processor
+        .goal_events
+        .iter()
+        .filter(|event| event.player.is_some())
+        .count();
+    assert!(
+        scorer_count * 2 >= processor.goal_events.len(),
+        "Expected scorer extraction to cover at least half of the goal events in rlcs.replay, found {scorer_count}/{}",
+        processor.goal_events.len(),
+    );
+    for event in processor
+        .goal_events
+        .iter()
+        .filter(|event| event.player.is_some())
+    {
+        let scorer = event
+            .player
+            .as_ref()
+            .expect("Filtered to goal events with scorers");
+        assert_eq!(
+            processor.get_player_is_team_0(scorer).ok(),
+            Some(event.scoring_team_is_team_0),
+            "Expected resolved goal scorer to be on the scoring team"
+        );
+    }
     let goal_scores: Vec<(i32, i32)> = processor
         .goal_events
         .iter()
