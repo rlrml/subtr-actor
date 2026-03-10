@@ -159,6 +159,12 @@ pub struct ReplayProcessor<'a> {
     pub car_to_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
     pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    pub boost_pad_events: Vec<BoostPadEvent>,
+    current_frame_boost_pad_events: Vec<BoostPadEvent>,
+    pub touch_events: Vec<TouchEvent>,
+    current_frame_touch_events: Vec<TouchEvent>,
+    pub goal_events: Vec<GoalEvent>,
+    current_frame_goal_events: Vec<GoalEvent>,
     pub demolishes: Vec<DemolishInfo>,
     known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
@@ -202,6 +208,12 @@ impl<'a> ReplayProcessor<'a> {
             car_to_jump: HashMap::new(),
             car_to_double_jump: HashMap::new(),
             car_to_dodge: HashMap::new(),
+            boost_pad_events: Vec::new(),
+            current_frame_boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            current_frame_touch_events: Vec::new(),
+            goal_events: Vec::new(),
+            current_frame_goal_events: Vec::new(),
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
             demolish_format: None,
@@ -254,6 +266,9 @@ impl<'a> ReplayProcessor<'a> {
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
+            self.update_boost_pad_events(frame, index)?;
+            self.update_touch_events(frame, index)?;
+            self.update_goal_events(frame, index)?;
             self.update_demolishes(frame, index)?;
 
             // Get the time to process for this frame. If target_time is set to
@@ -306,6 +321,9 @@ impl<'a> ReplayProcessor<'a> {
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
+            self.update_boost_pad_events(frame, index)?;
+            self.update_touch_events(frame, index)?;
+            self.update_goal_events(frame, index)?;
             self.update_demolishes(frame, index)?;
 
             for collector in collectors.iter_mut() {
@@ -326,6 +344,12 @@ impl<'a> ReplayProcessor<'a> {
         self.car_to_double_jump = HashMap::new();
         self.car_to_dodge = HashMap::new();
         self.actor_state = ActorStateModeler::new();
+        self.boost_pad_events = Vec::new();
+        self.current_frame_boost_pad_events = Vec::new();
+        self.touch_events = Vec::new();
+        self.current_frame_touch_events = Vec::new();
+        self.goal_events = Vec::new();
+        self.current_frame_goal_events = Vec::new();
         self.demolishes = Vec::new();
         self.known_demolishes = Vec::new();
         self.demolish_format = None;
@@ -467,8 +491,24 @@ impl<'a> ReplayProcessor<'a> {
             )
         }
         let get_player_info = |player_id| {
-            let name = self.get_player_name(player_id)?;
-            let stats = find_player_stats(player_id, &name, player_stats).ok();
+            let fallback_name = String::new();
+            let stats = self
+                .get_player_name(player_id)
+                .ok()
+                .and_then(|name| find_player_stats(player_id, &name, player_stats).ok())
+                .or_else(|| find_player_stats(player_id, &fallback_name, player_stats).ok());
+            let name = self
+                .get_player_name(player_id)
+                .ok()
+                .or_else(|| {
+                    stats.as_ref().and_then(|stats| {
+                        stats.get("Name").and_then(|prop| match prop {
+                            boxcars::HeaderProp::Str(name) => Some(name.clone()),
+                            _ => None,
+                        })
+                    })
+                })
+                .unwrap_or_else(|| format!("{player_id:?}"));
             Ok(PlayerInfo {
                 name,
                 stats,
@@ -659,7 +699,8 @@ impl<'a> ReplayProcessor<'a> {
                 // In this case we are using the update actor as the key.
                 use_update_actor,
                 get_actor_id_from_active_actor,
-                boxcars::Attribute::ActiveActor
+                boxcars::Attribute::ActiveActor,
+                skip_value boxcars::ActorId(-1)
             );
             maintain_actor_link!(self.player_to_car, CAR_TYPE, PLAYER_REPLICATION_KEY);
             // `car_to_player` is intentionally the reverse of `player_to_car`:
@@ -887,6 +928,233 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    fn actor_is_boost_pad(&self, actor_id: &boxcars::ActorId) -> bool {
+        self.get_actor_state_or_recently_deleted(actor_id)
+            .ok()
+            .and_then(|state| self.object_id_to_name.get(&state.object_id))
+            .map(|name| name.contains("VehiclePickup_Boost_TA"))
+            .unwrap_or(false)
+    }
+
+    fn get_actor_instance_name(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<String> {
+        let state = self.get_actor_state_or_recently_deleted(actor_id)?;
+        if let Some(name_id) = state.name_id {
+            if let Some(name) = self.replay.names.get(name_id as usize) {
+                return Ok(name.clone());
+            }
+        }
+        self.object_id_to_name
+            .get(&state.object_id)
+            .cloned()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
+                    actor_id: *actor_id,
+                })
+            })
+    }
+
+    fn update_boost_pad_events(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        self.current_frame_boost_pad_events.clear();
+
+        for update in &frame.updated_actors {
+            if !self.actor_is_boost_pad(&update.actor_id) {
+                continue;
+            }
+
+            let Some(event) = (match &update.attribute {
+                boxcars::Attribute::PickupNew(pickup) => {
+                    let pad_id = self.get_actor_instance_name(&update.actor_id)?;
+                    if let Some(instigator) = pickup.instigator {
+                        if instigator.0 >= 0 && pickup.picked_up != u8::MAX {
+                            Some(BoostPadEvent {
+                                time: frame.time,
+                                frame: frame_index,
+                                pad_id,
+                                player: self.get_player_id_from_car_id(&instigator).ok(),
+                                kind: BoostPadEventKind::PickedUp {
+                                    sequence: pickup.picked_up,
+                                },
+                            })
+                        } else {
+                            None
+                        }
+                    } else if pickup.picked_up == u8::MAX {
+                        Some(BoostPadEvent {
+                            time: frame.time,
+                            frame: frame_index,
+                            pad_id,
+                            player: None,
+                            kind: BoostPadEventKind::Available,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                boxcars::Attribute::Pickup(pickup) => {
+                    let pad_id = self.get_actor_instance_name(&update.actor_id)?;
+                    if let Some(instigator) = pickup.instigator {
+                        if instigator.0 >= 0 && pickup.picked_up {
+                            Some(BoostPadEvent {
+                                time: frame.time,
+                                frame: frame_index,
+                                pad_id,
+                                player: self.get_player_id_from_car_id(&instigator).ok(),
+                                kind: BoostPadEventKind::PickedUp { sequence: 1 },
+                            })
+                        } else {
+                            None
+                        }
+                    } else if !pickup.picked_up {
+                        Some(BoostPadEvent {
+                            time: frame.time,
+                            frame: frame_index,
+                            pad_id,
+                            player: None,
+                            kind: BoostPadEventKind::Available,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }) else {
+                continue;
+            };
+
+            self.current_frame_boost_pad_events.push(event.clone());
+            self.boost_pad_events.push(event);
+        }
+
+        Ok(())
+    }
+
+    fn estimate_touching_player(&self, touch_team_is_team_0: bool) -> Option<PlayerId> {
+        const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
+
+        let ball_position = vec_to_glam(&self.get_ball_rigid_body().ok()?.location);
+        self.iter_player_ids_in_order()
+            .filter(|player_id| {
+                self.get_player_is_team_0(player_id).ok() == Some(touch_team_is_team_0)
+            })
+            .filter_map(|player_id| {
+                self.get_player_rigid_body(player_id)
+                    .ok()
+                    .map(|rigid_body| {
+                        (
+                            player_id.clone(),
+                            ball_position.distance(vec_to_glam(&rigid_body.location)),
+                        )
+                    })
+            })
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .and_then(|(player_id, distance)| {
+                (distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(player_id)
+            })
+    }
+
+    fn update_touch_events(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        self.current_frame_touch_events.clear();
+        let hit_team_num_key = *self.get_object_id_for_key(BALL_HIT_TEAM_NUM_KEY)?;
+
+        for update in &frame.updated_actors {
+            if update.object_id != hit_team_num_key {
+                continue;
+            }
+
+            let boxcars::Attribute::Byte(team_num) = update.attribute else {
+                continue;
+            };
+            let team_is_team_0 = match team_num {
+                0 => true,
+                1 => false,
+                _ => continue,
+            };
+            let event = TouchEvent {
+                time: frame.time,
+                frame: frame_index,
+                team_is_team_0,
+                player: self.estimate_touching_player(team_is_team_0),
+            };
+            self.current_frame_touch_events.push(event.clone());
+            self.touch_events.push(event);
+        }
+
+        Ok(())
+    }
+
+    fn update_goal_events(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
+
+        self.current_frame_goal_events.clear();
+
+        let ball_explosion_data = self
+            .get_object_id_for_key(BALL_EXPLOSION_DATA_KEY)
+            .ok()
+            .copied();
+        let ball_explosion_data_extended = self
+            .get_object_id_for_key(BALL_EXPLOSION_DATA_EXTENDED_KEY)
+            .ok()
+            .copied();
+
+        for update in &frame.updated_actors {
+            let is_ball_goal_explosion = matches!(
+                &update.attribute,
+                boxcars::Attribute::Explosion(_) | boxcars::Attribute::ExtendedExplosion(_)
+            ) && (ball_explosion_data == Some(update.object_id)
+                || ball_explosion_data_extended == Some(update.object_id));
+
+            if !is_ball_goal_explosion {
+                continue;
+            }
+
+            let scoring_team_is_team_0 = match self.get_scored_on_team_num() {
+                Ok(0) => false,
+                Ok(1) => true,
+                _ => continue,
+            };
+            let (team_zero_score, team_one_score) = self
+                .get_team_scores()
+                .map(|(team_zero, team_one)| (Some(team_zero), Some(team_one)))
+                .unwrap_or((None, None));
+
+            if self
+                .goal_events
+                .last()
+                .map(|event| {
+                    event.scoring_team_is_team_0 == scoring_team_is_team_0
+                        && (frame.time - event.time).abs() <= GOAL_EVENT_DEDUPE_WINDOW_SECONDS
+                })
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let event = GoalEvent {
+                time: frame.time,
+                frame: frame_index,
+                scoring_team_is_team_0,
+                team_zero_score,
+                team_one_score,
+            };
+            self.current_frame_goal_events.push(event.clone());
+            self.goal_events.push(event);
+        }
+
+        Ok(())
+    }
+
     fn try_push_demolish(
         &mut self,
         demolish: &DemolishAttribute,
@@ -980,6 +1248,18 @@ impl<'a> ReplayProcessor<'a> {
     /// Returns the detected demolition format, if any demolitions have been encountered.
     pub fn get_demolish_format(&self) -> Option<DemolishFormat> {
         self.demolish_format
+    }
+
+    pub fn current_frame_boost_pad_events(&self) -> &[BoostPadEvent] {
+        &self.current_frame_boost_pad_events
+    }
+
+    pub fn current_frame_touch_events(&self) -> &[TouchEvent] {
+        &self.current_frame_touch_events
+    }
+
+    pub fn current_frame_goal_events(&self) -> &[GoalEvent] {
+        &self.current_frame_goal_events
     }
 
     /// Detects which demolition format this replay uses by checking car actor attributes.
@@ -1654,11 +1934,9 @@ impl<'a> ReplayProcessor<'a> {
         time: f32,
         close_enough: f32,
     ) -> SubtrActorResult<boxcars::RigidBody> {
-        self.get_interpolated_actor_rigid_body(
-            &self.get_car_actor_id(player_id).unwrap(),
-            time,
-            close_enough,
-        )
+        self.get_car_actor_id(player_id).and_then(|car_actor_id| {
+            self.get_interpolated_actor_rigid_body(&car_actor_id, time, close_enough)
+        })
     }
 
     /// Returns the player's boost amount in raw replay units (`0.0..=255.0`).

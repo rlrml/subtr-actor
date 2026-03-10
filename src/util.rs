@@ -86,6 +86,44 @@ pub struct DemolishInfo {
     pub victim_location: boxcars::Vector3f,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum BoostPadEventKind {
+    PickedUp { sequence: u8 },
+    Available,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum BoostPadSize {
+    Big,
+    Small,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BoostPadEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub pad_id: String,
+    pub player: Option<PlayerId>,
+    pub kind: BoostPadEventKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GoalEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub scoring_team_is_team_0: bool,
+    pub team_zero_score: Option<i32>,
+    pub team_one_score: Option<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TouchEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub team_is_team_0: bool,
+    pub player: Option<PlayerId>,
+}
+
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
 /// This includes information about the players in the match and all replay headers.

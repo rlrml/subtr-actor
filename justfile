@@ -20,6 +20,53 @@ build-js:
 test:
     cargo test
 
+# Download replay metadata/stats JSON from ballchasing.com for a specific replay id
+ballchasing-replay-json replay_id output='':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    target_path="{{output}}"
+    if [[ -z "${BALLCHASING_API_KEY:-}" ]]; then
+        echo "BALLCHASING_API_KEY is not set. Run 'direnv allow' or export it manually." >&2
+        exit 1
+    fi
+    if [[ -z "$target_path" ]]; then
+        target_path="ballchasing-{{replay_id}}.json"
+    fi
+    curl --fail --silent --show-error \
+        -H "Authorization: ${BALLCHASING_API_KEY}" \
+        "https://ballchasing.com/api/replays/{{replay_id}}" \
+        -o "$target_path"
+    echo "Wrote $target_path"
+
+# Download the raw replay file from ballchasing.com for a specific replay id
+ballchasing-replay-file replay_id output='':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    target_path="{{output}}"
+    if [[ -z "${BALLCHASING_API_KEY:-}" ]]; then
+        echo "BALLCHASING_API_KEY is not set. Run 'direnv allow' or export it manually." >&2
+        exit 1
+    fi
+    if [[ -z "$target_path" ]]; then
+        target_path="ballchasing-{{replay_id}}.replay"
+    fi
+    curl --fail --silent --show-error \
+        -H "Authorization: ${BALLCHASING_API_KEY}" \
+        "https://ballchasing.com/api/replays/{{replay_id}}/file" \
+        -o "$target_path"
+    echo "Wrote $target_path"
+
+# Download both the replay file and ballchasing JSON into a named fixture directory
+ballchasing-fixture replay_id name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    fixture_dir="assets/ballchasing-fixtures/{{name}}"
+    mkdir -p "$fixture_dir"
+    just ballchasing-replay-json {{replay_id}} "$fixture_dir/ballchasing.json"
+    just ballchasing-replay-file {{replay_id}} "$fixture_dir/replay.replay"
+    printf '%s\n' '{{replay_id}}' > "$fixture_dir/replay_id.txt"
+    echo "Prepared fixture $fixture_dir"
+
 # Run Python tests
 test-python:
     cd python && pytest

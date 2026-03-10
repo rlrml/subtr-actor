@@ -101,6 +101,106 @@ fn test_replay_data_exposes_powerslide_activity() {
     );
 }
 
+#[test]
+fn test_processor_extracts_exact_boost_pad_events() {
+    let replay = parse_replay("assets/replays/new_boost_format.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for boost pad extraction");
+
+    assert!(
+        processor
+            .boost_pad_events
+            .iter()
+            .any(|event| matches!(event.kind, BoostPadEventKind::PickedUp { .. })),
+        "Expected at least one exact boost pickup event"
+    );
+    assert!(
+        processor
+            .boost_pad_events
+            .iter()
+            .any(|event| matches!(event.kind, BoostPadEventKind::Available)),
+        "Expected at least one boost pad availability event"
+    );
+    assert!(
+        processor
+            .boost_pad_events
+            .iter()
+            .any(|event| event.pad_id.starts_with("VehiclePickup_Boost_TA_")),
+        "Expected boost pad events to keep stable per-pad instance identifiers"
+    );
+    assert!(
+        processor
+            .boost_pad_events
+            .iter()
+            .any(|event| event.player.is_some()),
+        "Expected at least one boost pad event to resolve to a player"
+    );
+}
+
+#[test]
+fn test_processor_extracts_exact_goal_events() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for goal extraction");
+
+    assert!(
+        !processor.goal_events.is_empty(),
+        "Expected at least one exact goal event"
+    );
+
+    let replay_meta = processor
+        .get_replay_meta()
+        .expect("Expected replay metadata after processing");
+    let total_goals = replay_meta
+        .player_order()
+        .filter_map(|player| player.stats.as_ref())
+        .filter_map(|stats| match stats.get("Goals") {
+            Some(boxcars::HeaderProp::Int(value)) => Some(*value),
+            _ => None,
+        })
+        .sum::<i32>();
+    assert_eq!(
+        processor.goal_events.len(),
+        total_goals as usize,
+        "Expected one deduplicated goal event per scored goal"
+    );
+}
+
+#[test]
+fn test_processor_extracts_touch_events() {
+    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for touch extraction");
+
+    assert!(
+        processor.touch_events.len() > 100,
+        "Expected many touch events from HitTeamNum updates"
+    );
+    assert!(
+        processor
+            .touch_events
+            .iter()
+            .any(|event| event.player.is_some()),
+        "Expected at least some touch events to resolve to a player"
+    );
+    assert!(
+        processor
+            .touch_events
+            .windows(2)
+            .any(|window| window[0].team_is_team_0 == window[1].team_is_team_0),
+        "Expected same-team consecutive touch events, not just team changes"
+    );
+}
+
 /// Regression: new-format demolish payloads still need car->player resolution even
 /// when same-frame cleanup clears the player link to `ActorId(-1)`.
 #[test]
