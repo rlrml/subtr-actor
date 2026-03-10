@@ -1800,6 +1800,7 @@ pub struct BoostReducer {
     team_zero_stats: BoostStats,
     team_one_stats: BoostStats,
     previous_boost_amounts: HashMap<PlayerId, f32>,
+    previous_player_speeds: HashMap<PlayerId, f32>,
     observed_pad_positions: HashMap<String, PadPositionEstimate>,
     known_pad_sizes: HashMap<String, BoostPadSize>,
     known_pad_indices: HashMap<String, usize>,
@@ -1987,6 +1988,12 @@ impl StatsReducer for BoostReducer {
                 .get(&player.player_id)
                 .copied()
                 .unwrap_or(boost_amount);
+            let speed = player.speed();
+            let previous_speed = self
+                .previous_player_speeds
+                .get(&player.player_id)
+                .copied()
+                .or(speed);
 
             let stats = self
                 .player_stats
@@ -2029,7 +2036,8 @@ impl StatsReducer for BoostReducer {
                 }
 
                 if player.boost_active
-                    && player.speed().unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                    && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                    && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
                 {
                     let supersonic_usage = (previous_boost_amount - boost_amount)
                         .max(0.0)
@@ -2116,6 +2124,12 @@ impl StatsReducer for BoostReducer {
 
         for (player_id, boost_amount) in current_boost_amounts {
             self.previous_boost_amounts.insert(player_id, boost_amount);
+        }
+        for player in &sample.players {
+            if let Some(speed) = player.speed() {
+                self.previous_player_speeds
+                    .insert(player.player_id.clone(), speed);
+            }
         }
 
         Ok(())
