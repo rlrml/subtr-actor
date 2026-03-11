@@ -6,12 +6,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use subtr_actor::ballchasing::parse_replay_bytes;
 use subtr_actor::constants::DODGES_REFRESHED_COUNTER_KEY;
-use subtr_actor::{DodgeRefreshedEvent, FlipResetEvent, ReplayDataCollector};
+use subtr_actor::{
+    DodgeRefreshedEvent, FlipResetEvent, FlipResetTuningManifest, FlipResetTuningReplay,
+    ReplayDataCollector,
+};
 
 #[derive(Debug, Clone)]
 struct Config {
     count: usize,
     scan_limit: usize,
+    manifest: Option<PathBuf>,
     playlist: String,
     min_rank: String,
     cache_dir: PathBuf,
@@ -23,6 +27,7 @@ impl Default for Config {
         Self {
             count: 50,
             scan_limit: 250,
+            manifest: None,
             playlist: "ranked-standard".to_owned(),
             min_rank: "supersonic-legend".to_owned(),
             cache_dir: PathBuf::from("target/flip-reset-ground-truth"),
@@ -56,6 +61,11 @@ impl Config {
                         .context("Expected a value after --scan-limit")?
                         .parse()
                         .context("Failed to parse --scan-limit as an integer")?;
+                }
+                "--manifest" => {
+                    config.manifest = Some(PathBuf::from(
+                        args.next().context("Expected a value after --manifest")?,
+                    ));
                 }
                 "--cache-dir" => {
                     config.cache_dir =
@@ -204,7 +214,7 @@ impl AggregateMetrics {
 
 fn print_usage() {
     eprintln!(
-        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--count N] [--scan-limit N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--match-window SECONDS]"
+        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--manifest PATH] [--count N] [--scan-limit N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--match-window SECONDS]"
     );
 }
 
@@ -270,6 +280,13 @@ fn search_recent_replays(
 
     results.truncate(config.scan_limit);
     Ok(results)
+}
+
+fn load_manifest(path: &Path) -> Result<FlipResetTuningManifest> {
+    let manifest_bytes =
+        fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    serde_json::from_slice(&manifest_bytes)
+        .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 fn cached_replay_path(cache_dir: &Path, replay_id: &str) -> PathBuf {
@@ -476,13 +493,36 @@ fn evaluate_replay(
     })
 }
 
+fn evaluate_manifest_replay(
+    manifest_path: &Path,
+    replay: &FlipResetTuningReplay,
+    match_window_seconds: f32,
+) -> Result<ReplayEvaluation> {
+    let replay_path = replay.replay_path_from_manifest(manifest_path);
+    let replay_bytes = fs::read(&replay_path)
+        .with_context(|| format!("Failed to read {}", replay_path.display()))?;
+    let summary = ReplaySummary {
+        id: replay.replay_id.clone(),
+        title: replay.title.clone(),
+        uploader: replay.uploader.clone(),
+    };
+    evaluate_replay(&summary, &replay_bytes, match_window_seconds)
+}
+
 fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplaySummary]) {
-    println!(
-        "Scanned {} recent public {} replays at rank {}",
-        replays.len(),
-        config.playlist,
-        config.min_rank
-    );
+    if let Some(manifest_path) = &config.manifest {
+        println!(
+            "Evaluated local tuning set from {}",
+            manifest_path.display()
+        );
+    } else {
+        println!(
+            "Scanned {} recent public {} replays at rank {}",
+            replays.len(),
+            config.playlist,
+            config.min_rank
+        );
+    }
     println!(
         "Supported replays with the exact counter: {} / {} scanned",
         metrics.supported_replay_count, metrics.scanned_replay_count
@@ -564,35 +604,60 @@ fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplayS
 
 fn main() -> Result<()> {
     let config = Config::from_args()?;
-    let api_key =
-        std::env::var("BALLCHASING_API_KEY").context("BALLCHASING_API_KEY must be set")?;
-    let client = Client::builder()
-        .build()
-        .context("Failed to build HTTP client")?;
-    let replays = search_recent_replays(&client, &api_key, &config)?;
-    if replays.is_empty() {
-        anyhow::bail!("Ballchasing search returned no replays");
-    }
 
     let mut metrics = AggregateMetrics::default();
-    for (index, summary) in replays.iter().enumerate() {
-        eprintln!(
-            "[{}/{}] evaluating {} ({})",
-            index + 1,
-            replays.len(),
-            summary.id,
-            summary.uploader.as_deref().unwrap_or("unknown uploader")
-        );
-        let replay_bytes = fetch_replay_bytes(&client, &api_key, &config.cache_dir, &summary.id)
-            .with_context(|| format!("Failed to fetch replay {}", summary.id))?;
-        let evaluation = evaluate_replay(summary, &replay_bytes, config.match_window_seconds)
-            .with_context(|| format!("Failed to evaluate replay {}", summary.id))?;
-        metrics.add(evaluation);
-        if metrics.supported_replay_count >= config.count {
-            break;
+    let mut replay_summaries = Vec::new();
+    if let Some(manifest_path) = &config.manifest {
+        let manifest = load_manifest(manifest_path)?;
+        for (index, replay) in manifest.replays.iter().enumerate() {
+            eprintln!(
+                "[{}/{}] evaluating local replay {}",
+                index + 1,
+                manifest.replays.len(),
+                replay.replay_id
+            );
+            metrics.add(
+                evaluate_manifest_replay(manifest_path, replay, config.match_window_seconds)
+                    .with_context(|| format!("Failed to evaluate replay {}", replay.replay_id))?,
+            );
+            replay_summaries.push(ReplaySummary {
+                id: replay.replay_id.clone(),
+                title: replay.title.clone(),
+                uploader: replay.uploader.clone(),
+            });
+        }
+    } else {
+        let api_key =
+            std::env::var("BALLCHASING_API_KEY").context("BALLCHASING_API_KEY must be set")?;
+        let client = Client::builder()
+            .build()
+            .context("Failed to build HTTP client")?;
+        replay_summaries = search_recent_replays(&client, &api_key, &config)?;
+        if replay_summaries.is_empty() {
+            anyhow::bail!("Ballchasing search returned no replays");
+        }
+
+        for (index, summary) in replay_summaries.iter().enumerate() {
+            eprintln!(
+                "[{}/{}] evaluating {} ({})",
+                index + 1,
+                replay_summaries.len(),
+                summary.id,
+                summary.uploader.as_deref().unwrap_or("unknown uploader")
+            );
+            let replay_bytes =
+                fetch_replay_bytes(&client, &api_key, &config.cache_dir, &summary.id)
+                    .with_context(|| format!("Failed to fetch replay {}", summary.id))?;
+            let evaluation =
+                evaluate_replay(summary, &replay_bytes, config.match_window_seconds)
+                    .with_context(|| format!("Failed to evaluate replay {}", summary.id))?;
+            metrics.add(evaluation);
+            if metrics.supported_replay_count >= config.count {
+                break;
+            }
         }
     }
 
-    print_summary(&config, &metrics, &replays);
+    print_summary(&config, &metrics, &replay_summaries);
     Ok(())
 }

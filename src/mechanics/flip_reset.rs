@@ -292,6 +292,34 @@ impl FlipResetTracker {
         })
     }
 
+    fn build_flip_reset_event_for_player(
+        &self,
+        processor: &ReplayProcessor,
+        player: &PlayerId,
+        time: f32,
+        frame_index: usize,
+        is_team_0: bool,
+        closest_approach_distance: f32,
+    ) -> Option<FlipResetEvent> {
+        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+        let heuristic = flip_reset_candidate(
+            ball_rigid_body,
+            player_rigid_body,
+            closest_approach_distance,
+        )?;
+
+        Some(FlipResetEvent {
+            time,
+            frame: frame_index,
+            player: player.clone(),
+            is_team_0,
+            confidence: heuristic.confidence,
+            local_ball_position: glam_to_vec(&heuristic.local_ball_position),
+            closest_approach_distance,
+        })
+    }
+
     fn build_flip_reset_followup_touch_candidate(
         &self,
         processor: &ReplayProcessor,
@@ -326,8 +354,38 @@ impl FlipResetTracker {
     ) -> SubtrActorResult<()> {
         self.current_frame_flip_reset_events.clear();
         for touch_event in processor.current_frame_touch_events() {
-            let Some(event) = self.build_flip_reset_event(processor, touch_event, frame_index)
-            else {
+            let event = self
+                .build_flip_reset_event(processor, touch_event, frame_index)
+                .or_else(|| {
+                    let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
+                    let ball_position = vec_to_glam(&ball_rigid_body.location);
+                    processor
+                        .iter_player_ids_in_order()
+                        .filter(|player| {
+                            processor.get_player_is_team_0(player).ok()
+                                == Some(touch_event.team_is_team_0)
+                        })
+                        .filter_map(|player| {
+                            let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+                            let player_position = vec_to_glam(&player_rigid_body.location);
+                            let fallback_touch_distance =
+                                (ball_position - player_position).length();
+                            self.build_flip_reset_event_for_player(
+                                processor,
+                                player,
+                                touch_event.time,
+                                frame_index,
+                                touch_event.team_is_team_0,
+                                fallback_touch_distance,
+                            )
+                        })
+                        .max_by(|left, right| {
+                            left.confidence
+                                .partial_cmp(&right.confidence)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                });
+            let Some(event) = event else {
                 continue;
             };
             self.current_frame_flip_reset_events.push(event.clone());
