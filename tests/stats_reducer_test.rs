@@ -846,12 +846,19 @@ fn test_positioning_reducer_uses_field_marking_zone_boundary() {
         rigid_body: sample_rigid_body(0.0, 0.0, 0.0),
     };
 
-    for (frame_number, y) in [(1, 2000.0), (2, 3000.0), (3, -3000.0)] {
+    for (frame_number, dt, y) in [
+        (1, 0.0, 2000.0),
+        (2, 1.0, 2000.0),
+        (3, 0.0, 3000.0),
+        (4, 1.0, 3000.0),
+        (5, 0.0, -3000.0),
+        (6, 1.0, -3000.0),
+    ] {
         reducer
             .on_sample(&StatsSample {
                 frame_number,
                 time: frame_number as f32,
-                dt: 1.0,
+                dt,
                 seconds_remaining: Some(100 - frame_number as i32),
                 game_state: Some(0),
                 ball_has_been_hit: None,
@@ -878,6 +885,132 @@ fn test_positioning_reducer_uses_field_marking_zone_boundary() {
     assert_eq!(stats.time_neutral_zone, 1.0);
     assert_eq!(stats.time_offensive_zone, 1.0);
     assert_eq!(stats.time_defensive_zone, 1.0);
+}
+
+#[test]
+fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
+    let player_id = epic_id("positioning-boundary-interpolation");
+    let mut reducer = PositioningReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.0,
+            seconds_remaining: Some(99),
+            game_state: Some(0),
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: Some(BallSample {
+                rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
+            }),
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 2000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: Some(98),
+            game_state: Some(0),
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: Some(BallSample {
+                rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
+            }),
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 2600.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
+            dt: 0.0,
+            seconds_remaining: Some(97),
+            game_state: Some(0),
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: Some(BallSample {
+                rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
+            }),
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, -100.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 4,
+            time: 4.0,
+            dt: 1.0,
+            seconds_remaining: Some(96),
+            game_state: Some(0),
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: Some(BallSample {
+                rigid_body: sample_rigid_body(0.0, 100.0, 92.75),
+            }),
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 100.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert!((stats.time_neutral_zone - 1.5).abs() < 0.001);
+    assert!((stats.time_offensive_zone - 0.5).abs() < 0.001);
+    assert!((stats.time_defensive_half - 0.5).abs() < 0.001);
+    assert!((stats.time_offensive_half - 1.5).abs() < 0.001);
+    assert!((stats.time_behind_ball - 1.0).abs() < 0.001);
+    assert!((stats.time_in_front_of_ball - 1.0).abs() < 0.001);
 }
 
 #[test]

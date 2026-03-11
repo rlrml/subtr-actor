@@ -26,6 +26,56 @@ impl BallSample {
     }
 }
 
+fn interval_fraction_in_scalar_range(start: f32, end: f32, min_value: f32, max_value: f32) -> f32 {
+    if (end - start).abs() <= f32::EPSILON {
+        return ((start >= min_value) && (start < max_value)) as i32 as f32;
+    }
+
+    let t_at_min = (min_value - start) / (end - start);
+    let t_at_max = (max_value - start) / (end - start);
+    let interval_start = t_at_min.min(t_at_max).max(0.0);
+    let interval_end = t_at_min.max(t_at_max).min(1.0);
+    (interval_end - interval_start).max(0.0)
+}
+
+fn interval_fraction_below_threshold(start: f32, end: f32, threshold: f32) -> f32 {
+    if (end - start).abs() <= f32::EPSILON {
+        return (start < threshold) as i32 as f32;
+    }
+
+    let threshold_time = ((threshold - start) / (end - start)).clamp(0.0, 1.0);
+    if start < threshold {
+        if end < threshold {
+            1.0
+        } else {
+            threshold_time
+        }
+    } else if end < threshold {
+        1.0 - threshold_time
+    } else {
+        0.0
+    }
+}
+
+fn interval_fraction_above_threshold(start: f32, end: f32, threshold: f32) -> f32 {
+    if (end - start).abs() <= f32::EPSILON {
+        return (start > threshold) as i32 as f32;
+    }
+
+    let threshold_time = ((threshold - start) / (end - start)).clamp(0.0, 1.0);
+    if start > threshold {
+        if end > threshold {
+            1.0
+        } else {
+            threshold_time
+        }
+    } else if end > threshold {
+        1.0 - threshold_time
+    } else {
+        0.0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PlayerSample {
     pub player_id: PlayerId,
@@ -1550,6 +1600,8 @@ impl PositioningStats {
 pub struct PositioningReducer {
     player_stats: HashMap<PlayerId, PositioningStats>,
     current_possession_team_is_team_0: Option<bool>,
+    previous_ball_position: Option<glam::Vec3>,
+    previous_player_positions: HashMap<PlayerId, glam::Vec3>,
 }
 
 impl PositioningReducer {
@@ -1565,6 +1617,15 @@ impl PositioningReducer {
 impl StatsReducer for PositioningReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         if sample.dt == 0.0 {
+            if let Some(ball) = &sample.ball {
+                self.previous_ball_position = Some(ball.position());
+            }
+            for player in &sample.players {
+                if let Some(position) = player.position() {
+                    self.previous_player_positions
+                        .insert(player.player_id.clone(), position);
+                }
+            }
             return Ok(());
         }
 
@@ -1584,8 +1645,16 @@ impl StatsReducer for PositioningReducer {
             let Some(position) = player.position() else {
                 continue;
             };
+            let previous_position = self
+                .previous_player_positions
+                .get(&player.player_id)
+                .copied()
+                .unwrap_or(position);
+            let previous_ball_position = self.previous_ball_position.unwrap_or(ball_position);
             let normalized_position_y = normalized_y(player.is_team_0, position);
+            let normalized_previous_position_y = normalized_y(player.is_team_0, previous_position);
             let normalized_ball_y = normalized_y(player.is_team_0, ball_position);
+            let normalized_previous_ball_y = normalized_y(player.is_team_0, previous_ball_position);
             let stats = self
                 .player_stats
                 .entry(player.player_id.clone())
@@ -1605,25 +1674,41 @@ impl StatsReducer for PositioningReducer {
                         position.distance(ball_position) * sample.dt;
                 }
 
-                if normalized_position_y < -FIELD_ZONE_BOUNDARY_Y {
-                    stats.time_defensive_zone += sample.dt;
-                } else if normalized_position_y > FIELD_ZONE_BOUNDARY_Y {
-                    stats.time_offensive_zone += sample.dt;
-                } else {
-                    stats.time_neutral_zone += sample.dt;
-                }
+                let defensive_zone_fraction = interval_fraction_below_threshold(
+                    normalized_previous_position_y,
+                    normalized_position_y,
+                    -FIELD_ZONE_BOUNDARY_Y,
+                );
+                let offensive_zone_fraction = interval_fraction_above_threshold(
+                    normalized_previous_position_y,
+                    normalized_position_y,
+                    FIELD_ZONE_BOUNDARY_Y,
+                );
+                let neutral_zone_fraction = interval_fraction_in_scalar_range(
+                    normalized_previous_position_y,
+                    normalized_position_y,
+                    -FIELD_ZONE_BOUNDARY_Y,
+                    FIELD_ZONE_BOUNDARY_Y,
+                );
+                stats.time_defensive_zone += sample.dt * defensive_zone_fraction;
+                stats.time_neutral_zone += sample.dt * neutral_zone_fraction;
+                stats.time_offensive_zone += sample.dt * offensive_zone_fraction;
 
-                if normalized_position_y < 0.0 {
-                    stats.time_defensive_half += sample.dt;
-                } else {
-                    stats.time_offensive_half += sample.dt;
-                }
+                let defensive_half_fraction = interval_fraction_below_threshold(
+                    normalized_previous_position_y,
+                    normalized_position_y,
+                    0.0,
+                );
+                stats.time_defensive_half += sample.dt * defensive_half_fraction;
+                stats.time_offensive_half += sample.dt * (1.0 - defensive_half_fraction);
 
-                if normalized_position_y < normalized_ball_y {
-                    stats.time_behind_ball += sample.dt;
-                } else {
-                    stats.time_in_front_of_ball += sample.dt;
-                }
+                let previous_ball_delta =
+                    normalized_previous_position_y - normalized_previous_ball_y;
+                let current_ball_delta = normalized_position_y - normalized_ball_y;
+                let behind_ball_fraction =
+                    interval_fraction_below_threshold(previous_ball_delta, current_ball_delta, 0.0);
+                stats.time_behind_ball += sample.dt * behind_ball_fraction;
+                stats.time_in_front_of_ball += sample.dt * (1.0 - behind_ball_fraction);
             }
         }
 
@@ -1711,6 +1796,14 @@ impl StatsReducer for PositioningReducer {
             self.current_possession_team_is_team_0 = sample
                 .possession_team_is_team_0
                 .or(self.current_possession_team_is_team_0);
+        }
+
+        self.previous_ball_position = Some(ball_position);
+        for player in &sample.players {
+            if let Some(position) = player.position() {
+                self.previous_player_positions
+                    .insert(player.player_id.clone(), position);
+            }
         }
 
         Ok(())
