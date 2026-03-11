@@ -45,7 +45,7 @@ These are the important places where we are making an explicit semantic choice.
 | Ground threshold | `z <= 20` | [`GROUND_Z_THRESHOLD`](src/stats.rs) | Unknown |
 | High-air threshold | `z >= 300` | [`HIGH_AIR_Z_THRESHOLD`](src/stats.rs) | Unknown |
 | Field halves | Normalize to team attack direction; `y < 0` is defensive half | [`PositioningReducer`](src/stats.rs) | Probably similar, not confirmed |
-| Field thirds | Normalize to team attack direction; split using `FIELD_THIRD_LENGTH_Y = 5120 * 2 / 3` | [`PositioningReducer`](src/stats.rs) | Unknown |
+| Field zones | Normalize to team attack direction; split using `FIELD_ZONE_BOUNDARY_Y = BOOST_PAD_SIDE_LANE_Y` | [`PositioningReducer`](src/stats.rs) | Unknown |
 | Behind / in front of ball | Compare normalized player `y` to normalized ball `y` | [`PositioningReducer`](src/stats.rs) | Unknown |
 | Closest / farthest / most back / most forward | Pure per-sample ranking among teammates | [`PositioningReducer`](src/stats.rs) | Unknown |
 | Possession owner | Use team last-touch signal, not replay-native player possession | [`PositioningReducer`](src/stats.rs), [`PossessionReducer`](src/stats.rs) | No |
@@ -80,8 +80,8 @@ This is exactly the shape you would expect if our vertical and handbrake semanti
 
 Across the sampled replays:
 
-- `time_neutral_third` is often much higher on our side
-- `time_defensive_third` and `time_offensive_third` are often lower on our side
+- Ballchasing's `time_neutral_third` is often much higher than our internal neutral-zone time
+- Ballchasing's `time_defensive_third` and `time_offensive_third` are often lower than our internal zone totals
 - the possession-conditioned distance stats disagree in a way that looks heuristic rather than threshold-driven
 
 This strongly suggests semantic mismatch in zone boundaries and possession labeling.
@@ -177,9 +177,9 @@ Impact:
 | `positioning.avg_distance_to_ball_possession` | 5 | Moderate mismatch | Team possession owner heuristic from last touch | No | Very likely possession semantics differ; Ballchasing may use player-level possession rather than team last-touch. |
 | `positioning.avg_distance_to_ball_no_possession` | 5 | Moderate mismatch | Same as above | No | Same note. |
 | `positioning.avg_distance_to_mates` | 2 | Small sample of disagreement | Per-sample teammate distance | No | Lower priority; likely derivative of sampling / interpolation differences. |
-| `positioning.time_defensive_third` | 13 | Usually low on our side | Normalized `y < -FIELD_THIRD_LENGTH_Y` | No | Suggests Ballchasing uses different thirds geometry or a different live-play window. |
-| `positioning.time_neutral_third` | 13 | Usually high on our side | Center band between our third thresholds | No | Strong sign that our thirds are narrower than Ballchasing's or that Ballchasing uses a different field reference. |
-| `positioning.time_offensive_third` | 13 | Usually low on our side | Normalized `y > FIELD_THIRD_LENGTH_Y` | No | Same as defensive / neutral thirds. |
+| `positioning.time_defensive_third` | 13 | Usually low on our side | Normalized `y < -FIELD_ZONE_BOUNDARY_Y` | No | Suggests Ballchasing uses different zone geometry or a different live-play window. |
+| `positioning.time_neutral_third` | 13 | Usually high on our side | Center band between our zone thresholds | No | Strong sign that our neutral zone is narrower than Ballchasing's or that Ballchasing uses a different field reference. |
+| `positioning.time_offensive_third` | 13 | Usually low on our side | Normalized `y > FIELD_ZONE_BOUNDARY_Y` | No | Same as defensive / neutral zones. |
 | `positioning.percent_defensive_third` | 13 | Usually low | Same as above plus denominator | No | Same root cause. |
 | `positioning.percent_neutral_third` | 13 | Usually high | Same as above plus denominator | No | Same root cause. |
 | `positioning.percent_offensive_third` | 13 | Usually low | Same as above plus denominator | No | Same root cause. |

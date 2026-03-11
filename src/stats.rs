@@ -547,9 +547,10 @@ const BALL_RADIUS_Z: f32 = 92.75;
 // Ballchasing's high-air bucket lines up better with the car center clearing a
 // crossbar-height ball than with plain goal height.
 const HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
-// Ballchasing's thirds split tracks the standard soccar lane markings more
-// closely than a literal geometric third of the full playable length.
-const FIELD_THIRD_LENGTH_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
+// Ballchasing's defensive / neutral / offensive zones track the standard
+// soccar lane markings more closely than a literal geometric third of the full
+// playable length.
+const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
@@ -1448,9 +1449,9 @@ pub struct PositioningStats {
     pub time_no_possession: f32,
     pub time_most_back: f32,
     pub time_most_forward: f32,
-    pub time_defensive_third: f32,
-    pub time_neutral_third: f32,
-    pub time_offensive_third: f32,
+    pub time_defensive_zone: f32,
+    pub time_neutral_zone: f32,
+    pub time_offensive_zone: f32,
     pub time_defensive_half: f32,
     pub time_offensive_half: f32,
     pub time_closest_to_ball: f32,
@@ -1508,16 +1509,16 @@ impl PositioningStats {
         self.pct(self.time_most_forward)
     }
 
-    pub fn defensive_third_pct(&self) -> f32 {
-        self.pct(self.time_defensive_third)
+    pub fn defensive_zone_pct(&self) -> f32 {
+        self.pct(self.time_defensive_zone)
     }
 
-    pub fn neutral_third_pct(&self) -> f32 {
-        self.pct(self.time_neutral_third)
+    pub fn neutral_zone_pct(&self) -> f32 {
+        self.pct(self.time_neutral_zone)
     }
 
-    pub fn offensive_third_pct(&self) -> f32 {
-        self.pct(self.time_offensive_third)
+    pub fn offensive_zone_pct(&self) -> f32 {
+        self.pct(self.time_offensive_zone)
     }
 
     pub fn defensive_half_pct(&self) -> f32 {
@@ -1604,12 +1605,12 @@ impl StatsReducer for PositioningReducer {
                         position.distance(ball_position) * sample.dt;
                 }
 
-                if normalized_position_y < -FIELD_THIRD_LENGTH_Y {
-                    stats.time_defensive_third += sample.dt;
-                } else if normalized_position_y > FIELD_THIRD_LENGTH_Y {
-                    stats.time_offensive_third += sample.dt;
+                if normalized_position_y < -FIELD_ZONE_BOUNDARY_Y {
+                    stats.time_defensive_zone += sample.dt;
+                } else if normalized_position_y > FIELD_ZONE_BOUNDARY_Y {
+                    stats.time_offensive_zone += sample.dt;
                 } else {
-                    stats.time_neutral_third += sample.dt;
+                    stats.time_neutral_zone += sample.dt;
                 }
 
                 if normalized_position_y < 0.0 {

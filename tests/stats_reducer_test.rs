@@ -839,8 +839,8 @@ fn test_positioning_reducer_collects_distances_and_percent_buckets() {
 }
 
 #[test]
-fn test_positioning_reducer_uses_field_marking_thirds_boundary() {
-    let player_id = epic_id("positioning-thirds-boundary");
+fn test_positioning_reducer_uses_field_marking_zone_boundary() {
+    let player_id = epic_id("positioning-zone-boundary");
     let mut reducer = PositioningReducer::new();
     let ball = BallSample {
         rigid_body: sample_rigid_body(0.0, 0.0, 0.0),
@@ -875,9 +875,9 @@ fn test_positioning_reducer_uses_field_marking_thirds_boundary() {
     }
 
     let stats = reducer.player_stats().get(&player_id).unwrap();
-    assert_eq!(stats.time_neutral_third, 1.0);
-    assert_eq!(stats.time_offensive_third, 1.0);
-    assert_eq!(stats.time_defensive_third, 1.0);
+    assert_eq!(stats.time_neutral_zone, 1.0);
+    assert_eq!(stats.time_offensive_zone, 1.0);
+    assert_eq!(stats.time_defensive_zone, 1.0);
 }
 
 #[test]

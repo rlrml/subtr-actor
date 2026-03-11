@@ -19,7 +19,7 @@
 - `PressureReducer`: time and percentage of ball-side pressure
 - `PossessionReducer`: team possession time and percentage using exact team-touch boundaries
 - `BoostReducer`: boost amount buckets, BPM, exact pad pickup counts and pad-size classification, collected/stolen amounts, overfill, supersonic boost usage
-- `PositioningReducer`: teammate distance, ball distance, back/forward role percentages, thirds/halves, closest/farthest to ball, behind/in front of ball
+- `PositioningReducer`: teammate distance, ball distance, back/forward role percentages, defensive/neutral/offensive zones plus halves, closest/farthest to ball, behind/in front of ball
 - `MovementReducer`: distance, average speed, speed buckets, ground/air buckets, team aggregates
 - `PowerslideReducer`: total powerslide duration, count, average duration, team aggregates
 - `SettingsReducer`: camera settings and steering sensitivity from replay metadata
@@ -58,7 +58,7 @@
 | Time in boost ranges 0-25 / 25-50 / 50-75 / 75-100 | Current boost value from processor | Integrate `dt` into range buckets; report seconds and percentages | Prefer full frame deltas | `Available` |
 | Average distance to teammates | Player rigid bodies | Integrate pairwise teammate distance over `dt` and average per player | Prefer full frame deltas or deterministic resampling | `Available` |
 | Percent most back / most forward | Player positions projected along team attack axis | At each sample choose relative ordering within team, then integrate `dt` | Needs a stable sample policy | `Available` |
-| Percent in defensive / neutral / offensive third | Player positions | Bucket field zone per sample, integrate `dt` | Needs a stable sample policy | `Available` |
+| Percent in defensive / neutral / offensive zone | Player positions | Bucket field zone per sample, integrate `dt` | Needs a stable sample policy | `Available` |
 | Percent in defensive / offensive half | Player positions | Bucket field half per sample, integrate `dt` | Needs a stable sample policy | `Available` |
 | Percent closest to ball / farthest from ball | Player-ball distances | Rank teammates by ball distance per sample, integrate `dt` | Needs a stable sample policy | `Available` |
 | Percent behind ball / in front of ball | Player and ball positions | Classify by attack-direction-relative position, integrate `dt` | Needs a stable sample policy | `Available` |
