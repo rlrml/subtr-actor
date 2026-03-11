@@ -646,6 +646,7 @@ fn test_ndarray_collector_all_player_features() {
             "PlayerBoost",
             "PlayerJump",
             "PlayerAnyJump",
+            "PlayerDodgeRefreshed",
         ],
     )
     .expect("Should create collector with all player features");
@@ -662,6 +663,41 @@ fn test_ndarray_collector_all_player_features() {
         "Should have player headers"
     );
     assert!(array.ncols() > 0, "Should have columns");
+}
+
+#[test]
+fn test_ndarray_collector_player_dodge_refreshed_feature() {
+    let replay = parse_replay("assets/replays/dodges_refreshed_counter.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Should collect replay data");
+
+    let (meta, array) = NDArrayCollector::<f32>::from_strings(&[], &["PlayerDodgeRefreshed"])
+        .expect("Should create collector")
+        .process_replay(&replay)
+        .expect("Should process replay")
+        .get_meta_and_ndarray()
+        .expect("Should get ndarray");
+
+    assert_eq!(
+        meta.column_headers.player_headers,
+        vec!["dodge refresh count".to_string()],
+        "Should expose the dodge refresh player header"
+    );
+    assert_eq!(
+        array.ncols(),
+        meta.replay_meta.player_count(),
+        "Should add one dodge refresh column per player"
+    );
+    assert!(
+        array.iter().any(|value| *value > 0.0),
+        "Should emit non-zero values on frames with dodge refreshes"
+    );
+    assert_eq!(
+        array.sum(),
+        replay_data.dodge_refreshed_events.len() as f32,
+        "Should preserve the exact total count of dodge refresh events"
+    );
 }
 
 /// Test FrameRateDecorator with different FPS values

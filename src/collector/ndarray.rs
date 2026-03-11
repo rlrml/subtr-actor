@@ -343,6 +343,7 @@ where
         "PlayerBoost" => Some(PlayerBoost::<F>::arc_new()),
         "PlayerJump" => Some(PlayerJump::<F>::arc_new()),
         "PlayerAnyJump" => Some(PlayerAnyJump::<F>::arc_new()),
+        "PlayerDodgeRefreshed" => Some(PlayerDodgeRefreshed::<F>::arc_new()),
         "PlayerDemolishedBy" => Some(PlayerDemolishedBy::<F>::arc_new()),
         _ => None,
     }
@@ -1314,6 +1315,24 @@ build_player_feature_adder!(
         convert_all_floats!(value)
     },
     "any_jump_active"
+);
+
+build_player_feature_adder!(
+    PlayerDodgeRefreshed,
+    |_,
+     player_id: &PlayerId,
+     processor: &ReplayProcessor,
+     _frame,
+     _frame_number,
+     _current_time: f32| {
+        let dodge_refresh_count = processor
+            .current_frame_dodge_refreshed_events()
+            .iter()
+            .filter(|event| &event.player == player_id)
+            .count() as f32;
+        convert_all_floats!(dodge_refresh_count)
+    },
+    "dodge refresh count"
 );
 
 const DEMOLISH_APPEARANCE_FRAME_COUNT: usize = 30;

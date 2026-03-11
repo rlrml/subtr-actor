@@ -148,7 +148,8 @@ Common player features:
 - `"PlayerRigidBody"`
 - `"PlayerBoost"`
 - `"PlayerAnyJump"`
-- `"PlayerDoubleJump"`
+- `"PlayerJump"`
+- `"PlayerDodgeRefreshed"`
 
 `"PlayerBoost"` is exposed in raw replay units (`0-255`), not percentage.
 
