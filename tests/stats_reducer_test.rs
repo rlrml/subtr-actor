@@ -75,6 +75,35 @@ fn sample_rigid_body_with_linear_velocity(
     rigid_body
 }
 
+fn sample_stats(
+    frame_number: usize,
+    time: f32,
+    dt: f32,
+    ball: Option<boxcars::RigidBody>,
+    players: Vec<PlayerSample>,
+) -> StatsSample {
+    StatsSample {
+        frame_number,
+        time,
+        dt,
+        seconds_remaining: Some(100),
+        game_state: Some(0),
+        ball_has_been_hit: Some(true),
+        team_zero_score: None,
+        team_one_score: None,
+        possession_team_is_team_0: None,
+        scored_on_team_is_team_0: None,
+        ball: ball.map(|rigid_body| BallSample { rigid_body }),
+        players,
+        active_demos: Vec::new(),
+        demo_events: Vec::new(),
+        boost_pad_events: Vec::new(),
+        touch_events: Vec::new(),
+        player_stat_events: Vec::new(),
+        goal_events: Vec::new(),
+    }
+}
+
 #[derive(Clone)]
 struct RecordingReducer {
     replay_meta_calls: Rc<RefCell<usize>>,
@@ -140,6 +169,159 @@ fn test_powerslide_reducer_collects_duration_and_presses() {
             || reducer.team_one_stats().total_duration > 0.0,
         "Expected at least one team to have non-zero powerslide duration"
     );
+}
+
+#[test]
+fn test_ball_carry_reducer_tracks_single_carry() {
+    let player_id = epic_id("carry-player");
+    let mut reducer = BallCarryReducer::new();
+
+    let mut touch_sample = sample_stats(
+        1,
+        0.0,
+        0.0,
+        Some(sample_rigid_body(0.0, 0.0, 140.0)),
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                0.0, 0.0, 17.0, 400.0, 0.0, 0.0,
+            )),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    touch_sample.touch_events.push(TouchEvent {
+        time: 0.0,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(player_id.clone()),
+        closest_approach_distance: Some(40.0),
+    });
+    reducer.on_sample(&touch_sample).unwrap();
+
+    for (frame_number, time, player_x) in [(2, 0.5, 50.0), (3, 1.0, 100.0), (4, 1.5, 150.0)] {
+        reducer
+            .on_sample(&sample_stats(
+                frame_number,
+                time,
+                0.5,
+                Some(sample_rigid_body(player_x, 0.0, 150.0)),
+                vec![PlayerSample {
+                    rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                        player_x, 0.0, 17.0, 600.0, 0.0, 0.0,
+                    )),
+                    ..sample_player(player_id.clone(), true)
+                }],
+            ))
+            .unwrap();
+    }
+
+    reducer.finish().unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.carry_count, 1);
+    assert!((stats.total_carry_time - 1.5).abs() < 0.001);
+    assert!((stats.longest_carry_time - 1.5).abs() < 0.001);
+    assert!((stats.furthest_carry_distance - 100.0).abs() < 0.001);
+    assert!(stats.average_horizontal_gap() < 5.0);
+
+    let event = reducer.carry_events().first().unwrap();
+    assert_eq!(event.start_frame, 1);
+    assert_eq!(event.end_frame, 4);
+    assert!((event.duration - 1.5).abs() < 0.001);
+    assert!((event.straight_line_distance - 100.0).abs() < 0.001);
+    assert!((event.path_distance - 100.0).abs() < 0.001);
+}
+
+#[test]
+fn test_ball_carry_reducer_requires_last_touch_owner() {
+    let player_id = epic_id("carry-no-touch");
+    let mut reducer = BallCarryReducer::new();
+
+    for (frame_number, time) in [(1, 0.5), (2, 1.0), (3, 1.5)] {
+        reducer
+            .on_sample(&sample_stats(
+                frame_number,
+                time,
+                0.5,
+                Some(sample_rigid_body(time * 100.0, 0.0, 145.0)),
+                vec![PlayerSample {
+                    rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                        time * 100.0,
+                        0.0,
+                        17.0,
+                        500.0,
+                        0.0,
+                        0.0,
+                    )),
+                    ..sample_player(player_id.clone(), true)
+                }],
+            ))
+            .unwrap();
+    }
+
+    reducer.finish().unwrap();
+
+    assert!(reducer.player_stats().get(&player_id).is_none());
+    assert!(reducer.carry_events().is_empty());
+}
+
+#[test]
+fn test_ball_carry_reducer_flushes_active_carry_on_finish() {
+    let player_id = epic_id("carry-finish");
+    let mut manual = BallCarryReducer::new();
+    let mut touch_sample = sample_stats(
+        1,
+        0.0,
+        0.0,
+        Some(sample_rigid_body(0.0, 0.0, 145.0)),
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                0.0, 0.0, 17.0, 450.0, 0.0, 0.0,
+            )),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    touch_sample.touch_events.push(TouchEvent {
+        time: 0.0,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(player_id.clone()),
+        closest_approach_distance: Some(30.0),
+    });
+    manual.on_sample(&touch_sample).unwrap();
+    manual
+        .on_sample(&sample_stats(
+            2,
+            0.5,
+            0.5,
+            Some(sample_rigid_body(60.0, 0.0, 150.0)),
+            vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                    60.0, 0.0, 17.0, 450.0, 0.0, 0.0,
+                )),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+    manual
+        .on_sample(&sample_stats(
+            3,
+            1.0,
+            0.5,
+            Some(sample_rigid_body(120.0, 0.0, 150.0)),
+            vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body_with_linear_velocity(
+                    120.0, 0.0, 17.0, 450.0, 0.0, 0.0,
+                )),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+    manual.finish().unwrap();
+
+    let stats = manual.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.carry_count, 1);
+    assert!((stats.total_carry_time - 1.0).abs() < 0.001);
+    assert_eq!(manual.carry_events().len(), 1);
 }
 
 #[test]
