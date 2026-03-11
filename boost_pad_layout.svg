@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8472 10520" width="8472" height="10520">
+  <rect width="8472" height="10520" fill="#f8fafc" />
+  <rect x="140" y="140" width="8192" height="10240" rx="24" fill="#ecfccb" stroke="#365314" stroke-width="12" />
+  <line x1="4236" y1="140" x2="4236" y2="10380" stroke="#65a30d" stroke-width="10" stroke-dasharray="36 24" />
+  <line x1="140" y1="5260" x2="8332" y2="5260" stroke="#65a30d" stroke-width="6" stroke-dasharray="18 18" />
+  <text x="140" y="70" font-size="44" font-family="monospace" fill="#1f2937">Standard Soccar Boost Pad Layout</text>
+  <text x="140" y="118" font-size="28" font-family="monospace" fill="#475569">orange = big pad, blue = small pad, labels = layout index</text>
+  <circle cx="4236" cy="9500" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="9425" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">0</text>
+  <text x="4236" y="9589" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, -4240)</text>
+  <circle cx="4236" cy="1020" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="945" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">1</text>
+  <text x="4236" y="1109" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, 4240)</text>
+  <circle cx="2444" cy="9444" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2444" y="9369" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">2</text>
+  <text x="2444" y="9533" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-1792, -4184)</text>
+  <circle cx="6028" cy="9444" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6028" y="9369" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">3</text>
+  <text x="6028" y="9533" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(1792, -4184)</text>
+  <circle cx="2444" cy="1076" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2444" y="1001" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">4</text>
+  <text x="2444" y="1165" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-1792, 4184)</text>
+  <circle cx="6028" cy="1076" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6028" y="1001" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">5</text>
+  <text x="6028" y="1165" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(1792, 4184)</text>
+  <circle cx="1164" cy="9356" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="1164" y="9246" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">6</text>
+  <text x="1164" y="9480" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-3072, -4096)</text>
+  <circle cx="7308" cy="9356" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="7308" y="9246" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">7</text>
+  <text x="7308" y="9480" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(3072, -4096)</text>
+  <circle cx="1164" cy="1164" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="1164" y="1054" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">8</text>
+  <text x="1164" y="1288" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-3072, 4096)</text>
+  <circle cx="7308" cy="1164" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="7308" y="1054" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">9</text>
+  <text x="7308" y="1288" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(3072, 4096)</text>
+  <circle cx="3296" cy="8568" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="3296" y="8493" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">10</text>
+  <text x="3296" y="8657" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-940, -3308)</text>
+  <circle cx="5176" cy="8568" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="5176" y="8493" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">11</text>
+  <text x="5176" y="8657" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(940, -3308)</text>
+  <circle cx="3296" cy="1952" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="3296" y="1877" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">12</text>
+  <text x="3296" y="2041" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-940, 3308)</text>
+  <circle cx="5176" cy="1952" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="5176" y="1877" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">13</text>
+  <text x="5176" y="2041" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(940, 3308)</text>
+  <circle cx="4236" cy="8076" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="8001" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">14</text>
+  <text x="4236" y="8165" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, -2816)</text>
+  <circle cx="4236" cy="2444" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="2369" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">15</text>
+  <text x="4236" y="2533" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, 2816)</text>
+  <circle cx="652" cy="7744" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="652" y="7669" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">16</text>
+  <text x="652" y="7833" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-3584, -2484)</text>
+  <circle cx="7820" cy="7744" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="7820" y="7669" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">17</text>
+  <text x="7820" y="7833" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(3584, -2484)</text>
+  <circle cx="652" cy="2776" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="652" y="2701" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">18</text>
+  <text x="652" y="2865" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-3584, 2484)</text>
+  <circle cx="7820" cy="2776" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="7820" y="2701" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">19</text>
+  <text x="7820" y="2865" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(3584, 2484)</text>
+  <circle cx="2448" cy="7560" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2448" y="7485" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">20</text>
+  <text x="2448" y="7649" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-1788, -2300)</text>
+  <circle cx="6024" cy="7560" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6024" y="7485" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">21</text>
+  <text x="6024" y="7649" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(1788, -2300)</text>
+  <circle cx="2448" cy="2960" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2448" y="2885" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">22</text>
+  <text x="2448" y="3049" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-1788, 2300)</text>
+  <circle cx="6024" cy="2960" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6024" y="2885" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">23</text>
+  <text x="6024" y="3049" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(1788, 2300)</text>
+  <circle cx="2188" cy="6296" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2188" y="6221" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">24</text>
+  <text x="2188" y="6385" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-2048, -1036)</text>
+  <circle cx="6284" cy="6296" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6284" y="6221" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">25</text>
+  <text x="6284" y="6385" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(2048, -1036)</text>
+  <circle cx="2188" cy="4224" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="2188" y="4149" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">26</text>
+  <text x="2188" y="4313" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-2048, 1036)</text>
+  <circle cx="6284" cy="4224" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="6284" y="4149" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">27</text>
+  <text x="6284" y="4313" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(2048, 1036)</text>
+  <circle cx="4236" cy="6284" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="6209" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">28</text>
+  <text x="4236" y="6373" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, -1024)</text>
+  <circle cx="4236" cy="4236" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="4236" y="4161" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">29</text>
+  <text x="4236" y="4325" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(0, 1024)</text>
+  <circle cx="652" cy="5260" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="652" y="5150" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">30</text>
+  <text x="652" y="5384" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-3584, 0)</text>
+  <circle cx="7820" cy="5260" r="90" fill="#f97316" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="7820" y="5150" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">31</text>
+  <text x="7820" y="5384" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(3584, 0)</text>
+  <circle cx="3212" cy="5260" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="3212" y="5185" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">32</text>
+  <text x="3212" y="5349" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(-1024, 0)</text>
+  <circle cx="5260" cy="5260" r="55" fill="#38bdf8" fill-opacity="0.82" stroke="#0f172a" stroke-width="10" />
+  <text x="5260" y="5185" text-anchor="middle" font-size="42" font-family="monospace" font-weight="700" fill="#111827">33</text>
+  <text x="5260" y="5349" text-anchor="middle" font-size="22" font-family="monospace" fill="#334155">(1024, 0)</text>
+</svg>

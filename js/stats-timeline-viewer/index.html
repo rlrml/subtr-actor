@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats Timeline Viewer</title>
+</head>
+<body>
+    <div id="app" class="app-shell">
+        <header class="hero">
+            <p class="eyebrow">subtr-actor</p>
+            <h1>Stats Timeline Viewer</h1>
+            <p class="hero-copy">
+                Watch the replay, scrub freely, and inspect cumulative reducer state at each point in time.
+            </p>
+        </header>
+
+        <section class="upload-card" id="uploadCard">
+            <label class="upload-dropzone" id="uploadArea">
+                <input type="file" id="fileInput" class="file-input" accept=".replay">
+                <span class="upload-kicker">Replay Input</span>
+                <strong>Drop a Rocket League replay here</strong>
+                <span>or click to browse</span>
+            </label>
+            <div class="progress-card" id="progressCard" hidden>
+                <div class="progress-label" id="progressLabel">Preparing…</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            <div class="error-banner" id="errorBanner" hidden></div>
+        </section>
+
+        <section class="workspace" id="workspace" hidden>
+            <div class="viewer-column">
+                <div class="surface viewer-meta" id="viewerMeta"></div>
+                <div class="surface">
+                    <div id="details-watch">
+                        <div id="player-container">
+                            <div id="player"></div>
+                            <div id="player-controls">
+                                <div class="ticks"></div>
+                                <input type="range" id="seekbar" min="0" max="1000" value="0">
+                                <div class="player-info">
+                                    <span id="current-time">00:00</span>
+                                    <span class="time-divider">/</span>
+                                    <span id="total-time">00:00</span>
+                                    <button id="play-pause" class="control-button">Play</button>
+                                    <button id="cameraSwitcher" class="control-button">Camera</button>
+                                    <button id="full-screen" class="control-button">Fullscreen</button>
+                                    <button id="playback-speed-dn" class="control-button">Slower</button>
+                                    <span id="playback-speed-value">1x</span>
+                                    <button id="playback-speed-up" class="control-button">Faster</button>
+                                </div>
+                            </div>
+                            <div id="game-info">
+                                <div id="blue-score">0</div>
+                                <div id="rem-seconds">05:00</div>
+                                <div id="orange-score">0</div>
+                            </div>
+                            <div id="countdown"></div>
+                        </div>
+                        <div class="watchers"></div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="stats-column">
+                <div class="surface stats-surface" id="statsPanel"></div>
+            </aside>
+        </section>
+    </div>
+
+    <div id="player-shortcuts-popup" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <button class="modal-close" type="button">&times;</button>
+            <h3>Keyboard Shortcuts</h3>
+            <ul>
+                <li><strong>X</strong> toggles playback</li>
+                <li><strong>Left/Right</strong> seeks</li>
+                <li><strong>W</strong> and <strong>S</strong> adjust speed</li>
+                <li><strong>C</strong> switches camera</li>
+            </ul>
+        </div>
+    </div>
+    <div id="session-broken" class="modal"><div class="modal-background"></div><div class="modal-content"><button class="modal-close" type="button">&times;</button></div></div>
+    <div id="session-over" class="modal"><div class="modal-background"></div><div class="modal-content"><button class="modal-close" type="button">&times;</button></div></div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>

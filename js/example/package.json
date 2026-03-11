@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build-wasm": "cd .. && wasm-pack build --target web --out-dir pkg",
+    "build-wasm": "sh ../scripts/build-wasm.sh",
     "dev-with-wasm": "npm run build-wasm && npm run dev"
   },
   "dependencies": {

@@ -1845,6 +1845,8 @@ function createCountdown(bus) {
         }
         function setTime(t) {
             time = t;
+            player.currentTime = time;
+            player.bus.fire("time-update", time);
             if (!player.playing) {
                 setTimeout(update, 0);
             }
@@ -1884,10 +1886,7 @@ function createCountdown(bus) {
                 player.bus.fire("set-time", 0);
             }
             clock.start();
-            $("#play-pause")
-                .find("i.fa")
-                .removeClass("fa-play")
-                .addClass("fa-pause");
+            updatePlayPauseButton();
             update();
             notify("state", { playing: true, time: time });
         }
@@ -1895,14 +1894,22 @@ function createCountdown(bus) {
         function pause() {
             player.playing = false;
             clock.stop();
-            $("#play-pause")
-                .find("i.fa")
-                .removeClass("fa-pause")
-                .addClass("fa-play");
+            updatePlayPauseButton();
             persistTimeToHash(time);
             notify("state", { playing: false, time: time });
         }
         player.pause = pause;
+        function updatePlayPauseButton() {
+            var playPause = $("#play-pause");
+            var icon = playPause.find("i.fa");
+            if (icon.length > 0) {
+                icon.removeClass("fa-play fa-pause").addClass(
+                    player.playing ? "fa-pause" : "fa-play",
+                );
+            } else {
+                playPause.text(player.playing ? "Pause" : "Play");
+            }
+        }
         function togglePlayback() {
             if (player.playing) {
                 pause();
@@ -2063,6 +2070,8 @@ function createCountdown(bus) {
                 time +=
                     speedMultipliers[speedMultiplierIndex] * clock.getDelta();
             }
+            player.currentTime = time;
+            player.bus.fire("time-update", time);
             ballCtrl.anim(time);
             carsCtrl.anim(time);
             timeAndScore.anim(time);
@@ -2135,8 +2144,8 @@ function createCountdown(bus) {
             countdownElement.style.top = (height - countdownSize) / 2 + "px";
         }
         applySelectedCamera();
-        update();
         onWindowResize();
+        update();
         document.getElementById("player-container").style.display = "block";
         window.addEventListener("resize", onWindowResize, false);
         var currentSettings = {
