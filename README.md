@@ -175,10 +175,12 @@ These are useful when working through the Python or JavaScript bindings:
 ## Documentation
 
 - Rust API docs: <https://docs.rs/subtr-actor>
+- Project docs: [docs/README.md](./docs/README.md)
+- Changelog: [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 - Python package README: [python/README.md](./python/README.md)
 - JavaScript package README: [js/README.md](./js/README.md)
 - Example app: [js/example/README.md](./js/example/README.md)
-- Release notes and process: [RELEASING.md](./RELEASING.md)
+- Release notes and process: [docs/RELEASING.md](./docs/RELEASING.md)
 
 ## Development
 
