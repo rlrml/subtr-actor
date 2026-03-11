@@ -162,7 +162,17 @@ pub struct ReplayProcessor<'a> {
     pub boost_pad_events: Vec<BoostPadEvent>,
     current_frame_boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
-    current_frame_touch_events: Vec<TouchEvent>,
+    pub(crate) current_frame_touch_events: Vec<TouchEvent>,
+    pub flip_reset_events: Vec<FlipResetEvent>,
+    pub(crate) current_frame_flip_reset_events: Vec<FlipResetEvent>,
+    pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    pub(crate) current_frame_post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    pub flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
+    pub(crate) current_frame_flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
+    pub(crate) recent_wall_contact_time: HashMap<PlayerId, f32>,
+    pub(crate) recent_flip_reset_candidates: HashMap<PlayerId, FlipResetEvent>,
+    pub(crate) current_frame_dodge_rising_edges: Vec<PlayerId>,
+    pub(crate) previous_dodge_active: HashMap<PlayerId, bool>,
     pub goal_events: Vec<GoalEvent>,
     current_frame_goal_events: Vec<GoalEvent>,
     pub player_stat_events: Vec<PlayerStatEvent>,
@@ -215,6 +225,16 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
             current_frame_touch_events: Vec::new(),
+            flip_reset_events: Vec::new(),
+            current_frame_flip_reset_events: Vec::new(),
+            post_wall_dodge_events: Vec::new(),
+            current_frame_post_wall_dodge_events: Vec::new(),
+            flip_reset_followup_dodge_events: Vec::new(),
+            current_frame_flip_reset_followup_dodge_events: Vec::new(),
+            recent_wall_contact_time: HashMap::new(),
+            recent_flip_reset_candidates: HashMap::new(),
+            current_frame_dodge_rising_edges: Vec::new(),
+            previous_dodge_active: HashMap::new(),
             goal_events: Vec::new(),
             current_frame_goal_events: Vec::new(),
             player_stat_events: Vec::new(),
@@ -274,6 +294,10 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame, index)?;
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
+            self.update_flip_reset_events(frame, index)?;
+            self.update_dodge_rising_edges()?;
+            self.update_flip_reset_followup_dodge_events(frame, index)?;
+            self.update_post_wall_dodge_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -330,6 +354,10 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame, index)?;
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
+            self.update_flip_reset_events(frame, index)?;
+            self.update_dodge_rising_edges()?;
+            self.update_flip_reset_followup_dodge_events(frame, index)?;
+            self.update_post_wall_dodge_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -356,6 +384,16 @@ impl<'a> ReplayProcessor<'a> {
         self.current_frame_boost_pad_events = Vec::new();
         self.touch_events = Vec::new();
         self.current_frame_touch_events = Vec::new();
+        self.flip_reset_events = Vec::new();
+        self.current_frame_flip_reset_events = Vec::new();
+        self.post_wall_dodge_events = Vec::new();
+        self.current_frame_post_wall_dodge_events = Vec::new();
+        self.flip_reset_followup_dodge_events = Vec::new();
+        self.current_frame_flip_reset_followup_dodge_events = Vec::new();
+        self.recent_wall_contact_time = HashMap::new();
+        self.recent_flip_reset_candidates = HashMap::new();
+        self.current_frame_dodge_rising_edges = Vec::new();
+        self.previous_dodge_active = HashMap::new();
         self.goal_events = Vec::new();
         self.current_frame_goal_events = Vec::new();
         self.player_stat_events = Vec::new();

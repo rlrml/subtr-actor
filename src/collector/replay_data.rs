@@ -487,6 +487,9 @@ pub struct FrameData {
 /// * `demolish_infos` - Information about all demolition events that occurred during the replay
 /// * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
 /// * `touch_events` - Exact team touch events plus attributed player when available
+/// * `flip_reset_events` - Heuristic sparse flip-reset candidates derived from airborne touch geometry
+/// * `post_wall_dodge_events` - Heuristic airborne dodge uses that occur after wall contact
+/// * `flip_reset_followup_dodge_events` - Heuristic airborne dodge uses following a likely reset touch
 /// * `player_stat_events` - Exact shot/save/assist counter increment events
 /// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
 ///
@@ -522,6 +525,12 @@ pub struct ReplayData {
     pub boost_pad_events: Vec<BoostPadEvent>,
     /// Exact touch events observed during the replay
     pub touch_events: Vec<TouchEvent>,
+    /// Heuristic flip-reset candidates observed during the replay
+    pub flip_reset_events: Vec<FlipResetEvent>,
+    /// Heuristic airborne dodge uses observed after wall contact
+    pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    /// Heuristic airborne dodge uses observed after a likely reset touch
+    pub flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
     /// Exact player stat counter increments observed during the replay
     pub player_stat_events: Vec<PlayerStatEvent>,
     /// Exact goal events observed during the replay
@@ -747,6 +756,9 @@ impl ReplayDataCollector {
             demolish_infos: processor.demolishes,
             boost_pad_events: processor.boost_pad_events,
             touch_events: processor.touch_events,
+            flip_reset_events: processor.flip_reset_events,
+            post_wall_dodge_events: processor.post_wall_dodge_events,
+            flip_reset_followup_dodge_events: processor.flip_reset_followup_dodge_events,
             player_stat_events: processor.player_stat_events,
             goal_events: processor.goal_events,
             frame_data: self.get_frame_data(),

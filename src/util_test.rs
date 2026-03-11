@@ -147,3 +147,37 @@ fn test_touch_candidate_rank_penalizes_unreachable_far_candidates() {
         "expected a far candidate outside the short contact window to rank worse: {close_rank:?} !< {far_rank:?}"
     );
 }
+
+#[test]
+fn test_flip_reset_candidate_detects_airborne_underside_touch() {
+    let ball = sample_rigid_body(0.0, 0.0, 6.0, 0.0, 0.0, 0.0);
+    let player = sample_rigid_body(0.0, 0.0, 8.5, 0.0, 0.0, 0.0);
+
+    let heuristic = mechanics::flip_reset::flip_reset_candidate(&ball, &player, 1.2)
+        .expect("expected underside aerial contact to qualify as a flip-reset candidate");
+
+    assert!(heuristic.confidence > 0.5);
+    assert!(heuristic.local_ball_position.z < 0.0);
+}
+
+#[test]
+fn test_flip_reset_candidate_rejects_front_bumper_like_touch() {
+    let ball = sample_rigid_body(7.0, 0.0, 8.5, 0.0, 0.0, 0.0);
+    let player = sample_rigid_body(0.0, 0.0, 8.5, 0.0, 0.0, 0.0);
+
+    assert!(
+        mechanics::flip_reset::flip_reset_candidate(&ball, &player, 1.2).is_none(),
+        "expected front-facing touch geometry to be rejected"
+    );
+}
+
+#[test]
+fn test_flip_reset_candidate_rejects_low_ground_touch() {
+    let ball = sample_rigid_body(0.0, 0.0, 1.2, 0.0, 0.0, 0.0);
+    let player = sample_rigid_body(0.0, 0.0, 0.2, 0.0, 0.0, 0.0);
+
+    assert!(
+        mechanics::flip_reset::flip_reset_candidate(&ball, &player, 1.2).is_none(),
+        "expected grounded touch geometry to be rejected"
+    );
+}
