@@ -5,11 +5,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use subtr_actor::ballchasing::parse_replay_bytes;
+use subtr_actor::constants::DODGES_REFRESHED_COUNTER_KEY;
 use subtr_actor::{DodgeRefreshedEvent, FlipResetEvent, ReplayDataCollector};
 
 #[derive(Debug, Clone)]
 struct Config {
     count: usize,
+    scan_limit: usize,
     playlist: String,
     min_rank: String,
     cache_dir: PathBuf,
@@ -20,6 +22,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             count: 50,
+            scan_limit: 250,
             playlist: "ranked-standard".to_owned(),
             min_rank: "supersonic-legend".to_owned(),
             cache_dir: PathBuf::from("target/flip-reset-ground-truth"),
@@ -46,6 +49,13 @@ impl Config {
                 }
                 "--min-rank" => {
                     config.min_rank = args.next().context("Expected a value after --min-rank")?;
+                }
+                "--scan-limit" => {
+                    config.scan_limit = args
+                        .next()
+                        .context("Expected a value after --scan-limit")?
+                        .parse()
+                        .context("Failed to parse --scan-limit as an integer")?;
                 }
                 "--cache-dir" => {
                     config.cache_dir =
@@ -80,12 +90,15 @@ struct ReplaySummary {
 struct ReplayEvaluation {
     replay_id: String,
     title: Option<String>,
+    supports_exact_counter: bool,
     exact_count: usize,
     heuristic_count: usize,
-    matches: usize,
+    player_matches: usize,
+    team_matches: usize,
+    time_only_matches: usize,
     unmatched_exacts: Vec<ExactEventSummary>,
     unmatched_heuristics: Vec<HeuristicEventSummary>,
-    matched_deltas: Vec<f32>,
+    player_matched_deltas: Vec<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,54 +117,94 @@ struct HeuristicEventSummary {
 
 #[derive(Debug, Default)]
 struct AggregateMetrics {
-    replay_count: usize,
+    scanned_replay_count: usize,
+    supported_replay_count: usize,
     replay_with_exact_refresh_count: usize,
     total_exact: usize,
     total_heuristic: usize,
-    total_matches: usize,
-    matched_deltas: Vec<f32>,
+    total_player_matches: usize,
+    total_team_matches: usize,
+    total_time_only_matches: usize,
+    player_matched_deltas: Vec<f32>,
     evaluations: Vec<ReplayEvaluation>,
 }
 
 impl AggregateMetrics {
     fn add(&mut self, evaluation: ReplayEvaluation) {
-        self.replay_count += 1;
+        self.scanned_replay_count += 1;
+        if !evaluation.supports_exact_counter {
+            return;
+        }
+        self.supported_replay_count += 1;
         if evaluation.exact_count > 0 {
             self.replay_with_exact_refresh_count += 1;
         }
         self.total_exact += evaluation.exact_count;
         self.total_heuristic += evaluation.heuristic_count;
-        self.total_matches += evaluation.matches;
-        self.matched_deltas
-            .extend(evaluation.matched_deltas.iter().copied());
+        self.total_player_matches += evaluation.player_matches;
+        self.total_team_matches += evaluation.team_matches;
+        self.total_time_only_matches += evaluation.time_only_matches;
+        self.player_matched_deltas
+            .extend(evaluation.player_matched_deltas.iter().copied());
         self.evaluations.push(evaluation);
     }
 
-    fn precision(&self) -> f32 {
+    fn player_precision(&self) -> f32 {
         if self.total_heuristic == 0 {
             return 0.0;
         }
-        self.total_matches as f32 / self.total_heuristic as f32
+        self.total_player_matches as f32 / self.total_heuristic as f32
     }
 
-    fn recall(&self) -> f32 {
+    fn player_recall(&self) -> f32 {
         if self.total_exact == 0 {
             return 0.0;
         }
-        self.total_matches as f32 / self.total_exact as f32
+        self.total_player_matches as f32 / self.total_exact as f32
+    }
+
+    fn team_precision(&self) -> f32 {
+        if self.total_heuristic == 0 {
+            return 0.0;
+        }
+        self.total_team_matches as f32 / self.total_heuristic as f32
+    }
+
+    fn team_recall(&self) -> f32 {
+        if self.total_exact == 0 {
+            return 0.0;
+        }
+        self.total_team_matches as f32 / self.total_exact as f32
+    }
+
+    fn time_only_precision(&self) -> f32 {
+        if self.total_heuristic == 0 {
+            return 0.0;
+        }
+        self.total_time_only_matches as f32 / self.total_heuristic as f32
+    }
+
+    fn time_only_recall(&self) -> f32 {
+        if self.total_exact == 0 {
+            return 0.0;
+        }
+        self.total_time_only_matches as f32 / self.total_exact as f32
     }
 
     fn average_delta(&self) -> Option<f32> {
-        if self.matched_deltas.is_empty() {
+        if self.player_matched_deltas.is_empty() {
             return None;
         }
-        Some(self.matched_deltas.iter().sum::<f32>() / self.matched_deltas.len() as f32)
+        Some(
+            self.player_matched_deltas.iter().sum::<f32>()
+                / self.player_matched_deltas.len() as f32,
+        )
     }
 }
 
 fn print_usage() {
     eprintln!(
-        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--count N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--match-window SECONDS]"
+        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--count N] [--scan-limit N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--match-window SECONDS]"
     );
 }
 
@@ -189,10 +242,10 @@ fn search_recent_replays(
     let mut results = Vec::new();
     let mut next_url = Some(format!(
         "https://ballchasing.com/api/replays?playlist={}&min-rank={}&sort-by=replay-date&sort-dir=desc&count={}",
-        config.playlist, config.min_rank, config.count.min(200)
+        config.playlist, config.min_rank, config.scan_limit.min(200)
     ));
 
-    while results.len() < config.count {
+    while results.len() < config.scan_limit {
         let Some(url) = next_url.take() else {
             break;
         };
@@ -215,7 +268,7 @@ fn search_recent_replays(
         }
     }
 
-    results.truncate(config.count);
+    results.truncate(config.scan_limit);
     Ok(results)
 }
 
@@ -266,6 +319,7 @@ fn greedy_match_exact_events(
     exact_events: &[DodgeRefreshedEvent],
     heuristic_events: &[FlipResetEvent],
     match_window_seconds: f32,
+    events_can_match: impl Fn(&DodgeRefreshedEvent, &FlipResetEvent) -> bool,
 ) -> (usize, Vec<f32>, Vec<usize>, Vec<usize>) {
     let mut matched_exact = vec![false; exact_events.len()];
     let mut matched_heuristic = vec![false; heuristic_events.len()];
@@ -277,7 +331,8 @@ fn greedy_match_exact_events(
         let mut best_delta = f32::INFINITY;
 
         for (heuristic_index, heuristic_event) in heuristic_events.iter().enumerate() {
-            if matched_heuristic[heuristic_index] || heuristic_event.player != exact_event.player {
+            if matched_heuristic[heuristic_index] || !events_can_match(exact_event, heuristic_event)
+            {
                 continue;
             }
             let delta = (heuristic_event.time - exact_event.time).abs();
@@ -317,12 +372,35 @@ fn greedy_match_exact_events(
     )
 }
 
+fn replay_supports_exact_dodge_refreshes(replay: &boxcars::Replay) -> bool {
+    replay
+        .objects
+        .iter()
+        .any(|name| name == DODGES_REFRESHED_COUNTER_KEY)
+}
+
 fn evaluate_replay(
     summary: &ReplaySummary,
     replay_bytes: &[u8],
     match_window_seconds: f32,
 ) -> Result<ReplayEvaluation> {
     let replay = parse_replay_bytes(replay_bytes)?;
+    let supports_exact_counter = replay_supports_exact_dodge_refreshes(&replay);
+    if !supports_exact_counter {
+        return Ok(ReplayEvaluation {
+            replay_id: summary.id.clone(),
+            title: summary.title.clone(),
+            supports_exact_counter,
+            exact_count: 0,
+            heuristic_count: 0,
+            player_matches: 0,
+            team_matches: 0,
+            time_only_matches: 0,
+            unmatched_exacts: Vec::new(),
+            unmatched_heuristics: Vec::new(),
+            player_matched_deltas: Vec::new(),
+        });
+    }
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .map_err(|error| anyhow::Error::new(error.variant))
@@ -330,8 +408,29 @@ fn evaluate_replay(
     let player_names = player_names_by_id(&replay_data);
     let exact_events = &replay_data.dodge_refreshed_events;
     let heuristic_events = &replay_data.flip_reset_events;
-    let (matches, matched_deltas, unmatched_exact_indices, unmatched_heuristic_indices) =
-        greedy_match_exact_events(exact_events, heuristic_events, match_window_seconds);
+    let (
+        player_matches,
+        player_matched_deltas,
+        unmatched_exact_indices,
+        unmatched_heuristic_indices,
+    ) = greedy_match_exact_events(
+        exact_events,
+        heuristic_events,
+        match_window_seconds,
+        |exact, heuristic| heuristic.player == exact.player,
+    );
+    let (team_matches, _, _, _) = greedy_match_exact_events(
+        exact_events,
+        heuristic_events,
+        match_window_seconds,
+        |exact, heuristic| heuristic.is_team_0 == exact.is_team_0,
+    );
+    let (time_only_matches, _, _, _) = greedy_match_exact_events(
+        exact_events,
+        heuristic_events,
+        match_window_seconds,
+        |_exact, _heuristic| true,
+    );
 
     let unmatched_exacts = unmatched_exact_indices
         .into_iter()
@@ -365,37 +464,48 @@ fn evaluate_replay(
     Ok(ReplayEvaluation {
         replay_id: summary.id.clone(),
         title: summary.title.clone(),
+        supports_exact_counter,
         exact_count: exact_events.len(),
         heuristic_count: heuristic_events.len(),
-        matches,
+        player_matches,
+        team_matches,
+        time_only_matches,
         unmatched_exacts,
         unmatched_heuristics,
-        matched_deltas,
+        player_matched_deltas,
     })
 }
 
 fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplaySummary]) {
     println!(
-        "Sampled {} recent public {} replays at rank {}",
+        "Scanned {} recent public {} replays at rank {}",
         replays.len(),
         config.playlist,
         config.min_rank
     );
     println!(
-        "Replays with exact dodge refreshes: {} / {}",
-        metrics.replay_with_exact_refresh_count, metrics.replay_count
+        "Supported replays with the exact counter: {} / {} scanned",
+        metrics.supported_replay_count, metrics.scanned_replay_count
+    );
+    println!(
+        "Supported replays with exact dodge refreshes: {} / {}",
+        metrics.replay_with_exact_refresh_count, metrics.supported_replay_count
     );
     println!(
         "Exact refresh events: {}, strict heuristic events: {}, matched within {:.2}s: {}",
         metrics.total_exact,
         metrics.total_heuristic,
         config.match_window_seconds,
-        metrics.total_matches
+        metrics.total_player_matches
     );
     println!(
-        "Precision: {:.3}, recall: {:.3}, avg |delta|: {}",
-        metrics.precision(),
-        metrics.recall(),
+        "Player precision/recall: {:.3} / {:.3}, team precision/recall: {:.3} / {:.3}, time-only precision/recall: {:.3} / {:.3}, avg |player delta|: {}",
+        metrics.player_precision(),
+        metrics.player_recall(),
+        metrics.team_precision(),
+        metrics.team_recall(),
+        metrics.time_only_precision(),
+        metrics.time_only_recall(),
         metrics
             .average_delta()
             .map(|value| format!("{value:.3}s"))
@@ -411,11 +521,11 @@ fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplayS
     println!("Worst false-negative replays:");
     for evaluation in worst_false_negatives.into_iter().take(10) {
         println!(
-            "  {} exact={} heuristic={} matched={} title={}",
+            "  {} exact={} heuristic={} player-matched={} title={}",
             evaluation.replay_id,
             evaluation.exact_count,
             evaluation.heuristic_count,
-            evaluation.matches,
+            evaluation.player_matches,
             evaluation.title.as_deref().unwrap_or("<untitled>")
         );
         for event in evaluation.unmatched_exacts.iter().take(3) {
@@ -436,11 +546,11 @@ fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplayS
     println!("Worst false-positive replays:");
     for evaluation in worst_false_positives.into_iter().take(10) {
         println!(
-            "  {} exact={} heuristic={} matched={} title={}",
+            "  {} exact={} heuristic={} player-matched={} title={}",
             evaluation.replay_id,
             evaluation.exact_count,
             evaluation.heuristic_count,
-            evaluation.matches,
+            evaluation.player_matches,
             evaluation.title.as_deref().unwrap_or("<untitled>")
         );
         for event in evaluation.unmatched_heuristics.iter().take(3) {
@@ -478,6 +588,9 @@ fn main() -> Result<()> {
         let evaluation = evaluate_replay(summary, &replay_bytes, config.match_window_seconds)
             .with_context(|| format!("Failed to evaluate replay {}", summary.id))?;
         metrics.add(evaluation);
+        if metrics.supported_replay_count >= config.count {
+            break;
+        }
     }
 
     print_summary(&config, &metrics, &replays);

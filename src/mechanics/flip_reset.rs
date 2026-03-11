@@ -52,6 +52,61 @@ pub(crate) struct FlipResetHeuristic {
     pub local_ball_position: glam::Vec3,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FlipResetTouchFeatures {
+    player_position: glam::Vec3,
+    ball_position: glam::Vec3,
+    local_ball_position: glam::Vec3,
+    scaled_touch_distance: f32,
+    underside_alignment: f32,
+}
+
+fn scale_factor_for_positions(ball_position: glam::Vec3, player_position: glam::Vec3) -> f32 {
+    if ball_position
+        .truncate()
+        .abs()
+        .max(player_position.truncate().abs())
+        .max_element()
+        < 200.0
+    {
+        100.0
+    } else {
+        1.0
+    }
+}
+
+fn build_touch_features(
+    ball_body: &boxcars::RigidBody,
+    player_body: &boxcars::RigidBody,
+    closest_approach_distance: f32,
+) -> Option<FlipResetTouchFeatures> {
+    let raw_ball_position = vec_to_glam(&ball_body.location);
+    let raw_player_position = vec_to_glam(&player_body.location);
+    let scale_factor = scale_factor_for_positions(raw_ball_position, raw_player_position);
+
+    let ball_position = raw_ball_position * scale_factor;
+    let player_position = raw_player_position * scale_factor;
+    let relative_ball_position = ball_position - player_position;
+    let center_distance = relative_ball_position.length();
+    if !center_distance.is_finite() || center_distance <= 30.0 || center_distance >= 550.0 {
+        return None;
+    }
+
+    let player_rotation = quat_to_glam(&player_body.rotation);
+    let local_ball_position = player_rotation.inverse() * relative_ball_position;
+    let car_up = (player_rotation * glam::Vec3::Z).normalize_or_zero();
+    let underside_alignment = (-car_up).dot(relative_ball_position.normalize_or_zero());
+    let scaled_touch_distance = closest_approach_distance * scale_factor;
+
+    Some(FlipResetTouchFeatures {
+        player_position,
+        ball_position,
+        local_ball_position,
+        scaled_touch_distance,
+        underside_alignment,
+    })
+}
+
 /// Returns a conservative flip-reset heuristic for a touch, if the geometry
 /// looks like an underside wheel contact on an airborne car.
 pub(crate) fn flip_reset_candidate(
@@ -59,73 +114,48 @@ pub(crate) fn flip_reset_candidate(
     player_body: &boxcars::RigidBody,
     closest_approach_distance: f32,
 ) -> Option<FlipResetHeuristic> {
-    const MIN_PLAYER_HEIGHT: f32 = 120.0;
-    const MIN_BALL_HEIGHT: f32 = 90.0;
-    const MIN_CENTER_DISTANCE: f32 = 60.0;
-    const MAX_CENTER_DISTANCE: f32 = 450.0;
-    const MAX_TOUCH_DISTANCE: f32 = 250.0;
-    const MIN_UNDERSIDE_ALIGNMENT: f32 = 0.72;
-    const MAX_LOCAL_FORWARD_OFFSET: f32 = 220.0;
-    const MAX_LOCAL_LATERAL_OFFSET: f32 = 220.0;
+    const MIN_PLAYER_HEIGHT: f32 = 95.0;
+    const MIN_BALL_HEIGHT: f32 = 80.0;
+    const MAX_TOUCH_DISTANCE: f32 = 220.0;
+    const MIN_UNDERSIDE_ALIGNMENT: f32 = 0.60;
+    const MAX_LOCAL_FORWARD_OFFSET: f32 = 240.0;
+    const MAX_LOCAL_LATERAL_OFFSET: f32 = 240.0;
+    const MIN_CONFIDENCE: f32 = 0.55;
 
-    let raw_ball_position = vec_to_glam(&ball_body.location);
-    let raw_player_position = vec_to_glam(&player_body.location);
-    let scale_factor = if raw_ball_position
-        .truncate()
-        .abs()
-        .max(raw_player_position.truncate().abs())
-        .max_element()
-        < 200.0
+    let features = build_touch_features(ball_body, player_body, closest_approach_distance)?;
+    if features.player_position.z < MIN_PLAYER_HEIGHT || features.ball_position.z < MIN_BALL_HEIGHT
     {
-        100.0
-    } else {
-        1.0
-    };
-    let closest_approach_distance = closest_approach_distance * scale_factor;
-
-    if closest_approach_distance > MAX_TOUCH_DISTANCE {
         return None;
     }
-
-    let ball_position = raw_ball_position * scale_factor;
-    let player_position = raw_player_position * scale_factor;
-    if player_position.z < MIN_PLAYER_HEIGHT || ball_position.z < MIN_BALL_HEIGHT {
-        return None;
-    }
-
-    let relative_ball_position = ball_position - player_position;
-    let center_distance = relative_ball_position.length();
-    if !center_distance.is_finite()
-        || !(MIN_CENTER_DISTANCE..=MAX_CENTER_DISTANCE).contains(&center_distance)
+    if features.scaled_touch_distance > MAX_TOUCH_DISTANCE
+        || features.underside_alignment < MIN_UNDERSIDE_ALIGNMENT
+        || features.local_ball_position.x.abs() > MAX_LOCAL_FORWARD_OFFSET
+        || features.local_ball_position.y.abs() > MAX_LOCAL_LATERAL_OFFSET
+        || features.local_ball_position.z >= 10.0
     {
         return None;
     }
 
-    let player_rotation = quat_to_glam(&player_body.rotation);
-    let local_ball_position = player_rotation.inverse() * relative_ball_position;
-    if local_ball_position.x.abs() > MAX_LOCAL_FORWARD_OFFSET
-        || local_ball_position.y.abs() > MAX_LOCAL_LATERAL_OFFSET
-    {
-        return None;
-    }
-
-    let car_up = (player_rotation * glam::Vec3::Z).normalize_or_zero();
-    let underside_alignment = (-car_up).dot(relative_ball_position.normalize_or_zero());
-    if underside_alignment < MIN_UNDERSIDE_ALIGNMENT {
-        return None;
-    }
-
-    let height_score = ((player_position.z - MIN_PLAYER_HEIGHT) / 600.0).clamp(0.0, 1.0);
-    let touch_score =
-        (1.0 - ((closest_approach_distance - 30.0) / (MAX_TOUCH_DISTANCE - 30.0))).clamp(0.0, 1.0);
-    let alignment_score = ((underside_alignment - MIN_UNDERSIDE_ALIGNMENT)
-        / (1.0 - MIN_UNDERSIDE_ALIGNMENT))
+    let below_car_score = (-features.local_ball_position.z / 180.0).clamp(0.0, 1.0);
+    let alignment_score = ((features.underside_alignment - 0.45) / 0.50).clamp(0.0, 1.0);
+    let touch_score = (1.0 - ((features.scaled_touch_distance - 20.0) / 220.0)).clamp(0.0, 1.0);
+    let height_score = ((features.player_position.z - 70.0) / 500.0).clamp(0.0, 1.0);
+    let footprint_score = (1.0
+        - (features.local_ball_position.x.abs() / 260.0).clamp(0.0, 1.0) * 0.5
+        - (features.local_ball_position.y.abs() / 260.0).clamp(0.0, 1.0) * 0.5)
         .clamp(0.0, 1.0);
-    let confidence = 0.45 * alignment_score + 0.35 * touch_score + 0.20 * height_score;
+    let confidence = 0.28 * below_car_score
+        + 0.26 * alignment_score
+        + 0.20 * touch_score
+        + 0.14 * height_score
+        + 0.12 * footprint_score;
+    if confidence < MIN_CONFIDENCE {
+        return None;
+    }
 
     Some(FlipResetHeuristic {
         confidence,
-        local_ball_position,
+        local_ball_position: features.local_ball_position,
     })
 }
 
@@ -137,39 +167,14 @@ pub(crate) fn flip_reset_followup_touch_candidate(
     player_body: &boxcars::RigidBody,
     closest_approach_distance: f32,
 ) -> Option<FlipResetHeuristic> {
-    let raw_ball_position = vec_to_glam(&ball_body.location);
-    let raw_player_position = vec_to_glam(&player_body.location);
-    let scale_factor = if raw_ball_position
-        .truncate()
-        .abs()
-        .max(raw_player_position.truncate().abs())
-        .max_element()
-        < 200.0
-    {
-        100.0
-    } else {
-        1.0
-    };
-    let ball_position = raw_ball_position * scale_factor;
-    let player_position = raw_player_position * scale_factor;
-    let relative_ball_position = ball_position - player_position;
-    let center_distance = relative_ball_position.length();
-    if !center_distance.is_finite() || center_distance <= 30.0 || center_distance >= 550.0 {
-        return None;
-    }
-
-    let player_rotation = quat_to_glam(&player_body.rotation);
-    let local_ball_position = player_rotation.inverse() * relative_ball_position;
-    let underside_alignment = (-(player_rotation * glam::Vec3::Z).normalize_or_zero())
-        .dot(relative_ball_position.normalize_or_zero());
-    let scaled_touch_distance = closest_approach_distance * scale_factor;
-    let below_car_score = (-local_ball_position.z / 180.0).clamp(0.0, 1.0);
-    let alignment_score = ((underside_alignment - 0.45) / 0.50).clamp(0.0, 1.0);
-    let touch_score = (1.0 - ((scaled_touch_distance - 20.0) / 220.0)).clamp(0.0, 1.0);
-    let height_score = ((player_position.z - 70.0) / 500.0).clamp(0.0, 1.0);
+    let features = build_touch_features(ball_body, player_body, closest_approach_distance)?;
+    let below_car_score = (-features.local_ball_position.z / 180.0).clamp(0.0, 1.0);
+    let alignment_score = ((features.underside_alignment - 0.45) / 0.50).clamp(0.0, 1.0);
+    let touch_score = (1.0 - ((features.scaled_touch_distance - 20.0) / 220.0)).clamp(0.0, 1.0);
+    let height_score = ((features.player_position.z - 70.0) / 500.0).clamp(0.0, 1.0);
     let footprint_score = (1.0
-        - (local_ball_position.x.abs() / 260.0).clamp(0.0, 1.0) * 0.5
-        - (local_ball_position.y.abs() / 260.0).clamp(0.0, 1.0) * 0.5)
+        - (features.local_ball_position.x.abs() / 260.0).clamp(0.0, 1.0) * 0.5
+        - (features.local_ball_position.y.abs() / 260.0).clamp(0.0, 1.0) * 0.5)
         .clamp(0.0, 1.0);
     let confidence = 0.28 * below_car_score
         + 0.26 * alignment_score
@@ -177,13 +182,16 @@ pub(crate) fn flip_reset_followup_touch_candidate(
         + 0.14 * height_score
         + 0.12 * footprint_score;
 
-    if confidence < 0.45 || local_ball_position.z >= 20.0 || underside_alignment < 0.25 {
+    if confidence < 0.45
+        || features.local_ball_position.z >= 20.0
+        || features.underside_alignment < 0.25
+    {
         return None;
     }
 
     Some(FlipResetHeuristic {
         confidence,
-        local_ball_position,
+        local_ball_position: features.local_ball_position,
     })
 }
 
