@@ -9,6 +9,9 @@ license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"
 edition = "2021"
 
+[workspace.dependencies]
+boxcars = { git = "https://github.com/nickbabcock/boxcars.git", rev = "f9fbee88e53fa3fe515c157c9f5cf10e1bd9e1a3" }
+
 [package]
 name = "subtr-actor"
 version.workspace = true
@@ -22,7 +25,7 @@ description = "Rocket League replay transformer"
 
 [dependencies]
 anyhow = "1.0.98"
-boxcars = "0.10.10"
+boxcars.workspace = true
 derive-new = "0.7.0"
 float-ord = "0.3.2"
 glam = "0.31.0"
