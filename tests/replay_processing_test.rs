@@ -1,25 +1,28 @@
 use std::collections::HashSet;
+use std::path::Path;
 use subtr_actor::*;
 
 /// Helper to parse a replay file
 fn parse_replay(path: &str) -> boxcars::Replay {
-    let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
+    let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+    let data = std::fs::read(&replay_path)
+        .unwrap_or_else(|_| panic!("Failed to read replay file: {}", replay_path.display()));
     boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
         .must_parse_network_data()
         .parse()
-        .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
+        .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
 }
 
 /// Test that all sample replays can be parsed and processed without errors
 #[test]
 fn test_all_replays_parse_successfully() {
     let replays = [
-        "assets/replays/test/rumble.replay",
-        "assets/replays/test/rlcs.replay",
-        "assets/replays/test/gridiron.replay",
-        "assets/replays/test/tourny.replay",
-        "assets/replays/test/soccar-lan.replay",
+        "assets/replays/rumble.replay",
+        "assets/replays/rlcs.replay",
+        "assets/replays/gridiron.replay",
+        "assets/replays/tourny.replay",
+        "assets/replays/soccar-lan.replay",
     ];
 
     for path in replays {
@@ -68,7 +71,7 @@ fn test_replay_data_collector_multiple_replays() {
 
 #[test]
 fn test_replay_data_exposes_powerslide_activity() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .expect("Failed to get replay data for rlcs.replay");
@@ -154,7 +157,7 @@ fn test_processor_extracts_exact_boost_pad_events() {
 
 #[test]
 fn test_processor_extracts_exact_goal_events() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
     let mut counter = FrameCounter::new();
     processor
@@ -257,7 +260,7 @@ fn test_processor_extracts_exact_goal_events() {
 
 #[test]
 fn test_processor_extracts_touch_events() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
     let mut counter = FrameCounter::new();
     processor
@@ -293,8 +296,71 @@ fn test_processor_extracts_touch_events() {
 }
 
 #[test]
+fn test_processor_extracts_flip_reset_events() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for flip-reset extraction");
+
+    assert!(
+        !processor.flip_reset_events.is_empty(),
+        "Expected the heuristic to find at least one flip-reset candidate in rlcs.replay"
+    );
+    assert!(
+        processor
+            .flip_reset_events
+            .iter()
+            .all(|event| (0.0..=1.0).contains(&event.confidence)),
+        "Expected heuristic confidence to stay normalized"
+    );
+    assert!(
+        processor
+            .flip_reset_events
+            .iter()
+            .all(|event| event.closest_approach_distance <= 8.0),
+        "Expected flip-reset candidates to be backed by very close attributed touches"
+    );
+    assert!(
+        processor.flip_reset_events.iter().all(|event| {
+            processor.get_player_is_team_0(&event.player).ok() == Some(event.is_team_0)
+        }),
+        "Expected flip-reset candidate team labels to agree with the resolved player team"
+    );
+}
+
+#[test]
+fn test_processor_extracts_post_wall_dodge_events() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+    let mut counter = FrameCounter::new();
+    processor
+        .process(&mut counter)
+        .expect("Failed to process replay for post-wall dodge extraction");
+
+    assert!(
+        !processor.post_wall_dodge_events.is_empty(),
+        "Expected the heuristic to find at least one post-wall dodge in rlcs.replay"
+    );
+    assert!(
+        processor
+            .post_wall_dodge_events
+            .iter()
+            .all(|event| event.time_since_wall_contact >= 0.30),
+        "Expected post-wall dodge events to occur after the minimum wall-contact delay"
+    );
+    assert!(
+        processor.post_wall_dodge_events.iter().all(|event| {
+            processor.get_player_is_team_0(&event.player).ok() == Some(event.is_team_0)
+        }),
+        "Expected post-wall dodge team labels to agree with resolved player teams"
+    );
+}
+
+#[test]
 fn test_processor_extracts_player_stat_events() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
     let mut counter = FrameCounter::new();
     processor
@@ -360,7 +426,7 @@ fn test_processor_extracts_player_stat_events() {
 
 #[test]
 fn test_touch_attribution_usually_matches_goal_scorer() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
     let mut counter = FrameCounter::new();
     processor
@@ -404,7 +470,7 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
 /// when same-frame cleanup clears the player link to `ActorId(-1)`.
 #[test]
 fn test_new_demolition_format_replay_has_demolishes() {
-    let replay = parse_replay("assets/replays/test/new_demolition_format.replay");
+    let replay = parse_replay("assets/replays/new_demolition_format.replay");
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .expect("Failed to get replay data for new_demolition_format.replay");
@@ -427,7 +493,7 @@ fn test_new_demolition_format_replay_has_demolishes() {
 /// Test NDArrayCollector with default feature adders
 #[test]
 fn test_ndarray_collector_default_features() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     let collector = NDArrayCollector::<f32>::from_strings(
         &["BallRigidBody"],
@@ -490,7 +556,7 @@ fn test_ndarray_collector_all_global_features() {
 /// Test NDArrayCollector with all player feature adders
 #[test]
 fn test_ndarray_collector_all_player_features() {
-    let replay = parse_replay("assets/replays/test/rumble.replay");
+    let replay = parse_replay("assets/replays/rumble.replay");
 
     // Use all available player feature adders
     let collector = NDArrayCollector::<f32>::from_strings(
@@ -522,7 +588,7 @@ fn test_ndarray_collector_all_player_features() {
 /// Test FrameRateDecorator with different FPS values
 #[test]
 fn test_frame_rate_decorator() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     for fps in [5.0, 10.0, 30.0] {
         let mut collector =
@@ -544,7 +610,7 @@ fn test_frame_rate_decorator() {
 /// Test that different FPS values produce different row counts
 #[test]
 fn test_frame_rate_affects_output_size() {
-    let replay = parse_replay("assets/replays/test/soccar-lan.replay");
+    let replay = parse_replay("assets/replays/soccar-lan.replay");
 
     let mut collector_low =
         NDArrayCollector::<f32>::from_strings(&["BallRigidBody"], &[]).expect("Should create");
@@ -572,7 +638,7 @@ fn test_frame_rate_affects_output_size() {
 /// Test ball position changes over time
 #[test]
 fn test_ball_position_changes() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     let collector = NDArrayCollector::<f32>::from_strings(&["BallRigidBody"], &[])
         .expect("Should create collector");
@@ -607,7 +673,7 @@ fn test_ball_position_changes() {
 /// Test player rigid body extraction
 #[test]
 fn test_player_rigid_body_extraction() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     let collector = NDArrayCollector::<f32>::from_strings(&[], &["PlayerRigidBody"])
         .expect("Should create collector");
@@ -639,7 +705,7 @@ fn test_player_rigid_body_extraction() {
 /// Test gridiron (special game mode) replay parsing - note this mode has different archetypes
 #[test]
 fn test_gridiron_replay() {
-    let replay = parse_replay("assets/replays/test/gridiron.replay");
+    let replay = parse_replay("assets/replays/gridiron.replay");
 
     // Gridiron has different game event archetypes, so just verify parsing works
     assert!(
@@ -664,7 +730,7 @@ fn test_gridiron_replay() {
 /// Test tournament replay processing
 #[test]
 fn test_tournament_replay() {
-    let replay = parse_replay("assets/replays/test/tourny.replay");
+    let replay = parse_replay("assets/replays/tourny.replay");
 
     let collector =
         NDArrayCollector::<f32>::from_strings(&["BallRigidBody", "SecondsRemaining"], &[])
@@ -689,7 +755,7 @@ fn test_tournament_replay() {
 /// Test that player order is consistent
 #[test]
 fn test_player_order_consistency() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     // Process twice and verify player order is the same
     let collector1 =
@@ -771,8 +837,8 @@ fn test_column_header_generation() {
 #[test]
 fn test_replay_meta_extraction() {
     let replays = [
-        ("assets/replays/test/rlcs.replay", 6), // RLCS should have 6 players (3v3)
-        ("assets/replays/test/soccar-lan.replay", 2), // Might be 1v1 or 2v2
+        ("assets/replays/rlcs.replay", 6), // RLCS should have 6 players (3v3)
+        ("assets/replays/soccar-lan.replay", 2), // Might be 1v1 or 2v2
     ];
 
     for (path, min_players) in replays {
@@ -844,7 +910,7 @@ impl Collector for FrameCounter {
 /// Test custom collector receives all frames
 #[test]
 fn test_custom_collector_receives_frames() {
-    let replay = parse_replay("assets/replays/test/rumble.replay");
+    let replay = parse_replay("assets/replays/rumble.replay");
 
     let counter = FrameCounter::new()
         .process_replay(&replay)

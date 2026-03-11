@@ -18,7 +18,7 @@ fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a E
 
 #[test]
 fn test_stats_timeline_collector_final_frame_matches_reducers() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -135,7 +135,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
 
 #[test]
 fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -175,7 +175,7 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
 
 #[test]
 fn test_stats_timeline_collector_can_export_dynamic_stats() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let typed_timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected typed stats timeline data");

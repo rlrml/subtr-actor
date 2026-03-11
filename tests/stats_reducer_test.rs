@@ -75,7 +75,7 @@ fn sample_rigid_body_with_linear_velocity(
 
 #[test]
 fn test_powerslide_reducer_collects_duration_and_presses() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let reducer = ReducerCollector::new(PowerslideReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with powerslide reducer")
@@ -302,7 +302,7 @@ fn test_powerslide_reducer_allows_small_suspension_height() {
 
 #[test]
 fn test_pressure_reducer_tracks_ball_side_time() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let reducer = ReducerCollector::new(PressureReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with pressure reducer")
@@ -324,7 +324,7 @@ fn test_pressure_reducer_tracks_ball_side_time() {
 
 #[test]
 fn test_tuple_reducers_compose_under_frame_rate_decorator() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let mut collector = ReducerCollector::new((PowerslideReducer::new(), PressureReducer::new()));
 
     FrameRateDecorator::new_from_fps(10.0, &mut collector)
@@ -348,7 +348,7 @@ fn test_tuple_reducers_compose_under_frame_rate_decorator() {
 
 #[test]
 fn test_match_stats_reducer_builds_core_stats_and_timeline() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let reducer = ReducerCollector::new(MatchStatsReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with match stats reducer")
@@ -373,7 +373,7 @@ fn test_match_stats_reducer_builds_core_stats_and_timeline() {
 
 #[test]
 fn test_match_stats_reducer_keeps_exact_timeline_under_sampling() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let full = ReducerCollector::new(MatchStatsReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with full match stats reducer")
@@ -645,7 +645,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
 
 #[test]
 fn test_movement_reducer_collects_distance_and_speed_buckets() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let reducer = ReducerCollector::new(MovementReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with movement reducer")
@@ -817,7 +817,7 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
 
 #[test]
 fn test_positioning_reducer_collects_distances_and_percent_buckets() {
-    let replay = parse_replay("assets/replays/test/rlcs.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
     let reducer = ReducerCollector::new(PositioningReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with positioning reducer")
@@ -3215,7 +3215,7 @@ fn test_settings_reducer_extracts_player_camera_settings_from_replay_meta() {
 
 #[test]
 fn test_demo_reducer_collects_real_demolitions_from_replay() {
-    let replay = parse_replay("assets/replays/test/new_demolition_format.replay");
+    let replay = parse_replay("assets/replays/new_demolition_format.replay");
     let reducer = ReducerCollector::new(DemoReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with demo reducer")
@@ -3246,7 +3246,7 @@ fn test_demo_reducer_collects_real_demolitions_from_replay() {
 
 #[test]
 fn test_demo_reducer_keeps_exact_timeline_under_sampling() {
-    let replay = parse_replay("assets/replays/test/new_demolition_format.replay");
+    let replay = parse_replay("assets/replays/new_demolition_format.replay");
     let full = ReducerCollector::new(DemoReducer::new())
         .process_replay(&replay)
         .expect("Failed to process replay with full demo reducer")
