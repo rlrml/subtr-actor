@@ -2246,11 +2246,12 @@ impl StatsReducer for BoostReducer {
                             .or_default()
                             .observe(position);
                     }
-                    let previous_boost_amount = self
-                        .previous_boost_amounts
-                        .get(player_id)
-                        .copied()
-                        .unwrap_or_else(|| player.boost_amount.unwrap_or(0.0));
+                    let previous_boost_amount = player.last_boost_amount.unwrap_or_else(|| {
+                        self.previous_boost_amounts
+                            .get(player_id)
+                            .copied()
+                            .unwrap_or_else(|| player.boost_amount.unwrap_or(0.0))
+                    });
                     let pending_pickup = PendingBoostPickup {
                         player_id: player_id.clone(),
                         is_team_0: player.is_team_0,
