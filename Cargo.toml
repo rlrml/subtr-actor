@@ -10,7 +10,7 @@ repository = "https://github.com/rlrml/subtr-actor"
 edition = "2021"
 
 [workspace.dependencies]
-boxcars = { git = "https://github.com/nickbabcock/boxcars.git", rev = "f9fbee88e53fa3fe515c157c9f5cf10e1bd9e1a3" }
+boxcars = "0.10.11"
 
 [package]
 name = "subtr-actor"
