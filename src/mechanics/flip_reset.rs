@@ -17,6 +17,15 @@ pub struct FlipResetEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DodgeRefreshedEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub counter_value: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PostWallDodgeEvent {
     pub time: f32,
     pub frame: usize,

@@ -154,6 +154,49 @@ fn test_processor_extracts_exact_boost_pad_events() {
 }
 
 #[test]
+fn test_replay_data_exposes_exact_dodge_refresh_events() {
+    let replay = parse_replay("assets/replays/dodges_refreshed_counter.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for dodges_refreshed_counter.replay");
+
+    assert!(
+        !replay_data.dodge_refreshed_events.is_empty(),
+        "Expected dodges_refreshed_counter.replay to expose at least one exact dodge refresh event"
+    );
+    assert!(
+        replay_data.dodge_refreshed_events.len() == 12,
+        "Expected dodges_refreshed_counter.replay to expose the known 12 exact dodge refresh events"
+    );
+    assert!(
+        replay_data
+            .dodge_refreshed_events
+            .iter()
+            .all(|event| event.counter_value >= 1),
+        "Expected dodge refresh counter values to be positive event counts"
+    );
+    assert!(
+        replay_data.dodge_refreshed_events.iter().all(|event| {
+            replay_data
+                .meta
+                .player_order()
+                .any(|player| player.remote_id == event.player)
+        }),
+        "Expected dodge refresh events to resolve to known replay players"
+    );
+    let unique_counter_values = replay_data
+        .dodge_refreshed_events
+        .iter()
+        .map(|event| event.counter_value)
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        unique_counter_values,
+        HashSet::from([1, 2, 3]),
+        "Expected dodges_refreshed_counter.replay to expose the known counter increments"
+    );
+}
+
+#[test]
 fn test_processor_extracts_exact_goal_events() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");

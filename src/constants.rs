@@ -24,6 +24,7 @@ pub static BALL_EXPLOSION_DATA_EXTENDED_KEY: &str =
 pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
 pub static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
 pub static DEMOLISH_GOAL_EXPLOSION_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishGoalExplosion";
+pub static DODGES_REFRESHED_COUNTER_KEY: &str = "TAGame.Car_TA:DodgesRefreshedCounter";
 pub static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 pub static HANDBRAKE_KEY: &str = "TAGame.Vehicle_TA:bReplicatedHandbrake";
 pub static LAST_BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";

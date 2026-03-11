@@ -163,6 +163,9 @@ pub struct ReplayProcessor<'a> {
     current_frame_boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
     current_frame_touch_events: Vec<TouchEvent>,
+    pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
+    current_frame_dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
+    dodge_refreshed_counters: HashMap<PlayerId, i32>,
     pub goal_events: Vec<GoalEvent>,
     current_frame_goal_events: Vec<GoalEvent>,
     pub player_stat_events: Vec<PlayerStatEvent>,
@@ -215,6 +218,9 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
             current_frame_touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            current_frame_dodge_refreshed_events: Vec::new(),
+            dodge_refreshed_counters: HashMap::new(),
             goal_events: Vec::new(),
             current_frame_goal_events: Vec::new(),
             player_stat_events: Vec::new(),
@@ -274,6 +280,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame, index)?;
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
+            self.update_dodge_refreshed_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -330,6 +337,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_amounts(frame, index)?;
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
+            self.update_dodge_refreshed_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -356,6 +364,9 @@ impl<'a> ReplayProcessor<'a> {
         self.current_frame_boost_pad_events = Vec::new();
         self.touch_events = Vec::new();
         self.current_frame_touch_events = Vec::new();
+        self.dodge_refreshed_events = Vec::new();
+        self.current_frame_dodge_refreshed_events = Vec::new();
+        self.dodge_refreshed_counters = HashMap::new();
         self.goal_events = Vec::new();
         self.current_frame_goal_events = Vec::new();
         self.player_stat_events = Vec::new();
@@ -1108,6 +1119,61 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    fn update_dodge_refreshed_events(
+        &mut self,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        self.current_frame_dodge_refreshed_events.clear();
+        let dodges_refreshed_counter_key = self
+            .get_object_id_for_key(DODGES_REFRESHED_COUNTER_KEY)
+            .ok()
+            .copied();
+
+        let Some(dodges_refreshed_counter_key) = dodges_refreshed_counter_key else {
+            return Ok(());
+        };
+
+        for update in &frame.updated_actors {
+            if update.object_id != dodges_refreshed_counter_key {
+                continue;
+            }
+            let boxcars::Attribute::Int(counter_value) = update.attribute else {
+                continue;
+            };
+            let Some(player_id) = self.get_player_id_from_car_id(&update.actor_id).ok() else {
+                continue;
+            };
+            let previous_value = self
+                .dodge_refreshed_counters
+                .get(&player_id)
+                .copied()
+                .unwrap_or(counter_value);
+            self.dodge_refreshed_counters
+                .insert(player_id.clone(), counter_value);
+            let delta = counter_value - previous_value;
+            if delta <= 0 {
+                continue;
+            }
+
+            let is_team_0 = self.get_player_is_team_0(&player_id).unwrap_or(false);
+            for offset in 0..delta {
+                let event = DodgeRefreshedEvent {
+                    time: frame.time,
+                    frame: frame_index,
+                    player: player_id.clone(),
+                    is_team_0,
+                    counter_value: previous_value + offset + 1,
+                };
+                self.current_frame_dodge_refreshed_events
+                    .push(event.clone());
+                self.dodge_refreshed_events.push(event);
+            }
+        }
+
+        Ok(())
+    }
+
     fn update_goal_events(
         &mut self,
         frame: &boxcars::Frame,
@@ -1520,6 +1586,10 @@ impl<'a> ReplayProcessor<'a> {
 
     pub fn current_frame_touch_events(&self) -> &[TouchEvent] {
         &self.current_frame_touch_events
+    }
+
+    pub fn current_frame_dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
+        &self.current_frame_dodge_refreshed_events
     }
 
     pub fn current_frame_goal_events(&self) -> &[GoalEvent] {

@@ -487,6 +487,7 @@ pub struct FrameData {
 /// * `demolish_infos` - Information about all demolition events that occurred during the replay
 /// * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
 /// * `touch_events` - Exact team touch events plus attributed player when available
+/// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
 /// * `flip_reset_events` - Heuristic sparse flip-reset candidates derived from airborne touch geometry
 /// * `post_wall_dodge_events` - Heuristic airborne dodge uses that occur after wall contact
 /// * `flip_reset_followup_dodge_events` - Heuristic airborne dodge uses following a likely reset touch
@@ -525,6 +526,8 @@ pub struct ReplayData {
     pub boost_pad_events: Vec<BoostPadEvent>,
     /// Exact touch events observed during the replay
     pub touch_events: Vec<TouchEvent>,
+    /// Exact dodge refresh events observed via the replay's refreshed-dodge counter
+    pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     /// Heuristic flip-reset candidates observed during the replay
     pub flip_reset_events: Vec<FlipResetEvent>,
     /// Heuristic airborne dodge uses observed after wall contact
@@ -759,6 +762,7 @@ impl ReplayDataCollector {
             demolish_infos: processor.demolishes,
             boost_pad_events: processor.boost_pad_events,
             touch_events: processor.touch_events,
+            dodge_refreshed_events: processor.dodge_refreshed_events,
             flip_reset_events,
             post_wall_dodge_events,
             flip_reset_followup_dodge_events,
