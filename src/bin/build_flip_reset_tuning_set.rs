@@ -124,6 +124,13 @@ struct ReplaySummary {
     uploader: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct ReplayInspection {
+    supports_exact_counter: bool,
+    player_names: Vec<String>,
+    positive_entry: Option<FlipResetTuningReplay>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum SearchQuery {
     Recent,
@@ -281,23 +288,36 @@ fn replay_supports_exact_dodge_refreshes(replay: &boxcars::Replay) -> bool {
         .any(|name| name == DODGES_REFRESHED_COUNTER_KEY)
 }
 
-fn positive_replay_entry(
+fn inspect_replay(
     config: &Config,
     summary: &ReplaySummary,
     replay_bytes: &[u8],
-) -> Result<Option<FlipResetTuningReplay>> {
+) -> Result<ReplayInspection> {
     let replay = parse_replay_bytes(replay_bytes)?;
-    if !replay_supports_exact_dodge_refreshes(&replay) {
-        return Ok(None);
-    }
-
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .map_err(|error| anyhow::Error::new(error.variant))
         .context("Failed to compute replay data")?;
+    let player_names: Vec<String> = replay_data
+        .meta
+        .player_order()
+        .map(|player| player.name.clone())
+        .collect();
+    let supports_exact_counter = replay_supports_exact_dodge_refreshes(&replay);
+    if !supports_exact_counter {
+        return Ok(ReplayInspection {
+            supports_exact_counter,
+            player_names,
+            positive_entry: None,
+        });
+    }
     let exact_dodge_refresh_count = replay_data.dodge_refreshed_events.len();
     if exact_dodge_refresh_count == 0 {
-        return Ok(None);
+        return Ok(ReplayInspection {
+            supports_exact_counter,
+            player_names,
+            positive_entry: None,
+        });
     }
 
     let positive_path = saved_positive_replay_path(&config.output_dir, &summary.id);
@@ -312,23 +332,23 @@ fn positive_replay_entry(
         )
     })?;
 
-    Ok(Some(FlipResetTuningReplay {
-        replay_id: summary.id.clone(),
-        replay_path: positive_path
-            .strip_prefix(&config.output_dir)
-            .unwrap_or(&positive_path)
-            .to_string_lossy()
-            .to_string(),
-        exact_dodge_refresh_count,
-        date: summary.date.clone(),
-        title: summary.title.clone(),
-        uploader: summary.uploader.clone(),
-        player_names: replay_data
-            .meta
-            .player_order()
-            .map(|player| player.name.clone())
-            .collect(),
-    }))
+    Ok(ReplayInspection {
+        supports_exact_counter,
+        player_names: player_names.clone(),
+        positive_entry: Some(FlipResetTuningReplay {
+            replay_id: summary.id.clone(),
+            replay_path: positive_path
+                .strip_prefix(&config.output_dir)
+                .unwrap_or(&positive_path)
+                .to_string_lossy()
+                .to_string(),
+            exact_dodge_refresh_count,
+            date: summary.date.clone(),
+            title: summary.title.clone(),
+            uploader: summary.uploader.clone(),
+            player_names,
+        }),
+    })
 }
 
 fn manifest_path(output_dir: &Path) -> PathBuf {
@@ -426,9 +446,19 @@ fn main() -> Result<()> {
         );
         let replay_bytes = fetch_replay_bytes(&client, &api_key, &config, &summary.id)
             .with_context(|| format!("Failed to fetch replay {}", summary.id))?;
-        let Some(entry) = positive_replay_entry(&config, &summary, &replay_bytes)
+        let inspection = inspect_replay(&config, &summary, &replay_bytes)
             .with_context(|| format!("Failed to inspect replay {}", summary.id))?
-        else {
+        ;
+        if inspection.supports_exact_counter {
+            for player_name in &inspection.player_names {
+                if player_name_is_searchable(player_name)
+                    && positive_player_names.insert(player_name.clone())
+                {
+                    search_queue.push_back(SearchQuery::PlayerName(player_name.clone()));
+                }
+            }
+        }
+        let Some(entry) = inspection.positive_entry else {
             continue;
         };
 
@@ -436,13 +466,6 @@ fn main() -> Result<()> {
             "  kept {} with {} exact dodge refreshes",
             entry.replay_id, entry.exact_dodge_refresh_count
         );
-        for player_name in &entry.player_names {
-            if player_name_is_searchable(player_name)
-                && positive_player_names.insert(player_name.clone())
-            {
-                search_queue.push_back(SearchQuery::PlayerName(player_name.clone()));
-            }
-        }
         positive_replays.push(entry);
         save_manifest(&config, &positive_replays)?;
     }
