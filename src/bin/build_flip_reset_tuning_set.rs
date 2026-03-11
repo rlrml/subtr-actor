@@ -444,11 +444,24 @@ fn main() -> Result<()> {
             summary.id,
             summary.uploader.as_deref().unwrap_or("unknown uploader")
         );
-        let replay_bytes = fetch_replay_bytes(&client, &api_key, &config, &summary.id)
-            .with_context(|| format!("Failed to fetch replay {}", summary.id))?;
-        let inspection = inspect_replay(&config, &summary, &replay_bytes)
-            .with_context(|| format!("Failed to inspect replay {}", summary.id))?
-        ;
+        let replay_bytes = match fetch_replay_bytes(&client, &api_key, &config, &summary.id)
+            .with_context(|| format!("Failed to fetch replay {}", summary.id))
+        {
+            Ok(replay_bytes) => replay_bytes,
+            Err(error) => {
+                eprintln!("  skipping {} due to fetch error: {error:#}", summary.id);
+                continue;
+            }
+        };
+        let inspection = match inspect_replay(&config, &summary, &replay_bytes)
+            .with_context(|| format!("Failed to inspect replay {}", summary.id))
+        {
+            Ok(inspection) => inspection,
+            Err(error) => {
+                eprintln!("  skipping {} due to parse error: {error:#}", summary.id);
+                continue;
+            }
+        };
         if inspection.supports_exact_counter {
             for player_name in &inspection.player_names {
                 if player_name_is_searchable(player_name)
