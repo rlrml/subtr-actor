@@ -22,6 +22,7 @@ fn sample_player(player_id: PlayerId, is_team_0: bool) -> PlayerSample {
         is_team_0,
         rigid_body: None,
         boost_amount: None,
+        last_boost_amount: None,
         boost_active: false,
         powerslide_active: false,
         match_goals: None,

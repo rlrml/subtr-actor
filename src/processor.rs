@@ -2223,6 +2223,20 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    /// Returns the player's prior boost amount in raw replay units (`0.0..=255.0`)
+    /// as reported by `ReplicatedBoostAmount.Last` for the current frame state.
+    pub fn get_player_last_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_boost_actor_id(player_id).and_then(|actor_id| {
+            let boost_state = self.get_actor_state(&actor_id)?;
+            get_derived_attribute!(
+                boost_state.derived_attributes,
+                LAST_BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Byte
+            )
+            .map(|value| *value as f32)
+        })
+    }
+
     /// Returns the player's boost amount as a percentage (`0.0..=100.0`).
     pub fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
         self.get_player_boost_level(player_id)

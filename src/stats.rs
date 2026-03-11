@@ -82,6 +82,7 @@ pub struct PlayerSample {
     pub is_team_0: bool,
     pub rigid_body: Option<boxcars::RigidBody>,
     pub boost_amount: Option<f32>,
+    pub last_boost_amount: Option<f32>,
     pub boost_active: bool,
     pub powerslide_active: bool,
     pub match_goals: Option<i32>,
@@ -167,6 +168,7 @@ impl StatsSample {
                     .ok()
                     .filter(|rigid_body| !rigid_body.sleeping),
                 boost_amount: processor.get_player_boost_level(player_id).ok(),
+                last_boost_amount: processor.get_player_last_boost_level(player_id).ok(),
                 boost_active: processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1,
                 powerslide_active: processor.get_powerslide_active(player_id).unwrap_or(false),
                 match_goals: processor.get_player_match_goals(player_id).ok(),
@@ -2105,11 +2107,12 @@ impl StatsReducer for BoostReducer {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
-            let previous_boost_amount = self
-                .previous_boost_amounts
-                .get(&player.player_id)
-                .copied()
-                .unwrap_or(boost_amount);
+            let previous_boost_amount = player.last_boost_amount.unwrap_or_else(|| {
+                self.previous_boost_amounts
+                    .get(&player.player_id)
+                    .copied()
+                    .unwrap_or(boost_amount)
+            });
             let speed = player.speed();
             let previous_speed = self
                 .previous_player_speeds
