@@ -259,34 +259,59 @@ pub trait StatsReducer {
     }
 
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()>;
-}
 
-impl<A: StatsReducer, B: StatsReducer> StatsReducer for (A, B) {
-    fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
-        self.0.on_replay_meta(meta)?;
-        self.1.on_replay_meta(meta)?;
-        Ok(())
-    }
-
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        self.0.on_sample(sample)?;
-        self.1.on_sample(sample)?;
+    fn finish(&mut self) -> SubtrActorResult<()> {
         Ok(())
     }
 }
 
-impl<A: StatsReducer, B: StatsReducer, C: StatsReducer> StatsReducer for (A, B, C) {
+#[derive(Default)]
+pub struct CompositeStatsReducer {
+    children: Vec<Box<dyn StatsReducer>>,
+}
+
+impl CompositeStatsReducer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push<R: StatsReducer + 'static>(&mut self, reducer: R) {
+        self.children.push(Box::new(reducer));
+    }
+
+    pub fn with_child<R: StatsReducer + 'static>(mut self, reducer: R) -> Self {
+        self.push(reducer);
+        self
+    }
+
+    pub fn children(&self) -> &[Box<dyn StatsReducer>] {
+        &self.children
+    }
+
+    pub fn children_mut(&mut self) -> &mut [Box<dyn StatsReducer>] {
+        &mut self.children
+    }
+}
+
+impl StatsReducer for CompositeStatsReducer {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
-        self.0.on_replay_meta(meta)?;
-        self.1.on_replay_meta(meta)?;
-        self.2.on_replay_meta(meta)?;
+        for child in &mut self.children {
+            child.on_replay_meta(meta)?;
+        }
         Ok(())
     }
 
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        self.0.on_sample(sample)?;
-        self.1.on_sample(sample)?;
-        self.2.on_sample(sample)?;
+        for child in &mut self.children {
+            child.on_sample(sample)?;
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> SubtrActorResult<()> {
+        for child in &mut self.children {
+            child.finish()?;
+        }
         Ok(())
     }
 }
@@ -371,6 +396,10 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
         self.last_goal_event_count = processor.goal_events.len();
 
         Ok(TimeAdvance::NextFrame)
+    }
+
+    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.reducer.finish()
     }
 }
 

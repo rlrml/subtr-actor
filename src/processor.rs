@@ -308,6 +308,7 @@ impl<'a> ReplayProcessor<'a> {
                 }
             }
         }
+        handler.finish_replay(self)?;
         Ok(())
     }
 
@@ -345,6 +346,9 @@ impl<'a> ReplayProcessor<'a> {
             for collector in collectors.iter_mut() {
                 collector.process_frame(self, frame, index, frame.time)?;
             }
+        }
+        for collector in collectors.iter_mut() {
+            collector.finish_replay(self)?;
         }
         Ok(())
     }

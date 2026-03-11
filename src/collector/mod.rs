@@ -64,6 +64,14 @@ pub trait Collector {
         ReplayProcessor::new(replay)?.process(&mut self)?;
         Ok(self)
     }
+
+    /// Finalize replay-derived state after the last frame has been processed.
+    ///
+    /// Collectors that aggregate state across frame boundaries can override
+    /// this to flush any in-progress segment once replay traversal is complete.
+    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        Ok(())
+    }
 }
 
 impl<G> Collector for G

@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use boxcars::HeaderProp;
 use subtr_actor::*;
@@ -71,6 +73,44 @@ fn sample_rigid_body_with_linear_velocity(
         z: vz,
     });
     rigid_body
+}
+
+#[derive(Clone)]
+struct RecordingReducer {
+    replay_meta_calls: Rc<RefCell<usize>>,
+    sample_calls: Rc<RefCell<usize>>,
+    finish_calls: Rc<RefCell<usize>>,
+}
+
+impl RecordingReducer {
+    fn new(
+        replay_meta_calls: Rc<RefCell<usize>>,
+        sample_calls: Rc<RefCell<usize>>,
+        finish_calls: Rc<RefCell<usize>>,
+    ) -> Self {
+        Self {
+            replay_meta_calls,
+            sample_calls,
+            finish_calls,
+        }
+    }
+}
+
+impl StatsReducer for RecordingReducer {
+    fn on_replay_meta(&mut self, _meta: &ReplayMeta) -> SubtrActorResult<()> {
+        *self.replay_meta_calls.borrow_mut() += 1;
+        Ok(())
+    }
+
+    fn on_sample(&mut self, _sample: &StatsSample) -> SubtrActorResult<()> {
+        *self.sample_calls.borrow_mut() += 1;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> SubtrActorResult<()> {
+        *self.finish_calls.borrow_mut() += 1;
+        Ok(())
+    }
 }
 
 #[test]
@@ -323,27 +363,40 @@ fn test_pressure_reducer_tracks_ball_side_time() {
 }
 
 #[test]
-fn test_tuple_reducers_compose_under_frame_rate_decorator() {
+fn test_composite_stats_reducer_composes_children_under_frame_rate_decorator() {
     let replay = parse_replay("assets/replays/rlcs.replay");
-    let mut collector = ReducerCollector::new((PowerslideReducer::new(), PressureReducer::new()));
+    let replay_meta_calls_a = Rc::new(RefCell::new(0));
+    let sample_calls_a = Rc::new(RefCell::new(0));
+    let finish_calls_a = Rc::new(RefCell::new(0));
+    let replay_meta_calls_b = Rc::new(RefCell::new(0));
+    let sample_calls_b = Rc::new(RefCell::new(0));
+    let finish_calls_b = Rc::new(RefCell::new(0));
+
+    let composite = CompositeStatsReducer::new()
+        .with_child(RecordingReducer::new(
+            replay_meta_calls_a.clone(),
+            sample_calls_a.clone(),
+            finish_calls_a.clone(),
+        ))
+        .with_child(RecordingReducer::new(
+            replay_meta_calls_b.clone(),
+            sample_calls_b.clone(),
+            finish_calls_b.clone(),
+        ));
+    let mut collector = ReducerCollector::new(composite);
 
     FrameRateDecorator::new_from_fps(10.0, &mut collector)
         .process_replay(&replay)
         .expect("Failed to process replay with composed reducers");
 
-    let (powerslide, pressure) = collector.into_inner();
+    let _ = collector.into_inner();
 
-    assert!(
-        powerslide
-            .player_stats()
-            .values()
-            .any(|stats| stats.press_count > 0),
-        "Expected composed powerslide reducer to record presses"
-    );
-    assert!(
-        pressure.total_tracked_duration() > 0.0,
-        "Expected composed pressure reducer to track ball-side time"
-    );
+    assert_eq!(*replay_meta_calls_a.borrow(), 1);
+    assert_eq!(*replay_meta_calls_b.borrow(), 1);
+    assert!(*sample_calls_a.borrow() > 0);
+    assert_eq!(*sample_calls_a.borrow(), *sample_calls_b.borrow());
+    assert_eq!(*finish_calls_a.borrow(), 1);
+    assert_eq!(*finish_calls_b.borrow(), 1);
 }
 
 #[test]

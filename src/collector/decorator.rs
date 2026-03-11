@@ -73,4 +73,8 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
 
         Ok(next_target_time)
     }
+
+    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.collector.finish_replay(processor)
+    }
 }
