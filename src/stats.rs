@@ -1812,6 +1812,7 @@ pub struct BoostReducer {
     unavailable_pads: HashSet<String>,
     seen_pickup_sequences: HashSet<(String, u8)>,
     pickup_frames: HashMap<(String, PlayerId), usize>,
+    last_pickup_times: HashMap<String, f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -1993,6 +1994,13 @@ impl BoostReducer {
         let interval_end = t_at_min.max(t_at_max).min(1.0);
         (interval_end - interval_start).max(0.0)
     }
+
+    fn pad_respawn_time_seconds(pad_size: BoostPadSize) -> f32 {
+        match pad_size {
+            BoostPadSize::Big => 10.0,
+            BoostPadSize::Small => 4.0,
+        }
+    }
 }
 
 impl StatsReducer for BoostReducer {
@@ -2127,6 +2135,8 @@ impl StatsReducer for BoostReducer {
                         continue;
                     }
                     self.unavailable_pads.insert(event.pad_id.clone());
+                    self.last_pickup_times
+                        .insert(event.pad_id.clone(), event.time);
                     let Some(player) = sample
                         .players
                         .iter()
@@ -2161,6 +2171,16 @@ impl StatsReducer for BoostReducer {
                     }
                 }
                 BoostPadEventKind::Available => {
+                    if let Some(pad_size) = self.known_pad_sizes.get(&event.pad_id).copied() {
+                        let Some(last_pickup_time) = self.last_pickup_times.get(&event.pad_id)
+                        else {
+                            continue;
+                        };
+                        if event.time - *last_pickup_time < Self::pad_respawn_time_seconds(pad_size)
+                        {
+                            continue;
+                        }
+                    }
                     self.unavailable_pads.remove(&event.pad_id);
                     let Some(pending_pickup) = self.pending_pickups.remove(&event.pad_id) else {
                         continue;

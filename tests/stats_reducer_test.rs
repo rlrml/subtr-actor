@@ -2046,6 +2046,253 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
 }
 
 #[test]
+fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
+    let player_id = epic_id("boost-known-small-pad-early-available");
+    let pad_id = "VehiclePickup_Boost_TA_20".to_string();
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(243.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 1.0,
+                frame: 1,
+                pad_id: pad_id.clone(),
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 1 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 6.0,
+            dt: 5.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 6.0,
+                frame: 2,
+                pad_id: pad_id.clone(),
+                player: None,
+                kind: BoostPadEventKind::Available,
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 7.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(243.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 7.0,
+                frame: 3,
+                pad_id: pad_id.clone(),
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 2 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.small_pads_collected, 2);
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 4,
+            time: 10.0,
+            dt: 3.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 10.0,
+                frame: 4,
+                pad_id: pad_id.clone(),
+                player: None,
+                kind: BoostPadEventKind::Available,
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 5,
+            time: 10.5,
+            dt: 0.5,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(243.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 10.5,
+                frame: 5,
+                pad_id: pad_id.clone(),
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 3 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.small_pads_collected, 2);
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 6,
+            time: 11.0,
+            dt: 0.5,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 11.0,
+                frame: 6,
+                pad_id: pad_id.clone(),
+                player: None,
+                kind: BoostPadEventKind::Available,
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 7,
+            time: 11.5,
+            dt: 0.5,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(243.0),
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 11.5,
+                frame: 7,
+                pad_id,
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 4 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.small_pads_collected, 3);
+}
+
+#[test]
 fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
     let player_id = epic_id("boost-non-live-pickup-opt-in");
     let mut reducer = BoostReducer::with_config(BoostReducerConfig {
