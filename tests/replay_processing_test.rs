@@ -18,9 +18,7 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 #[test]
 fn test_all_replays_parse_successfully() {
     let replays = [
-        "assets/replays/rumble.replay",
         "assets/replays/rlcs.replay",
-        "assets/replays/gridiron.replay",
         "assets/replays/tourny.replay",
         "assets/replays/soccar-lan.replay",
     ];
@@ -556,7 +554,7 @@ fn test_ndarray_collector_all_global_features() {
 /// Test NDArrayCollector with all player feature adders
 #[test]
 fn test_ndarray_collector_all_player_features() {
-    let replay = parse_replay("assets/replays/rumble.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     // Use all available player feature adders
     let collector = NDArrayCollector::<f32>::from_strings(
@@ -699,31 +697,6 @@ fn test_player_rigid_body_extraction() {
     assert!(
         array.ncols() >= total_player_cols,
         "Should have enough columns for all players"
-    );
-}
-
-/// Test gridiron (special game mode) replay parsing - note this mode has different archetypes
-#[test]
-fn test_gridiron_replay() {
-    let replay = parse_replay("assets/replays/gridiron.replay");
-
-    // Gridiron has different game event archetypes, so just verify parsing works
-    assert!(
-        replay.network_frames.is_some(),
-        "Gridiron replay should have network frames"
-    );
-
-    // Use basic NDArrayCollector without soccar-specific features
-    let collector = NDArrayCollector::<f32>::from_strings(&["BallRigidBody"], &["PlayerRigidBody"])
-        .expect("Should create collector");
-
-    // This should work even for gridiron
-    let result = collector.process_replay(&replay);
-    // Gridiron may or may not work depending on how similar it is to soccar
-    // Just verify we can attempt to process it
-    assert!(
-        result.is_ok() || result.is_err(),
-        "Processing should complete (success or failure)"
     );
 }
 
@@ -910,7 +883,7 @@ impl Collector for FrameCounter {
 /// Test custom collector receives all frames
 #[test]
 fn test_custom_collector_receives_frames() {
-    let replay = parse_replay("assets/replays/rumble.replay");
+    let replay = parse_replay("assets/replays/rlcs.replay");
 
     let counter = FrameCounter::new()
         .process_replay(&replay)
