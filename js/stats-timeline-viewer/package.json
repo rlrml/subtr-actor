@@ -11,6 +11,9 @@
     "build-wasm": "sh ../scripts/build-wasm.sh",
     "dev-with-wasm": "npm run build-wasm && npm run dev"
   },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "vite": "^5.0.0"
