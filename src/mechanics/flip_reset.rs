@@ -1,5 +1,6 @@
 use crate::*;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FlipResetEvent {
@@ -177,16 +178,86 @@ pub(crate) fn flip_reset_followup_touch_candidate(
     })
 }
 
-impl<'a> ReplayProcessor<'a> {
+#[derive(Debug, Clone, Default)]
+pub struct FlipResetTracker {
+    flip_reset_events: Vec<FlipResetEvent>,
+    current_frame_flip_reset_events: Vec<FlipResetEvent>,
+    post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    current_frame_post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
+    current_frame_flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
+    recent_wall_contact_time: HashMap<PlayerId, f32>,
+    recent_flip_reset_candidates: HashMap<PlayerId, FlipResetEvent>,
+    current_frame_dodge_rising_edges: Vec<PlayerId>,
+    previous_dodge_active: HashMap<PlayerId, bool>,
+}
+
+impl FlipResetTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn on_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_index: usize,
+    ) -> SubtrActorResult<()> {
+        self.update_flip_reset_events(processor, frame_index)?;
+        self.update_dodge_rising_edges(processor)?;
+        self.update_flip_reset_followup_dodge_events(processor, frame, frame_index)?;
+        self.update_post_wall_dodge_events(processor, frame, frame_index)?;
+        Ok(())
+    }
+
+    pub fn flip_reset_events(&self) -> &[FlipResetEvent] {
+        &self.flip_reset_events
+    }
+
+    pub fn current_frame_flip_reset_events(&self) -> &[FlipResetEvent] {
+        &self.current_frame_flip_reset_events
+    }
+
+    pub fn post_wall_dodge_events(&self) -> &[PostWallDodgeEvent] {
+        &self.post_wall_dodge_events
+    }
+
+    pub fn current_frame_post_wall_dodge_events(&self) -> &[PostWallDodgeEvent] {
+        &self.current_frame_post_wall_dodge_events
+    }
+
+    pub fn flip_reset_followup_dodge_events(&self) -> &[FlipResetFollowupDodgeEvent] {
+        &self.flip_reset_followup_dodge_events
+    }
+
+    pub fn current_frame_flip_reset_followup_dodge_events(&self) -> &[FlipResetFollowupDodgeEvent] {
+        &self.current_frame_flip_reset_followup_dodge_events
+    }
+
+    pub fn into_events(
+        self,
+    ) -> (
+        Vec<FlipResetEvent>,
+        Vec<PostWallDodgeEvent>,
+        Vec<FlipResetFollowupDodgeEvent>,
+    ) {
+        (
+            self.flip_reset_events,
+            self.post_wall_dodge_events,
+            self.flip_reset_followup_dodge_events,
+        )
+    }
+
     fn build_flip_reset_event(
         &self,
+        processor: &ReplayProcessor,
         touch_event: &TouchEvent,
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
         let closest_approach_distance = touch_event.closest_approach_distance?;
-        let ball_rigid_body = self.get_ball_rigid_body().ok()?;
-        let player_rigid_body = self.get_player_rigid_body(player).ok()?;
+        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_candidate(
             ball_rigid_body,
             player_rigid_body,
@@ -206,13 +277,14 @@ impl<'a> ReplayProcessor<'a> {
 
     fn build_flip_reset_followup_touch_candidate(
         &self,
+        processor: &ReplayProcessor,
         touch_event: &TouchEvent,
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
         let closest_approach_distance = touch_event.closest_approach_distance?;
-        let ball_rigid_body = self.get_ball_rigid_body().ok()?;
-        let player_rigid_body = self.get_player_rigid_body(player).ok()?;
+        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_followup_touch_candidate(
             ball_rigid_body,
             player_rigid_body,
@@ -230,14 +302,15 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    pub(crate) fn update_flip_reset_events(
+    fn update_flip_reset_events(
         &mut self,
-        _frame: &boxcars::Frame,
+        processor: &ReplayProcessor,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
         self.current_frame_flip_reset_events.clear();
-        for touch_event in &self.current_frame_touch_events {
-            let Some(event) = self.build_flip_reset_event(touch_event, frame_index) else {
+        for touch_event in processor.current_frame_touch_events() {
+            let Some(event) = self.build_flip_reset_event(processor, touch_event, frame_index)
+            else {
                 continue;
             };
             self.current_frame_flip_reset_events.push(event.clone());
@@ -246,12 +319,12 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    pub(crate) fn update_dodge_rising_edges(&mut self) -> SubtrActorResult<()> {
+    fn update_dodge_rising_edges(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
         self.current_frame_dodge_rising_edges.clear();
-        let player_ids: Vec<_> = self.iter_player_ids_in_order().cloned().collect();
+        let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in player_ids {
-            let dodge_active = self.get_dodge_active(&player_id).unwrap_or(0) % 2 == 1;
+            let dodge_active = processor.get_dodge_active(&player_id).unwrap_or(0) % 2 == 1;
             let was_dodge_active = self
                 .previous_dodge_active
                 .insert(player_id.clone(), dodge_active)
@@ -291,8 +364,9 @@ impl<'a> ReplayProcessor<'a> {
         z >= 120.0 && (x >= 3600.0 || y >= 5000.0)
     }
 
-    pub(crate) fn update_post_wall_dodge_events(
+    fn update_post_wall_dodge_events(
         &mut self,
+        processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -301,10 +375,10 @@ impl<'a> ReplayProcessor<'a> {
 
         self.current_frame_post_wall_dodge_events.clear();
         let current_time = frame.time;
-        let player_ids: Vec<_> = self.iter_player_ids_in_order().cloned().collect();
+        let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = self.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
                 self.previous_dodge_active.remove(player_id);
                 continue;
             };
@@ -320,7 +394,7 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = self.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
                 continue;
             };
             let player_rigid_body = *player_rigid_body;
@@ -347,7 +421,7 @@ impl<'a> ReplayProcessor<'a> {
                 time: current_time,
                 frame: frame_index,
                 player: player_id.clone(),
-                is_team_0: self.get_player_is_team_0(player_id).unwrap_or(false),
+                is_team_0: processor.get_player_is_team_0(player_id).unwrap_or(false),
                 wall_contact_time,
                 time_since_wall_contact,
             };
@@ -359,8 +433,9 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
-    pub(crate) fn update_flip_reset_followup_dodge_events(
+    fn update_flip_reset_followup_dodge_events(
         &mut self,
+        processor: &ReplayProcessor,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -369,10 +444,10 @@ impl<'a> ReplayProcessor<'a> {
 
         self.current_frame_flip_reset_followup_dodge_events.clear();
         let current_time = frame.time;
-        let player_ids: Vec<_> = self.iter_player_ids_in_order().cloned().collect();
+        let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = self.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
                 self.recent_flip_reset_candidates.remove(player_id);
                 continue;
             };
@@ -381,9 +456,9 @@ impl<'a> ReplayProcessor<'a> {
             }
         }
 
-        for touch_event in &self.current_frame_touch_events {
+        for touch_event in processor.current_frame_touch_events() {
             let Some(event) =
-                self.build_flip_reset_followup_touch_candidate(touch_event, frame_index)
+                self.build_flip_reset_followup_touch_candidate(processor, touch_event, frame_index)
             else {
                 continue;
             };
@@ -392,7 +467,7 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = self.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
                 continue;
             };
             if Self::player_is_grounded_for_wall_sequence(player_rigid_body) {
@@ -414,7 +489,7 @@ impl<'a> ReplayProcessor<'a> {
                 time: current_time,
                 frame: frame_index,
                 player: player_id.clone(),
-                is_team_0: self.get_player_is_team_0(player_id).unwrap_or(false),
+                is_team_0: processor.get_player_is_team_0(player_id).unwrap_or(false),
                 candidate_touch_time: candidate_event.time,
                 time_since_candidate_touch,
                 candidate_touch_confidence: candidate_event.confidence,
@@ -427,16 +502,17 @@ impl<'a> ReplayProcessor<'a> {
 
         Ok(())
     }
+}
 
-    pub fn current_frame_flip_reset_events(&self) -> &[FlipResetEvent] {
-        &self.current_frame_flip_reset_events
-    }
-
-    pub fn current_frame_post_wall_dodge_events(&self) -> &[PostWallDodgeEvent] {
-        &self.current_frame_post_wall_dodge_events
-    }
-
-    pub fn current_frame_flip_reset_followup_dodge_events(&self) -> &[FlipResetFollowupDodgeEvent] {
-        &self.current_frame_flip_reset_followup_dodge_events
+impl Collector for FlipResetTracker {
+    fn process_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        frame: &boxcars::Frame,
+        frame_number: usize,
+        _current_time: f32,
+    ) -> SubtrActorResult<TimeAdvance> {
+        self.on_frame(processor, frame, frame_number)?;
+        Ok(TimeAdvance::NextFrame)
     }
 }

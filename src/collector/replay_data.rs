@@ -749,16 +749,19 @@ impl ReplayDataCollector {
     /// ```
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
-        processor.process(&mut self)?;
+        let mut flip_reset_tracker = FlipResetTracker::new();
+        processor.process_all(&mut [&mut self, &mut flip_reset_tracker])?;
         let meta = processor.get_replay_meta()?;
+        let (flip_reset_events, post_wall_dodge_events, flip_reset_followup_dodge_events) =
+            flip_reset_tracker.into_events();
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes,
             boost_pad_events: processor.boost_pad_events,
             touch_events: processor.touch_events,
-            flip_reset_events: processor.flip_reset_events,
-            post_wall_dodge_events: processor.post_wall_dodge_events,
-            flip_reset_followup_dodge_events: processor.flip_reset_followup_dodge_events,
+            flip_reset_events,
+            post_wall_dodge_events,
+            flip_reset_followup_dodge_events,
             player_stat_events: processor.player_stat_events,
             goal_events: processor.goal_events,
             frame_data: self.get_frame_data(),

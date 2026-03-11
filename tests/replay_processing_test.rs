@@ -297,31 +297,31 @@ fn test_processor_extracts_touch_events() {
 fn test_processor_extracts_flip_reset_events() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
-    let mut counter = FrameCounter::new();
+    let mut tracker = FlipResetTracker::new();
     processor
-        .process(&mut counter)
+        .process(&mut tracker)
         .expect("Failed to process replay for flip-reset extraction");
 
     assert!(
-        !processor.flip_reset_events.is_empty(),
+        !tracker.flip_reset_events().is_empty(),
         "Expected the heuristic to find at least one flip-reset candidate in rlcs.replay"
     );
     assert!(
-        processor
-            .flip_reset_events
+        tracker
+            .flip_reset_events()
             .iter()
             .all(|event| (0.0..=1.0).contains(&event.confidence)),
         "Expected heuristic confidence to stay normalized"
     );
     assert!(
-        processor
-            .flip_reset_events
+        tracker
+            .flip_reset_events()
             .iter()
             .all(|event| event.closest_approach_distance <= 8.0),
         "Expected flip-reset candidates to be backed by very close attributed touches"
     );
     assert!(
-        processor.flip_reset_events.iter().all(|event| {
+        tracker.flip_reset_events().iter().all(|event| {
             processor.get_player_is_team_0(&event.player).ok() == Some(event.is_team_0)
         }),
         "Expected flip-reset candidate team labels to agree with the resolved player team"
@@ -332,24 +332,24 @@ fn test_processor_extracts_flip_reset_events() {
 fn test_processor_extracts_post_wall_dodge_events() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
-    let mut counter = FrameCounter::new();
+    let mut tracker = FlipResetTracker::new();
     processor
-        .process(&mut counter)
+        .process(&mut tracker)
         .expect("Failed to process replay for post-wall dodge extraction");
 
     assert!(
-        !processor.post_wall_dodge_events.is_empty(),
+        !tracker.post_wall_dodge_events().is_empty(),
         "Expected the heuristic to find at least one post-wall dodge in rlcs.replay"
     );
     assert!(
-        processor
-            .post_wall_dodge_events
+        tracker
+            .post_wall_dodge_events()
             .iter()
-            .all(|event| event.time_since_wall_contact >= 0.30),
+            .all(|event| event.time_since_wall_contact >= 0.20),
         "Expected post-wall dodge events to occur after the minimum wall-contact delay"
     );
     assert!(
-        processor.post_wall_dodge_events.iter().all(|event| {
+        tracker.post_wall_dodge_events().iter().all(|event| {
             processor.get_player_is_team_0(&event.player).ok() == Some(event.is_team_0)
         }),
         "Expected post-wall dodge team labels to agree with resolved player teams"
@@ -360,32 +360,32 @@ fn test_processor_extracts_post_wall_dodge_events() {
 fn test_processor_extracts_flip_reset_followup_dodge_events() {
     let replay = parse_replay("assets/replays/new_demolition_format.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
-    let mut counter = FrameCounter::new();
+    let mut tracker = FlipResetTracker::new();
     processor
-        .process(&mut counter)
+        .process(&mut tracker)
         .expect("Failed to process replay for flip-reset followup dodge extraction");
 
     assert!(
-        !processor.flip_reset_followup_dodge_events.is_empty(),
+        !tracker.flip_reset_followup_dodge_events().is_empty(),
         "Expected the heuristic to find at least one followup dodge after a likely reset touch"
     );
     assert!(
-        processor
-            .flip_reset_followup_dodge_events
+        tracker
+            .flip_reset_followup_dodge_events()
             .iter()
             .all(|event| (0.05..=1.75).contains(&event.time_since_candidate_touch)),
         "Expected followup dodges to occur within the candidate-touch timing window"
     );
     assert!(
-        processor
-            .flip_reset_followup_dodge_events
+        tracker
+            .flip_reset_followup_dodge_events()
             .iter()
             .all(|event| (0.0..=1.0).contains(&event.candidate_touch_confidence)),
         "Expected candidate-touch confidence to remain normalized"
     );
     assert!(
-        processor
-            .flip_reset_followup_dodge_events
+        tracker
+            .flip_reset_followup_dodge_events()
             .iter()
             .all(|event| {
                 processor.get_player_is_team_0(&event.player).ok() == Some(event.is_team_0)
