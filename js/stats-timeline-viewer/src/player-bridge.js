@@ -1,176 +1,165 @@
-import playerScriptUrl from "../../example/src/player.js?url";
+import { ReplayPlayer } from "./local-player.js";
 
-let dependenciesReady = false;
+const CAMERA_MODES = ["overview", "attached", "third-person"];
+const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 
-export async function createReplayPlayer(replayData, onTimeUpdate) {
-  window.replayData = replayData;
-  await ensureViewerDependencies();
+let activePlayer = null;
+let activeChangeListener = null;
+let controlsBound = false;
+let playbackRateIndex = PLAYBACK_SPEEDS.indexOf(1);
 
-  document.getElementById("player").replaceChildren();
+export async function createReplayPlayer(replay, onTimeUpdate) {
+  detachActivePlayer();
+
+  const container = document.getElementById("player");
+  container.replaceChildren();
   document.getElementById("player-container").style.display = "block";
   document.getElementById("details-watch").style.display = "block";
 
-  const settings = window.Settings({
-    "player.autoplay": false,
-    "player.speed": 3,
-    "cars.colors.simple": false,
-    "cars.name.hide": false,
-    "cars.bam.hide": false,
-    "boost.pads.hide": true,
-    "cars.boost.trail.hide": false,
-    "cars.trails": false,
-    "ball.trail": false,
-    "trail.duration": 1,
+  activePlayer = new ReplayPlayer(container, replay, {
+    initialCameraMode: "overview",
+    initialTrackedPlayerId: replay.players[0]?.id,
   });
 
-  window.ReplayPlayer({ settings, slave: null });
-  const player = window.player;
-  if (!player?.bus) {
-    throw new Error("Replay player failed to initialize.");
-  }
+  bindControlsOnce();
+  populateTrackedPlayer(replay);
 
-  if (onTimeUpdate) {
-    player.bus.on("time-update", onTimeUpdate);
-    player.bus.on("set-time", onTimeUpdate);
-    onTimeUpdate(player.currentTime ?? 0);
-  }
-  return player;
+  playbackRateIndex = PLAYBACK_SPEEDS.indexOf(1);
+  activePlayer.setPlaybackRate(PLAYBACK_SPEEDS[playbackRateIndex]);
+
+  activeChangeListener = (event) => {
+    const snapshot = event.detail;
+    syncControls(snapshot);
+    onTimeUpdate?.(snapshot.currentTime, snapshot);
+  };
+
+  activePlayer.addEventListener("change", activeChangeListener);
+  const initialSnapshot = activePlayer.getSnapshot();
+  syncControls(initialSnapshot);
+  onTimeUpdate?.(initialSnapshot.currentTime, initialSnapshot);
+  return activePlayer;
 }
 
-async function ensureViewerDependencies() {
-  if (dependenciesReady) {
+function detachActivePlayer() {
+  if (activePlayer && activeChangeListener) {
+    activePlayer.removeEventListener("change", activeChangeListener);
+  }
+  if (activePlayer) {
+    activePlayer.dispose();
+  }
+  activePlayer = null;
+  activeChangeListener = null;
+}
+
+function bindControlsOnce() {
+  if (controlsBound) {
     return;
   }
 
-  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js");
-  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/three.js/r116/three.min.js");
-  await loadOptionalScript(
-    "https://unpkg.com/stats.js@0.17.0/build/stats.min.js",
-    () =>
-      function StatsStub() {
-        return { begin() {}, end() {}, showPanel() {}, dom: document.createElement("div") };
-      },
-    "Stats",
-  );
-  await loadOptionalScript(
-    "https://unpkg.com/hotkeys-js@3.8.1/dist/hotkeys.min.js",
-    () => function hotkeysStub() {},
-    "hotkeys",
-  );
+  const playPause = document.getElementById("play-pause");
+  const seekbar = document.getElementById("seekbar");
+  const cameraSwitcher = document.getElementById("cameraSwitcher");
+  const fullScreen = document.getElementById("full-screen");
+  const slower = document.getElementById("playback-speed-dn");
+  const faster = document.getElementById("playback-speed-up");
 
-  installCookieHelpers();
-  ensureParticleShaders();
-  await loadScript(playerScriptUrl);
-  dependenciesReady = true;
-}
-
-function installCookieHelpers() {
-  window.readCookie =
-    window.readCookie ||
-    function readCookie(name) {
-      const prefix = `${name}=`;
-      for (const value of document.cookie.split(";")) {
-        const trimmed = value.trim();
-        if (trimmed.startsWith(prefix)) {
-          return trimmed.slice(prefix.length);
-        }
-      }
-      return null;
-    };
-
-  window.createCookie =
-    window.createCookie ||
-    function createCookie(name, value, days) {
-      let expires = "";
-      if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
-        expires = `; expires=${date.toUTCString()}`;
-      }
-      document.cookie = `${name}=${value}${expires}; path=/`;
-    };
-}
-
-function ensureParticleShaders() {
-  if (!document.getElementById("particle-vertex-shader")) {
-    const vertexShader = document.createElement("script");
-    vertexShader.id = "particle-vertex-shader";
-    vertexShader.type = "x-shader/x-vertex";
-    vertexShader.textContent = `
-      attribute float size;
-      attribute float age;
-      varying float vAge;
-      void main() {
-          vAge = age;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (300.0 / -mvPosition.z);
-          gl_Position = projectionMatrix * mvPosition;
-      }
-    `;
-    document.head.appendChild(vertexShader);
-  }
-
-  if (!document.getElementById("particle-fragment-shader")) {
-    const fragmentShader = document.createElement("script");
-    fragmentShader.id = "particle-fragment-shader";
-    fragmentShader.type = "x-shader/x-fragment";
-    fragmentShader.textContent = `
-      uniform sampler2D texture;
-      varying float vAge;
-      void main() {
-          gl_FragColor = vec4(color, vAge) * texture2D(texture, gl_PointCoord);
-      }
-    `;
-    document.head.appendChild(fragmentShader);
-  }
-
-  if (window.THREE?.TextureLoader) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const context = canvas.getContext("2d");
-    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 30);
-    gradient.addColorStop(0, "rgba(255,255,255,1)");
-    gradient.addColorStop(0.5, "rgba(255,255,255,0.5)");
-    gradient.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, 64, 64);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    const originalLoad = THREE.TextureLoader.prototype.load;
-    THREE.TextureLoader.prototype.load = function loadTexture(url, onLoad, onProgress, onError) {
-      if (
-        url === "/static/textures/solid-particle.png" ||
-        url === "/static/textures/lensflare0_alpha.png"
-      ) {
-        if (onLoad) {
-          onLoad(texture);
-        }
-        return texture;
-      }
-      return originalLoad.call(this, url, onLoad, onProgress, onError);
-    };
-  }
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = (error) => reject(new Error(`Failed to load script ${src}: ${error}`));
-    document.head.appendChild(script);
+  playPause.addEventListener("click", () => {
+    activePlayer?.togglePlayback();
   });
+
+  seekbar.addEventListener("input", () => {
+    const snapshot = activePlayer?.getSnapshot();
+    if (!snapshot || snapshot.duration <= 0) {
+      return;
+    }
+    const nextTime = (Number(seekbar.value) / 1000) * snapshot.duration;
+    activePlayer.seek(nextTime);
+  });
+
+  cameraSwitcher.addEventListener("click", () => {
+    if (!activePlayer) {
+      return;
+    }
+    const { cameraMode } = activePlayer.getSnapshot();
+    const index = CAMERA_MODES.indexOf(cameraMode);
+    const nextMode = CAMERA_MODES[(index + 1) % CAMERA_MODES.length];
+    activePlayer.setCameraMode(nextMode);
+  });
+
+  fullScreen.addEventListener("click", async () => {
+    const element = document.getElementById("player-container");
+    if (!document.fullscreenElement) {
+      await element.requestFullscreen?.();
+    } else {
+      await document.exitFullscreen?.();
+    }
+  });
+
+  slower.addEventListener("click", () => {
+    if (!activePlayer) {
+      return;
+    }
+    playbackRateIndex = Math.max(0, playbackRateIndex - 1);
+    activePlayer.setPlaybackRate(PLAYBACK_SPEEDS[playbackRateIndex]);
+    syncPlaybackRateLabel();
+  });
+
+  faster.addEventListener("click", () => {
+    if (!activePlayer) {
+      return;
+    }
+    playbackRateIndex = Math.min(PLAYBACK_SPEEDS.length - 1, playbackRateIndex + 1);
+    activePlayer.setPlaybackRate(PLAYBACK_SPEEDS[playbackRateIndex]);
+    syncPlaybackRateLabel();
+  });
+
+  controlsBound = true;
 }
 
-async function loadOptionalScript(src, fallbackFactory, globalName) {
-  try {
-    await loadScript(src);
-  } catch (error) {
-    console.warn(error);
-    if (!window[globalName]) {
-      window[globalName] = fallbackFactory();
-    }
+function populateTrackedPlayer(replay) {
+  const trackedPlayerId = replay.players[0]?.id ?? null;
+  const cameraSwitcher = document.getElementById("cameraSwitcher");
+
+  if (trackedPlayerId) {
+    activePlayer.setTrackedPlayer(trackedPlayerId);
+    cameraSwitcher.disabled = false;
+  } else {
+    cameraSwitcher.disabled = true;
   }
+}
+
+function syncControls(snapshot) {
+  const currentTime = document.getElementById("current-time");
+  const totalTime = document.getElementById("total-time");
+  const seekbar = document.getElementById("seekbar");
+  const playPause = document.getElementById("play-pause");
+  const cameraSwitcher = document.getElementById("cameraSwitcher");
+
+  currentTime.textContent = formatClock(snapshot.currentTime);
+  totalTime.textContent = formatClock(snapshot.duration);
+  seekbar.value =
+    snapshot.duration > 0
+      ? String(Math.round((snapshot.currentTime / snapshot.duration) * 1000))
+      : "0";
+  playPause.textContent = snapshot.playing ? "Pause" : "Play";
+  cameraSwitcher.textContent = `Camera: ${formatCameraMode(snapshot.cameraMode)}`;
+  syncPlaybackRateLabel();
+}
+
+function syncPlaybackRateLabel() {
+  document.getElementById("playback-speed-value").textContent =
+    `${PLAYBACK_SPEEDS[playbackRateIndex].toFixed(2).replace(/\.?0+$/, "")}x`;
+}
+
+function formatCameraMode(mode) {
+  if (mode === "third-person") {
+    return "Third Person";
+  }
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
+
+function formatClock(time) {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

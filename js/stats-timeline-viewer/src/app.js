@@ -1,5 +1,6 @@
 import { createReplayPlayer } from "./player-bridge.js";
-import { adaptReplayDataForViewer, normalizeStatsTimeline } from "./replay-adapter.js";
+import { normalizeReplayData } from "./local-replay-data.js";
+import { normalizeStatsTimeline } from "./replay-adapter.js";
 import { StatsPanel } from "./stats-panel.js";
 import { initializeWasm, loadReplayArtifacts } from "./wasm-api.js";
 
@@ -72,14 +73,26 @@ export class StatsTimelineViewerApp {
       const normalizedStatsTimeline = normalizeStatsTimeline(statsTimeline, startTime);
 
       this.setProgress(75, "Adapting replay for the viewer…");
-      const replayData = adaptReplayDataForViewer(frameData, statsTimeline);
+      const replay = normalizeReplayData(frameData);
 
       this.setProgress(90, "Initializing 3D playback and stats panel…");
       this.uploadCard.hidden = true;
       this.workspace.hidden = false;
-      this.populateViewerMeta(file, info, normalizedStatsTimeline);
+      this.populateViewerMeta(file, info, normalizedStatsTimeline, replay);
       this.statsPanel.setTimeline(normalizedStatsTimeline);
-      await createReplayPlayer(replayData, (time) => this.statsPanel.updateTime(time));
+      window.statsTimelineViewerDebug = {
+        fileName: file.name,
+        info,
+        frameData,
+        rawStatsTimeline: statsTimeline,
+        normalizedStatsTimeline,
+        replay,
+      };
+      await createReplayPlayer(replay, (time) => {
+        this.statsPanel.updateTime(time);
+        this.updatePlaybackHud(normalizedStatsTimeline, time);
+      });
+      this.updatePlaybackHud(normalizedStatsTimeline, 0);
 
       this.setProgress(100, "Ready.");
       this.hideProgress();
@@ -90,10 +103,10 @@ export class StatsTimelineViewerApp {
     }
   }
 
-  populateViewerMeta(file, info, statsTimeline) {
+  populateViewerMeta(file, info, statsTimeline, replay) {
     const playerCount = statsTimeline.replay_meta?.player_order?.length
       ?? (statsTimeline.replay_meta?.team_zero?.length ?? 0) + (statsTimeline.replay_meta?.team_one?.length ?? 0);
-    const duration = statsTimeline.frames?.at(-1)?.time ?? 0;
+    const duration = replay.duration ?? statsTimeline.frames?.at(-1)?.time ?? 0;
 
     this.viewerMeta.innerHTML = `
       <div class="meta-chip">
@@ -113,6 +126,20 @@ export class StatsTimelineViewerApp {
         <strong>${info.major_version}.${info.minor_version}</strong>
       </div>
     `;
+  }
+
+  updatePlaybackHud(timeline, time) {
+    const frameIndex = findFrameIndexAtOrBefore(timeline.frames ?? [], time);
+    const frame = timeline.frames?.[frameIndex];
+    if (!frame) {
+      return;
+    }
+
+    document.getElementById("blue-score").textContent = String(frame.team_zero?.core?.goals ?? 0);
+    document.getElementById("orange-score").textContent = String(frame.team_one?.core?.goals ?? 0);
+    document.getElementById("rem-seconds").textContent = formatClock(frame.seconds_remaining ?? 0);
+    document.getElementById("countdown").textContent =
+      frame.game_state === 55 ? "Kickoff" : "";
   }
 
   setProgress(percent, label) {
@@ -149,4 +176,22 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function findFrameIndexAtOrBefore(frames, time) {
+  let low = 0;
+  let high = frames.length - 1;
+  let result = -1;
+
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (frames[middle].time <= time) {
+      result = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+
+  return result >= 0 ? result : 0;
 }
