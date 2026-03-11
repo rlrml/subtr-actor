@@ -47,6 +47,7 @@ pub struct DynamicReplayStatsFrame {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TeamStatsSnapshot {
     pub core: CoreTeamStats,
+    pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
     pub movement: MovementStats,
     pub powerslide: PowerslideStats,
@@ -64,6 +65,7 @@ pub struct PlayerStatsSnapshot {
     pub name: String,
     pub is_team_0: bool,
     pub core: CorePlayerStats,
+    pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
     pub movement: MovementStats,
     pub positioning: PositioningStats,
@@ -82,6 +84,7 @@ pub struct DynamicPlayerStatsSnapshot {
 impl StatFieldProvider for TeamStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
         self.movement.visit_stat_fields(visitor);
         self.powerslide.visit_stat_fields(visitor);
@@ -92,6 +95,7 @@ impl StatFieldProvider for TeamStatsSnapshot {
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
         self.movement.visit_stat_fields(visitor);
         self.positioning.visit_stat_fields(visitor);
@@ -137,6 +141,7 @@ impl ReplayStatsFrame {
 struct StatsTimelineReducers {
     possession: PossessionReducer,
     match_stats: MatchStatsReducer,
+    ball_carry: BallCarryReducer,
     boost: BoostReducer,
     movement: MovementReducer,
     positioning: PositioningReducer,
@@ -148,6 +153,7 @@ impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.possession.on_replay_meta(meta)?;
         self.match_stats.on_replay_meta(meta)?;
+        self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
         self.movement.on_replay_meta(meta)?;
         self.positioning.on_replay_meta(meta)?;
@@ -159,11 +165,24 @@ impl StatsReducer for StatsTimelineReducers {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         self.possession.on_sample(sample)?;
         self.match_stats.on_sample(sample)?;
+        self.ball_carry.on_sample(sample)?;
         self.boost.on_sample(sample)?;
         self.movement.on_sample(sample)?;
         self.positioning.on_sample(sample)?;
         self.powerslide.on_sample(sample)?;
         self.demo.on_sample(sample)?;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> SubtrActorResult<()> {
+        self.possession.finish()?;
+        self.match_stats.finish()?;
+        self.ball_carry.finish()?;
+        self.boost.finish()?;
+        self.movement.finish()?;
+        self.positioning.finish()?;
+        self.powerslide.finish()?;
+        self.demo.finish()?;
         Ok(())
     }
 }
@@ -174,6 +193,7 @@ pub struct StatsTimelineCollector {
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
+    last_sample: Option<StatsSample>,
 }
 
 impl StatsTimelineCollector {
@@ -242,6 +262,7 @@ impl StatsTimelineCollector {
             possession: self.reducers.possession.stats().clone(),
             team_zero: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_zero_stats(),
+                ball_carry: self.reducers.ball_carry.team_zero_stats().clone(),
                 boost: self.reducers.boost.team_zero_stats().clone(),
                 movement: self.reducers.movement.team_zero_stats().clone(),
                 powerslide: self.reducers.powerslide.team_zero_stats().clone(),
@@ -249,6 +270,7 @@ impl StatsTimelineCollector {
             },
             team_one: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_one_stats(),
+                ball_carry: self.reducers.ball_carry.team_one_stats().clone(),
                 boost: self.reducers.boost.team_one_stats().clone(),
                 movement: self.reducers.movement.team_one_stats().clone(),
                 powerslide: self.reducers.powerslide.team_one_stats().clone(),
@@ -266,6 +288,13 @@ impl StatsTimelineCollector {
                     core: self
                         .reducers
                         .match_stats
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    ball_carry: self
+                        .reducers
+                        .ball_carry
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
@@ -338,7 +367,23 @@ impl Collector for StatsTimelineCollector {
             .as_ref()
             .expect("replay metadata should be initialized before snapshotting");
         self.frames.push(self.snapshot_frame(&sample, replay_meta));
+        self.last_sample = Some(sample);
 
         Ok(TimeAdvance::NextFrame)
+    }
+
+    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.reducers.finish()?;
+        let Some(last_sample) = self.last_sample.as_ref() else {
+            return Ok(());
+        };
+        let Some(replay_meta) = self.replay_meta.as_ref() else {
+            return Ok(());
+        };
+        let final_snapshot = self.snapshot_frame(last_sample, replay_meta);
+        if let Some(last_frame) = self.frames.last_mut() {
+            *last_frame = final_snapshot;
+        }
+        Ok(())
     }
 }

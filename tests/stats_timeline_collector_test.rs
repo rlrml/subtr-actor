@@ -26,6 +26,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
 
     let mut possession_collector = ReducerCollector::new(PossessionReducer::new());
     let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
+    let mut ball_carry_collector = ReducerCollector::new(BallCarryReducer::new());
     let mut boost_collector = ReducerCollector::new(BoostReducer::new());
     let mut movement_collector = ReducerCollector::new(MovementReducer::new());
     let mut positioning_collector = ReducerCollector::new(PositioningReducer::new());
@@ -33,9 +34,10 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let mut demo_collector = ReducerCollector::new(DemoReducer::new());
 
     let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
-    let mut collectors: [&mut dyn Collector; 7] = [
+    let mut collectors: [&mut dyn Collector; 8] = [
         &mut possession_collector,
         &mut match_collector,
+        &mut ball_carry_collector,
         &mut boost_collector,
         &mut movement_collector,
         &mut positioning_collector,
@@ -48,6 +50,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
 
     let possession = possession_collector.into_inner();
     let match_stats = match_collector.into_inner();
+    let ball_carry = ball_carry_collector.into_inner();
     let boost = boost_collector.into_inner();
     let movement = movement_collector.into_inner();
     let positioning = positioning_collector.into_inner();
@@ -57,6 +60,14 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     assert_eq!(final_frame.possession, possession.stats().clone());
     assert_eq!(final_frame.team_zero.core, match_stats.team_zero_stats());
     assert_eq!(final_frame.team_one.core, match_stats.team_one_stats());
+    assert_eq!(
+        final_frame.team_zero.ball_carry,
+        ball_carry.team_zero_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.ball_carry,
+        ball_carry.team_one_stats().clone()
+    );
     assert_eq!(final_frame.team_zero.boost, boost.team_zero_stats().clone());
     assert_eq!(final_frame.team_one.boost, boost.team_one_stats().clone());
     assert_eq!(
@@ -86,6 +97,14 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
         assert_eq!(
             player.core,
             match_stats
+                .player_stats()
+                .get(&player.player_id)
+                .cloned()
+                .unwrap_or_default()
+        );
+        assert_eq!(
+            player.ball_carry,
+            ball_carry
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -200,6 +219,10 @@ fn test_stats_timeline_collector_can_export_dynamic_stats() {
         find_field(&dynamic_frame.team_zero.stats, "core", "goals").value,
         StatValue::Signed(typed_frame.team_zero.core.goals)
     );
+    assert_eq!(
+        find_field(&dynamic_frame.team_zero.stats, "ball_carry", "count").value,
+        StatValue::Unsigned(typed_frame.team_zero.ball_carry.carry_count)
+    );
 
     let typed_player = typed_frame
         .players
@@ -218,5 +241,9 @@ fn test_stats_timeline_collector_can_export_dynamic_stats() {
     assert_eq!(
         find_field(&dynamic_player.stats, "movement", "total_distance").value,
         StatValue::Float(typed_player.movement.total_distance)
+    );
+    assert_eq!(
+        find_field(&dynamic_player.stats, "ball_carry", "count").value,
+        StatValue::Unsigned(typed_player.ball_carry.carry_count)
     );
 }
