@@ -1,8 +1,10 @@
 import type {
   BallSample,
+  CameraSettings,
   PlaybackFrame,
   PlayerSample,
   RawBallFrame,
+  RawPlayerInfo,
   RawPlayerFrame,
   RawReplayFramesData,
   ReplayModel,
@@ -11,6 +13,12 @@ import type {
 } from "./types";
 
 const UNIT_SCALE = 0.01;
+const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
+  distance: 270,
+  height: 100,
+  pitch: -4,
+  fov: 110,
+};
 
 function scaleVector(value: Vec3): Vec3 {
   return {
@@ -20,9 +28,103 @@ function scaleVector(value: Vec3): Vec3 {
   };
 }
 
+function mapVectorToScene(value: Vec3): Vec3 {
+  return {
+    x: value.x,
+    y: value.z,
+    z: value.y,
+  };
+}
+
 function playerIdToString(playerId: Record<string, string>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
   return `${kind}:${value}`;
+}
+
+function normalizeVector(value: Vec3): Vec3 | null {
+  const magnitude = Math.hypot(value.x, value.y, value.z);
+  if (magnitude < 0.000001) {
+    return null;
+  }
+
+  return {
+    x: value.x / magnitude,
+    y: value.y / magnitude,
+    z: value.z / magnitude,
+  };
+}
+
+function normalizeQuaternion(raw: {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}): { x: number; y: number; z: number; w: number } | null {
+  const magnitude = Math.hypot(raw.x, raw.y, raw.z, raw.w);
+  if (magnitude < 0.000001) {
+    return null;
+  }
+
+  return {
+    x: raw.x / magnitude,
+    y: raw.y / magnitude,
+    z: raw.z / magnitude,
+    w: raw.w / magnitude,
+  };
+}
+
+function multiplyQuaternions(
+  left: { x: number; y: number; z: number; w: number },
+  right: { x: number; y: number; z: number; w: number }
+): { x: number; y: number; z: number; w: number } {
+  return {
+    w:
+      left.w * right.w -
+      left.x * right.x -
+      left.y * right.y -
+      left.z * right.z,
+    x:
+      left.w * right.x +
+      left.x * right.w +
+      left.y * right.z -
+      left.z * right.y,
+    y:
+      left.w * right.y -
+      left.x * right.z +
+      left.y * right.w +
+      left.z * right.x,
+    z:
+      left.w * right.z +
+      left.x * right.y -
+      left.y * right.x +
+      left.z * right.w,
+  };
+}
+
+function rotateVectorByQuaternion(
+  vector: Vec3,
+  quaternion: { x: number; y: number; z: number; w: number }
+): Vec3 {
+  const rotated = multiplyQuaternions(
+    multiplyQuaternions(quaternion, {
+      x: vector.x,
+      y: vector.y,
+      z: vector.z,
+      w: 0,
+    }),
+    {
+      x: -quaternion.x,
+      y: -quaternion.y,
+      z: -quaternion.z,
+      w: quaternion.w,
+    }
+  );
+
+  return {
+    x: rotated.x,
+    y: rotated.y,
+    z: rotated.z,
+  };
 }
 
 function parseBallFrame(frame: RawBallFrame): BallSample {
@@ -40,6 +142,8 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
     return {
       position: null,
       velocity: null,
+      forward: null,
+      up: null,
       boostAmount: 0,
       boostActive: false,
       jumpActive: false,
@@ -47,9 +151,21 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
     };
   }
 
+  const rotation = normalizeQuaternion(frame.Data.rigid_body.rotation);
+  const forwardRl = rotation
+    ? rotateVectorByQuaternion({ x: 1, y: 0, z: 0 }, rotation)
+    : null;
+  const upRl = rotation
+    ? rotateVectorByQuaternion({ x: 0, y: 0, z: 1 }, rotation)
+    : null;
+
   return {
     position: scaleVector(frame.Data.rigid_body.location),
-    velocity: scaleVector(frame.Data.rigid_body.linear_velocity),
+    velocity: mapVectorToScene(scaleVector(frame.Data.rigid_body.linear_velocity)),
+    forward: forwardRl
+      ? normalizeVector(mapVectorToScene(forwardRl))
+      : null,
+    up: upRl ? normalizeVector(mapVectorToScene(upRl)) : null,
     boostAmount: frame.Data.boost_amount,
     boostActive: frame.Data.boost_active,
     jumpActive: frame.Data.jump_active,
@@ -87,23 +203,91 @@ function inferTeamSide(
   return true;
 }
 
+function getStatEntries(
+  stats: RawPlayerInfo["stats"]
+): Array<[string, unknown]> {
+  if (!stats) {
+    return [];
+  }
+
+  if (stats instanceof Map) {
+    return Array.from(stats.entries());
+  }
+
+  return Object.entries(stats);
+}
+
+function extractNumericSetting(
+  entries: Array<[string, unknown]>,
+  key: string
+): number | undefined {
+  const value = entries.find(([entryKey]) => entryKey === key)?.[1];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function extractCameraSettings(playerInfo?: RawPlayerInfo): CameraSettings {
+  const entries = getStatEntries(playerInfo?.stats);
+  return {
+    fov: extractNumericSetting(entries, "CameraFOV") ?? DEFAULT_CAMERA_SETTINGS.fov,
+    height:
+      extractNumericSetting(entries, "CameraHeight") ??
+      DEFAULT_CAMERA_SETTINGS.height,
+    pitch:
+      extractNumericSetting(entries, "CameraPitch") ?? DEFAULT_CAMERA_SETTINGS.pitch,
+    distance:
+      extractNumericSetting(entries, "CameraDistance") ??
+      DEFAULT_CAMERA_SETTINGS.distance,
+    stiffness:
+      extractNumericSetting(entries, "CameraStiffness") ??
+      DEFAULT_CAMERA_SETTINGS.stiffness,
+    swivelSpeed:
+      extractNumericSetting(entries, "CameraSwivelSpeed") ??
+      DEFAULT_CAMERA_SETTINGS.swivelSpeed,
+    transitionSpeed:
+      extractNumericSetting(entries, "CameraTransitionSpeed") ??
+      DEFAULT_CAMERA_SETTINGS.transitionSpeed,
+  };
+}
+
+function indexReplayPlayers(raw: RawReplayFramesData): {
+  byId: Map<string, RawPlayerInfo>;
+  byName: Map<string, RawPlayerInfo>;
+} {
+  const byId = new Map<string, RawPlayerInfo>();
+  const byName = new Map<string, RawPlayerInfo>();
+
+  for (const playerInfo of [...raw.meta.team_zero, ...raw.meta.team_one]) {
+    byName.set(playerInfo.name, playerInfo);
+    if (playerInfo.remote_id) {
+      byId.set(playerIdToString(playerInfo.remote_id), playerInfo);
+    }
+  }
+
+  return { byId, byName };
+}
+
 function buildPlayerTracks(raw: RawReplayFramesData): ReplayPlayerTrack[] {
   const teamZeroNames = new Set(raw.meta.team_zero.map((player) => player.name));
   const teamOneNames = new Set(raw.meta.team_one.map((player) => player.name));
+  const replayPlayers = indexReplayPlayers(raw);
 
   return raw.frame_data.players.map(([playerId, playerData]) => {
     const firstFrame = playerData.frames.find(
       (frame): frame is Exclude<RawPlayerFrame, "Empty"> => frame !== "Empty"
     );
+    const playerIdString = playerIdToString(playerId);
     const name =
       firstFrame !== undefined && firstFrame.Data.player_name
         ? firstFrame.Data.player_name
-        : playerIdToString(playerId);
+        : playerIdString;
+    const replayPlayerInfo =
+      replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
 
     return {
-      id: playerIdToString(playerId),
+      id: playerIdString,
       name,
       isTeamZero: inferTeamSide(name, teamZeroNames, teamOneNames, firstFrame),
+      cameraSettings: extractCameraSettings(replayPlayerInfo),
       frames: playerData.frames.map(parsePlayerFrame),
     };
   });

@@ -83,7 +83,7 @@ function makeBallMesh(): THREE.Mesh {
 
 function makePlayerMesh(color: string): THREE.Mesh {
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 1.2, 3.8),
+    new THREE.BoxGeometry(0.84, 0.36, 1.18),
     new THREE.MeshStandardMaterial({
       color,
       roughness: 0.45,

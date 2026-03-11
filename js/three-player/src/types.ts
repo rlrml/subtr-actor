@@ -54,6 +54,8 @@ export interface RawMetadataFrame {
 }
 
 export interface RawPlayerInfo {
+  remote_id?: Record<string, string>;
+  stats?: Map<string, unknown> | Record<string, unknown> | null;
   name: string;
 }
 
@@ -77,6 +79,16 @@ export interface Vec3 {
   z: number;
 }
 
+export interface CameraSettings {
+  fov?: number;
+  height?: number;
+  pitch?: number;
+  distance?: number;
+  stiffness?: number;
+  swivelSpeed?: number;
+  transitionSpeed?: number;
+}
+
 export interface PlaybackFrame {
   time: number;
   secondsRemaining: number;
@@ -90,6 +102,8 @@ export interface BallSample {
 export interface PlayerSample {
   position: Vec3 | null;
   velocity: Vec3 | null;
+  forward: Vec3 | null;
+  up: Vec3 | null;
   boostAmount: number;
   boostActive: boolean;
   jumpActive: boolean;
@@ -100,6 +114,7 @@ export interface ReplayPlayerTrack {
   id: string;
   name: string;
   isTeamZero: boolean;
+  cameraSettings: CameraSettings;
   frames: PlayerSample[];
 }
 
@@ -123,6 +138,7 @@ export interface ReplayPlayerOptions {
   fieldScale?: number;
   initialCameraMode?: CameraMode;
   initialTrackedPlayerId?: string;
+  initialBallCamEnabled?: boolean;
 }
 
 export type CameraMode = "overview" | "attached" | "third-person";
@@ -135,4 +151,5 @@ export interface ReplayPlayerSnapshot {
   speed: number;
   cameraMode: CameraMode;
   trackedPlayerId: string | null;
+  ballCamEnabled: boolean;
 }

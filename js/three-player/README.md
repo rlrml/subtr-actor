@@ -9,6 +9,7 @@ Clean-room three.js replay playback package built against the local `subtr-actor
 - Replay loading through fresh local wasm builds from `../pkg`
 - A Vite demo page that loads `.replay` files from disk
 - Camera modes for detached overview, close attached follow, and wider third-person follow
+- Quaternion-based car orientation, with replay header camera settings used when present and sensible defaults otherwise
 
 ## Run the demo
 
