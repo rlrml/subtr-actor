@@ -49,6 +49,10 @@ app.innerHTML = `
               <option value="">No player</option>
             </select>
           </div>
+          <label class="toggle">
+            <input id="ball-cam" type="checkbox" disabled />
+            <span>Ball cam</span>
+          </label>
         </div>
         <div class="panel">
           <h2>Transport</h2>
@@ -110,6 +114,7 @@ const togglePlayback = mustElement<HTMLButtonElement>("#toggle-playback");
 const playbackRate = mustElement<HTMLSelectElement>("#playback-rate");
 const cameraMode = mustElement<HTMLSelectElement>("#camera-mode");
 const trackedPlayer = mustElement<HTMLSelectElement>("#tracked-player");
+const ballCam = mustElement<HTMLInputElement>("#ball-cam");
 const timeline = mustElement<HTMLInputElement>("#timeline");
 const statusReadout = mustElement<HTMLElement>("#status-readout");
 const teamsReadout = mustElement<HTMLElement>("#teams-readout");
@@ -126,6 +131,7 @@ function setControlsEnabled(enabled: boolean): void {
   playbackRate.disabled = !enabled;
   cameraMode.disabled = !enabled;
   trackedPlayer.disabled = !enabled;
+  ballCam.disabled = !enabled;
   timeline.disabled = !enabled;
 }
 
@@ -136,6 +142,7 @@ function renderSnapshot(snapshot: ReplayPlayerSnapshot): void {
   timeline.value = `${snapshot.currentTime}`;
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
   cameraMode.value = snapshot.cameraMode;
+  ballCam.checked = snapshot.ballCamEnabled;
 
   if (snapshot.trackedPlayerId) {
     trackedPlayer.value = snapshot.trackedPlayerId;
@@ -161,6 +168,7 @@ async function loadReplayFile(file: File): Promise<void> {
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraMode: "overview",
     initialTrackedPlayerId: replay.players[0]?.id,
+    initialBallCamEnabled: false,
   });
   replayPlayer.addEventListener("change", (event: Event) => {
     renderSnapshot((event as CustomEvent<ReplayPlayerSnapshot>).detail);
@@ -216,6 +224,10 @@ trackedPlayer.addEventListener("change", () => {
   }
 
   replayPlayer?.setTrackedPlayer(trackedPlayer.value);
+});
+
+ballCam.addEventListener("change", () => {
+  replayPlayer?.setBallCamEnabled(ballCam.checked);
 });
 
 timeline.addEventListener("input", () => {
