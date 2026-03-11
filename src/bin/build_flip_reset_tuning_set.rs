@@ -15,6 +15,8 @@ struct Config {
     count: usize,
     seed_scan_limit: usize,
     per_player_limit: usize,
+    recent_page_limit: usize,
+    player_page_limit: usize,
     seed_players: Vec<String>,
     playlist: String,
     min_rank: String,
@@ -28,6 +30,8 @@ impl Default for Config {
             count: 30,
             seed_scan_limit: 80,
             per_player_limit: 20,
+            recent_page_limit: 3,
+            player_page_limit: 2,
             seed_players: Vec::new(),
             playlist: "ranked-doubles".to_owned(),
             min_rank: "supersonic-legend".to_owned(),
@@ -63,6 +67,20 @@ impl Config {
                         .context("Expected a value after --per-player-limit")?
                         .parse()
                         .context("Failed to parse --per-player-limit as an integer")?;
+                }
+                "--recent-page-limit" => {
+                    config.recent_page_limit = args
+                        .next()
+                        .context("Expected a value after --recent-page-limit")?
+                        .parse()
+                        .context("Failed to parse --recent-page-limit as an integer")?;
+                }
+                "--player-page-limit" => {
+                    config.player_page_limit = args
+                        .next()
+                        .context("Expected a value after --player-page-limit")?
+                        .parse()
+                        .context("Failed to parse --player-page-limit as an integer")?;
                 }
                 "--seed-player" => {
                     config.seed_players.push(
@@ -123,7 +141,7 @@ impl SearchQuery {
 
 fn print_usage() {
     eprintln!(
-        "Usage: cargo run --bin build_flip_reset_tuning_set -- [--count N] [--seed-scan-limit N] [--per-player-limit N] [--seed-player NAME]... [--playlist PLAYLIST] [--min-rank RANK] [--output-dir PATH] [--sleep-millis N]"
+        "Usage: cargo run --bin build_flip_reset_tuning_set -- [--count N] [--seed-scan-limit N] [--per-player-limit N] [--recent-page-limit N] [--player-page-limit N] [--seed-player NAME]... [--playlist PLAYLIST] [--min-rank RANK] [--output-dir PATH] [--sleep-millis N]"
     );
 }
 
@@ -158,41 +176,59 @@ fn extract_replay_summaries(response: &Value) -> Vec<ReplaySummary> {
         .collect()
 }
 
-fn search_replays(
-    client: &Client,
-    api_key: &str,
-    config: &Config,
-    query: &SearchQuery,
-) -> Result<Vec<ReplaySummary>> {
+fn search_replays(client: &Client, api_key: &str, config: &Config, query: &SearchQuery) -> Result<Vec<ReplaySummary>> {
     let count = match query {
         SearchQuery::Recent => config.seed_scan_limit.min(200),
         SearchQuery::PlayerName(_) => config.per_player_limit.min(200),
     };
-    let mut request = client
-        .get("https://ballchasing.com/api/replays")
-        .header("Authorization", api_key)
-        .query(&[
-            ("min-rank", config.min_rank.as_str()),
-            ("sort-by", "replay-date"),
-            ("sort-dir", "desc"),
-        ])
-        .query(&[("count", count)]);
-    if !config.playlist.trim().is_empty() && config.playlist != "any" {
-        request = request.query(&[("playlist", config.playlist.as_str())]);
-    }
-    if let SearchQuery::PlayerName(player_name) = query {
-        request = request.query(&[("player-name", player_name.as_str())]);
+    let max_pages = match query {
+        SearchQuery::Recent => config.recent_page_limit,
+        SearchQuery::PlayerName(_) => config.player_page_limit,
+    };
+    let mut next_url = Some("https://ballchasing.com/api/replays".to_owned());
+    let mut is_first_page = true;
+    let mut results = Vec::new();
+    let mut page_index = 0usize;
+
+    while let Some(url) = next_url.take() {
+        if page_index >= max_pages {
+            break;
+        }
+        let mut request = client.get(&url).header("Authorization", api_key);
+        if is_first_page {
+            request = request
+                .query(&[
+                    ("min-rank", config.min_rank.as_str()),
+                    ("sort-by", "replay-date"),
+                    ("sort-dir", "desc"),
+                ])
+                .query(&[("count", count)]);
+            if !config.playlist.trim().is_empty() && config.playlist != "any" {
+                request = request.query(&[("playlist", config.playlist.as_str())]);
+            }
+            if let SearchQuery::PlayerName(player_name) = query {
+                request = request.query(&[("player-name", player_name.as_str())]);
+            }
+        }
+
+        let response: Value = request
+            .send()
+            .with_context(|| format!("Failed to query Ballchasing for {}", query.label()))?
+            .error_for_status()
+            .with_context(|| format!("Ballchasing returned an error for {}", query.label()))?
+            .json()
+            .with_context(|| format!("Failed to decode Ballchasing JSON for {}", query.label()))?;
+        sleep(Duration::from_millis(config.sleep_millis));
+        results.extend(extract_replay_summaries(&response));
+        next_url = response
+            .get("next")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+        is_first_page = false;
+        page_index += 1;
     }
 
-    let response: Value = request
-        .send()
-        .with_context(|| format!("Failed to query Ballchasing for {}", query.label()))?
-        .error_for_status()
-        .with_context(|| format!("Ballchasing returned an error for {}", query.label()))?
-        .json()
-        .with_context(|| format!("Failed to decode Ballchasing JSON for {}", query.label()))?;
-    sleep(Duration::from_millis(config.sleep_millis));
-    Ok(extract_replay_summaries(&response))
+    Ok(results)
 }
 
 fn cached_replay_path(output_dir: &Path, replay_id: &str) -> PathBuf {
@@ -322,6 +358,17 @@ fn save_manifest(config: &Config, replays: &[FlipResetTuningReplay]) -> Result<(
     Ok(())
 }
 
+fn load_manifest(output_dir: &Path) -> Result<Vec<FlipResetTuningReplay>> {
+    let path = manifest_path(output_dir);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let bytes = fs::read(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let manifest: FlipResetTuningManifest =
+        serde_json::from_slice(&bytes).with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(manifest.replays)
+}
+
 fn main() -> Result<()> {
     let config = Config::from_args()?;
     let api_key =
@@ -339,8 +386,16 @@ fn main() -> Result<()> {
             search_queue.push_back(SearchQuery::PlayerName(seed_player.clone()));
         }
     }
-    let mut positive_replays = Vec::new();
+    let mut positive_replays = load_manifest(&config.output_dir)?;
     let mut positive_player_names = HashSet::new();
+    for replay in &positive_replays {
+        seen_replay_ids.insert(replay.replay_id.clone());
+        for player_name in &replay.player_names {
+            if player_name_is_searchable(player_name) && positive_player_names.insert(player_name.clone()) {
+                search_queue.push_back(SearchQuery::PlayerName(player_name.clone()));
+            }
+        }
+    }
 
     while positive_replays.len() < config.count {
         if replay_queue.is_empty() {
