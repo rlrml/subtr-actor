@@ -108,7 +108,18 @@ uv run maturin develop
 uv run pytest
 ```
 
-If you are not using `uv`, install `maturin`, `pytest`, and `numpy` in a virtual environment and run `maturin develop` directly.
+If you are using the repo flake, `nix develop` now provides the pinned CPython 3.11 toolchain and Python dev dependencies via `uv2nix`. Create a writable virtual environment from that interpreter, then install the local extension into it:
+
+```bash
+nix develop
+uv venv /tmp/subtr-actor-venv
+source /tmp/subtr-actor-venv/bin/activate
+cd python
+maturin develop
+pytest
+```
+
+If you are not using `uv` or Nix, install `maturin`, `pytest`, and `numpy` in a virtual environment and run `maturin develop` directly.
 
 ## Publishing Notes
 

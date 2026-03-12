@@ -11,11 +11,13 @@ requires-python = ">=3.7"
 Repository = "https://github.com/rlrml/subtr-actor"
 
 [dependency-groups]
-dev = ["wheel", "maturin>=1.0", "pytest", "numpy"]
+dev = ["wheel", "pytest", "numpy"]
 
 [tool.maturin]
+python-source = "."
+module-name = "subtr_actor.subtr_actor"
 features = ["pyo3/extension-module"]
 
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.0,<1.11"]
 build-backend = "maturin"
