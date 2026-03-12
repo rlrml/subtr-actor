@@ -643,6 +643,7 @@ fn test_ndarray_collector_all_player_features() {
         &[
             "PlayerRigidBody",
             "PlayerRigidBodyNoVelocities",
+            "PlayerBallDistance",
             "PlayerBoost",
             "PlayerJump",
             "PlayerAnyJump",
@@ -663,6 +664,33 @@ fn test_ndarray_collector_all_player_features() {
         "Should have player headers"
     );
     assert!(array.ncols() > 0, "Should have columns");
+}
+
+#[test]
+fn test_ndarray_collector_player_ball_distance_feature() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+
+    let (meta, array) = NDArrayCollector::<f32>::from_strings(&[], &["PlayerBallDistance"])
+        .expect("Should create collector")
+        .process_replay(&replay)
+        .expect("Should process replay")
+        .get_meta_and_ndarray()
+        .expect("Should get ndarray");
+
+    assert_eq!(
+        meta.column_headers.player_headers,
+        vec!["distance to ball".to_string()],
+        "Should expose the distance-to-ball player header"
+    );
+    assert_eq!(
+        array.ncols(),
+        meta.replay_meta.player_count(),
+        "Should add one distance-to-ball column per player"
+    );
+    assert!(
+        array.iter().any(|value| *value > 0.0),
+        "Should emit positive ball-distance values for at least some frames"
+    );
 }
 
 #[test]

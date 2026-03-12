@@ -146,6 +146,7 @@ Common global features:
 Common player features:
 
 - `"PlayerRigidBody"`
+- `"PlayerBallDistance"`
 - `"PlayerBoost"`
 - `"PlayerAnyJump"`
 - `"PlayerJump"`
