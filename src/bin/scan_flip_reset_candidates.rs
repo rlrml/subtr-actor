@@ -320,7 +320,7 @@ fn scan_replay(label: &str, replay: &boxcars::Replay) -> Result<()> {
     println!("top loose flip-reset candidates:");
     for candidate in loose_flip_candidates.iter().take(5) {
         println!(
-            "  t={:.2} frame={} player={} team={} score={:.3} touch={:.1} align={:.3} local=({:.1},{:.1},{:.1}) heights=({:.1},{:.1}) id={}",
+            "  t={:.2} frame={} player={} team={} score={:.3} touch={:.1} align={:.3} local=({:.1},{:.1},{:.1}) heights=({:.1},{:.1}) id={:?}",
             candidate.time,
             candidate.frame,
             candidate.player_name,
@@ -333,7 +333,7 @@ fn scan_replay(label: &str, replay: &boxcars::Replay) -> Result<()> {
             candidate.local_ball_position.z,
             candidate.player_height,
             candidate.ball_height,
-            format!("{:?}", candidate.player_id)
+            candidate.player_id
         );
     }
 
@@ -347,7 +347,7 @@ fn scan_replay(label: &str, replay: &boxcars::Replay) -> Result<()> {
     println!("top loose post-wall dodge candidates:");
     for candidate in loose_post_wall_candidates.iter().take(5) {
         println!(
-            "  t={:.2} frame={} player={} team={} score={:.3} dt={:.3} wall_t={:.2} id={}",
+            "  t={:.2} frame={} player={} team={} score={:.3} dt={:.3} wall_t={:.2} id={:?}",
             candidate.time,
             candidate.frame,
             candidate.player_name,
@@ -355,7 +355,7 @@ fn scan_replay(label: &str, replay: &boxcars::Replay) -> Result<()> {
             candidate.score,
             candidate.time_since_wall_contact,
             candidate.wall_contact_time,
-            format!("{:?}", candidate.player_id)
+            candidate.player_id
         );
     }
     println!();

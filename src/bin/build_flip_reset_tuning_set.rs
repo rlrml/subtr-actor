@@ -183,7 +183,12 @@ fn extract_replay_summaries(response: &Value) -> Vec<ReplaySummary> {
         .collect()
 }
 
-fn search_replays(client: &Client, api_key: &str, config: &Config, query: &SearchQuery) -> Result<Vec<ReplaySummary>> {
+fn search_replays(
+    client: &Client,
+    api_key: &str,
+    config: &Config,
+    query: &SearchQuery,
+) -> Result<Vec<ReplaySummary>> {
     let count = match query {
         SearchQuery::Recent => config.seed_scan_limit.min(200),
         SearchQuery::PlayerName(_) => config.per_player_limit.min(200),
@@ -384,8 +389,8 @@ fn load_manifest(output_dir: &Path) -> Result<Vec<FlipResetTuningReplay>> {
         return Ok(Vec::new());
     }
     let bytes = fs::read(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let manifest: FlipResetTuningManifest =
-        serde_json::from_slice(&bytes).with_context(|| format!("Failed to parse {}", path.display()))?;
+    let manifest: FlipResetTuningManifest = serde_json::from_slice(&bytes)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(manifest.replays)
 }
 
@@ -411,7 +416,9 @@ fn main() -> Result<()> {
     for replay in &positive_replays {
         seen_replay_ids.insert(replay.replay_id.clone());
         for player_name in &replay.player_names {
-            if player_name_is_searchable(player_name) && positive_player_names.insert(player_name.clone()) {
+            if player_name_is_searchable(player_name)
+                && positive_player_names.insert(player_name.clone())
+            {
                 search_queue.push_back(SearchQuery::PlayerName(player_name.clone()));
             }
         }
