@@ -130,32 +130,6 @@ input {
   height: 100%;
 }
 
-.viewport-play-button {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.72rem 0.95rem;
-  border-radius: 999px;
-  border: 1px solid rgba(75, 148, 255, 0.3);
-  background: rgba(7, 16, 24, 0.88);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
-}
-
-.viewport-play-button span:first-child {
-  display: inline-grid;
-  place-items: center;
-  width: 1.4rem;
-  font-size: 0.94rem;
-}
-
-.viewport-play-button[data-playing="true"] {
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
 .followed-player-overlay {
   position: absolute;
   top: 1.25rem;

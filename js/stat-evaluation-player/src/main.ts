@@ -484,16 +484,6 @@ app.innerHTML = `
       <div class="viewport-column">
         <div class="viewport-panel">
           <div id="viewport" class="viewport"></div>
-          <button
-            id="viewport-toggle-playback"
-            class="viewport-play-button"
-            type="button"
-            disabled
-            hidden
-          >
-            <span id="viewport-toggle-playback-icon" aria-hidden="true">▶</span>
-            <span id="viewport-toggle-playback-label">Play replay</span>
-          </button>
           <div
             id="followed-player-overlay"
             class="followed-player-overlay"
@@ -660,15 +650,6 @@ const fileInput = mustElement<HTMLInputElement>("#replay-file");
 const viewport = mustElement<HTMLDivElement>("#viewport");
 const emptyState = mustElement<HTMLDivElement>("#empty-state");
 const togglePlayback = mustElement<HTMLButtonElement>("#toggle-playback");
-const viewportTogglePlayback = mustElement<HTMLButtonElement>(
-  "#viewport-toggle-playback",
-);
-const viewportTogglePlaybackIcon = mustElement<HTMLElement>(
-  "#viewport-toggle-playback-icon",
-);
-const viewportTogglePlaybackLabel = mustElement<HTMLElement>(
-  "#viewport-toggle-playback-label",
-);
 const followedPlayerOverlay = mustElement<HTMLDivElement>(
   "#followed-player-overlay",
 );
@@ -741,8 +722,6 @@ function formatSetting(
 
 function setTransportEnabled(enabled: boolean): void {
   togglePlayback.disabled = !enabled;
-  viewportTogglePlayback.disabled = !enabled;
-  viewportTogglePlayback.hidden = !enabled;
   playbackRate.disabled = !enabled;
   attachedPlayer.disabled = !enabled;
 }
@@ -897,13 +876,6 @@ function renderSnapshot(state: ReplayPlayerState): void {
   durationReadout.textContent = `${state.duration.toFixed(2)}s`;
   playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
   togglePlayback.textContent = state.playing ? "Pause" : "Play";
-  viewportTogglePlayback.dataset.playing = state.playing ? "true" : "false";
-  viewportTogglePlaybackIcon.textContent = state.playing ? "❚❚" : "▶";
-  viewportTogglePlaybackLabel.textContent = state.playing ? "Pause replay" : "Play replay";
-  viewportTogglePlayback.setAttribute(
-    "aria-label",
-    state.playing ? "Pause replay" : "Play replay",
-  );
   playbackRate.value = `${state.speed}`;
   cameraDistance.value = `${state.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
@@ -989,10 +961,6 @@ fileInput.addEventListener("change", async () => {
 });
 
 togglePlayback.addEventListener("click", () => {
-  replayPlayer?.togglePlayback();
-});
-
-viewportTogglePlayback.addEventListener("click", () => {
   replayPlayer?.togglePlayback();
 });
 
