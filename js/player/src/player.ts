@@ -4,7 +4,9 @@ import { findFrameIndexAtTime } from "./replay-data";
 import type {
   BeforeRenderCallback,
   FrameRenderInfo,
+  ReplayPlayerActiveMetadata,
   ReplayModel,
+  ReplayPlayerKickoffCountdownMetadata,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
   ReplayPlayerState,
@@ -278,10 +280,12 @@ export class ReplayPlayer extends EventTarget {
   }
 
   getState(): ReplayPlayerState {
+    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
     return {
       currentTime: this.currentTime,
       duration: this.replay.duration,
-      frameIndex: findFrameIndexAtTime(this.replay, this.currentTime),
+      frameIndex,
+      activeMetadata: this.getActiveMetadata(frameIndex, this.currentTime),
       playing: this.playing,
       speed: this.speed,
       cameraDistanceScale: this.cameraDistanceScale,
@@ -580,6 +584,57 @@ export class ReplayPlayer extends EventTarget {
     }
 
     return this.kickoffGameState !== null && frame.gameState === this.kickoffGameState;
+  }
+
+  private getActiveMetadata(
+    frameIndex: number,
+    currentTime: number
+  ): ReplayPlayerActiveMetadata | null {
+    return this.getKickoffCountdownMetadata(frameIndex, currentTime);
+  }
+
+  private getKickoffCountdownMetadata(
+    frameIndex: number,
+    currentTime: number
+  ): ReplayPlayerKickoffCountdownMetadata | null {
+    const currentFrame = this.replay.frames[frameIndex];
+    if (!currentFrame || currentFrame.kickoffCountdown <= 0) {
+      return null;
+    }
+
+    let startIndex = frameIndex;
+    while (
+      startIndex > 0 &&
+      (this.replay.frames[startIndex - 1]?.kickoffCountdown ?? 0) > 0
+    ) {
+      startIndex -= 1;
+    }
+
+    let endIndex = frameIndex + 1;
+    while (
+      endIndex < this.replay.frames.length &&
+      this.replay.frames[endIndex].kickoffCountdown > 0
+    ) {
+      endIndex += 1;
+    }
+
+    let maxCountdown = 0;
+    for (let index = startIndex; index < endIndex; index += 1) {
+      maxCountdown = Math.max(
+        maxCountdown,
+        this.replay.frames[index].kickoffCountdown
+      );
+    }
+
+    const endsAt = this.replay.frames[endIndex]?.time ?? this.replay.duration;
+    const secondsRemaining = Math.max(0, endsAt - currentTime);
+
+    return {
+      kind: "kickoff-countdown",
+      countdown: Math.max(1, Math.min(maxCountdown, Math.ceil(secondsRemaining))),
+      secondsRemaining,
+      endsAt,
+    };
   }
 
   private hasRenderableSamples(frameIndex: number): boolean {

@@ -1,6 +1,15 @@
 :root {
   color-scheme: dark;
   font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  --hud-shell: rgba(8, 14, 20, 0.9);
+  --hud-panel: rgba(16, 22, 30, 0.94);
+  --hud-border: rgba(168, 196, 220, 0.12);
+  --hud-text: #f4f8fb;
+  --hud-muted: #a6b8c8;
+  --hud-blue: #3c86ff;
+  --hud-blue-soft: rgba(60, 134, 255, 0.28);
+  --hud-orange: #f28a25;
+  --hud-orange-soft: rgba(242, 138, 37, 0.28);
   background:
     radial-gradient(circle at top, rgba(58, 96, 136, 0.3), transparent 30%),
     linear-gradient(180deg, #071018 0%, #0d1721 100%);
@@ -120,20 +129,150 @@ input {
   color: #bfd0dd;
 }
 
+.scoreboard {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  width: min(31rem, calc(100% - 2rem));
+  min-height: 4.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.45rem;
+  pointer-events: none;
+}
+
+.scoreboard[hidden] {
+  display: none;
+}
+
+.scoreboard-team,
+.scoreboard-center {
+  position: relative;
+  border: 1px solid var(--hud-border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(33, 41, 52, 0.9), rgba(12, 16, 22, 0.98));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.scoreboard-team {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  overflow: hidden;
+}
+
+.scoreboard-team::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.scoreboard-team-blue::after {
+  background: linear-gradient(90deg, var(--hud-blue) 0%, transparent 64%);
+}
+
+.scoreboard-team-orange::after {
+  background: linear-gradient(270deg, var(--hud-orange) 0%, transparent 64%);
+}
+
+.scoreboard-team-accent {
+  width: 0.26rem;
+  align-self: stretch;
+  border-radius: 999px;
+}
+
+.scoreboard-team-blue .scoreboard-team-accent {
+  background: linear-gradient(180deg, #79b2ff, var(--hud-blue));
+  box-shadow: 0 0 18px var(--hud-blue-soft);
+}
+
+.scoreboard-team-orange .scoreboard-team-accent {
+  background: linear-gradient(180deg, #ffc16d, var(--hud-orange));
+  box-shadow: 0 0 18px var(--hud-orange-soft);
+}
+
+.scoreboard-team-label {
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+  min-width: 0;
+  justify-self: start;
+}
+
+.scoreboard-team-label-right {
+  justify-self: end;
+}
+
+.scoreboard-score {
+  min-width: 1.3ch;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1;
+  color: #ffffff;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.12);
+}
+
+.scoreboard-center {
+  min-width: 6.8rem;
+  padding: 0.55rem 1rem 0.65rem;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.12rem;
+}
+
+.scoreboard-phase {
+  font-size: 0.63rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+}
+
+.scoreboard-clock {
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  line-height: 1;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
 .kickoff-overlay {
   position: absolute;
-  top: 1.5rem;
+  top: 6.15rem;
   left: 50%;
+  z-index: 2;
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
   gap: 0.25rem;
   min-width: 8rem;
-  padding: 0.85rem 1.2rem;
-  border: 1px solid rgba(255, 203, 107, 0.32);
+  padding: 0.82rem 1.15rem;
+  border: 1px solid var(--hud-border);
   border-radius: 1.1rem;
-  background: rgba(28, 18, 4, 0.84);
+  background:
+    linear-gradient(135deg, rgba(14, 20, 28, 0.94), rgba(8, 12, 18, 0.98));
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.kickoff-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--hud-blue-soft), transparent 38%, transparent 62%, var(--hud-orange-soft));
+  opacity: 0.8;
   pointer-events: none;
 }
 
@@ -142,16 +281,21 @@ input {
 }
 
 .kickoff-label {
+  position: relative;
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #ffd57d;
+  color: var(--hud-muted);
 }
 
 .kickoff-countdown {
+  position: relative;
   font-size: clamp(1.8rem, 3vw, 2.8rem);
   line-height: 1;
-  color: #fff4d8;
+  color: #ffffff;
+  text-shadow:
+    -10px 0 20px rgba(60, 134, 255, 0.2),
+    10px 0 20px rgba(242, 138, 37, 0.24);
 }
 
 .sidebar {
@@ -249,5 +393,29 @@ dt {
   .viewport-panel {
     min-height: 20rem;
     height: auto;
+  }
+
+  .scoreboard {
+    width: min(28rem, calc(100% - 1rem));
+    top: 0.65rem;
+    gap: 0.35rem;
+  }
+
+  .scoreboard-team {
+    padding: 0.55rem 0.65rem;
+    gap: 0.5rem;
+  }
+
+  .scoreboard-score {
+    font-size: 1.55rem;
+  }
+
+  .scoreboard-center {
+    min-width: 5.75rem;
+    padding-inline: 0.7rem;
+  }
+
+  .kickoff-overlay {
+    top: 5.25rem;
   }
 }

@@ -32,6 +32,22 @@ app.innerHTML = `
     <section class="workspace">
       <div class="viewport-panel">
         <div id="viewport" class="viewport"></div>
+        <div id="scoreboard" class="scoreboard" hidden>
+          <section class="scoreboard-team scoreboard-team-blue">
+            <span class="scoreboard-team-accent" aria-hidden="true"></span>
+            <span class="scoreboard-team-label">Blue</span>
+            <strong id="blue-score" class="scoreboard-score">0</strong>
+          </section>
+          <section class="scoreboard-center">
+            <span id="scoreboard-phase" class="scoreboard-phase">Replay</span>
+            <strong id="scoreboard-clock" class="scoreboard-clock">5:00</strong>
+          </section>
+          <section class="scoreboard-team scoreboard-team-orange">
+            <strong id="orange-score" class="scoreboard-score">0</strong>
+            <span class="scoreboard-team-label scoreboard-team-label-right">Orange</span>
+            <span class="scoreboard-team-accent" aria-hidden="true"></span>
+          </section>
+        </div>
         <div id="kickoff-overlay" class="kickoff-overlay" hidden>
           <span class="kickoff-label">Kickoff</span>
           <strong id="kickoff-countdown" class="kickoff-countdown">3</strong>
@@ -147,11 +163,17 @@ const frameReadout = mustElement("#frame-readout");
 const durationReadout = mustElement("#duration-readout");
 const skipPostGoalTransitions = mustElement("#skip-post-goal-transitions");
 const skipKickoffs = mustElement("#skip-kickoffs");
+const scoreboard = mustElement("#scoreboard");
+const blueScore = mustElement("#blue-score");
+const orangeScore = mustElement("#orange-score");
+const scoreboardPhase = mustElement("#scoreboard-phase");
+const scoreboardClock = mustElement("#scoreboard-clock");
 const kickoffOverlay = mustElement("#kickoff-overlay");
 const kickoffCountdown = mustElement("#kickoff-countdown");
 
 let replayPlayer = null;
 let unsubscribe = null;
+let currentReplayRaw = null;
 
 function setControlsEnabled(enabled) {
   togglePlayback.disabled = !enabled;
@@ -162,43 +184,54 @@ function setControlsEnabled(enabled) {
   timeline.disabled = !enabled;
 }
 
-function getKickoffDisplayCountdown(replay, snapshot) {
-  const currentFrame = replay.frames[snapshot.frameIndex];
-  if (!currentFrame || currentFrame.kickoffCountdown <= 0) {
-    return null;
+function formatClock(secondsRemaining) {
+  if (!Number.isFinite(secondsRemaining)) {
+    return "--:--";
   }
 
-  let startIndex = snapshot.frameIndex;
-  while (
-    startIndex > 0 &&
-    (replay.frames[startIndex - 1]?.kickoffCountdown ?? 0) > 0
-  ) {
-    startIndex -= 1;
+  const safeSeconds = Math.max(0, Math.round(secondsRemaining));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getScoreAtFrame(frameIndex) {
+  const goalEvents = currentReplayRaw?.goal_events;
+  if (!Array.isArray(goalEvents) || goalEvents.length === 0) {
+    return {
+      teamZeroScore: 0,
+      teamOneScore: 0,
+    };
   }
 
-  let endIndex = snapshot.frameIndex + 1;
-  while (
-    endIndex < replay.frames.length &&
-    replay.frames[endIndex].kickoffCountdown > 0
-  ) {
-    endIndex += 1;
+  let teamZeroScore = 0;
+  let teamOneScore = 0;
+  for (const event of goalEvents) {
+    if ((event?.frame ?? Number.POSITIVE_INFINITY) > frameIndex) {
+      break;
+    }
+
+    if (typeof event?.team_zero_score === "number") {
+      teamZeroScore = event.team_zero_score;
+    }
+    if (typeof event?.team_one_score === "number") {
+      teamOneScore = event.team_one_score;
+    }
   }
 
-  let maxCountdown = 0;
-  for (let index = startIndex; index < endIndex; index += 1) {
-    maxCountdown = Math.max(maxCountdown, replay.frames[index].kickoffCountdown);
-  }
-
-  const kickoffEndTime = replay.frames[endIndex]?.time ?? replay.duration;
-  const secondsRemaining = Math.max(0, kickoffEndTime - snapshot.currentTime);
-  return Math.max(1, Math.min(maxCountdown, Math.ceil(secondsRemaining)));
+  return {
+    teamZeroScore,
+    teamOneScore,
+  };
 }
 
 function renderSnapshot(snapshot) {
   const metadata = replayPlayer?.replay.frames[snapshot.frameIndex];
-  const kickoffDisplayCountdown = replayPlayer
-    ? getKickoffDisplayCountdown(replayPlayer.replay, snapshot)
-    : null;
+  const kickoffMetadata =
+    snapshot.activeMetadata?.kind === "kickoff-countdown"
+      ? snapshot.activeMetadata
+      : null;
+  const { teamZeroScore, teamOneScore } = getScoreAtFrame(snapshot.frameIndex);
 
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${snapshot.frameIndex}`;
@@ -216,11 +249,16 @@ function renderSnapshot(snapshot) {
 
   remainingReadout.textContent =
     metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
+  scoreboard.hidden = replayPlayer === null;
+  blueScore.textContent = `${teamZeroScore}`;
+  orangeScore.textContent = `${teamOneScore}`;
+  scoreboardClock.textContent = formatClock(metadata?.secondsRemaining);
+  scoreboardPhase.textContent = kickoffMetadata ? "Kickoff" : "Live";
 
-  const inKickoff = kickoffDisplayCountdown !== null;
+  const inKickoff = kickoffMetadata !== null;
   kickoffOverlay.hidden = !inKickoff;
   if (inKickoff) {
-    kickoffCountdown.textContent = `${kickoffDisplayCountdown}`;
+    kickoffCountdown.textContent = `${kickoffMetadata.countdown}`;
   }
 }
 
@@ -241,6 +279,8 @@ function populateAttachedPlayerOptions(players) {
 async function loadReplayFile(file) {
   statusReadout.textContent = "Parsing replay...";
   setControlsEnabled(false);
+  scoreboard.hidden = true;
+  kickoffOverlay.hidden = true;
 
   if (unsubscribe) {
     unsubscribe();
@@ -249,9 +289,11 @@ async function loadReplayFile(file) {
 
   replayPlayer?.destroy();
   replayPlayer = null;
+  currentReplayRaw = null;
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { replay } = await loadReplayFromBytes(bytes);
+  const { replay, raw } = await loadReplayFromBytes(bytes);
+  currentReplayRaw = raw;
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: 2.25,

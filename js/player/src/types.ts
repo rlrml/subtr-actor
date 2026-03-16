@@ -108,6 +108,16 @@ export interface PlaybackFrame {
   kickoffCountdown: number;
 }
 
+export interface ReplayPlayerKickoffCountdownMetadata {
+  kind: "kickoff-countdown";
+  countdown: number;
+  secondsRemaining: number;
+  endsAt: number;
+}
+
+export type ReplayPlayerActiveMetadata =
+  | ReplayPlayerKickoffCountdownMetadata;
+
 export interface BallSample {
   position: Vec3 | null;
   linearVelocity: Vec3 | null;
@@ -212,6 +222,7 @@ export interface ReplayPlayerState {
   currentTime: number;
   duration: number;
   frameIndex: number;
+  activeMetadata: ReplayPlayerActiveMetadata | null;
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
