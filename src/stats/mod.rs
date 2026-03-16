@@ -1,7 +1,7 @@
 mod boost_invariants;
 pub mod export;
 pub mod mechanics;
-mod reducers;
+pub mod reducers;
 
 pub use boost_invariants::*;
 pub use export::*;

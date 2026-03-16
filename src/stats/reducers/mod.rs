@@ -874,23 +874,26 @@ fn get_header_f32(stats: &HashMap<String, HeaderProp>, keys: &[&str]) -> Option<
         .find_map(|key| stats.get(*key).and_then(header_prop_to_f32))
 }
 
-mod powerslide;
+pub mod powerslide;
+#[allow(unused_imports)]
 pub use powerslide::*;
-mod pressure;
+pub mod pressure;
+#[allow(unused_imports)]
 pub use pressure::*;
-mod possession;
+pub mod possession;
+#[allow(unused_imports)]
 pub use possession::*;
-mod settings;
+pub mod settings;
 pub use settings::*;
-mod match_stats;
+pub mod match_stats;
 pub use match_stats::*;
-mod demo;
+pub mod demo;
 pub use demo::*;
-mod movement;
+pub mod movement;
 pub use movement::*;
-mod positioning;
+pub mod positioning;
 pub use positioning::*;
-mod ball_carry;
+pub mod ball_carry;
 pub use ball_carry::*;
-mod boost;
+pub mod boost;
 pub use boost::*;
