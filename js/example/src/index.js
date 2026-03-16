@@ -1,5 +1,6 @@
 import "./styles.css";
-import { ReplayPlayer, loadReplayFromBytes } from "../../player/src/lib.ts";
+import { ReplayPlayer } from "../../player/src/player.ts";
+import { loadReplayFromBytes } from "../../player/src/wasm.ts";
 
 function mustElement(selector) {
   const element = document.querySelector(selector);

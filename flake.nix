@@ -42,6 +42,14 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        rustToolchain = fenix.packages.${system}.combine [
+          fenix.packages.${system}.stable.toolchain
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+        ];
+        rustPlatform = pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
         pythonBase = pkgs.callPackage pyproject-nix.build.packages {
           python = pkgs.python311;
         };
@@ -66,7 +74,7 @@
           pkgs.uv
           pkgs.maturin
           pkgs.zlib
-          fenix.packages.${system}.stable.toolchain
+          rustToolchain
           pkgs.curl
           pkgs.leveldb
           pkgs.python311Packages.twine
@@ -74,6 +82,61 @@
       in
       {
         packages.python-env = pythonEnv;
+        packages.js-web-wasm = rustPlatform.buildRustPackage {
+          pname = "subtr-actor-js-web-wasm";
+          version = "0.1.17";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [
+            pkgs.writableTmpDirAsHomeHook
+            pkgs.wasm-pack
+            pkgs.wasm-bindgen-cli
+            pkgs.binaryen
+          ];
+          buildPhase = ''
+            runHook preBuild
+            mkdir -p $out
+            cd js
+            wasm-pack build --target web --out-dir "$out"
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            runHook postInstall
+          '';
+          doCheck = false;
+          dontCargoInstall = true;
+        };
+        packages.js-example-pages = pkgs.buildNpmPackage rec {
+          pname = "subtr-actor-js-example-pages";
+          version = "0.1.17";
+          src = ./.;
+          npmRoot = "js/example";
+          npmDeps = pkgs.fetchNpmDeps {
+            inherit pname version;
+            src = ./js/example;
+            hash = "sha256-aeaptp5VT6sIHOChZqqdRjXdN92GQTkYiHKDPTHbVlc=";
+          };
+          preBuild = ''
+            rm -rf js/pkg
+            mkdir -p js/pkg
+            cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
+          '';
+          buildPhase = ''
+            runHook preBuild
+            pushd js/example
+            SUBTR_ACTOR_SKIP_WASM_BUILD=1 npm run build
+            popd
+            runHook postBuild
+          '';
+
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out
+            cp -r js/example/dist/. $out/
+            runHook postInstall
+          '';
+        };
 
         devShells.default = pkgs.mkShell {
           packages = shellPackages;

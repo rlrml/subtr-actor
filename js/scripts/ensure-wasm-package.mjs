@@ -130,6 +130,15 @@ export async function ensureWasmPackageFresh({
   force = false,
   log = console.log,
 } = {}) {
+  if (process.env.SUBTR_ACTOR_SKIP_WASM_BUILD === "1") {
+    if ((await earliestMtime(outputFiles)) === 0) {
+      throw new Error("SUBTR_ACTOR_SKIP_WASM_BUILD=1 but js/pkg is missing");
+    }
+
+    log("[wasm] using prebuilt js/pkg");
+    return false;
+  }
+
   if (!force && !(await isWasmPackageStale())) {
     log("[wasm] js/pkg is up to date");
     return false;

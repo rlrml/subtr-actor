@@ -1,9 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import {
   ensureWasmPackageFresh,
   getWasmWatchTargets,
   isWasmSourcePath,
 } from "../scripts/ensure-wasm-package.mjs";
+
+const exampleDir = fileURLToPath(new URL(".", import.meta.url));
 
 function ensureWasmBindingsPlugin() {
   let rebuild = Promise.resolve();
@@ -50,6 +54,7 @@ function ensureWasmBindingsPlugin() {
 }
 
 export default defineConfig({
+  base: "./",
   plugins: [ensureWasmBindingsPlugin()],
   server: {
     fs: {
@@ -58,6 +63,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["rl-replay-subtr-actor"],
+  },
+  resolve: {
+    alias: {
+      three: path.resolve(exampleDir, "node_modules/three"),
+    },
   },
   assetsInclude: ["**/*.wasm"],
 });

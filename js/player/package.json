@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/subtr-actor-player.js",
   "scripts": {
-    "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin npm --prefix .. run build",
+    "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
     "check": "tsc --noEmit",
     "build": "npm run build:bindings && npm run check && vite build"
   },
