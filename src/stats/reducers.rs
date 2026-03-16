@@ -637,6 +637,7 @@ const HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 // soccar lane markings more closely than a literal geometric third of the full
 // playable length.
 const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
+const MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 800.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
@@ -1542,6 +1543,7 @@ pub struct PositioningStats {
     pub time_offensive_half: f32,
     pub time_closest_to_ball: f32,
     pub time_farthest_from_ball: f32,
+    pub time_even: f32,
     pub time_behind_ball: f32,
     pub time_in_front_of_ball: f32,
 }
@@ -1621,6 +1623,10 @@ impl PositioningStats {
 
     pub fn farthest_from_ball_pct(&self) -> f32 {
         self.pct(self.time_farthest_from_ball)
+    }
+
+    pub fn even_pct(&self) -> f32 {
+        self.pct(self.time_even)
     }
 
     pub fn behind_ball_pct(&self) -> f32 {
@@ -1778,28 +1784,45 @@ impl StatsReducer for PositioningReducer {
                     }
                 }
 
-                if let Some((most_back_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
-                    normalized_y(is_team_0, *a)
-                        .partial_cmp(&normalized_y(is_team_0, *b))
-                        .unwrap()
-                }) {
-                    self.player_stats
-                        .entry(most_back_player.player_id.clone())
-                        .or_default()
-                        .time_most_back += sample.dt;
-                }
+                // Sort team players by normalized Y
+                let mut sorted_team: Vec<_> = team_players
+                    .iter()
+                    .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))
+                    .collect();
+                sorted_team.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
 
-                if let Some((most_forward_player, _)) =
-                    team_players.iter().max_by(|(_, a), (_, b)| {
-                        normalized_y(is_team_0, *a)
-                            .partial_cmp(&normalized_y(is_team_0, *b))
-                            .unwrap()
-                    })
-                {
-                    self.player_stats
-                        .entry(most_forward_player.player_id.clone())
-                        .or_default()
-                        .time_most_forward += sample.dt;
+                let team_spread = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0)
+                    - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
+
+                if team_spread <= MOST_BACK_FORWARD_THRESHOLD_Y {
+                    // All players are even
+                    for (player_id, _) in &sorted_team {
+                        self.player_stats
+                            .entry(player_id.clone())
+                            .or_default()
+                            .time_even += sample.dt;
+                    }
+                } else {
+                    let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
+                    let max_y = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0);
+
+                    for (player_id, y) in &sorted_team {
+                        let near_back = (*y - min_y) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+                        let near_front = (max_y - *y) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+
+                        if near_back && !near_front {
+                            self.player_stats
+                                .entry(player_id.clone())
+                                .or_default()
+                                .time_most_back += sample.dt;
+                        } else if near_front && !near_back {
+                            self.player_stats
+                                .entry(player_id.clone())
+                                .or_default()
+                                .time_most_forward += sample.dt;
+                        }
+                        // If near both or neither, player gets no role credit (mid)
+                    }
                 }
 
                 if let Some((closest_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {

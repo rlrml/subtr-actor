@@ -26,6 +26,7 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_offensive_half: 4.0,
         time_closest_to_ball: 2.0,
         time_farthest_from_ball: 4.0,
+        time_even: 0.0,
         time_behind_ball: 7.0,
         time_in_front_of_ball: 3.0,
     };

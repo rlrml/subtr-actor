@@ -84,6 +84,12 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
+            "time_even",
+            StatUnit::Seconds,
+            self.time_even,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "time_closest_to_ball",
             StatUnit::Seconds,
             self.time_closest_to_ball,
@@ -147,6 +153,12 @@ impl StatFieldProvider for PositioningStats {
             "percent_most_forward",
             StatUnit::Percent,
             self.most_forward_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "percent_even",
+            StatUnit::Percent,
+            self.even_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",
