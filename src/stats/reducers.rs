@@ -642,7 +642,8 @@ const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 118.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
-const STANDARD_PAD_MATCH_RADIUS: f32 = 400.0;
+const STANDARD_PAD_MATCH_RADIUS_SMALL: f32 = 450.0;
+const STANDARD_PAD_MATCH_RADIUS_BIG: f32 = 1000.0;
 const BOOST_PAD_MIDFIELD_TOLERANCE_Y: f32 = 128.0;
 const BOOST_PAD_SMALL_Z: f32 = 70.0;
 const BOOST_PAD_BIG_Z: f32 = 73.0;
@@ -813,24 +814,31 @@ fn standard_soccar_boost_pad_position(index: usize) -> glam::Vec3 {
     STANDARD_SOCCAR_BOOST_PAD_LAYOUT[index].0
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 struct PadPositionEstimate {
-    sum: glam::Vec3,
-    count: u32,
+    observations: Vec<glam::Vec3>,
 }
 
 impl PadPositionEstimate {
     fn observe(&mut self, position: glam::Vec3) {
-        self.sum += position;
-        self.count += 1;
+        self.observations.push(position);
+    }
+
+    fn observations(&self) -> &[glam::Vec3] {
+        self.observations.as_slice()
     }
 
     fn mean(&self) -> Option<glam::Vec3> {
-        if self.count == 0 {
-            None
-        } else {
-            Some(self.sum / self.count as f32)
+        if self.observations.is_empty() {
+            return None;
         }
+
+        let sum = self
+            .observations
+            .iter()
+            .copied()
+            .fold(glam::Vec3::ZERO, |acc, position| acc + position);
+        Some(sum / self.observations.len() as f32)
     }
 }
 
@@ -2342,6 +2350,36 @@ impl BoostReducer {
             .and_then(PadPositionEstimate::mean)
     }
 
+    fn observed_pad_positions(&self, pad_id: &str) -> &[glam::Vec3] {
+        self.observed_pad_positions
+            .get(pad_id)
+            .map(PadPositionEstimate::observations)
+            .unwrap_or(&[])
+    }
+
+    fn pad_match_radius(pad_size: BoostPadSize) -> f32 {
+        match pad_size {
+            BoostPadSize::Big => STANDARD_PAD_MATCH_RADIUS_BIG,
+            BoostPadSize::Small => STANDARD_PAD_MATCH_RADIUS_SMALL,
+        }
+    }
+
+    pub fn resolved_boost_pads(&self) -> Vec<ResolvedBoostPad> {
+        standard_soccar_boost_pad_layout()
+            .iter()
+            .enumerate()
+            .map(|(index, (position, size))| ResolvedBoostPad {
+                index,
+                pad_id: self
+                    .known_pad_indices
+                    .iter()
+                    .find_map(|(pad_id, pad_index)| (*pad_index == index).then(|| pad_id.clone())),
+                size: *size,
+                position: glam_to_vec(position),
+            })
+            .collect()
+    }
+
     fn infer_pad_index(
         &self,
         pad_id: &str,
@@ -2357,19 +2395,67 @@ impl BoostReducer {
             .unwrap_or(observed_position);
         let layout = &*STANDARD_SOCCAR_BOOST_PAD_LAYOUT;
         let used_indices: HashSet<usize> = self.known_pad_indices.values().copied().collect();
-        let best_unused = layout
-            .iter()
-            .enumerate()
-            .filter(|(index, (_, size))| *size == pad_size && !used_indices.contains(index))
-            .min_by(|(_, (a, _)), (_, (b, _))| {
-                observed_position
-                    .distance_squared(*a)
-                    .partial_cmp(&observed_position.distance_squared(*b))
-                    .unwrap()
-            })
-            .map(|(index, _)| index);
+        let radius = Self::pad_match_radius(pad_size);
+        let observed_positions = self.observed_pad_positions(pad_id);
+        let best_candidate = |allow_used: bool| {
+            layout
+                .iter()
+                .enumerate()
+                .filter(|(index, (_, size))| {
+                    *size == pad_size && (allow_used || !used_indices.contains(index))
+                })
+                .filter_map(|(index, (candidate_position, _))| {
+                    let mut vote_count = 0usize;
+                    let mut total_vote_distance = 0.0f32;
+                    let mut best_vote_distance = f32::INFINITY;
 
-        best_unused
+                    for position in observed_positions {
+                        let distance = position.distance(*candidate_position);
+                        if distance <= radius {
+                            vote_count += 1;
+                            total_vote_distance += distance;
+                            best_vote_distance = best_vote_distance.min(distance);
+                        }
+                    }
+
+                    if vote_count == 0 {
+                        return None;
+                    }
+
+                    let representative_distance = observed_position.distance(*candidate_position);
+                    Some((
+                        index,
+                        vote_count,
+                        total_vote_distance / vote_count as f32,
+                        best_vote_distance,
+                        representative_distance,
+                    ))
+                })
+                .max_by(|left, right| {
+                    left.1
+                        .cmp(&right.1)
+                        .then_with(|| right.2.partial_cmp(&left.2).unwrap())
+                        .then_with(|| right.3.partial_cmp(&left.3).unwrap())
+                        .then_with(|| right.4.partial_cmp(&left.4).unwrap())
+                })
+                .map(|(index, _, _, _, _)| index)
+        };
+
+        best_candidate(false)
+            .or_else(|| best_candidate(true))
+            .or_else(|| {
+                layout
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, (_, size))| *size == pad_size && !used_indices.contains(index))
+                    .min_by(|(_, (a, _)), (_, (b, _))| {
+                        observed_position
+                            .distance_squared(*a)
+                            .partial_cmp(&observed_position.distance_squared(*b))
+                            .unwrap()
+                    })
+                    .map(|(index, _)| index)
+            })
             .or_else(|| {
                 layout
                     .iter()
@@ -2384,8 +2470,7 @@ impl BoostReducer {
                     .map(|(index, _)| index)
             })
             .filter(|index| {
-                observed_position.distance(standard_soccar_boost_pad_position(*index))
-                    <= STANDARD_PAD_MATCH_RADIUS
+                observed_position.distance(standard_soccar_boost_pad_position(*index)) <= radius
             })
     }
 

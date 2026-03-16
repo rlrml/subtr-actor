@@ -64,6 +64,51 @@ export interface RawPlayerInfo {
   name: string;
 }
 
+export type RawPlayerStatEventKind = "Shot" | "Save" | "Assist";
+
+export interface RawDemolishInfo {
+  time: number;
+  seconds_remaining: number;
+  frame: number;
+  attacker: Record<string, string>;
+  victim: Record<string, string>;
+  attacker_velocity: RawVec3;
+  victim_velocity: RawVec3;
+  victim_location: RawVec3;
+}
+
+export interface RawGoalEvent {
+  time: number;
+  frame: number;
+  scoring_team_is_team_0: boolean;
+  player?: Record<string, string> | null;
+  team_zero_score?: number | null;
+  team_one_score?: number | null;
+}
+
+export interface RawPlayerStatEvent {
+  time: number;
+  frame: number;
+  player: Record<string, string>;
+  is_team_0: boolean;
+  kind: RawPlayerStatEventKind;
+}
+
+export interface RawBoostPadEvent {
+  time: number;
+  frame: number;
+  pad_id: string;
+  player?: Record<string, string> | null;
+  kind: unknown;
+}
+
+export interface RawBoostPad {
+  index: number;
+  pad_id?: string | null;
+  size: unknown;
+  position: RawVec3;
+}
+
 export interface RawReplayFramesData {
   frame_data: {
     ball_data: RawBallData;
@@ -75,11 +120,12 @@ export interface RawReplayFramesData {
     team_one: RawPlayerInfo[];
     all_headers: unknown[];
   };
-  demolish_infos?: unknown[];
-  boost_pad_events?: unknown[];
-  goal_events?: unknown[];
+  demolish_infos?: RawDemolishInfo[];
+  boost_pad_events?: RawBoostPadEvent[];
+  boost_pads?: RawBoostPad[];
+  goal_events?: RawGoalEvent[];
   touch_events?: unknown[];
-  player_stat_events?: unknown[];
+  player_stat_events?: RawPlayerStatEvent[];
 }
 
 export interface Vec3 {
@@ -153,12 +199,69 @@ export interface ReplayPlayerTrack {
   frames: PlayerSample[];
 }
 
+export type ReplayTimelineEventKind =
+  | "goal"
+  | "shot"
+  | "save"
+  | "assist"
+  | "demo"
+  | (string & {});
+
+export interface ReplayTimelineEvent {
+  id?: string;
+  time: number;
+  frame?: number;
+  kind: ReplayTimelineEventKind;
+  label?: string;
+  shortLabel?: string;
+  iconText?: string;
+  iconName?: string;
+  playerId?: string | null;
+  playerName?: string | null;
+  secondaryPlayerId?: string | null;
+  secondaryPlayerName?: string | null;
+  isTeamZero?: boolean | null;
+  color?: string;
+}
+
+export interface ReplayPlayerTimelineSegment {
+  startTime: number;
+  endTime: number;
+}
+
+export interface ReplayPlayerTimelineProjection {
+  replayTime: number;
+  timelineTime: number;
+  seekTime: number;
+  hiddenBySkip: boolean;
+}
+
+export type ReplayBoostPadSize = "big" | "small";
+
+export interface ReplayBoostPadEvent {
+  time: number;
+  frame: number;
+  available: boolean;
+  playerId?: string | null;
+  playerName?: string | null;
+}
+
+export interface ReplayBoostPad {
+  index: number;
+  padId: string | null;
+  size: ReplayBoostPadSize;
+  position: Vec3;
+  events: ReplayBoostPadEvent[];
+}
+
 export interface ReplayModel {
   frameCount: number;
   duration: number;
   frames: PlaybackFrame[];
   ballFrames: BallSample[];
+  boostPads: ReplayBoostPad[];
   players: ReplayPlayerTrack[];
+  timelineEvents: ReplayTimelineEvent[];
   teamZeroNames: string[];
   teamOneNames: string[];
 }
@@ -288,6 +391,10 @@ export type ReplayPlayerPluginFactory = () => ReplayPlayerPlugin;
 export type ReplayPlayerPluginDefinition =
   | ReplayPlayerPlugin
   | ReplayPlayerPluginFactory;
+
+export type ReplayTimelineEventSource =
+  | ReplayTimelineEvent[]
+  | ((context: ReplayPlayerPluginContext) => ReplayTimelineEvent[]);
 
 export interface ReplayPlayerOptions {
   autoplay?: boolean;

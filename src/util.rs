@@ -108,6 +108,14 @@ pub struct BoostPadEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ResolvedBoostPad {
+    pub index: usize,
+    pub pad_id: Option<String>,
+    pub size: BoostPadSize,
+    pub position: boxcars::Vector3f,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GoalEvent {
     pub time: f32,
     pub frame: usize,

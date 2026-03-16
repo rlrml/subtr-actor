@@ -41,10 +41,15 @@ or at runtime with `ReplayPlayer.addPlugin(...)`. Plugins receive:
 This keeps optional features such as scoreboards, scrubbers, and scene overlays
 out of the core playback engine while still giving them a first-class API.
 
-The package ships with one reusable UI plugin:
+The package ships with reusable UI plugins:
 
 - `createBallchasingOverlayPlugin()` for Ballchasing-style floating player labels,
   floating boost bars, and side team boost HUDs
+- `createBoostPadOverlayPlugin()` for in-stadium standard Soccar boost pad
+  availability markers driven by replay pad events
+- `createTimelineOverlayPlugin()` for a bottom-docked replay scrubber with
+  time readouts, clickable event markers, default replay markers
+  (goals/saves), and caller-supplied custom events
 
 For multi-replay workflows, the playlist layer is intentionally generic. Each
 `PlaylistItem` specifies a replay source, a start bound, an end bound, and

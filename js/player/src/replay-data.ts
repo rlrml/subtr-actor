@@ -2,13 +2,22 @@ import type {
   BallSample,
   CameraSettings,
   PlaybackFrame,
+  RawBoostPad,
+  RawBoostPadEvent,
+  RawDemolishInfo,
+  RawGoalEvent,
+  RawPlayerStatEvent,
   PlayerSample,
   RawBallFrame,
   RawPlayerFrame,
   RawPlayerInfo,
   RawReplayFramesData,
+  ReplayBoostPad,
+  ReplayBoostPadEvent,
+  ReplayBoostPadSize,
   ReplayModel,
   ReplayPlayerTrack,
+  ReplayTimelineEvent,
   Vec3,
   Quaternion,
 } from "./types";
@@ -19,6 +28,24 @@ const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
   pitch: -4,
   fov: 110,
 };
+const BOOST_PAD_SMALL_Z = 70;
+const BOOST_PAD_BIG_Z = 73;
+const BOOST_PAD_BACK_CORNER_X = 3072;
+const BOOST_PAD_BACK_CORNER_Y = 4096;
+const BOOST_PAD_BACK_LANE_X = 1792;
+const BOOST_PAD_BACK_LANE_Y = 4184;
+const BOOST_PAD_BACK_MID_X = 940;
+const BOOST_PAD_BACK_MID_Y = 3308;
+const BOOST_PAD_CENTER_BACK_Y = 2816;
+const BOOST_PAD_SIDE_WALL_X = 3584;
+const BOOST_PAD_SIDE_WALL_Y = 2484;
+const BOOST_PAD_SIDE_LANE_X = 1788;
+const BOOST_PAD_SIDE_LANE_Y = 2300;
+const BOOST_PAD_FRONT_LANE_X = 2048;
+const BOOST_PAD_FRONT_LANE_Y = 1036;
+const BOOST_PAD_CENTER_X = 1024;
+const BOOST_PAD_CENTER_MID_Y = 1024;
+const BOOST_PAD_GOAL_LINE_Y = 4240;
 
 function playerIdToString(playerId: Record<string, string>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
@@ -101,6 +128,10 @@ function parseBallFrame(frame: RawBallFrame): BallSample {
     angularVelocity: rigidBody.angular_velocity,
     rotation: normalizeQuaternion(rigidBody.rotation),
   };
+}
+
+function normalizeReplayTime(rawTime: number, startTime: number): number {
+  return Math.max(0, rawTime - startTime);
 }
 
 function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
@@ -262,7 +293,326 @@ function buildPlayerTracks(raw: RawReplayFramesData): ReplayPlayerTrack[] {
   });
 }
 
+function buildPlayerLookup(
+  players: ReplayPlayerTrack[]
+): Map<string, ReplayPlayerTrack> {
+  return new Map(players.map((player) => [player.id, player]));
+}
+
+function pushPad(
+  pads: ReplayBoostPad[],
+  x: number,
+  y: number,
+  z: number,
+  size: ReplayBoostPadSize
+): void {
+  pads.push({
+    index: pads.length,
+    padId: null,
+    size,
+    position: { x, y, z },
+    events: [],
+  });
+}
+
+function pushMirrorX(
+  pads: ReplayBoostPad[],
+  x: number,
+  y: number,
+  z: number,
+  size: ReplayBoostPadSize
+): void {
+  pushPad(pads, -x, y, z, size);
+  pushPad(pads, x, y, z, size);
+}
+
+function pushMirrorY(
+  pads: ReplayBoostPad[],
+  x: number,
+  y: number,
+  z: number,
+  size: ReplayBoostPadSize
+): void {
+  pushPad(pads, x, -y, z, size);
+  pushPad(pads, x, y, z, size);
+}
+
+function pushMirrorXY(
+  pads: ReplayBoostPad[],
+  x: number,
+  y: number,
+  z: number,
+  size: ReplayBoostPadSize
+): void {
+  pushMirrorX(pads, x, -y, z, size);
+  pushMirrorX(pads, x, y, z, size);
+}
+
+function buildStandardSoccarBoostPads(): ReplayBoostPad[] {
+  const pads: ReplayBoostPad[] = [];
+
+  pushMirrorY(pads, 0, BOOST_PAD_GOAL_LINE_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_BACK_LANE_X,
+    BOOST_PAD_BACK_LANE_Y,
+    BOOST_PAD_SMALL_Z,
+    "small"
+  );
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_BACK_CORNER_X,
+    BOOST_PAD_BACK_CORNER_Y,
+    BOOST_PAD_BIG_Z,
+    "big"
+  );
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_BACK_MID_X,
+    BOOST_PAD_BACK_MID_Y,
+    BOOST_PAD_SMALL_Z,
+    "small"
+  );
+  pushMirrorY(pads, 0, BOOST_PAD_CENTER_BACK_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_SIDE_WALL_X,
+    BOOST_PAD_SIDE_WALL_Y,
+    BOOST_PAD_SMALL_Z,
+    "small"
+  );
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_SIDE_LANE_X,
+    BOOST_PAD_SIDE_LANE_Y,
+    BOOST_PAD_SMALL_Z,
+    "small"
+  );
+  pushMirrorXY(
+    pads,
+    BOOST_PAD_FRONT_LANE_X,
+    BOOST_PAD_FRONT_LANE_Y,
+    BOOST_PAD_SMALL_Z,
+    "small"
+  );
+  pushMirrorY(pads, 0, BOOST_PAD_CENTER_MID_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorX(pads, BOOST_PAD_SIDE_WALL_X, 0, BOOST_PAD_BIG_Z, "big");
+  pushMirrorX(pads, BOOST_PAD_CENTER_X, 0, BOOST_PAD_SMALL_Z, "small");
+
+  return pads;
+}
+
+function parseBoostPadAvailability(kind: unknown): boolean | null {
+  if (kind === "Available") {
+    return true;
+  }
+  if (kind && typeof kind === "object") {
+    if ("Available" in kind) {
+      return true;
+    }
+    if ("PickedUp" in kind) {
+      return false;
+    }
+    const taggedKind = (kind as { kind?: unknown }).kind;
+    if (taggedKind === "Available") {
+      return true;
+    }
+    if (taggedKind === "PickedUp") {
+      return false;
+    }
+  }
+  return null;
+}
+
+function parseBoostPadSize(size: unknown): ReplayBoostPadSize | null {
+  if (size === "big" || size === "Big") {
+    return "big";
+  }
+  if (size === "small" || size === "Small") {
+    return "small";
+  }
+  return null;
+}
+
+function inferBoostPadSize(events: RawBoostPadEvent[]): ReplayBoostPadSize | null {
+  let lastPickupTime: number | null = null;
+  for (const event of events) {
+    const available = parseBoostPadAvailability(event.kind);
+    if (available === false) {
+      lastPickupTime = event.time;
+      continue;
+    }
+    if (available === true && lastPickupTime !== null) {
+      return event.time - lastPickupTime >= 7 ? "big" : "small";
+    }
+  }
+
+  return null;
+}
+
+function buildBoostPads(
+  raw: RawReplayFramesData,
+  players: ReplayPlayerTrack[],
+  startTime: number
+): ReplayBoostPad[] {
+  const playersById = buildPlayerLookup(players);
+  const eventsByPadId = new Map<string, RawBoostPadEvent[]>();
+
+  for (const event of raw.boost_pad_events ?? []) {
+    const availability = parseBoostPadAvailability(event.kind);
+    if (availability === null) {
+      continue;
+    }
+    const bucket = eventsByPadId.get(event.pad_id);
+    if (bucket) {
+      bucket.push(event);
+    } else {
+      eventsByPadId.set(event.pad_id, [event]);
+    }
+  }
+
+  const rawPads = raw.boost_pads;
+  if (!rawPads || rawPads.length === 0) {
+    return buildStandardSoccarBoostPads();
+  }
+
+  return [...rawPads]
+    .sort((left, right) => left.index - right.index)
+    .map((pad: RawBoostPad): ReplayBoostPad => {
+      const padId = typeof pad.pad_id === "string" ? pad.pad_id : null;
+      const rawEvents = padId ? [...(eventsByPadId.get(padId) ?? [])] : [];
+      const size =
+        parseBoostPadSize(pad.size) ??
+        inferBoostPadSize(rawEvents) ??
+        (pad.position.z >= 72 ? "big" : "small");
+
+      const events = rawEvents
+        .sort((left, right) => left.time - right.time)
+        .map((event): ReplayBoostPadEvent => {
+          const playerId = event.player ? playerIdToString(event.player) : null;
+          return {
+            time: normalizeReplayTime(event.time, startTime),
+            frame: event.frame,
+            available: parseBoostPadAvailability(event.kind) ?? true,
+            playerId,
+            playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
+          };
+        });
+
+      return {
+        index: pad.index,
+        padId,
+        size,
+        position: pad.position,
+        events,
+      };
+    });
+}
+
+function createTimelineEventId(
+  prefix: string,
+  frame: number,
+  suffix: string
+): string {
+  return `${prefix}:${frame}:${suffix}`;
+}
+
+function goalTimelineEvent(
+  event: RawGoalEvent,
+  playersById: Map<string, ReplayPlayerTrack>,
+  startTime: number
+): ReplayTimelineEvent {
+  const playerId = event.player ? playerIdToString(event.player) : null;
+  const playerName = playerId ? playersById.get(playerId)?.name ?? playerId : null;
+  const label = playerName ? `${playerName} scored` : "Goal";
+  return {
+    id: createTimelineEventId("goal", event.frame, playerId ?? "team"),
+    time: normalizeReplayTime(event.time, startTime),
+    frame: event.frame,
+    kind: "goal",
+    label,
+    shortLabel: "G",
+    playerId,
+    playerName,
+    isTeamZero: event.scoring_team_is_team_0,
+  };
+}
+
+function playerStatTimelineEvent(
+  event: RawPlayerStatEvent,
+  playersById: Map<string, ReplayPlayerTrack>,
+  startTime: number
+): ReplayTimelineEvent {
+  const playerId = playerIdToString(event.player);
+  const playerName = playersById.get(playerId)?.name ?? playerId;
+  const kind = event.kind.toLowerCase() as ReplayTimelineEvent["kind"];
+  const verb =
+    event.kind === "Shot" ? "shot" : event.kind === "Save" ? "save" : "assist";
+  const shortLabel =
+    event.kind === "Shot" ? "SH" : event.kind === "Save" ? "SV" : "A";
+  return {
+    id: createTimelineEventId(kind, event.frame, playerId),
+    time: normalizeReplayTime(event.time, startTime),
+    frame: event.frame,
+    kind,
+    label: `${playerName} ${verb}`,
+    shortLabel,
+    playerId,
+    playerName,
+    isTeamZero: event.is_team_0,
+  };
+}
+
+function demoTimelineEvent(
+  event: RawDemolishInfo,
+  playersById: Map<string, ReplayPlayerTrack>,
+  startTime: number
+): ReplayTimelineEvent {
+  const attackerId = playerIdToString(event.attacker);
+  const victimId = playerIdToString(event.victim);
+  const attacker = playersById.get(attackerId);
+  const victim = playersById.get(victimId);
+  return {
+    id: createTimelineEventId("demo", event.frame, `${attackerId}:${victimId}`),
+    time: normalizeReplayTime(event.time, startTime),
+    frame: event.frame,
+    kind: "demo",
+    label: `${attacker?.name ?? attackerId} demoed ${victim?.name ?? victimId}`,
+    shortLabel: "D",
+    playerId: attackerId,
+    playerName: attacker?.name ?? attackerId,
+    secondaryPlayerId: victimId,
+    secondaryPlayerName: victim?.name ?? victimId,
+    isTeamZero: attacker?.isTeamZero ?? null,
+  };
+}
+
+function buildTimelineEvents(
+  raw: RawReplayFramesData,
+  players: ReplayPlayerTrack[],
+  startTime: number
+): ReplayTimelineEvent[] {
+  const playersById = buildPlayerLookup(players);
+  const goalEvents = (raw.goal_events ?? []).map((event) =>
+    goalTimelineEvent(event, playersById, startTime)
+  );
+  const playerStatEvents = (raw.player_stat_events ?? []).map((event) =>
+    playerStatTimelineEvent(event, playersById, startTime)
+  );
+  const demoEvents = (raw.demolish_infos ?? []).map((event) =>
+    demoTimelineEvent(event, playersById, startTime)
+  );
+
+  return [...goalEvents, ...playerStatEvents, ...demoEvents].sort((left, right) => {
+    if (left.time !== right.time) {
+      return left.time - right.time;
+    }
+    return (left.frame ?? 0) - (right.frame ?? 0);
+  });
+}
+
 export function normalizeReplayData(raw: RawReplayFramesData): ReplayModel {
+  const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
   const frames = buildPlaybackFrames(raw);
   const players = buildPlayerTracks(raw);
 
@@ -271,7 +621,9 @@ export function normalizeReplayData(raw: RawReplayFramesData): ReplayModel {
     duration: frames.at(-1)?.time ?? 0,
     frames,
     ballFrames: raw.frame_data.ball_data.frames.map(parseBallFrame),
+    boostPads: buildBoostPads(raw, players, startTime),
     players,
+    timelineEvents: buildTimelineEvents(raw, players, startTime),
     teamZeroNames: raw.meta.team_zero.map((player) => player.name),
     teamOneNames: raw.meta.team_one.map((player) => player.name),
   };

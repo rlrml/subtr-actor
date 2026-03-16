@@ -496,6 +496,7 @@ pub struct FrameData {
 /// * `meta` - Replay metadata including player information, game settings, and statistics
 /// * `demolish_infos` - Information about all demolition events that occurred during the replay
 /// * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
+/// * `boost_pads` - Resolved standard boost pad layout annotated with replay pad ids when known
 /// * `touch_events` - Exact team touch events plus attributed player when available
 /// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
 /// * `flip_reset_events` - Heuristic sparse flip-reset candidates derived from airborne touch geometry
@@ -534,6 +535,8 @@ pub struct ReplayData {
     pub demolish_infos: Vec<DemolishInfo>,
     /// Exact boost pad pickup and availability events observed during the replay
     pub boost_pad_events: Vec<BoostPadEvent>,
+    /// Resolved standard boost pad layout annotated with replay pad ids when known
+    pub boost_pads: Vec<ResolvedBoostPad>,
     /// Exact touch events observed during the replay
     pub touch_events: Vec<TouchEvent>,
     /// Exact dodge refresh events observed via the replay's refreshed-dodge counter
@@ -763,14 +766,21 @@ impl ReplayDataCollector {
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
         let mut flip_reset_tracker = FlipResetTracker::new();
-        processor.process_all(&mut [&mut self, &mut flip_reset_tracker])?;
+        let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+        processor.process_all(&mut [
+            &mut self,
+            &mut flip_reset_tracker,
+            &mut boost_pad_collector,
+        ])?;
         let meta = processor.get_replay_meta()?;
         let (flip_reset_events, post_wall_dodge_events, flip_reset_followup_dodge_events) =
             flip_reset_tracker.into_events();
+        let boost_pads = boost_pad_collector.into_inner().resolved_boost_pads();
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes,
             boost_pad_events: processor.boost_pad_events,
+            boost_pads,
             touch_events: processor.touch_events,
             dodge_refreshed_events: processor.dodge_refreshed_events,
             flip_reset_events,

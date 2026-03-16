@@ -2,6 +2,8 @@ import "./styles.css";
 import {
   ReplayPlayer,
   createBallchasingOverlayPlugin,
+  createBoostPadOverlayPlugin,
+  createTimelineOverlayPlugin,
   loadReplayFromBytes,
 } from "../../player/src/lib.ts";
 
@@ -109,7 +111,6 @@ app.innerHTML = `
             <input id="skip-kickoffs" type="checkbox" />
             <span>Skip kickoffs</span>
           </label>
-          <input id="timeline" type="range" min="0" max="0" step="0.01" value="0" disabled />
           <div class="stat-grid">
             <div>
               <span class="label">Time</span>
@@ -160,7 +161,6 @@ const cameraDistance = mustElement("#camera-distance");
 const cameraDistanceReadout = mustElement("#camera-distance-readout");
 const attachedPlayer = mustElement("#attached-player");
 const ballCam = mustElement("#ball-cam");
-const timeline = mustElement("#timeline");
 const statusReadout = mustElement("#status-readout");
 const teamsReadout = mustElement("#teams-readout");
 const playersReadout = mustElement("#players-readout");
@@ -189,7 +189,6 @@ function setControlsEnabled(enabled) {
   attachedPlayer.disabled = !enabled;
   cameraDistance.disabled = !enabled;
   ballCam.disabled = !enabled;
-  timeline.disabled = !enabled;
 }
 
 function formatClock(secondsRemaining) {
@@ -244,7 +243,6 @@ function renderSnapshot(snapshot) {
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${snapshot.frameIndex}`;
   durationReadout.textContent = `${snapshot.duration.toFixed(2)}s`;
-  timeline.value = `${snapshot.currentTime}`;
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
   cameraDistance.value = `${snapshot.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${snapshot.cameraDistanceScale.toFixed(2)}x`;
@@ -313,16 +311,17 @@ async function loadReplayFile(file) {
     initialBoostMeterEnabled: false,
     initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
     initialSkipKickoffsEnabled: skipKickoffs.checked,
-    plugins: [createBallchasingOverlayPlugin()],
+    plugins: [
+      createBallchasingOverlayPlugin(),
+      createBoostPadOverlayPlugin(),
+      createTimelineOverlayPlugin(),
+    ],
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
   populateAttachedPlayerOptions(replay.players);
 
   emptyState.hidden = true;
-  timeline.min = "0";
-  timeline.max = `${replay.duration}`;
-  timeline.step = "0.01";
   teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
   playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
   statusReadout.textContent = `Loaded ${file.name}`;
@@ -374,8 +373,4 @@ skipPostGoalTransitions.addEventListener("change", () => {
 
 skipKickoffs.addEventListener("change", () => {
   replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
-});
-
-timeline.addEventListener("input", () => {
-  replayPlayer?.seek(Number(timeline.value));
 });

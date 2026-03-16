@@ -1,9 +1,19 @@
 export { ReplayPlayer } from "./player";
 export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
 export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
+export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";
+export type { BoostPadOverlayPluginOptions } from "./boost-pad-overlay";
+export { createTimelineOverlayPlugin } from "./timeline-overlay";
+export type { TimelineOverlayPluginOptions } from "./timeline-overlay";
+export {
+  loadPlaylistManifestFromFile,
+  parsePlaylistManifest,
+  resolvePlaylistItemsFromManifest,
+} from "./manifest";
 export {
   ReplayPlaylistPlayer,
   createReplayBytesSource,
+  createReplayFileSource,
   createReplayPathSource,
   createReplaySource,
   createStaticReplaySource,
@@ -14,6 +24,7 @@ export {
 export { findFrameIndexAtTime, normalizeReplayData } from "./replay-data";
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
 export type {
+  ReplayPlayerActiveMetadata,
   BallSample,
   BeforeRenderCallback,
   CameraSettings,
@@ -22,6 +33,11 @@ export type {
   PlaybackBound,
   PlaybackFrame,
   PlaylistItem,
+  PlaylistManifest,
+  PlaylistManifestItem,
+  PlaylistManifestReplay,
+  ReplayPreloadContext,
+  ReplayPreloadPolicy,
   PlayerSample,
   RawReplayFramesData,
   ReplayLoadResult,
@@ -34,14 +50,23 @@ export type {
   ReplayPlayerPluginContext,
   ReplayPlayerPluginDefinition,
   ReplayPlayerPluginFactory,
+  ReplayBoostPad,
+  ReplayBoostPadEvent,
+  ReplayBoostPadSize,
+  ReplayPlayerTimelineProjection,
+  ReplayPlayerTimelineSegment,
   ReplayPlayerRenderContext,
   ReplayPlayerRenderTrackContext,
-  ReplayPlayerPluginStateContext,
+  ReplayPlayerKickoffCountdownMetadata,
   ReplayPlayerSnapshot,
+  ReplayPlayerPluginStateContext,
   ReplayPlayerState,
   ReplayPlayerStatePatch,
   ReplayPlayerTrack,
   ReplaySource,
+  ReplayTimelineEvent,
+  ReplayTimelineEventKind,
+  ReplayTimelineEventSource,
   ResolvedPlaybackBound,
   ResolvedPlaylistItem,
 } from "./types";
