@@ -118,62 +118,99 @@ export class RoleOverlay {
   }
 }
 
-// Dynamic threshold lines showing most-back/most-forward demarcation per team
+// Dynamic threshold zones showing most-back/most-forward classification bands
 const FIELD_HALF_X = 4120;
 const WALL_HEIGHT = 1960;
 
-interface ThresholdLine {
+interface ThresholdZone {
   group: THREE.Group;
-  positionAttr: THREE.BufferAttribute;
+  floorMesh: THREE.Mesh;
+  leftWallMesh: THREE.Mesh;
+  rightWallMesh: THREE.Mesh;
+  floorGeom: THREE.PlaneGeometry;
+  leftWallGeom: THREE.PlaneGeometry;
+  rightWallGeom: THREE.PlaneGeometry;
+  material: THREE.MeshBasicMaterial;
 }
 
-function makeThresholdLineMesh(
+function makeThresholdZone(
   fieldScale: number,
   color: number,
   opacity: number,
-): ThresholdLine {
+): ThresholdZone {
   const hw = FIELD_HALF_X * fieldScale;
   const wh = WALL_HEIGHT * fieldScale;
+  // Zone depth (Y extent) will be set dynamically via scale, so create at unit size
+  const zoneDepth = 1; // will be scaled
 
-  // U-shape: down left wall, across floor, up right wall
-  const points = [
-    new THREE.Vector3(-hw, 0, wh),
-    new THREE.Vector3(-hw, 0, 0),
-    new THREE.Vector3(hw, 0, 0),
-    new THREE.Vector3(hw, 0, wh),
-  ];
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({
+  const material = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
     opacity,
+    side: THREE.DoubleSide,
     depthWrite: false,
   });
-  const line = new THREE.Line(geometry, material);
+
   const group = new THREE.Group();
-  group.add(line);
   group.visible = false;
-  return {
-    group,
-    positionAttr: geometry.getAttribute("position") as THREE.BufferAttribute,
-  };
+
+  // Floor plane: width = full field, depth = 1 (scaled dynamically)
+  const floorGeom = new THREE.PlaneGeometry(hw * 2, zoneDepth);
+  const floorMesh = new THREE.Mesh(floorGeom, material);
+  floorMesh.position.z = 2; // slightly above floor to avoid z-fighting
+  group.add(floorMesh);
+
+  // Left wall strip
+  const leftWallGeom = new THREE.PlaneGeometry(zoneDepth, wh);
+  const leftWallMesh = new THREE.Mesh(leftWallGeom, material);
+  leftWallMesh.position.set(-hw, 0, wh / 2);
+  leftWallMesh.rotation.y = Math.PI / 2;
+  group.add(leftWallMesh);
+
+  // Right wall strip
+  const rightWallGeom = new THREE.PlaneGeometry(zoneDepth, wh);
+  const rightWallMesh = new THREE.Mesh(rightWallGeom, material);
+  rightWallMesh.position.set(hw, 0, wh / 2);
+  rightWallMesh.rotation.y = Math.PI / 2;
+  group.add(rightWallMesh);
+
+  return { group, floorMesh, leftWallMesh, rightWallMesh, floorGeom, leftWallGeom, rightWallGeom, material };
 }
 
-export class ThresholdLineOverlay {
+function updateZonePosition(zone: ThresholdZone, centerY: number, halfDepth: number, fieldScale: number): void {
+  const depth = halfDepth * 2 * fieldScale;
+  const wh = WALL_HEIGHT * fieldScale;
+  const hw = FIELD_HALF_X * fieldScale;
+
+  zone.group.position.y = centerY * fieldScale;
+
+  // Floor: scale Y to match zone depth
+  zone.floorMesh.scale.y = depth;
+
+  // Wall strips: scale X to match zone depth, reposition
+  zone.leftWallMesh.scale.x = depth;
+  zone.leftWallMesh.position.set(-hw, 0, wh / 2);
+
+  zone.rightWallMesh.scale.x = depth;
+  zone.rightWallMesh.position.set(hw, 0, wh / 2);
+
+  zone.group.visible = true;
+}
+
+export class ThresholdZoneOverlay {
   private replay: ReplayModel;
-  // 2 lines per team: back boundary and forward boundary
-  private blueBack: ThresholdLine;
-  private blueFront: ThresholdLine;
-  private orangeBack: ThresholdLine;
-  private orangeFront: ThresholdLine;
+  private blueBack: ThresholdZone;
+  private blueFront: ThresholdZone;
+  private orangeBack: ThresholdZone;
+  private orangeFront: ThresholdZone;
 
   constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
     this.replay = replay;
-    // Back boundaries = red, forward boundaries = green (matches role ring colors)
-    this.blueBack = makeThresholdLineMesh(fieldScale, 0xff5577, 0.4);
-    this.blueFront = makeThresholdLineMesh(fieldScale, 0x55ff77, 0.4);
-    this.orangeBack = makeThresholdLineMesh(fieldScale, 0xff5577, 0.4);
-    this.orangeFront = makeThresholdLineMesh(fieldScale, 0x55ff77, 0.4);
+    // Back zones = red tint, forward zones = green tint
+    this.blueBack = makeThresholdZone(fieldScale, 0xff3333, 0.12);
+    this.blueFront = makeThresholdZone(fieldScale, 0x33ff33, 0.12);
+    this.orangeBack = makeThresholdZone(fieldScale, 0xff3333, 0.12);
+    this.orangeFront = makeThresholdZone(fieldScale, 0x33ff33, 0.12);
     scene.add(this.blueBack.group);
     scene.add(this.blueFront.group);
     scene.add(this.orangeBack.group);
@@ -182,57 +219,47 @@ export class ThresholdLineOverlay {
 
   update(info: FrameRenderInfo, fieldScale: number): void {
     const { frameIndex } = info;
+    const threshold = MOST_BACK_FORWARD_THRESHOLD_Y;
 
     for (const isTeamZero of [true, false]) {
-      const teamPlayers: number[] = []; // raw Y positions
+      const rawYs: number[] = [];
       for (const player of this.replay.players) {
         if (player.isTeamZero !== isTeamZero) continue;
         const frame = player.frames[frameIndex];
         if (!frame?.position) continue;
-        teamPlayers.push(frame.position.y);
+        rawYs.push(frame.position.y);
       }
 
-      const backLine = isTeamZero ? this.blueBack : this.orangeBack;
-      const frontLine = isTeamZero ? this.blueFront : this.orangeFront;
+      const backZone = isTeamZero ? this.blueBack : this.orangeBack;
+      const frontZone = isTeamZero ? this.blueFront : this.orangeFront;
 
-      if (teamPlayers.length < 2) {
-        backLine.group.visible = false;
-        frontLine.group.visible = false;
+      if (rawYs.length < 2) {
+        backZone.group.visible = false;
+        frontZone.group.visible = false;
         continue;
       }
 
-      // For team 0: most back = min raw Y, most forward = max raw Y
-      // For team 1: most back = max raw Y, most forward = min raw Y
-      const rawMin = Math.min(...teamPlayers);
-      const rawMax = Math.max(...teamPlayers);
+      const rawMin = Math.min(...rawYs);
+      const rawMax = Math.max(...rawYs);
 
-      // Back boundary (the Y beyond which you're no longer "most back"):
-      // Team 0: minY + threshold, Team 1: maxY - threshold
-      const backBoundaryRawY = isTeamZero
-        ? rawMin + MOST_BACK_FORWARD_THRESHOLD_Y
-        : rawMax - MOST_BACK_FORWARD_THRESHOLD_Y;
-      // Forward boundary (the Y beyond which you're no longer "most forward"):
-      // Team 0: maxY - threshold, Team 1: minY + threshold
-      const frontBoundaryRawY = isTeamZero
-        ? rawMax - MOST_BACK_FORWARD_THRESHOLD_Y
-        : rawMin + MOST_BACK_FORWARD_THRESHOLD_Y;
+      // For team 0: most back player is at rawMin, most forward at rawMax
+      // For team 1: most back player is at rawMax, most forward at rawMin
+      // Zone is centered on the extreme player, extending ±threshold
+      const backPlayerY = isTeamZero ? rawMin : rawMax;
+      const frontPlayerY = isTeamZero ? rawMax : rawMin;
 
-      backLine.group.position.y = backBoundaryRawY * fieldScale;
-      backLine.group.visible = true;
-      frontLine.group.position.y = frontBoundaryRawY * fieldScale;
-      frontLine.group.visible = true;
+      updateZonePosition(backZone, backPlayerY, threshold, fieldScale);
+      updateZonePosition(frontZone, frontPlayerY, threshold, fieldScale);
     }
   }
 
   dispose(): void {
-    for (const tl of [this.blueBack, this.blueFront, this.orangeBack, this.orangeFront]) {
-      tl.group.removeFromParent();
-      tl.group.traverse((node) => {
-        if (node instanceof THREE.Line) {
-          node.geometry.dispose();
-          (node.material as THREE.Material).dispose();
-        }
-      });
+    for (const zone of [this.blueBack, this.blueFront, this.orangeBack, this.orangeFront]) {
+      zone.group.removeFromParent();
+      zone.floorGeom.dispose();
+      zone.leftWallGeom.dispose();
+      zone.rightWallGeom.dispose();
+      zone.material.dispose();
     }
   }
 }

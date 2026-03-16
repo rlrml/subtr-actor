@@ -10,7 +10,7 @@ import type {
   FrameRenderInfo,
 } from "../../player/src/lib.ts";
 import type { ReplayScene } from "../../player/src/scene.ts";
-import { RoleOverlay, ThresholdLineOverlay, createZoneBoundaryLines } from "./overlays.ts";
+import { RoleOverlay, ThresholdZoneOverlay, createZoneBoundaryLines } from "./overlays.ts";
 
 // WASM module - init is the default export, get_stats_timeline is named
 import wasmInit, {
@@ -126,7 +126,7 @@ function getCurrentRole(
 
 function createPositioningModule(): StatModule {
   let roleOverlay: RoleOverlay | null = null;
-  let thresholdLineOverlay: ThresholdLineOverlay | null = null;
+  let thresholdZoneOverlay: ThresholdZoneOverlay | null = null;
   let fieldScale = 1;
 
   return {
@@ -136,7 +136,7 @@ function createPositioningModule(): StatModule {
     setup(ctx) {
       fieldScale = ctx.fieldScale;
       roleOverlay = new RoleOverlay(ctx.player.sceneState, ctx.replay);
-      thresholdLineOverlay = new ThresholdLineOverlay(
+      thresholdZoneOverlay = new ThresholdZoneOverlay(
         ctx.player.sceneState.scene,
         ctx.replay,
         fieldScale,
@@ -146,14 +146,14 @@ function createPositioningModule(): StatModule {
 
     teardown() {
       roleOverlay?.dispose();
-      thresholdLineOverlay?.dispose();
+      thresholdZoneOverlay?.dispose();
       roleOverlay = null;
-      thresholdLineOverlay = null;
+      thresholdZoneOverlay = null;
     },
 
     onBeforeRender(info) {
       roleOverlay?.update(info);
-      thresholdLineOverlay?.update(info, fieldScale);
+      thresholdZoneOverlay?.update(info, fieldScale);
     },
 
     renderStats(frameIndex, ctx) {
