@@ -24,6 +24,8 @@ pub struct BoostStats {
     pub overfill_total: f32,
     pub overfill_from_stolen: f32,
     pub amount_used: f32,
+    pub amount_used_while_grounded: f32,
+    pub amount_used_while_airborne: f32,
     pub amount_used_while_supersonic: f32,
 }
 
@@ -730,6 +732,16 @@ impl StatsReducer for BoostReducer {
                 } else {
                     0.0
                 };
+                let observed_usage = (previous_boost_amount - boost_amount).max(0.0);
+                let grounded_usage = if player
+                    .position()
+                    .is_some_and(|position| position.z <= GROUND_Z_THRESHOLD)
+                {
+                    observed_usage
+                } else {
+                    0.0
+                };
+                let airborne_usage = observed_usage - grounded_usage;
 
                 let stats = self
                     .player_stats
@@ -757,6 +769,10 @@ impl StatsReducer for BoostReducer {
                 team_stats.time_boost_50_75 += time_boost_50_75;
                 stats.time_boost_75_100 += time_boost_75_100;
                 team_stats.time_boost_75_100 += time_boost_75_100;
+                stats.amount_used_while_grounded += grounded_usage;
+                team_stats.amount_used_while_grounded += grounded_usage;
+                stats.amount_used_while_airborne += airborne_usage;
+                team_stats.amount_used_while_airborne += airborne_usage;
                 stats.amount_used_while_supersonic += supersonic_usage;
                 team_stats.amount_used_while_supersonic += supersonic_usage;
             }

@@ -102,6 +102,18 @@ impl StatFieldProvider for BoostStats {
         ));
         visitor(ExportedStat::float(
             "boost",
+            "amount_used_while_grounded",
+            StatUnit::Boost,
+            self.amount_used_while_grounded,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
+            "amount_used_while_airborne",
+            StatUnit::Boost,
+            self.amount_used_while_airborne,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
             "amount_used_while_supersonic",
             StatUnit::Boost,
             self.amount_used_while_supersonic,

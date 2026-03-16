@@ -2445,6 +2445,114 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
 }
 
 #[test]
+fn test_boost_reducer_splits_observed_usage_between_ground_and_air() {
+    let player_id = epic_id("boost-ground-air-usage");
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(BOOST_KICKOFF_START_AMOUNT),
+                boost_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(45.0),
+                boost_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(20.0),
+                boost_active: true,
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 400.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.amount_used, BOOST_KICKOFF_START_AMOUNT - 20.0);
+    assert_eq!(stats.amount_used_while_grounded, 40.0);
+    assert_eq!(stats.amount_used_while_airborne, 25.0);
+    assert_eq!(
+        stats.amount_used_while_grounded + stats.amount_used_while_airborne,
+        stats.amount_used
+    );
+}
+
+#[test]
 fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
     let player_id = epic_id("boost-supersonic-no-usage");
     let mut reducer = BoostReducer::new();

@@ -71,6 +71,8 @@ export interface PlayerStatsSnapshot {
     overfill_total: number;
     overfill_from_stolen: number;
     amount_used: number;
+    amount_used_while_grounded: number;
+    amount_used_while_airborne: number;
     amount_stolen: number;
     big_pads_collected: number;
     small_pads_collected: number;

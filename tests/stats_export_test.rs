@@ -109,6 +109,8 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
         amount_collected_small: 24.0,
         amount_respawned: 68.0,
         amount_used: 91.0,
+        amount_used_while_grounded: 61.0,
+        amount_used_while_airborne: 30.0,
         ..BoostStats::default()
     };
 
@@ -131,5 +133,25 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
     assert_eq!(
         find_field(&fields, "boost", "amount_used").value,
         StatValue::Float(91.0)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used_while_grounded")
+            .descriptor
+            .unit,
+        StatUnit::Boost
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used_while_grounded").value,
+        StatValue::Float(61.0)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used_while_airborne")
+            .descriptor
+            .unit,
+        StatUnit::Boost
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used_while_airborne").value,
+        StatValue::Float(30.0)
     );
 }

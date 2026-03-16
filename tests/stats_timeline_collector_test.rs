@@ -487,6 +487,12 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
             b.amount_collected_small as f64
         }),
         ("amount_respawned", |b| b.amount_respawned as f64),
+        ("amount_used_while_grounded", |b| {
+            b.amount_used_while_grounded as f64
+        }),
+        ("amount_used_while_airborne", |b| {
+            b.amount_used_while_airborne as f64
+        }),
         ("amount_stolen", |b| b.amount_stolen as f64),
         ("amount_stolen_big", |b| b.amount_stolen_big as f64),
         ("amount_stolen_small", |b| b.amount_stolen_small as f64),
