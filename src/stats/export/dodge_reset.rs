@@ -10,5 +10,11 @@ impl StatFieldProvider for DodgeResetStats {
             StatUnit::Count,
             self.count,
         ));
+        visitor(ExportedStat::unsigned(
+            "dodge_reset",
+            "on_ball_count",
+            StatUnit::Count,
+            self.on_ball_count,
+        ));
     }
 }

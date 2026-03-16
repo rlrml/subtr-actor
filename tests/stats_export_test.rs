@@ -187,3 +187,22 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
         StatValue::Float(30.0)
     );
 }
+
+#[test]
+fn test_dodge_reset_stats_export_includes_on_ball_count() {
+    let stats = DodgeResetStats {
+        count: 4,
+        on_ball_count: 3,
+    };
+
+    let fields = stats.stat_fields();
+
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "count").value,
+        StatValue::Unsigned(4)
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "on_ball_count").value,
+        StatValue::Unsigned(3)
+    );
+}

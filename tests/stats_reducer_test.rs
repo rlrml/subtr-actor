@@ -284,6 +284,96 @@ fn test_ball_carry_reducer_requires_last_touch_owner() {
 }
 
 #[test]
+fn test_dodge_reset_reducer_tracks_on_ball_resets_separately() {
+    let player_id = epic_id("flip-reset-player");
+    let mut reducer = DodgeResetReducer::new();
+
+    let mut sample = sample_stats(
+        1,
+        0.1,
+        0.1,
+        Some(sample_rigid_body(0.0, 0.0, 210.0)),
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body(0.0, 0.0, 300.0)),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    sample.dodge_refreshed_events.push(DodgeRefreshedEvent {
+        time: sample.time,
+        frame: sample.frame_number,
+        player: player_id.clone(),
+        is_team_0: true,
+        counter_value: 1,
+    });
+
+    reducer.on_sample(&sample).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.count, 1);
+    assert_eq!(stats.on_ball_count, 1);
+}
+
+#[test]
+fn test_dodge_reset_reducer_keeps_nearby_non_ideal_geometry_as_on_ball() {
+    let player_id = epic_id("nearby-reset-player");
+    let mut reducer = DodgeResetReducer::new();
+
+    let mut sample = sample_stats(
+        1,
+        0.1,
+        0.1,
+        Some(sample_rigid_body(140.0, 0.0, 330.0)),
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body(0.0, 0.0, 300.0)),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    sample.dodge_refreshed_events.push(DodgeRefreshedEvent {
+        time: sample.time,
+        frame: sample.frame_number,
+        player: player_id.clone(),
+        is_team_0: true,
+        counter_value: 1,
+    });
+
+    reducer.on_sample(&sample).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.count, 1);
+    assert_eq!(stats.on_ball_count, 1);
+}
+
+#[test]
+fn test_dodge_reset_reducer_excludes_off_ball_resets_from_on_ball_count() {
+    let player_id = epic_id("ceiling-reset-player");
+    let mut reducer = DodgeResetReducer::new();
+
+    let mut sample = sample_stats(
+        1,
+        0.1,
+        0.1,
+        Some(sample_rigid_body(0.0, 0.0, 650.0)),
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body(0.0, 0.0, 300.0)),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    sample.dodge_refreshed_events.push(DodgeRefreshedEvent {
+        time: sample.time,
+        frame: sample.frame_number,
+        player: player_id.clone(),
+        is_team_0: true,
+        counter_value: 1,
+    });
+
+    reducer.on_sample(&sample).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.count, 1);
+    assert_eq!(stats.on_ball_count, 0);
+}
+
+#[test]
 fn test_ball_carry_reducer_flushes_active_carry_on_finish() {
     let player_id = epic_id("carry-finish");
     let mut manual = BallCarryReducer::new();

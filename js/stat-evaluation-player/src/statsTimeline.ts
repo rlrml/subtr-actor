@@ -43,6 +43,7 @@ export interface PlayerStatsSnapshot {
   };
   dodge_reset?: {
     count: number;
+    on_ball_count: number;
     [key: string]: unknown;
   };
   ball_carry?: {

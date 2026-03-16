@@ -328,6 +328,7 @@ function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
 function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): string {
   return `
     <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
+    <div class="stat-row"><span class="label">On-ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
   `;
 }
 
