@@ -52,6 +52,10 @@ app.innerHTML = `
           <span class="kickoff-label">Kickoff</span>
           <strong id="kickoff-countdown" class="kickoff-countdown">3</strong>
         </div>
+        <button id="play-overlay" class="play-overlay" hidden type="button">
+          <span class="play-overlay-icon" aria-hidden="true"></span>
+          <span class="play-overlay-label">Resume replay</span>
+        </button>
         <div id="empty-state" class="empty-state">
           Choose a replay to populate the scene.
         </div>
@@ -170,6 +174,7 @@ const scoreboardPhase = mustElement("#scoreboard-phase");
 const scoreboardClock = mustElement("#scoreboard-clock");
 const kickoffOverlay = mustElement("#kickoff-overlay");
 const kickoffCountdown = mustElement("#kickoff-countdown");
+const playOverlay = mustElement("#play-overlay");
 
 let replayPlayer = null;
 let unsubscribe = null;
@@ -254,6 +259,7 @@ function renderSnapshot(snapshot) {
   orangeScore.textContent = `${teamOneScore}`;
   scoreboardClock.textContent = formatClock(metadata?.secondsRemaining);
   scoreboardPhase.textContent = kickoffMetadata ? "Kickoff" : "Live";
+  playOverlay.hidden = replayPlayer === null || snapshot.playing;
 
   const inKickoff = kickoffMetadata !== null;
   kickoffOverlay.hidden = !inKickoff;
@@ -281,6 +287,7 @@ async function loadReplayFile(file) {
   setControlsEnabled(false);
   scoreboard.hidden = true;
   kickoffOverlay.hidden = true;
+  playOverlay.hidden = true;
 
   if (unsubscribe) {
     unsubscribe();
@@ -296,6 +303,7 @@ async function loadReplayFile(file) {
   currentReplayRaw = raw;
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
+    autoplay: true,
     initialCameraDistanceScale: 2.25,
     initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
@@ -349,6 +357,10 @@ attachedPlayer.addEventListener("change", () => {
 
 ballCam.addEventListener("change", () => {
   replayPlayer?.setBallCamEnabled(ballCam.checked);
+});
+
+playOverlay.addEventListener("click", () => {
+  replayPlayer?.play();
 });
 
 skipPostGoalTransitions.addEventListener("change", () => {

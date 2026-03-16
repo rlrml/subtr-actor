@@ -298,6 +298,52 @@ input {
     10px 0 20px rgba(242, 138, 37, 0.24);
 }
 
+.play-overlay {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(13, 18, 24, 0.9), rgba(7, 11, 16, 0.96));
+  color: var(--hud-text);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.play-overlay[hidden] {
+  display: none;
+}
+
+.play-overlay:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(18, 24, 31, 0.94), rgba(8, 12, 18, 0.98));
+}
+
+.play-overlay-icon {
+  width: 0;
+  height: 0;
+  border-top: 0.72rem solid transparent;
+  border-bottom: 0.72rem solid transparent;
+  border-left: 1.05rem solid #ffffff;
+  filter:
+    drop-shadow(-8px 0 14px rgba(60, 134, 255, 0.22))
+    drop-shadow(8px 0 14px rgba(242, 138, 37, 0.2));
+}
+
+.play-overlay-label {
+  font-size: 0.84rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .sidebar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -417,5 +463,14 @@ dt {
 
   .kickoff-overlay {
     top: 5.25rem;
+  }
+
+  .play-overlay {
+    gap: 0.7rem;
+    padding: 0.85rem 1.1rem;
+  }
+
+  .play-overlay-label {
+    font-size: 0.72rem;
   }
 }
