@@ -95,11 +95,12 @@ function getCurrentRole(
   frameIndex: number,
 ): Role {
   const player = replay.players.find((p) => p.id === playerId);
-  if (!player) return "even";
+  if (!player) return "mid";
   const frame = player.frames[frameIndex];
-  if (!frame?.position) return "even";
+  if (!frame?.position) return "mid";
 
   const isTeamZero = player.isTeamZero;
+  const teamRosterCount = replay.players.filter((p) => p.isTeamZero === isTeamZero).length;
   const allYs: number[] = [];
   let normalizedY = 0;
 
@@ -111,6 +112,8 @@ function getCurrentRole(
     allYs.push(ny);
     if (p.id === playerId) normalizedY = ny;
   }
+
+  if (teamRosterCount < 2 || allYs.length !== teamRosterCount) return "mid";
 
   const minY = Math.min(...allYs);
   const maxY = Math.max(...allYs);

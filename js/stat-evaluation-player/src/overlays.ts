@@ -35,7 +35,7 @@ export class RoleOverlay {
       if (!mesh) continue;
 
       const material = new THREE.MeshBasicMaterial({
-        color: ROLE_COLORS.even,
+        color: ROLE_COLORS.mid,
         transparent: true,
         opacity: 0.6,
         side: THREE.DoubleSide,
@@ -72,7 +72,19 @@ export class RoleOverlay {
       teams.set(player.isTeamZero, team);
     }
 
-    for (const [, teamPlayers] of teams) {
+    for (const [isTeamZero, teamPlayers] of teams) {
+      const teamRosterCount = this.replay.players.filter(
+        (player) => player.isTeamZero === isTeamZero,
+      ).length;
+      if (teamRosterCount < 2 || teamPlayers.length !== teamRosterCount) {
+        for (const p of teamPlayers) {
+          const entry = this.rings.get(p.id);
+          if (!entry) continue;
+          entry.material.color.setHex(ROLE_COLORS.mid);
+        }
+        continue;
+      }
+
       teamPlayers.sort((a, b) => a.y - b.y);
 
       const minY = teamPlayers[0]?.y ?? 0;
@@ -222,6 +234,9 @@ export class ThresholdZoneOverlay {
     const threshold = MOST_BACK_FORWARD_THRESHOLD_Y;
 
     for (const isTeamZero of [true, false]) {
+      const teamRosterCount = this.replay.players.filter(
+        (player) => player.isTeamZero === isTeamZero,
+      ).length;
       const rawYs: number[] = [];
       for (const player of this.replay.players) {
         if (player.isTeamZero !== isTeamZero) continue;
@@ -233,7 +248,7 @@ export class ThresholdZoneOverlay {
       const backZone = isTeamZero ? this.blueBack : this.orangeBack;
       const frontZone = isTeamZero ? this.blueFront : this.orangeFront;
 
-      if (rawYs.length < 2) {
+      if (teamRosterCount < 2 || rawYs.length !== teamRosterCount) {
         backZone.group.visible = false;
         frontZone.group.visible = false;
         continue;

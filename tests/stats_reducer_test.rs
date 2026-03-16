@@ -1250,6 +1250,119 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
 }
 
 #[test]
+fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_buckets() {
+    let front_id = epic_id("positioning-front");
+    let back_id = epic_id("positioning-back");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball.clone(),
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1000.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&sample_stats(
+            2,
+            2.0,
+            1.0,
+            ball,
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                sample_player(back_id.clone(), true),
+            ],
+        ))
+        .unwrap();
+
+    let front_stats = reducer.player_stats().get(&front_id).unwrap();
+    assert_eq!(front_stats.time_most_forward, 0.0);
+    assert_eq!(front_stats.time_most_back, 0.0);
+    assert_eq!(front_stats.time_even, 0.0);
+    assert!(reducer.player_stats().get(&back_id).is_none());
+}
+
+#[test]
+fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold() {
+    let player_ids = [
+        epic_id("positioning-even-1"),
+        epic_id("positioning-even-2"),
+        epic_id("positioning-even-3"),
+    ];
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball.clone(),
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -40.0, 17.0)),
+                    ..sample_player(player_ids[0].clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(player_ids[1].clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 40.0, 17.0)),
+                    ..sample_player(player_ids[2].clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&sample_stats(
+            2,
+            2.0,
+            1.0,
+            ball,
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -40.0, 17.0)),
+                    ..sample_player(player_ids[0].clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(player_ids[1].clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 40.0, 17.0)),
+                    ..sample_player(player_ids[2].clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    for player_id in player_ids {
+        let stats = reducer.player_stats().get(&player_id).unwrap();
+        assert_eq!(stats.time_even, 1.0);
+        assert_eq!(stats.time_most_back, 0.0);
+        assert_eq!(stats.time_most_forward, 0.0);
+    }
+}
+
+#[test]
 fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets() {
     let mut reducer = PositioningReducer::new();
     let team_zero_id = epic_id("team-zero-positioning");

@@ -1790,6 +1790,11 @@ impl StatsReducer for PositioningReducer {
 
         if live_play {
             for is_team_0 in [true, false] {
+                let team_roster_count = sample
+                    .players
+                    .iter()
+                    .filter(|player| player.is_team_0 == is_team_0)
+                    .count();
                 let team_players: Vec<_> = sample
                     .players
                     .iter()
@@ -1818,44 +1823,48 @@ impl StatsReducer for PositioningReducer {
                     }
                 }
 
-                // Sort team players by normalized Y
-                let mut sorted_team: Vec<_> = team_players
-                    .iter()
-                    .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))
-                    .collect();
-                sorted_team.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+                if team_roster_count >= 2 && team_players.len() == team_roster_count {
+                    // These role buckets only make sense when the full multi-player team is live.
+                    let mut sorted_team: Vec<_> = team_players
+                        .iter()
+                        .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))
+                        .collect();
+                    sorted_team.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
 
-                let team_spread = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0)
-                    - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
+                    let team_spread = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0)
+                        - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
 
-                if team_spread <= self.config.most_back_forward_threshold_y {
-                    // All players are even
-                    for (player_id, _) in &sorted_team {
-                        self.player_stats
-                            .entry(player_id.clone())
-                            .or_default()
-                            .time_even += sample.dt;
-                    }
-                } else {
-                    let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
-                    let max_y = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0);
-
-                    for (player_id, y) in &sorted_team {
-                        let near_back = (*y - min_y) <= self.config.most_back_forward_threshold_y;
-                        let near_front = (max_y - *y) <= self.config.most_back_forward_threshold_y;
-
-                        if near_back && !near_front {
+                    if team_spread <= self.config.most_back_forward_threshold_y {
+                        // "Even" means the whole live team is compressed inside the threshold band.
+                        for (player_id, _) in &sorted_team {
                             self.player_stats
                                 .entry(player_id.clone())
                                 .or_default()
-                                .time_most_back += sample.dt;
-                        } else if near_front && !near_back {
-                            self.player_stats
-                                .entry(player_id.clone())
-                                .or_default()
-                                .time_most_forward += sample.dt;
+                                .time_even += sample.dt;
                         }
-                        // If near both or neither, player gets no role credit (mid)
+                    } else {
+                        let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
+                        let max_y = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0);
+
+                        for (player_id, y) in &sorted_team {
+                            let near_back =
+                                (*y - min_y) <= self.config.most_back_forward_threshold_y;
+                            let near_front =
+                                (max_y - *y) <= self.config.most_back_forward_threshold_y;
+
+                            if near_back && !near_front {
+                                self.player_stats
+                                    .entry(player_id.clone())
+                                    .or_default()
+                                    .time_most_back += sample.dt;
+                            } else if near_front && !near_back {
+                                self.player_stats
+                                    .entry(player_id.clone())
+                                    .or_default()
+                                    .time_most_forward += sample.dt;
+                            }
+                            // If near both or neither, player gets no role credit (mid).
+                        }
                     }
                 }
 
