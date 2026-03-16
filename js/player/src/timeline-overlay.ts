@@ -1,0 +1,601 @@
+import type {
+  ReplayPlayerPlugin,
+  ReplayPlayerPluginContext,
+  ReplayPlayerPluginStateContext,
+  ReplayTimelineEvent,
+  ReplayTimelineEventSource,
+} from "./types";
+
+export interface TimelineOverlayPluginOptions {
+  pauseWhileScrubbing?: boolean;
+  includeReplayEvents?: boolean;
+  events?: ReplayTimelineEventSource;
+}
+
+interface TimelineEventBucket {
+  key: string;
+  time: number;
+  events: ReplayTimelineEvent[];
+}
+
+const STYLE_ID = "subtr-actor-timeline-overlay-styles";
+const DEFAULT_REPLAY_EVENT_KINDS = new Set(["goal", "save"]);
+const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
+const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
+
+function ensureStyles(): void {
+  if (document.getElementById(STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    .sap-tl-root {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      overflow: hidden;
+      font-family: "IBM Plex Sans", "Segoe UI", Roboto, sans-serif;
+    }
+
+    .sap-tl-shell {
+      position: absolute;
+      left: 0.8rem;
+      right: 0.8rem;
+      bottom: 0.9rem;
+      padding: 0.75rem 0.9rem 0.9rem;
+      border: 1px solid rgba(180, 205, 226, 0.18);
+      border-radius: 1.05rem;
+      background:
+        linear-gradient(180deg, rgba(13, 20, 28, 0.92), rgba(7, 12, 18, 0.96));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+
+    .sap-tl-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        linear-gradient(90deg, rgba(60, 134, 255, 0.18), transparent 28%, transparent 72%, rgba(242, 138, 37, 0.16));
+      pointer-events: none;
+    }
+
+    .sap-tl-topline {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.55rem;
+      color: #f5fbff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      gap: 0.85rem;
+    }
+
+    .sap-tl-current {
+      color: #f5fbff;
+    }
+
+    .sap-tl-remaining {
+      color: #b8c9d9;
+    }
+
+    .sap-tl-track-wrap {
+      position: relative;
+      padding-top: 1.05rem;
+    }
+
+    .sap-tl-range {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      margin: 0;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .sap-tl-range:focus {
+      outline: none;
+    }
+
+    .sap-tl-range::-webkit-slider-runnable-track {
+      height: 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(90deg, rgba(60, 134, 255, 0.42), rgba(103, 179, 255, 0.58) 45%, rgba(242, 138, 37, 0.58));
+      box-shadow: inset 0 0 0 999px rgba(5, 10, 15, 0.4);
+    }
+
+    .sap-tl-range::-moz-range-track {
+      height: 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(90deg, rgba(60, 134, 255, 0.42), rgba(103, 179, 255, 0.58) 45%, rgba(242, 138, 37, 0.58));
+      box-shadow: inset 0 0 0 999px rgba(5, 10, 15, 0.4);
+    }
+
+    .sap-tl-range::-webkit-slider-thumb {
+      appearance: none;
+      margin-top: -0.38rem;
+      width: 1.35rem;
+      height: 1.35rem;
+      border: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, #ffffff 0%, #d8ebff 28%, #7bb4ff 55%, #27456d 100%);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
+    }
+
+    .sap-tl-range::-moz-range-thumb {
+      width: 1.35rem;
+      height: 1.35rem;
+      border: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, #ffffff 0%, #d8ebff 28%, #7bb4ff 55%, #27456d 100%);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
+    }
+
+    .sap-tl-shell[data-scrubbing="true"] .sap-tl-range::-webkit-slider-thumb,
+    .sap-tl-shell[data-scrubbing="true"] .sap-tl-range::-moz-range-thumb {
+      background:
+        radial-gradient(circle at 35% 35%, #ffffff 0%, #ffe5c5 32%, #ffad47 58%, #7b3d00 100%);
+      transform: scale(1.05);
+    }
+
+    .sap-tl-markers {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 1rem;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .sap-tl-marker {
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      width: 0.95rem;
+      height: 0.95rem;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(12, 18, 24, 0.96);
+      color: #f5fbff;
+      font-size: 0.52rem;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .sap-tl-marker::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 0.85rem;
+      width: 2px;
+      height: 0.55rem;
+      transform: translateX(-50%);
+      background: currentColor;
+      opacity: 0.7;
+    }
+
+    .sap-tl-marker:hover {
+      filter: brightness(1.08);
+    }
+
+    .sap-tl-marker[data-passed="true"] {
+      opacity: 0.9;
+    }
+
+    .sap-tl-marker[data-active="true"] {
+      transform: translateX(-50%) scale(1.16);
+      opacity: 1;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+    }
+
+    @media (max-width: 720px) {
+      .sap-tl-shell {
+        bottom: 0.6rem;
+        left: 0.5rem;
+        right: 0.5rem;
+        padding: 0.65rem 0.7rem 0.75rem;
+      }
+
+      .sap-tl-topline {
+        font-size: 0.72rem;
+      }
+    }
+  `;
+  document.head.append(style);
+}
+
+function formatPlaybackTime(seconds: number): string {
+  if (!Number.isFinite(seconds)) {
+    return "--:--.--";
+  }
+
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const wholeSeconds = Math.floor(safeSeconds % 60);
+  const hundredths = Math.floor((safeSeconds - Math.floor(safeSeconds)) * 100);
+  return `${minutes}:${String(wholeSeconds).padStart(2, "0")}.${String(hundredths).padStart(2, "0")}`;
+}
+
+function eventPriority(event: ReplayTimelineEvent): number {
+  switch (event.kind) {
+    case "goal":
+      return 5;
+    case "demo":
+      return 4;
+    case "save":
+      return 3;
+    case "assist":
+      return 2;
+    case "shot":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function eventAccent(event: ReplayTimelineEvent): string {
+  if (event.color) {
+    return event.color;
+  }
+
+  if (event.isTeamZero === true) {
+    return "#3b82f6";
+  }
+  if (event.isTeamZero === false) {
+    return "#f59e0b";
+  }
+
+  switch (event.kind) {
+    case "goal":
+      return "#f5f7fa";
+    case "demo":
+      return "#ef4444";
+    case "save":
+      return "#34d399";
+    case "assist":
+      return "#c084fc";
+    case "shot":
+      return "#60a5fa";
+    default:
+      return "#d1d9e0";
+  }
+}
+
+function eventBadgeText(bucket: TimelineEventBucket): string {
+  if (bucket.events.length > 1) {
+    return `${bucket.events.length}`;
+  }
+
+  const event = bucket.events[0];
+  if (!event) {
+    return "";
+  }
+
+  if (event.shortLabel && event.shortLabel.trim() !== "") {
+    return event.shortLabel.slice(0, 3).toUpperCase();
+  }
+
+  return event.kind.slice(0, 1).toUpperCase();
+}
+
+function bucketTitle(bucket: TimelineEventBucket): string {
+  return bucket.events
+    .map((event) => `${formatPlaybackTime(event.time)} ${event.label ?? event.kind}`)
+    .join("\n");
+}
+
+function groupEvents(events: ReplayTimelineEvent[]): TimelineEventBucket[] {
+  const groups = new Map<string, TimelineEventBucket>();
+  for (const event of events) {
+    const key =
+      event.frame !== undefined
+        ? `frame:${event.frame}`
+        : `time:${event.time.toFixed(2)}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.events.push(event);
+      continue;
+    }
+    groups.set(key, {
+      key,
+      time: event.time,
+      events: [event],
+    });
+  }
+
+  return [...groups.values()]
+    .map((bucket) => ({
+      ...bucket,
+      events: [...bucket.events].sort((left, right) => {
+        const priorityDiff = eventPriority(right) - eventPriority(left);
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
+        return left.time - right.time;
+      }),
+    }))
+    .sort((left, right) => left.time - right.time);
+}
+
+function resolveCustomEvents(
+  source: ReplayTimelineEventSource | undefined,
+  context: ReplayPlayerPluginContext
+): ReplayTimelineEvent[] {
+  if (!source) {
+    return [];
+  }
+
+  return typeof source === "function" ? source(context) : source;
+}
+
+function markerSeekTime(
+  eventTime: number,
+  context: ReplayPlayerPluginContext
+): number {
+  const projection = context.player.projectReplayTimeToTimeline(eventTime);
+  if (!projection.hiddenBySkip) {
+    return projection.seekTime;
+  }
+
+  const nextTimelineTime = Math.min(
+    context.player.getTimelineDuration(),
+    projection.timelineTime + HIDDEN_EVENT_SEEK_EPSILON_SECONDS
+  );
+  return context.player.projectTimelineTimeToReplay(nextTimelineTime);
+}
+
+export function createTimelineOverlayPlugin(
+  options: TimelineOverlayPluginOptions = {}
+): ReplayPlayerPlugin {
+  const pauseWhileScrubbing = options.pauseWhileScrubbing ?? true;
+  const includeReplayEvents = options.includeReplayEvents ?? true;
+
+  let root: HTMLDivElement | null = null;
+  let shell: HTMLDivElement | null = null;
+  let range: HTMLInputElement | null = null;
+  let currentTimeText: HTMLSpanElement | null = null;
+  let remainingTimeText: HTMLSpanElement | null = null;
+  let markers: HTMLDivElement | null = null;
+  let removeWindowListeners: (() => void) | null = null;
+  let changedContainerPosition = false;
+  let originalContainerPosition = "";
+  let scrubbing = false;
+  let resumePlaybackAfterScrub = false;
+  let playerContext: ReplayPlayerPluginContext | null = null;
+  let eventBuckets: TimelineEventBucket[] = [];
+  const markerElements = new Map<string, HTMLButtonElement>();
+
+  function syncState(context: ReplayPlayerPluginStateContext): void {
+    if (!range || !currentTimeText || !remainingTimeText || !shell) {
+      return;
+    }
+
+    const currentTime = context.player.getTimelineCurrentTime();
+    const duration = context.player.getTimelineDuration();
+    range.min = "0";
+    range.max = `${duration}`;
+    range.step = "0.01";
+    range.value = `${Math.min(currentTime, duration)}`;
+    currentTimeText.textContent = formatPlaybackTime(currentTime);
+    remainingTimeText.textContent = `-${formatPlaybackTime(duration - currentTime)}`;
+    shell.dataset.scrubbing = scrubbing ? "true" : "false";
+
+    for (const bucket of eventBuckets) {
+      const marker = markerElements.get(bucket.key);
+      if (!marker) {
+        continue;
+      }
+      const projection = context.player.projectReplayTimeToTimeline(bucket.time);
+      const timeSinceEvent = currentTime - projection.timelineTime;
+      const active =
+        timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
+      marker.dataset.active = active ? "true" : "false";
+      marker.dataset.passed =
+        projection.timelineTime <= currentTime ? "true" : "false";
+    }
+  }
+
+  function buildMarkers(
+    context: ReplayPlayerPluginContext
+  ): void {
+    if (!markers) {
+      return;
+    }
+
+    markers.replaceChildren();
+    markerElements.clear();
+
+    const replayEvents = includeReplayEvents
+      ? context.replay.timelineEvents.filter((event) =>
+          DEFAULT_REPLAY_EVENT_KINDS.has(event.kind)
+        )
+      : [];
+    const customEvents = resolveCustomEvents(options.events, context);
+    eventBuckets = groupEvents([...replayEvents, ...customEvents]);
+    const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
+
+    for (const bucket of eventBuckets) {
+      const primaryEvent = bucket.events[0];
+      if (!primaryEvent) {
+        continue;
+      }
+      const projection = context.player.projectReplayTimeToTimeline(bucket.time);
+
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = "sap-tl-marker";
+      marker.style.left = `${(projection.timelineTime / duration) * 100}%`;
+      marker.style.color = eventAccent(primaryEvent);
+      marker.title = bucketTitle(bucket);
+      marker.textContent = eventBadgeText(bucket);
+      marker.addEventListener("click", () => {
+        context.player.seek(markerSeekTime(bucket.time, context));
+      });
+      marker.dataset.active = "false";
+      marker.dataset.passed = "false";
+      markers.append(marker);
+      markerElements.set(bucket.key, marker);
+    }
+  }
+
+  function endScrub(): void {
+    if (!scrubbing) {
+      return;
+    }
+
+    scrubbing = false;
+    shell?.setAttribute("data-scrubbing", "false");
+    if (resumePlaybackAfterScrub) {
+      playerContext?.player.play();
+    }
+    resumePlaybackAfterScrub = false;
+  }
+
+  function beginScrub(): void {
+    if (scrubbing) {
+      return;
+    }
+
+    scrubbing = true;
+    shell?.setAttribute("data-scrubbing", "true");
+    if (!pauseWhileScrubbing) {
+      return;
+    }
+
+    const player = playerContext?.player;
+    if (!player) {
+      return;
+    }
+
+    resumePlaybackAfterScrub = player.getState().playing;
+    if (resumePlaybackAfterScrub) {
+      player.pause();
+    }
+  }
+
+  return {
+    id: "timeline-overlay",
+    setup(context): void {
+      playerContext = context;
+      ensureStyles();
+
+      if (getComputedStyle(context.container).position === "static") {
+        changedContainerPosition = true;
+        originalContainerPosition = context.container.style.position;
+        context.container.style.position = "relative";
+      }
+
+      root = document.createElement("div");
+      root.className = "sap-tl-root";
+      shell = document.createElement("div");
+      shell.className = "sap-tl-shell";
+      shell.dataset.scrubbing = "false";
+
+      const topLine = document.createElement("div");
+      topLine.className = "sap-tl-topline";
+
+      currentTimeText = document.createElement("span");
+      currentTimeText.className = "sap-tl-current";
+      currentTimeText.textContent = "0:00.00";
+
+      remainingTimeText = document.createElement("span");
+      remainingTimeText.className = "sap-tl-remaining";
+      remainingTimeText.textContent = "-0:00.00";
+
+      topLine.append(currentTimeText, remainingTimeText);
+
+      const trackWrap = document.createElement("div");
+      trackWrap.className = "sap-tl-track-wrap";
+
+      markers = document.createElement("div");
+      markers.className = "sap-tl-markers";
+
+      range = document.createElement("input");
+      range.className = "sap-tl-range";
+      range.type = "range";
+      range.min = "0";
+      range.max = `${context.replay.duration}`;
+      range.step = "0.01";
+      range.value = "0";
+
+      const handlePointerDown = (): void => {
+        beginScrub();
+      };
+      const handleInput = (): void => {
+        if (!range) {
+          return;
+        }
+
+        context.player.seek(
+          context.player.projectTimelineTimeToReplay(Number(range.value))
+        );
+      };
+      const handleWindowPointerUp = (): void => {
+        endScrub();
+      };
+
+      range.addEventListener("pointerdown", handlePointerDown);
+      range.addEventListener("input", handleInput);
+      range.addEventListener("change", handleWindowPointerUp);
+      window.addEventListener("pointerup", handleWindowPointerUp);
+      window.addEventListener("pointercancel", handleWindowPointerUp);
+      removeWindowListeners = (): void => {
+        range?.removeEventListener("pointerdown", handlePointerDown);
+        range?.removeEventListener("input", handleInput);
+        range?.removeEventListener("change", handleWindowPointerUp);
+        window.removeEventListener("pointerup", handleWindowPointerUp);
+        window.removeEventListener("pointercancel", handleWindowPointerUp);
+      };
+
+      trackWrap.append(markers, range);
+      shell.append(topLine, trackWrap);
+      root.append(shell);
+      context.container.append(root);
+      buildMarkers(context);
+      syncState({
+        ...context,
+        state: context.player.getState(),
+      });
+    },
+    onStateChange(context): void {
+      playerContext = context;
+      syncState(context);
+    },
+    teardown(context): void {
+      removeWindowListeners?.();
+      removeWindowListeners = null;
+      endScrub();
+      root?.remove();
+      root = null;
+      shell = null;
+      range = null;
+      currentTimeText = null;
+      remainingTimeText = null;
+      markers = null;
+      playerContext = null;
+      eventBuckets = [];
+      markerElements.clear();
+      if (changedContainerPosition) {
+        context.container.style.position = originalContainerPosition;
+        changedContainerPosition = false;
+      }
+    },
+  };
+}

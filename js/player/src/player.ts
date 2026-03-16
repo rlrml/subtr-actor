@@ -13,6 +13,8 @@ import type {
   ReplayPlayerPluginStateContext,
   ReplayPlayerRenderContext,
   ReplayPlayerRenderTrackContext,
+  ReplayPlayerTimelineProjection,
+  ReplayPlayerTimelineSegment,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
   ReplayPlayerState,
@@ -102,6 +104,9 @@ export class ReplayPlayer extends EventTarget {
   private readonly boundWindowResize = () => this.sceneState.resize();
   private readonly liveGameState: number | null;
   private readonly kickoffGameState: number | null;
+  private timelineSegmentsCacheKey: string | null = null;
+  private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
+  private timelineDurationCache = 0;
   private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
   private disposed = false;
@@ -334,6 +339,95 @@ export class ReplayPlayer extends EventTarget {
 
   getSnapshot(): ReplayPlayerSnapshot {
     return this.getState();
+  }
+
+  getTimelineDuration(): number {
+    return this.getTimelineSegments().length === 0
+      ? this.replay.duration
+      : this.timelineDurationCache;
+  }
+
+  getTimelineCurrentTime(): number {
+    return this.projectReplayTimeToTimeline(this.currentTime).timelineTime;
+  }
+
+  getTimelineSegments(): ReplayPlayerTimelineSegment[] {
+    const cacheKey =
+      `${this.skipPostGoalTransitionsEnabled}:${this.skipKickoffsEnabled}`;
+    if (this.timelineSegmentsCacheKey === cacheKey) {
+      return this.timelineSegmentsCache;
+    }
+
+    this.timelineSegmentsCacheKey = cacheKey;
+    this.timelineSegmentsCache = this.computeTimelineSegments();
+    this.timelineDurationCache = Math.max(
+      0,
+      this.replay.duration -
+        this.timelineSegmentsCache.reduce(
+          (total, segment) => total + (segment.endTime - segment.startTime),
+          0
+        )
+    );
+    return this.timelineSegmentsCache;
+  }
+
+  projectReplayTimeToTimeline(
+    replayTime: number
+  ): ReplayPlayerTimelineProjection {
+    const clampedReplayTime = THREE.MathUtils.clamp(
+      replayTime,
+      0,
+      this.replay.duration
+    );
+    let skippedDuration = 0;
+
+    for (const segment of this.getTimelineSegments()) {
+      if (clampedReplayTime < segment.startTime) {
+        break;
+      }
+
+      if (clampedReplayTime < segment.endTime) {
+        return {
+          replayTime: clampedReplayTime,
+          timelineTime: segment.startTime - skippedDuration,
+          seekTime: segment.startTime,
+          hiddenBySkip: true,
+        };
+      }
+
+      skippedDuration += segment.endTime - segment.startTime;
+    }
+
+    return {
+      replayTime: clampedReplayTime,
+      timelineTime: clampedReplayTime - skippedDuration,
+      seekTime: clampedReplayTime,
+      hiddenBySkip: false,
+    };
+  }
+
+  projectTimelineTimeToReplay(timelineTime: number): number {
+    const clampedTimelineTime = THREE.MathUtils.clamp(
+      timelineTime,
+      0,
+      this.getTimelineDuration()
+    );
+    let skippedDuration = 0;
+
+    for (const segment of this.getTimelineSegments()) {
+      const visibleEnd = segment.startTime - skippedDuration;
+      if (clampedTimelineTime <= visibleEnd) {
+        return clampedTimelineTime + skippedDuration;
+      }
+
+      skippedDuration += segment.endTime - segment.startTime;
+    }
+
+    return THREE.MathUtils.clamp(
+      clampedTimelineTime + skippedDuration,
+      0,
+      this.replay.duration
+    );
   }
 
   subscribe(listener: ReplayPlayerListener): () => void {
@@ -779,6 +873,61 @@ export class ReplayPlayer extends EventTarget {
     frameIndex: number
   ): boolean {
     return !this.isLiveGameplayFrame(frame) && !this.isRenderableKickoffFrame(frame, frameIndex);
+  }
+
+  private isSkippedTimelineFrame(
+    frame: ReplayModel["frames"][number],
+    frameIndex: number
+  ): boolean {
+    return (
+      (this.skipPostGoalTransitionsEnabled &&
+        this.isPostGoalTransitionFrame(frame, frameIndex)) ||
+      (this.skipKickoffsEnabled && this.isKickoffFrame(frame))
+    );
+  }
+
+  private computeTimelineSegments(): ReplayPlayerTimelineSegment[] {
+    const segments: ReplayPlayerTimelineSegment[] = [];
+    const frames = this.replay.frames;
+
+    if (
+      frames.length === 0 ||
+      (!this.skipPostGoalTransitionsEnabled && !this.skipKickoffsEnabled)
+    ) {
+      return segments;
+    }
+
+    let index = 0;
+    while (index < frames.length) {
+      const frame = frames[index];
+      if (!frame || !this.isSkippedTimelineFrame(frame, index)) {
+        index += 1;
+        continue;
+      }
+
+      const startTime = frame.time;
+      let endIndex = index + 1;
+      while (
+        endIndex < frames.length &&
+        this.isSkippedTimelineFrame(frames[endIndex], endIndex)
+      ) {
+        endIndex += 1;
+      }
+
+      const endTime = frames[endIndex]?.time ?? this.replay.duration;
+      if (endTime > startTime) {
+        const previous = segments.at(-1);
+        if (previous && previous.endTime >= startTime) {
+          previous.endTime = Math.max(previous.endTime, endTime);
+        } else {
+          segments.push({ startTime, endTime });
+        }
+      }
+
+      index = endIndex;
+    }
+
+    return segments;
   }
 
   private updateCamera(

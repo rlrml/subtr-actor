@@ -384,14 +384,8 @@ input {
 }
 
 .transport-row button:disabled,
-.transport-row select:disabled,
-#timeline:disabled {
+.transport-row select:disabled {
   opacity: 0.5;
-}
-
-#timeline {
-  width: 100%;
-  margin-bottom: 1rem;
 }
 
 .stat-grid {
