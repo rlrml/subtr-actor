@@ -4,6 +4,7 @@ mod ball_carry;
 mod boost;
 mod core;
 mod demo;
+mod dodge_reset;
 mod movement;
 mod positioning;
 mod possession;

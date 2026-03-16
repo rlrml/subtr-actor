@@ -135,6 +135,7 @@ pub struct StatsSample {
     pub demo_events: Vec<DemolishInfo>,
     pub boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
+    pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     pub player_stat_events: Vec<PlayerStatEvent>,
     pub goal_events: Vec<GoalEvent>,
 }
@@ -282,6 +283,7 @@ impl StatsSample {
             demo_events: Vec::new(),
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
             touch_events: processor.current_frame_touch_events().to_vec(),
+            dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
             player_stat_events: processor.current_frame_player_stat_events().to_vec(),
             goal_events: processor.current_frame_goal_events().to_vec(),
         })
@@ -938,6 +940,8 @@ pub mod match_stats;
 pub use match_stats::*;
 pub mod demo;
 pub use demo::*;
+pub mod dodge_reset;
+pub use dodge_reset::*;
 pub mod movement;
 pub use movement::*;
 pub mod positioning;

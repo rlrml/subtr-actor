@@ -88,6 +88,7 @@ pub struct PlayerStatsSnapshot {
     pub name: String,
     pub is_team_0: bool,
     pub core: CorePlayerStats,
+    pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
     pub movement: MovementStats,
@@ -118,6 +119,7 @@ impl StatFieldProvider for TeamStatsSnapshot {
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.dodge_reset.visit_stat_fields(visitor);
         self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
         self.movement.visit_stat_fields(visitor);
@@ -170,6 +172,7 @@ struct StatsTimelineReducers {
     positioning: PositioningReducer,
     powerslide: PowerslideReducer,
     demo: DemoReducer,
+    dodge_reset: DodgeResetReducer,
 }
 
 impl StatsTimelineReducers {
@@ -191,6 +194,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.positioning.on_replay_meta(meta)?;
         self.powerslide.on_replay_meta(meta)?;
         self.demo.on_replay_meta(meta)?;
+        self.dodge_reset.on_replay_meta(meta)?;
         Ok(())
     }
 
@@ -203,6 +207,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.positioning.on_sample(sample)?;
         self.powerslide.on_sample(sample)?;
         self.demo.on_sample(sample)?;
+        self.dodge_reset.on_sample(sample)?;
         Ok(())
     }
 
@@ -215,6 +220,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.positioning.finish()?;
         self.powerslide.finish()?;
         self.demo.finish()?;
+        self.dodge_reset.finish()?;
         Ok(())
     }
 }
@@ -343,6 +349,13 @@ impl StatsTimelineCollector {
                     core: self
                         .reducers
                         .match_stats
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    dodge_reset: self
+                        .reducers
+                        .dodge_reset
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()

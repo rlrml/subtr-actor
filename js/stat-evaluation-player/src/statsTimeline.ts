@@ -35,6 +35,10 @@ export interface PlayerStatsSnapshot {
     goals_conceded_while_last_defender: number;
     [key: string]: unknown;
   };
+  dodge_reset?: {
+    count: number;
+    [key: string]: unknown;
+  };
   ball_carry?: {
     carry_count: number;
     total_carry_time: number;
