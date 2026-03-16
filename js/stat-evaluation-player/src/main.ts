@@ -56,12 +56,12 @@ interface StatModule {
 const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 
-type Role = "back" | "forward" | "even" | "mid";
+type Role = "back" | "forward" | "other" | "mid";
 
 const ROLE_LABELS: Record<Role, string> = {
   back: "Back",
   forward: "Fwd",
-  even: "Even",
+  other: "Other",
   mid: "Mid",
 };
 
@@ -140,7 +140,7 @@ function getCurrentRole(
   const maxY = Math.max(...allYs);
   const spread = maxY - minY;
 
-  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "even";
+  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "other";
 
   const nearBack = normalizedY - minY <= MOST_BACK_FORWARD_THRESHOLD_Y;
   const nearFront = maxY - normalizedY <= MOST_BACK_FORWARD_THRESHOLD_Y;
@@ -166,8 +166,8 @@ function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"])
     <div class="stat-row"><span class="label">Active</span><span class="value">${pos?.active_game_time?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Mid</span><span class="value">${pos?.time_mid_role?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Other</span><span class="value">${pos?.time_other_role?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Even</span><span class="value">${pos?.time_even?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">No teammate</span><span class="value">${pos?.time_no_teammates?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Demoed</span><span class="value">${pos?.time_demolished?.toFixed(1) ?? "?"}s</span></div>
   `;
@@ -318,6 +318,12 @@ function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
     <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(demo?.demos_inflicted)}</span></div>
     <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(demo?.demos_taken)}</span></div>
     <div class="stat-row"><span class="label">Diff</span><span class="value">${differential === undefined ? "?" : `${differential > 0 ? "+" : ""}${differential}`}</span></div>
+  `;
+}
+
+function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): string {
+  return `
+    <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
   `;
 }
 
@@ -531,6 +537,8 @@ function createBoostModule(): StatModule {
           <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
           <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
           <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
+          <div class="stat-row"><span class="label">Used ground</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_grounded)}</span></div>
+          <div class="stat-row"><span class="label">Used air</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_airborne)}</span></div>
           <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
@@ -559,6 +567,8 @@ function createBoostModule(): StatModule {
         <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
         <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
         <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
+        <div class="stat-row"><span class="label">Used ground</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_grounded)}</span></div>
+        <div class="stat-row"><span class="label">Used air</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_airborne)}</span></div>
         <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
         <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
         <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
@@ -633,6 +643,15 @@ function createBallCarryModule(): StatModule {
   });
 }
 
+function createDodgeResetModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "dodge-reset",
+    label: "Dodge Reset",
+    select: (player) => player.dodge_reset,
+    render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
+  });
+}
+
 function createMovementModule(): StatModule {
   return createPlayerStatsModule({
     id: "movement",
@@ -667,6 +686,7 @@ const ALL_MODULES = [
   createPossessionModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
+  createDodgeResetModule,
   createBoostModule,
   createBallCarryModule,
   createMovementModule,

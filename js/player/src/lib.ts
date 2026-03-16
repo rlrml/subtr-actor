@@ -4,7 +4,10 @@ export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
 export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";
 export type { BoostPadOverlayPluginOptions } from "./boost-pad-overlay";
 export { createTimelineOverlayPlugin } from "./timeline-overlay";
-export type { TimelineOverlayPluginOptions } from "./timeline-overlay";
+export type {
+  TimelineOverlayPlugin,
+  TimelineOverlayPluginOptions,
+} from "./timeline-overlay";
 export {
   loadPlaylistManifestFromFile,
   parsePlaylistManifest,

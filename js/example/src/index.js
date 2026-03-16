@@ -314,7 +314,9 @@ async function loadReplayFile(file) {
     plugins: [
       createBallchasingOverlayPlugin(),
       createBoostPadOverlayPlugin(),
-      createTimelineOverlayPlugin(),
+      createTimelineOverlayPlugin({
+        replayEventKinds: ["goal", "save", "demo"],
+      }),
     ],
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);

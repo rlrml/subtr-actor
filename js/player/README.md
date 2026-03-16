@@ -48,8 +48,36 @@ The package ships with reusable UI plugins:
 - `createBoostPadOverlayPlugin()` for in-stadium standard Soccar boost pad
   availability markers driven by replay pad events
 - `createTimelineOverlayPlugin()` for a bottom-docked replay scrubber with
-  integrated play/pause, time readouts, clickable event markers, default replay markers
-  (goals/saves), and caller-supplied custom events
+  integrated play/pause, time readouts, clickable event markers, configurable replay
+  markers (defaulting to goals/saves), and caller-supplied custom events
+
+Timeline markers can be tuned per consumer. For example, to include demolishes:
+
+```ts
+createTimelineOverlayPlugin({
+  replayEventKinds: ["goal", "save", "demo"],
+});
+```
+
+For full control, `replayEvents` can override the built-in replay marker source,
+and `events` can append additional caller-defined markers.
+
+If you need to add markers later, keep a reference to the plugin instance:
+
+```ts
+const timeline = createTimelineOverlayPlugin();
+
+const detachShots = timeline.addEventSource(({ replay }) =>
+  replay.timelineEvents.filter((event) => event.kind === "shot")
+);
+
+timeline.refreshEvents();
+detachShots();
+```
+
+`addEventSource()` is additive, `removeEventSource()` removes a previously added
+source, and `refreshEvents()` rebuilds markers when a source's output depends on
+external mutable state.
 
 For multi-replay workflows, the playlist layer is intentionally generic. Each
 `PlaylistItem` specifies a replay source, a start bound, an end bound, and

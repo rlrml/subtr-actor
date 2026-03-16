@@ -3,13 +3,22 @@ import type {
   ReplayPlayerPluginContext,
   ReplayPlayerPluginStateContext,
   ReplayTimelineEvent,
+  ReplayTimelineEventKind,
   ReplayTimelineEventSource,
 } from "./types";
 
 export interface TimelineOverlayPluginOptions {
   pauseWhileScrubbing?: boolean;
   includeReplayEvents?: boolean;
+  replayEventKinds?: Iterable<ReplayTimelineEventKind>;
+  replayEvents?: ReplayTimelineEventSource;
   events?: ReplayTimelineEventSource;
+}
+
+export interface TimelineOverlayPlugin extends ReplayPlayerPlugin {
+  addEventSource(source: ReplayTimelineEventSource): () => void;
+  removeEventSource(source: ReplayTimelineEventSource): boolean;
+  refreshEvents(): void;
 }
 
 interface TimelineEventBucket {
@@ -19,7 +28,10 @@ interface TimelineEventBucket {
 }
 
 const STYLE_ID = "subtr-actor-timeline-overlay-styles";
-const DEFAULT_REPLAY_EVENT_KINDS = new Set(["goal", "save"]);
+const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>([
+  "goal",
+  "save",
+]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
 const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
 
@@ -393,6 +405,37 @@ function resolveCustomEvents(
   return typeof source === "function" ? source(context) : source;
 }
 
+function resolveEventSources(
+  sources: Iterable<ReplayTimelineEventSource>,
+  context: ReplayPlayerPluginContext
+): ReplayTimelineEvent[] {
+  const events: ReplayTimelineEvent[] = [];
+  for (const source of sources) {
+    events.push(...resolveCustomEvents(source, context));
+  }
+  return events;
+}
+
+function resolveReplayEvents(
+  options: TimelineOverlayPluginOptions,
+  context: ReplayPlayerPluginContext
+): ReplayTimelineEvent[] {
+  if (options.replayEvents) {
+    return resolveCustomEvents(options.replayEvents, context);
+  }
+
+  if (options.includeReplayEvents === false) {
+    return [];
+  }
+
+  const allowedKinds = new Set(
+    options.replayEventKinds ?? DEFAULT_REPLAY_EVENT_KINDS
+  );
+  return context.replay.timelineEvents.filter((event) =>
+    allowedKinds.has(event.kind)
+  );
+}
+
 function markerSeekTime(
   eventTime: number,
   context: ReplayPlayerPluginContext
@@ -418,9 +461,9 @@ function markerLeftPercent(
 
 export function createTimelineOverlayPlugin(
   options: TimelineOverlayPluginOptions = {}
-): ReplayPlayerPlugin {
+): TimelineOverlayPlugin {
   const pauseWhileScrubbing = options.pauseWhileScrubbing ?? true;
-  const includeReplayEvents = options.includeReplayEvents ?? true;
+  const extraEventSources = options.events ? [options.events] : [];
 
   let root: HTMLDivElement | null = null;
   let shell: HTMLDivElement | null = null;
@@ -439,6 +482,18 @@ export function createTimelineOverlayPlugin(
   let playerContext: ReplayPlayerPluginContext | null = null;
   let eventBuckets: TimelineEventBucket[] = [];
   const markerElements = new Map<string, HTMLButtonElement>();
+
+  function refreshMarkers(): void {
+    if (!playerContext) {
+      return;
+    }
+
+    buildMarkers(playerContext);
+    syncState({
+      ...playerContext,
+      state: playerContext.player.getState(),
+    });
+  }
 
   function syncState(context: ReplayPlayerPluginStateContext): void {
     if (
@@ -497,12 +552,8 @@ export function createTimelineOverlayPlugin(
     markers.replaceChildren();
     markerElements.clear();
 
-    const replayEvents = includeReplayEvents
-      ? context.replay.timelineEvents.filter((event) =>
-          DEFAULT_REPLAY_EVENT_KINDS.has(event.kind)
-        )
-      : [];
-    const customEvents = resolveCustomEvents(options.events, context);
+    const replayEvents = resolveReplayEvents(options, context);
+    const customEvents = resolveEventSources(extraEventSources, context);
     eventBuckets = groupEvents([...replayEvents, ...customEvents]);
     const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
 
@@ -567,6 +618,26 @@ export function createTimelineOverlayPlugin(
 
   return {
     id: "timeline-overlay",
+    addEventSource(source): () => void {
+      extraEventSources.push(source);
+      refreshMarkers();
+      return () => {
+        this.removeEventSource(source);
+      };
+    },
+    removeEventSource(source): boolean {
+      const index = extraEventSources.indexOf(source);
+      if (index < 0) {
+        return false;
+      }
+
+      extraEventSources.splice(index, 1);
+      refreshMarkers();
+      return true;
+    },
+    refreshEvents(): void {
+      refreshMarkers();
+    },
     setup(context): void {
       playerContext = context;
       ensureStyles();
