@@ -183,6 +183,202 @@ function renderAbsolutePositioningStats(pos: PlayerStatsSnapshot["positioning"])
   `;
 }
 
+function formatInteger(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return "?";
+  }
+
+  return `${Math.round(value)}`;
+}
+
+function formatNumber(
+  value: number | undefined,
+  digits = 1,
+  suffix = "",
+): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return "?";
+  }
+
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
+function formatPercentage(
+  numerator: number | undefined,
+  denominator: number | undefined,
+  digits = 1,
+): string {
+  if (
+    numerator === undefined ||
+    denominator === undefined ||
+    Number.isNaN(numerator) ||
+    Number.isNaN(denominator) ||
+    denominator <= 0
+  ) {
+    return "?";
+  }
+
+  return `${(numerator * 100 / denominator).toFixed(digits)}%`;
+}
+
+function formatTimeShare(
+  value: number | undefined,
+  total: number | undefined,
+  digits = 1,
+): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return "?";
+  }
+
+  const percentage = formatPercentage(value, total, digits);
+  if (percentage === "?") {
+    return `${value.toFixed(digits)}s`;
+  }
+
+  return `${value.toFixed(digits)}s (${percentage})`;
+}
+
+function renderCoreStats(core: PlayerStatsSnapshot["core"]): string {
+  const shootingPercentage = core
+    ? core.shots > 0
+      ? formatPercentage(core.goals, core.shots)
+      : "0.0%"
+    : "?";
+
+  return `
+    <div class="stat-row"><span class="label">Score</span><span class="value">${formatInteger(core?.score)}</span></div>
+    <div class="stat-row"><span class="label">Goals</span><span class="value">${formatInteger(core?.goals)}</span></div>
+    <div class="stat-row"><span class="label">Assists</span><span class="value">${formatInteger(core?.assists)}</span></div>
+    <div class="stat-row"><span class="label">Saves</span><span class="value">${formatInteger(core?.saves)}</span></div>
+    <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(core?.shots)}</span></div>
+    <div class="stat-row"><span class="label">Shooting</span><span class="value">${shootingPercentage}</span></div>
+    <div class="stat-row"><span class="label">GA as last</span><span class="value">${formatInteger(core?.goals_conceded_while_last_defender)}</span></div>
+  `;
+}
+
+function renderBallCarryStats(ballCarry: PlayerStatsSnapshot["ball_carry"]): string {
+  const carryCount = ballCarry?.carry_count;
+  return `
+    <div class="stat-row"><span class="label">Carries</span><span class="value">${formatInteger(carryCount)}</span></div>
+    <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(ballCarry?.total_carry_time, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg carry</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_carry_time / carryCount : undefined, 1, "s") : carryCount === 0 ? "0.0s" : "?"}</span></div>
+    <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(ballCarry?.longest_carry_time, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Furthest</span><span class="value">${formatNumber(ballCarry?.furthest_carry_distance, 0, " uu")}</span></div>
+    <div class="stat-row"><span class="label">Avg straight</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_straight_line_distance / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
+    <div class="stat-row"><span class="label">Avg path</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_path_distance / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
+    <div class="stat-row"><span class="label">Fastest</span><span class="value">${formatNumber(ballCarry?.fastest_carry_speed, 0, " uu/s")}</span></div>
+    <div class="stat-row"><span class="label">Avg speed</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.carry_speed_sum / carryCount : undefined, 0, " uu/s") : carryCount === 0 ? "0 uu/s" : "?"}</span></div>
+    <div class="stat-row"><span class="label">Avg h gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_horizontal_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
+    <div class="stat-row"><span class="label">Avg v gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_vertical_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
+  `;
+}
+
+function renderMovementStats(movement: PlayerStatsSnapshot["movement"]): string {
+  const trackedTime = movement?.tracked_time;
+  const averageSpeed = movement && trackedTime && trackedTime > 0
+    ? movement.speed_integral / trackedTime
+    : trackedTime === 0
+      ? 0
+      : undefined;
+
+  return `
+    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Distance</span><span class="value">${formatNumber(movement?.total_distance, 0, " uu")}</span></div>
+    <div class="stat-row"><span class="label">Avg speed</span><span class="value">${formatNumber(averageSpeed, 0, " uu/s")}</span></div>
+    <div class="stat-row"><span class="label">Slow</span><span class="value">${formatTimeShare(movement?.time_slow_speed, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Boost</span><span class="value">${formatTimeShare(movement?.time_boost_speed, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Super</span><span class="value">${formatTimeShare(movement?.time_supersonic_speed, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Ground</span><span class="value">${formatTimeShare(movement?.time_on_ground, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Low air</span><span class="value">${formatTimeShare(movement?.time_low_air, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">High air</span><span class="value">${formatTimeShare(movement?.time_high_air, trackedTime)}</span></div>
+  `;
+}
+
+function renderPowerslideStats(powerslide: PlayerStatsSnapshot["powerslide"]): string {
+  const pressCount = powerslide?.press_count;
+  const averageDuration = powerslide && pressCount && pressCount > 0
+    ? powerslide.total_duration / pressCount
+    : pressCount === 0
+      ? 0
+      : undefined;
+
+  return `
+    <div class="stat-row"><span class="label">Presses</span><span class="value">${formatInteger(pressCount)}</span></div>
+    <div class="stat-row"><span class="label">Total duration</span><span class="value">${formatNumber(powerslide?.total_duration, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg duration</span><span class="value">${formatNumber(averageDuration, 2, "s")}</span></div>
+  `;
+}
+
+function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
+  const differential = demo
+    ? demo.demos_inflicted - demo.demos_taken
+    : undefined;
+
+  return `
+    <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(demo?.demos_inflicted)}</span></div>
+    <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(demo?.demos_taken)}</span></div>
+    <div class="stat-row"><span class="label">Diff</span><span class="value">${differential === undefined ? "?" : `${differential > 0 ? "+" : ""}${differential}`}</span></div>
+  `;
+}
+
+function renderPossessionStats(
+  possession: StatsFrame["possession"],
+  isTeamZero: boolean,
+): string {
+  const teamTime = isTeamZero
+    ? possession?.team_zero_time
+    : possession?.team_one_time;
+  const opponentTime = isTeamZero
+    ? possession?.team_one_time
+    : possession?.team_zero_time;
+  const trackedTime = possession?.tracked_time;
+
+  return `
+    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Team control</span><span class="value">${formatTimeShare(teamTime, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Opp control</span><span class="value">${formatTimeShare(opponentTime, trackedTime)}</span></div>
+  `;
+}
+
+function createPlayerStatsModule<T>(options: {
+  id: string;
+  label: string;
+  select: (player: PlayerStatsSnapshot) => T | undefined;
+  render: (stats: T | undefined, player: PlayerStatsSnapshot) => string;
+}): StatModule {
+  return {
+    id: options.id,
+    label: options.label,
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        options.render(options.select(player), player),
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return options.render(options.select(player), player);
+    },
+  };
+}
+
 function createRelativePositioningModule(): StatModule {
   let thresholdZoneOverlay: ThresholdZoneOverlay | null = null;
   let fieldScale = 1;
@@ -374,12 +570,108 @@ function createBoostModule(): StatModule {
   };
 }
 
+function createCoreModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "core",
+    label: "Core",
+    select: (player) => player.core,
+    render: (core) => renderCoreStats(core),
+  });
+}
+
+function createPossessionModule(): StatModule {
+  return {
+    id: "possession",
+    label: "Possession",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame?.possession) return "";
+
+      return [
+        renderPlayerCard(
+          "Blue Team",
+          true,
+          renderPossessionStats(statsFrame.possession, true),
+        ),
+        renderPlayerCard(
+          "Orange Team",
+          false,
+          renderPossessionStats(statsFrame.possession, false),
+        ),
+      ].join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!statsFrame?.possession || !player) return "";
+
+      return renderPossessionStats(statsFrame.possession, player.is_team_0);
+    },
+  };
+}
+
+function createBallCarryModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "ball-carry",
+    label: "Ball Carry",
+    select: (player) => player.ball_carry,
+    render: (ballCarry) => renderBallCarryStats(ballCarry),
+  });
+}
+
+function createMovementModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "movement",
+    label: "Movement",
+    select: (player) => player.movement,
+    render: (movement) => renderMovementStats(movement),
+  });
+}
+
+function createPowerslideModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "powerslide",
+    label: "Powerslide",
+    select: (player) => player.powerslide,
+    render: (powerslide) => renderPowerslideStats(powerslide),
+  });
+}
+
+function createDemoModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "demo",
+    label: "Demo",
+    select: (player) => player.demo,
+    render: (demo) => renderDemoStats(demo),
+  });
+}
+
 const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 
 const ALL_MODULES = [
+  createCoreModule,
+  createPossessionModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
   createBoostModule,
+  createBallCarryModule,
+  createMovementModule,
+  createPowerslideModule,
+  createDemoModule,
 ];
 
 let activeModules: StatModule[] = [];
@@ -930,7 +1222,9 @@ async function loadReplay(file: File): Promise<void> {
     plugins: [
       createBallchasingOverlayPlugin(),
       createBoostPadOverlayPlugin(),
-      createTimelineOverlayPlugin(),
+      createTimelineOverlayPlugin({
+        replayEventKinds: ["goal", "save", "demo"],
+      }),
     ],
   });
 
