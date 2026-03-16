@@ -90,6 +90,18 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
+            "time_demolished",
+            StatUnit::Seconds,
+            self.time_demolished,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "time_no_teammates",
+            StatUnit::Seconds,
+            self.time_no_teammates,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "time_most_back",
             StatUnit::Seconds,
             self.time_most_back,
@@ -99,6 +111,12 @@ impl StatFieldProvider for PositioningStats {
             "time_most_forward",
             StatUnit::Seconds,
             self.time_most_forward,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "time_other_role",
+            StatUnit::Seconds,
+            self.time_other_role,
         ));
         visitor(ExportedStat::float(
             "positioning",

@@ -74,6 +74,22 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         StatValue::Float(1.0)
     );
     assert_eq!(
+        find_field(&fields, "positioning", "active_game_time").value,
+        StatValue::Float(12.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_demolished").value,
+        StatValue::Float(1.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_no_teammates").value,
+        StatValue::Float(2.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_other_role").value,
+        StatValue::Float(1.0)
+    );
+    assert_eq!(
         find_field(&fields, "positioning", "percent_neutral_zone").value,
         StatValue::Float(30.0)
     );

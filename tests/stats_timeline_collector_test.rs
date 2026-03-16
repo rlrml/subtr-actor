@@ -190,7 +190,8 @@ fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a E
 fn test_stats_timeline_frame_lookup_uses_frame_number() {
     let timeline = ReplayStatsTimeline {
         config: StatsTimelineConfig {
-            most_back_forward_threshold_y: 118.0,
+            most_back_forward_threshold_y: PositioningReducerConfig::default()
+                .most_back_forward_threshold_y,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),

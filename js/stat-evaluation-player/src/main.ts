@@ -162,9 +162,13 @@ function disposeIfPossible(value: unknown): void {
 
 function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
   return `
+    <div class="stat-row"><span class="label">Active</span><span class="value">${pos?.active_game_time?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Other</span><span class="value">${pos?.time_other_role?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Even</span><span class="value">${pos?.time_even?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">No teammate</span><span class="value">${pos?.time_no_teammates?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Demoed</span><span class="value">${pos?.time_demolished?.toFixed(1) ?? "?"}s</span></div>
   `;
 }
 

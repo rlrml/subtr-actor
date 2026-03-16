@@ -17,13 +17,17 @@ export interface PlayerStatsSnapshot {
   name: string;
   is_team_0: boolean;
   positioning?: {
+    active_game_time: number;
     time_defensive_zone: number;
     time_neutral_zone: number;
     time_offensive_zone: number;
     time_defensive_half: number;
     time_offensive_half: number;
+    time_demolished: number;
+    time_no_teammates: number;
     time_most_back: number;
     time_most_forward: number;
+    time_other_role: number;
     time_even: number;
     [key: string]: unknown;
   };

@@ -1776,6 +1776,7 @@ impl StatsReducer for PositioningReducer {
                 .or_default();
 
             if live_play {
+                stats.active_game_time += sample.dt;
                 stats.tracked_time += sample.dt;
                 stats.sum_distance_to_ball += position.distance(ball_position) * sample.dt;
 
