@@ -120,6 +120,40 @@ input {
   color: #bfd0dd;
 }
 
+.kickoff-overlay {
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  min-width: 8rem;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid rgba(255, 203, 107, 0.32);
+  border-radius: 1.1rem;
+  background: rgba(28, 18, 4, 0.84);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.kickoff-overlay[hidden] {
+  display: none;
+}
+
+.kickoff-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffd57d;
+}
+
+.kickoff-countdown {
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  line-height: 1;
+  color: #fff4d8;
+}
+
 .sidebar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -147,6 +181,7 @@ input {
   align-items: center;
   gap: 0.55rem;
   color: #bfd0dd;
+  margin-bottom: 1rem;
 }
 
 .transport-row button,

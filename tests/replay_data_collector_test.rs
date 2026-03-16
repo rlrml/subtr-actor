@@ -41,3 +41,29 @@ fn kickoff_ball_frames_are_present_before_first_touch() {
         "Expected kickoff frames before the first touch to retain ball position data"
     );
 }
+
+#[test]
+fn kickoff_countdown_metadata_is_exported() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to collect replay data");
+
+    let countdowns: Vec<i32> = replay_data
+        .frame_data
+        .metadata_frames
+        .iter()
+        .map(|metadata| metadata.replicated_game_state_time_remaining)
+        .collect();
+
+    assert!(
+        countdowns
+            .iter()
+            .all(|countdown| (0..=3).contains(countdown)),
+        "Expected kickoff countdown metadata to stay within the replay's 0-3 range"
+    );
+    assert!(
+        countdowns.iter().any(|countdown| *countdown > 0),
+        "Expected replay metadata export to include non-zero kickoff countdown frames"
+    );
+}

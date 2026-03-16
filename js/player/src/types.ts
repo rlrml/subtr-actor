@@ -51,6 +51,7 @@ export interface RawMetadataFrame {
   time: number;
   seconds_remaining: number;
   replicated_game_state_name: number;
+  replicated_game_state_time_remaining: number;
 }
 
 export interface RawPlayerInfo {
@@ -104,6 +105,7 @@ export interface PlaybackFrame {
   time: number;
   secondsRemaining: number;
   gameState: number;
+  kickoffCountdown: number;
 }
 
 export interface BallSample {
@@ -159,6 +161,7 @@ export interface ReplayPlayerOptions {
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
   initialPlaybackRate?: number;
+  initialSkipKickoffsEnabled?: boolean;
 }
 
 export interface ReplayPlayerState {
@@ -170,6 +173,7 @@ export interface ReplayPlayerState {
   cameraDistanceScale: number;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  skipKickoffsEnabled: boolean;
 }
 
 export type ReplayPlayerSnapshot = ReplayPlayerState;
@@ -183,5 +187,6 @@ export type ReplayPlayerStatePatch = Partial<
     | "cameraDistanceScale"
     | "attachedPlayerId"
     | "ballCamEnabled"
+    | "skipKickoffsEnabled"
   >
 >;

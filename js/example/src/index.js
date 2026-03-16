@@ -31,6 +31,10 @@ app.innerHTML = `
     <section class="workspace">
       <div class="viewport-panel">
         <div id="viewport" class="viewport"></div>
+        <div id="kickoff-overlay" class="kickoff-overlay" hidden>
+          <span class="kickoff-label">Kickoff</span>
+          <strong id="kickoff-countdown" class="kickoff-countdown">3</strong>
+        </div>
         <div id="empty-state" class="empty-state">
           Choose a replay to populate the scene.
         </div>
@@ -73,6 +77,10 @@ app.innerHTML = `
               <option value="2">2.0x</option>
             </select>
           </div>
+          <label class="toggle">
+            <input id="skip-kickoffs" type="checkbox" />
+            <span>Skip kickoffs</span>
+          </label>
           <input id="timeline" type="range" min="0" max="0" step="0.01" value="0" disabled />
           <div class="stat-grid">
             <div>
@@ -132,6 +140,9 @@ const timeReadout = mustElement("#time-readout");
 const remainingReadout = mustElement("#remaining-readout");
 const frameReadout = mustElement("#frame-readout");
 const durationReadout = mustElement("#duration-readout");
+const skipKickoffs = mustElement("#skip-kickoffs");
+const kickoffOverlay = mustElement("#kickoff-overlay");
+const kickoffCountdown = mustElement("#kickoff-countdown");
 
 let replayPlayer = null;
 let unsubscribe = null;
@@ -146,6 +157,8 @@ function setControlsEnabled(enabled) {
 }
 
 function renderSnapshot(snapshot) {
+  const metadata = replayPlayer?.replay.frames[snapshot.frameIndex];
+
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${snapshot.frameIndex}`;
   durationReadout.textContent = `${snapshot.duration.toFixed(2)}s`;
@@ -157,11 +170,15 @@ function renderSnapshot(snapshot) {
   attachedPlayer.value = snapshot.attachedPlayerId ?? "";
   cameraDistance.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
   ballCam.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
+  skipKickoffs.checked = snapshot.skipKickoffsEnabled;
 
-  if (replayPlayer) {
-    const metadata = replayPlayer.replay.frames[snapshot.frameIndex];
-    remainingReadout.textContent =
-      metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
+  remainingReadout.textContent =
+    metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
+
+  const inKickoff = (metadata?.kickoffCountdown ?? 0) > 0;
+  kickoffOverlay.hidden = !inKickoff;
+  if (inKickoff) {
+    kickoffCountdown.textContent = `${metadata.kickoffCountdown}`;
   }
 }
 
@@ -198,6 +215,7 @@ async function loadReplayFile(file) {
     initialCameraDistanceScale: 2.25,
     initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
+    initialSkipKickoffsEnabled: skipKickoffs.checked,
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
@@ -246,6 +264,10 @@ attachedPlayer.addEventListener("change", () => {
 
 ballCam.addEventListener("change", () => {
   replayPlayer?.setBallCamEnabled(ballCam.checked);
+});
+
+skipKickoffs.addEventListener("change", () => {
+  replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
 });
 
 timeline.addEventListener("input", () => {

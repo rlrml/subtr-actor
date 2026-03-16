@@ -8,8 +8,8 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "build-wasm": "sh ../scripts/build-wasm.sh",
-        "dev-with-wasm": "npm run build-wasm && npm run dev"
+        "build-wasm": "node ../scripts/ensure-wasm-package.mjs --force",
+        "dev-with-wasm": "npm run dev"
     },
     "dependencies": {
         "chart.js": "^4.4.0",

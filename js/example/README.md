@@ -24,13 +24,14 @@ From the repository root:
 ```bash
 cd js/example
 npm install
-npm run build-wasm
 npm run dev
 ```
 
 Open `http://localhost:5173`, then drop in a `.replay` file.
 
-`npm run build-wasm` is required before the app can start cleanly. It builds the web-target WASM package into `js/pkg/`, which this example imports directly.
+`npm run dev` and `npm run build` now rebuild `js/pkg/` automatically when the
+Rust or JS binding sources are newer than the generated package. `npm run
+build-wasm` remains available when you want to force a rebuild.
 
 ## Scripts
 
@@ -66,9 +67,8 @@ js/example/
 
 ### Import or WASM initialization errors
 
-- Run `npm run build-wasm` again.
+- Run `npm run build-wasm` to force a clean rebuild.
 - Confirm that `js/pkg/` contains the generated JS and `.wasm` files.
-- Make sure `wasm-pack` is on your `PATH`.
 
 ### Invalid replay errors
 

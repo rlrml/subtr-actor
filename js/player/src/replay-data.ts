@@ -154,6 +154,7 @@ function buildPlaybackFrames(raw: RawReplayFramesData): PlaybackFrame[] {
     time: frame.time - startTime,
     secondsRemaining: frame.seconds_remaining,
     gameState: frame.replicated_game_state_name,
+    kickoffCountdown: frame.replicated_game_state_time_remaining,
   }));
 }
 

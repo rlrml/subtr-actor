@@ -52,6 +52,7 @@ export class ReplayPlayer extends EventTarget {
   private cameraDistanceScale: number;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
+  private skipKickoffsEnabled: boolean;
 
   constructor(
     container: HTMLElement,
@@ -71,6 +72,8 @@ export class ReplayPlayer extends EventTarget {
     );
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
+    this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
+    this.skipPastKickoffIfNeeded();
 
     this.installResizeHandling();
     this.render();
@@ -139,8 +142,18 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setSkipKickoffsEnabled(enabled: boolean): void {
+    this.skipKickoffsEnabled = enabled;
+    if (enabled) {
+      this.skipPastKickoffIfNeeded();
+    }
+    this.render();
+    this.emitChange();
+  }
+
   seek(time: number): void {
     this.currentTime = THREE.MathUtils.clamp(time, 0, this.replay.duration);
+    this.skipPastKickoffIfNeeded();
     if (this.playing) {
       this.reanchorPlaybackClock();
     }
@@ -165,6 +178,9 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
     }
+    if (nextState.skipKickoffsEnabled !== undefined) {
+      this.skipKickoffsEnabled = nextState.skipKickoffsEnabled;
+    }
     if (nextState.currentTime !== undefined) {
       this.currentTime = THREE.MathUtils.clamp(
         nextState.currentTime,
@@ -185,6 +201,7 @@ export class ReplayPlayer extends EventTarget {
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
+    this.skipPastKickoffIfNeeded(now);
 
     this.render();
     this.emitChange();
@@ -200,6 +217,7 @@ export class ReplayPlayer extends EventTarget {
       cameraDistanceScale: this.cameraDistanceScale,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
+      skipKickoffsEnabled: this.skipKickoffsEnabled,
     };
   }
 
@@ -290,6 +308,7 @@ export class ReplayPlayer extends EventTarget {
     let shouldEmitChange = false;
     if (this.playing) {
       shouldEmitChange = this.syncPlaybackClock(now);
+      shouldEmitChange = this.skipPastKickoffIfNeeded(now) || shouldEmitChange;
       if (this.currentTime >= this.replay.duration) {
         this.playing = false;
         shouldEmitChange = true;
@@ -403,6 +422,31 @@ export class ReplayPlayer extends EventTarget {
       this.sceneState.scene,
       this.sceneState.camera
     );
+  }
+
+  private skipPastKickoffIfNeeded(now?: number): boolean {
+    if (!this.skipKickoffsEnabled) {
+      return false;
+    }
+
+    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
+    const frame = this.replay.frames[frameIndex];
+    if (!frame || frame.kickoffCountdown <= 0) {
+      return false;
+    }
+
+    const nextLiveFrame = this.replay.frames.find(
+      (candidate, index) => index > frameIndex && candidate.kickoffCountdown <= 0
+    );
+    if (!nextLiveFrame || nextLiveFrame.time === this.currentTime) {
+      return false;
+    }
+
+    this.currentTime = nextLiveFrame.time;
+    if (this.playing) {
+      this.reanchorPlaybackClock(now);
+    }
+    return true;
   }
 
   private updateCamera(
