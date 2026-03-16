@@ -309,11 +309,11 @@ impl FlipResetTracker {
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
         let closest_approach_distance = touch_event.closest_approach_distance?;
-        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
-        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+        let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_candidate(
-            ball_rigid_body,
-            player_rigid_body,
+            &ball_rigid_body,
+            &player_rigid_body,
             closest_approach_distance,
         )?;
 
@@ -337,11 +337,11 @@ impl FlipResetTracker {
         is_team_0: bool,
         closest_approach_distance: f32,
     ) -> Option<FlipResetEvent> {
-        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
-        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+        let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_candidate(
-            ball_rigid_body,
-            player_rigid_body,
+            &ball_rigid_body,
+            &player_rigid_body,
             closest_approach_distance,
         )?;
 
@@ -364,11 +364,11 @@ impl FlipResetTracker {
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
         let closest_approach_distance = touch_event.closest_approach_distance?;
-        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
-        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+        let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_followup_touch_candidate(
-            ball_rigid_body,
-            player_rigid_body,
+            &ball_rigid_body,
+            &player_rigid_body,
             closest_approach_distance,
         )?;
 
@@ -390,9 +390,9 @@ impl FlipResetTracker {
         time: f32,
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
-        let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
-        let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
-        let heuristic = flip_reset_proximity_candidate(ball_rigid_body, player_rigid_body)?;
+        let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
+        let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
+        let heuristic = flip_reset_proximity_candidate(&ball_rigid_body, &player_rigid_body)?;
         let raw_ball_position = vec_to_glam(&ball_rigid_body.location);
         let raw_player_position = vec_to_glam(&player_rigid_body.location);
         let scale_factor = scale_factor_for_positions(raw_ball_position, raw_player_position);
@@ -423,7 +423,7 @@ impl FlipResetTracker {
             let event = self
                 .build_flip_reset_event(processor, touch_event, frame_index)
                 .or_else(|| {
-                    let ball_rigid_body = processor.get_ball_rigid_body().ok()?;
+                    let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
                     let ball_position = vec_to_glam(&ball_rigid_body.location);
                     processor
                         .iter_player_ids_in_order()
@@ -432,7 +432,8 @@ impl FlipResetTracker {
                                 == Some(touch_event.team_is_team_0)
                         })
                         .filter_map(|player| {
-                            let player_rigid_body = processor.get_player_rigid_body(player).ok()?;
+                            let player_rigid_body =
+                                processor.get_normalized_player_rigid_body(player).ok()?;
                             let player_position = vec_to_glam(&player_rigid_body.location);
                             let fallback_touch_distance =
                                 (ball_position - player_position).length();
@@ -548,11 +549,10 @@ impl FlipResetTracker {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
                 self.previous_dodge_active.remove(player_id);
                 continue;
             };
-            let player_rigid_body = *player_rigid_body;
 
             let is_grounded = Self::player_is_grounded_for_wall_sequence(&player_rigid_body);
             if is_grounded {
@@ -564,10 +564,9 @@ impl FlipResetTracker {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
                 continue;
             };
-            let player_rigid_body = *player_rigid_body;
             let is_grounded = Self::player_is_grounded_for_wall_sequence(&player_rigid_body);
             if is_grounded {
                 continue;
@@ -617,11 +616,11 @@ impl FlipResetTracker {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
                 self.recent_flip_reset_candidates.remove(player_id);
                 continue;
             };
-            if Self::player_is_grounded_for_wall_sequence(player_rigid_body) {
+            if Self::player_is_grounded_for_wall_sequence(&player_rigid_body) {
                 self.recent_flip_reset_candidates.remove(player_id);
             }
         }
@@ -637,10 +636,10 @@ impl FlipResetTracker {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = processor.get_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
                 continue;
             };
-            if Self::player_is_grounded_for_wall_sequence(player_rigid_body) {
+            if Self::player_is_grounded_for_wall_sequence(&player_rigid_body) {
                 continue;
             }
 
