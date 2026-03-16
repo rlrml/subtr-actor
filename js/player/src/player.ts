@@ -1252,7 +1252,7 @@ export class ReplayPlayer extends EventTarget {
       const plumePulse = 0.92 + 0.14 * Math.sin(phase + index * 0.85);
       plume.scale.setScalar(plumePulse);
 
-      plume.traverse((node) => {
+      plume.traverse((node: THREE.Object3D) => {
         if (!(node instanceof THREE.Mesh)) {
           return;
         }

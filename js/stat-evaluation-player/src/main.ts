@@ -17,6 +17,7 @@ import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
+import type { Object3D } from "three";
 import {
   formatCollectedWithRespawnBound,
   formatBoostDisplayAmount,
@@ -258,7 +259,7 @@ function createAbsolutePositioningModule(): StatModule {
     teardown() {
       if (zoneBoundaryLines) {
         zoneBoundaryLines.removeFromParent();
-        zoneBoundaryLines.traverse((node) => {
+        zoneBoundaryLines.traverse((node: Object3D) => {
           const geometry = "geometry" in node ? node.geometry : null;
           disposeIfPossible(geometry);
 

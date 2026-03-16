@@ -10,7 +10,9 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "subtr-actor": ["../pkg/rl_replay_subtr_actor.js"]
+      "subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
+      "three": ["./node_modules/@types/three/index.d.ts"],
+      "three/examples/jsm/*": ["./node_modules/@types/three/examples/jsm/*"]
     },
     "isolatedModules": true,
     "esModuleInterop": true,
