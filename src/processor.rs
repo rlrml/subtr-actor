@@ -145,6 +145,7 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
 ///   the `ReplayProcessor` processes a replay.
 pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
+    spatial_normalization_factor: f32,
     pub actor_state: ActorStateModeler,
     pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
     pub name_to_object_id: HashMap<String, boxcars::ObjectId>,
@@ -202,6 +203,11 @@ impl<'a> ReplayProcessor<'a> {
         let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
+            spatial_normalization_factor: if replay.net_version.unwrap_or(0) < 7 {
+                100.0
+            } else {
+                1.0
+            },
             object_id_to_name,
             name_to_object_id,
             team_zero: Vec::new(),
@@ -237,6 +243,43 @@ impl<'a> ReplayProcessor<'a> {
             .or_else(|_| processor.set_player_order_from_frames())?;
 
         Ok(processor)
+    }
+
+    pub fn spatial_normalization_factor(&self) -> f32 {
+        self.spatial_normalization_factor
+    }
+
+    fn normalize_vector(&self, vector: boxcars::Vector3f) -> boxcars::Vector3f {
+        if (self.spatial_normalization_factor - 1.0).abs() < f32::EPSILON {
+            vector
+        } else {
+            boxcars::Vector3f {
+                x: vector.x * self.spatial_normalization_factor,
+                y: vector.y * self.spatial_normalization_factor,
+                z: vector.z * self.spatial_normalization_factor,
+            }
+        }
+    }
+
+    fn normalize_optional_vector(
+        &self,
+        vector: Option<boxcars::Vector3f>,
+    ) -> Option<boxcars::Vector3f> {
+        vector.map(|value| self.normalize_vector(value))
+    }
+
+    fn normalize_rigid_body(&self, rigid_body: &boxcars::RigidBody) -> boxcars::RigidBody {
+        if (self.spatial_normalization_factor - 1.0).abs() < f32::EPSILON {
+            *rigid_body
+        } else {
+            boxcars::RigidBody {
+                sleeping: rigid_body.sleeping,
+                location: self.normalize_vector(rigid_body.location),
+                rotation: rigid_body.rotation,
+                linear_velocity: self.normalize_optional_vector(rigid_body.linear_velocity),
+                angular_velocity: self.normalize_optional_vector(rigid_body.angular_velocity),
+            }
+        }
     }
 
     /// [`Self::process`] takes a [`Collector`] as an argument and iterates over
@@ -1547,9 +1590,9 @@ impl<'a> ReplayProcessor<'a> {
             frame: frame_index,
             attacker,
             victim,
-            attacker_velocity: demo.attacker_velocity(),
-            victim_velocity: demo.victim_velocity(),
-            victim_location: current_rigid_body.location,
+            attacker_velocity: self.normalize_vector(demo.attacker_velocity()),
+            victim_velocity: self.normalize_vector(demo.victim_velocity()),
+            victim_location: self.normalize_vector(current_rigid_body.location),
         })
     }
 
@@ -1708,10 +1751,10 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<boxcars::RigidBody> {
         let rb_frame = self.get_frame(rb_frame_index)?;
         let interpolation_amount = target_time - rb_frame.time;
-        Ok(apply_velocities_to_rigid_body(
+        Ok(self.normalize_rigid_body(&apply_velocities_to_rigid_body(
             rigid_body,
             interpolation_amount,
-        ))
+        )))
     }
 
     /// This function first retrieves the actor's [`RigidBody`] at the current
@@ -1755,7 +1798,7 @@ impl<'a> ReplayProcessor<'a> {
         let time_and_frame_difference = time - frame_time;
 
         if (time_and_frame_difference).abs() <= close_enough.abs() {
-            return Ok(*frame_body);
+            return Ok(self.normalize_rigid_body(frame_body));
         }
 
         let search_direction = if time_and_frame_difference > 0.0 {
@@ -1773,7 +1816,7 @@ impl<'a> ReplayProcessor<'a> {
         let found_body = attribute_match!(attribute, boxcars::Attribute::RigidBody)?;
 
         if (found_time - time).abs() <= close_enough {
-            return Ok(found_body);
+            return Ok(self.normalize_rigid_body(&found_body));
         }
 
         let (start_body, start_time, end_body, end_time) = match search_direction {
@@ -1782,6 +1825,7 @@ impl<'a> ReplayProcessor<'a> {
         };
 
         util::get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
+            .map(|rigid_body| self.normalize_rigid_body(&rigid_body))
     }
 
     // Actor functions
@@ -2138,6 +2182,11 @@ impl<'a> ReplayProcessor<'a> {
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
+    pub fn get_normalized_ball_rigid_body(&self) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_ball_rigid_body()
+            .map(|rigid_body| self.normalize_rigid_body(rigid_body))
+    }
+
     /// Returns a boolean indicating whether the ball's
     /// [`RigidBody`](boxcars::RigidBody) exists and is not sleeping.
     pub fn ball_rigid_body_exists(&self) -> SubtrActorResult<bool> {
@@ -2287,6 +2336,14 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<&boxcars::RigidBody> {
         self.get_car_actor_id(player_id)
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
+    }
+
+    pub fn get_normalized_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_player_rigid_body(player_id)
+            .map(|rigid_body| self.normalize_rigid_body(rigid_body))
     }
 
     /// Returns the most recent update to the [`RigidBody`](boxcars::RigidBody)
