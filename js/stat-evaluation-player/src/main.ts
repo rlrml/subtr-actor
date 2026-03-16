@@ -18,6 +18,10 @@ import {
   createZoneBoundaryLines,
 } from "./overlays.ts";
 import {
+  LastTouchOverlay,
+  getLastTouchPlayer,
+} from "./touchOverlay.ts";
+import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
@@ -329,6 +333,17 @@ function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): 
   return `
     <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
     <div class="stat-row"><span class="label">On-ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
+  `;
+}
+
+function renderTouchStats(touch: PlayerStatsSnapshot["touch"]): string {
+  return `
+    <div class="stat-row"><span class="label">Touches</span><span class="value">${formatInteger(touch?.touch_count)}</span></div>
+    <div class="stat-row"><span class="label">Current</span><span class="value">${touch?.is_last_touch ? "Yes" : "No"}</span></div>
+    <div class="stat-row"><span class="label">Touch time</span><span class="value">${formatNumber(touch?.last_touch_time, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Touch frame</span><span class="value">${formatInteger(touch?.last_touch_frame)}</span></div>
+    <div class="stat-row"><span class="label">Since touch</span><span class="value">${formatNumber(touch?.time_since_last_touch, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Frames since</span><span class="value">${formatInteger(touch?.frames_since_last_touch)}</span></div>
   `;
 }
 
@@ -734,6 +749,63 @@ function createDodgeResetModule(): StatModule {
   });
 }
 
+function createTouchModule(): StatModule {
+  let overlay: LastTouchOverlay | null = null;
+  let statsFrameLookup: Map<number, StatsFrame> | null = null;
+
+  return {
+    id: "touch",
+    label: "Touch",
+
+    setup(ctx) {
+      statsFrameLookup = ctx.statsFrameLookup;
+      overlay = new LastTouchOverlay(ctx.player.sceneState, ctx.fieldScale);
+    },
+
+    teardown() {
+      overlay?.dispose();
+      overlay = null;
+      statsFrameLookup = null;
+    },
+
+    onBeforeRender(info) {
+      const statsFrame = statsFrameLookup
+        ? getStatsFrameForReplayFrame(statsFrameLookup, info.frameIndex)
+        : null;
+      const lastTouchPlayer = statsFrame ? getLastTouchPlayer(statsFrame) : null;
+      overlay?.update(
+        lastTouchPlayer ? playerIdToString(lastTouchPlayer.player_id) : null,
+        lastTouchPlayer?.is_team_0 ?? null,
+        lastTouchPlayer?.touch?.time_since_last_touch ?? null,
+      );
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderTouchStats(player.touch),
+        player.touch?.is_last_touch
+          ? '<span class="role-indicator role-forward">Last Touch</span>'
+          : "",
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderTouchStats(player.touch);
+    },
+  };
+}
+
 function createMovementModule(): StatModule {
   return createPlayerStatsModule({
     id: "movement",
@@ -769,6 +841,7 @@ const ALL_MODULES = [
   createPressureModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
+  createTouchModule,
   createDodgeResetModule,
   createBoostModule,
   createBallCarryModule,

@@ -967,6 +967,8 @@ pub mod demo;
 pub use demo::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
+pub mod touch;
+pub use touch::*;
 pub mod movement;
 pub use movement::*;
 pub mod positioning;

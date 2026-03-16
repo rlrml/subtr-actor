@@ -10,6 +10,7 @@ mod positioning;
 mod possession;
 mod powerslide;
 mod pressure;
+mod touch;
 
 pub const LEGACY_STAT_VARIANT: &str = "legacy";
 

@@ -41,6 +41,15 @@ export interface PlayerStatsSnapshot {
     goals_conceded_while_last_defender: number;
     [key: string]: unknown;
   };
+  touch?: {
+    touch_count: number;
+    is_last_touch: boolean;
+    last_touch_time?: number;
+    last_touch_frame?: number;
+    time_since_last_touch?: number;
+    frames_since_last_touch?: number;
+    [key: string]: unknown;
+  };
   dodge_reset?: {
     count: number;
     on_ball_count: number;

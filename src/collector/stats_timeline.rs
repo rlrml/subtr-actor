@@ -90,6 +90,7 @@ pub struct PlayerStatsSnapshot {
     pub name: String,
     pub is_team_0: bool,
     pub core: CorePlayerStats,
+    pub touch: TouchStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
@@ -121,6 +122,7 @@ impl StatFieldProvider for TeamStatsSnapshot {
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.touch.visit_stat_fields(visitor);
         self.dodge_reset.visit_stat_fields(visitor);
         self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
@@ -170,6 +172,7 @@ struct StatsTimelineReducers {
     possession: PossessionReducer,
     pressure: PressureReducer,
     match_stats: MatchStatsReducer,
+    touch: TouchReducer,
     ball_carry: BallCarryReducer,
     boost: BoostReducer,
     movement: MovementReducer,
@@ -193,6 +196,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.possession.on_replay_meta(meta)?;
         self.pressure.on_replay_meta(meta)?;
         self.match_stats.on_replay_meta(meta)?;
+        self.touch.on_replay_meta(meta)?;
         self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
         self.movement.on_replay_meta(meta)?;
@@ -207,6 +211,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.possession.on_sample(sample)?;
         self.pressure.on_sample(sample)?;
         self.match_stats.on_sample(sample)?;
+        self.touch.on_sample(sample)?;
         self.ball_carry.on_sample(sample)?;
         self.boost.on_sample(sample)?;
         self.movement.on_sample(sample)?;
@@ -221,6 +226,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.possession.finish()?;
         self.pressure.finish()?;
         self.match_stats.finish()?;
+        self.touch.finish()?;
         self.ball_carry.finish()?;
         self.boost.finish()?;
         self.movement.finish()?;
@@ -364,6 +370,13 @@ impl StatsTimelineCollector {
                     core: self
                         .reducers
                         .match_stats
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    touch: self
+                        .reducers
+                        .touch
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
