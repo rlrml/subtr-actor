@@ -12,6 +12,7 @@ export interface ReplayScene {
   dispose: () => void;
   ballMesh: THREE.Mesh;
   playerMeshes: Map<string, THREE.Object3D>;
+  playerBoostTrails: Map<string, THREE.Group>;
   updateWallVisibility: () => void;
 }
 
@@ -380,6 +381,71 @@ function createExampleCarMesh(color: string): THREE.Group {
   return outer;
 }
 
+function createBoostTrail(): THREE.Group {
+  const trail = new THREE.Group();
+  trail.visible = false;
+  trail.position.set(-124, 0, 8);
+
+  const outerGeometry = new THREE.ConeGeometry(30, 220, 14, 1, true);
+  outerGeometry.rotateZ(Math.PI / 2);
+  outerGeometry.translate(-110, 0, 0);
+
+  const innerGeometry = new THREE.ConeGeometry(17, 150, 12, 1, true);
+  innerGeometry.rotateZ(Math.PI / 2);
+  innerGeometry.translate(-75, 0, 0);
+
+  const glowGeometry = new THREE.SphereGeometry(21, 12, 12);
+  const nozzleOffsets = [-38, 38];
+
+  for (const lateralOffset of nozzleOffsets) {
+    const plume = new THREE.Group();
+    plume.position.set(0, lateralOffset, 0);
+
+    const outerMaterial = new THREE.MeshBasicMaterial({
+      color: "#ff9b2f",
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    outerMaterial.forceSinglePass = true;
+    const outerFlame = new THREE.Mesh(outerGeometry, outerMaterial);
+    outerFlame.name = "outer-flame";
+    plume.add(outerFlame);
+
+    const innerMaterial = new THREE.MeshBasicMaterial({
+      color: "#fff2ba",
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    innerMaterial.forceSinglePass = true;
+    const innerFlame = new THREE.Mesh(innerGeometry, innerMaterial);
+    innerFlame.name = "inner-flame";
+    plume.add(innerFlame);
+
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: "#fff8db",
+      transparent: true,
+      opacity: 0.62,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    glowMaterial.forceSinglePass = true;
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.name = "glow";
+    glow.position.x = -10;
+    plume.add(glow);
+
+    trail.add(plume);
+  }
+
+  return trail;
+}
+
 function makeLights(scene: THREE.Scene): void {
   scene.add(new THREE.AmbientLight("#d8ecff", 1.6));
 
@@ -439,10 +505,14 @@ export function createReplayScene(
   replayRoot.add(ballMesh);
 
   const playerMeshes = new Map<string, THREE.Object3D>();
+  const playerBoostTrails = new Map<string, THREE.Group>();
   for (const player of replay.players) {
     const mesh = createExampleCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40");
+    const boostTrail = createBoostTrail();
+    mesh.add(boostTrail);
     replayRoot.add(mesh);
     playerMeshes.set(player.id, mesh);
+    playerBoostTrails.set(player.id, boostTrail);
   }
 
   const resize = (): void => {
@@ -490,6 +560,7 @@ export function createReplayScene(
     dispose,
     ballMesh,
     playerMeshes,
+    playerBoostTrails,
     updateWallVisibility,
   };
 }

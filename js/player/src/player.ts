@@ -290,8 +290,9 @@ export class ReplayPlayer extends EventTarget {
       this.sceneState.ballMesh.visible = false;
     }
 
-    for (const player of this.replay.players) {
+    for (const [playerIndex, player] of this.replay.players.entries()) {
       const mesh = this.sceneState.playerMeshes.get(player.id);
+      const boostTrail = this.sceneState.playerBoostTrails.get(player.id);
       if (!mesh) {
         continue;
       }
@@ -305,6 +306,9 @@ export class ReplayPlayer extends EventTarget {
       );
       if (!interpolatedPosition) {
         mesh.visible = false;
+        if (boostTrail) {
+          boostTrail.visible = false;
+        }
         continue;
       }
 
@@ -319,6 +323,30 @@ export class ReplayPlayer extends EventTarget {
         );
       } else {
         mesh.quaternion.identity();
+      }
+
+      if (boostTrail) {
+        const currentBoostFraction = frame?.boostFraction ?? 0;
+        const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
+        const boostFraction = THREE.MathUtils.lerp(
+          currentBoostFraction,
+          nextBoostFraction,
+          frameWindow.alpha
+        );
+        const boostActive =
+          (frameWindow.alpha >= 0.5
+            ? nextFrame?.boostActive
+            : frame?.boostActive) ??
+          frame?.boostActive ??
+          nextFrame?.boostActive ??
+          false;
+        this.updateBoostTrail(
+          boostTrail,
+          boostActive,
+          boostFraction,
+          this.currentTime,
+          playerIndex
+        );
       }
     }
 
@@ -555,5 +583,58 @@ export class ReplayPlayer extends EventTarget {
         detail: this.getState(),
       })
     );
+  }
+
+  private updateBoostTrail(
+    boostTrail: THREE.Group,
+    boostActive: boolean,
+    boostFraction: number,
+    time: number,
+    playerIndex: number
+  ): void {
+    if (!boostActive) {
+      boostTrail.visible = false;
+      return;
+    }
+
+    boostTrail.visible = true;
+
+    const phase = time * 36 + playerIndex * 1.7;
+    const pulse = 0.86 + 0.14 * Math.sin(phase);
+    const intensity = THREE.MathUtils.clamp(0.62 + boostFraction * 0.88, 0.62, 1.5);
+    const lengthScale = intensity * (1.02 + pulse * 0.52);
+    const widthScale = 1.02 + intensity * 0.28;
+    boostTrail.scale.set(lengthScale, widthScale, widthScale);
+
+    for (const [index, child] of boostTrail.children.entries()) {
+      const plume = child as THREE.Group;
+      const plumePulse = 0.92 + 0.14 * Math.sin(phase + index * 0.85);
+      plume.scale.setScalar(plumePulse);
+
+      plume.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) {
+          return;
+        }
+
+        const material = node.material;
+        if (!(material instanceof THREE.MeshBasicMaterial)) {
+          return;
+        }
+
+        switch (node.name) {
+          case "outer-flame":
+            material.opacity = 0.24 + intensity * 0.24;
+            break;
+          case "inner-flame":
+            material.opacity = 0.58 + intensity * 0.3;
+            break;
+          case "glow":
+            material.opacity = 0.4 + intensity * 0.26;
+            break;
+          default:
+            break;
+        }
+      });
+    }
   }
 }
