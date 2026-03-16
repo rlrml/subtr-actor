@@ -1270,7 +1270,11 @@ build_player_feature_adder!(
                 vec_to_glam(&ball_rigid_body.location) - vec_to_glam(&player_rigid_body.location)
             })
             .unwrap_or(glam::f32::Vec3::ZERO);
-        convert_all_floats!(relative_position.x, relative_position.y, relative_position.z)
+        convert_all_floats!(
+            relative_position.x,
+            relative_position.y,
+            relative_position.z
+        )
     },
     "relative ball position x",
     "relative ball position y",
@@ -1285,11 +1289,22 @@ build_player_feature_adder!(
             .ok()
             .zip(processor.get_ball_rigid_body().ok())
             .map(|(player_rigid_body, ball_rigid_body)| {
-                vec_to_glam(&ball_rigid_body.linear_velocity.unwrap_or_else(or_zero_boxcars_3f))
-                    - vec_to_glam(&player_rigid_body.linear_velocity.unwrap_or_else(or_zero_boxcars_3f))
+                vec_to_glam(
+                    &ball_rigid_body
+                        .linear_velocity
+                        .unwrap_or_else(or_zero_boxcars_3f),
+                ) - vec_to_glam(
+                    &player_rigid_body
+                        .linear_velocity
+                        .unwrap_or_else(or_zero_boxcars_3f),
+                )
             })
             .unwrap_or(glam::f32::Vec3::ZERO);
-        convert_all_floats!(relative_velocity.x, relative_velocity.y, relative_velocity.z)
+        convert_all_floats!(
+            relative_velocity.x,
+            relative_velocity.y,
+            relative_velocity.z
+        )
     },
     "relative ball velocity x",
     "relative ball velocity y",
