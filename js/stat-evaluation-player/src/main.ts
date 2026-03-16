@@ -6,6 +6,7 @@ import {
 import type {
   ReplayPlayerState,
 } from "../../player/src/lib.ts";
+import { RoleOverlay, createZoneBoundaryLines } from "./overlays.ts";
 
 // WASM module - init is the default export, get_stats_timeline is named
 import wasmInit, {
@@ -79,6 +80,8 @@ app.innerHTML = `
 let replayPlayer: ReplayPlayer | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let unsubscribe: (() => void) | null = null;
+let roleOverlay: RoleOverlay | null = null;
+let removeRenderHook: (() => void) | null = null;
 
 const fileInput = document.getElementById("replay-file") as HTMLInputElement;
 const viewport = document.getElementById("viewport")!;
@@ -135,6 +138,21 @@ async function loadReplay(file: File): Promise<void> {
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: 2.25,
   });
+
+  // Clean up previous overlays
+  roleOverlay?.dispose();
+  removeRenderHook?.();
+
+  // Set up overlays
+  roleOverlay = new RoleOverlay(replayPlayer.sceneState, replay);
+  removeRenderHook = replayPlayer.onBeforeRender((info) => {
+    roleOverlay?.update(info);
+  });
+
+  createZoneBoundaryLines(
+    replayPlayer.sceneState.scene,
+    replayPlayer.options.fieldScale ?? 1,
+  );
 
   unsubscribe = replayPlayer.subscribe(onStateChange);
 
