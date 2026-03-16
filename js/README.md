@@ -198,7 +198,7 @@ Local packages built on top of these bindings:
 
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
 - [`js/example`](./example/README.md): example/demo app that exercises the local player library.
-- [`js/mechanics-evaluation-player`](./mechanics-evaluation-player/README.md): manifest-driven playlist viewer for mechanics evaluation workflows.
+- [`js/mechanics-evaluation-player`](./mechanics-evaluation-player/README.md): manifest-driven playlist viewer for mechanics evaluation workflows, typically backed by datasets from the sibling `subtr-actor-mechanics` project.
 
 The example app under [`js/example`](./example/README.md) uses the web target and expects `js/pkg/` to be built with `wasm-pack build --target web --out-dir pkg`.
 

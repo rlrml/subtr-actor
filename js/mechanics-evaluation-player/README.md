@@ -27,16 +27,20 @@ To generate a manifest from the local exact flip reset training set:
 cargo run --bin build_flip_reset_playlist_manifest
 ```
 
-By default this writes:
+By default this reads and writes from the sibling mechanics project
+(`../subtr-actor-mechanics`). You can override that root with
+`SUBTR_ACTOR_MECHANICS_ROOT` or pass explicit CLI paths.
+
+Default manifest output:
 
 ```text
-data/flip-reset-ground-truth-exact/flip-reset-playlist-manifest.json
+../subtr-actor-mechanics/data/flip-reset-ground-truth-exact/flip-reset-playlist-manifest.json
 ```
 
-using the first 30 positive replays under:
+Default replay directory:
 
 ```text
-data/flip-reset-ground-truth-exact/replays
+../subtr-actor-mechanics/data/flip-reset-ground-truth-exact/replays
 ```
 
 ## Manifest Format

@@ -7,8 +7,10 @@ use std::path::{Path, PathBuf};
 use subtr_actor::ballchasing::parse_replay_file;
 use subtr_actor::{BallFrame, DodgeRefreshedEvent, PlayerFrame, PlayerId, ReplayDataCollector};
 
-const DEFAULT_INPUT_DIR: &str = "data/flip-reset-ground-truth-exact/replays";
-const DEFAULT_OUTPUT_PATH: &str =
+const MECHANICS_ROOT_ENV: &str = "SUBTR_ACTOR_MECHANICS_ROOT";
+const DEFAULT_MECHANICS_ROOT: &str = "../subtr-actor-mechanics";
+const DEFAULT_INPUT_DIR_RELATIVE: &str = "data/flip-reset-ground-truth-exact/replays";
+const DEFAULT_OUTPUT_PATH_RELATIVE: &str =
     "data/flip-reset-ground-truth-exact/flip-reset-playlist-manifest.json";
 const DEFAULT_MAX_REPLAYS: usize = 30;
 const DEFAULT_BEFORE_SECONDS: f32 = 5.0;
@@ -26,9 +28,10 @@ struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let mechanics_root = mechanics_root();
         Self {
-            input_dir: PathBuf::from(DEFAULT_INPUT_DIR),
-            output_path: PathBuf::from(DEFAULT_OUTPUT_PATH),
+            input_dir: mechanics_root.join(DEFAULT_INPUT_DIR_RELATIVE),
+            output_path: mechanics_root.join(DEFAULT_OUTPUT_PATH_RELATIVE),
             max_replays: DEFAULT_MAX_REPLAYS,
             before_seconds: DEFAULT_BEFORE_SECONDS,
             after_seconds: DEFAULT_AFTER_SECONDS,
@@ -160,8 +163,15 @@ struct ClipMeta {
 
 fn print_usage() {
     eprintln!(
-        "Usage: cargo run --bin build_flip_reset_playlist_manifest -- [--input-dir PATH] [--output-path PATH] [--max-replays N] [--before-seconds N] [--after-seconds N]"
+        "Usage: cargo run --bin build_flip_reset_playlist_manifest -- [--input-dir PATH] [--output-path PATH] [--max-replays N] [--before-seconds N] [--after-seconds N]\nDefaults point at ../subtr-actor-mechanics; override the root with {MECHANICS_ROOT_ENV}."
     );
+}
+
+fn mechanics_root() -> PathBuf {
+    std::env::var_os(MECHANICS_ROOT_ENV)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_MECHANICS_ROOT))
 }
 
 fn list_replay_paths(input_dir: &Path) -> Result<Vec<PathBuf>> {

@@ -4,6 +4,10 @@
 
 `subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
+Mechanics-specific datasets and ML experiments now live in the sibling
+`subtr-actor-mechanics` project so this repository can stay focused on the core
+replay-processing packages.
+
 It supports two main workflows:
 
 - structured replay data for inspection, export, and analysis
