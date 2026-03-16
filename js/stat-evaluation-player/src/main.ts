@@ -48,6 +48,8 @@ interface PlayerStatsSnapshot {
     amount_collected_big: number;
     amount_collected_small: number;
     amount_stolen: number;
+    big_pads_collected: number;
+    small_pads_collected: number;
     amount_used_while_supersonic: number;
     time_zero_boost: number;
     time_hundred_boost: number;
@@ -213,8 +215,10 @@ function createBoostModule(): StatModule {
             <span class="player-name">${player.name}</span>
           </div>
           <div class="stat-row"><span class="label">Collected</span><span class="value">${b?.amount_collected?.toFixed(0) ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Big pads</span><span class="value">${b?.amount_collected_big?.toFixed(0) ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Small pads</span><span class="value">${b?.amount_collected_small?.toFixed(0) ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Amount from big pads</span><span class="value">${b?.amount_collected_big?.toFixed(0) ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Amount from small pads</span><span class="value">${b?.amount_collected_small?.toFixed(0) ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Big pads collected</span><span class="value">${b?.big_pads_collected ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Small pads collected</span><span class="value">${b?.small_pads_collected ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Stolen</span><span class="value">${b?.amount_stolen?.toFixed(0) ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
           <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${b?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
