@@ -41,13 +41,25 @@ app.innerHTML = `
           <div class="transport-row">
             <select id="camera-mode" disabled>
               <option value="overview" selected>Overview</option>
-              <option value="attached">Attached</option>
-              <option value="third-person">Third Person</option>
+              <option value="tracked">Tracked</option>
             </select>
             <select id="tracked-player" disabled>
               <option value="">No player</option>
             </select>
           </div>
+          <label>
+            <span class="label">Follow Distance</span>
+            <input
+              id="camera-distance"
+              type="range"
+              min="0.75"
+              max="4"
+              step="0.05"
+              value="2.25"
+              disabled
+            />
+          </label>
+          <strong id="camera-distance-readout">2.25x</strong>
           <label class="toggle">
             <input id="ball-cam" type="checkbox" disabled />
             <span>Ball cam</span>
@@ -113,6 +125,8 @@ const emptyState = mustElement("#empty-state");
 const togglePlayback = mustElement("#toggle-playback");
 const playbackRate = mustElement("#playback-rate");
 const cameraMode = mustElement("#camera-mode");
+const cameraDistance = mustElement("#camera-distance");
+const cameraDistanceReadout = mustElement("#camera-distance-readout");
 const trackedPlayer = mustElement("#tracked-player");
 const ballCam = mustElement("#ball-cam");
 const timeline = mustElement("#timeline");
@@ -131,6 +145,7 @@ function setControlsEnabled(enabled) {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
   cameraMode.disabled = !enabled;
+  cameraDistance.disabled = !enabled;
   trackedPlayer.disabled = !enabled;
   ballCam.disabled = !enabled;
   timeline.disabled = !enabled;
@@ -143,6 +158,8 @@ function renderSnapshot(snapshot) {
   timeline.value = `${snapshot.currentTime}`;
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
   cameraMode.value = snapshot.cameraMode;
+  cameraDistance.value = `${snapshot.cameraDistanceScale}`;
+  cameraDistanceReadout.textContent = `${snapshot.cameraDistanceScale.toFixed(2)}x`;
   ballCam.checked = snapshot.ballCamEnabled;
   trackedPlayer.value = snapshot.trackedPlayerId ?? "";
 
@@ -170,6 +187,7 @@ async function loadReplayFile(file) {
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraMode: "overview",
+    initialCameraDistanceScale: 2.25,
     initialTrackedPlayerId: replay.players[0]?.id ?? null,
     initialBallCamEnabled: false,
   });
@@ -217,6 +235,10 @@ playbackRate.addEventListener("change", () => {
 
 cameraMode.addEventListener("change", () => {
   replayPlayer?.setCameraMode(cameraMode.value);
+});
+
+cameraDistance.addEventListener("input", () => {
+  replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
 });
 
 trackedPlayer.addEventListener("change", () => {

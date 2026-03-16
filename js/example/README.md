@@ -9,7 +9,7 @@ drives the reusable `ReplayPlayer` API with example controls.
 
 - browser-side replay parsing with the WASM binding
 - example controls layered on top of the player library state API
-- camera switching, tracked-player selection, seeking, and playback-rate control
+- overview/tracked camera control, tracked-player selection, follow-distance tuning, seeking, and playback-rate control
 - integration testing for the local `js/player` package
 
 ## Prerequisites

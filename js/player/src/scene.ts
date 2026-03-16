@@ -17,7 +17,7 @@ export interface ReplayScene {
 
 interface WallPanel {
   mesh: THREE.Mesh;
-  material: THREE.MeshBasicMaterial;
+  material: THREE.Material;
   outwardLocal: THREE.Vector3;
 }
 
@@ -33,6 +33,15 @@ function createWallMaterial(color: number): THREE.MeshBasicMaterial {
   });
   material.forceSinglePass = true;
   return material;
+}
+
+function createFloorMaterial(color: number): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({
+    color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: OPAQUE_WALL_OPACITY,
+  });
 }
 
 function createVerticalWallBox(
@@ -62,7 +71,7 @@ function createExampleSoccarField(scale: number): {
   const wallPanels: WallPanel[] = [];
 
   function registerWall(mesh: THREE.Mesh, outwardLocal: THREE.Vector3): THREE.Mesh {
-    const material = (mesh.material as THREE.MeshBasicMaterial).clone();
+    const material = (mesh.material as THREE.Material).clone();
     mesh.material = material;
     wallPanels.push({
       mesh,
@@ -174,15 +183,15 @@ function createExampleSoccarField(scale: number): {
     floor.lineTo(SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER);
     floor.lineTo(SOCCAR_XSIZE / 2, 0);
 
-    const opaqueMaterial = new THREE.MeshLambertMaterial({
-      color,
-      side: THREE.DoubleSide,
-    });
+    const floorMaterial = createFloorMaterial(color);
     const wallMaterial = createWallMaterial(color);
 
-    const floorMesh = new THREE.Mesh(
-      new THREE.ShapeGeometry(floor),
-      opaqueMaterial
+    const floorMesh = registerWall(
+      new THREE.Mesh(
+        new THREE.ShapeGeometry(floor),
+        floorMaterial
+      ),
+      new THREE.Vector3(0, 0, -1)
     );
     floorMesh.receiveShadow = true;
     res.add(floorMesh);
@@ -397,13 +406,12 @@ export function createReplayScene(
 ): ReplayScene {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#081119");
-  scene.fog = new THREE.Fog("#081119", 9000 * fieldScale, 22000 * fieldScale);
 
   const camera = new THREE.PerspectiveCamera(
     48,
     1,
     10 * fieldScale,
-    100000 * fieldScale
+    500000 * fieldScale
   );
   camera.up.set(0, 0, 1);
   camera.position.set(0, -9000 * fieldScale, 5000 * fieldScale);
@@ -415,6 +423,7 @@ export function createReplayScene(
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.maxDistance = 160000 * fieldScale;
   controls.target.set(0, 0, 600 * fieldScale);
   controls.update();
 
