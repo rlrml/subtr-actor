@@ -293,6 +293,18 @@ impl StatsReducer for PositioningReducer {
 
         if live_play {
             for is_team_0 in [true, false] {
+                let team_present_player_count = sample
+                    .players
+                    .iter()
+                    .filter(|player| player.is_team_0 == is_team_0)
+                    .count();
+                let team_roster_count = sample.current_in_game_team_player_count(is_team_0).max(
+                    sample
+                        .players
+                        .iter()
+                        .filter(|player| player.is_team_0 == is_team_0)
+                        .count(),
+                );
                 let team_players: Vec<_> = sample
                     .players
                     .iter()
@@ -322,7 +334,9 @@ impl StatsReducer for PositioningReducer {
                     }
                 }
 
-                if sample.current_in_game_team_player_count(is_team_0) < 2 || team_players.len() < 2
+                if team_roster_count < 2
+                    || team_present_player_count < team_roster_count
+                    || team_players.len() < 2
                 {
                     for (player, _) in &team_players {
                         self.player_stats
@@ -331,7 +345,7 @@ impl StatsReducer for PositioningReducer {
                             .time_no_teammates += sample.dt;
                     }
                 } else {
-                    // Relative role buckets still make sense as long as at least one teammate is live.
+                    // These role buckets only make sense when the full multi-player team is live.
                     let mut sorted_team: Vec<_> = team_players
                         .iter()
                         .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))

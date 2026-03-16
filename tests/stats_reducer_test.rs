@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use boxcars::HeaderProp;
@@ -1735,6 +1735,170 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
             + victim_stats.time_no_teammates
             + victim_stats.time_demolished,
         victim_stats.active_game_time
+    );
+}
+
+#[test]
+fn test_positioning_reducer_treats_single_teammate_demo_in_3v3_like_2v2() {
+    #[derive(Default)]
+    struct SingleTeammateDemoTracker {
+        impacted_players_by_frame: HashMap<usize, Vec<PlayerId>>,
+    }
+
+    impl Collector for SingleTeammateDemoTracker {
+        fn process_frame(
+            &mut self,
+            processor: &ReplayProcessor,
+            _frame: &boxcars::Frame,
+            frame_number: usize,
+            current_time: f32,
+        ) -> SubtrActorResult<TimeAdvance> {
+            const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
+            const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
+
+            let live_play = !matches!(
+                processor.get_replicated_state_name().ok(),
+                Some(GAME_STATE_KICKOFF_COUNTDOWN | GAME_STATE_GOAL_SCORED_REPLAY)
+            ) && !matches!(processor.get_ball_has_been_hit().ok(), Some(false));
+            if !live_play {
+                return Ok(TimeAdvance::NextFrame);
+            }
+
+            let demoed_players: HashSet<_> = processor
+                .get_active_demos()?
+                .filter_map(|demo| {
+                    processor
+                        .get_player_id_from_car_id(&demo.victim_actor_id())
+                        .ok()
+                })
+                .collect();
+            if demoed_players.is_empty() {
+                return Ok(TimeAdvance::NextFrame);
+            }
+
+            let roster_counts = processor.current_in_game_team_player_counts();
+            let mut impacted_players = Vec::new();
+
+            for is_team_0 in [true, false] {
+                let team_roster_count = if is_team_0 {
+                    roster_counts[0]
+                } else {
+                    roster_counts[1]
+                };
+                if team_roster_count != 3 {
+                    continue;
+                }
+
+                let team_demo_count = demoed_players
+                    .iter()
+                    .filter(|player_id| {
+                        processor.get_player_is_team_0(player_id).ok() == Some(is_team_0)
+                    })
+                    .count();
+                if team_demo_count != 1 {
+                    continue;
+                }
+
+                let live_teammates: Vec<_> = processor
+                    .iter_player_ids_in_order()
+                    .filter(|player_id| {
+                        processor.get_player_is_team_0(player_id).ok() == Some(is_team_0)
+                    })
+                    .filter(|player_id| !demoed_players.contains(*player_id))
+                    .filter(|player_id| {
+                        processor
+                            .get_interpolated_player_rigid_body(player_id, current_time, 0.0)
+                            .ok()
+                            .is_some_and(|rigid_body| !rigid_body.sleeping)
+                    })
+                    .cloned()
+                    .collect();
+
+                if live_teammates.len() == 2 {
+                    impacted_players.extend(live_teammates);
+                }
+            }
+
+            if !impacted_players.is_empty() {
+                self.impacted_players_by_frame
+                    .insert(frame_number, impacted_players);
+            }
+
+            Ok(TimeAdvance::NextFrame)
+        }
+    }
+
+    fn find_player<'a>(
+        frame: &'a ReplayStatsFrame,
+        player_id: &PlayerId,
+    ) -> &'a PlayerStatsSnapshot {
+        frame
+            .players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+            .unwrap_or_else(|| panic!("Missing player snapshot for {player_id:?}"))
+    }
+
+    let replay = parse_replay("assets/replays/new_demolition_format.replay");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to build stats timeline for positioning demo regression");
+
+    let mut tracker = SingleTeammateDemoTracker::default();
+    ReplayProcessor::new(&replay)
+        .expect("Failed to construct replay processor")
+        .process(&mut tracker)
+        .expect("Failed to scan replay for single-teammate demo frames");
+
+    let mut checked_players = 0usize;
+    for window in timeline.frames.windows(2) {
+        let previous = &window[0];
+        let current = &window[1];
+        let Some(player_ids) = tracker.impacted_players_by_frame.get(&current.frame_number) else {
+            continue;
+        };
+        if !current.is_live_play {
+            continue;
+        }
+
+        for player_id in player_ids {
+            let previous_player = find_player(previous, player_id);
+            let current_player = find_player(current, player_id);
+
+            let no_teammates_delta = current_player.positioning.time_no_teammates
+                - previous_player.positioning.time_no_teammates;
+            let role_time_delta = (current_player.positioning.time_most_back
+                - previous_player.positioning.time_most_back)
+                + (current_player.positioning.time_most_forward
+                    - previous_player.positioning.time_most_forward)
+                + (current_player.positioning.time_other_role
+                    - previous_player.positioning.time_other_role)
+                + (current_player.positioning.time_even - previous_player.positioning.time_even);
+
+            assert!(
+                no_teammates_delta.abs() < 1e-4,
+                "Player {} accumulated {:.4}s of no-teammates time at frame {} (t={:.3}) with exactly one teammate demoed in 3v3",
+                current_player.name,
+                no_teammates_delta,
+                current.frame_number,
+                current.time
+            );
+            assert!(
+                (role_time_delta - current.dt).abs() < 1e-4,
+                "Player {} failed to accumulate 2v2 role time at frame {} (t={:.3}) with one teammate demoed: role_delta={:.4}, dt={:.4}",
+                current_player.name,
+                current.frame_number,
+                current.time,
+                role_time_delta,
+                current.dt
+            );
+            checked_players += 1;
+        }
+    }
+
+    assert!(
+        checked_players > 0,
+        "Expected new_demolition_format.replay to contain at least one live 3v3 frame with exactly one demoed teammate"
     );
 }
 
