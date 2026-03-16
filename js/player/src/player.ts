@@ -530,6 +530,11 @@ export class ReplayPlayer extends EventTarget {
           updateBoostMeter(
             boostMeter,
             boostFraction,
+            THREE.MathUtils.lerp(
+              frame?.boostAmount ?? 0,
+              nextFrame?.boostAmount ?? frame?.boostAmount ?? 0,
+              frameWindow.alpha
+            ),
             this.sceneState.camera
           );
         } else {

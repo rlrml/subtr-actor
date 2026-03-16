@@ -458,58 +458,134 @@ export interface BoostMeter {
   group: THREE.Group;
   fillMesh: THREE.Mesh;
   fillMaterial: THREE.MeshBasicMaterial;
+  labelTexture: THREE.CanvasTexture;
+  labelContext: CanvasRenderingContext2D;
+  labelCanvas: HTMLCanvasElement;
+  lastPercent: number | null;
 }
 
 function createBoostMeter(): BoostMeter {
   const group = new THREE.Group();
   group.visible = false;
 
-  // Position above the car
-  group.position.set(0, 0, 160);
+  // Position above the car, sized to remain readable from the default camera.
+  group.position.set(0, 0, 235);
 
-  const barWidth = 120;
-  const barHeight = 12;
+  const panelWidth = 240;
+  const panelHeight = 82;
+  const barWidth = 188;
+  const barHeight = 20;
+
+  const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+  const panelMaterial = new THREE.MeshBasicMaterial({
+    color: 0x07131d,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+  panelMesh.position.z = -1;
+  group.add(panelMesh);
 
   // Background (dark)
   const bgGeometry = new THREE.PlaneGeometry(barWidth, barHeight);
   const bgMaterial = new THREE.MeshBasicMaterial({
-    color: 0x222222,
+    color: 0x152431,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.92,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
   const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
+  bgMesh.position.y = -18;
   group.add(bgMesh);
 
   // Fill (yellow-gold, scales with boost amount)
   const fillGeometry = new THREE.PlaneGeometry(barWidth, barHeight);
   const fillMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffcc00,
+    color: 0xffc247,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.98,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
   const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial);
-  // Anchor fill to the left so it grows rightward
-  fillMesh.position.x = 0;
+  fillMesh.position.y = -18;
   group.add(fillMesh);
 
-  return { group, fillMesh, fillMaterial };
+  const labelCanvas = document.createElement("canvas");
+  labelCanvas.width = 512;
+  labelCanvas.height = 160;
+  const labelContext = labelCanvas.getContext("2d");
+  if (!labelContext) {
+    throw new Error("Unable to create boost meter label context");
+  }
+
+  const labelTexture = new THREE.CanvasTexture(labelCanvas);
+  labelTexture.colorSpace = THREE.SRGBColorSpace;
+  labelTexture.needsUpdate = true;
+
+  const labelGeometry = new THREE.PlaneGeometry(190, 48);
+  const labelMaterial = new THREE.MeshBasicMaterial({
+    map: labelTexture,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+  labelMesh.position.set(0, 15, 0);
+  group.add(labelMesh);
+
+  return {
+    group,
+    fillMesh,
+    fillMaterial,
+    labelTexture,
+    labelContext,
+    labelCanvas,
+    lastPercent: null,
+  };
 }
 
 export function updateBoostMeter(
   meter: BoostMeter,
   fraction: number,
+  amount: number,
   camera: THREE.Camera,
 ): void {
   // Scale fill bar horizontally by fraction
   meter.fillMesh.scale.x = Math.max(0.001, fraction);
   // Shift fill so it stays left-aligned: at scale=1 it's centered,
   // so offset = (1 - scale) * halfWidth
-  const halfWidth = 60; // barWidth / 2
+  const halfWidth = 94; // barWidth / 2
   meter.fillMesh.position.x = -(1 - fraction) * halfWidth;
+  meter.fillMesh.position.y = -18;
+
+  const percent = Math.max(0, Math.min(100, Math.round((amount / 255) * 100)));
+  if (meter.lastPercent !== percent) {
+    const { labelContext, labelCanvas, labelTexture } = meter;
+    labelContext.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+    labelContext.textAlign = "center";
+    labelContext.textBaseline = "middle";
+    labelContext.lineJoin = "round";
+
+    labelContext.font = "700 84px sans-serif";
+    labelContext.lineWidth = 18;
+    labelContext.strokeStyle = "rgba(7, 19, 29, 0.92)";
+    labelContext.strokeText(`${percent}`, labelCanvas.width / 2, 78);
+    labelContext.fillStyle = "#fff8e1";
+    labelContext.fillText(`${percent}`, labelCanvas.width / 2, 78);
+
+    labelContext.font = "600 30px sans-serif";
+    labelContext.lineWidth = 10;
+    labelContext.strokeText("BOOST", labelCanvas.width / 2, 130);
+    labelContext.fillStyle = "#ffcf70";
+    labelContext.fillText("BOOST", labelCanvas.width / 2, 130);
+
+    labelTexture.needsUpdate = true;
+    meter.lastPercent = percent;
+  }
 
   // Billboard: face the camera
   meter.group.quaternion.copy(camera.quaternion);

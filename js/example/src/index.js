@@ -307,6 +307,7 @@ async function loadReplayFile(file) {
     initialCameraDistanceScale: 2.25,
     initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
+    initialBoostMeterEnabled: true,
     initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
     initialSkipKickoffsEnabled: skipKickoffs.checked,
   });

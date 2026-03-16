@@ -66,6 +66,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "subtr-actor": path.resolve(
+        exampleDir,
+        "../pkg/rl_replay_subtr_actor.js"
+      ),
       three: path.resolve(exampleDir, "node_modules/three"),
     },
   },
