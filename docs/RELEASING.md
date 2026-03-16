@@ -4,10 +4,11 @@ This document describes how to release new versions of subtr-actor to GitHub Rel
 
 ## Overview
 
-The project publishes three packages:
+The project publishes four packages:
 - **Rust**: `subtr-actor` on [crates.io](https://crates.io/crates/subtr-actor)
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
-- **JavaScript**: `rl-replay-subtr-actor` on [npm](https://www.npmjs.com/package/rl-replay-subtr-actor)
+- **JavaScript bindings**: `subtr-actor` on [npm](https://www.npmjs.com/package/subtr-actor)
+- **JavaScript player**: `subtr-actor-player` on [npm](https://www.npmjs.com/package/subtr-actor-player)
 
 ## Automated Releases (GitHub Actions)
 
@@ -31,7 +32,9 @@ Builds wheels for multiple platforms:
 All artifacts are published to PyPI.
 
 ### JavaScript (`release-js.yml`)
-Builds WebAssembly package and publishes to npm.
+Builds the WebAssembly bindings package, builds the player package, smoke-tests
+the packed player artifact in a fresh consumer app, and publishes both npm
+packages.
 
 ## Setup Required (One-Time)
 
@@ -73,6 +76,9 @@ sed -i '/\\[dependencies\\.subtr-actor\\]/,/^\\[/{s/version = "0.1.10"/version =
 # js/package.json
 sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/package.json
 
+# js/player/package.json
+sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/player/package.json
+
 # Cargo.lock
 cargo metadata --format-version 1 >/dev/null
 ```
@@ -85,7 +91,7 @@ just bump 0.1.11
 ### 2. Commit and Tag
 
 ```bash
-git add Cargo.toml Cargo.lock python/pyproject.toml python/Cargo.toml js/package.json js/Cargo.toml
+git add Cargo.toml Cargo.lock python/pyproject.toml python/Cargo.toml js/package.json js/player/package.json js/Cargo.toml
 git commit -m "Release v0.1.11"
 git tag v0.1.11
 git push origin master --tags
@@ -99,7 +105,8 @@ git push origin master --tags
   - https://github.com/rlrml/subtr-actor/releases
   - https://crates.io/crates/subtr-actor
   - https://pypi.org/project/subtr-actor-py/
-  - https://www.npmjs.com/package/rl-replay-subtr-actor
+  - https://www.npmjs.com/package/subtr-actor
+  - https://www.npmjs.com/package/subtr-actor-player
 
 ## Manual Release (Alternative)
 

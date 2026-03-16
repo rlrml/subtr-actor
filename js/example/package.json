@@ -15,7 +15,6 @@
         "chart.js": "^4.4.0",
         "chartjs-adapter-date-fns": "^3.0.0",
         "date-fns": "^3.0.0",
-        "rl-replay-subtr-actor": "^0.1.7",
         "three": "^0.180.0"
     },
     "devDependencies": {

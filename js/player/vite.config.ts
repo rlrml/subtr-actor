@@ -23,11 +23,11 @@ export default defineConfig({
     lib: {
       entry: path.resolve(srcDir, "lib.ts"),
       name: "SubtrActorPlayer",
-      fileName: "subtr-actor-player",
+      fileName: "index",
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["three"],
+      external: ["subtr-actor", "three"],
     },
   },
 });

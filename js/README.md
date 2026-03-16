@@ -1,13 +1,18 @@
-# rl-replay-subtr-actor
+# subtr-actor
 
 WebAssembly bindings for [subtr-actor](https://crates.io/crates/subtr-actor), a Rocket League replay processing library.
 
 This package mirrors the Python binding at a JavaScript/TypeScript-friendly boundary: pass replay bytes in, get structured data or ndarray-like output back.
 
+Related npm packages:
+
+- [`subtr-actor`](https://www.npmjs.com/package/subtr-actor): low-level WebAssembly bindings
+- [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player): replay player package built on top of these bindings
+
 ## Installation
 
 ```bash
-npm install rl-replay-subtr-actor
+npm install subtr-actor
 ```
 
 ## Runtime Support
@@ -35,7 +40,7 @@ import init, {
   get_replay_info,
   get_replay_meta,
   validate_replay,
-} from "rl-replay-subtr-actor";
+} from "subtr-actor";
 
 await init();
 
@@ -191,8 +196,9 @@ npm --prefix js test
 
 Local packages built on top of these bindings:
 
-- [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
+- [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
 - [`js/example`](./example/README.md): example/demo app that exercises the local player library.
+- [`js/mechanics-evaluation-player`](./mechanics-evaluation-player/README.md): manifest-driven playlist viewer for mechanics evaluation workflows.
 
 The example app under [`js/example`](./example/README.md) uses the web target and expects `js/pkg/` to be built with `wasm-pack build --target web --out-dir pkg`.
 

@@ -38,6 +38,7 @@ def main() -> int:
     python_pyproject = load_toml("python/pyproject.toml")
     js_cargo = load_toml("js/Cargo.toml")
     js_package = load_json("js/package.json")
+    js_player_package = load_json("js/player/package.json")
     lock_versions = load_lock_versions()
 
     checks = {
@@ -45,6 +46,7 @@ def main() -> int:
         "python/pyproject.toml [project.version]": python_pyproject["project"]["version"],
         "python/Cargo.toml dependency on subtr-actor": python_cargo["dependencies"]["subtr-actor"]["version"],
         "js/package.json version": js_package["version"],
+        "js/player/package.json version": js_player_package["version"],
         "js/Cargo.toml dependency on subtr-actor": js_cargo["dependencies"]["subtr-actor"]["version"],
         "Cargo.lock package subtr-actor": lock_versions.get("subtr-actor"),
         "Cargo.lock package subtr-actor-py": lock_versions.get("subtr-actor-py"),

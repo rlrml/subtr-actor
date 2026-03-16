@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-publish:
-    name: Build and publish to npm
+    name: Build and publish npm packages
     runs-on: ubuntu-latest
 
     steps:
@@ -49,12 +49,81 @@ jobs:
           npm whoami --registry=https://registry.npmjs.org >/dev/null
           echo "npm auth preflight passed."
 
-      - name: Build WASM package
-        working-directory: js
-        run: wasm-pack build --target web --out-dir pkg
+      - name: Resolve npm package metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Publish to npm
+          bindings_name="$(python3 -c 'import json; print(json.load(open("js/package.json"))["name"])')"
+          bindings_version="$(python3 -c 'import json; print(json.load(open("js/package.json"))["version"])')"
+          player_name="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["name"])')"
+          player_version="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["version"])')"
+
+          echo "bindings_name=${bindings_name}" >> "$GITHUB_OUTPUT"
+          echo "bindings_version=${bindings_version}" >> "$GITHUB_OUTPUT"
+          echo "player_name=${player_name}" >> "$GITHUB_OUTPUT"
+          echo "player_version=${player_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm publish state
+        id: publish_state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_already_published() {
+            local package_name="$1"
+            local package_version="$2"
+            local output_name="$3"
+
+            if npm view "${package_name}@${package_version}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+              echo "${package_name}@${package_version} is already published."
+              echo "${output_name}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "${package_name}@${package_version} is not published yet."
+              echo "${output_name}=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          check_already_published "${{ steps.metadata.outputs.bindings_name }}" "${{ steps.metadata.outputs.bindings_version }}" "bindings_already_published"
+          check_already_published "${{ steps.metadata.outputs.player_name }}" "${{ steps.metadata.outputs.player_version }}" "player_already_published"
+
+      - name: Build WASM package
+        if: steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true'
+        run: npm --prefix js run build
+
+      - name: Install player dependencies
+        if: steps.publish_state.outputs.player_already_published != 'true'
+        working-directory: js/player
+        run: npm ci
+
+      - name: Build player package
+        if: steps.publish_state.outputs.player_already_published != 'true'
+        working-directory: js/player
+        run: npm run build
+
+      - name: Smoke test packed player package
+        if: steps.publish_state.outputs.player_already_published != 'true'
+        working-directory: js/player
+        run: npm run smoke:install
+
+      - name: Publish bindings package to npm
+        if: steps.publish_state.outputs.bindings_already_published != 'true'
         working-directory: js/pkg
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish player package to npm
+        if: steps.publish_state.outputs.player_already_published != 'true'
+        shell: bash
+        working-directory: js/player
+        run: |
+          set -euo pipefail
+          package_dir="$(npm run --silent prepare:package)"
+          (
+            cd "$package_dir"
+            npm publish --access public
+          )
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

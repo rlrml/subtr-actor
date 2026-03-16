@@ -1,8 +1,7 @@
 import init, {
   get_replay_frames_data,
   validate_replay,
-} from "../../pkg/rl_replay_subtr_actor";
-import wasmUrl from "../../pkg/rl_replay_subtr_actor_bg.wasm?url";
+} from "subtr-actor";
 import type { RawReplayFramesData, ReplayLoadResult } from "./types";
 import { normalizeReplayData } from "./replay-data";
 
@@ -38,7 +37,7 @@ function toPlainData<T>(value: T): T {
 
 export async function ensureBindingsReady(): Promise<void> {
   if (!bindingsReady) {
-    bindingsReady = init(wasmUrl);
+    bindingsReady = init();
   }
   await bindingsReady;
 }

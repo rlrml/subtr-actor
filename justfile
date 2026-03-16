@@ -113,6 +113,7 @@ bump version:
     sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' Cargo.toml
     sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' python/pyproject.toml
     sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/package.json
+    sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/player/package.json
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' js/Cargo.toml
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' python/Cargo.toml
     cargo metadata --format-version 1 > /dev/null
