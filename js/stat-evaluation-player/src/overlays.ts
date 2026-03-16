@@ -1,107 +1,335 @@
 import * as THREE from "three";
-import type { ReplayModel } from "../../player/src/types.ts";
-import type { FrameRenderInfo } from "../../player/src/types.ts";
+import type { FrameRenderInfo, ReplayModel } from "../../player/src/types.ts";
 
 // Must match Rust DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y (approx two car lengths)
 const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;
 
-// Dynamic threshold zones showing most-back/most-forward classification bands
 const FIELD_HALF_X = 4120;
-const WALL_HEIGHT = 1960;
+const FIELD_ZONE_BOUNDARY_Y = 2300.0;
+
+const BAND_FILL_COLOR = 0xf6f6f3;
+const BAND_FILL_OPACITY = 0.18;
+const BAND_ARROW_COLOR = 0x111111;
+const BLUE_TEAM_ACCENT_COLOR = 0x59c3ff;
+const ORANGE_TEAM_ACCENT_COLOR = 0xffc15c;
+const TEAM_STRIPE_OPACITY = 0.55;
+
+const BAND_BASE_Z = 3;
+const STRIPE_Z = 4;
+const ARROW_Z = 5;
+
+const TEAM_LANE_EDGE_INSET_X = 220;
+const TEAM_LANE_GAP_X = 200;
+const TEAM_STRIPE_WIDTH = 140;
+const MIN_ARROW_LENGTH = 220;
+const ARROW_HEAD_LENGTH = 100;
+const ARROW_HEAD_WIDTH = 120;
+
+type BandKind = "back" | "forward" | "even";
+
+export interface TeamLaneBounds {
+  minX: number;
+  maxX: number;
+  centerX: number;
+  width: number;
+}
+
+export interface RelativeBandDescriptor {
+  kind: BandKind;
+  centerY: number;
+  halfDepth: number;
+  directions: number[];
+}
+
+interface DirectionMarker {
+  group: THREE.Group;
+  shaftGeom: THREE.PlaneGeometry;
+  shaftMesh: THREE.Mesh;
+  headGeom: THREE.ShapeGeometry;
+  headMesh: THREE.Mesh;
+  material: THREE.MeshBasicMaterial;
+  headLength: number;
+}
 
 interface ThresholdZone {
   group: THREE.Group;
-  floorMesh: THREE.Mesh;
-  leftWallMesh: THREE.Mesh;
-  rightWallMesh: THREE.Mesh;
   floorGeom: THREE.PlaneGeometry;
-  leftWallGeom: THREE.PlaneGeometry;
-  rightWallGeom: THREE.PlaneGeometry;
-  material: THREE.MeshBasicMaterial;
+  floorMesh: THREE.Mesh;
+  floorMaterial: THREE.MeshBasicMaterial;
+  stripeGeom: THREE.PlaneGeometry;
+  stripeMesh: THREE.Mesh;
+  stripeMaterial: THREE.MeshBasicMaterial;
+  primaryMarker: DirectionMarker;
+  secondaryMarker: DirectionMarker;
 }
 
-function makeThresholdZone(
-  fieldScale: number,
-  color: number,
-  opacity: number,
-): ThresholdZone {
-  const hw = FIELD_HALF_X * fieldScale;
-  const wh = WALL_HEIGHT * fieldScale;
-  // Zone depth (Y extent) will be set dynamically via scale, so create at unit size
-  const zoneDepth = 1; // will be scaled
+export function getTeamLaneBounds(isTeamZero: boolean): TeamLaneBounds {
+  const innerEdge = TEAM_LANE_GAP_X / 2;
 
+  if (isTeamZero) {
+    const minX = -FIELD_HALF_X + TEAM_LANE_EDGE_INSET_X;
+    const maxX = -innerEdge;
+    return {
+      minX,
+      maxX,
+      centerX: (minX + maxX) / 2,
+      width: maxX - minX,
+    };
+  }
+
+  const minX = innerEdge;
+  const maxX = FIELD_HALF_X - TEAM_LANE_EDGE_INSET_X;
+  return {
+    minX,
+    maxX,
+    centerX: (minX + maxX) / 2,
+    width: maxX - minX,
+  };
+}
+
+export function computeTeamBandDescriptors(
+  rawYs: number[],
+  isTeamZero: boolean,
+  threshold: number,
+): RelativeBandDescriptor[] {
+  if (rawYs.length < 2) return [];
+
+  const rawMin = Math.min(...rawYs);
+  const rawMax = Math.max(...rawYs);
+  const spread = rawMax - rawMin;
+  const backDirection = isTeamZero ? -1 : 1;
+  const forwardDirection = -backDirection;
+
+  if (spread <= threshold) {
+    return [{
+      kind: "even",
+      centerY: (rawMin + rawMax) / 2,
+      // Use the overlap of the back/front threshold bands for the even state.
+      halfDepth: Math.max(threshold - spread / 2, threshold * 0.35),
+      directions: [backDirection, forwardDirection],
+    }];
+  }
+
+  return [
+    {
+      kind: "back",
+      centerY: isTeamZero ? rawMin : rawMax,
+      halfDepth: threshold,
+      directions: [backDirection],
+    },
+    {
+      kind: "forward",
+      centerY: isTeamZero ? rawMax : rawMin,
+      halfDepth: threshold,
+      directions: [forwardDirection],
+    },
+  ];
+}
+
+function createArrowHeadGeometry(width: number, length: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, length / 2);
+  shape.lineTo(width / 2, -length / 2);
+  shape.lineTo(-width / 2, -length / 2);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+function makeDirectionMarker(fieldScale: number): DirectionMarker {
+  const headLength = ARROW_HEAD_LENGTH * fieldScale;
   const material = new THREE.MeshBasicMaterial({
-    color,
+    color: BAND_ARROW_COLOR,
     transparent: true,
-    opacity,
+    opacity: 0.9,
     side: THREE.DoubleSide,
     depthWrite: false,
+    depthTest: false,
   });
 
   const group = new THREE.Group();
   group.visible = false;
 
-  // Floor plane: width = full field, depth = 1 (scaled dynamically)
-  const floorGeom = new THREE.PlaneGeometry(hw * 2, zoneDepth);
-  const floorMesh = new THREE.Mesh(floorGeom, material);
-  floorMesh.position.z = 2; // slightly above floor to avoid z-fighting
-  group.add(floorMesh);
+  const shaftGeom = new THREE.PlaneGeometry(TEAM_STRIPE_WIDTH * 0.55 * fieldScale, 1);
+  const shaftMesh = new THREE.Mesh(shaftGeom, material);
+  shaftMesh.position.z = ARROW_Z;
+  shaftMesh.renderOrder = 22;
+  group.add(shaftMesh);
 
-  // Left wall strip
-  const leftWallGeom = new THREE.PlaneGeometry(zoneDepth, wh);
-  const leftWallMesh = new THREE.Mesh(leftWallGeom, material);
-  leftWallMesh.position.set(-hw, 0, wh / 2);
-  leftWallMesh.rotation.y = Math.PI / 2;
-  group.add(leftWallMesh);
+  const headGeom = createArrowHeadGeometry(
+    ARROW_HEAD_WIDTH * fieldScale,
+    headLength,
+  );
+  const headMesh = new THREE.Mesh(headGeom, material);
+  headMesh.position.z = ARROW_Z;
+  headMesh.renderOrder = 23;
+  group.add(headMesh);
 
-  // Right wall strip
-  const rightWallGeom = new THREE.PlaneGeometry(zoneDepth, wh);
-  const rightWallMesh = new THREE.Mesh(rightWallGeom, material);
-  rightWallMesh.position.set(hw, 0, wh / 2);
-  rightWallMesh.rotation.y = Math.PI / 2;
-  group.add(rightWallMesh);
-
-  return { group, floorMesh, leftWallMesh, rightWallMesh, floorGeom, leftWallGeom, rightWallGeom, material };
+  return {
+    group,
+    shaftGeom,
+    shaftMesh,
+    headGeom,
+    headMesh,
+    material,
+    headLength,
+  };
 }
 
-function updateZonePosition(zone: ThresholdZone, centerY: number, halfDepth: number, fieldScale: number): void {
-  const depth = halfDepth * 2 * fieldScale;
-  const wh = WALL_HEIGHT * fieldScale;
-  const hw = FIELD_HALF_X * fieldScale;
+function setDirectionMarker(
+  marker: DirectionMarker,
+  centerX: number,
+  totalLength: number,
+  direction: number,
+): void {
+  const shaftLength = Math.max(totalLength - marker.headLength, marker.headLength * 0.2);
 
-  zone.group.position.y = centerY * fieldScale;
+  marker.group.position.x = centerX;
+  marker.group.rotation.z = direction > 0 ? 0 : Math.PI;
 
-  // Floor: scale Y to match zone depth
-  zone.floorMesh.scale.y = depth;
+  marker.shaftMesh.scale.y = shaftLength;
+  marker.shaftMesh.position.y = -marker.headLength / 2;
+  marker.headMesh.position.y = totalLength / 2 - marker.headLength / 2;
+  marker.group.visible = true;
+}
 
-  // Wall strips: scale X to match zone depth, reposition
-  zone.leftWallMesh.scale.x = depth;
-  zone.leftWallMesh.position.set(-hw, 0, wh / 2);
+function hideDirectionMarker(marker: DirectionMarker): void {
+  marker.group.visible = false;
+}
 
-  zone.rightWallMesh.scale.x = depth;
-  zone.rightWallMesh.position.set(hw, 0, wh / 2);
+function makeThresholdZone(fieldScale: number, stripeColor: number): ThresholdZone {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const floorMaterial = new THREE.MeshBasicMaterial({
+    color: BAND_FILL_COLOR,
+    transparent: true,
+    opacity: BAND_FILL_OPACITY,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const floorGeom = new THREE.PlaneGeometry(1, 1);
+  const floorMesh = new THREE.Mesh(floorGeom, floorMaterial);
+  floorMesh.position.z = BAND_BASE_Z;
+  floorMesh.renderOrder = 20;
+  group.add(floorMesh);
+
+  const stripeMaterial = new THREE.MeshBasicMaterial({
+    color: stripeColor,
+    transparent: true,
+    opacity: TEAM_STRIPE_OPACITY,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const stripeGeom = new THREE.PlaneGeometry(1, 1);
+  const stripeMesh = new THREE.Mesh(stripeGeom, stripeMaterial);
+  stripeMesh.position.z = STRIPE_Z;
+  stripeMesh.renderOrder = 21;
+  group.add(stripeMesh);
+
+  const primaryMarker = makeDirectionMarker(fieldScale);
+  const secondaryMarker = makeDirectionMarker(fieldScale);
+  group.add(primaryMarker.group);
+  group.add(secondaryMarker.group);
+
+  return {
+    group,
+    floorGeom,
+    floorMesh,
+    floorMaterial,
+    stripeGeom,
+    stripeMesh,
+    stripeMaterial,
+    primaryMarker,
+    secondaryMarker,
+  };
+}
+
+function hideZone(zone: ThresholdZone): void {
+  zone.group.visible = false;
+  hideDirectionMarker(zone.primaryMarker);
+  hideDirectionMarker(zone.secondaryMarker);
+}
+
+function updateZone(
+  zone: ThresholdZone,
+  descriptor: RelativeBandDescriptor,
+  lane: TeamLaneBounds,
+  fieldScale: number,
+): void {
+  const depth = descriptor.halfDepth * 2 * fieldScale;
+  const laneWidth = lane.width * fieldScale;
+  const laneCenterX = lane.centerX * fieldScale;
+  const stripeWidth = TEAM_STRIPE_WIDTH * fieldScale;
+  const maxArrowLength = Math.max(depth - 32 * fieldScale, zone.primaryMarker.headLength * 1.15);
+  const arrowLength = Math.min(
+    maxArrowLength,
+    Math.max(MIN_ARROW_LENGTH * fieldScale, depth * 0.6),
+  );
+
+  zone.group.position.y = descriptor.centerY * fieldScale;
+
+  zone.floorMesh.position.x = laneCenterX;
+  zone.floorMesh.scale.set(laneWidth, depth, 1);
+
+  zone.stripeMesh.position.x = laneCenterX;
+  zone.stripeMesh.scale.set(stripeWidth, depth, 1);
+
+  hideDirectionMarker(zone.primaryMarker);
+  hideDirectionMarker(zone.secondaryMarker);
+
+  if (descriptor.directions.length === 1) {
+    setDirectionMarker(zone.primaryMarker, laneCenterX, arrowLength, descriptor.directions[0]!);
+  } else {
+    const arrowOffsetX = laneWidth * 0.18;
+    setDirectionMarker(
+      zone.primaryMarker,
+      laneCenterX - arrowOffsetX,
+      arrowLength,
+      descriptor.directions[0]!,
+    );
+    setDirectionMarker(
+      zone.secondaryMarker,
+      laneCenterX + arrowOffsetX,
+      arrowLength,
+      descriptor.directions[1]!,
+    );
+  }
 
   zone.group.visible = true;
+}
+
+function disposeDirectionMarker(marker: DirectionMarker): void {
+  marker.group.removeFromParent();
+  marker.shaftGeom.dispose();
+  marker.headGeom.dispose();
+  marker.material.dispose();
 }
 
 export class ThresholdZoneOverlay {
   private replay: ReplayModel;
   private blueBack: ThresholdZone;
-  private blueFront: ThresholdZone;
+  private blueForward: ThresholdZone;
+  private blueEven: ThresholdZone;
   private orangeBack: ThresholdZone;
-  private orangeFront: ThresholdZone;
+  private orangeForward: ThresholdZone;
+  private orangeEven: ThresholdZone;
 
   constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
     this.replay = replay;
-    // Back zones = red tint, forward zones = green tint
-    this.blueBack = makeThresholdZone(fieldScale, 0xff3333, 0.12);
-    this.blueFront = makeThresholdZone(fieldScale, 0x33ff33, 0.12);
-    this.orangeBack = makeThresholdZone(fieldScale, 0xff3333, 0.12);
-    this.orangeFront = makeThresholdZone(fieldScale, 0x33ff33, 0.12);
-    scene.add(this.blueBack.group);
-    scene.add(this.blueFront.group);
-    scene.add(this.orangeBack.group);
-    scene.add(this.orangeFront.group);
+    this.blueBack = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
+    this.blueForward = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
+    this.blueEven = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
+    this.orangeBack = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
+    this.orangeForward = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
+    this.orangeEven = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
+
+    for (const zone of this.getZones()) {
+      scene.add(zone.group);
+    }
   }
 
   update(info: FrameRenderInfo, fieldScale: number): void {
@@ -113,6 +341,7 @@ export class ThresholdZoneOverlay {
         (player) => player.isTeamZero === isTeamZero,
       ).length;
       const rawYs: number[] = [];
+
       for (const player of this.replay.players) {
         if (player.isTeamZero !== isTeamZero) continue;
         const frame = player.frames[frameIndex];
@@ -120,48 +349,71 @@ export class ThresholdZoneOverlay {
         rawYs.push(frame.position.y);
       }
 
-      const backZone = isTeamZero ? this.blueBack : this.orangeBack;
-      const frontZone = isTeamZero ? this.blueFront : this.orangeFront;
+      const lane = getTeamLaneBounds(isTeamZero);
+      const teamZones = this.getTeamZones(isTeamZero);
+      for (const zone of teamZones.values()) {
+        hideZone(zone);
+      }
 
       if (teamRosterCount < 2 || rawYs.length !== teamRosterCount) {
-        backZone.group.visible = false;
-        frontZone.group.visible = false;
         continue;
       }
 
-      const rawMin = Math.min(...rawYs);
-      const rawMax = Math.max(...rawYs);
-
-      // For team 0: most back player is at rawMin, most forward at rawMax
-      // For team 1: most back player is at rawMax, most forward at rawMin
-      // Zone is centered on the extreme player, extending ±threshold
-      const backPlayerY = isTeamZero ? rawMin : rawMax;
-      const frontPlayerY = isTeamZero ? rawMax : rawMin;
-
-      updateZonePosition(backZone, backPlayerY, threshold, fieldScale);
-      updateZonePosition(frontZone, frontPlayerY, threshold, fieldScale);
+      const descriptors = computeTeamBandDescriptors(rawYs, isTeamZero, threshold);
+      for (const descriptor of descriptors) {
+        const zone = teamZones.get(descriptor.kind);
+        if (!zone) continue;
+        updateZone(zone, descriptor, lane, fieldScale);
+      }
     }
   }
 
   dispose(): void {
-    for (const zone of [this.blueBack, this.blueFront, this.orangeBack, this.orangeFront]) {
+    for (const zone of this.getZones()) {
       zone.group.removeFromParent();
       zone.floorGeom.dispose();
-      zone.leftWallGeom.dispose();
-      zone.rightWallGeom.dispose();
-      zone.material.dispose();
+      zone.floorMaterial.dispose();
+      zone.stripeGeom.dispose();
+      zone.stripeMaterial.dispose();
+      disposeDirectionMarker(zone.primaryMarker);
+      disposeDirectionMarker(zone.secondaryMarker);
     }
   }
-}
 
-const FIELD_ZONE_BOUNDARY_Y = 2300.0;
+  private getTeamZones(isTeamZero: boolean): Map<BandKind, ThresholdZone> {
+    if (isTeamZero) {
+      return new Map<BandKind, ThresholdZone>([
+        ["back", this.blueBack],
+        ["forward", this.blueForward],
+        ["even", this.blueEven],
+      ]);
+    }
+
+    return new Map<BandKind, ThresholdZone>([
+      ["back", this.orangeBack],
+      ["forward", this.orangeForward],
+      ["even", this.orangeEven],
+    ]);
+  }
+
+  private getZones(): ThresholdZone[] {
+    return [
+      this.blueBack,
+      this.blueForward,
+      this.blueEven,
+      this.orangeBack,
+      this.orangeForward,
+      this.orangeEven,
+    ];
+  }
+}
 
 export function createZoneBoundaryLines(
   scene: THREE.Scene,
   fieldScale: number,
 ): THREE.Group {
   const group = new THREE.Group();
-  const FIELD_HALF_WIDTH = 4120 * fieldScale;
+  const fieldHalfWidth = FIELD_HALF_X * fieldScale;
 
   const material = new THREE.LineBasicMaterial({
     color: 0xffffff,
@@ -172,18 +424,17 @@ export function createZoneBoundaryLines(
   for (const ySign of [-1, 1]) {
     const y = ySign * FIELD_ZONE_BOUNDARY_Y * fieldScale;
     const points = [
-      new THREE.Vector3(-FIELD_HALF_WIDTH, y, 2),
-      new THREE.Vector3(FIELD_HALF_WIDTH, y, 2),
+      new THREE.Vector3(-fieldHalfWidth, y, 2),
+      new THREE.Vector3(fieldHalfWidth, y, 2),
     ];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const line = new THREE.Line(geometry, material);
     group.add(line);
   }
 
-  // Midfield line
   const midPoints = [
-    new THREE.Vector3(-FIELD_HALF_WIDTH, 0, 2),
-    new THREE.Vector3(FIELD_HALF_WIDTH, 0, 2),
+    new THREE.Vector3(-fieldHalfWidth, 0, 2),
+    new THREE.Vector3(fieldHalfWidth, 0, 2),
   ];
   const midGeometry = new THREE.BufferGeometry().setFromPoints(midPoints);
   const midMaterial = new THREE.LineBasicMaterial({
