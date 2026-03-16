@@ -154,6 +154,41 @@ export interface ReplayLoadResult {
   raw: RawReplayFramesData;
 }
 
+export interface LoadedReplay {
+  replay: ReplayModel;
+  raw?: RawReplayFramesData;
+}
+
+export type PlaybackBound =
+  | { kind: "frame"; value: number }
+  | { kind: "time"; value: number };
+
+export interface ReplaySource {
+  id: string;
+  load: () => Promise<LoadedReplay>;
+}
+
+export interface PlaylistItem {
+  replay: ReplaySource;
+  start: PlaybackBound;
+  end: PlaybackBound;
+  label?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface ResolvedPlaybackBound {
+  frameIndex: number;
+  time: number;
+}
+
+export interface ResolvedPlaylistItem {
+  source: PlaylistItem;
+  replay: LoadedReplay;
+  start: ResolvedPlaybackBound;
+  end: ResolvedPlaybackBound;
+  duration: number;
+}
+
 export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
@@ -162,6 +197,14 @@ export interface ReplayPlayerOptions {
   initialBallCamEnabled?: boolean;
   initialPlaybackRate?: number;
   initialSkipKickoffsEnabled?: boolean;
+}
+
+export interface ReplayPlaylistPlayerOptions
+  extends Omit<ReplayPlayerOptions, "autoplay"> {
+  autoplay?: boolean;
+  advanceOnEnd?: boolean;
+  initialItemIndex?: number;
+  preloadRadius?: number;
 }
 
 export interface ReplayPlayerState {
@@ -176,7 +219,28 @@ export interface ReplayPlayerState {
   skipKickoffsEnabled: boolean;
 }
 
+export interface ReplayPlaylistPlayerState {
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  itemIndex: number;
+  itemCount: number;
+  item: PlaylistItem | null;
+  currentTime: number;
+  duration: number;
+  replayCurrentTime: number;
+  replayDuration: number;
+  frameIndex: number;
+  playing: boolean;
+  speed: number;
+  cameraDistanceScale: number;
+  attachedPlayerId: string | null;
+  ballCamEnabled: boolean;
+  skipKickoffsEnabled: boolean;
+}
+
 export type ReplayPlayerSnapshot = ReplayPlayerState;
+export type ReplayPlaylistPlayerSnapshot = ReplayPlaylistPlayerState;
 
 export type ReplayPlayerStatePatch = Partial<
   Pick<
@@ -190,3 +254,12 @@ export type ReplayPlayerStatePatch = Partial<
     | "skipKickoffsEnabled"
   >
 >;
+
+export interface FrameRenderInfo {
+  frameIndex: number;
+  nextFrameIndex: number;
+  alpha: number;
+  currentTime: number;
+}
+
+export type BeforeRenderCallback = (info: FrameRenderInfo) => void;

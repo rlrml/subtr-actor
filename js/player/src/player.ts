@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { createReplayScene, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
+  BeforeRenderCallback,
+  FrameRenderInfo,
   ReplayModel,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
@@ -36,7 +38,8 @@ export class ReplayPlayer extends EventTarget {
   readonly replay: ReplayModel;
   readonly options: ReplayPlayerOptions;
 
-  private readonly sceneState: ReplayScene;
+  readonly sceneState: ReplayScene;
+  private readonly beforeRenderCallbacks: BeforeRenderCallback[] = [];
   private readonly fieldScale: number;
   private readonly desiredCameraPosition = new THREE.Vector3();
   private readonly desiredLookTarget = new THREE.Vector3();
@@ -236,6 +239,16 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
+  onBeforeRender(callback: BeforeRenderCallback): () => void {
+    this.beforeRenderCallbacks.push(callback);
+    return () => {
+      const index = this.beforeRenderCallbacks.indexOf(callback);
+      if (index >= 0) {
+        this.beforeRenderCallbacks.splice(index, 1);
+      }
+    };
+  }
+
   destroy(): void {
     if (this.playing) {
       this.pause();
@@ -418,6 +431,15 @@ export class ReplayPlayer extends EventTarget {
     this.updateCamera(frameIndex, ballPosition);
     this.sceneState.controls.update();
     this.sceneState.updateWallVisibility();
+    const renderInfo: FrameRenderInfo = {
+      frameIndex: frameWindow.frameIndex,
+      nextFrameIndex: frameWindow.nextFrameIndex,
+      alpha: frameWindow.alpha,
+      currentTime: this.currentTime,
+    };
+    for (const callback of this.beforeRenderCallbacks) {
+      callback(renderInfo);
+    }
     this.sceneState.renderer.render(
       this.sceneState.scene,
       this.sceneState.camera
