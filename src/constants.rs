@@ -56,6 +56,12 @@ pub static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 /// `0..=100` percentage scale.
 pub const BOOST_MAX_AMOUNT: f32 = u8::MAX as f32;
 
+/// The raw replay boost amount players spawn with at each standard kickoff.
+///
+/// Rocket League starts each kickoff with one third of a full tank, which maps
+/// cleanly to `85.0` on the replay's `0..=255` boost scale.
+pub const BOOST_KICKOFF_START_AMOUNT: f32 = BOOST_MAX_AMOUNT / 3.0;
+
 /// The rate at which boost drains while active, in raw replay units per second.
 pub const BOOST_USED_RAW_UNITS_PER_SECOND: f32 = 80.0 / 0.93;
 

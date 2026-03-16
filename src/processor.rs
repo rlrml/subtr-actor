@@ -174,6 +174,7 @@ pub struct ReplayProcessor<'a> {
     pub demolishes: Vec<DemolishInfo>,
     known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
+    kickoff_phase_active_last_frame: bool,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -229,6 +230,7 @@ impl<'a> ReplayProcessor<'a> {
             demolishes: Vec::new(),
             known_demolishes: Vec::new(),
             demolish_format: None,
+            kickoff_phase_active_last_frame: false,
         };
         processor
             .set_player_order_from_headers()
@@ -380,6 +382,7 @@ impl<'a> ReplayProcessor<'a> {
         self.demolishes = Vec::new();
         self.known_demolishes = Vec::new();
         self.demolish_format = None;
+        self.kickoff_phase_active_last_frame = false;
     }
 
     fn set_player_order_from_headers(&mut self) -> SubtrActorResult<()> {
@@ -794,12 +797,19 @@ impl<'a> ReplayProcessor<'a> {
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
+        let kickoff_phase_active = self.kickoff_phase_active();
+        let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
                 let (actor_amount_value, last_value, _, derived_value, is_active) =
                     self.get_current_boost_values(actor_state);
-                let mut current_value = if actor_amount_value == last_value {
+                let mut current_value = if kickoff_phase_started {
+                    // Some replays do not publish a trustworthy boost amount
+                    // until after kickoff begins, so seed the standard spawn
+                    // amount when we enter a new kickoff phase.
+                    BOOST_KICKOFF_START_AMOUNT
+                } else if actor_amount_value == last_value {
                     // If we don't have an update in the actor, just continue
                     // using our derived value
                     derived_value
@@ -832,7 +842,17 @@ impl<'a> ReplayProcessor<'a> {
                 (boxcars::Attribute::Float(current_value), frame_index),
             );
         }
+        self.kickoff_phase_active_last_frame = kickoff_phase_active;
         Ok(())
+    }
+
+    fn kickoff_phase_active(&self) -> bool {
+        self.get_replicated_state_name().ok() == Some(55)
+            || self
+                .get_replicated_game_state_time_remaining()
+                .ok()
+                .is_some_and(|countdown| countdown > 0)
+            || self.get_ball_has_been_hit().ok() == Some(false)
     }
 
     /// Gets the current boost values for a given actor state.

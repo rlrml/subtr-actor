@@ -1,5 +1,6 @@
 use std::path::Path;
-use subtr_actor::collector::replay_data::{BallFrame, ReplayDataCollector};
+use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
+use subtr_actor::BOOST_KICKOFF_START_AMOUNT;
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -65,5 +66,46 @@ fn kickoff_countdown_metadata_is_exported() {
     assert!(
         countdowns.iter().any(|countdown| *countdown > 0),
         "Expected replay metadata export to include non-zero kickoff countdown frames"
+    );
+}
+
+#[test]
+fn kickoff_player_boost_frames_start_initialized() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to collect replay data");
+
+    let kickoff_frame_index = replay_data
+        .frame_data
+        .metadata_frames
+        .iter()
+        .position(|metadata| {
+            metadata.replicated_game_state_name == 55
+                || metadata.replicated_game_state_time_remaining > 0
+        })
+        .expect("Expected replay to contain kickoff countdown frames");
+
+    let kickoff_boosts: Vec<f32> = replay_data
+        .frame_data
+        .players
+        .iter()
+        .filter_map(
+            |(_, player_data)| match player_data.frames().get(kickoff_frame_index) {
+                Some(PlayerFrame::Data { boost_amount, .. }) => Some(*boost_amount),
+                _ => None,
+            },
+        )
+        .collect();
+
+    assert!(
+        !kickoff_boosts.is_empty(),
+        "Expected kickoff countdown frames to expose at least one active player"
+    );
+    assert!(
+        kickoff_boosts
+            .iter()
+            .all(|boost| (*boost - BOOST_KICKOFF_START_AMOUNT).abs() < f32::EPSILON),
+        "Expected kickoff player boosts to start at {BOOST_KICKOFF_START_AMOUNT}, got {kickoff_boosts:?}"
     );
 }
