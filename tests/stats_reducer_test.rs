@@ -1563,68 +1563,6 @@ fn test_positioning_reducer_records_other_role_for_unclassified_middle_player() 
 }
 
 #[test]
-fn test_positioning_reducer_records_other_role_for_unclassified_middle_player() {
-    let front_id = epic_id("positioning-front-middle");
-    let middle_id = epic_id("positioning-middle-middle");
-    let back_id = epic_id("positioning-back-middle");
-    let mut reducer = PositioningReducer::new();
-    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
-
-    reducer
-        .on_sample(&sample_stats(
-            1,
-            1.0,
-            0.0,
-            ball,
-            vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
-                    ..sample_player(middle_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-        ))
-        .unwrap();
-
-    reducer
-        .on_sample(&sample_stats(
-            2,
-            2.0,
-            1.0,
-            ball,
-            vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
-                    ..sample_player(middle_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-        ))
-        .unwrap();
-
-    let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
-    assert_eq!(middle_stats.active_game_time, 1.0);
-    assert_eq!(middle_stats.time_other_role, 1.0);
-    assert_eq!(middle_stats.time_most_back, 0.0);
-    assert_eq!(middle_stats.time_most_forward, 0.0);
-    assert_eq!(middle_stats.time_even, 0.0);
-}
-
-#[test]
 fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold() {
     let player_ids = [
         epic_id("positioning-even-1"),
@@ -1801,11 +1739,12 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
 }
 
 #[test]
-fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
-    let live_id = epic_id("positioning-live-demo");
-    let victim_id = epic_id("positioning-victim-demo");
-    let opp_a = epic_id("positioning-opp-a");
-    let opp_b = epic_id("positioning-opp-b");
+fn test_positioning_reducer_even_uses_two_car_length_default_threshold() {
+    let player_ids = [
+        epic_id("positioning-even-two-cars-1"),
+        epic_id("positioning-even-two-cars-2"),
+        epic_id("positioning-even-two-cars-3"),
+    ];
     let mut reducer = PositioningReducer::new();
     let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
 
@@ -1817,99 +1756,50 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
             ball,
             vec![
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
-                    ..sample_player(live_id.clone(), true)
+                    rigid_body: Some(sample_rigid_body(0.0, -100.0, 17.0)),
+                    ..sample_player(player_ids[0].clone(), true)
                 },
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1000.0, 17.0)),
-                    ..sample_player(victim_id.clone(), true)
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(player_ids[1].clone(), true)
                 },
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(1000.0, 1000.0, 17.0)),
-                    ..sample_player(opp_a.clone(), false)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(1000.0, -1000.0, 17.0)),
-                    ..sample_player(opp_b.clone(), false)
+                    rigid_body: Some(sample_rigid_body(0.0, 100.0, 17.0)),
+                    ..sample_player(player_ids[2].clone(), true)
                 },
             ],
         ))
         .unwrap();
 
-    let mut victim_sample = sample_player(victim_id.clone(), true);
-    victim_sample.rigid_body = None;
-
     reducer
-        .on_sample(&StatsSample {
-            frame_number: 2,
-            time: 2.0,
-            dt: 1.0,
-            seconds_remaining: Some(100),
-            game_state: Some(0),
-            ball_has_been_hit: Some(true),
-            kickoff_countdown_time: None,
-            team_zero_score: None,
-            team_one_score: None,
-            possession_team_is_team_0: None,
-            scored_on_team_is_team_0: None,
-            current_in_game_team_player_counts: Some([2, 2]),
-            ball: ball.map(|rigid_body| BallSample { rigid_body }),
-            players: vec![
+        .on_sample(&sample_stats(
+            2,
+            2.0,
+            1.0,
+            ball,
+            vec![
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
-                    ..sample_player(live_id.clone(), true)
-                },
-                victim_sample,
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(1000.0, 1000.0, 17.0)),
-                    ..sample_player(opp_a.clone(), false)
+                    rigid_body: Some(sample_rigid_body(0.0, -100.0, 17.0)),
+                    ..sample_player(player_ids[0].clone(), true)
                 },
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(1000.0, -1000.0, 17.0)),
-                    ..sample_player(opp_b.clone(), false)
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(player_ids[1].clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 100.0, 17.0)),
+                    ..sample_player(player_ids[2].clone(), true)
                 },
             ],
-            active_demos: vec![DemoEventSample {
-                attacker: opp_a,
-                victim: victim_id.clone(),
-            }],
-            demo_events: Vec::new(),
-            boost_pad_events: Vec::new(),
-            touch_events: Vec::new(),
-            player_stat_events: Vec::new(),
-            goal_events: Vec::new(),
-        })
+        ))
         .unwrap();
 
-    let live_stats = reducer.player_stats().get(&live_id).unwrap();
-    assert_eq!(live_stats.active_game_time, 1.0);
-    assert_eq!(live_stats.tracked_time, 1.0);
-    assert_eq!(live_stats.time_no_teammates, 1.0);
-    assert_eq!(live_stats.time_demolished, 0.0);
-    assert_eq!(
-        live_stats.time_most_back
-            + live_stats.time_most_forward
-            + live_stats.time_other_role
-            + live_stats.time_even
-            + live_stats.time_no_teammates
-            + live_stats.time_demolished,
-        live_stats.active_game_time
-    );
-
-    let victim_stats = reducer.player_stats().get(&victim_id).unwrap();
-    assert_eq!(victim_stats.active_game_time, 1.0);
-    assert_eq!(victim_stats.tracked_time, 0.0);
-    assert_eq!(victim_stats.time_demolished, 1.0);
-    assert_eq!(victim_stats.time_no_teammates, 0.0);
-    assert_eq!(
-        victim_stats.time_most_back
-            + victim_stats.time_most_forward
-            + victim_stats.time_other_role
-            + victim_stats.time_even
-            + victim_stats.time_no_teammates
-            + victim_stats.time_demolished,
-        victim_stats.active_game_time
-    );
+    for player_id in player_ids {
+        let stats = reducer.player_stats().get(&player_id).unwrap();
+        assert_eq!(stats.time_even, 1.0);
+        assert_eq!(stats.time_most_back, 0.0);
+        assert_eq!(stats.time_most_forward, 0.0);
+    }
 }
 
 #[test]

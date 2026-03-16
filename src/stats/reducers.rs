@@ -655,8 +655,8 @@ const HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 // soccar lane markings more closely than a literal geometric third of the full
 // playable length.
 const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
-/// Approximate length of the Octane hitbox in Unreal units.
-const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 118.0;
+/// Approximate length of two Octane hitboxes in Unreal units.
+const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 236.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
@@ -1510,7 +1510,6 @@ impl StatsReducer for MovementReducer {
             };
 
             if live_play {
-                stats.active_game_time += sample.dt;
                 stats.tracked_time += sample.dt;
                 stats.speed_integral += speed * sample.dt;
                 team_stats.tracked_time += sample.dt;
@@ -1568,8 +1567,11 @@ pub struct PositioningStats {
     pub time_most_back: f32,
     pub time_most_forward: f32,
     pub time_other_role: f32,
+    #[serde(rename = "time_defensive_third")]
     pub time_defensive_zone: f32,
+    #[serde(rename = "time_neutral_third")]
     pub time_neutral_zone: f32,
+    #[serde(rename = "time_offensive_third")]
     pub time_offensive_zone: f32,
     pub time_defensive_half: f32,
     pub time_offensive_half: f32,
@@ -1629,16 +1631,28 @@ impl PositioningStats {
         self.pct(self.time_most_forward)
     }
 
-    pub fn defensive_zone_pct(&self) -> f32 {
+    pub fn defensive_third_pct(&self) -> f32 {
         self.pct(self.time_defensive_zone)
     }
 
-    pub fn neutral_zone_pct(&self) -> f32 {
+    pub fn neutral_third_pct(&self) -> f32 {
         self.pct(self.time_neutral_zone)
     }
 
-    pub fn offensive_zone_pct(&self) -> f32 {
+    pub fn offensive_third_pct(&self) -> f32 {
         self.pct(self.time_offensive_zone)
+    }
+
+    pub fn defensive_zone_pct(&self) -> f32 {
+        self.defensive_third_pct()
+    }
+
+    pub fn neutral_zone_pct(&self) -> f32 {
+        self.neutral_third_pct()
+    }
+
+    pub fn offensive_zone_pct(&self) -> f32 {
+        self.offensive_third_pct()
     }
 
     pub fn defensive_half_pct(&self) -> f32 {

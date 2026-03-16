@@ -36,19 +36,19 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_defensive_zone",
+            "time_defensive_third",
             StatUnit::Seconds,
             self.time_defensive_zone,
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_neutral_zone",
+            "time_neutral_third",
             StatUnit::Seconds,
             self.time_neutral_zone,
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_offensive_zone",
+            "time_offensive_third",
             StatUnit::Seconds,
             self.time_offensive_zone,
         ));
@@ -90,18 +90,6 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_demolished",
-            StatUnit::Seconds,
-            self.time_demolished,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
-            "time_no_teammates",
-            StatUnit::Seconds,
-            self.time_no_teammates,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
             "time_most_back",
             StatUnit::Seconds,
             self.time_most_back,
@@ -111,12 +99,6 @@ impl StatFieldProvider for PositioningStats {
             "time_most_forward",
             StatUnit::Seconds,
             self.time_most_forward,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
-            "time_other_role",
-            StatUnit::Seconds,
-            self.time_other_role,
         ));
         visitor(ExportedStat::float(
             "positioning",
@@ -144,21 +126,21 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "percent_defensive_zone",
+            "percent_defensive_third",
             StatUnit::Percent,
-            self.defensive_zone_pct(),
+            self.defensive_third_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "percent_neutral_zone",
+            "percent_neutral_third",
             StatUnit::Percent,
-            self.neutral_zone_pct(),
+            self.neutral_third_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "percent_offensive_zone",
+            "percent_offensive_third",
             StatUnit::Percent,
-            self.offensive_zone_pct(),
+            self.offensive_third_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",

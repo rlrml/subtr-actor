@@ -18,9 +18,9 @@ export interface PlayerStatsSnapshot {
   is_team_0: boolean;
   positioning?: {
     active_game_time: number;
-    time_defensive_zone: number;
-    time_neutral_zone: number;
-    time_offensive_zone: number;
+    time_defensive_third: number;
+    time_neutral_third: number;
+    time_offensive_third: number;
     time_defensive_half: number;
     time_offensive_half: number;
     time_demolished: number;

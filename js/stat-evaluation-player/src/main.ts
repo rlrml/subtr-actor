@@ -174,9 +174,9 @@ function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"])
 
 function renderAbsolutePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
   return `
-    <div class="stat-row"><span class="label">Def zone</span><span class="value">${pos?.time_defensive_zone?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Neutral zone</span><span class="value">${pos?.time_neutral_zone?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Off zone</span><span class="value">${pos?.time_offensive_zone?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Def third</span><span class="value">${pos?.time_defensive_third?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Neutral third</span><span class="value">${pos?.time_neutral_third?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Off third</span><span class="value">${pos?.time_offensive_third?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Def half</span><span class="value">${pos?.time_defensive_half?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Off half</span><span class="value">${pos?.time_offensive_half?.toFixed(1) ?? "?"}s</span></div>
   `;
