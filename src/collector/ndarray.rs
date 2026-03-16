@@ -305,6 +305,10 @@ where
         "BallRigidBody" => Some(BallRigidBody::<F>::arc_new()),
         "BallRigidBodyNoVelocities" => Some(BallRigidBodyNoVelocities::<F>::arc_new()),
         "BallRigidBodyQuaternions" => Some(BallRigidBodyQuaternions::<F>::arc_new()),
+        "BallRigidBodyQuaternionVelocities" => {
+            Some(BallRigidBodyQuaternionVelocities::<F>::arc_new())
+        }
+        "BallRigidBodyBasis" => Some(BallRigidBodyBasis::<F>::arc_new()),
         "VelocityAddedBallRigidBodyNoVelocities" => {
             Some(VelocityAddedBallRigidBodyNoVelocities::<F>::arc_new())
         }
@@ -334,8 +338,14 @@ where
         "PlayerRigidBody" => Some(PlayerRigidBody::<F>::arc_new()),
         "PlayerRigidBodyNoVelocities" => Some(PlayerRigidBodyNoVelocities::<F>::arc_new()),
         "PlayerRigidBodyQuaternions" => Some(PlayerRigidBodyQuaternions::<F>::arc_new()),
+        "PlayerRigidBodyQuaternionVelocities" => {
+            Some(PlayerRigidBodyQuaternionVelocities::<F>::arc_new())
+        }
+        "PlayerRigidBodyBasis" => Some(PlayerRigidBodyBasis::<F>::arc_new()),
         "PlayerRelativeBallPosition" => Some(PlayerRelativeBallPosition::<F>::arc_new()),
         "PlayerRelativeBallVelocity" => Some(PlayerRelativeBallVelocity::<F>::arc_new()),
+        "PlayerLocalRelativeBallPosition" => Some(PlayerLocalRelativeBallPosition::<F>::arc_new()),
+        "PlayerLocalRelativeBallVelocity" => Some(PlayerLocalRelativeBallVelocity::<F>::arc_new()),
         "VelocityAddedPlayerRigidBodyNoVelocities" => {
             Some(VelocityAddedPlayerRigidBodyNoVelocities::<F>::arc_new())
         }
@@ -920,6 +930,8 @@ fn or_zero_boxcars_3f() -> boxcars::Vector3f {
 }
 
 type RigidBodyArrayResult<F> = SubtrActorResult<[F; 12]>;
+type RigidBodyQuaternionArrayResult<F> = SubtrActorResult<[F; 13]>;
+type RigidBodyBasisArrayResult<F> = SubtrActorResult<[F; 15]>;
 
 /// Extracts the location, rotation, linear velocity and angular velocity from a
 /// [`boxcars::RigidBody`] and converts them to a type implementing [`TryFrom<f32>`].
@@ -953,6 +965,73 @@ where
         rx,
         ry,
         rz,
+        linear_velocity.x,
+        linear_velocity.y,
+        linear_velocity.z,
+        angular_velocity.x,
+        angular_velocity.y,
+        angular_velocity.z,
+    )
+}
+
+pub fn get_rigid_body_properties_quaternion<F: TryFrom<f32>>(
+    rigid_body: &boxcars::RigidBody,
+) -> RigidBodyQuaternionArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let linear_velocity = rigid_body
+        .linear_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let angular_velocity = rigid_body
+        .angular_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let rotation = rigid_body.rotation;
+    let location = rigid_body.location;
+    convert_all_floats!(
+        location.x,
+        location.y,
+        location.z,
+        rotation.x,
+        rotation.y,
+        rotation.z,
+        rotation.w,
+        linear_velocity.x,
+        linear_velocity.y,
+        linear_velocity.z,
+        angular_velocity.x,
+        angular_velocity.y,
+        angular_velocity.z,
+    )
+}
+
+pub fn get_rigid_body_properties_basis<F: TryFrom<f32>>(
+    rigid_body: &boxcars::RigidBody,
+) -> RigidBodyBasisArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    let linear_velocity = rigid_body
+        .linear_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let angular_velocity = rigid_body
+        .angular_velocity
+        .unwrap_or_else(or_zero_boxcars_3f);
+    let rotation = rigid_body.rotation;
+    let location = rigid_body.location;
+    let quat = glam::quat(rotation.x, rotation.y, rotation.z, rotation.w);
+    let forward = quat.mul_vec3(glam::Vec3::X);
+    let up = quat.mul_vec3(glam::Vec3::Z);
+    convert_all_floats!(
+        location.x,
+        location.y,
+        location.z,
+        forward.x,
+        forward.y,
+        forward.z,
+        up.x,
+        up.y,
+        up.z,
         linear_velocity.x,
         linear_velocity.y,
         linear_velocity.z,
@@ -1005,6 +1084,20 @@ where
         0.0,
         0.0,
     )
+}
+
+fn default_rb_state_quaternion<F: TryFrom<f32>>() -> RigidBodyQuaternionArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
+}
+
+fn default_rb_state_basis<F: TryFrom<f32>>() -> RigidBodyBasisArrayResult<F>
+where
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    convert_all_floats!(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
 }
 
 fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtrActorResult<[F; 7]>
@@ -1312,6 +1405,75 @@ build_player_feature_adder!(
 );
 
 build_player_feature_adder!(
+    PlayerLocalRelativeBallPosition,
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        let local_relative_position = processor
+            .get_player_rigid_body(player_id)
+            .ok()
+            .zip(processor.get_ball_rigid_body().ok())
+            .map(|(player_rigid_body, ball_rigid_body)| {
+                let player_rotation = player_rigid_body.rotation;
+                let player_quat = glam::quat(
+                    player_rotation.x,
+                    player_rotation.y,
+                    player_rotation.z,
+                    player_rotation.w,
+                );
+                let world_relative_position = vec_to_glam(&ball_rigid_body.location)
+                    - vec_to_glam(&player_rigid_body.location);
+                player_quat.inverse().mul_vec3(world_relative_position)
+            })
+            .unwrap_or(glam::f32::Vec3::ZERO);
+        convert_all_floats!(
+            local_relative_position.x,
+            local_relative_position.y,
+            local_relative_position.z
+        )
+    },
+    "local relative ball position x",
+    "local relative ball position y",
+    "local relative ball position z"
+);
+
+build_player_feature_adder!(
+    PlayerLocalRelativeBallVelocity,
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        let local_relative_velocity = processor
+            .get_player_rigid_body(player_id)
+            .ok()
+            .zip(processor.get_ball_rigid_body().ok())
+            .map(|(player_rigid_body, ball_rigid_body)| {
+                let player_rotation = player_rigid_body.rotation;
+                let player_quat = glam::quat(
+                    player_rotation.x,
+                    player_rotation.y,
+                    player_rotation.z,
+                    player_rotation.w,
+                );
+                let world_relative_velocity = vec_to_glam(
+                    &ball_rigid_body
+                        .linear_velocity
+                        .unwrap_or_else(or_zero_boxcars_3f),
+                ) - vec_to_glam(
+                    &player_rigid_body
+                        .linear_velocity
+                        .unwrap_or_else(or_zero_boxcars_3f),
+                );
+                player_quat.inverse().mul_vec3(world_relative_velocity)
+            })
+            .unwrap_or(glam::f32::Vec3::ZERO);
+        convert_all_floats!(
+            local_relative_velocity.x,
+            local_relative_velocity.y,
+            local_relative_velocity.z
+        )
+    },
+    "local relative ball velocity x",
+    "local relative ball velocity y",
+    "local relative ball velocity z"
+);
+
+build_player_feature_adder!(
     PlayerBallDistance,
     |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
         let distance = processor
@@ -1459,6 +1621,56 @@ build_player_feature_adder!(
     "quaternion w"
 );
 
+build_player_feature_adder!(
+    PlayerRigidBodyQuaternionVelocities,
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+            get_rigid_body_properties_quaternion(rb)
+        } else {
+            default_rb_state_quaternion()
+        }
+    },
+    "position x",
+    "position y",
+    "position z",
+    "quaternion x",
+    "quaternion y",
+    "quaternion z",
+    "quaternion w",
+    "linear velocity x",
+    "linear velocity y",
+    "linear velocity z",
+    "angular velocity x",
+    "angular velocity y",
+    "angular velocity z",
+);
+
+build_player_feature_adder!(
+    PlayerRigidBodyBasis,
+    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+        if let Ok(rb) = processor.get_player_rigid_body(player_id) {
+            get_rigid_body_properties_basis(rb)
+        } else {
+            default_rb_state_basis()
+        }
+    },
+    "position x",
+    "position y",
+    "position z",
+    "forward x",
+    "forward y",
+    "forward z",
+    "up x",
+    "up y",
+    "up z",
+    "linear velocity x",
+    "linear velocity y",
+    "linear velocity z",
+    "angular velocity x",
+    "angular velocity y",
+    "angular velocity z",
+);
+
 build_global_feature_adder!(
     BallRigidBodyQuaternions,
     |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
@@ -1481,4 +1693,52 @@ build_global_feature_adder!(
     "Ball - quaternion y",
     "Ball - quaternion z",
     "Ball - quaternion w"
+);
+
+build_global_feature_adder!(
+    BallRigidBodyQuaternionVelocities,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        processor
+            .get_ball_rigid_body()
+            .and_then(|rb| get_rigid_body_properties_quaternion(rb))
+            .or_else(|_| default_rb_state_quaternion())
+    },
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
+    "Ball - quaternion x",
+    "Ball - quaternion y",
+    "Ball - quaternion z",
+    "Ball - quaternion w",
+    "Ball - linear velocity x",
+    "Ball - linear velocity y",
+    "Ball - linear velocity z",
+    "Ball - angular velocity x",
+    "Ball - angular velocity y",
+    "Ball - angular velocity z",
+);
+
+build_global_feature_adder!(
+    BallRigidBodyBasis,
+    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+        processor
+            .get_ball_rigid_body()
+            .and_then(|rb| get_rigid_body_properties_basis(rb))
+            .or_else(|_| default_rb_state_basis())
+    },
+    "Ball - position x",
+    "Ball - position y",
+    "Ball - position z",
+    "Ball - forward x",
+    "Ball - forward y",
+    "Ball - forward z",
+    "Ball - up x",
+    "Ball - up y",
+    "Ball - up z",
+    "Ball - linear velocity x",
+    "Ball - linear velocity y",
+    "Ball - linear velocity z",
+    "Ball - angular velocity x",
+    "Ball - angular velocity y",
+    "Ball - angular velocity z",
 );

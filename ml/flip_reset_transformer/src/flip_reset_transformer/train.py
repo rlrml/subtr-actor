@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
+from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 
@@ -18,6 +20,10 @@ from .dataset import (
     load_replay_paths,
     load_replay_tensor_data,
 )
+from .features import (
+    global_feature_adders_for_orientation,
+    player_feature_adders_for_orientation,
+)
 from .model import FlipResetTransformer, FlipResetTransformerConfig
 
 
@@ -30,6 +36,7 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--replay-cache-dir", type=Path, default=None)
     parser.add_argument("--require-positive-replays", action="store_true")
     parser.add_argument("--include-geometry-features", action="store_true")
+    parser.add_argument("--orientation-encoding", choices=("euler", "quaternion", "basis"), default="euler")
     parser.add_argument("--fps", type=float, default=30.0)
     parser.add_argument("--window-radius", type=int, default=45)
     parser.add_argument("--positive-radius-frames", type=int, default=1)
@@ -56,6 +63,8 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--count-loss-weight", type=float, default=0.25)
     parser.add_argument("--exact-bce-loss-weight", type=float, default=0.0)
     parser.add_argument("--exact-positive-weight", type=float, default=1.0)
+    parser.add_argument("--compute-train-metrics", action="store_true")
+    parser.add_argument("--sweep-train-thresholds", action="store_true")
     parser.add_argument("--pretrained-encoder-checkpoint", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
@@ -74,6 +83,8 @@ def parse_args() -> TrainConfig:
         require_positive_replays=args.require_positive_replays,
         replay_features=ReplayFeatureConfig(
             fps=args.fps,
+            global_feature_adders=global_feature_adders_for_orientation(args.orientation_encoding),
+            player_feature_adders=player_feature_adders_for_orientation(args.orientation_encoding),
             include_geometry_scalars=args.include_geometry_features,
         ),
         sampling=WindowSamplingConfig(
@@ -104,6 +115,8 @@ def parse_args() -> TrainConfig:
         count_loss_weight=args.count_loss_weight,
         exact_bce_loss_weight=args.exact_bce_loss_weight,
         exact_positive_weight=args.exact_positive_weight,
+        compute_train_metrics=args.compute_train_metrics,
+        sweep_train_thresholds=args.sweep_train_thresholds,
     )
 
 
@@ -141,6 +154,8 @@ def train_config_to_json(config: TrainConfig) -> dict[str, object]:
         "count_loss_weight": config.count_loss_weight,
         "exact_bce_loss_weight": config.exact_bce_loss_weight,
         "exact_positive_weight": config.exact_positive_weight,
+        "compute_train_metrics": config.compute_train_metrics,
+        "sweep_train_thresholds": config.sweep_train_thresholds,
     }
 
 
@@ -212,9 +227,13 @@ def standardize_windows(
     mean = train_features.mean(axis=(0, 1), keepdims=True)
     std = train_features.std(axis=(0, 1), keepdims=True)
     std = np.where(std < 1e-6, 1.0, std)
+    np.subtract(train_features, mean, out=train_features)
+    np.divide(train_features, std, out=train_features)
+    np.subtract(validation_features, mean, out=validation_features)
+    np.divide(validation_features, std, out=validation_features)
     return (
-        ((train_features - mean) / std).astype(np.float32),
-        ((validation_features - mean) / std).astype(np.float32),
+        train_features,
+        validation_features,
         mean.squeeze(0).squeeze(0).astype(np.float32),
         std.squeeze(0).squeeze(0).astype(np.float32),
     )
@@ -232,7 +251,12 @@ def make_loader(
         torch.from_numpy(relative_times),
         torch.from_numpy(labels),
     )
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        pin_memory=torch.cuda.is_available(),
+    )
 
 
 def binary_classification_metrics(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, float]:
@@ -382,6 +406,100 @@ def best_threshold_metrics(logits: torch.Tensor, labels: torch.Tensor, radius: i
     }
 
 
+class StreamingThresholdMetrics:
+    def __init__(self, thresholds: np.ndarray, radius: int) -> None:
+        self.thresholds = np.asarray(thresholds, dtype=np.float32)
+        self.radius = radius
+        zeros = np.zeros(len(self.thresholds), dtype=np.int64)
+        self.prediction_counts = zeros.copy()
+        self.label_counts = zeros.copy()
+        self.matched_prediction_counts = zeros.copy()
+        self.matched_label_counts = zeros.copy()
+        self.exact_true_positive_counts = zeros.copy()
+        self.exact_false_positive_counts = zeros.copy()
+        self.exact_false_negative_counts = zeros.copy()
+        self.exact_true_negative_counts = zeros.copy()
+
+    def update(self, probabilities: torch.Tensor, labels: torch.Tensor) -> None:
+        thresholds = torch.as_tensor(
+            self.thresholds,
+            device=probabilities.device,
+            dtype=probabilities.dtype,
+        ).view(-1, 1, 1)
+        labels_bool = labels > 0
+        kernel_size = self.radius * 2 + 1
+
+        predictions = probabilities.unsqueeze(0) >= thresholds
+        dilated_labels = F.max_pool1d(
+            labels_bool.float().unsqueeze(1),
+            kernel_size=kernel_size,
+            stride=1,
+            padding=self.radius,
+        ).squeeze(1) > 0
+        dilated_predictions = F.max_pool1d(
+            predictions.float().reshape(-1, 1, predictions.shape[-1]),
+            kernel_size=kernel_size,
+            stride=1,
+            padding=self.radius,
+        ).reshape(predictions.shape[0], predictions.shape[1], predictions.shape[2]) > 0
+
+        self.prediction_counts += predictions.sum(dim=(1, 2)).cpu().numpy()
+        label_count = int(labels_bool.sum().item())
+        self.label_counts += label_count
+        self.matched_prediction_counts += torch.logical_and(
+            predictions, dilated_labels.unsqueeze(0)
+        ).sum(dim=(1, 2)).cpu().numpy()
+        self.matched_label_counts += torch.logical_and(
+            labels_bool.unsqueeze(0), dilated_predictions
+        ).sum(dim=(1, 2)).cpu().numpy()
+        self.exact_true_positive_counts += torch.logical_and(
+            predictions, labels_bool.unsqueeze(0)
+        ).sum(dim=(1, 2)).cpu().numpy()
+        self.exact_false_positive_counts += torch.logical_and(
+            predictions, ~labels_bool.unsqueeze(0)
+        ).sum(dim=(1, 2)).cpu().numpy()
+        self.exact_false_negative_counts += torch.logical_and(
+            ~predictions, labels_bool.unsqueeze(0)
+        ).sum(dim=(1, 2)).cpu().numpy()
+        self.exact_true_negative_counts += torch.logical_and(
+            ~predictions, ~labels_bool.unsqueeze(0)
+        ).sum(dim=(1, 2)).cpu().numpy()
+
+    def _metrics_for_index(self, index: int) -> dict[str, float]:
+        prediction_count = int(self.prediction_counts[index])
+        label_count = int(self.label_counts[index])
+        matched_predictions = int(self.matched_prediction_counts[index])
+        matched_labels = int(self.matched_label_counts[index])
+
+        precision = matched_predictions / max(prediction_count, 1)
+        recall = matched_labels / max(label_count, 1)
+        f1 = 2.0 * precision * recall / max(precision + recall, 1e-6)
+
+        exact_true_positive = int(self.exact_true_positive_counts[index])
+        exact_false_positive = int(self.exact_false_positive_counts[index])
+        exact_false_negative = int(self.exact_false_negative_counts[index])
+        exact_true_negative = int(self.exact_true_negative_counts[index])
+        accuracy = (exact_true_positive + exact_true_negative) / max(
+            exact_true_positive + exact_false_positive + exact_false_negative + exact_true_negative,
+            1,
+        )
+        return {
+            "accuracy": float(accuracy),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(f1),
+            "threshold": float(self.thresholds[index]),
+        }
+
+    def metrics_for_threshold(self, threshold: float) -> dict[str, float]:
+        threshold_index = int(np.argmin(np.abs(self.thresholds - threshold)))
+        return self._metrics_for_index(threshold_index)
+
+    def best_metrics(self) -> dict[str, float]:
+        best_index = max(range(len(self.thresholds)), key=lambda index: self._metrics_for_index(index)["f1"])
+        return self._metrics_for_index(best_index)
+
+
 def run_epoch(
     model: FlipResetTransformer,
     loader: DataLoader,
@@ -389,6 +507,8 @@ def run_epoch(
     optimizer: torch.optim.Optimizer | None,
     device: torch.device,
     event_match_radius_frames: int,
+    compute_metrics: bool,
+    sweep_thresholds: bool,
 ) -> tuple[float, dict[str, float], dict[str, float]]:
     if optimizer is None:
         model.eval()
@@ -396,40 +516,57 @@ def run_epoch(
         model.train()
 
     total_loss = 0.0
-    all_logits = []
-    all_labels = []
+    metric_thresholds = (
+        np.linspace(0.05, 0.95, 19, dtype=np.float32)
+        if sweep_thresholds
+        else np.asarray([0.5], dtype=np.float32)
+    )
+    metrics_accumulator = (
+        StreamingThresholdMetrics(metric_thresholds, radius=event_match_radius_frames)
+        if compute_metrics
+        else None
+    )
 
-    for features, relative_times, labels in loader:
-        features = features.to(device)
-        relative_times = relative_times.to(device)
-        labels = labels.to(device)
+    context = torch.inference_mode if optimizer is None else nullcontext
+    with context():
+        for features, relative_times, labels in loader:
+            features = features.to(device, non_blocking=True)
+            relative_times = relative_times.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
 
-        if optimizer is not None:
-            optimizer.zero_grad(set_to_none=True)
+            if optimizer is not None:
+                optimizer.zero_grad(set_to_none=True)
 
-        logits = model(features, relative_times)
-        loss = loss_fn(logits, labels)
+            logits = model(features, relative_times)
+            loss = loss_fn(logits, labels)
 
-        if optimizer is not None:
-            loss.backward()
-            optimizer.step()
+            if optimizer is not None:
+                loss.backward()
+                optimizer.step()
 
-        total_loss += loss.item() * features.shape[0]
-        all_logits.append(logits.detach().cpu())
-        all_labels.append(labels.detach().cpu())
+            total_loss += loss.item() * features.shape[0]
+            if metrics_accumulator is not None:
+                metrics_accumulator.update(
+                    torch.sigmoid(logits.detach()),
+                    labels.detach(),
+                )
 
-    logits = torch.cat(all_logits)
-    labels = torch.cat(all_labels)
     average_loss = total_loss / max(len(loader.dataset), 1)
+    if metrics_accumulator is None:
+        empty_metrics = {
+            "accuracy": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+        }
+        return average_loss, empty_metrics, {**empty_metrics, "threshold": 0.5}
+
+    default_metrics = metrics_accumulator.metrics_for_threshold(0.5)
+    best_metrics = metrics_accumulator.best_metrics() if sweep_thresholds else default_metrics
     return (
         average_loss,
-        tolerant_sequence_metrics(
-            torch.sigmoid(logits),
-            labels,
-            threshold=0.5,
-            radius=event_match_radius_frames,
-        ),
-        best_threshold_metrics(logits, labels, radius=event_match_radius_frames),
+        {key: value for key, value in default_metrics.items() if key != "threshold"},
+        best_metrics,
     )
 
 
@@ -471,6 +608,7 @@ def main() -> None:
         validation_ratio=config.validation_ratio,
         seed=config.sampling.random_seed,
     )
+    training_replay_count = len(replay_data_by_path)
 
     train_replays = [replay_data_by_path[path] for path in train_paths]
     validation_replays = [replay_data_by_path[path] for path in validation_paths]
@@ -485,6 +623,11 @@ def main() -> None:
         train_data.features,
         validation_data.features,
     )
+    del replay_data_by_path
+    del positive_replays
+    del train_replays
+    del validation_replays
+    gc.collect()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = FlipResetTransformer(
@@ -544,6 +687,7 @@ def main() -> None:
             num_samples=len(sample_weights),
             replacement=True,
         ),
+        pin_memory=torch.cuda.is_available(),
     )
     validation_loader = make_loader(
         validation_features,
@@ -565,6 +709,8 @@ def main() -> None:
             optimizer,
             device,
             config.event_match_radius_frames,
+            compute_metrics=config.compute_train_metrics,
+            sweep_thresholds=config.sweep_train_thresholds,
         )
         validation_loss, validation_metrics, validation_best_threshold_metrics = run_epoch(
             model,
@@ -573,6 +719,8 @@ def main() -> None:
             None,
             device,
             config.event_match_radius_frames,
+            compute_metrics=True,
+            sweep_thresholds=True,
         )
 
         epoch_summary = {
@@ -611,7 +759,7 @@ def main() -> None:
                 "train_window_count": int(train_data.labels.shape[0]),
                 "validation_window_count": int(validation_data.labels.shape[0]),
                 "loaded_replay_count": len(replay_paths),
-                "training_replay_count": len(replay_data_by_path),
+                "training_replay_count": training_replay_count,
                 "filtered_zero_label_replay_count": len(zero_label_replays)
                 if config.require_positive_replays
                 else 0,

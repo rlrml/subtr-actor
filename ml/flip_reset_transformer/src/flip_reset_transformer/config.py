@@ -71,4 +71,6 @@ class TrainConfig:
     count_loss_weight: float = 0.25
     exact_bce_loss_weight: float = 0.0
     exact_positive_weight: float = 1.0
+    compute_train_metrics: bool = False
+    sweep_train_thresholds: bool = False
     replay_cache_dir_name: str = "replay-cache"
