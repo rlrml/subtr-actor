@@ -1,6 +1,9 @@
 import "./styles.css";
-import { ReplayPlayer } from "../../player/src/player.ts";
-import { loadReplayFromBytes } from "../../player/src/wasm.ts";
+import {
+  ReplayPlayer,
+  createBallchasingOverlayPlugin,
+  loadReplayFromBytes,
+} from "../../player/src/lib.ts";
 
 function mustElement(selector) {
   const element = document.querySelector(selector);
@@ -307,9 +310,10 @@ async function loadReplayFile(file) {
     initialCameraDistanceScale: 2.25,
     initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
-    initialBoostMeterEnabled: true,
+    initialBoostMeterEnabled: false,
     initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
     initialSkipKickoffsEnabled: skipKickoffs.checked,
+    plugins: [createBallchasingOverlayPlugin()],
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);
 

@@ -51,6 +51,14 @@ function ensureWasmBindingsPlugin() {
 
 export default defineConfig({
   plugins: [ensureWasmBindingsPlugin()],
+  resolve: {
+    alias: {
+      "subtr-actor": path.resolve(
+        import.meta.dirname,
+        "../pkg/rl_replay_subtr_actor.js"
+      ),
+    },
+  },
   server: {
     fs: {
       allow: [path.resolve(import.meta.dirname, "..")],

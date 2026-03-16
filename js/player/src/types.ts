@@ -1,3 +1,7 @@
+import type { Group, Object3D } from "three";
+import type { ReplayScene } from "./scene";
+import type { ReplayPlayer } from "./player";
+
 export interface RawVec3 {
   x: number;
   y: number;
@@ -238,6 +242,53 @@ export type ReplayPreloadPolicy =
       ) => Iterable<string | ReplaySource>;
     };
 
+export interface ReplayPlayerPluginContext {
+  player: ReplayPlayer;
+  replay: ReplayModel;
+  scene: ReplayScene;
+  container: HTMLElement;
+  options: ReplayPlayerOptions;
+}
+
+export interface ReplayPlayerPluginStateContext
+  extends ReplayPlayerPluginContext {
+  state: ReplayPlayerState;
+}
+
+export interface ReplayPlayerRenderTrackContext {
+  track: ReplayPlayerTrack;
+  mesh: Object3D | null;
+  boostTrail: Group | null;
+  frame: PlayerSample | null;
+  nextFrame: PlayerSample | null;
+  interpolatedPosition: Vec3 | null;
+  boostFraction: number;
+}
+
+export interface ReplayPlayerRenderContext
+  extends ReplayPlayerPluginStateContext,
+    FrameRenderInfo {
+  frame: PlaybackFrame | null;
+  nextFrame: PlaybackFrame | null;
+  ballFrame: BallSample | null;
+  nextBallFrame: BallSample | null;
+  ballPosition: Vec3 | null;
+  players: ReplayPlayerRenderTrackContext[];
+}
+
+export interface ReplayPlayerPlugin {
+  id: string;
+  setup?(context: ReplayPlayerPluginContext): void;
+  onStateChange?(context: ReplayPlayerPluginStateContext): void;
+  beforeRender?(context: ReplayPlayerRenderContext): void;
+  teardown?(context: ReplayPlayerPluginContext): void;
+}
+
+export type ReplayPlayerPluginFactory = () => ReplayPlayerPlugin;
+export type ReplayPlayerPluginDefinition =
+  | ReplayPlayerPlugin
+  | ReplayPlayerPluginFactory;
+
 export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
@@ -248,6 +299,7 @@ export interface ReplayPlayerOptions {
   initialPlaybackRate?: number;
   initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
+  plugins?: ReplayPlayerPluginDefinition[];
 }
 
 export interface ReplayPlaylistPlayerOptions

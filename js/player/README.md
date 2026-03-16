@@ -16,6 +16,7 @@ It provides:
 - a typed replay normalization layer on top of `get_replay_frames_data()`
 - a `ReplayPlayer` class with imperative playback and camera APIs
 - a `ReplayPlaylistPlayer` wrapper for back-to-back clip playback across replays
+- a plugin host for optional scene and UI extensions
 - state snapshots and change subscriptions so callers can build their own controls
 
 The player exposes camera state as data, not fixed UI assumptions. The built-in
@@ -29,6 +30,21 @@ without imposing any built-in overlay or styling.
 
 The package does not assume any specific UI. The demo app under `js/example/`
 is the reference consumer in this repository.
+
+Optional replay extensions can be installed through `ReplayPlayerOptions.plugins`
+or at runtime with `ReplayPlayer.addPlugin(...)`. Plugins receive:
+
+- a setup/teardown lifecycle with access to the player, replay, scene, and container
+- state-change hooks for DOM/HUD style integrations
+- per-frame render hooks with interpolated frame timing and player sample context
+
+This keeps optional features such as scoreboards, scrubbers, and scene overlays
+out of the core playback engine while still giving them a first-class API.
+
+The package ships with one reusable UI plugin:
+
+- `createBallchasingOverlayPlugin()` for Ballchasing-style floating player labels,
+  floating boost bars, and side team boost HUDs
 
 For multi-replay workflows, the playlist layer is intentionally generic. Each
 `PlaylistItem` specifies a replay source, a start bound, an end bound, and

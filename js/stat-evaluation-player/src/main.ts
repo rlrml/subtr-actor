@@ -1,5 +1,6 @@
 import "./styles.css";
 import {
+  createBallchasingOverlayPlugin,
   ReplayPlayer,
   loadReplayFromBytes,
 } from "../../player/src/lib.ts";
@@ -391,6 +392,7 @@ async function loadReplay(file: File): Promise<void> {
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: 2.25,
+    plugins: [createBallchasingOverlayPlugin()],
   });
 
   setupActiveModules();

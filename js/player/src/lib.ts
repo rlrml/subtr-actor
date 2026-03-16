@@ -1,4 +1,6 @@
 export { ReplayPlayer } from "./player";
+export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
+export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
 export {
   ReplayPlaylistPlayer,
   createReplayBytesSource,
@@ -28,6 +30,13 @@ export type {
   ReplayPlaylistPlayerSnapshot,
   ReplayPlaylistPlayerState,
   ReplayPlayerOptions,
+  ReplayPlayerPlugin,
+  ReplayPlayerPluginContext,
+  ReplayPlayerPluginDefinition,
+  ReplayPlayerPluginFactory,
+  ReplayPlayerRenderContext,
+  ReplayPlayerRenderTrackContext,
+  ReplayPlayerPluginStateContext,
   ReplayPlayerSnapshot,
   ReplayPlayerState,
   ReplayPlayerStatePatch,

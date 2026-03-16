@@ -7,6 +7,12 @@ import type {
   ReplayPlayerActiveMetadata,
   ReplayModel,
   ReplayPlayerKickoffCountdownMetadata,
+  ReplayPlayerPlugin,
+  ReplayPlayerPluginContext,
+  ReplayPlayerPluginDefinition,
+  ReplayPlayerPluginStateContext,
+  ReplayPlayerRenderContext,
+  ReplayPlayerRenderTrackContext,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
   ReplayPlayerState,
@@ -33,6 +39,10 @@ type FrameWindow = {
   frameIndex: number;
   nextFrameIndex: number;
   alpha: number;
+};
+type InstalledReplayPlayerPlugin = {
+  definition: ReplayPlayerPluginDefinition;
+  plugin: ReplayPlayerPlugin;
 };
 
 function inferLiveGameState(replay: ReplayModel): number | null {
@@ -85,6 +95,7 @@ export class ReplayPlayer extends EventTarget {
 
   readonly sceneState: ReplayScene;
   private readonly beforeRenderCallbacks: BeforeRenderCallback[] = [];
+  private readonly plugins: InstalledReplayPlayerPlugin[] = [];
   private readonly fieldScale: number;
   private readonly desiredCameraPosition = new THREE.Vector3();
   private readonly desiredLookTarget = new THREE.Vector3();
@@ -134,6 +145,9 @@ export class ReplayPlayer extends EventTarget {
     this.skipPastKickoffIfNeeded();
 
     this.installResizeHandling();
+    for (const plugin of options.plugins ?? []) {
+      this.installPlugin(plugin, false);
+    }
     this.render();
     this.scheduleAnimationFrame();
     this.emitChange();
@@ -343,6 +357,26 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
+  addPlugin(definition: ReplayPlayerPluginDefinition): () => void {
+    return this.installPlugin(definition, true);
+  }
+
+  removePlugin(id: string): boolean {
+    const index = this.plugins.findIndex((entry) => entry.plugin.id === id);
+    if (index < 0) {
+      return false;
+    }
+
+    const [entry] = this.plugins.splice(index, 1);
+    entry.plugin.teardown?.(this.createPluginContext());
+    this.render();
+    return true;
+  }
+
+  getPlugins(): ReplayPlayerPlugin[] {
+    return this.plugins.map((entry) => entry.plugin);
+  }
+
   destroy(): void {
     if (this.playing) {
       this.pause();
@@ -357,6 +391,10 @@ export class ReplayPlayer extends EventTarget {
       this.resizeObserver = null;
     } else {
       window.removeEventListener("resize", this.boundWindowResize);
+    }
+    while (this.plugins.length > 0) {
+      const entry = this.plugins.pop();
+      entry?.plugin.teardown?.(this.createPluginContext());
     }
     this.sceneState.dispose();
   }
@@ -433,8 +471,9 @@ export class ReplayPlayer extends EventTarget {
   private render(): void {
     const frameWindow = this.getFrameWindow(this.currentTime);
     const frameIndex = frameWindow.frameIndex;
-    const ballFrame = this.replay.ballFrames[frameIndex];
-    const nextBallFrame = this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
+    const ballFrame = this.replay.ballFrames[frameIndex] ?? null;
+    const nextBallFrame =
+      this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
     const interpolatedBallPosition = this.interpolatePosition(
       ballFrame?.position ?? null,
       nextBallFrame?.position ?? null,
@@ -443,6 +482,7 @@ export class ReplayPlayer extends EventTarget {
     const ballPosition = interpolatedBallPosition
       ? this.worldPosition(interpolatedBallPosition)
       : null;
+    const renderPlayers: ReplayPlayerRenderTrackContext[] = [];
 
     if (interpolatedBallPosition) {
       this.sceneState.ballMesh.visible = true;
@@ -466,13 +506,24 @@ export class ReplayPlayer extends EventTarget {
     for (const [playerIndex, player] of this.replay.players.entries()) {
       const mesh = this.sceneState.playerMeshes.get(player.id);
       const boostTrail = this.sceneState.playerBoostTrails.get(player.id);
+      const frame = player.frames[frameIndex] ?? null;
+      const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
+      let interpolatedPosition: Vec3 | null = null;
+      let boostFraction = 0;
       if (!mesh) {
+        renderPlayers.push({
+          track: player,
+          mesh: null,
+          boostTrail: boostTrail ?? null,
+          frame,
+          nextFrame,
+          interpolatedPosition,
+          boostFraction,
+        });
         continue;
       }
 
-      const frame = player.frames[frameIndex];
-      const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
-      const interpolatedPosition = this.interpolatePosition(
+      interpolatedPosition = this.interpolatePosition(
         frame?.position ?? null,
         nextFrame?.position ?? null,
         frameWindow.alpha
@@ -482,6 +533,15 @@ export class ReplayPlayer extends EventTarget {
         if (boostTrail) {
           boostTrail.visible = false;
         }
+        renderPlayers.push({
+          track: player,
+          mesh,
+          boostTrail: boostTrail ?? null,
+          frame,
+          nextFrame,
+          interpolatedPosition,
+          boostFraction,
+        });
         continue;
       }
 
@@ -500,7 +560,7 @@ export class ReplayPlayer extends EventTarget {
 
       const currentBoostFraction = frame?.boostFraction ?? 0;
       const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
-      const boostFraction = THREE.MathUtils.lerp(
+      boostFraction = THREE.MathUtils.lerp(
         currentBoostFraction,
         nextBoostFraction,
         frameWindow.alpha
@@ -541,6 +601,16 @@ export class ReplayPlayer extends EventTarget {
           boostMeter.group.visible = false;
         }
       }
+
+      renderPlayers.push({
+        track: player,
+        mesh,
+        boostTrail: boostTrail ?? null,
+        frame,
+        nextFrame,
+        interpolatedPosition,
+        boostFraction,
+      });
     }
 
     this.updateCamera(frameIndex, ballPosition);
@@ -554,6 +624,16 @@ export class ReplayPlayer extends EventTarget {
     };
     for (const callback of this.beforeRenderCallbacks) {
       callback(renderInfo);
+    }
+    const renderContext = this.createRenderContext(
+      renderInfo,
+      ballFrame,
+      nextBallFrame,
+      ballPosition,
+      renderPlayers
+    );
+    for (const entry of this.plugins) {
+      entry.plugin.beforeRender?.(renderContext);
     }
     this.sceneState.renderer.render(
       this.sceneState.scene,
@@ -919,12 +999,82 @@ export class ReplayPlayer extends EventTarget {
     return new THREE.Vector3(-direction.x, direction.y, direction.z).normalize();
   }
 
+  private installPlugin(
+    definition: ReplayPlayerPluginDefinition,
+    renderAfterSetup: boolean
+  ): () => void {
+    const plugin =
+      typeof definition === "function" ? definition() : definition;
+
+    if (this.plugins.some((entry) => entry.plugin.id === plugin.id)) {
+      throw new Error(`Replay player plugin "${plugin.id}" is already installed`);
+    }
+
+    const entry = { definition, plugin };
+    this.plugins.push(entry);
+    plugin.setup?.(this.createPluginContext());
+    plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
+
+    if (renderAfterSetup) {
+      this.render();
+    }
+
+    return () => {
+      const index = this.plugins.indexOf(entry);
+      if (index < 0) {
+        return;
+      }
+      this.plugins.splice(index, 1);
+      plugin.teardown?.(this.createPluginContext());
+      this.render();
+    };
+  }
+
+  private createPluginContext(): ReplayPlayerPluginContext {
+    return {
+      player: this,
+      replay: this.replay,
+      scene: this.sceneState,
+      container: this.container,
+      options: this.options,
+    };
+  }
+
+  private createPluginStateContext(
+    state: ReplayPlayerState
+  ): ReplayPlayerPluginStateContext {
+    return {
+      ...this.createPluginContext(),
+      state,
+    };
+  }
+
+  private createRenderContext(
+    renderInfo: FrameRenderInfo,
+    ballFrame: ReplayModel["ballFrames"][number] | null,
+    nextBallFrame: ReplayModel["ballFrames"][number] | null,
+    ballPosition: Vec3 | null,
+    players: ReplayPlayerRenderTrackContext[]
+  ): ReplayPlayerRenderContext {
+    return {
+      ...this.createPluginStateContext(this.getState()),
+      ...renderInfo,
+      frame: this.replay.frames[renderInfo.frameIndex] ?? null,
+      nextFrame: this.replay.frames[renderInfo.nextFrameIndex] ?? null,
+      ballFrame,
+      nextBallFrame,
+      ballPosition,
+      players,
+    };
+  }
+
   private emitChange(): void {
-    this.dispatchEvent(
-      new CustomEvent<ReplayPlayerState>("change", {
-        detail: this.getState(),
-      })
-    );
+    const state = this.getState();
+    const pluginStateContext = this.createPluginStateContext(state);
+    for (const entry of this.plugins) {
+      entry.plugin.onStateChange?.(pluginStateContext);
+    }
+    this.dispatchEvent(new CustomEvent<ReplayPlayerState>("change", { detail: state }));
   }
 
   private updateBoostTrail(

@@ -367,7 +367,80 @@ function createExampleCarMesh(color: string): THREE.Group {
   body.castShadow = true;
   inner.add(body);
 
-  const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  const windowMaterial = new THREE.MeshPhongMaterial({
+    color: 0x1a1b2e,
+    shininess: 120,
+    transparent: true,
+    opacity: 0.82,
+  });
+  const windowVertices = [
+    [100, -100, 100],
+    [-100, -100, 100],
+    [150, -220, 20],
+    [-150, -220, 20],
+    [100, 100, 100],
+    [-100, 100, 100],
+    [140, 170, 25],
+    [-140, 170, 25],
+    [100, -100, 100],
+    [100, 100, 100],
+    [150, -220, 20],
+    [140, 170, 25],
+    [-100, -100, 100],
+    [-100, 100, 100],
+    [-150, -220, 20],
+    [-140, 170, 25],
+  ];
+  const windowFaces = [
+    [0, 2, 3],
+    [0, 3, 1],
+    [4, 6, 7],
+    [4, 7, 5],
+    [8, 10, 11],
+    [8, 11, 9],
+    [12, 14, 15],
+    [12, 15, 13],
+  ];
+  const windowGeometry = new THREE.BufferGeometry();
+  windowGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(windowVertices.flat(), 3)
+  );
+  windowGeometry.setIndex(windowFaces.flat());
+  windowGeometry.computeVertexNormals();
+  const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
+  windowMesh.position.z = 1;
+  inner.add(windowMesh);
+
+  const windshieldMaterial = new THREE.MeshBasicMaterial({
+    color: 0x88d7ff,
+    transparent: true,
+    opacity: 0.34,
+    side: THREE.DoubleSide,
+  });
+  const windshieldGeometry = new THREE.BufferGeometry();
+  windshieldGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      [
+        90, -110, 95,
+        -90, -110, 95,
+        140, -210, 25,
+        -140, -210, 25,
+      ],
+      3
+    )
+  );
+  windshieldGeometry.setIndex([0, 2, 3, 0, 3, 1]);
+  windshieldGeometry.computeVertexNormals();
+  const windshieldMesh = new THREE.Mesh(windshieldGeometry, windshieldMaterial);
+  windshieldMesh.position.z = 2;
+  inner.add(windshieldMesh);
+
+  const wheelMaterial = new THREE.MeshPhongMaterial({
+    color: 0x222222,
+    shininess: 48,
+  });
   const makeWheel = (x: number, y: number, z: number, width: number): THREE.Mesh => {
     const wheel = new THREE.Mesh(
       new THREE.CylinderGeometry(70, 70, width, 10),
@@ -375,6 +448,7 @@ function createExampleCarMesh(color: string): THREE.Group {
     );
     wheel.rotateZ(Math.PI / 2);
     wheel.position.set(x, y, z);
+    wheel.castShadow = true;
     return wheel;
   };
 
