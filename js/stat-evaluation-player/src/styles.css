@@ -20,7 +20,7 @@ html, body {
 .shell {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   height: 100%;
   gap: 8px;
   padding: 8px;
@@ -152,4 +152,50 @@ button:hover {
 
 input[type="range"] {
   width: 100%;
+}
+
+/* Module toggles */
+.module-toggles {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.module-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #7a8fa3;
+  user-select: none;
+}
+
+.module-toggle input:checked + * {
+  color: #d0dce8;
+}
+
+.module-toggle input[type="checkbox"] {
+  accent-color: #57a8ff;
+}
+
+/* Stat module sections */
+.stat-module-section {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.stat-module-section:last-child {
+  margin-bottom: 0;
+}
+
+.stat-module-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #556677;
+  margin-bottom: 4px;
+  padding-left: 2px;
 }
