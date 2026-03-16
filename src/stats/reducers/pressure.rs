@@ -4,6 +4,7 @@ use super::*;
 pub struct PressureReducer {
     team_zero_side_duration: f32,
     team_one_side_duration: f32,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PressureReducer {
@@ -42,7 +43,7 @@ impl PressureReducer {
 
 impl StatsReducer for PressureReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        if !sample.is_live_play() {
+        if !self.live_play_tracker.is_live_play(sample) {
             return Ok(());
         }
         if let Some(ball) = &sample.ball {

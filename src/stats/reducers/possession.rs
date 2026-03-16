@@ -29,6 +29,7 @@ impl PossessionStats {
 pub struct PossessionReducer {
     stats: PossessionStats,
     current_team_is_team_0: Option<bool>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PossessionReducer {
@@ -43,7 +44,7 @@ impl PossessionReducer {
 
 impl StatsReducer for PossessionReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         let active_team_before_sample = if sample.touch_events.is_empty() {
             self.current_team_is_team_0
                 .or(sample.possession_team_is_team_0)

@@ -22,6 +22,7 @@ pub struct PowerslideReducer {
     team_zero_stats: PowerslideStats,
     team_one_stats: PowerslideStats,
     last_active: HashMap<PlayerId, bool>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PowerslideReducer {
@@ -52,7 +53,7 @@ impl PowerslideReducer {
 
 impl StatsReducer for PowerslideReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         for player in &sample.players {
             let effective_powerslide = Self::is_effective_powerslide(player);
             let previous_active = self

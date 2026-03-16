@@ -142,6 +142,50 @@ pub struct StatsSample {
 const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
 const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LivePlayTracker {
+    post_goal_phase_active: bool,
+    last_score: Option<(i32, i32)>,
+}
+
+impl LivePlayTracker {
+    fn current_score(sample: &StatsSample) -> Option<(i32, i32)> {
+        Some((sample.team_zero_score?, sample.team_one_score?))
+    }
+
+    fn kickoff_phase_active(sample: &StatsSample) -> bool {
+        sample.kickoff_countdown_time.is_some_and(|time| time > 0)
+            || matches!(sample.ball_has_been_hit, Some(false))
+    }
+
+    pub fn is_live_play(&mut self, sample: &StatsSample) -> bool {
+        let kickoff_phase_active = Self::kickoff_phase_active(sample);
+        let score_changed = Self::current_score(sample)
+            .zip(self.last_score)
+            .is_some_and(
+                |((team_zero_score, team_one_score), (last_team_zero, last_team_one))| {
+                    team_zero_score > last_team_zero || team_one_score > last_team_one
+                },
+            );
+
+        if !sample.goal_events.is_empty() || score_changed {
+            self.post_goal_phase_active = true;
+        }
+
+        let live_play = sample.is_live_play() && !self.post_goal_phase_active;
+
+        if kickoff_phase_active {
+            self.post_goal_phase_active = false;
+        }
+
+        if let Some(score) = Self::current_score(sample) {
+            self.last_score = Some(score);
+        }
+
+        live_play
+    }
+}
+
 impl StatsSample {
     pub(crate) fn from_processor(
         processor: &ReplayProcessor,
@@ -248,6 +292,8 @@ impl StatsSample {
     /// We exclude frozen kickoff countdown frames and post-goal replay frames,
     /// but keep unknown states live so we do not accidentally discard stats
     /// from replay variants whose state enum values we have not catalogued yet.
+    /// Use [`LivePlayTracker`] when you need to exclude the full post-goal
+    /// reset segment that can continue after the goal frame itself.
     pub fn is_live_play(&self) -> bool {
         if matches!(
             self.game_state,
@@ -443,6 +489,7 @@ pub struct PowerslideReducer {
     team_zero_stats: PowerslideStats,
     team_one_stats: PowerslideStats,
     last_active: HashMap<PlayerId, bool>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PowerslideReducer {
@@ -473,7 +520,7 @@ impl PowerslideReducer {
 
 impl StatsReducer for PowerslideReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         for player in &sample.players {
             let effective_powerslide = Self::is_effective_powerslide(player);
             let previous_active = self
@@ -512,6 +559,7 @@ impl StatsReducer for PowerslideReducer {
 pub struct PressureReducer {
     team_zero_side_duration: f32,
     team_one_side_duration: f32,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PressureReducer {
@@ -550,7 +598,7 @@ impl PressureReducer {
 
 impl StatsReducer for PressureReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        if !sample.is_live_play() {
+        if !self.live_play_tracker.is_live_play(sample) {
             return Ok(());
         }
         if let Some(ball) = &sample.ball {
@@ -593,6 +641,7 @@ impl PossessionStats {
 pub struct PossessionReducer {
     stats: PossessionStats,
     current_team_is_team_0: Option<bool>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PossessionReducer {
@@ -607,7 +656,7 @@ impl PossessionReducer {
 
 impl StatsReducer for PossessionReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         let active_team_before_sample = if sample.touch_events.is_empty() {
             self.current_team_is_team_0
                 .or(sample.possession_team_is_team_0)

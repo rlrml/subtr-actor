@@ -152,6 +152,7 @@ pub struct PositioningReducer {
     current_possession_team_is_team_0: Option<bool>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl PositioningReducer {
@@ -177,6 +178,7 @@ impl PositioningReducer {
 
 impl StatsReducer for PositioningReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let live_play = self.live_play_tracker.is_live_play(sample);
         if sample.dt == 0.0 {
             if let Some(ball) = &sample.ball {
                 self.previous_ball_position = Some(ball.position());
@@ -194,7 +196,6 @@ impl StatsReducer for PositioningReducer {
             return Ok(());
         };
         let ball_position = ball.position();
-        let live_play = sample.is_live_play();
         let demoed_players: HashSet<_> = sample
             .active_demos
             .iter()
@@ -292,13 +293,6 @@ impl StatsReducer for PositioningReducer {
 
         if live_play {
             for is_team_0 in [true, false] {
-                let team_roster_count = sample.current_in_game_team_player_count(is_team_0).max(
-                    sample
-                        .players
-                        .iter()
-                        .filter(|player| player.is_team_0 == is_team_0)
-                        .count(),
-                );
                 let team_players: Vec<_> = sample
                     .players
                     .iter()
@@ -328,7 +322,8 @@ impl StatsReducer for PositioningReducer {
                     }
                 }
 
-                if team_roster_count < 2 || team_players.len() < team_roster_count {
+                if sample.current_in_game_team_player_count(is_team_0) < 2 || team_players.len() < 2
+                {
                     for (player, _) in &team_players {
                         self.player_stats
                             .entry(player.player_id.clone())
@@ -336,7 +331,7 @@ impl StatsReducer for PositioningReducer {
                             .time_no_teammates += sample.dt;
                     }
                 } else {
-                    // These role buckets only make sense when the full multi-player team is live.
+                    // Relative role buckets still make sense as long as at least one teammate is live.
                     let mut sorted_team: Vec<_> = team_players
                         .iter()
                         .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))

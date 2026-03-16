@@ -97,6 +97,7 @@ pub struct BallCarryReducer {
     carry_events: Vec<BallCarryEvent>,
     active_carry: Option<ActiveBallCarry>,
     last_touch_player: Option<PlayerId>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl BallCarryReducer {
@@ -255,7 +256,7 @@ impl BallCarryReducer {
 impl StatsReducer for BallCarryReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let controlling_player = self.last_touch_player.clone();
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         let carry_candidate = if live_play && sample.dt > 0.0 {
             if let (Some(ball), Some(player_id)) = (&sample.ball, controlling_player.as_ref()) {
                 sample

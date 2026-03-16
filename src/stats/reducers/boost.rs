@@ -106,6 +106,7 @@ pub struct BoostReducer {
     initial_respawn_awarded: HashSet<PlayerId>,
     pending_demo_respawns: HashSet<PlayerId>,
     active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
+    live_play_tracker: LivePlayTracker,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -630,7 +631,7 @@ impl BoostReducer {
 
 impl StatsReducer for BoostReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
+        let live_play = self.live_play_tracker.is_live_play(sample);
         let kickoff_phase_active = sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || sample.kickoff_countdown_time.is_some_and(|t| t > 0)
             || sample.ball_has_been_hit == Some(false);
