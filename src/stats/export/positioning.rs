@@ -6,6 +6,12 @@ impl StatFieldProvider for PositioningStats {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         visitor(ExportedStat::float(
             "positioning",
+            "active_game_time",
+            StatUnit::Seconds,
+            self.active_game_time,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "avg_distance_to_ball",
             StatUnit::UnrealUnits,
             self.average_distance_to_ball(),
@@ -72,6 +78,18 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
+            "time_demolished",
+            StatUnit::Seconds,
+            self.time_demolished,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "time_no_teammates",
+            StatUnit::Seconds,
+            self.time_no_teammates,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "time_most_back",
             StatUnit::Seconds,
             self.time_most_back,
@@ -81,6 +99,12 @@ impl StatFieldProvider for PositioningStats {
             "time_most_forward",
             StatUnit::Seconds,
             self.time_most_forward,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "time_other_role",
+            StatUnit::Seconds,
+            self.time_other_role,
         ));
         visitor(ExportedStat::float(
             "positioning",

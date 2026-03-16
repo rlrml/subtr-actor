@@ -1510,6 +1510,7 @@ impl StatsReducer for MovementReducer {
             };
 
             if live_play {
+                stats.active_game_time += sample.dt;
                 stats.tracked_time += sample.dt;
                 stats.speed_integral += speed * sample.dt;
                 team_stats.tracked_time += sample.dt;
@@ -1554,6 +1555,7 @@ impl StatsReducer for MovementReducer {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PositioningStats {
+    pub active_game_time: f32,
     pub tracked_time: f32,
     pub sum_distance_to_teammates: f32,
     pub sum_distance_to_ball: f32,
@@ -1561,8 +1563,11 @@ pub struct PositioningStats {
     pub time_has_possession: f32,
     pub sum_distance_to_ball_no_possession: f32,
     pub time_no_possession: f32,
+    pub time_demolished: f32,
+    pub time_no_teammates: f32,
     pub time_most_back: f32,
     pub time_most_forward: f32,
+    pub time_other_role: f32,
     pub time_defensive_zone: f32,
     pub time_neutral_zone: f32,
     pub time_offensive_zone: f32,
@@ -1728,6 +1733,11 @@ impl StatsReducer for PositioningReducer {
         };
         let ball_position = ball.position();
         let live_play = sample.is_live_play();
+        let demoed_players: HashSet<_> = sample
+            .active_demos
+            .iter()
+            .map(|demo| demo.victim.clone())
+            .collect();
         let possession_team_before_sample = if sample.touch_events.is_empty() {
             self.current_possession_team_is_team_0
                 .or(sample.possession_team_is_team_0)
@@ -1736,6 +1746,17 @@ impl StatsReducer for PositioningReducer {
         };
 
         for player in &sample.players {
+            let is_demoed = demoed_players.contains(&player.player_id);
+            if live_play && is_demoed {
+                let stats = self
+                    .player_stats
+                    .entry(player.player_id.clone())
+                    .or_default();
+                stats.active_game_time += sample.dt;
+                stats.time_demolished += sample.dt;
+                continue;
+            }
+
             let Some(position) = player.position() else {
                 continue;
             };
@@ -1819,6 +1840,7 @@ impl StatsReducer for PositioningReducer {
                     .players
                     .iter()
                     .filter(|player| player.is_team_0 == is_team_0)
+                    .filter(|player| !demoed_players.contains(&player.player_id))
                     .filter_map(|player| player.position().map(|position| (player, position)))
                     .collect();
 
@@ -1843,7 +1865,14 @@ impl StatsReducer for PositioningReducer {
                     }
                 }
 
-                if team_roster_count >= 2 && team_players.len() == team_roster_count {
+                if team_roster_count < 2 || team_players.len() < team_roster_count {
+                    for (player, _) in &team_players {
+                        self.player_stats
+                            .entry(player.player_id.clone())
+                            .or_default()
+                            .time_no_teammates += sample.dt;
+                    }
+                } else {
                     // These role buckets only make sense when the full multi-player team is live.
                     let mut sorted_team: Vec<_> = team_players
                         .iter()
@@ -1882,8 +1911,12 @@ impl StatsReducer for PositioningReducer {
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_most_forward += sample.dt;
+                            } else {
+                                self.player_stats
+                                    .entry(player_id.clone())
+                                    .or_default()
+                                    .time_other_role += sample.dt;
                             }
-                            // If near both or neither, player gets no role credit (mid).
                         }
                     }
                 }

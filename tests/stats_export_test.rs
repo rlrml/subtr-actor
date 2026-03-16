@@ -10,6 +10,7 @@ fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a E
 #[test]
 fn test_positioning_stats_export_includes_derived_metrics() {
     let stats = PositioningStats {
+        active_game_time: 12.0,
         tracked_time: 10.0,
         sum_distance_to_teammates: 2_500.0,
         sum_distance_to_ball: 20_000.0,
@@ -17,8 +18,11 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_has_possession: 2.0,
         sum_distance_to_ball_no_possession: 15_000.0,
         time_no_possession: 5.0,
+        time_demolished: 1.0,
+        time_no_teammates: 2.0,
         time_most_back: 3.0,
         time_most_forward: 1.0,
+        time_other_role: 1.0,
         time_defensive_zone: 4.0,
         time_neutral_zone: 3.0,
         time_offensive_zone: 3.0,
@@ -52,6 +56,22 @@ fn test_positioning_stats_export_includes_derived_metrics() {
     assert_eq!(
         find_field(&fields, "positioning", "time_defensive_zone").value,
         StatValue::Float(4.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "active_game_time").value,
+        StatValue::Float(12.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_demolished").value,
+        StatValue::Float(1.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_no_teammates").value,
+        StatValue::Float(2.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_other_role").value,
+        StatValue::Float(1.0)
     );
     assert_eq!(
         find_field(&fields, "positioning", "percent_neutral_zone").value,
