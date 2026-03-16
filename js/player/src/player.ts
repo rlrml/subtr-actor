@@ -33,6 +33,49 @@ type FrameWindow = {
   alpha: number;
 };
 
+function inferLiveGameState(replay: ReplayModel): number | null {
+  if (replay.frames.length === 0) {
+    return null;
+  }
+
+  const counts = new Map<number, number>();
+  for (const frame of replay.frames) {
+    counts.set(frame.gameState, (counts.get(frame.gameState) ?? 0) + 1);
+  }
+
+  let liveGameState: number | null = null;
+  let liveGameStateCount = -1;
+  for (const [gameState, count] of counts.entries()) {
+    if (count <= liveGameStateCount) {
+      continue;
+    }
+
+    liveGameState = gameState;
+    liveGameStateCount = count;
+  }
+
+  return liveGameState;
+}
+
+function inferKickoffGameState(
+  replay: ReplayModel,
+  liveGameState: number | null
+): number | null {
+  if (liveGameState === null) {
+    return null;
+  }
+
+  for (const frame of replay.frames) {
+    if (frame.gameState === liveGameState) {
+      break;
+    }
+
+    return frame.gameState;
+  }
+
+  return null;
+}
+
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
   readonly replay: ReplayModel;
@@ -44,6 +87,8 @@ export class ReplayPlayer extends EventTarget {
   private readonly desiredCameraPosition = new THREE.Vector3();
   private readonly desiredLookTarget = new THREE.Vector3();
   private readonly boundWindowResize = () => this.sceneState.resize();
+  private readonly liveGameState: number | null;
+  private readonly kickoffGameState: number | null;
   private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
   private disposed = false;
@@ -55,6 +100,7 @@ export class ReplayPlayer extends EventTarget {
   private cameraDistanceScale: number;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
+  private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
   constructor(
@@ -68,6 +114,8 @@ export class ReplayPlayer extends EventTarget {
     this.options = options;
     this.fieldScale = options.fieldScale ?? DEFAULT_FIELD_SCALE;
     this.sceneState = createReplayScene(container, replay, this.fieldScale);
+    this.liveGameState = inferLiveGameState(replay);
+    this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
     this.cameraDistanceScale = Math.max(
       0.25,
@@ -75,7 +123,10 @@ export class ReplayPlayer extends EventTarget {
     );
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
+    this.skipPostGoalTransitionsEnabled =
+      options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
+    this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
 
     this.installResizeHandling();
@@ -145,9 +196,19 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
+    this.skipPostGoalTransitionsEnabled = enabled;
+    if (enabled) {
+      this.skipPostGoalTransitionIfNeeded();
+    }
+    this.render();
+    this.emitChange();
+  }
+
   setSkipKickoffsEnabled(enabled: boolean): void {
     this.skipKickoffsEnabled = enabled;
     if (enabled) {
+      this.skipPostGoalTransitionIfNeeded();
       this.skipPastKickoffIfNeeded();
     }
     this.render();
@@ -156,6 +217,7 @@ export class ReplayPlayer extends EventTarget {
 
   seek(time: number): void {
     this.currentTime = THREE.MathUtils.clamp(time, 0, this.replay.duration);
+    this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
     if (this.playing) {
       this.reanchorPlaybackClock();
@@ -181,6 +243,10 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
     }
+    if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
+      this.skipPostGoalTransitionsEnabled =
+        nextState.skipPostGoalTransitionsEnabled;
+    }
     if (nextState.skipKickoffsEnabled !== undefined) {
       this.skipKickoffsEnabled = nextState.skipKickoffsEnabled;
     }
@@ -204,6 +270,7 @@ export class ReplayPlayer extends EventTarget {
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
+    this.skipPostGoalTransitionIfNeeded(now);
     this.skipPastKickoffIfNeeded(now);
 
     this.render();
@@ -220,6 +287,7 @@ export class ReplayPlayer extends EventTarget {
       cameraDistanceScale: this.cameraDistanceScale,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
+      skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
       skipKickoffsEnabled: this.skipKickoffsEnabled,
     };
   }
@@ -321,6 +389,7 @@ export class ReplayPlayer extends EventTarget {
     let shouldEmitChange = false;
     if (this.playing) {
       shouldEmitChange = this.syncPlaybackClock(now);
+      shouldEmitChange = this.skipPostGoalTransitionIfNeeded(now) || shouldEmitChange;
       shouldEmitChange = this.skipPastKickoffIfNeeded(now) || shouldEmitChange;
       if (this.currentTime >= this.replay.duration) {
         this.playing = false;
@@ -453,12 +522,12 @@ export class ReplayPlayer extends EventTarget {
 
     const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
     const frame = this.replay.frames[frameIndex];
-    if (!frame || frame.kickoffCountdown <= 0) {
+    if (!frame || !this.isKickoffFrame(frame)) {
       return false;
     }
 
     const nextLiveFrame = this.replay.frames.find(
-      (candidate, index) => index > frameIndex && candidate.kickoffCountdown <= 0
+      (candidate, index) => index > frameIndex && this.isLiveGameplayFrame(candidate)
     );
     if (!nextLiveFrame || nextLiveFrame.time === this.currentTime) {
       return false;
@@ -469,6 +538,70 @@ export class ReplayPlayer extends EventTarget {
       this.reanchorPlaybackClock(now);
     }
     return true;
+  }
+
+  private skipPostGoalTransitionIfNeeded(now?: number): boolean {
+    if (!this.skipPostGoalTransitionsEnabled) {
+      return false;
+    }
+
+    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
+    const frame = this.replay.frames[frameIndex];
+    if (!frame || !this.isPostGoalTransitionFrame(frame, frameIndex)) {
+      return false;
+    }
+
+    const nextFrame = this.replay.frames.find(
+      (candidate, index) =>
+        index > frameIndex && !this.isPostGoalTransitionFrame(candidate, index)
+    );
+    if (!nextFrame || nextFrame.time === this.currentTime) {
+      return false;
+    }
+
+    this.currentTime = nextFrame.time;
+    if (this.playing) {
+      this.reanchorPlaybackClock(now);
+    }
+    return true;
+  }
+
+  private isLiveGameplayFrame(frame: ReplayModel["frames"][number]): boolean {
+    if (this.liveGameState === null) {
+      return frame.kickoffCountdown <= 0;
+    }
+
+    return frame.gameState === this.liveGameState;
+  }
+
+  private isKickoffFrame(frame: ReplayModel["frames"][number]): boolean {
+    if (frame.kickoffCountdown > 0) {
+      return true;
+    }
+
+    return this.kickoffGameState !== null && frame.gameState === this.kickoffGameState;
+  }
+
+  private hasRenderableSamples(frameIndex: number): boolean {
+    if (this.replay.ballFrames[frameIndex]?.position) {
+      return true;
+    }
+
+    return this.replay.players.some((player) => player.frames[frameIndex]?.position);
+  }
+
+  private isRenderableKickoffFrame(
+    frame: ReplayModel["frames"][number],
+    frameIndex: number
+  ): boolean {
+    return this.isKickoffFrame(frame) && this.hasRenderableSamples(frameIndex);
+  }
+
+  private isPostGoalTransitionFrame(
+    frame: ReplayModel["frames"][number],
+    frameIndex: number
+  ): boolean {
+    return !this.isLiveGameplayFrame(frame) && !this.isRenderableKickoffFrame(frame, frameIndex);
   }
 
   private updateCamera(

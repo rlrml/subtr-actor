@@ -196,6 +196,7 @@ export interface ReplayPlayerOptions {
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
   initialPlaybackRate?: number;
+  initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
 }
 
@@ -216,6 +217,7 @@ export interface ReplayPlayerState {
   cameraDistanceScale: number;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
 
@@ -236,6 +238,7 @@ export interface ReplayPlaylistPlayerState {
   cameraDistanceScale: number;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
 
@@ -251,6 +254,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "cameraDistanceScale"
     | "attachedPlayerId"
     | "ballCamEnabled"
+    | "skipPostGoalTransitionsEnabled"
     | "skipKickoffsEnabled"
   >
 >;

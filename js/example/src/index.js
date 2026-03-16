@@ -78,6 +78,10 @@ app.innerHTML = `
             </select>
           </div>
           <label class="toggle">
+            <input id="skip-post-goal-transitions" type="checkbox" checked />
+            <span>Skip post-goal resets</span>
+          </label>
+          <label class="toggle">
             <input id="skip-kickoffs" type="checkbox" />
             <span>Skip kickoffs</span>
           </label>
@@ -140,6 +144,7 @@ const timeReadout = mustElement("#time-readout");
 const remainingReadout = mustElement("#remaining-readout");
 const frameReadout = mustElement("#frame-readout");
 const durationReadout = mustElement("#duration-readout");
+const skipPostGoalTransitions = mustElement("#skip-post-goal-transitions");
 const skipKickoffs = mustElement("#skip-kickoffs");
 const kickoffOverlay = mustElement("#kickoff-overlay");
 const kickoffCountdown = mustElement("#kickoff-countdown");
@@ -205,6 +210,7 @@ function renderSnapshot(snapshot) {
   attachedPlayer.value = snapshot.attachedPlayerId ?? "";
   cameraDistance.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
   ballCam.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
+  skipPostGoalTransitions.checked = snapshot.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = snapshot.skipKickoffsEnabled;
 
   remainingReadout.textContent =
@@ -250,6 +256,7 @@ async function loadReplayFile(file) {
     initialCameraDistanceScale: 2.25,
     initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
+    initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
     initialSkipKickoffsEnabled: skipKickoffs.checked,
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);
@@ -299,6 +306,10 @@ attachedPlayer.addEventListener("change", () => {
 
 ballCam.addEventListener("change", () => {
   replayPlayer?.setBallCamEnabled(ballCam.checked);
+});
+
+skipPostGoalTransitions.addEventListener("change", () => {
+  replayPlayer?.setSkipPostGoalTransitionsEnabled(skipPostGoalTransitions.checked);
 });
 
 skipKickoffs.addEventListener("change", () => {
