@@ -52,6 +52,12 @@ impl StatFieldProvider for BoostStats {
             StatUnit::Boost,
             self.amount_stolen_small,
         ));
+        visitor(ExportedStat::float(
+            "boost",
+            "amount_respawned",
+            StatUnit::Boost,
+            self.amount_respawned,
+        ));
         visitor(ExportedStat::unsigned(
             "boost",
             "count_collected_big",
@@ -87,6 +93,12 @@ impl StatFieldProvider for BoostStats {
             "amount_overfill_stolen",
             StatUnit::Boost,
             self.overfill_from_stolen,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
+            "amount_used",
+            StatUnit::Boost,
+            self.amount_used,
         ));
         visitor(ExportedStat::float(
             "boost",

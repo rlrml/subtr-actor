@@ -89,10 +89,12 @@ fn sample_stats(
         seconds_remaining: Some(100),
         game_state: Some(0),
         ball_has_been_hit: Some(true),
+        kickoff_countdown_time: None,
         team_zero_score: None,
         team_one_score: None,
         possession_team_is_team_0: None,
         scored_on_team_is_team_0: None,
+        current_in_game_team_player_counts: None,
         ball: ball.map(|rigid_body| BallSample { rigid_body }),
         players,
         active_demos: Vec::new(),
@@ -101,6 +103,22 @@ fn sample_stats(
         touch_events: Vec::new(),
         player_stat_events: Vec::new(),
         goal_events: Vec::new(),
+    }
+}
+
+fn replay_player_boost_sample_at_frame(
+    replay_data: &ReplayData,
+    player_id: &PlayerId,
+    frame_number: usize,
+) -> Option<(usize, f32)> {
+    let (_, player_data) = replay_data
+        .frame_data
+        .players
+        .iter()
+        .find(|(candidate, _)| candidate == player_id)?;
+    match player_data.frames().get(frame_number)? {
+        PlayerFrame::Data { boost_amount, .. } => Some((frame_number, *boost_amount)),
+        PlayerFrame::Empty => None,
     }
 }
 
@@ -337,10 +355,12 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![sample_player(player_id.clone(), true)],
             active_demos: Vec::new(),
@@ -360,10 +380,12 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 powerslide_active: true,
@@ -387,10 +409,12 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             seconds_remaining: None,
             game_state: Some(58),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 powerslide_active: true,
@@ -427,10 +451,12 @@ fn test_powerslide_reducer_requires_ground_contact() {
             seconds_remaining: Some(100),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![airborne_player],
             active_demos: Vec::new(),
@@ -454,10 +480,12 @@ fn test_powerslide_reducer_requires_ground_contact() {
             seconds_remaining: Some(99),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![grounded_player],
             active_demos: Vec::new(),
@@ -499,10 +527,12 @@ fn test_powerslide_reducer_allows_small_suspension_height() {
             seconds_remaining: Some(100),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![player],
             active_demos: Vec::new(),
@@ -642,10 +672,12 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![sample_player(player_id.clone(), true)],
             active_demos: Vec::new(),
@@ -665,10 +697,12 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(1),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: Some(false),
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 match_goals: Some(1),
@@ -715,10 +749,12 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![
                 sample_player(scorer.clone(), true),
@@ -741,10 +777,12 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(1),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: Some(false),
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![
                 PlayerSample {
@@ -792,10 +830,12 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![sample_player(player_id.clone(), true)],
             active_demos: Vec::new(),
@@ -815,10 +855,12 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(0),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 match_shots: Some(1),
@@ -912,10 +954,12 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
@@ -938,10 +982,12 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 rigid_body: Some(sample_rigid_body(100.0, 0.0, 17.0)),
@@ -964,10 +1010,12 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             seconds_remaining: None,
             game_state: Some(58),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 rigid_body: Some(sample_rigid_body(110.0, 0.0, 17.0)),
@@ -1000,10 +1048,12 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
             seconds_remaining: Some(100),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 rigid_body: Some(sample_rigid_body(0.0, 0.0, 300.0)),
@@ -1026,10 +1076,12 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
             seconds_remaining: Some(99),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 rigid_body: Some(sample_rigid_body(0.0, 0.0, 800.0)),
@@ -1098,10 +1150,12 @@ fn test_positioning_reducer_uses_field_marking_zone_boundary() {
                 seconds_remaining: Some(100 - frame_number as i32),
                 game_state: Some(0),
                 ball_has_been_hit: None,
+                kickoff_countdown_time: None,
                 team_zero_score: None,
                 team_one_score: None,
                 possession_team_is_team_0: None,
                 scored_on_team_is_team_0: None,
+                current_in_game_team_player_counts: None,
                 ball: Some(ball.clone()),
                 players: vec![PlayerSample {
                     rigid_body: Some(sample_rigid_body(0.0, y, 17.0)),
@@ -1136,10 +1190,12 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             seconds_remaining: Some(99),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(BallSample {
                 rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
             }),
@@ -1164,10 +1220,12 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             seconds_remaining: Some(98),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(BallSample {
                 rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
             }),
@@ -1192,10 +1250,12 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             seconds_remaining: Some(97),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(BallSample {
                 rigid_body: sample_rigid_body(0.0, 0.0, 92.75),
             }),
@@ -1220,10 +1280,12 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             seconds_remaining: Some(96),
             game_state: Some(0),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(BallSample {
                 rigid_body: sample_rigid_body(0.0, 100.0, 92.75),
             }),
@@ -1264,7 +1326,7 @@ fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_bucket
             ball.clone(),
             vec![
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                    rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                     ..sample_player(front_id.clone(), true)
                 },
                 PlayerSample {
@@ -1283,7 +1345,7 @@ fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_bucket
             ball,
             vec![
                 PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                    rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                     ..sample_player(front_id.clone(), true)
                 },
                 sample_player(back_id.clone(), true),
@@ -1296,6 +1358,144 @@ fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_bucket
     assert_eq!(front_stats.time_most_back, 0.0);
     assert_eq!(front_stats.time_even, 0.0);
     assert!(reducer.player_stats().get(&back_id).is_none());
+}
+
+#[test]
+fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating() {
+    let front_id = epic_id("positioning-front-meta");
+    let middle_id = epic_id("positioning-middle-meta");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball.clone(),
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(middle_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([3, 0]),
+            ball: ball.map(|rigid_body| BallSample { rigid_body }),
+            players: vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(middle_id.clone(), true)
+                },
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let front_stats = reducer.player_stats().get(&front_id).unwrap();
+    let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
+    assert_eq!(front_stats.time_most_forward, 0.0);
+    assert_eq!(front_stats.time_most_back, 0.0);
+    assert_eq!(front_stats.time_even, 0.0);
+    assert_eq!(middle_stats.time_most_forward, 0.0);
+    assert_eq!(middle_stats.time_most_back, 0.0);
+    assert_eq!(middle_stats.time_even, 0.0);
+}
+
+#[test]
+fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
+    let front_id = epic_id("positioning-front-leave");
+    let back_id = epic_id("positioning-back-leave");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball.clone(),
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([2, 0]),
+            ball: ball.map(|rigid_body| BallSample { rigid_body }),
+            players: vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let front_stats = reducer.player_stats().get(&front_id).unwrap();
+    let back_stats = reducer.player_stats().get(&back_id).unwrap();
+    assert_eq!(front_stats.time_most_forward, 1.0);
+    assert_eq!(front_stats.time_most_back, 0.0);
+    assert_eq!(back_stats.time_most_back, 1.0);
+    assert_eq!(back_stats.time_most_forward, 0.0);
 }
 
 #[test]
@@ -1456,10 +1656,12 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(ball.clone()),
             players: vec![team_zero_player.clone(), team_one_player.clone()],
             active_demos: Vec::new(),
@@ -1485,10 +1687,12 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(ball.clone()),
             players: vec![team_zero_player.clone(), team_one_player.clone()],
             active_demos: Vec::new(),
@@ -1508,10 +1712,12 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(ball.clone()),
             players: vec![team_zero_player.clone(), team_one_player.clone()],
             active_demos: Vec::new(),
@@ -1537,10 +1743,12 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(ball),
             players: vec![team_zero_player, team_one_player],
             active_demos: Vec::new(),
@@ -1601,10 +1809,12 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(100.0),
@@ -1627,10 +1837,12 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1653,10 +1865,12 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             seconds_remaining: None,
             game_state: Some(58),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1689,10 +1903,12 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1719,10 +1935,12 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(190.0),
@@ -1758,10 +1976,12 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1788,10 +2008,12 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1827,10 +2049,12 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
@@ -1857,10 +2081,12 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(190.0),
@@ -1896,10 +2122,12 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -1922,10 +2150,12 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(0.0),
@@ -1963,37 +2193,16 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(boxcars::RigidBody {
-                    sleeping: false,
-                    location: boxcars::Vector3f {
-                        x: 0.0,
-                        y: 1000.0,
-                        z: 17.0,
-                    },
-                    rotation: boxcars::Quaternion {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                        w: 0.0,
-                    },
-                    linear_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                    angular_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                }),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2013,37 +2222,16 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(boxcars::RigidBody {
-                    sleeping: false,
-                    location: boxcars::Vector3f {
-                        x: 0.0,
-                        y: 1000.0,
-                        z: 17.0,
-                    },
-                    rotation: boxcars::Quaternion {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                        w: 0.0,
-                    },
-                    linear_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                    angular_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                }),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2069,37 +2257,16 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(boxcars::RigidBody {
-                    sleeping: false,
-                    location: boxcars::Vector3f {
-                        x: 0.0,
-                        y: 1000.0,
-                        z: 17.0,
-                    },
-                    rotation: boxcars::Quaternion {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                        w: 0.0,
-                    },
-                    linear_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                    angular_velocity: Some(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    }),
-                }),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2138,14 +2305,16 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2165,15 +2334,17 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
                 last_boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2199,14 +2370,16 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2243,14 +2416,16 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2276,14 +2451,16 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2324,15 +2501,17 @@ fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
             seconds_remaining: Some(300),
             game_state: Some(58),
             ball_has_been_hit: Some(false),
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
                 boost_active: true,
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2358,14 +2537,16 @@ fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
             seconds_remaining: Some(290),
             game_state: Some(58),
             ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2405,14 +2586,16 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2447,14 +2630,16 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2491,14 +2676,16 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2524,14 +2711,16 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2557,14 +2746,16 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2603,14 +2794,16 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2647,10 +2840,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(243.0),
@@ -2680,10 +2875,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -2713,10 +2910,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(243.0),
@@ -2749,10 +2948,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -2782,10 +2983,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(243.0),
@@ -2818,10 +3021,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -2851,10 +3056,12 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(243.0),
@@ -2895,14 +3102,16 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
             seconds_remaining: None,
             game_state: Some(55),
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(200.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2928,14 +3137,16 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
-                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
                 ..sample_player(player_id.clone(), true)
             }],
             active_demos: Vec::new(),
@@ -2971,10 +3182,12 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(0.0),
@@ -3021,10 +3234,12 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -3077,10 +3292,12 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -3132,6 +3349,502 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
 }
 
 #[test]
+fn test_boost_reducer_overrides_small_position_guess_when_gain_exceeds_small_pad() {
+    // Player is positioned near a small pad (0, 1024) but gains more boost than
+    // a small pad can provide. The sanity check should override to big.
+    let player_id = epic_id("gain-override");
+    let small_pad_position = sample_rigid_body(0.0, 1024.0, 70.0);
+    let mut reducer = BoostReducer::new();
+
+    // Frame 1: establish previous boost amount
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            0.0,
+            0.0,
+            None,
+            vec![PlayerSample {
+                boost_amount: Some(0.0),
+                rigid_body: Some(small_pad_position.clone()),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+
+    // Frame 2: pickup event with large boost gain (0 → 255, gain = 255)
+    let mut frame2 = sample_stats(
+        2,
+        1.0,
+        1.0,
+        None,
+        vec![PlayerSample {
+            boost_amount: Some(255.0),
+            rigid_body: Some(small_pad_position.clone()),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    frame2.boost_pad_events = vec![BoostPadEvent {
+        time: 1.0,
+        frame: 2,
+        pad_id: "VehiclePickup_Boost_TA_near_small".to_string(),
+        player: Some(player_id.clone()),
+        kind: BoostPadEventKind::PickedUp { sequence: 1 },
+    }];
+    reducer.on_sample(&frame2).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    // Gain of 255 exceeds SMALL_PAD_AMOUNT_RAW (~30.6), so must be big
+    assert_eq!(
+        stats.big_pads_collected, 1,
+        "Expected big pad override from gain sanity check"
+    );
+    assert_eq!(stats.small_pads_collected, 0);
+}
+
+#[test]
+fn test_boost_reducer_keeps_small_when_gain_is_consistent() {
+    // Player is near a small pad and gains a small-pad-consistent amount.
+    // Position inference should be trusted.
+    let player_id = epic_id("small-consistent");
+    let small_pad_position = sample_rigid_body(0.0, 1024.0, 70.0);
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            0.0,
+            0.0,
+            None,
+            vec![PlayerSample {
+                boost_amount: Some(100.0),
+                rigid_body: Some(small_pad_position.clone()),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+
+    // Gain of 30.6 (100 → 130.6) is consistent with a small pad
+    let mut frame2 = sample_stats(
+        2,
+        1.0,
+        1.0,
+        None,
+        vec![PlayerSample {
+            boost_amount: Some(130.6),
+            rigid_body: Some(small_pad_position.clone()),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    frame2.boost_pad_events = vec![BoostPadEvent {
+        time: 1.0,
+        frame: 2,
+        pad_id: "VehiclePickup_Boost_TA_small_ok".to_string(),
+        player: Some(player_id.clone()),
+        kind: BoostPadEventKind::PickedUp { sequence: 1 },
+    }];
+    reducer.on_sample(&frame2).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    eprintln!(
+        "small_pads={} big_pads={} collected={:.1} collected_small={:.1} collected_big={:.1}",
+        stats.small_pads_collected,
+        stats.big_pads_collected,
+        stats.amount_collected,
+        stats.amount_collected_small,
+        stats.amount_collected_big
+    );
+    assert_eq!(
+        stats.small_pads_collected, 1,
+        "Expected small pad when gain is consistent"
+    );
+    assert_eq!(stats.big_pads_collected, 0);
+}
+
+#[test]
+fn test_boost_reducer_trusts_big_position_with_small_gain_near_full_boost() {
+    // Player is near a big pad but gains only a small amount because they were
+    // nearly full. The position-based guess (big) should be trusted since the
+    // gain is ambiguous — a big pad with overfill looks like a small gain.
+    let player_id = epic_id("big-small-gain");
+    let big_pad_position = sample_rigid_body(3584.0, 0.0, 73.0);
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            0.0,
+            0.0,
+            None,
+            vec![PlayerSample {
+                boost_amount: Some(240.0),
+                rigid_body: Some(big_pad_position.clone()),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+
+    // Gain of 15 (240 → 255), less than small pad amount, but position says big
+    let mut frame2 = sample_stats(
+        2,
+        1.0,
+        1.0,
+        None,
+        vec![PlayerSample {
+            boost_amount: Some(255.0),
+            rigid_body: Some(big_pad_position.clone()),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    frame2.boost_pad_events = vec![BoostPadEvent {
+        time: 1.0,
+        frame: 2,
+        pad_id: "VehiclePickup_Boost_TA_big_overfill".to_string(),
+        player: Some(player_id.clone()),
+        kind: BoostPadEventKind::PickedUp { sequence: 1 },
+    }];
+    reducer.on_sample(&frame2).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.big_pads_collected, 1,
+        "Expected big pad from position even with small gain"
+    );
+    assert_eq!(stats.small_pads_collected, 0);
+    // Overfill: big pad gives 255, but only 15 could be collected (255 - 240)
+    assert!((stats.overfill_total - 240.0).abs() < 0.01);
+}
+
+#[test]
+fn test_boost_reducer_aligns_canonical_pickups_with_boost_jump_frame() {
+    let player_id = epic_id("canonical-pickup-alignment-player");
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(200.0),
+                rigid_body: Some(sample_rigid_body(3584.0, 50.0, 73.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(255.0),
+                last_boost_amount: Some(200.0),
+                rigid_body: Some(sample_rigid_body(3584.0, 50.0, 73.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: vec![BoostPadEvent {
+                time: 1.0,
+                frame: 2,
+                pad_id: "VehiclePickup_Boost_TA_centerline_big".to_string(),
+                player: Some(player_id.clone()),
+                kind: BoostPadEventKind::PickedUp { sequence: 1 },
+            }],
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert!((stats.amount_collected - 55.0).abs() < 0.001);
+    assert!((stats.amount_collected_big - 55.0).abs() < 0.001);
+    assert!((stats.amount_collected_small - 0.0).abs() < 0.001);
+    assert!(
+        (stats.amount_collected - (stats.amount_collected_big + stats.amount_collected_small))
+            .abs()
+            < 0.001
+    );
+}
+
+#[test]
+fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
+    let player_id = epic_id("boost-respawn-accounting");
+    let mut reducer = BoostReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: Some(55),
+            ball_has_been_hit: Some(false),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(BOOST_KICKOFF_START_AMOUNT),
+                rigid_body: Some(sample_rigid_body(0.0, -1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(60.0),
+                rigid_body: Some(sample_rigid_body(0.0, -900.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(60.0),
+                rigid_body: None,
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: vec![DemolishInfo {
+                time: 2.0,
+                seconds_remaining: 100,
+                frame: 3,
+                attacker: epic_id("attacker"),
+                victim: player_id.clone(),
+                attacker_velocity: boxcars::Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: boxcars::Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_location: boxcars::Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            }],
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 4,
+            time: 3.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                boost_amount: Some(BOOST_KICKOFF_START_AMOUNT),
+                rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.amount_respawned, BOOST_KICKOFF_START_AMOUNT * 2.0);
+    assert_eq!(stats.amount_used, BOOST_KICKOFF_START_AMOUNT);
+    assert_eq!(
+        stats.amount_obtained() - BOOST_KICKOFF_START_AMOUNT,
+        stats.amount_used
+    );
+}
+
+#[test]
+fn test_boost_reducer_final_replay_accounting_matches_current_boost() {
+    // Legacy replay formats can drift by a couple of raw units relative to the
+    // sampled boost state even when aligned to the stats frame number.
+    const BOOST_ACCOUNTING_TOLERANCE_RAW: f32 = 3.0;
+
+    for replay_path in [
+        "assets/replays/old_boost_format.replay",
+        "assets/replays/new_boost_format.replay",
+        "assets/replays/rlcs.replay",
+        "assets/replays/new_demolition_format.replay",
+    ] {
+        let replay = parse_replay(replay_path);
+        let replay_data = ReplayDataCollector::new()
+            .get_replay_data(&replay)
+            .expect("Expected replay data");
+        let reducer = ReducerCollector::new(BoostReducer::new())
+            .process_replay(&replay)
+            .expect("Expected boost reducer to process replay")
+            .into_inner();
+        let stats_timeline = StatsTimelineCollector::new()
+            .get_replay_data(&replay)
+            .expect("Expected stats timeline data");
+        let stats_frame = stats_timeline
+            .frames
+            .iter()
+            .rev()
+            .find(|frame| {
+                reducer.player_stats().keys().any(|player_id| {
+                    replay_player_boost_sample_at_frame(&replay_data, player_id, frame.frame_number)
+                        .is_some()
+                })
+            })
+            .expect("Expected a stats frame with current boost data");
+        let mut checked_players = 0usize;
+
+        for (player_id, stats) in reducer.player_stats() {
+            let Some((current_boost_frame, current_boost_amount)) =
+                replay_player_boost_sample_at_frame(
+                    &replay_data,
+                    player_id,
+                    stats_frame.frame_number,
+                )
+            else {
+                continue;
+            };
+            checked_players += 1;
+            let obtained_minus_current = stats.amount_obtained() - current_boost_amount;
+            assert!(
+                (obtained_minus_current - stats.amount_used).abs()
+                    <= BOOST_ACCOUNTING_TOLERANCE_RAW,
+                "Expected boost accounting invariant for {replay_path} player {player_id:?} at stats frame {} using replay frame {}: obtained={} current={} used={}",
+                stats_frame.frame_number,
+                current_boost_frame,
+                stats.amount_obtained(),
+                current_boost_amount,
+                stats.amount_used,
+            );
+        }
+
+        assert!(
+            checked_players > 0,
+            "Expected at least one player with current boost data in {replay_path}"
+        );
+    }
+}
+
+#[test]
+fn test_boost_reducer_final_replay_collected_totals_match_size_buckets() {
+    const BOOST_COLLECTION_TOLERANCE_RAW: f32 = 0.01;
+
+    for replay_path in [
+        "assets/replays/old_boost_format.replay",
+        "assets/replays/new_boost_format.replay",
+        "assets/replays/rlcs.replay",
+        "assets/replays/new_demolition_format.replay",
+    ] {
+        let replay = parse_replay(replay_path);
+        let reducer = ReducerCollector::new(BoostReducer::new())
+            .process_replay(&replay)
+            .expect("Expected boost reducer to process replay")
+            .into_inner();
+
+        for (player_id, stats) in reducer.player_stats() {
+            assert!(
+                (stats.amount_collected
+                    - (stats.amount_collected_big + stats.amount_collected_small))
+                    .abs()
+                    <= BOOST_COLLECTION_TOLERANCE_RAW,
+                "Expected collected totals to match size buckets for {replay_path} player {player_id:?}: collected={} big={} small={}",
+                stats.amount_collected,
+                stats.amount_collected_big,
+                stats.amount_collected_small,
+            );
+        }
+    }
+}
+
+#[test]
 fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
     let player_id = epic_id("fallback-midfield-player");
     let mut reducer = BoostReducer::new();
@@ -3144,10 +3857,12 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(0.0),
@@ -3194,10 +3909,12 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -3250,10 +3967,12 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![PlayerSample {
                 boost_amount: Some(255.0),
@@ -3318,10 +4037,12 @@ fn test_possession_reducer_tracks_team_possession_time() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
@@ -3340,10 +4061,12 @@ fn test_possession_reducer_tracks_team_possession_time() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero, team_one],
             active_demos: Vec::new(),
@@ -3376,10 +4099,12 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
@@ -3405,10 +4130,12 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(true),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
@@ -3428,10 +4155,12 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
@@ -3457,10 +4186,12 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: None,
             players: vec![team_zero, team_one],
             active_demos: Vec::new(),
@@ -3492,10 +4223,12 @@ fn test_demo_reducer_counts_events_and_dedupes_consecutive_frames() {
                 seconds_remaining: None,
                 game_state: None,
                 ball_has_been_hit: None,
+                kickoff_countdown_time: None,
                 team_zero_score: None,
                 team_one_score: None,
                 possession_team_is_team_0: None,
                 scored_on_team_is_team_0: None,
+                current_in_game_team_player_counts: None,
                 ball: None,
                 players: vec![
                     sample_player(attacker.clone(), true),

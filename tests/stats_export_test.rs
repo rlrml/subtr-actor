@@ -81,3 +81,35 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
     assert_eq!(shooting.descriptor.unit, StatUnit::Percent);
     assert_eq!(shooting.value, StatValue::Float(50.0));
 }
+
+#[test]
+fn test_boost_stats_export_includes_respawn_and_used_fields() {
+    let stats = BoostStats {
+        amount_collected_big: 55.0,
+        amount_collected_small: 24.0,
+        amount_respawned: 68.0,
+        amount_used: 91.0,
+        ..BoostStats::default()
+    };
+
+    let fields = stats.stat_fields();
+
+    assert_eq!(
+        find_field(&fields, "boost", "amount_respawned")
+            .descriptor
+            .unit,
+        StatUnit::Boost
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_respawned").value,
+        StatValue::Float(68.0)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used").descriptor.unit,
+        StatUnit::Boost
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_used").value,
+        StatValue::Float(91.0)
+    );
+}

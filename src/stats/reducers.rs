@@ -5,6 +5,7 @@ use boxcars;
 use boxcars::HeaderProp;
 use serde::Serialize;
 
+use super::boost_invariants::{boost_invariant_violations, BoostInvariantKind};
 use crate::*;
 
 #[derive(Debug, Clone)]
@@ -122,10 +123,12 @@ pub struct StatsSample {
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
     pub ball_has_been_hit: Option<bool>,
+    pub kickoff_countdown_time: Option<i32>,
     pub team_zero_score: Option<i32>,
     pub team_one_score: Option<i32>,
     pub possession_team_is_team_0: Option<bool>,
     pub scored_on_team_is_team_0: Option<bool>,
+    pub current_in_game_team_player_counts: Option<[usize; 2]>,
     pub ball: Option<BallSample>,
     pub players: Vec<PlayerSample>,
     pub active_demos: Vec<DemoEventSample>,
@@ -221,10 +224,14 @@ impl StatsSample {
             seconds_remaining: processor.get_seconds_remaining().ok(),
             game_state: processor.get_replicated_state_name().ok(),
             ball_has_been_hit: processor.get_ball_has_been_hit().ok(),
+            kickoff_countdown_time: processor.get_replicated_game_state_time_remaining().ok(),
             team_zero_score: team_scores.map(|scores| scores.0),
             team_one_score: team_scores.map(|scores| scores.1),
             possession_team_is_team_0,
             scored_on_team_is_team_0,
+            current_in_game_team_player_counts: Some(
+                processor.current_in_game_team_player_counts(),
+            ),
             ball,
             players,
             active_demos,
@@ -250,6 +257,17 @@ impl StatsSample {
         }
 
         !matches!(self.ball_has_been_hit, Some(false))
+    }
+
+    pub fn current_in_game_team_player_count(&self, is_team_0: bool) -> usize {
+        self.current_in_game_team_player_counts
+            .map(|counts| counts[usize::from(!is_team_0)])
+            .unwrap_or_else(|| {
+                self.players
+                    .iter()
+                    .filter(|player| player.is_team_0 == is_team_0)
+                    .count()
+            })
     }
 }
 
@@ -1790,11 +1808,13 @@ impl StatsReducer for PositioningReducer {
 
         if live_play {
             for is_team_0 in [true, false] {
-                let team_roster_count = sample
-                    .players
-                    .iter()
-                    .filter(|player| player.is_team_0 == is_team_0)
-                    .count();
+                let team_roster_count = sample.current_in_game_team_player_count(is_team_0).max(
+                    sample
+                        .players
+                        .iter()
+                        .filter(|player| player.is_team_0 == is_team_0)
+                        .count(),
+                );
                 let team_players: Vec<_> = sample
                     .players
                     .iter()
@@ -2242,8 +2262,10 @@ pub struct BoostStats {
     pub amount_stolen_big: f32,
     pub amount_collected_small: f32,
     pub amount_stolen_small: f32,
+    pub amount_respawned: f32,
     pub overfill_total: f32,
     pub overfill_from_stolen: f32,
+    pub amount_used: f32,
     pub amount_used_while_supersonic: f32,
 }
 
@@ -2295,6 +2317,10 @@ impl BoostStats {
     pub fn boost_75_100_pct(&self) -> f32 {
         self.pct(self.time_boost_75_100)
     }
+
+    pub fn amount_obtained(&self) -> f32 {
+        self.amount_collected_big + self.amount_collected_small + self.amount_respawned
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2313,11 +2339,21 @@ pub struct BoostReducer {
     observed_pad_positions: HashMap<String, PadPositionEstimate>,
     known_pad_sizes: HashMap<String, BoostPadSize>,
     known_pad_indices: HashMap<String, usize>,
-    pending_pickups: HashMap<String, PendingBoostPickup>,
     unavailable_pads: HashSet<String>,
     seen_pickup_sequences: HashSet<(String, u8)>,
     pickup_frames: HashMap<(String, PlayerId), usize>,
     last_pickup_times: HashMap<String, f32>,
+    kickoff_phase_active_last_frame: bool,
+    kickoff_respawn_awarded: HashSet<PlayerId>,
+    initial_respawn_awarded: HashSet<PlayerId>,
+    pending_demo_respawns: HashSet<PlayerId>,
+    active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct BoostInvariantWarningKey {
+    scope: String,
+    kind: BoostInvariantKind,
 }
 
 #[derive(Debug, Clone)]
@@ -2325,7 +2361,8 @@ struct PendingBoostPickup {
     player_id: PlayerId,
     is_team_0: bool,
     previous_boost_amount: f32,
-    time: f32,
+    pre_applied_collected_amount: f32,
+    pre_applied_pad_size: Option<BoostPadSize>,
     player_position: glam::Vec3,
 }
 
@@ -2483,6 +2520,97 @@ impl BoostReducer {
             })
     }
 
+    fn infer_pad_details_from_position(
+        &self,
+        pad_id: &str,
+        observed_position: glam::Vec3,
+    ) -> Option<(usize, BoostPadSize)> {
+        if let Some(index) = self.known_pad_indices.get(pad_id).copied() {
+            let (_, size) = standard_soccar_boost_pad_layout().get(index)?;
+            return Some((index, *size));
+        }
+
+        let observed_position = self
+            .estimated_pad_position(pad_id)
+            .unwrap_or(observed_position);
+        let layout = &*STANDARD_SOCCAR_BOOST_PAD_LAYOUT;
+        let used_indices: HashSet<usize> = self.known_pad_indices.values().copied().collect();
+        let observed_positions = self.observed_pad_positions(pad_id);
+        let best_candidate = |allow_used: bool| {
+            layout
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| allow_used || !used_indices.contains(index))
+                .filter_map(|(index, (candidate_position, size))| {
+                    let radius = Self::pad_match_radius(*size);
+                    let mut vote_count = 0usize;
+                    let mut total_vote_distance = 0.0f32;
+                    let mut best_vote_distance = f32::INFINITY;
+
+                    for position in observed_positions {
+                        let distance = position.distance(*candidate_position);
+                        if distance <= radius {
+                            vote_count += 1;
+                            total_vote_distance += distance;
+                            best_vote_distance = best_vote_distance.min(distance);
+                        }
+                    }
+
+                    if vote_count == 0 {
+                        return None;
+                    }
+
+                    let representative_distance = observed_position.distance(*candidate_position);
+                    Some((
+                        index,
+                        *size,
+                        vote_count,
+                        total_vote_distance / vote_count as f32,
+                        best_vote_distance,
+                        representative_distance,
+                    ))
+                })
+                .max_by(|left, right| {
+                    left.2
+                        .cmp(&right.2)
+                        .then_with(|| right.3.partial_cmp(&left.3).unwrap())
+                        .then_with(|| right.4.partial_cmp(&left.4).unwrap())
+                        .then_with(|| right.5.partial_cmp(&left.5).unwrap())
+                })
+                .map(|(index, size, _, _, _, _)| (index, size))
+        };
+
+        best_candidate(false).or_else(|| best_candidate(true))
+    }
+
+    fn guess_pad_size_from_position(
+        &self,
+        pad_id: &str,
+        observed_position: glam::Vec3,
+    ) -> Option<BoostPadSize> {
+        if let Some(pad_size) = self.known_pad_sizes.get(pad_id).copied() {
+            return Some(pad_size);
+        }
+
+        if let Some((_, pad_size)) = self.infer_pad_details_from_position(pad_id, observed_position)
+        {
+            return Some(pad_size);
+        }
+
+        let observed_position = self
+            .estimated_pad_position(pad_id)
+            .unwrap_or(observed_position);
+        standard_soccar_boost_pad_layout()
+            .iter()
+            .min_by(|(left_position, _), (right_position, _)| {
+                observed_position
+                    .distance_squared(*left_position)
+                    .partial_cmp(&observed_position.distance_squared(*right_position))
+                    .unwrap()
+            })
+            .map(|(_, pad_size)| *pad_size)
+    }
+
     fn resolve_pickup(
         &mut self,
         pad_id: &str,
@@ -2513,12 +2641,39 @@ impl BoostReducer {
             BoostPadSize::Big => BOOST_MAX_AMOUNT,
             BoostPadSize::Small => SMALL_PAD_AMOUNT_RAW,
         };
-        let collected_amount =
-            (BOOST_MAX_AMOUNT - pending_pickup.previous_boost_amount).min(nominal_gain);
+        let collected_amount = (BOOST_MAX_AMOUNT - pending_pickup.previous_boost_amount)
+            .min(nominal_gain)
+            .max(pending_pickup.pre_applied_collected_amount);
+        let collected_amount_delta = collected_amount - pending_pickup.pre_applied_collected_amount;
         let overfill = (nominal_gain - collected_amount).max(0.0);
 
-        stats.amount_collected += collected_amount;
-        team_stats.amount_collected += collected_amount;
+        stats.amount_collected += collected_amount_delta;
+        team_stats.amount_collected += collected_amount_delta;
+
+        match pending_pickup.pre_applied_pad_size {
+            Some(pre_applied_pad_size) if pre_applied_pad_size == pad_size => {
+                Self::apply_collected_bucket_amount(stats, pad_size, collected_amount_delta);
+                Self::apply_collected_bucket_amount(team_stats, pad_size, collected_amount_delta);
+            }
+            Some(pre_applied_pad_size) => {
+                Self::apply_collected_bucket_amount(
+                    stats,
+                    pre_applied_pad_size,
+                    -pending_pickup.pre_applied_collected_amount,
+                );
+                Self::apply_collected_bucket_amount(
+                    team_stats,
+                    pre_applied_pad_size,
+                    -pending_pickup.pre_applied_collected_amount,
+                );
+                Self::apply_collected_bucket_amount(stats, pad_size, collected_amount);
+                Self::apply_collected_bucket_amount(team_stats, pad_size, collected_amount);
+            }
+            None => {
+                Self::apply_collected_bucket_amount(stats, pad_size, collected_amount);
+                Self::apply_collected_bucket_amount(team_stats, pad_size, collected_amount);
+            }
+        }
 
         if stolen {
             stats.amount_stolen += collected_amount;
@@ -2529,8 +2684,6 @@ impl BoostReducer {
             BoostPadSize::Big => {
                 stats.big_pads_collected += 1;
                 team_stats.big_pads_collected += 1;
-                stats.amount_collected_big += collected_amount;
-                team_stats.amount_collected_big += collected_amount;
                 if stolen {
                     stats.big_pads_stolen += 1;
                     team_stats.big_pads_stolen += 1;
@@ -2541,8 +2694,6 @@ impl BoostReducer {
             BoostPadSize::Small => {
                 stats.small_pads_collected += 1;
                 team_stats.small_pads_collected += 1;
-                stats.amount_collected_small += collected_amount;
-                team_stats.amount_collected_small += collected_amount;
                 if stolen {
                     stats.small_pads_stolen += 1;
                     team_stats.small_pads_stolen += 1;
@@ -2557,6 +2708,140 @@ impl BoostReducer {
         if stolen {
             stats.overfill_from_stolen += overfill;
             team_stats.overfill_from_stolen += overfill;
+        }
+    }
+
+    fn apply_collected_bucket_amount(stats: &mut BoostStats, pad_size: BoostPadSize, amount: f32) {
+        if amount == 0.0 {
+            return;
+        }
+
+        match pad_size {
+            BoostPadSize::Big => stats.amount_collected_big += amount,
+            BoostPadSize::Small => stats.amount_collected_small += amount,
+        }
+    }
+
+    fn apply_pickup_collected_amount(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        amount: f32,
+        pad_size: Option<BoostPadSize>,
+    ) {
+        if amount <= 0.0 {
+            return;
+        }
+
+        let stats = self.player_stats.entry(player_id.clone()).or_default();
+        let team_stats = if is_team_0 {
+            &mut self.team_zero_stats
+        } else {
+            &mut self.team_one_stats
+        };
+        stats.amount_collected += amount;
+        team_stats.amount_collected += amount;
+        if let Some(pad_size) = pad_size {
+            Self::apply_collected_bucket_amount(stats, pad_size, amount);
+            Self::apply_collected_bucket_amount(team_stats, pad_size, amount);
+        }
+    }
+
+    fn apply_respawn_amount(&mut self, player_id: &PlayerId, is_team_0: bool, amount: f32) {
+        if amount <= 0.0 {
+            return;
+        }
+
+        let stats = self.player_stats.entry(player_id.clone()).or_default();
+        let team_stats = if is_team_0 {
+            &mut self.team_zero_stats
+        } else {
+            &mut self.team_one_stats
+        };
+        stats.amount_respawned += amount;
+        team_stats.amount_respawned += amount;
+    }
+
+    fn warn_for_boost_invariant_violations(
+        &mut self,
+        scope: &str,
+        frame_number: usize,
+        time: f32,
+        stats: &BoostStats,
+        observed_boost_amount: Option<f32>,
+    ) {
+        let violations = boost_invariant_violations(stats, observed_boost_amount);
+        let active_kinds: HashSet<BoostInvariantKind> =
+            violations.iter().map(|violation| violation.kind).collect();
+
+        for violation in violations {
+            let key = BoostInvariantWarningKey {
+                scope: scope.to_string(),
+                kind: violation.kind,
+            };
+            if self.active_invariant_warnings.insert(key) {
+                log::warn!(
+                    "Boost invariant violation for {} at frame {} (t={:.3}): {}",
+                    scope,
+                    frame_number,
+                    time,
+                    violation.message(),
+                );
+            }
+        }
+
+        for kind in BoostInvariantKind::ALL {
+            if active_kinds.contains(&kind) {
+                continue;
+            }
+            self.active_invariant_warnings
+                .remove(&BoostInvariantWarningKey {
+                    scope: scope.to_string(),
+                    kind,
+                });
+        }
+    }
+
+    fn warn_for_sample_boost_invariants(&mut self, sample: &StatsSample) {
+        let team_zero_stats = self.team_zero_stats.clone();
+        let team_one_stats = self.team_one_stats.clone();
+        let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = sample
+            .players
+            .iter()
+            .map(|player| {
+                (
+                    player.player_id.clone(),
+                    player.boost_amount,
+                    self.player_stats
+                        .get(&player.player_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                )
+            })
+            .collect();
+
+        self.warn_for_boost_invariant_violations(
+            "team_zero",
+            sample.frame_number,
+            sample.time,
+            &team_zero_stats,
+            None,
+        );
+        self.warn_for_boost_invariant_violations(
+            "team_one",
+            sample.frame_number,
+            sample.time,
+            &team_one_stats,
+            None,
+        );
+        for (player_id, observed_boost_amount, stats) in player_scopes {
+            self.warn_for_boost_invariant_violations(
+                &format!("player {:?}", player_id),
+                sample.frame_number,
+                sample.time,
+                &stats,
+                observed_boost_amount,
+            );
         }
     }
 
@@ -2588,7 +2873,32 @@ impl BoostReducer {
 impl StatsReducer for BoostReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = sample.is_live_play();
+        let kickoff_phase_active = sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+            || sample.kickoff_countdown_time.is_some_and(|t| t > 0)
+            || sample.ball_has_been_hit == Some(false);
+        let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
+        if kickoff_phase_started {
+            self.kickoff_respawn_awarded.clear();
+        }
+        for demo in &sample.demo_events {
+            self.pending_demo_respawns.insert(demo.victim.clone());
+        }
+
         let mut current_boost_amounts = Vec::new();
+        let mut pickup_counts_by_player = HashMap::<PlayerId, usize>::new();
+        let mut respawn_amounts_by_player = HashMap::<PlayerId, f32>::new();
+
+        for event in &sample.boost_pad_events {
+            let BoostPadEventKind::PickedUp { .. } = event.kind else {
+                continue;
+            };
+            let Some(player_id) = &event.player else {
+                continue;
+            };
+            *pickup_counts_by_player
+                .entry(player_id.clone())
+                .or_default() += 1;
+        }
 
         for player in &sample.players {
             let Some(boost_amount) = player.boost_amount else {
@@ -2607,23 +2917,8 @@ impl StatsReducer for BoostReducer {
                 .copied()
                 .or(speed);
 
-            let stats = self
-                .player_stats
-                .entry(player.player_id.clone())
-                .or_default();
-            let team_stats = if player.is_team_0 {
-                &mut self.team_zero_stats
-            } else {
-                &mut self.team_one_stats
-            };
-
             if live_play {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
-                stats.tracked_time += sample.dt;
-                stats.boost_integral += average_boost_amount * sample.dt;
-                team_stats.tracked_time += sample.dt;
-                team_stats.boost_integral += average_boost_amount * sample.dt;
-
                 let time_zero_boost = sample.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
@@ -2638,11 +2933,6 @@ impl StatsReducer for BoostReducer {
                         BOOST_FULL_BAND_MIN_RAW,
                         BOOST_MAX_AMOUNT + 1.0,
                     );
-                stats.time_zero_boost += time_zero_boost;
-                team_stats.time_zero_boost += time_zero_boost;
-                stats.time_hundred_boost += time_hundred_boost;
-                team_stats.time_hundred_boost += time_hundred_boost;
-
                 let time_boost_0_25 = sample.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
@@ -2671,6 +2961,35 @@ impl StatsReducer for BoostReducer {
                         boost_percent_to_amount(75.0),
                         BOOST_MAX_AMOUNT + 1.0,
                     );
+                let supersonic_usage = if player.boost_active
+                    && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                    && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                {
+                    (previous_boost_amount - boost_amount)
+                        .max(0.0)
+                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt)
+                } else {
+                    0.0
+                };
+
+                let stats = self
+                    .player_stats
+                    .entry(player.player_id.clone())
+                    .or_default();
+                let team_stats = if player.is_team_0 {
+                    &mut self.team_zero_stats
+                } else {
+                    &mut self.team_one_stats
+                };
+
+                stats.tracked_time += sample.dt;
+                stats.boost_integral += average_boost_amount * sample.dt;
+                team_stats.tracked_time += sample.dt;
+                team_stats.boost_integral += average_boost_amount * sample.dt;
+                stats.time_zero_boost += time_zero_boost;
+                team_stats.time_zero_boost += time_zero_boost;
+                stats.time_hundred_boost += time_hundred_boost;
+                team_stats.time_hundred_boost += time_hundred_boost;
                 stats.time_boost_0_25 += time_boost_0_25;
                 team_stats.time_boost_0_25 += time_boost_0_25;
                 stats.time_boost_25_50 += time_boost_25_50;
@@ -2679,18 +2998,38 @@ impl StatsReducer for BoostReducer {
                 team_stats.time_boost_50_75 += time_boost_50_75;
                 stats.time_boost_75_100 += time_boost_75_100;
                 team_stats.time_boost_75_100 += time_boost_75_100;
-
-                if player.boost_active
-                    && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
-                    && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
-                {
-                    let supersonic_usage = (previous_boost_amount - boost_amount)
-                        .max(0.0)
-                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt);
-                    stats.amount_used_while_supersonic += supersonic_usage;
-                    team_stats.amount_used_while_supersonic += supersonic_usage;
-                }
+                stats.amount_used_while_supersonic += supersonic_usage;
+                team_stats.amount_used_while_supersonic += supersonic_usage;
             }
+
+            let mut respawn_amount = 0.0;
+            // Grant initial kickoff respawn the first time we see each player.
+            // This handles replays that start after the kickoff countdown has
+            // already ended (game_state != 55 on the first frame).
+            if self
+                .initial_respawn_awarded
+                .insert(player.player_id.clone())
+            {
+                respawn_amount += BOOST_KICKOFF_START_AMOUNT;
+                self.kickoff_respawn_awarded
+                    .insert(player.player_id.clone());
+            } else if kickoff_phase_active
+                && !self.kickoff_respawn_awarded.contains(&player.player_id)
+            {
+                respawn_amount += BOOST_KICKOFF_START_AMOUNT;
+                self.kickoff_respawn_awarded
+                    .insert(player.player_id.clone());
+            }
+            if self.pending_demo_respawns.contains(&player.player_id) && player.rigid_body.is_some()
+            {
+                respawn_amount += BOOST_KICKOFF_START_AMOUNT;
+                self.pending_demo_respawns.remove(&player.player_id);
+            }
+            if respawn_amount > 0.0 {
+                self.apply_respawn_amount(&player.player_id, player.is_team_0, respawn_amount);
+            }
+            respawn_amounts_by_player.insert(player.player_id.clone(), respawn_amount);
+
             current_boost_amounts.push((player.player_id.clone(), boost_amount));
         }
 
@@ -2739,19 +3078,70 @@ impl StatsReducer for BoostReducer {
                             .copied()
                             .unwrap_or_else(|| player.boost_amount.unwrap_or(0.0))
                     });
+                    let pre_applied_collected_amount =
+                        if pickup_counts_by_player.get(player_id).copied() == Some(1) {
+                            self.previous_boost_amounts
+                                .get(player_id)
+                                .copied()
+                                .map(|previous_sample_boost_amount| {
+                                    let respawn_amount = respawn_amounts_by_player
+                                        .get(player_id)
+                                        .copied()
+                                        .unwrap_or(0.0);
+                                    (player.boost_amount.unwrap_or(previous_boost_amount)
+                                        - previous_sample_boost_amount
+                                        - respawn_amount)
+                                        .max(0.0)
+                                })
+                                .unwrap_or(0.0)
+                        } else {
+                            0.0
+                        };
+                    let pre_applied_pad_size = (pre_applied_collected_amount > 0.0)
+                        .then(|| {
+                            self.guess_pad_size_from_position(
+                                &event.pad_id,
+                                player.position().unwrap_or(glam::Vec3::ZERO),
+                            )
+                        })
+                        .flatten();
+                    self.apply_pickup_collected_amount(
+                        player_id,
+                        player.is_team_0,
+                        pre_applied_collected_amount,
+                        pre_applied_pad_size,
+                    );
                     let pending_pickup = PendingBoostPickup {
                         player_id: player_id.clone(),
                         is_team_0: player.is_team_0,
                         previous_boost_amount,
-                        time: sample.time,
+                        pre_applied_collected_amount,
+                        pre_applied_pad_size,
                         player_position: player.position().unwrap_or(glam::Vec3::ZERO),
                     };
 
-                    if let Some(pad_size) = self.known_pad_sizes.get(&event.pad_id).copied() {
+                    let pad_size = self
+                        .known_pad_sizes
+                        .get(&event.pad_id)
+                        .copied()
+                        .or_else(|| {
+                            let mut size = self.guess_pad_size_from_position(
+                                &event.pad_id,
+                                player.position().unwrap_or(glam::Vec3::ZERO),
+                            )?;
+                            // Sanity check: if the observed boost gain clearly
+                            // exceeds what a small pad can provide, the pad must
+                            // be big.  Use a margin to avoid float imprecision.
+                            if size == BoostPadSize::Small
+                                && pre_applied_collected_amount > SMALL_PAD_AMOUNT_RAW * 1.5
+                            {
+                                size = BoostPadSize::Big;
+                            }
+                            self.known_pad_sizes.insert(event.pad_id.clone(), size);
+                            Some(size)
+                        });
+                    if let Some(pad_size) = pad_size {
                         self.resolve_pickup(&event.pad_id, pending_pickup, pad_size);
-                    } else {
-                        self.pending_pickups
-                            .insert(event.pad_id.clone(), pending_pickup);
                     }
                 }
                 BoostPadEventKind::Available => {
@@ -2766,16 +3156,6 @@ impl StatsReducer for BoostReducer {
                         }
                     }
                     self.unavailable_pads.remove(&event.pad_id);
-                    let Some(pending_pickup) = self.pending_pickups.remove(&event.pad_id) else {
-                        continue;
-                    };
-                    let pad_size = if event.time - pending_pickup.time >= 7.0 {
-                        BoostPadSize::Big
-                    } else {
-                        BoostPadSize::Small
-                    };
-                    self.known_pad_sizes.insert(event.pad_id.clone(), pad_size);
-                    self.resolve_pickup(&event.pad_id, pending_pickup, pad_size);
                 }
             }
         }
@@ -2789,6 +3169,27 @@ impl StatsReducer for BoostReducer {
                     .insert(player.player_id.clone(), speed);
             }
         }
+        let mut team_zero_used = 0.0;
+        let mut team_one_used = 0.0;
+        for player in &sample.players {
+            let Some(boost_amount) = player.boost_amount else {
+                continue;
+            };
+            let stats = self
+                .player_stats
+                .entry(player.player_id.clone())
+                .or_default();
+            stats.amount_used = (stats.amount_obtained() - boost_amount).max(0.0);
+            if player.is_team_0 {
+                team_zero_used += stats.amount_used;
+            } else {
+                team_one_used += stats.amount_used;
+            }
+        }
+        self.team_zero_stats.amount_used = team_zero_used;
+        self.team_one_stats.amount_used = team_one_used;
+        self.warn_for_sample_boost_invariants(sample);
+        self.kickoff_phase_active_last_frame = kickoff_phase_active;
 
         Ok(())
     }

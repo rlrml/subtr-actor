@@ -15,12 +15,28 @@ pub struct ReplayStatsTimeline {
     pub frames: Vec<ReplayStatsFrame>,
 }
 
+impl ReplayStatsTimeline {
+    pub fn frame_by_number(&self, frame_number: usize) -> Option<&ReplayStatsFrame> {
+        self.frames
+            .iter()
+            .find(|frame| frame.frame_number == frame_number)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DynamicReplayStatsTimeline {
     pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub frames: Vec<DynamicReplayStatsFrame>,
+}
+
+impl DynamicReplayStatsTimeline {
+    pub fn frame_by_number(&self, frame_number: usize) -> Option<&DynamicReplayStatsFrame> {
+        self.frames
+            .iter()
+            .find(|frame| frame.frame_number == frame_number)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
