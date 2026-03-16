@@ -1,0 +1,5878 @@
+{
+  "label": "Exact flip reset review (30)",
+  "replays": [
+    {
+      "id": "0004627f-a7c1-4289-81e0-8178af7d310c",
+      "path": "replays/0004627f-a7c1-4289-81e0-8178af7d310c.replay",
+      "label": "0004627f-a7c1-4289-81e0-8178af7d310c"
+    },
+    {
+      "id": "0097a2dd-832d-4417-9eba-b111a7fe743a",
+      "path": "replays/0097a2dd-832d-4417-9eba-b111a7fe743a.replay",
+      "label": "0097a2dd-832d-4417-9eba-b111a7fe743a"
+    },
+    {
+      "id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "path": "replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+      "label": "01374bb7-d589-46c0-aa36-a1104c63b7bd"
+    },
+    {
+      "id": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+      "path": "replays/017301b1-d06c-4768-bc58-6a610f2a0b10.replay",
+      "label": "017301b1-d06c-4768-bc58-6a610f2a0b10"
+    },
+    {
+      "id": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf",
+      "path": "replays/01c54e34-2c08-422f-8f5a-5499e0cbcfdf.replay",
+      "label": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf"
+    },
+    {
+      "id": "022e1d84-3353-4aea-a2c3-a068bd505469",
+      "path": "replays/022e1d84-3353-4aea-a2c3-a068bd505469.replay",
+      "label": "022e1d84-3353-4aea-a2c3-a068bd505469"
+    },
+    {
+      "id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "path": "replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+      "label": "023080ba-0769-4cfa-97dd-c912b35866e4"
+    },
+    {
+      "id": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+      "path": "replays/0262d81e-f6e3-4c0a-80cb-bf3e10dc606b.replay",
+      "label": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b"
+    },
+    {
+      "id": "027a4b40-04f7-4c36-bf08-115cf20de792",
+      "path": "replays/027a4b40-04f7-4c36-bf08-115cf20de792.replay",
+      "label": "027a4b40-04f7-4c36-bf08-115cf20de792"
+    },
+    {
+      "id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "path": "replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+      "label": "02d80d5d-69a0-4af2-b180-5fc644d28e5a"
+    },
+    {
+      "id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "path": "replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+      "label": "0305cf42-ad7a-4be7-98ce-edb3648f82e5"
+    },
+    {
+      "id": "0365c0b9-3c12-4f45-9671-f299db13d6bb",
+      "path": "replays/0365c0b9-3c12-4f45-9671-f299db13d6bb.replay",
+      "label": "0365c0b9-3c12-4f45-9671-f299db13d6bb"
+    },
+    {
+      "id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "path": "replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+      "label": "03c913e5-5114-4ff0-a45d-840e9c501a5c"
+    },
+    {
+      "id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "path": "replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+      "label": "04354bf3-5393-4ff0-8121-93ff5258f974"
+    },
+    {
+      "id": "044b132c-c8c4-4cba-9e44-8ba337f1d2cd",
+      "path": "replays/044b132c-c8c4-4cba-9e44-8ba337f1d2cd.replay",
+      "label": "044b132c-c8c4-4cba-9e44-8ba337f1d2cd"
+    },
+    {
+      "id": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "path": "replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+      "label": "0479392d-611a-4aa6-8188-b83082c971c2"
+    },
+    {
+      "id": "048a9351-637f-4361-9420-53944cba6316",
+      "path": "replays/048a9351-637f-4361-9420-53944cba6316.replay",
+      "label": "048a9351-637f-4361-9420-53944cba6316"
+    },
+    {
+      "id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "path": "replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+      "label": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764"
+    },
+    {
+      "id": "0522af20-2323-447f-a812-56b0b6d516c1",
+      "path": "replays/0522af20-2323-447f-a812-56b0b6d516c1.replay",
+      "label": "0522af20-2323-447f-a812-56b0b6d516c1"
+    },
+    {
+      "id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "path": "replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+      "label": "053f88ea-38c2-4fcb-956e-2bcc93d0b827"
+    },
+    {
+      "id": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f",
+      "path": "replays/0543ef4e-94ba-4158-a1f6-a45591eb7e1f.replay",
+      "label": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f"
+    },
+    {
+      "id": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4",
+      "path": "replays/058a8fe5-8973-4bef-95be-f5c6a2d4d6b4.replay",
+      "label": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4"
+    },
+    {
+      "id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "path": "replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+      "label": "061eb433-226f-45a4-b6b3-011d2a117a22"
+    },
+    {
+      "id": "06822988-153b-4c73-98d1-de64ee350441",
+      "path": "replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+      "label": "06822988-153b-4c73-98d1-de64ee350441"
+    },
+    {
+      "id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "path": "replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+      "label": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb"
+    },
+    {
+      "id": "070aeec6-6e77-486d-967a-104bc81184b3",
+      "path": "replays/070aeec6-6e77-486d-967a-104bc81184b3.replay",
+      "label": "070aeec6-6e77-486d-967a-104bc81184b3"
+    },
+    {
+      "id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "path": "replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+      "label": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9"
+    },
+    {
+      "id": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+      "path": "replays/07bddd27-1da9-43b7-a2a2-3f09a78a32a8.replay",
+      "label": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8"
+    },
+    {
+      "id": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+      "path": "replays/07c7ad92-b798-4d02-8068-3634dc44a5d1.replay",
+      "label": "07c7ad92-b798-4d02-8068-3634dc44a5d1"
+    },
+    {
+      "id": "07d9a61d-b225-44e6-9d8d-a2b41d0e6047",
+      "path": "replays/07d9a61d-b225-44e6-9d8d-a2b41d0e6047.replay",
+      "label": "07d9a61d-b225-44e6-9d8d-a2b41d0e6047"
+    }
+  ],
+  "items": [
+    {
+      "replay": "0004627f-a7c1-4289-81e0-8178af7d310c",
+      "start": {
+        "kind": "time",
+        "value": 242.69023
+      },
+      "end": {
+        "kind": "time",
+        "value": 252.69023
+      },
+      "label": "kirkify dis puh flip reset @ 247.69s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0004627f-a7c1-4289-81e0-8178af7d310c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0004627f-a7c1-4289-81e0-8178af7d310c.replay",
+        "event_index": 0,
+        "event_frame": 7105,
+        "event_time": 247.69023,
+        "counter_value": 1,
+        "player_id": "Steam:76561199045581414",
+        "player_name": "kirkify dis puh",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3437.57,
+          "y": 4323.18,
+          "z": 106.1
+        },
+        "player_position": {
+          "x": -3378.0,
+          "y": 4287.51,
+          "z": 188.16
+        },
+        "marker_position": {
+          "x": -3386.0317,
+          "y": 4292.3193,
+          "z": 177.09586
+        }
+      }
+    },
+    {
+      "replay": "0097a2dd-832d-4417-9eba-b111a7fe743a",
+      "start": {
+        "kind": "time",
+        "value": 249.47011
+      },
+      "end": {
+        "kind": "time",
+        "value": 259.4701
+      },
+      "label": "Mimic flip reset @ 254.47s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0097a2dd-832d-4417-9eba-b111a7fe743a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0097a2dd-832d-4417-9eba-b111a7fe743a.replay",
+        "event_index": 0,
+        "event_frame": 6747,
+        "event_time": 254.47011,
+        "counter_value": 1,
+        "player_id": "Steam:76561198365352516",
+        "player_name": "Mimic",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1237.09,
+          "y": 3786.5,
+          "z": 1328.15
+        },
+        "player_position": {
+          "x": -1260.46,
+          "y": 3687.84,
+          "z": 1291.17
+        },
+        "marker_position": {
+          "x": -1257.2284,
+          "y": 3701.4824,
+          "z": 1296.2836
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 49.624947
+      },
+      "end": {
+        "kind": "time",
+        "value": 59.624947
+      },
+      "label": "eiyvull flip reset @ 54.62s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 0,
+        "event_frame": 1514,
+        "event_time": 54.624947,
+        "counter_value": 1,
+        "player_id": "Steam:76561199032533695",
+        "player_name": "eiyvull",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 489.72,
+          "y": 364.92,
+          "z": 352.63
+        },
+        "player_position": {
+          "x": -653.51,
+          "y": 259.55,
+          "z": 46.25
+        },
+        "marker_position": {
+          "x": 400.24384,
+          "y": 356.6731,
+          "z": 328.65082
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 73.0655
+      },
+      "end": {
+        "kind": "time",
+        "value": 83.0655
+      },
+      "label": "eiyvull flip reset @ 78.07s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 1,
+        "event_frame": 2214,
+        "event_time": 78.0655,
+        "counter_value": 2,
+        "player_id": "Steam:76561199032533695",
+        "player_name": "eiyvull",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1366.11,
+          "y": -1666.75,
+          "z": 1377.79
+        },
+        "player_position": {
+          "x": -1421.6,
+          "y": -1568.79,
+          "z": 1315.59
+        },
+        "marker_position": {
+          "x": -1406.2313,
+          "y": -1595.9213,
+          "z": 1332.817
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 116.36335
+      },
+      "end": {
+        "kind": "time",
+        "value": 126.36335
+      },
+      "label": "veyron † flip reset @ 121.36s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 2,
+        "event_frame": 3332,
+        "event_time": 121.36335,
+        "counter_value": 1,
+        "player_id": "Steam:76561198085666064",
+        "player_name": "veyron †",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1833.53,
+          "y": 1385.79,
+          "z": 1766.55
+        },
+        "player_position": {
+          "x": -1844.92,
+          "y": 1306.86,
+          "z": 1703.41
+        },
+        "marker_position": {
+          "x": -1843.944,
+          "y": 1313.6241,
+          "z": 1708.821
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 221.0495
+      },
+      "end": {
+        "kind": "time",
+        "value": 231.0495
+      },
+      "label": "veyron † flip reset @ 226.05s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 3,
+        "event_frame": 6381,
+        "event_time": 226.0495,
+        "counter_value": 1,
+        "player_id": "Steam:76561198085666064",
+        "player_name": "veyron †",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1590.66,
+          "y": 2218.66,
+          "z": 839.78
+        },
+        "player_position": {
+          "x": -1572.59,
+          "y": 2171.59,
+          "z": 758.38
+        },
+        "marker_position": {
+          "x": -1573.1089,
+          "y": 2172.942,
+          "z": 760.71783
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 289.34305
+      },
+      "end": {
+        "kind": "time",
+        "value": 299.34305
+      },
+      "label": "eiyvull flip reset @ 294.34s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 4,
+        "event_frame": 8400,
+        "event_time": 294.34305,
+        "counter_value": 1,
+        "player_id": "Steam:76561199032533695",
+        "player_name": "eiyvull",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 990.5,
+          "y": 1883.62,
+          "z": 553.29
+        },
+        "player_position": {
+          "x": 883.68,
+          "y": 1921.3,
+          "z": 467.38
+        },
+        "marker_position": {
+          "x": 920.6215,
+          "y": 1908.2692,
+          "z": 497.0902
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 307.11746
+      },
+      "end": {
+        "kind": "time",
+        "value": 317.11746
+      },
+      "label": "veyron † flip reset @ 312.12s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 5,
+        "event_frame": 8929,
+        "event_time": 312.11746,
+        "counter_value": 1,
+        "player_id": "Steam:76561198085666064",
+        "player_name": "veyron †",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -369.61,
+          "y": 1041.7,
+          "z": 1079.47
+        },
+        "player_position": {
+          "x": -346.3,
+          "y": 992.41,
+          "z": 1001.05
+        },
+        "marker_position": {
+          "x": -346.91306,
+          "y": 993.70636,
+          "z": 1003.1125
+        }
+      }
+    },
+    {
+      "replay": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+      "start": {
+        "kind": "time",
+        "value": 323.009
+      },
+      "end": {
+        "kind": "time",
+        "value": 333.009
+      },
+      "label": "nibra flip reset @ 328.01s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01374bb7-d589-46c0-aa36-a1104c63b7bd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01374bb7-d589-46c0-aa36-a1104c63b7bd.replay",
+        "event_index": 6,
+        "event_frame": 9402,
+        "event_time": 328.009,
+        "counter_value": 1,
+        "player_id": "Steam:76561199013174805",
+        "player_name": "nibra",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3977.19,
+          "y": 443.01,
+          "z": 227.63
+        },
+        "player_position": {
+          "x": 3897.88,
+          "y": 621.74,
+          "z": 165.66
+        },
+        "marker_position": {
+          "x": 3941.2314,
+          "y": 524.04443,
+          "z": 199.53342
+        }
+      }
+    },
+    {
+      "replay": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+      "start": {
+        "kind": "time",
+        "value": 31.305454
+      },
+      "end": {
+        "kind": "time",
+        "value": 41.305454
+      },
+      "label": "jovan flip reset @ 36.31s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/017301b1-d06c-4768-bc58-6a610f2a0b10.replay",
+        "event_index": 0,
+        "event_frame": 959,
+        "event_time": 36.305454,
+        "counter_value": 1,
+        "player_id": "Steam:76561198139642628",
+        "player_name": "jovan",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1186.43,
+          "y": 1114.78,
+          "z": 1566.83
+        },
+        "player_position": {
+          "x": 1172.46,
+          "y": 1032.07,
+          "z": 1503.97
+        },
+        "marker_position": {
+          "x": 1174.0354,
+          "y": 1041.3976,
+          "z": 1511.0591
+        }
+      }
+    },
+    {
+      "replay": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+      "start": {
+        "kind": "time",
+        "value": 99.65557
+      },
+      "end": {
+        "kind": "time",
+        "value": 109.65557
+      },
+      "label": "jovan flip reset @ 104.66s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/017301b1-d06c-4768-bc58-6a610f2a0b10.replay",
+        "event_index": 1,
+        "event_frame": 3010,
+        "event_time": 104.65557,
+        "counter_value": 2,
+        "player_id": "Steam:76561198139642628",
+        "player_name": "jovan",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1623.27,
+          "y": -3832.05,
+          "z": 1725.62
+        },
+        "player_position": {
+          "x": -1589.36,
+          "y": -3914.91,
+          "z": 1679.97
+        },
+        "marker_position": {
+          "x": -1591.8895,
+          "y": -3908.729,
+          "z": 1683.3752
+        }
+      }
+    },
+    {
+      "replay": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+      "start": {
+        "kind": "time",
+        "value": 248.57951
+      },
+      "end": {
+        "kind": "time",
+        "value": 258.57953
+      },
+      "label": "bape flip reset @ 253.58s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/017301b1-d06c-4768-bc58-6a610f2a0b10.replay",
+        "event_index": 2,
+        "event_frame": 7287,
+        "event_time": 253.57951,
+        "counter_value": 1,
+        "player_id": "Steam:76561198938997678",
+        "player_name": "bape",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 147.13,
+          "y": 827.64,
+          "z": 94.03
+        },
+        "player_position": {
+          "x": 156.91,
+          "y": 719.51,
+          "z": 42.64
+        },
+        "marker_position": {
+          "x": 154.70197,
+          "y": 743.9226,
+          "z": 54.242348
+        }
+      }
+    },
+    {
+      "replay": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+      "start": {
+        "kind": "time",
+        "value": 282.25204
+      },
+      "end": {
+        "kind": "time",
+        "value": 292.25204
+      },
+      "label": "jovan flip reset @ 287.25s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "017301b1-d06c-4768-bc58-6a610f2a0b10",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/017301b1-d06c-4768-bc58-6a610f2a0b10.replay",
+        "event_index": 3,
+        "event_frame": 8294,
+        "event_time": 287.25204,
+        "counter_value": 1,
+        "player_id": "Steam:76561198139642628",
+        "player_name": "jovan",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1999.45,
+          "y": -2018.38,
+          "z": 1084.37
+        },
+        "player_position": {
+          "x": 2012.39,
+          "y": -2067.29,
+          "z": 1003.9
+        },
+        "marker_position": {
+          "x": 2012.1106,
+          "y": -2066.2336,
+          "z": 1005.63794
+        }
+      }
+    },
+    {
+      "replay": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf",
+      "start": {
+        "kind": "time",
+        "value": 88.69424
+      },
+      "end": {
+        "kind": "time",
+        "value": 98.69424
+      },
+      "label": "17 Andres. flip reset @ 93.69s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01c54e34-2c08-422f-8f5a-5499e0cbcfdf.replay",
+        "event_index": 0,
+        "event_frame": 2218,
+        "event_time": 93.69424,
+        "counter_value": 1,
+        "player_id": "Epic:7b9203f136b74cc6b1aa6e2ec56044ad",
+        "player_name": "17 Andres.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -3935.44,
+          "y": 1838.84,
+          "z": 116.95
+        },
+        "player_position": {
+          "x": -3879.72,
+          "y": 1902.39,
+          "z": 178.63
+        },
+        "marker_position": {
+          "x": -3885.914,
+          "y": 1895.3254,
+          "z": 171.77327
+        }
+      }
+    },
+    {
+      "replay": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf",
+      "start": {
+        "kind": "time",
+        "value": 149.69957
+      },
+      "end": {
+        "kind": "time",
+        "value": 159.69957
+      },
+      "label": "17 Andres. flip reset @ 154.70s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "01c54e34-2c08-422f-8f5a-5499e0cbcfdf",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/01c54e34-2c08-422f-8f5a-5499e0cbcfdf.replay",
+        "event_index": 1,
+        "event_frame": 3885,
+        "event_time": 154.69957,
+        "counter_value": 1,
+        "player_id": "Epic:7b9203f136b74cc6b1aa6e2ec56044ad",
+        "player_name": "17 Andres.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1670.99,
+          "y": -4631.38,
+          "z": 1260.89
+        },
+        "player_position": {
+          "x": 1877.38,
+          "y": -5086.55,
+          "z": 750.13
+        },
+        "marker_position": {
+          "x": 1697.8502,
+          "y": -4690.617,
+          "z": 1194.4182
+        }
+      }
+    },
+    {
+      "replay": "022e1d84-3353-4aea-a2c3-a068bd505469",
+      "start": {
+        "kind": "time",
+        "value": 13.922184
+      },
+      "end": {
+        "kind": "time",
+        "value": 23.922184
+      },
+      "label": "seg † flip reset @ 18.92s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "022e1d84-3353-4aea-a2c3-a068bd505469",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/022e1d84-3353-4aea-a2c3-a068bd505469.replay",
+        "event_index": 0,
+        "event_frame": 392,
+        "event_time": 18.922184,
+        "counter_value": 1,
+        "player_id": "Steam:76561198400943615",
+        "player_name": "seg †",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1663.4,
+          "y": 2183.73,
+          "z": 1239.15
+        },
+        "player_position": {
+          "x": -1692.64,
+          "y": 2127.92,
+          "z": 1166.63
+        },
+        "marker_position": {
+          "x": -1691.7064,
+          "y": 2129.7017,
+          "z": 1168.9453
+        }
+      }
+    },
+    {
+      "replay": "022e1d84-3353-4aea-a2c3-a068bd505469",
+      "start": {
+        "kind": "time",
+        "value": 116.74673
+      },
+      "end": {
+        "kind": "time",
+        "value": 126.74673
+      },
+      "label": "Nutria! flip reset @ 121.75s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "022e1d84-3353-4aea-a2c3-a068bd505469",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/022e1d84-3353-4aea-a2c3-a068bd505469.replay",
+        "event_index": 1,
+        "event_frame": 3427,
+        "event_time": 121.74673,
+        "counter_value": 1,
+        "player_id": "Steam:76561198964435487",
+        "player_name": "Nutria!",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -691.64,
+          "y": -673.98,
+          "z": 1165.82
+        },
+        "player_position": {
+          "x": -726.91,
+          "y": -725.3,
+          "z": 1091.99
+        },
+        "marker_position": {
+          "x": -725.601,
+          "y": -723.3953,
+          "z": 1094.7301
+        }
+      }
+    },
+    {
+      "replay": "022e1d84-3353-4aea-a2c3-a068bd505469",
+      "start": {
+        "kind": "time",
+        "value": 431.81473
+      },
+      "end": {
+        "kind": "time",
+        "value": 441.81473
+      },
+      "label": "King_Zephyrtiktk flip reset @ 436.81s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "022e1d84-3353-4aea-a2c3-a068bd505469",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/022e1d84-3353-4aea-a2c3-a068bd505469.replay",
+        "event_index": 2,
+        "event_frame": 12432,
+        "event_time": 436.81473,
+        "counter_value": 1,
+        "player_id": "Epic:fee0f3f99f744c56a0abebfa2942ea3e",
+        "player_name": "King_Zephyrtiktk",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1820.01,
+          "y": -2379.44,
+          "z": 994.0
+        },
+        "player_position": {
+          "x": 1831.05,
+          "y": -2281.67,
+          "z": 992.35
+        },
+        "marker_position": {
+          "x": 1830.4436,
+          "y": -2287.0403,
+          "z": 992.4406
+        }
+      }
+    },
+    {
+      "replay": "022e1d84-3353-4aea-a2c3-a068bd505469",
+      "start": {
+        "kind": "time",
+        "value": 468.5958
+      },
+      "end": {
+        "kind": "time",
+        "value": 478.5958
+      },
+      "label": "King_Zephyrtiktk flip reset @ 473.60s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "022e1d84-3353-4aea-a2c3-a068bd505469",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/022e1d84-3353-4aea-a2c3-a068bd505469.replay",
+        "event_index": 3,
+        "event_frame": 13528,
+        "event_time": 473.5958,
+        "counter_value": 1,
+        "player_id": "Epic:fee0f3f99f744c56a0abebfa2942ea3e",
+        "player_name": "King_Zephyrtiktk",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1630.69,
+          "y": 5013.04,
+          "z": 1306.98
+        },
+        "player_position": {
+          "x": -1990.02,
+          "y": 3816.44,
+          "z": 347.55
+        },
+        "marker_position": {
+          "x": -1651.9039,
+          "y": 4942.396,
+          "z": 1250.3376
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 16.396908
+      },
+      "end": {
+        "kind": "time",
+        "value": 26.396908
+      },
+      "label": "Rouka. flip reset @ 21.40s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 0,
+        "event_frame": 486,
+        "event_time": 21.396908,
+        "counter_value": 1,
+        "player_id": "Epic:23978d264f8b48ffb71df55c4f506b33",
+        "player_name": "Rouka.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -321.23,
+          "y": -4793.73,
+          "z": 893.79
+        },
+        "player_position": {
+          "x": -331.87,
+          "y": -4744.93,
+          "z": 978.61
+        },
+        "marker_position": {
+          "x": -331.2827,
+          "y": -4747.6235,
+          "z": 973.92834
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 57.95143
+      },
+      "end": {
+        "kind": "time",
+        "value": 67.95143
+      },
+      "label": "NewWorldSlayer69 flip reset @ 62.95s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 1,
+        "event_frame": 1647,
+        "event_time": 62.95143,
+        "counter_value": 1,
+        "player_id": "Epic:d79b32330bee4bec9cb77a5ab778277f",
+        "player_name": "NewWorldSlayer69",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1097.3,
+          "y": -2782.01,
+          "z": 1406.92
+        },
+        "player_position": {
+          "x": -1113.56,
+          "y": -2873.68,
+          "z": 1371.0
+        },
+        "marker_position": {
+          "x": -1112.4537,
+          "y": -2867.4426,
+          "z": 1373.4441
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 101.735664
+      },
+      "end": {
+        "kind": "time",
+        "value": 111.735664
+      },
+      "label": "NewWorldSlayer69 flip reset @ 106.74s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 2,
+        "event_frame": 2870,
+        "event_time": 106.735664,
+        "counter_value": 2,
+        "player_id": "Epic:d79b32330bee4bec9cb77a5ab778277f",
+        "player_name": "NewWorldSlayer69",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1226.21,
+          "y": 1568.63,
+          "z": 1197.93
+        },
+        "player_position": {
+          "x": -1255.47,
+          "y": 1516.45,
+          "z": 1124.43
+        },
+        "marker_position": {
+          "x": -1254.9238,
+          "y": 1517.424,
+          "z": 1125.802
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 114.493614
+      },
+      "end": {
+        "kind": "time",
+        "value": 124.493614
+      },
+      "label": "NewWorldSlayer69 flip reset @ 119.49s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 3,
+        "event_frame": 3229,
+        "event_time": 119.493614,
+        "counter_value": 3,
+        "player_id": "Epic:d79b32330bee4bec9cb77a5ab778277f",
+        "player_name": "NewWorldSlayer69",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -402.46,
+          "y": -1389.36,
+          "z": 1326.48
+        },
+        "player_position": {
+          "x": -397.12,
+          "y": -1420.73,
+          "z": 1237.29
+        },
+        "marker_position": {
+          "x": -397.21567,
+          "y": -1420.168,
+          "z": 1238.888
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 196.36911
+      },
+      "end": {
+        "kind": "time",
+        "value": 206.36911
+      },
+      "label": "NewWorldSlayer69 flip reset @ 201.37s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 4,
+        "event_frame": 5328,
+        "event_time": 201.36911,
+        "counter_value": 1,
+        "player_id": "Epic:d79b32330bee4bec9cb77a5ab778277f",
+        "player_name": "NewWorldSlayer69",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2458.5,
+          "y": 868.9,
+          "z": 1390.46
+        },
+        "player_position": {
+          "x": 2506.22,
+          "y": 812.58,
+          "z": 1347.46
+        },
+        "marker_position": {
+          "x": 2510.449,
+          "y": 807.58887,
+          "z": 1343.6493
+        }
+      }
+    },
+    {
+      "replay": "023080ba-0769-4cfa-97dd-c912b35866e4",
+      "start": {
+        "kind": "time",
+        "value": 297.29037
+      },
+      "end": {
+        "kind": "time",
+        "value": 307.29037
+      },
+      "label": "Rouka. flip reset @ 302.29s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "023080ba-0769-4cfa-97dd-c912b35866e4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/023080ba-0769-4cfa-97dd-c912b35866e4.replay",
+        "event_index": 5,
+        "event_frame": 8046,
+        "event_time": 302.29037,
+        "counter_value": 1,
+        "player_id": "Epic:23978d264f8b48ffb71df55c4f506b33",
+        "player_name": "Rouka.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1709.27,
+          "y": -331.21,
+          "z": 182.44
+        },
+        "player_position": {
+          "x": 1556.34,
+          "y": -371.87,
+          "z": 199.85
+        },
+        "marker_position": {
+          "x": 1619.9315,
+          "y": -354.9627,
+          "z": 192.61057
+        }
+      }
+    },
+    {
+      "replay": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+      "start": {
+        "kind": "time",
+        "value": 122.19272
+      },
+      "end": {
+        "kind": "time",
+        "value": 132.19272
+      },
+      "label": "Nostoll flip reset @ 127.19s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0262d81e-f6e3-4c0a-80cb-bf3e10dc606b.replay",
+        "event_index": 0,
+        "event_frame": 3438,
+        "event_time": 127.19272,
+        "counter_value": 1,
+        "player_id": "Epic:97a97504f56946c4b7c06ffa312ce086",
+        "player_name": "Nostoll",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -475.1,
+          "y": -3996.46,
+          "z": 1087.33
+        },
+        "player_position": {
+          "x": -557.7,
+          "y": -3899.12,
+          "z": 1025.0
+        },
+        "marker_position": {
+          "x": -529.17194,
+          "y": -3932.739,
+          "z": 1046.5272
+        }
+      }
+    },
+    {
+      "replay": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+      "start": {
+        "kind": "time",
+        "value": 308.45416
+      },
+      "end": {
+        "kind": "time",
+        "value": 318.45416
+      },
+      "label": "hydro flip reset @ 313.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0262d81e-f6e3-4c0a-80cb-bf3e10dc606b.replay",
+        "event_index": 1,
+        "event_frame": 8272,
+        "event_time": 313.45416,
+        "counter_value": 1,
+        "player_id": "Steam:76561198385550653",
+        "player_name": "hydro",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3828.14,
+          "y": -873.21,
+          "z": 118.61
+        },
+        "player_position": {
+          "x": 3887.33,
+          "y": -964.71,
+          "z": 114.24
+        },
+        "marker_position": {
+          "x": 3878.6123,
+          "y": -951.23346,
+          "z": 114.88364
+        }
+      }
+    },
+    {
+      "replay": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+      "start": {
+        "kind": "time",
+        "value": 353.0303
+      },
+      "end": {
+        "kind": "time",
+        "value": 363.0303
+      },
+      "label": "Nostoll flip reset @ 358.03s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0262d81e-f6e3-4c0a-80cb-bf3e10dc606b",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0262d81e-f6e3-4c0a-80cb-bf3e10dc606b.replay",
+        "event_index": 2,
+        "event_frame": 9604,
+        "event_time": 358.0303,
+        "counter_value": 1,
+        "player_id": "Epic:97a97504f56946c4b7c06ffa312ce086",
+        "player_name": "Nostoll",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 784.32,
+          "y": -3433.87,
+          "z": 1000.78
+        },
+        "player_position": {
+          "x": 854.96,
+          "y": -3384.14,
+          "z": 942.85
+        },
+        "marker_position": {
+          "x": 847.47974,
+          "y": -3389.406,
+          "z": 948.9844
+        }
+      }
+    },
+    {
+      "replay": "027a4b40-04f7-4c36-bf08-115cf20de792",
+      "start": {
+        "kind": "time",
+        "value": 226.42145
+      },
+      "end": {
+        "kind": "time",
+        "value": 236.42145
+      },
+      "label": "eqrux flip reset @ 231.42s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "027a4b40-04f7-4c36-bf08-115cf20de792",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/027a4b40-04f7-4c36-bf08-115cf20de792.replay",
+        "event_index": 0,
+        "event_frame": 6768,
+        "event_time": 231.42145,
+        "counter_value": 1,
+        "player_id": "Steam:76561198433297184",
+        "player_name": "eqrux",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -2723.91,
+          "y": -4967.37,
+          "z": 106.67
+        },
+        "player_position": {
+          "x": -2703.61,
+          "y": -4884.29,
+          "z": 138.85
+        },
+        "marker_position": {
+          "x": -2703.2498,
+          "y": -4882.8154,
+          "z": 139.42123
+        }
+      }
+    },
+    {
+      "replay": "027a4b40-04f7-4c36-bf08-115cf20de792",
+      "start": {
+        "kind": "time",
+        "value": 285.01895
+      },
+      "end": {
+        "kind": "time",
+        "value": 294.1424
+      },
+      "label": "fierri. flip reset @ 290.02s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "027a4b40-04f7-4c36-bf08-115cf20de792",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/027a4b40-04f7-4c36-bf08-115cf20de792.replay",
+        "event_index": 1,
+        "event_frame": 8463,
+        "event_time": 290.01895,
+        "counter_value": 1,
+        "player_id": "Steam:76561198845664948",
+        "player_name": "fierri.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -256.85,
+          "y": -4073.58,
+          "z": 798.95
+        },
+        "player_position": {
+          "x": -293.04,
+          "y": -3982.05,
+          "z": 734.18
+        },
+        "marker_position": {
+          "x": -285.4151,
+          "y": -4001.3345,
+          "z": 747.8264
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 96.88721
+      },
+      "end": {
+        "kind": "time",
+        "value": 106.88721
+      },
+      "label": "faded~ flip reset @ 101.89s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 0,
+        "event_frame": 2911,
+        "event_time": 101.88721,
+        "counter_value": 1,
+        "player_id": "Steam:76561198798979310",
+        "player_name": "faded~",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 3036.49,
+          "y": 3471.25,
+          "z": 1140.67
+        },
+        "player_position": {
+          "x": 2954.63,
+          "y": 4129.77,
+          "z": 38.34
+        },
+        "marker_position": {
+          "x": 3030.573,
+          "y": 3518.8481,
+          "z": 1060.9932
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 165.56851
+      },
+      "end": {
+        "kind": "time",
+        "value": 175.56851
+      },
+      "label": "Cøllin. flip reset @ 170.57s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 1,
+        "event_frame": 4935,
+        "event_time": 170.56851,
+        "counter_value": 1,
+        "player_id": "Epic:3d247ec962de4aff802adb47964c8f4c",
+        "player_name": "Cøllin.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 500.46,
+          "y": -1135.43,
+          "z": 1605.28
+        },
+        "player_position": {
+          "x": 527.09,
+          "y": -1195.12,
+          "z": 1533.74
+        },
+        "marker_position": {
+          "x": 526.01764,
+          "y": -1192.7163,
+          "z": 1536.6208
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 188.67749
+      },
+      "end": {
+        "kind": "time",
+        "value": 198.67749
+      },
+      "label": "Jxyski. flip reset @ 193.68s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 2,
+        "event_frame": 5605,
+        "event_time": 193.67749,
+        "counter_value": 1,
+        "player_id": "Epic:89b24536a2854cb6989ff82d1e55599b",
+        "player_name": "Jxyski.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -904.38,
+          "y": 2965.68,
+          "z": 680.04
+        },
+        "player_position": {
+          "x": -926.93,
+          "y": 2890.76,
+          "z": 609.65
+        },
+        "marker_position": {
+          "x": -924.3066,
+          "y": 2899.476,
+          "z": 617.839
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 198.50873
+      },
+      "end": {
+        "kind": "time",
+        "value": 208.50873
+      },
+      "label": "Cøllin. flip reset @ 203.51s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 3,
+        "event_frame": 5900,
+        "event_time": 203.50873,
+        "counter_value": 1,
+        "player_id": "Epic:3d247ec962de4aff802adb47964c8f4c",
+        "player_name": "Cøllin.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -979.53,
+          "y": -1494.31,
+          "z": 811.49
+        },
+        "player_position": {
+          "x": -1003.99,
+          "y": -1567.06,
+          "z": 721.39
+        },
+        "marker_position": {
+          "x": -998.7493,
+          "y": -1551.473,
+          "z": 740.6944
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 253.29947
+      },
+      "end": {
+        "kind": "time",
+        "value": 263.29947
+      },
+      "label": "Cøllin. flip reset @ 258.30s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 4,
+        "event_frame": 7527,
+        "event_time": 258.29947,
+        "counter_value": 1,
+        "player_id": "Epic:3d247ec962de4aff802adb47964c8f4c",
+        "player_name": "Cøllin.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1046.0,
+          "y": -1954.97,
+          "z": 851.19
+        },
+        "player_position": {
+          "x": -1071.61,
+          "y": -2022.38,
+          "z": 762.29
+        },
+        "marker_position": {
+          "x": -1066.8068,
+          "y": -2009.7369,
+          "z": 778.96356
+        }
+      }
+    },
+    {
+      "replay": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+      "start": {
+        "kind": "time",
+        "value": 296.26773
+      },
+      "end": {
+        "kind": "time",
+        "value": 306.26773
+      },
+      "label": "faded~ flip reset @ 301.27s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "02d80d5d-69a0-4af2-b180-5fc644d28e5a",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/02d80d5d-69a0-4af2-b180-5fc644d28e5a.replay",
+        "event_index": 5,
+        "event_frame": 8811,
+        "event_time": 301.26773,
+        "counter_value": 1,
+        "player_id": "Steam:76561198798979310",
+        "player_name": "faded~",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 781.71,
+          "y": -393.65,
+          "z": 795.23
+        },
+        "player_position": {
+          "x": 773.46,
+          "y": -322.11,
+          "z": 722.36
+        },
+        "marker_position": {
+          "x": 774.221,
+          "y": -328.70905,
+          "z": 729.0817
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 52.95619
+      },
+      "end": {
+        "kind": "time",
+        "value": 62.95619
+      },
+      "label": "Knight flip reset @ 57.96s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 0,
+        "event_frame": 1348,
+        "event_time": 57.95619,
+        "counter_value": 1,
+        "player_id": "Steam:76561198833095745",
+        "player_name": "Knight",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2774.77,
+          "y": 911.68,
+          "z": 1098.51
+        },
+        "player_position": {
+          "x": 2794.18,
+          "y": 939.87,
+          "z": 962.04
+        },
+        "marker_position": {
+          "x": 2787.5999,
+          "y": 930.31354,
+          "z": 1008.30365
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 59.53932
+      },
+      "end": {
+        "kind": "time",
+        "value": 69.53932
+      },
+      "label": "Knight flip reset @ 64.54s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 1,
+        "event_frame": 1533,
+        "event_time": 64.53932,
+        "counter_value": 2,
+        "player_id": "Steam:76561198833095745",
+        "player_name": "Knight",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1241.65,
+          "y": -2548.08,
+          "z": 1105.43
+        },
+        "player_position": {
+          "x": 1249.1,
+          "y": -2485.14,
+          "z": 1037.72
+        },
+        "marker_position": {
+          "x": 1249.1205,
+          "y": -2484.9668,
+          "z": 1037.5338
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 173.84293
+      },
+      "end": {
+        "kind": "time",
+        "value": 183.84293
+      },
+      "label": "FRLucho flip reset @ 178.84s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 2,
+        "event_frame": 4295,
+        "event_time": 178.84293,
+        "counter_value": 1,
+        "player_id": "Epic:1595c64a8a9045748e3c7b49dfb5d070",
+        "player_name": "FRLucho",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2692.66,
+          "y": -1741.94,
+          "z": 93.14
+        },
+        "player_position": {
+          "x": 2493.31,
+          "y": 15.85,
+          "z": 69.63
+        },
+        "marker_position": {
+          "x": 2682.181,
+          "y": -1649.5405,
+          "z": 91.90418
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 199.67093
+      },
+      "end": {
+        "kind": "time",
+        "value": 209.67093
+      },
+      "label": "Knight flip reset @ 204.67s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 3,
+        "event_frame": 5017,
+        "event_time": 204.67093,
+        "counter_value": 1,
+        "player_id": "Steam:76561198833095745",
+        "player_name": "Knight",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -27.32,
+          "y": 1149.46,
+          "z": 825.35
+        },
+        "player_position": {
+          "x": -43.37,
+          "y": 1179.81,
+          "z": 733.37
+        },
+        "marker_position": {
+          "x": -42.523407,
+          "y": 1178.2092,
+          "z": 738.2217
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 301.92914
+      },
+      "end": {
+        "kind": "time",
+        "value": 311.92914
+      },
+      "label": "Knight flip reset @ 306.93s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 4,
+        "event_frame": 7781,
+        "event_time": 306.92914,
+        "counter_value": 1,
+        "player_id": "Steam:76561198833095745",
+        "player_name": "Knight",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -881.4,
+          "y": -1820.99,
+          "z": 1745.54
+        },
+        "player_position": {
+          "x": -892.43,
+          "y": -1744.85,
+          "z": 1686.56
+        },
+        "marker_position": {
+          "x": -891.98157,
+          "y": -1747.9456,
+          "z": 1688.9579
+        }
+      }
+    },
+    {
+      "replay": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+      "start": {
+        "kind": "time",
+        "value": 379.76657
+      },
+      "end": {
+        "kind": "time",
+        "value": 389.76657
+      },
+      "label": "Knight flip reset @ 384.77s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0305cf42-ad7a-4be7-98ce-edb3648f82e5",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0305cf42-ad7a-4be7-98ce-edb3648f82e5.replay",
+        "event_index": 5,
+        "event_frame": 9787,
+        "event_time": 384.76657,
+        "counter_value": 1,
+        "player_id": "Steam:76561198833095745",
+        "player_name": "Knight",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1049.85,
+          "y": -1917.35,
+          "z": 1465.0
+        },
+        "player_position": {
+          "x": 968.53,
+          "y": -1787.79,
+          "z": 1443.01
+        },
+        "marker_position": {
+          "x": 1000.9124,
+          "y": -1839.3821,
+          "z": 1451.7666
+        }
+      }
+    },
+    {
+      "replay": "0365c0b9-3c12-4f45-9671-f299db13d6bb",
+      "start": {
+        "kind": "time",
+        "value": 26.876167
+      },
+      "end": {
+        "kind": "time",
+        "value": 36.876167
+      },
+      "label": "gophrrr flip reset @ 31.88s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0365c0b9-3c12-4f45-9671-f299db13d6bb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0365c0b9-3c12-4f45-9671-f299db13d6bb.replay",
+        "event_index": 0,
+        "event_frame": 779,
+        "event_time": 31.876167,
+        "counter_value": 1,
+        "player_id": "Epic:f36cc751f24145b58778260332870e5f",
+        "player_name": "gophrrr",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -128.31,
+          "y": -3008.52,
+          "z": 627.59
+        },
+        "player_position": {
+          "x": -119.26,
+          "y": -3033.57,
+          "z": 511.43
+        },
+        "marker_position": {
+          "x": -121.247665,
+          "y": -3028.0684,
+          "z": 536.94244
+        }
+      }
+    },
+    {
+      "replay": "0365c0b9-3c12-4f45-9671-f299db13d6bb",
+      "start": {
+        "kind": "time",
+        "value": 136.10593
+      },
+      "end": {
+        "kind": "time",
+        "value": 146.10593
+      },
+      "label": "sigmamonkeygaming flip reset @ 141.11s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0365c0b9-3c12-4f45-9671-f299db13d6bb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0365c0b9-3c12-4f45-9671-f299db13d6bb.replay",
+        "event_index": 1,
+        "event_frame": 3824,
+        "event_time": 141.10593,
+        "counter_value": 1,
+        "player_id": "Steam:76561198196874093",
+        "player_name": "sigmamonkeygaming",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3142.7,
+          "y": 2439.66,
+          "z": 108.55
+        },
+        "player_position": {
+          "x": -3476.98,
+          "y": 1158.56,
+          "z": 42.04
+        },
+        "marker_position": {
+          "x": -3166.151,
+          "y": 2349.7861,
+          "z": 103.88409
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 17.8757
+      },
+      "end": {
+        "kind": "time",
+        "value": 27.8757
+      },
+      "label": "Jøey flip reset @ 22.88s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 0,
+        "event_frame": 561,
+        "event_time": 22.8757,
+        "counter_value": 1,
+        "player_id": "Steam:76561198871347737",
+        "player_name": "Jøey",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1858.2,
+          "y": 3574.08,
+          "z": 1239.9
+        },
+        "player_position": {
+          "x": -1911.54,
+          "y": 3514.77,
+          "z": 1178.75
+        },
+        "marker_position": {
+          "x": -1907.5547,
+          "y": 3519.2014,
+          "z": 1183.3188
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 58.749805
+      },
+      "end": {
+        "kind": "time",
+        "value": 68.7498
+      },
+      "label": "vortex FSU 13 flip reset @ 63.75s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 1,
+        "event_frame": 1738,
+        "event_time": 63.749805,
+        "counter_value": 1,
+        "player_id": "Epic:b9ef8da74e774be79046314afc2b4b06",
+        "player_name": "vortex FSU 13",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2069.85,
+          "y": 946.43,
+          "z": 352.79
+        },
+        "player_position": {
+          "x": 2052.09,
+          "y": 979.73,
+          "z": 258.44
+        },
+        "marker_position": {
+          "x": 2053.5962,
+          "y": 976.9059,
+          "z": 266.44168
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 92.11825
+      },
+      "end": {
+        "kind": "time",
+        "value": 102.11825
+      },
+      "label": "sheep flip reset @ 97.12s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 2,
+        "event_frame": 2736,
+        "event_time": 97.11825,
+        "counter_value": 1,
+        "player_id": "Steam:76561198977984703",
+        "player_name": "sheep",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2035.02,
+          "y": 1451.98,
+          "z": 1680.95
+        },
+        "player_position": {
+          "x": 2061.74,
+          "y": 1385.84,
+          "z": 1613.48
+        },
+        "marker_position": {
+          "x": 2060.3284,
+          "y": 1389.3339,
+          "z": 1617.0442
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 94.591805
+      },
+      "end": {
+        "kind": "time",
+        "value": 104.591805
+      },
+      "label": "sheep flip reset @ 99.59s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 3,
+        "event_frame": 2810,
+        "event_time": 99.591805,
+        "counter_value": 2,
+        "player_id": "Steam:76561198977984703",
+        "player_name": "sheep",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 211.5,
+          "y": 4720.48,
+          "z": 97.29
+        },
+        "player_position": {
+          "x": 255.17,
+          "y": 4698.69,
+          "z": 183.51
+        },
+        "marker_position": {
+          "x": 252.49248,
+          "y": 4700.026,
+          "z": 178.22362
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 153.2671
+      },
+      "end": {
+        "kind": "time",
+        "value": 163.2671
+      },
+      "label": "Jøey flip reset @ 158.27s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 4,
+        "event_frame": 4546,
+        "event_time": 158.2671,
+        "counter_value": 1,
+        "player_id": "Steam:76561198871347737",
+        "player_name": "Jøey",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2629.66,
+          "y": -1048.31,
+          "z": 752.46
+        },
+        "player_position": {
+          "x": 2665.36,
+          "y": -1133.0,
+          "z": 712.53
+        },
+        "marker_position": {
+          "x": 2662.7927,
+          "y": -1126.9095,
+          "z": 715.40155
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 157.50627
+      },
+      "end": {
+        "kind": "time",
+        "value": 167.50627
+      },
+      "label": "Bosco flip reset @ 162.51s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 5,
+        "event_frame": 4673,
+        "event_time": 162.50627,
+        "counter_value": 1,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 685.03,
+          "y": -2499.89,
+          "z": 848.3
+        },
+        "player_position": {
+          "x": 683.46,
+          "y": -2400.0,
+          "z": 780.5
+        },
+        "marker_position": {
+          "x": 683.8207,
+          "y": -2422.9475,
+          "z": 796.0755
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 231.74045
+      },
+      "end": {
+        "kind": "time",
+        "value": 241.74045
+      },
+      "label": "Jøey flip reset @ 236.74s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 6,
+        "event_frame": 6620,
+        "event_time": 236.74045,
+        "counter_value": 1,
+        "player_id": "Steam:76561198871347737",
+        "player_name": "Jøey",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2681.45,
+          "y": -1643.1,
+          "z": 1823.54
+        },
+        "player_position": {
+          "x": 2712.16,
+          "y": -1706.63,
+          "z": 1747.8
+        },
+        "marker_position": {
+          "x": 2709.04,
+          "y": -1700.1757,
+          "z": 1755.4949
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 255.09393
+      },
+      "end": {
+        "kind": "time",
+        "value": 265.09393
+      },
+      "label": "Bosco flip reset @ 260.09s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 7,
+        "event_frame": 7319,
+        "event_time": 260.09393,
+        "counter_value": 1,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1309.51,
+          "y": -772.61,
+          "z": 856.7
+        },
+        "player_position": {
+          "x": -1335.14,
+          "y": -691.48,
+          "z": 822.76
+        },
+        "marker_position": {
+          "x": -1335.5312,
+          "y": -690.24164,
+          "z": 822.24194
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 290.33072
+      },
+      "end": {
+        "kind": "time",
+        "value": 300.33072
+      },
+      "label": "vortex FSU 13 flip reset @ 295.33s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 8,
+        "event_frame": 8266,
+        "event_time": 295.33072,
+        "counter_value": 1,
+        "player_id": "Epic:b9ef8da74e774be79046314afc2b4b06",
+        "player_name": "vortex FSU 13",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2833.5,
+          "y": -1295.78,
+          "z": 1725.68
+        },
+        "player_position": {
+          "x": 2895.74,
+          "y": -1264.92,
+          "z": 1648.19
+        },
+        "marker_position": {
+          "x": 2889.1187,
+          "y": -1268.203,
+          "z": 1656.4336
+        }
+      }
+    },
+    {
+      "replay": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+      "start": {
+        "kind": "time",
+        "value": 298.79642
+      },
+      "end": {
+        "kind": "time",
+        "value": 308.79642
+      },
+      "label": "Jøey flip reset @ 303.80s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "03c913e5-5114-4ff0-a45d-840e9c501a5c",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/03c913e5-5114-4ff0-a45d-840e9c501a5c.replay",
+        "event_index": 9,
+        "event_frame": 8518,
+        "event_time": 303.79642,
+        "counter_value": 1,
+        "player_id": "Steam:76561198871347737",
+        "player_name": "Jøey",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3268.66,
+          "y": -2516.4,
+          "z": 1544.9
+        },
+        "player_position": {
+          "x": -3217.33,
+          "y": -2526.15,
+          "z": 1432.14
+        },
+        "marker_position": {
+          "x": -3230.248,
+          "y": -2523.696,
+          "z": 1460.5182
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 37.482193
+      },
+      "end": {
+        "kind": "time",
+        "value": 47.482193
+      },
+      "label": "tawk flip reset @ 42.48s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 0,
+        "event_frame": 1163,
+        "event_time": 42.482193,
+        "counter_value": 1,
+        "player_id": "Steam:76561198381787004",
+        "player_name": "tawk",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1016.53,
+          "y": 2610.29,
+          "z": 812.91
+        },
+        "player_position": {
+          "x": 998.16,
+          "y": 2543.1,
+          "z": 741.05
+        },
+        "marker_position": {
+          "x": 999.45935,
+          "y": 2547.8528,
+          "z": 746.13293
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 67.09464
+      },
+      "end": {
+        "kind": "time",
+        "value": 77.09464
+      },
+      "label": "tawk flip reset @ 72.09s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 1,
+        "event_frame": 2018,
+        "event_time": 72.09464,
+        "counter_value": 1,
+        "player_id": "Steam:76561198381787004",
+        "player_name": "tawk",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1514.14,
+          "y": -20.99,
+          "z": 93.14
+        },
+        "player_position": {
+          "x": 1068.02,
+          "y": -356.41,
+          "z": 77.62
+        },
+        "marker_position": {
+          "x": 1439.8352,
+          "y": -76.85688,
+          "z": 90.55502
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 115.939125
+      },
+      "end": {
+        "kind": "time",
+        "value": 125.939125
+      },
+      "label": "Bosco flip reset @ 120.94s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 2,
+        "event_frame": 3416,
+        "event_time": 120.939125,
+        "counter_value": 1,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 799.27,
+          "y": -2483.46,
+          "z": 513.32
+        },
+        "player_position": {
+          "x": 736.26,
+          "y": -2528.31,
+          "z": 445.61
+        },
+        "marker_position": {
+          "x": 742.263,
+          "y": -2524.037,
+          "z": 452.0608
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 120.75969
+      },
+      "end": {
+        "kind": "time",
+        "value": 130.75969
+      },
+      "label": "tawk flip reset @ 125.76s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 3,
+        "event_frame": 3560,
+        "event_time": 125.75969,
+        "counter_value": 1,
+        "player_id": "Steam:76561198381787004",
+        "player_name": "tawk",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1548.46,
+          "y": -78.21,
+          "z": 1009.7
+        },
+        "player_position": {
+          "x": 1536.07,
+          "y": -144.59,
+          "z": 931.46
+        },
+        "marker_position": {
+          "x": 1537.3108,
+          "y": -137.94211,
+          "z": 939.29565
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 131.4373
+      },
+      "end": {
+        "kind": "time",
+        "value": 141.4373
+      },
+      "label": "frosty † flip reset @ 136.44s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 4,
+        "event_frame": 3879,
+        "event_time": 136.4373,
+        "counter_value": 1,
+        "player_id": "Steam:76561198351218981",
+        "player_name": "frosty †",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1040.8,
+          "y": -2226.08,
+          "z": 928.13
+        },
+        "player_position": {
+          "x": -1064.24,
+          "y": -2188.56,
+          "z": 842.95
+        },
+        "marker_position": {
+          "x": -1063.5115,
+          "y": -2189.7263,
+          "z": 845.59766
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 148.6069
+      },
+      "end": {
+        "kind": "time",
+        "value": 158.6069
+      },
+      "label": "frosty † flip reset @ 153.61s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 5,
+        "event_frame": 4392,
+        "event_time": 153.6069,
+        "counter_value": 2,
+        "player_id": "Steam:76561198351218981",
+        "player_name": "frosty †",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -866.94,
+          "y": -2013.57,
+          "z": 649.67
+        },
+        "player_position": {
+          "x": -929.55,
+          "y": -1951.25,
+          "z": 621.7
+        },
+        "marker_position": {
+          "x": -929.7789,
+          "y": -1951.0222,
+          "z": 621.5978
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 295.73526
+      },
+      "end": {
+        "kind": "time",
+        "value": 305.73526
+      },
+      "label": "esockMF flip reset @ 300.74s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 6,
+        "event_frame": 8729,
+        "event_time": 300.73526,
+        "counter_value": 1,
+        "player_id": "Steam:76561199030584852",
+        "player_name": "esockMF",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 443.51,
+          "y": -4034.4,
+          "z": 756.5
+        },
+        "player_position": {
+          "x": 489.03,
+          "y": -3954.2,
+          "z": 698.19
+        },
+        "marker_position": {
+          "x": 482.31036,
+          "y": -3966.039,
+          "z": 706.79767
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 297.88373
+      },
+      "end": {
+        "kind": "time",
+        "value": 307.88373
+      },
+      "label": "Bosco flip reset @ 302.88s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 7,
+        "event_frame": 8793,
+        "event_time": 302.88373,
+        "counter_value": 1,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -285.62,
+          "y": -1855.48,
+          "z": 876.99
+        },
+        "player_position": {
+          "x": 856.82,
+          "y": -2737.15,
+          "z": 57.25
+        },
+        "marker_position": {
+          "x": -221.60287,
+          "y": -1904.8848,
+          "z": 831.0555
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 300.27203
+      },
+      "end": {
+        "kind": "time",
+        "value": 310.27203
+      },
+      "label": "Bosco flip reset @ 305.27s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 8,
+        "event_frame": 8864,
+        "event_time": 305.27203,
+        "counter_value": 2,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": true,
+        "ball_position": null,
+        "player_position": {
+          "x": -630.3,
+          "y": -3842.54,
+          "z": 36.06
+        },
+        "marker_position": null
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 340.12747
+      },
+      "end": {
+        "kind": "time",
+        "value": 350.12747
+      },
+      "label": "tawk flip reset @ 345.13s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 9,
+        "event_frame": 9988,
+        "event_time": 345.12747,
+        "counter_value": 1,
+        "player_id": "Steam:76561198381787004",
+        "player_name": "tawk",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 816.54,
+          "y": -2034.28,
+          "z": 1027.66
+        },
+        "player_position": {
+          "x": 818.04,
+          "y": -2087.29,
+          "z": 946.31
+        },
+        "marker_position": {
+          "x": 817.9765,
+          "y": -2085.047,
+          "z": 949.75214
+        }
+      }
+    },
+    {
+      "replay": "04354bf3-5393-4ff0-8121-93ff5258f974",
+      "start": {
+        "kind": "time",
+        "value": 343.4515
+      },
+      "end": {
+        "kind": "time",
+        "value": 353.4515
+      },
+      "label": "esockMF flip reset @ 348.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "04354bf3-5393-4ff0-8121-93ff5258f974",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/04354bf3-5393-4ff0-8121-93ff5258f974.replay",
+        "event_index": 10,
+        "event_frame": 10087,
+        "event_time": 348.4515,
+        "counter_value": 1,
+        "player_id": "Steam:76561199030584852",
+        "player_name": "esockMF",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1102.0,
+          "y": 1675.27,
+          "z": 226.44
+        },
+        "player_position": {
+          "x": -1255.3,
+          "y": 2313.96,
+          "z": 73.26
+        },
+        "marker_position": {
+          "x": -1123.1384,
+          "y": 1763.3384,
+          "z": 205.31816
+        }
+      }
+    },
+    {
+      "replay": "044b132c-c8c4-4cba-9e44-8ba337f1d2cd",
+      "start": {
+        "kind": "time",
+        "value": 113.44806
+      },
+      "end": {
+        "kind": "time",
+        "value": 123.44806
+      },
+      "label": "IcedTi. flip reset @ 118.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "044b132c-c8c4-4cba-9e44-8ba337f1d2cd",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/044b132c-c8c4-4cba-9e44-8ba337f1d2cd.replay",
+        "event_index": 0,
+        "event_frame": 3027,
+        "event_time": 118.44806,
+        "counter_value": 1,
+        "player_id": "Epic:a3752c5b4ea044f8b29cf4efd371da8c",
+        "player_name": "IcedTi.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1642.1,
+          "y": -2922.07,
+          "z": 1250.82
+        },
+        "player_position": {
+          "x": -1670.89,
+          "y": -2994.77,
+          "z": 1199.14
+        },
+        "marker_position": {
+          "x": -1670.6664,
+          "y": -2994.2053,
+          "z": 1199.5415
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 18.796312
+      },
+      "end": {
+        "kind": "time",
+        "value": 28.796312
+      },
+      "label": "padula44 flip reset @ 23.80s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 0,
+        "event_frame": 471,
+        "event_time": 23.796312,
+        "counter_value": 1,
+        "player_id": "Epic:f68f267ae98d42b78ce1d1736fdafa3b",
+        "player_name": "padula44",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2400.81,
+          "y": 279.72,
+          "z": 1298.3
+        },
+        "player_position": {
+          "x": 2430.65,
+          "y": 308.3,
+          "z": 1202.76
+        },
+        "marker_position": {
+          "x": 2427.4702,
+          "y": 305.25455,
+          "z": 1212.9407
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 19.934727
+      },
+      "end": {
+        "kind": "time",
+        "value": 29.934727
+      },
+      "label": "padula44 flip reset @ 24.93s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 1,
+        "event_frame": 505,
+        "event_time": 24.934727,
+        "counter_value": 2,
+        "player_id": "Epic:f68f267ae98d42b78ce1d1736fdafa3b",
+        "player_name": "padula44",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1949.61,
+          "y": -1653.27,
+          "z": 418.59
+        },
+        "player_position": {
+          "x": 1970.49,
+          "y": -1636.86,
+          "z": 324.94
+        },
+        "marker_position": {
+          "x": 1969.5585,
+          "y": -1637.592,
+          "z": 329.1179
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 36.31901
+      },
+      "end": {
+        "kind": "time",
+        "value": 46.31901
+      },
+      "label": "soarz flip reset @ 41.32s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 2,
+        "event_frame": 994,
+        "event_time": 41.31901,
+        "counter_value": 1,
+        "player_id": "Steam:76561199038959651",
+        "player_name": "soarz",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2403.72,
+          "y": 4965.7,
+          "z": 489.36
+        },
+        "player_position": {
+          "x": -2398.97,
+          "y": 4842.97,
+          "z": 519.92
+        },
+        "marker_position": {
+          "x": -2400.2297,
+          "y": 4875.5195,
+          "z": 511.8152
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 120.45273
+      },
+      "end": {
+        "kind": "time",
+        "value": 130.45273
+      },
+      "label": "padula44 flip reset @ 125.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 3,
+        "event_frame": 3367,
+        "event_time": 125.45273,
+        "counter_value": 1,
+        "player_id": "Epic:f68f267ae98d42b78ce1d1736fdafa3b",
+        "player_name": "padula44",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -2328.22,
+          "y": -112.47,
+          "z": 1280.63
+        },
+        "player_position": {
+          "x": -2384.43,
+          "y": -70.4,
+          "z": 1211.83
+        },
+        "marker_position": {
+          "x": -2381.3992,
+          "y": -72.668274,
+          "z": 1215.5394
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 125.94568
+      },
+      "end": {
+        "kind": "time",
+        "value": 135.94568
+      },
+      "label": "soarz flip reset @ 130.95s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 4,
+        "event_frame": 3531,
+        "event_time": 130.94568,
+        "counter_value": 1,
+        "player_id": "Steam:76561199038959651",
+        "player_name": "soarz",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1958.61,
+          "y": -1044.25,
+          "z": 555.04
+        },
+        "player_position": {
+          "x": -1930.21,
+          "y": -1115.58,
+          "z": 491.3
+        },
+        "marker_position": {
+          "x": -1932.1414,
+          "y": -1110.7289,
+          "z": 495.63486
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 174.23839
+      },
+      "end": {
+        "kind": "time",
+        "value": 184.23839
+      },
+      "label": "soarz flip reset @ 179.24s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 5,
+        "event_frame": 4974,
+        "event_time": 179.23839,
+        "counter_value": 2,
+        "player_id": "Steam:76561199038959651",
+        "player_name": "soarz",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2899.2,
+          "y": -991.32,
+          "z": 775.87
+        },
+        "player_position": {
+          "x": -2969.07,
+          "y": -1051.29,
+          "z": 727.26
+        },
+        "marker_position": {
+          "x": -2961.6074,
+          "y": -1044.8848,
+          "z": 732.45197
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 199.31105
+      },
+      "end": {
+        "kind": "time",
+        "value": 209.31105
+      },
+      "label": "trevor flip reset @ 204.31s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 6,
+        "event_frame": 5723,
+        "event_time": 204.31105,
+        "counter_value": 1,
+        "player_id": "Steam:76561198325527739",
+        "player_name": "trevor",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2805.71,
+          "y": -3235.63,
+          "z": 1370.15
+        },
+        "player_position": {
+          "x": 2896.18,
+          "y": -3198.91,
+          "z": 1295.22
+        },
+        "marker_position": {
+          "x": 2874.0718,
+          "y": -3207.883,
+          "z": 1313.5305
+        }
+      }
+    },
+    {
+      "replay": "0479392d-611a-4aa6-8188-b83082c971c2",
+      "start": {
+        "kind": "time",
+        "value": 254.81546
+      },
+      "end": {
+        "kind": "time",
+        "value": 264.81546
+      },
+      "label": "migs flip reset @ 259.82s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0479392d-611a-4aa6-8188-b83082c971c2",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0479392d-611a-4aa6-8188-b83082c971c2.replay",
+        "event_index": 7,
+        "event_frame": 7214,
+        "event_time": 259.81546,
+        "counter_value": 1,
+        "player_id": "Steam:76561198992609394",
+        "player_name": "migs",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 266.06,
+          "y": 2592.41,
+          "z": 859.71
+        },
+        "player_position": {
+          "x": 257.77,
+          "y": 2475.98,
+          "z": 803.54
+        },
+        "marker_position": {
+          "x": 260.10825,
+          "y": 2508.8198,
+          "z": 819.38306
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 34.85849
+      },
+      "end": {
+        "kind": "time",
+        "value": 44.85849
+      },
+      "label": "wellace flip reset @ 39.86s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 0,
+        "event_frame": 1056,
+        "event_time": 39.85849,
+        "counter_value": 1,
+        "player_id": "Steam:76561198371705167",
+        "player_name": "wellace",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3571.98,
+          "y": -4197.74,
+          "z": 224.85
+        },
+        "player_position": {
+          "x": 3525.95,
+          "y": -4424.0,
+          "z": 158.09
+        },
+        "marker_position": {
+          "x": 3554.1694,
+          "y": -4285.2876,
+          "z": 199.0184
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 54.058056
+      },
+      "end": {
+        "kind": "time",
+        "value": 64.05806
+      },
+      "label": "wellace flip reset @ 59.06s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 1,
+        "event_frame": 1631,
+        "event_time": 59.058056,
+        "counter_value": 2,
+        "player_id": "Steam:76561198371705167",
+        "player_name": "wellace",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 979.51,
+          "y": -4278.81,
+          "z": 1842.09
+        },
+        "player_position": {
+          "x": 983.87,
+          "y": -4345.47,
+          "z": 1764.85
+        },
+        "marker_position": {
+          "x": 983.4806,
+          "y": -4339.5166,
+          "z": 1771.7484
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 67.08209
+      },
+      "end": {
+        "kind": "time",
+        "value": 77.08209
+      },
+      "label": "wellace flip reset @ 72.08s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 2,
+        "event_frame": 2019,
+        "event_time": 72.08209,
+        "counter_value": 3,
+        "player_id": "Steam:76561198371705167",
+        "player_name": "wellace",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -439.66,
+          "y": 3904.87,
+          "z": 1075.5
+        },
+        "player_position": {
+          "x": -427.15,
+          "y": 3824.06,
+          "z": 1010.52
+        },
+        "marker_position": {
+          "x": -428.52103,
+          "y": 3832.9165,
+          "z": 1017.64154
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 146.11705
+      },
+      "end": {
+        "kind": "time",
+        "value": 156.11705
+      },
+      "label": "wellace flip reset @ 151.12s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 3,
+        "event_frame": 4385,
+        "event_time": 151.11705,
+        "counter_value": 1,
+        "player_id": "Steam:76561198371705167",
+        "player_name": "wellace",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1634.15,
+          "y": -2358.59,
+          "z": 448.25
+        },
+        "player_position": {
+          "x": 1575.86,
+          "y": -2657.4,
+          "z": 60.74
+        },
+        "marker_position": {
+          "x": 1623.1497,
+          "y": -2414.981,
+          "z": 375.11966
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 205.5948
+      },
+      "end": {
+        "kind": "time",
+        "value": 215.5948
+      },
+      "label": "Tert flip reset @ 210.59s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 4,
+        "event_frame": 6139,
+        "event_time": 210.5948,
+        "counter_value": 1,
+        "player_id": "Steam:76561199084382801",
+        "player_name": "Tert",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1138.31,
+          "y": -1813.57,
+          "z": 916.88
+        },
+        "player_position": {
+          "x": -1176.1,
+          "y": -1778.87,
+          "z": 831.55
+        },
+        "marker_position": {
+          "x": -1173.6079,
+          "y": -1781.1583,
+          "z": 837.1771
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 236.95055
+      },
+      "end": {
+        "kind": "time",
+        "value": 246.95055
+      },
+      "label": "price flip reset @ 241.95s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 5,
+        "event_frame": 7078,
+        "event_time": 241.95055,
+        "counter_value": 1,
+        "player_id": "Steam:76561198873647443",
+        "player_name": "price",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2136.88,
+          "y": 3370.75,
+          "z": 557.95
+        },
+        "player_position": {
+          "x": -2171.09,
+          "y": 3308.66,
+          "z": 483.27
+        },
+        "marker_position": {
+          "x": -2167.778,
+          "y": 3314.6711,
+          "z": 490.5002
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 237.01967
+      },
+      "end": {
+        "kind": "time",
+        "value": 247.01967
+      },
+      "label": "price flip reset @ 242.02s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 6,
+        "event_frame": 7080,
+        "event_time": 242.01967,
+        "counter_value": 2,
+        "player_id": "Steam:76561198873647443",
+        "player_name": "price",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2049.35,
+          "y": 3492.71,
+          "z": 500.92
+        },
+        "player_position": {
+          "x": -2076.78,
+          "y": 3455.49,
+          "z": 412.94
+        },
+        "marker_position": {
+          "x": -2075.0166,
+          "y": 3457.8826,
+          "z": 418.59576
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 272.59772
+      },
+      "end": {
+        "kind": "time",
+        "value": 282.59772
+      },
+      "label": "Tert flip reset @ 277.60s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 7,
+        "event_frame": 8143,
+        "event_time": 277.59772,
+        "counter_value": 1,
+        "player_id": "Steam:76561199084382801",
+        "player_name": "Tert",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1120.39,
+          "y": -1085.12,
+          "z": 1306.14
+        },
+        "player_position": {
+          "x": -1129.62,
+          "y": -1010.19,
+          "z": 1231.33
+        },
+        "marker_position": {
+          "x": -1128.4664,
+          "y": -1019.55505,
+          "z": 1240.68
+        }
+      }
+    },
+    {
+      "replay": "048a9351-637f-4361-9420-53944cba6316",
+      "start": {
+        "kind": "time",
+        "value": 289.89865
+      },
+      "end": {
+        "kind": "time",
+        "value": 299.89865
+      },
+      "label": "Bosco flip reset @ 294.90s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "048a9351-637f-4361-9420-53944cba6316",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/048a9351-637f-4361-9420-53944cba6316.replay",
+        "event_index": 8,
+        "event_frame": 8659,
+        "event_time": 294.89865,
+        "counter_value": 1,
+        "player_id": "Steam:76561198301006859",
+        "player_name": "Bosco",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 3014.19,
+          "y": 2155.1,
+          "z": 1119.65
+        },
+        "player_position": {
+          "x": 3032.43,
+          "y": 2235.27,
+          "z": 1064.56
+        },
+        "marker_position": {
+          "x": 3031.3298,
+          "y": 2230.435,
+          "z": 1067.8826
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 27.903912
+      },
+      "end": {
+        "kind": "time",
+        "value": 37.90391
+      },
+      "label": "wow i love rl flip reset @ 32.90s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 0,
+        "event_frame": 857,
+        "event_time": 32.90391,
+        "counter_value": 1,
+        "player_id": "Steam:76561199089461283",
+        "player_name": "wow i love rl",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2594.38,
+          "y": 2084.99,
+          "z": 816.02
+        },
+        "player_position": {
+          "x": -2623.47,
+          "y": 2026.14,
+          "z": 742.65
+        },
+        "marker_position": {
+          "x": -2621.8591,
+          "y": 2029.3987,
+          "z": 746.71277
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 57.49963
+      },
+      "end": {
+        "kind": "time",
+        "value": 67.49963
+      },
+      "label": "Gogurt Yogurt flip reset @ 62.50s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 1,
+        "event_frame": 1745,
+        "event_time": 62.49963,
+        "counter_value": 1,
+        "player_id": "Epic:c6acecac327748d59bb2c8869e35f31c",
+        "player_name": "Gogurt Yogurt",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1820.94,
+          "y": 1100.28,
+          "z": 1337.62
+        },
+        "player_position": {
+          "x": -1847.63,
+          "y": 1010.12,
+          "z": 1293.8
+        },
+        "marker_position": {
+          "x": -1844.8676,
+          "y": 1019.4518,
+          "z": 1298.3356
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 180.0515
+      },
+      "end": {
+        "kind": "time",
+        "value": 190.0515
+      },
+      "label": "wow i love rl flip reset @ 185.05s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 2,
+        "event_frame": 4835,
+        "event_time": 185.0515,
+        "counter_value": 1,
+        "player_id": "Steam:76561199089461283",
+        "player_name": "wow i love rl",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1532.02,
+          "y": -2574.88,
+          "z": 1207.65
+        },
+        "player_position": {
+          "x": 1578.75,
+          "y": -2643.26,
+          "z": 1140.25
+        },
+        "marker_position": {
+          "x": 1572.7189,
+          "y": -2634.4346,
+          "z": 1148.9489
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 258.44797
+      },
+      "end": {
+        "kind": "time",
+        "value": 268.44797
+      },
+      "label": "obey.Ꮰ flip reset @ 263.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 3,
+        "event_frame": 6989,
+        "event_time": 263.44797,
+        "counter_value": 1,
+        "player_id": "Epic:cb6b4316795940c5afc077fc6884d317",
+        "player_name": "obey.Ꮰ",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2705.42,
+          "y": -682.31,
+          "z": 1421.2
+        },
+        "player_position": {
+          "x": 2756.97,
+          "y": -614.28,
+          "z": 1365.04
+        },
+        "marker_position": {
+          "x": 2752.3416,
+          "y": -620.388,
+          "z": 1370.0823
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 347.37784
+      },
+      "end": {
+        "kind": "time",
+        "value": 357.37784
+      },
+      "label": "Vizè flip reset @ 352.38s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 4,
+        "event_frame": 9473,
+        "event_time": 352.37784,
+        "counter_value": 1,
+        "player_id": "Epic:bf232e89360f4608897b3c18d05c29ce",
+        "player_name": "Vizè",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 677.32,
+          "y": 781.03,
+          "z": 208.74
+        },
+        "player_position": {
+          "x": 387.29,
+          "y": 235.99,
+          "z": 117.54
+        },
+        "marker_position": {
+          "x": 634.10144,
+          "y": 699.8114,
+          "z": 195.14992
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 352.29474
+      },
+      "end": {
+        "kind": "time",
+        "value": 362.29474
+      },
+      "label": "Gogurt Yogurt flip reset @ 357.29s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 5,
+        "event_frame": 9620,
+        "event_time": 357.29474,
+        "counter_value": 1,
+        "player_id": "Epic:c6acecac327748d59bb2c8869e35f31c",
+        "player_name": "Gogurt Yogurt",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1784.72,
+          "y": 2711.67,
+          "z": 1426.46
+        },
+        "player_position": {
+          "x": 1827.47,
+          "y": 2631.83,
+          "z": 1384.91
+        },
+        "marker_position": {
+          "x": 1824.6206,
+          "y": 2637.1514,
+          "z": 1387.6793
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 388.1928
+      },
+      "end": {
+        "kind": "time",
+        "value": 398.1928
+      },
+      "label": "wow i love rl flip reset @ 393.19s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 6,
+        "event_frame": 10527,
+        "event_time": 393.1928,
+        "counter_value": 1,
+        "player_id": "Steam:76561199089461283",
+        "player_name": "wow i love rl",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3109.39,
+          "y": -3758.41,
+          "z": 1861.7
+        },
+        "player_position": {
+          "x": 3154.41,
+          "y": -3806.69,
+          "z": 1788.89
+        },
+        "marker_position": {
+          "x": 3151.991,
+          "y": -3804.096,
+          "z": 1792.802
+        }
+      }
+    },
+    {
+      "replay": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+      "start": {
+        "kind": "time",
+        "value": 453.51004
+      },
+      "end": {
+        "kind": "time",
+        "value": 463.51004
+      },
+      "label": "obey.Ꮰ flip reset @ 458.51s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0501ca2d-3562-48b0-ac9f-6c9cad9bc764",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0501ca2d-3562-48b0-ac9f-6c9cad9bc764.replay",
+        "event_index": 7,
+        "event_frame": 12354,
+        "event_time": 458.51004,
+        "counter_value": 1,
+        "player_id": "Epic:cb6b4316795940c5afc077fc6884d317",
+        "player_name": "obey.Ꮰ",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1050.19,
+          "y": 119.81,
+          "z": 1178.35
+        },
+        "player_position": {
+          "x": -1074.94,
+          "y": 199.34,
+          "z": 1098.45
+        },
+        "marker_position": {
+          "x": -1070.1324,
+          "y": 183.89195,
+          "z": 1113.9698
+        }
+      }
+    },
+    {
+      "replay": "0522af20-2323-447f-a812-56b0b6d516c1",
+      "start": {
+        "kind": "time",
+        "value": 204.76842
+      },
+      "end": {
+        "kind": "time",
+        "value": 214.76842
+      },
+      "label": "large microwave flip reset @ 209.77s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0522af20-2323-447f-a812-56b0b6d516c1",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0522af20-2323-447f-a812-56b0b6d516c1.replay",
+        "event_index": 0,
+        "event_frame": 5874,
+        "event_time": 209.76842,
+        "counter_value": 1,
+        "player_id": "Epic:b2bcc8ab5ccf4f65a524a02d612de93d",
+        "player_name": "large microwave",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1681.84,
+          "y": 5009.21,
+          "z": 1603.2
+        },
+        "player_position": {
+          "x": -1764.99,
+          "y": 4934.06,
+          "z": 1550.73
+        },
+        "marker_position": {
+          "x": -1744.3275,
+          "y": 4952.7344,
+          "z": 1563.7686
+        }
+      }
+    },
+    {
+      "replay": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "start": {
+        "kind": "time",
+        "value": 48.01382
+      },
+      "end": {
+        "kind": "time",
+        "value": 58.01382
+      },
+      "label": "Canito_2008 flip reset @ 53.01s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+        "event_index": 0,
+        "event_frame": 1264,
+        "event_time": 53.01382,
+        "counter_value": 1,
+        "player_id": "PlayStation:{\"name\":\"Canito_2008\",\"online_id\":\"4301603046262314466\",\"unknown1\":[97,55,101,115,112,115,52,0,1,0,0,0,0,0,0,0]}",
+        "player_name": "Canito_2008",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1781.82,
+          "y": -4661.79,
+          "z": 1183.8
+        },
+        "player_position": {
+          "x": -1794.55,
+          "y": -4560.84,
+          "z": 1130.87
+        },
+        "marker_position": {
+          "x": -1792.1422,
+          "y": -4579.934,
+          "z": 1140.8813
+        }
+      }
+    },
+    {
+      "replay": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "start": {
+        "kind": "time",
+        "value": 104.39221
+      },
+      "end": {
+        "kind": "time",
+        "value": 114.39221
+      },
+      "label": "Iapis. flip reset @ 109.39s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+        "event_index": 1,
+        "event_frame": 2866,
+        "event_time": 109.39221,
+        "counter_value": 1,
+        "player_id": "Epic:9b4f6df2817a45b4bbbe89f132e0288f",
+        "player_name": "Iapis.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2222.89,
+          "y": 835.33,
+          "z": 1119.11
+        },
+        "player_position": {
+          "x": 2228.07,
+          "y": 813.06,
+          "z": 1028.84
+        },
+        "marker_position": {
+          "x": 2228.0632,
+          "y": 813.08887,
+          "z": 1028.957
+        }
+      }
+    },
+    {
+      "replay": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "start": {
+        "kind": "time",
+        "value": 188.44647
+      },
+      "end": {
+        "kind": "time",
+        "value": 198.44647
+      },
+      "label": "Iapis. flip reset @ 193.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+        "event_index": 2,
+        "event_frame": 5231,
+        "event_time": 193.44647,
+        "counter_value": 1,
+        "player_id": "Epic:9b4f6df2817a45b4bbbe89f132e0288f",
+        "player_name": "Iapis.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 939.21,
+          "y": 2717.57,
+          "z": 704.31
+        },
+        "player_position": {
+          "x": 946.54,
+          "y": 2658.97,
+          "z": 624.66
+        },
+        "marker_position": {
+          "x": 946.08496,
+          "y": 2662.608,
+          "z": 629.6046
+        }
+      }
+    },
+    {
+      "replay": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "start": {
+        "kind": "time",
+        "value": 204.94131
+      },
+      "end": {
+        "kind": "time",
+        "value": 214.94131
+      },
+      "label": "Iapis. flip reset @ 209.94s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+        "event_index": 3,
+        "event_frame": 5706,
+        "event_time": 209.94131,
+        "counter_value": 2,
+        "player_id": "Epic:9b4f6df2817a45b4bbbe89f132e0288f",
+        "player_name": "Iapis.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -763.78,
+          "y": 170.03,
+          "z": 975.61
+        },
+        "player_position": {
+          "x": -764.57,
+          "y": 103.91,
+          "z": 902.05
+        },
+        "marker_position": {
+          "x": -764.52277,
+          "y": 107.86191,
+          "z": 906.4466
+        }
+      }
+    },
+    {
+      "replay": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+      "start": {
+        "kind": "time",
+        "value": 371.83185
+      },
+      "end": {
+        "kind": "time",
+        "value": 381.83185
+      },
+      "label": "Iapis. flip reset @ 376.83s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "053f88ea-38c2-4fcb-956e-2bcc93d0b827",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/053f88ea-38c2-4fcb-956e-2bcc93d0b827.replay",
+        "event_index": 4,
+        "event_frame": 10413,
+        "event_time": 376.83185,
+        "counter_value": 1,
+        "player_id": "Epic:9b4f6df2817a45b4bbbe89f132e0288f",
+        "player_name": "Iapis.",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3575.65,
+          "y": -4355.21,
+          "z": 332.64
+        },
+        "player_position": {
+          "x": -3326.77,
+          "y": -4596.08,
+          "z": 209.42
+        },
+        "marker_position": {
+          "x": -3512.6882,
+          "y": -4416.1455,
+          "z": 301.4678
+        }
+      }
+    },
+    {
+      "replay": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f",
+      "start": {
+        "kind": "time",
+        "value": 211.35329
+      },
+      "end": {
+        "kind": "time",
+        "value": 221.35329
+      },
+      "label": ". flip reset @ 216.35s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0543ef4e-94ba-4158-a1f6-a45591eb7e1f.replay",
+        "event_index": 0,
+        "event_frame": 5926,
+        "event_time": 216.35329,
+        "counter_value": 1,
+        "player_id": "Steam:76561198064071117",
+        "player_name": ".",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3256.78,
+          "y": -3551.92,
+          "z": 1167.51
+        },
+        "player_position": {
+          "x": -3210.45,
+          "y": -3609.51,
+          "z": 1106.01
+        },
+        "marker_position": {
+          "x": -3211.969,
+          "y": -3607.6218,
+          "z": 1108.0265
+        }
+      }
+    },
+    {
+      "replay": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f",
+      "start": {
+        "kind": "time",
+        "value": 365.21732
+      },
+      "end": {
+        "kind": "time",
+        "value": 375.21732
+      },
+      "label": "Salad flip reset @ 370.22s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "0543ef4e-94ba-4158-a1f6-a45591eb7e1f",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/0543ef4e-94ba-4158-a1f6-a45591eb7e1f.replay",
+        "event_index": 1,
+        "event_frame": 10342,
+        "event_time": 370.21732,
+        "counter_value": 1,
+        "player_id": "Steam:76561198369824885",
+        "player_name": "Salad",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 3146.66,
+          "y": 1457.75,
+          "z": 1196.8
+        },
+        "player_position": {
+          "x": 3135.45,
+          "y": 1532.34,
+          "z": 1135.64
+        },
+        "marker_position": {
+          "x": 3135.924,
+          "y": 1529.1849,
+          "z": 1138.227
+        }
+      }
+    },
+    {
+      "replay": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4",
+      "start": {
+        "kind": "time",
+        "value": 8.915116
+      },
+      "end": {
+        "kind": "time",
+        "value": 18.915115
+      },
+      "label": "4 past 2 demon flip reset @ 13.92s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/058a8fe5-8973-4bef-95be-f5c6a2d4d6b4.replay",
+        "event_index": 0,
+        "event_frame": 299,
+        "event_time": 13.915116,
+        "counter_value": 1,
+        "player_id": "Steam:76561198044786959",
+        "player_name": "4 past 2 demon",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3365.66,
+          "y": 515.73,
+          "z": 1827.09
+        },
+        "player_position": {
+          "x": 3411.67,
+          "y": 454.5,
+          "z": 1744.93
+        },
+        "marker_position": {
+          "x": 3403.7551,
+          "y": 465.03308,
+          "z": 1759.0636
+        }
+      }
+    },
+    {
+      "replay": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4",
+      "start": {
+        "kind": "time",
+        "value": 208.80835
+      },
+      "end": {
+        "kind": "time",
+        "value": 218.80835
+      },
+      "label": "skåøud flip reset @ 213.81s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "058a8fe5-8973-4bef-95be-f5c6a2d4d6b4",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/058a8fe5-8973-4bef-95be-f5c6a2d4d6b4.replay",
+        "event_index": 1,
+        "event_frame": 5959,
+        "event_time": 213.80835,
+        "counter_value": 1,
+        "player_id": "Steam:76561198148128979",
+        "player_name": "skåøud",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2935.84,
+          "y": -427.16,
+          "z": 1422.97
+        },
+        "player_position": {
+          "x": 3002.08,
+          "y": -469.15,
+          "z": 1362.42
+        },
+        "marker_position": {
+          "x": 2998.0142,
+          "y": -466.5726,
+          "z": 1366.1367
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 15.508486
+      },
+      "end": {
+        "kind": "time",
+        "value": 25.508486
+      },
+      "label": "Tfzu flip reset @ 20.51s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 0,
+        "event_frame": 470,
+        "event_time": 20.508486,
+        "counter_value": 1,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1127.77,
+          "y": -3820.41,
+          "z": 881.11
+        },
+        "player_position": {
+          "x": 1138.56,
+          "y": -3764.04,
+          "z": 799.47
+        },
+        "marker_position": {
+          "x": 1137.8253,
+          "y": -3767.8784,
+          "z": 805.02893
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 125.09715
+      },
+      "end": {
+        "kind": "time",
+        "value": 135.09715
+      },
+      "label": "Tfzu flip reset @ 130.10s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 1,
+        "event_frame": 3618,
+        "event_time": 130.09715,
+        "counter_value": 1,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -3301.56,
+          "y": -2568.09,
+          "z": 1387.89
+        },
+        "player_position": {
+          "x": -3363.26,
+          "y": -2511.83,
+          "z": 1330.51
+        },
+        "marker_position": {
+          "x": -3358.1968,
+          "y": -2516.4468,
+          "z": 1335.2188
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 174.24759
+      },
+      "end": {
+        "kind": "time",
+        "value": 184.24759
+      },
+      "label": "i5fvrll flip reset @ 179.25s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 2,
+        "event_frame": 5092,
+        "event_time": 179.24759,
+        "counter_value": 1,
+        "player_id": "PlayStation:{\"name\":\"i5fvrll\",\"online_id\":\"6772937865088251526\",\"unknown1\":[98,54,117,115,112,115,52,0,1,0,0,0,0,0,0,0]}",
+        "player_name": "i5fvrll",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2989.52,
+          "y": 2204.46,
+          "z": 1365.56
+        },
+        "player_position": {
+          "x": -2996.28,
+          "y": 2185.68,
+          "z": 1270.49
+        },
+        "marker_position": {
+          "x": -2995.9917,
+          "y": 2186.4807,
+          "z": 1274.5443
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 176.647
+      },
+      "end": {
+        "kind": "time",
+        "value": 186.647
+      },
+      "label": "Tfzu flip reset @ 181.65s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 3,
+        "event_frame": 5164,
+        "event_time": 181.647,
+        "counter_value": 2,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1205.56,
+          "y": 3276.49,
+          "z": 1067.92
+        },
+        "player_position": {
+          "x": -1169.5,
+          "y": 3350.0,
+          "z": 1020.35
+        },
+        "marker_position": {
+          "x": -1170.1451,
+          "y": 3348.685,
+          "z": 1021.201
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 190.11841
+      },
+      "end": {
+        "kind": "time",
+        "value": 200.11841
+      },
+      "label": "Seymour- flip reset @ 195.12s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 4,
+        "event_frame": 5567,
+        "event_time": 195.11841,
+        "counter_value": 1,
+        "player_id": "Epic:185bbc79d8ca42cb98d2d0119d4381a5",
+        "player_name": "Seymour-",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 547.51,
+          "y": 3655.42,
+          "z": 801.73
+        },
+        "player_position": {
+          "x": 508.98,
+          "y": 3708.66,
+          "z": 735.92
+        },
+        "marker_position": {
+          "x": 508.98227,
+          "y": 3708.6567,
+          "z": 735.9238
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 211.7827
+      },
+      "end": {
+        "kind": "time",
+        "value": 221.7827
+      },
+      "label": "Seymour- flip reset @ 216.78s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 5,
+        "event_frame": 6217,
+        "event_time": 216.7827,
+        "counter_value": 2,
+        "player_id": "Epic:185bbc79d8ca42cb98d2d0119d4381a5",
+        "player_name": "Seymour-",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1232.34,
+          "y": 4171.88,
+          "z": 423.86
+        },
+        "player_position": {
+          "x": -1124.13,
+          "y": 4172.06,
+          "z": 396.23
+        },
+        "marker_position": {
+          "x": -1142.2311,
+          "y": 4172.03,
+          "z": 400.8519
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 233.41856
+      },
+      "end": {
+        "kind": "time",
+        "value": 243.41856
+      },
+      "label": "Tfzu flip reset @ 238.42s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 6,
+        "event_frame": 6865,
+        "event_time": 238.41856,
+        "counter_value": 3,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1496.88,
+          "y": -748.3,
+          "z": 820.08
+        },
+        "player_position": {
+          "x": -1495.64,
+          "y": -678.68,
+          "z": 739.46
+        },
+        "marker_position": {
+          "x": -1495.7975,
+          "y": -687.5206,
+          "z": 749.6975
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 239.65067
+      },
+      "end": {
+        "kind": "time",
+        "value": 249.65067
+      },
+      "label": "i5fvrll flip reset @ 244.65s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 7,
+        "event_frame": 7052,
+        "event_time": 244.65067,
+        "counter_value": 1,
+        "player_id": "PlayStation:{\"name\":\"i5fvrll\",\"online_id\":\"6772937865088251526\",\"unknown1\":[98,54,117,115,112,115,52,0,1,0,0,0,0,0,0,0]}",
+        "player_name": "i5fvrll",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2083.62,
+          "y": -1530.57,
+          "z": 753.1
+        },
+        "player_position": {
+          "x": 2127.83,
+          "y": -1573.82,
+          "z": 674.05
+        },
+        "marker_position": {
+          "x": 2124.5842,
+          "y": -1570.6445,
+          "z": 679.85394
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 264.2991
+      },
+      "end": {
+        "kind": "time",
+        "value": 274.2991
+      },
+      "label": "i5fvrll flip reset @ 269.30s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 8,
+        "event_frame": 7689,
+        "event_time": 269.2991,
+        "counter_value": 1,
+        "player_id": "PlayStation:{\"name\":\"i5fvrll\",\"online_id\":\"6772937865088251526\",\"unknown1\":[98,54,117,115,112,115,52,0,1,0,0,0,0,0,0,0]}",
+        "player_name": "i5fvrll",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -103.87,
+          "y": -3387.19,
+          "z": 1477.59
+        },
+        "player_position": {
+          "x": -132.04,
+          "y": -3426.34,
+          "z": 1391.69
+        },
+        "marker_position": {
+          "x": -130.46315,
+          "y": -3424.1487,
+          "z": 1396.4983
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 270.68997
+      },
+      "end": {
+        "kind": "time",
+        "value": 280.68997
+      },
+      "label": "Tfzu flip reset @ 275.69s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 9,
+        "event_frame": 7880,
+        "event_time": 275.68997,
+        "counter_value": 1,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 486.48,
+          "y": 2925.94,
+          "z": 872.65
+        },
+        "player_position": {
+          "x": 500.54,
+          "y": 2957.01,
+          "z": 788.16
+        },
+        "marker_position": {
+          "x": 500.83118,
+          "y": 2957.6533,
+          "z": 786.4103
+        }
+      }
+    },
+    {
+      "replay": "061eb433-226f-45a4-b6b3-011d2a117a22",
+      "start": {
+        "kind": "time",
+        "value": 308.01318
+      },
+      "end": {
+        "kind": "time",
+        "value": 318.01318
+      },
+      "label": "Tfzu flip reset @ 313.01s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "061eb433-226f-45a4-b6b3-011d2a117a22",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/061eb433-226f-45a4-b6b3-011d2a117a22.replay",
+        "event_index": 10,
+        "event_frame": 8993,
+        "event_time": 313.01318,
+        "counter_value": 1,
+        "player_id": "Steam:76561198361033403",
+        "player_name": "Tfzu",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2248.06,
+          "y": -187.41,
+          "z": 691.15
+        },
+        "player_position": {
+          "x": 2287.1,
+          "y": -105.63,
+          "z": 639.08
+        },
+        "marker_position": {
+          "x": 2282.7988,
+          "y": -114.64014,
+          "z": 644.81683
+        }
+      }
+    },
+    {
+      "replay": "06822988-153b-4c73-98d1-de64ee350441",
+      "start": {
+        "kind": "time",
+        "value": 49.21405
+      },
+      "end": {
+        "kind": "time",
+        "value": 59.21405
+      },
+      "label": "PreflightData flip reset @ 54.21s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06822988-153b-4c73-98d1-de64ee350441",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+        "event_index": 0,
+        "event_frame": 1369,
+        "event_time": 54.21405,
+        "counter_value": 1,
+        "player_id": "Epic:081e6df348894d7d8cd572262bef7aa5",
+        "player_name": "PreflightData",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1246.78,
+          "y": -1323.24,
+          "z": 838.42
+        },
+        "player_position": {
+          "x": -1224.41,
+          "y": -1377.28,
+          "z": 755.09
+        },
+        "marker_position": {
+          "x": -1226.3451,
+          "y": -1372.6053,
+          "z": 762.29846
+        }
+      }
+    },
+    {
+      "replay": "06822988-153b-4c73-98d1-de64ee350441",
+      "start": {
+        "kind": "time",
+        "value": 115.673386
+      },
+      "end": {
+        "kind": "time",
+        "value": 125.673386
+      },
+      "label": "blıtz. flip reset @ 120.67s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06822988-153b-4c73-98d1-de64ee350441",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+        "event_index": 1,
+        "event_frame": 3141,
+        "event_time": 120.673386,
+        "counter_value": 1,
+        "player_id": "Epic:abb9245fb7b4489aab28b477d4540e87",
+        "player_name": "blıtz.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 816.74,
+          "y": 3808.47,
+          "z": 687.62
+        },
+        "player_position": {
+          "x": 863.25,
+          "y": 3839.24,
+          "z": 595.37
+        },
+        "marker_position": {
+          "x": 856.86597,
+          "y": 3835.0164,
+          "z": 608.03235
+        }
+      }
+    },
+    {
+      "replay": "06822988-153b-4c73-98d1-de64ee350441",
+      "start": {
+        "kind": "time",
+        "value": 266.4915
+      },
+      "end": {
+        "kind": "time",
+        "value": 276.4915
+      },
+      "label": "blıtz. flip reset @ 271.49s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06822988-153b-4c73-98d1-de64ee350441",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+        "event_index": 2,
+        "event_frame": 7341,
+        "event_time": 271.4915,
+        "counter_value": 1,
+        "player_id": "Epic:abb9245fb7b4489aab28b477d4540e87",
+        "player_name": "blıtz.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1851.57,
+          "y": -324.55,
+          "z": 743.51
+        },
+        "player_position": {
+          "x": 1856.65,
+          "y": -279.5,
+          "z": 656.31
+        },
+        "marker_position": {
+          "x": 1856.3771,
+          "y": -281.9207,
+          "z": 660.99554
+        }
+      }
+    },
+    {
+      "replay": "06822988-153b-4c73-98d1-de64ee350441",
+      "start": {
+        "kind": "time",
+        "value": 282.86572
+      },
+      "end": {
+        "kind": "time",
+        "value": 292.86572
+      },
+      "label": "PreflightData flip reset @ 287.87s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06822988-153b-4c73-98d1-de64ee350441",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+        "event_index": 3,
+        "event_frame": 7801,
+        "event_time": 287.86572,
+        "counter_value": 1,
+        "player_id": "Epic:081e6df348894d7d8cd572262bef7aa5",
+        "player_name": "PreflightData",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 3579.14,
+          "y": -3490.47,
+          "z": 205.95
+        },
+        "player_position": {
+          "x": 3506.0,
+          "y": -3487.46,
+          "z": 292.6
+        },
+        "marker_position": {
+          "x": 3519.174,
+          "y": -3488.0022,
+          "z": 276.99237
+        }
+      }
+    },
+    {
+      "replay": "06822988-153b-4c73-98d1-de64ee350441",
+      "start": {
+        "kind": "time",
+        "value": 309.75894
+      },
+      "end": {
+        "kind": "time",
+        "value": 319.75894
+      },
+      "label": "PreflightData flip reset @ 314.76s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06822988-153b-4c73-98d1-de64ee350441",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06822988-153b-4c73-98d1-de64ee350441.replay",
+        "event_index": 4,
+        "event_frame": 8489,
+        "event_time": 314.75894,
+        "counter_value": 1,
+        "player_id": "Epic:081e6df348894d7d8cd572262bef7aa5",
+        "player_name": "PreflightData",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 542.6,
+          "y": 1212.18,
+          "z": 289.9
+        },
+        "player_position": {
+          "x": 309.97,
+          "y": 1305.0,
+          "z": 58.36
+        },
+        "marker_position": {
+          "x": 479.17236,
+          "y": 1237.4878,
+          "z": 226.76956
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 37.140167
+      },
+      "end": {
+        "kind": "time",
+        "value": 47.140167
+      },
+      "label": "Tylanz flip reset @ 42.14s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 0,
+        "event_frame": 1128,
+        "event_time": 42.140167,
+        "counter_value": 1,
+        "player_id": "Steam:76561198871589835",
+        "player_name": "Tylanz",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -2143.31,
+          "y": -1604.2,
+          "z": 714.46
+        },
+        "player_position": {
+          "x": -2116.82,
+          "y": -1692.31,
+          "z": 668.64
+        },
+        "marker_position": {
+          "x": -2119.3418,
+          "y": -1683.9227,
+          "z": 673.0017
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 50.137955
+      },
+      "end": {
+        "kind": "time",
+        "value": 60.137955
+      },
+      "label": "************* flip reset @ 55.14s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 1,
+        "event_frame": 1518,
+        "event_time": 55.137955,
+        "counter_value": 1,
+        "player_id": "Epic:0f5bc520821042bd88d6813335a9834d",
+        "player_name": "*************",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1793.66,
+          "y": 764.05,
+          "z": 1748.35
+        },
+        "player_position": {
+          "x": 1871.44,
+          "y": 780.29,
+          "z": 1687.34
+        },
+        "marker_position": {
+          "x": 1865.8667,
+          "y": 779.12634,
+          "z": 1691.7115
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 191.24025
+      },
+      "end": {
+        "kind": "time",
+        "value": 201.24025
+      },
+      "label": "slief_ flip reset @ 196.24s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 2,
+        "event_frame": 5376,
+        "event_time": 196.24025,
+        "counter_value": 1,
+        "player_id": "Epic:916cb2938ad6475da21c8ce63506c42d",
+        "player_name": "slief_",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2248.6,
+          "y": 2963.4,
+          "z": 422.79
+        },
+        "player_position": {
+          "x": 2274.35,
+          "y": 2844.04,
+          "z": 394.12
+        },
+        "marker_position": {
+          "x": 2267.6929,
+          "y": 2874.8982,
+          "z": 401.53204
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 197.00583
+      },
+      "end": {
+        "kind": "time",
+        "value": 207.00583
+      },
+      "label": "trans actions flip reset @ 202.01s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 3,
+        "event_frame": 5549,
+        "event_time": 202.00583,
+        "counter_value": 1,
+        "player_id": "Epic:9776416bb14c4c10af5b3c12ede26534",
+        "player_name": "trans actions",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1139.3,
+          "y": 1296.81,
+          "z": 902.37
+        },
+        "player_position": {
+          "x": 1142.2,
+          "y": 1341.06,
+          "z": 817.52
+        },
+        "marker_position": {
+          "x": 1142.117,
+          "y": 1339.7941,
+          "z": 819.94763
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 304.9351
+      },
+      "end": {
+        "kind": "time",
+        "value": 314.9351
+      },
+      "label": "slief_ flip reset @ 309.94s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 4,
+        "event_frame": 8240,
+        "event_time": 309.9351,
+        "counter_value": 1,
+        "player_id": "Epic:916cb2938ad6475da21c8ce63506c42d",
+        "player_name": "slief_",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2477.16,
+          "y": 2244.0,
+          "z": 1671.05
+        },
+        "player_position": {
+          "x": 2541.44,
+          "y": 2155.15,
+          "z": 1654.28
+        },
+        "marker_position": {
+          "x": 2531.0457,
+          "y": 2169.517,
+          "z": 1656.9918
+        }
+      }
+    },
+    {
+      "replay": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+      "start": {
+        "kind": "time",
+        "value": 384.306
+      },
+      "end": {
+        "kind": "time",
+        "value": 394.306
+      },
+      "label": "trans actions flip reset @ 389.31s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "06d6ae4d-dcd7-4b72-a54c-92900d6914cb",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/06d6ae4d-dcd7-4b72-a54c-92900d6914cb.replay",
+        "event_index": 5,
+        "event_frame": 10566,
+        "event_time": 389.306,
+        "counter_value": 1,
+        "player_id": "Epic:9776416bb14c4c10af5b3c12ede26534",
+        "player_name": "trans actions",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2637.06,
+          "y": -1115.99,
+          "z": 1537.64
+        },
+        "player_position": {
+          "x": 2696.9,
+          "y": -1051.06,
+          "z": 1475.61
+        },
+        "marker_position": {
+          "x": 2688.632,
+          "y": -1060.0311,
+          "z": 1484.1804
+        }
+      }
+    },
+    {
+      "replay": "070aeec6-6e77-486d-967a-104bc81184b3",
+      "start": {
+        "kind": "time",
+        "value": 128.43282
+      },
+      "end": {
+        "kind": "time",
+        "value": 138.43282
+      },
+      "label": "Zofeia flip reset @ 133.43s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "070aeec6-6e77-486d-967a-104bc81184b3",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/070aeec6-6e77-486d-967a-104bc81184b3.replay",
+        "event_index": 0,
+        "event_frame": 3740,
+        "event_time": 133.43282,
+        "counter_value": 1,
+        "player_id": "Xbox:2533274902040265",
+        "player_name": "Zofeia",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1522.51,
+          "y": 3276.62,
+          "z": 1270.77
+        },
+        "player_position": {
+          "x": -1500.52,
+          "y": 3313.66,
+          "z": 1191.76
+        },
+        "marker_position": {
+          "x": -1499.7843,
+          "y": 3314.8992,
+          "z": 1189.1167
+        }
+      }
+    },
+    {
+      "replay": "070aeec6-6e77-486d-967a-104bc81184b3",
+      "start": {
+        "kind": "time",
+        "value": 130.7372
+      },
+      "end": {
+        "kind": "time",
+        "value": 140.7372
+      },
+      "label": "Zofeia flip reset @ 135.74s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "070aeec6-6e77-486d-967a-104bc81184b3",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/070aeec6-6e77-486d-967a-104bc81184b3.replay",
+        "event_index": 1,
+        "event_frame": 3809,
+        "event_time": 135.7372,
+        "counter_value": 2,
+        "player_id": "Xbox:2533274902040265",
+        "player_name": "Zofeia",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -2838.94,
+          "y": 839.88,
+          "z": 707.66
+        },
+        "player_position": {
+          "x": -2818.5,
+          "y": 889.94,
+          "z": 628.86
+        },
+        "marker_position": {
+          "x": -2819.0493,
+          "y": 888.59485,
+          "z": 630.97736
+        }
+      }
+    },
+    {
+      "replay": "070aeec6-6e77-486d-967a-104bc81184b3",
+      "start": {
+        "kind": "time",
+        "value": 257.61093
+      },
+      "end": {
+        "kind": "time",
+        "value": 267.61093
+      },
+      "label": "Dillon [He/Him] flip reset @ 262.61s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "070aeec6-6e77-486d-967a-104bc81184b3",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/070aeec6-6e77-486d-967a-104bc81184b3.replay",
+        "event_index": 2,
+        "event_frame": 7357,
+        "event_time": 262.61093,
+        "counter_value": 1,
+        "player_id": "Steam:76561198328254784",
+        "player_name": "Dillon [He/Him]",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -3315.23,
+          "y": 4470.01,
+          "z": 473.61
+        },
+        "player_position": {
+          "x": -3321.4,
+          "y": 4425.32,
+          "z": 393.88
+        },
+        "marker_position": {
+          "x": -3321.4937,
+          "y": 4424.641,
+          "z": 392.669
+        }
+      }
+    },
+    {
+      "replay": "070aeec6-6e77-486d-967a-104bc81184b3",
+      "start": {
+        "kind": "time",
+        "value": 287.31168
+      },
+      "end": {
+        "kind": "time",
+        "value": 297.31168
+      },
+      "label": "Dillon [He/Him] flip reset @ 292.31s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "070aeec6-6e77-486d-967a-104bc81184b3",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/070aeec6-6e77-486d-967a-104bc81184b3.replay",
+        "event_index": 3,
+        "event_frame": 8221,
+        "event_time": 292.31168,
+        "counter_value": 1,
+        "player_id": "Steam:76561198328254784",
+        "player_name": "Dillon [He/Him]",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 2447.86,
+          "y": -1374.64,
+          "z": 820.23
+        },
+        "player_position": {
+          "x": 2925.93,
+          "y": -3557.41,
+          "z": 49.13
+        },
+        "marker_position": {
+          "x": 2466.669,
+          "y": -1460.5171,
+          "z": 789.89246
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 136.17163
+      },
+      "end": {
+        "kind": "time",
+        "value": 146.17163
+      },
+      "label": "mbappemessicr7jryamalchicharito flip reset @ 141.17s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 0,
+        "event_frame": 3741,
+        "event_time": 141.17163,
+        "counter_value": 1,
+        "player_id": "Steam:76561198807976746",
+        "player_name": "mbappemessicr7jryamalchicharito",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 146.1,
+          "y": -1390.9,
+          "z": 1177.27
+        },
+        "player_position": {
+          "x": 132.24,
+          "y": -1305.46,
+          "z": 1103.86
+        },
+        "marker_position": {
+          "x": 134.74286,
+          "y": -1320.8888,
+          "z": 1117.1165
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 161.75873
+      },
+      "end": {
+        "kind": "time",
+        "value": 171.75873
+      },
+      "label": "TurtlTerry flip reset @ 166.76s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 1,
+        "event_frame": 4417,
+        "event_time": 166.75873,
+        "counter_value": 1,
+        "player_id": "Steam:76561198271962106",
+        "player_name": "TurtlTerry",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 774.48,
+          "y": -4809.48,
+          "z": 613.85
+        },
+        "player_position": {
+          "x": 518.03,
+          "y": -5028.81,
+          "z": 414.85
+        },
+        "marker_position": {
+          "x": 713.60077,
+          "y": -4861.5474,
+          "z": 566.6089
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 347.451
+      },
+      "end": {
+        "kind": "time",
+        "value": 357.451
+      },
+      "label": "TurtlTerry flip reset @ 352.45s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 2,
+        "event_frame": 9193,
+        "event_time": 352.451,
+        "counter_value": 1,
+        "player_id": "Steam:76561198271962106",
+        "player_name": "TurtlTerry",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1191.05,
+          "y": 2381.55,
+          "z": 866.68
+        },
+        "player_position": {
+          "x": 1204.01,
+          "y": 2312.97,
+          "z": 797.26
+        },
+        "marker_position": {
+          "x": 1203.294,
+          "y": 2316.7595,
+          "z": 801.09595
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 457.7213
+      },
+      "end": {
+        "kind": "time",
+        "value": 467.7213
+      },
+      "label": "logan ;) flip reset @ 462.72s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 3,
+        "event_frame": 12300,
+        "event_time": 462.7213,
+        "counter_value": 1,
+        "player_id": "Steam:76561199015927393",
+        "player_name": "logan ;)",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -1127.22,
+          "y": -1653.0,
+          "z": 844.35
+        },
+        "player_position": {
+          "x": -1110.91,
+          "y": -1722.27,
+          "z": 768.63
+        },
+        "marker_position": {
+          "x": -1112.6229,
+          "y": -1714.9954,
+          "z": 776.58203
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 463.78796
+      },
+      "end": {
+        "kind": "time",
+        "value": 473.78796
+      },
+      "label": "SHEZZFFY DA GOAT flip reset @ 468.79s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 4,
+        "event_frame": 12481,
+        "event_time": 468.78796,
+        "counter_value": 1,
+        "player_id": "Steam:76561199048632244",
+        "player_name": "SHEZZFFY DA GOAT",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1922.75,
+          "y": 3138.69,
+          "z": 526.45
+        },
+        "player_position": {
+          "x": -1894.36,
+          "y": 3118.35,
+          "z": 436.65
+        },
+        "marker_position": {
+          "x": -1895.3477,
+          "y": 3119.0579,
+          "z": 439.77423
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 476.39426
+      },
+      "end": {
+        "kind": "time",
+        "value": 486.39426
+      },
+      "label": "mbappemessicr7jryamalchicharito flip reset @ 481.39s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 5,
+        "event_frame": 12857,
+        "event_time": 481.39426,
+        "counter_value": 1,
+        "player_id": "Steam:76561198807976746",
+        "player_name": "mbappemessicr7jryamalchicharito",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 3056.95,
+          "y": -1183.43,
+          "z": 1678.49
+        },
+        "player_position": {
+          "x": 3090.53,
+          "y": -1119.25,
+          "z": 1608.19
+        },
+        "marker_position": {
+          "x": 3087.8887,
+          "y": -1124.2982,
+          "z": 1613.7195
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 477.70975
+      },
+      "end": {
+        "kind": "time",
+        "value": 487.70975
+      },
+      "label": "mbappemessicr7jryamalchicharito flip reset @ 482.71s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 6,
+        "event_frame": 12896,
+        "event_time": 482.70975,
+        "counter_value": 2,
+        "player_id": "Steam:76561198807976746",
+        "player_name": "mbappemessicr7jryamalchicharito",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 2340.23,
+          "y": -1890.56,
+          "z": 1234.32
+        },
+        "player_position": {
+          "x": 2382.28,
+          "y": -1829.02,
+          "z": 1152.92
+        },
+        "marker_position": {
+          "x": 2375.6626,
+          "y": -1838.7047,
+          "z": 1165.7301
+        }
+      }
+    },
+    {
+      "replay": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+      "start": {
+        "kind": "time",
+        "value": 479.0179
+      },
+      "end": {
+        "kind": "time",
+        "value": 489.0179
+      },
+      "label": "mbappemessicr7jryamalchicharito flip reset @ 484.02s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bb76b2-6200-4e73-b6ae-dbdf6bc643c9",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bb76b2-6200-4e73-b6ae-dbdf6bc643c9.replay",
+        "event_index": 7,
+        "event_frame": 12935,
+        "event_time": 484.0179,
+        "counter_value": 3,
+        "player_id": "Steam:76561198807976746",
+        "player_name": "mbappemessicr7jryamalchicharito",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 1402.78,
+          "y": -3119.81,
+          "z": 658.86
+        },
+        "player_position": {
+          "x": 1433.82,
+          "y": -3072.7,
+          "z": 581.28
+        },
+        "marker_position": {
+          "x": 1432.8737,
+          "y": -3074.1362,
+          "z": 583.64514
+        }
+      }
+    },
+    {
+      "replay": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+      "start": {
+        "kind": "time",
+        "value": 63.164413
+      },
+      "end": {
+        "kind": "time",
+        "value": 73.16441
+      },
+      "label": "L ca. flip reset @ 68.16s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bddd27-1da9-43b7-a2a2-3f09a78a32a8.replay",
+        "event_index": 0,
+        "event_frame": 1518,
+        "event_time": 68.16441,
+        "counter_value": 1,
+        "player_id": "Epic:7e498a8f495f474c9589203718887ff9",
+        "player_name": "L ca.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1161.47,
+          "y": 250.61,
+          "z": 341.34
+        },
+        "player_position": {
+          "x": -1192.43,
+          "y": 358.36,
+          "z": 348.4
+        },
+        "marker_position": {
+          "x": -1187.1019,
+          "y": 339.8167,
+          "z": 347.185
+        }
+      }
+    },
+    {
+      "replay": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+      "start": {
+        "kind": "time",
+        "value": 101.26238
+      },
+      "end": {
+        "kind": "time",
+        "value": 111.26238
+      },
+      "label": "ty flip reset @ 106.26s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bddd27-1da9-43b7-a2a2-3f09a78a32a8.replay",
+        "event_index": 1,
+        "event_frame": 2398,
+        "event_time": 106.26238,
+        "counter_value": 1,
+        "player_id": "Steam:76561199067749356",
+        "player_name": "ty",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 831.94,
+          "y": -4884.29,
+          "z": 771.01
+        },
+        "player_position": {
+          "x": 938.37,
+          "y": -4853.4,
+          "z": 770.13
+        },
+        "marker_position": {
+          "x": 921.2514,
+          "y": -4858.368,
+          "z": 770.27155
+        }
+      }
+    },
+    {
+      "replay": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+      "start": {
+        "kind": "time",
+        "value": 116.35071
+      },
+      "end": {
+        "kind": "time",
+        "value": 126.35071
+      },
+      "label": "L ca. flip reset @ 121.35s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07bddd27-1da9-43b7-a2a2-3f09a78a32a8",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07bddd27-1da9-43b7-a2a2-3f09a78a32a8.replay",
+        "event_index": 2,
+        "event_frame": 2813,
+        "event_time": 121.35071,
+        "counter_value": 1,
+        "player_id": "Epic:7e498a8f495f474c9589203718887ff9",
+        "player_name": "L ca.",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -1216.11,
+          "y": -792.47,
+          "z": 587.35
+        },
+        "player_position": {
+          "x": -1245.2,
+          "y": -699.53,
+          "z": 545.8
+        },
+        "marker_position": {
+          "x": -1241.6614,
+          "y": -710.8355,
+          "z": 550.85425
+        }
+      }
+    },
+    {
+      "replay": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+      "start": {
+        "kind": "time",
+        "value": 68.1192
+      },
+      "end": {
+        "kind": "time",
+        "value": 78.1192
+      },
+      "label": "literlz flip reset @ 73.12s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07c7ad92-b798-4d02-8068-3634dc44a5d1.replay",
+        "event_index": 0,
+        "event_frame": 1887,
+        "event_time": 73.1192,
+        "counter_value": 1,
+        "player_id": "Epic:9d3c231294a146b78d297372f51466bc",
+        "player_name": "literlz",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 654.38,
+          "y": 1156.72,
+          "z": 839.74
+        },
+        "player_position": {
+          "x": 638.18,
+          "y": 1203.06,
+          "z": 750.18
+        },
+        "marker_position": {
+          "x": 639.6284,
+          "y": 1198.9169,
+          "z": 758.1875
+        }
+      }
+    },
+    {
+      "replay": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+      "start": {
+        "kind": "time",
+        "value": 75.28696
+      },
+      "end": {
+        "kind": "time",
+        "value": 85.28696
+      },
+      "label": "Shawn flip reset @ 80.29s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07c7ad92-b798-4d02-8068-3634dc44a5d1.replay",
+        "event_index": 1,
+        "event_frame": 2096,
+        "event_time": 80.28696,
+        "counter_value": 1,
+        "player_id": "Steam:76561198837994442",
+        "player_name": "Shawn",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": -263.87,
+          "y": -666.11,
+          "z": 649.32
+        },
+        "player_position": {
+          "x": -283.12,
+          "y": -726.03,
+          "z": 570.12
+        },
+        "marker_position": {
+          "x": -281.567,
+          "y": -721.1959,
+          "z": 576.5096
+        }
+      }
+    },
+    {
+      "replay": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+      "start": {
+        "kind": "time",
+        "value": 269.58313
+      },
+      "end": {
+        "kind": "time",
+        "value": 279.58313
+      },
+      "label": "literlz flip reset @ 274.58s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07c7ad92-b798-4d02-8068-3634dc44a5d1.replay",
+        "event_index": 2,
+        "event_frame": 7131,
+        "event_time": 274.58313,
+        "counter_value": 1,
+        "player_id": "Epic:9d3c231294a146b78d297372f51466bc",
+        "player_name": "literlz",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": -2853.42,
+          "y": -38.78,
+          "z": 1135.94
+        },
+        "player_position": {
+          "x": -2891.25,
+          "y": 45.81,
+          "z": 1054.84
+        },
+        "marker_position": {
+          "x": -2881.9902,
+          "y": 25.104885,
+          "z": 1074.6908
+        }
+      }
+    },
+    {
+      "replay": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+      "start": {
+        "kind": "time",
+        "value": 288.47214
+      },
+      "end": {
+        "kind": "time",
+        "value": 298.47214
+      },
+      "label": "Shawn flip reset @ 293.47s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07c7ad92-b798-4d02-8068-3634dc44a5d1",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07c7ad92-b798-4d02-8068-3634dc44a5d1.replay",
+        "event_index": 3,
+        "event_frame": 7682,
+        "event_time": 293.47214,
+        "counter_value": 1,
+        "player_id": "Steam:76561198837994442",
+        "player_name": "Shawn",
+        "is_team_zero": true,
+        "ball_position": {
+          "x": 1752.46,
+          "y": 367.22,
+          "z": 884.99
+        },
+        "player_position": {
+          "x": 1748.2,
+          "y": 330.7,
+          "z": 793.49
+        },
+        "marker_position": {
+          "x": 1748.4424,
+          "y": 332.77798,
+          "z": 798.6963
+        }
+      }
+    },
+    {
+      "replay": "07d9a61d-b225-44e6-9d8d-a2b41d0e6047",
+      "start": {
+        "kind": "time",
+        "value": 182.38428
+      },
+      "end": {
+        "kind": "time",
+        "value": 192.38428
+      },
+      "label": "pizza flip reset @ 187.38s",
+      "meta": {
+        "mechanic": "flip_reset",
+        "source": "ground_truth_exact",
+        "replay_id": "07d9a61d-b225-44e6-9d8d-a2b41d0e6047",
+        "replay_path": "data/flip-reset-ground-truth-exact/replays/07d9a61d-b225-44e6-9d8d-a2b41d0e6047.replay",
+        "event_index": 0,
+        "event_frame": 5290,
+        "event_time": 187.38428,
+        "counter_value": 1,
+        "player_id": "Steam:76561199013305601",
+        "player_name": "pizza",
+        "is_team_zero": false,
+        "ball_position": {
+          "x": 658.94,
+          "y": -3932.11,
+          "z": 863.52
+        },
+        "player_position": {
+          "x": 659.85,
+          "y": -3860.06,
+          "z": 871.4
+        },
+        "marker_position": {
+          "x": 660.10754,
+          "y": -3839.6687,
+          "z": 873.6302
+        }
+      }
+    }
+  ],
+  "meta": {
+    "mechanic": "flip_reset",
+    "source": "ground_truth_exact",
+    "selected_replay_count": 30,
+    "selected_clip_count": 143,
+    "before_seconds": 5.0,
+    "after_seconds": 5.0,
+    "input_dir": "data/flip-reset-ground-truth-exact/replays"
+  }
+}
