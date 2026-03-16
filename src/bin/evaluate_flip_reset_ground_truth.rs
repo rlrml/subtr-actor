@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use subtr_actor::ballchasing::parse_replay_bytes;
 use subtr_actor::constants::DODGES_REFRESHED_COUNTER_KEY;
 use subtr_actor::{
-    DodgeRefreshedEvent, FlipResetEvent, FlipResetFollowupDodgeEvent, FlipResetTuningManifest,
-    FlipResetTuningReplay, PlayerId, PostWallDodgeEvent, ReplayData, ReplayDataCollector,
+    DodgeRefreshedEvent, FlipResetEvent, FlipResetFollowupDodgeEvent, PlayerId, PostWallDodgeEvent,
+    ReplayData, ReplayDataCollector,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -79,7 +79,9 @@ impl HeuristicSource {
 struct Config {
     count: usize,
     scan_limit: usize,
-    manifest: Option<PathBuf>,
+    replay_dirs: Vec<PathBuf>,
+    replay_files: Vec<PathBuf>,
+    recursive_replay_search: bool,
     playlist: String,
     min_rank: String,
     cache_dir: PathBuf,
@@ -93,7 +95,9 @@ impl Default for Config {
         Self {
             count: 50,
             scan_limit: 250,
-            manifest: None,
+            replay_dirs: Vec::new(),
+            replay_files: Vec::new(),
+            recursive_replay_search: true,
             playlist: "ranked-standard".to_owned(),
             min_rank: "supersonic-legend".to_owned(),
             cache_dir: PathBuf::from("target/flip-reset-ground-truth"),
@@ -133,10 +137,19 @@ impl Config {
                         .parse()
                         .context("Failed to parse --scan-limit as an integer")?;
                 }
-                "--manifest" => {
-                    config.manifest = Some(PathBuf::from(
-                        args.next().context("Expected a value after --manifest")?,
+                "--replay-dir" => {
+                    config.replay_dirs.push(PathBuf::from(
+                        args.next().context("Expected a value after --replay-dir")?,
                     ));
+                }
+                "--replay-file" => {
+                    config.replay_files.push(PathBuf::from(
+                        args.next()
+                            .context("Expected a value after --replay-file")?,
+                    ));
+                }
+                "--non-recursive-replay-search" => {
+                    config.recursive_replay_search = false;
                 }
                 "--cache-dir" => {
                     config.cache_dir =
@@ -255,6 +268,7 @@ struct HeuristicEventSummary {
 #[derive(Debug, Default)]
 struct AggregateMetrics {
     scanned_replay_count: usize,
+    failed_replay_count: usize,
     supported_replay_count: usize,
     replay_with_exact_refresh_count: usize,
     total_exact: usize,
@@ -352,7 +366,7 @@ struct MatchResult {
 
 fn print_usage() {
     eprintln!(
-        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--manifest PATH] [--count N] [--scan-limit N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--heuristic strict|followup|combined|post-wall|all] [--debounce SECONDS] [--match-window SECONDS] [--match-window-before SECONDS] [--match-window-after SECONDS]"
+        "Usage: cargo run --bin evaluate_flip_reset_ground_truth -- [--replay-dir PATH]... [--replay-file PATH]... [--non-recursive-replay-search] [--count N] [--scan-limit N] [--playlist PLAYLIST] [--min-rank RANK] [--cache-dir PATH] [--heuristic strict|followup|combined|post-wall|all] [--debounce SECONDS] [--match-window SECONDS] [--match-window-before SECONDS] [--match-window-after SECONDS]"
     );
 }
 
@@ -420,11 +434,130 @@ fn search_recent_replays(
     Ok(results)
 }
 
-fn load_manifest(path: &Path) -> Result<FlipResetTuningManifest> {
-    let manifest_bytes =
-        fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    serde_json::from_slice(&manifest_bytes)
-        .with_context(|| format!("Failed to parse {}", path.display()))
+fn replay_path_priority(path: &Path) -> (i32, usize, String) {
+    let path_string = path.to_string_lossy().into_owned();
+    let path_depth = path.components().count();
+    let path_parts: Vec<_> = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if path_parts.iter().any(|part| part == "replays") {
+        return (0, path_depth, path_string);
+    }
+    if path_parts
+        .iter()
+        .any(|part| part.contains("flip-reset-ground-truth"))
+    {
+        return (1, path_depth, path_string);
+    }
+    if path_parts.iter().any(|part| part == "cache") {
+        return (2, path_depth, path_string);
+    }
+    (3, path_depth, path_string)
+}
+
+fn should_include_replay_path(path: &Path) -> bool {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    if file_name.starts_with("._") {
+        return false;
+    }
+    let path_parts: Vec<_> = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect();
+    !path_parts
+        .iter()
+        .any(|part| part.as_ref() == "replay-cache" || part.as_ref() == ".worktrees")
+}
+
+fn collect_replay_paths_from_dir(
+    replay_dir: &Path,
+    recursive: bool,
+    replay_paths: &mut Vec<PathBuf>,
+) -> Result<()> {
+    for entry in fs::read_dir(replay_dir)
+        .with_context(|| format!("Failed to read {}", replay_dir.display()))?
+    {
+        let entry = entry.with_context(|| format!("Failed to read {}", replay_dir.display()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            if recursive {
+                collect_replay_paths_from_dir(&path, recursive, replay_paths)?;
+            }
+            continue;
+        }
+        if path.extension().and_then(|value| value.to_str()) == Some("replay")
+            && should_include_replay_path(&path)
+        {
+            replay_paths.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn collect_replay_paths(
+    replay_dirs: &[PathBuf],
+    replay_files: &[PathBuf],
+    recursive: bool,
+) -> Result<Vec<PathBuf>> {
+    let mut replay_paths = Vec::new();
+    for replay_dir in replay_dirs {
+        let replay_dir = replay_dir.canonicalize().with_context(|| {
+            format!(
+                "Failed to resolve replay directory {}",
+                replay_dir.display()
+            )
+        })?;
+        if !replay_dir.is_dir() {
+            anyhow::bail!(
+                "Replay directory is not a directory: {}",
+                replay_dir.display()
+            );
+        }
+        collect_replay_paths_from_dir(&replay_dir, recursive, &mut replay_paths)?;
+    }
+
+    for replay_file in replay_files {
+        let replay_file = replay_file
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve replay file {}", replay_file.display()))?;
+        if replay_file.is_file()
+            && replay_file.extension().and_then(|value| value.to_str()) == Some("replay")
+            && should_include_replay_path(&replay_file)
+        {
+            replay_paths.push(replay_file);
+        }
+    }
+
+    replay_paths.sort();
+    replay_paths.dedup();
+    let mut replay_paths_by_stem: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for replay_path in replay_paths {
+        let Some(stem) = replay_path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .map(ToOwned::to_owned)
+        else {
+            continue;
+        };
+        replay_paths_by_stem
+            .entry(stem)
+            .or_default()
+            .push(replay_path);
+    }
+
+    let mut selected_replay_paths: Vec<_> = replay_paths_by_stem
+        .into_values()
+        .filter_map(|mut paths| {
+            paths.sort_by_key(|path| replay_path_priority(path));
+            paths.into_iter().next()
+        })
+        .collect();
+    selected_replay_paths.sort();
+    Ok(selected_replay_paths)
 }
 
 fn cached_replay_path(cache_dir: &Path, replay_id: &str) -> PathBuf {
@@ -771,20 +904,23 @@ fn evaluate_replay(
     })
 }
 
-fn evaluate_manifest_replay(
-    manifest_path: &Path,
-    replay: &FlipResetTuningReplay,
+fn evaluate_local_replay_path(
+    replay_path: &Path,
     heuristic_source: HeuristicSource,
     match_window: MatchWindow,
     debounce_seconds: f32,
 ) -> Result<ReplayEvaluation> {
-    let replay_path = replay.replay_path_from_manifest(manifest_path);
-    let replay_bytes = fs::read(&replay_path)
+    let replay_bytes = fs::read(replay_path)
         .with_context(|| format!("Failed to read {}", replay_path.display()))?;
+    let replay_id = replay_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| replay_path.display().to_string());
     let summary = ReplaySummary {
-        id: replay.replay_id.clone(),
-        title: replay.title.clone(),
-        uploader: replay.uploader.clone(),
+        id: replay_id,
+        title: None,
+        uploader: None,
     };
     evaluate_replay(
         &summary,
@@ -796,10 +932,12 @@ fn evaluate_manifest_replay(
 }
 
 fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplaySummary]) {
-    if let Some(manifest_path) = &config.manifest {
+    if !config.replay_dirs.is_empty() || !config.replay_files.is_empty() {
         println!(
-            "Evaluated local tuning set from {}",
-            manifest_path.display()
+            "Evaluated {} local replay files from {} directories and {} explicit files",
+            metrics.scanned_replay_count,
+            config.replay_dirs.len(),
+            config.replay_files.len()
         );
     } else {
         println!(
@@ -813,6 +951,12 @@ fn print_summary(config: &Config, metrics: &AggregateMetrics, replays: &[ReplayS
         "Supported replays with the exact counter: {} / {} scanned",
         metrics.supported_replay_count, metrics.scanned_replay_count
     );
+    if metrics.failed_replay_count > 0 {
+        println!(
+            "Skipped replays due to parse/processing failures: {}",
+            metrics.failed_replay_count
+        );
+    }
     println!(
         "Supported replays with exact dodge refreshes: {} / {}",
         metrics.replay_with_exact_refresh_count, metrics.supported_replay_count
@@ -932,30 +1076,41 @@ fn main() -> Result<()> {
 
     let mut metrics = AggregateMetrics::default();
     let mut replay_summaries = Vec::new();
-    if let Some(manifest_path) = &config.manifest {
-        let manifest = load_manifest(manifest_path)?;
-        for (index, replay) in manifest.replays.iter().enumerate() {
+    if !config.replay_dirs.is_empty() || !config.replay_files.is_empty() {
+        let replay_paths = collect_replay_paths(
+            &config.replay_dirs,
+            &config.replay_files,
+            config.recursive_replay_search,
+        )?;
+        if replay_paths.is_empty() {
+            anyhow::bail!("No usable .replay files found in the provided replay sources");
+        }
+        for (index, replay_path) in replay_paths.iter().enumerate() {
             eprintln!(
                 "[{}/{}] evaluating local replay {}",
                 index + 1,
-                manifest.replays.len(),
-                replay.replay_id
+                replay_paths.len(),
+                replay_path.display()
             );
-            metrics.add(
-                evaluate_manifest_replay(
-                    manifest_path,
-                    replay,
-                    config.heuristic_source,
-                    config.match_window,
-                    config.debounce_seconds,
-                )
-                .with_context(|| format!("Failed to evaluate replay {}", replay.replay_id))?,
-            );
+            let evaluation = match evaluate_local_replay_path(
+                replay_path,
+                config.heuristic_source,
+                config.match_window,
+                config.debounce_seconds,
+            ) {
+                Ok(evaluation) => evaluation,
+                Err(error) => {
+                    metrics.failed_replay_count += 1;
+                    eprintln!("Skipping {}: {error:#}", replay_path.display());
+                    continue;
+                }
+            };
             replay_summaries.push(ReplaySummary {
-                id: replay.replay_id.clone(),
-                title: replay.title.clone(),
-                uploader: replay.uploader.clone(),
+                id: evaluation.replay_id.clone(),
+                title: evaluation.title.clone(),
+                uploader: None,
             });
+            metrics.add(evaluation);
         }
     } else {
         let api_key =
