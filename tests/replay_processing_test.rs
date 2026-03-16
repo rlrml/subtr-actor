@@ -14,6 +14,46 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
 }
 
+fn max_abs_player_position_from_replay_data(replay_data: &ReplayData) -> f32 {
+    replay_data
+        .frame_data
+        .players
+        .iter()
+        .flat_map(|(_, player_data)| player_data.frames().iter())
+        .filter_map(|frame| match frame {
+            PlayerFrame::Data { rigid_body, .. } => Some(rigid_body.location),
+            PlayerFrame::Empty => None,
+        })
+        .flat_map(|location| [location.x.abs(), location.y.abs(), location.z.abs()])
+        .fold(0.0f32, f32::max)
+}
+
+fn max_abs_position_from_ndarray(
+    replay: &boxcars::Replay,
+    global_feature_adders: &[&str],
+    player_feature_adders: &[&str],
+) -> f32 {
+    let collector = NDArrayCollector::<f32>::from_strings(global_feature_adders, player_feature_adders)
+        .expect("Should create collector");
+    let (meta, array) = collector
+        .process_replay(replay)
+        .expect("Should process replay")
+        .get_meta_and_ndarray()
+        .expect("Should get ndarray");
+
+    let headers = meta.headers_vec();
+    let mut max_abs_position = 0.0f32;
+    for (index, header) in headers.iter().enumerate() {
+        if !header.contains("position ") {
+            continue;
+        }
+        for value in array.column(index).iter().copied() {
+            max_abs_position = max_abs_position.max(value.abs());
+        }
+    }
+    max_abs_position
+}
+
 /// Test that all sample replays can be parsed and processed without errors
 #[test]
 fn test_all_replays_parse_successfully() {
@@ -112,6 +152,91 @@ fn test_replay_data_exposes_powerslide_activity() {
         !replay_data.player_stat_events.is_empty(),
         "Expected replay data to expose exact player stat events"
     );
+}
+
+#[test]
+fn test_legacy_replays_use_spatial_normalization() {
+    for path in ["assets/replays/rlcs.replay", "assets/replays/soccar-lan.replay"] {
+        let replay = parse_replay(path);
+        let processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+        assert_eq!(
+            processor.spatial_normalization_factor(),
+            100.0,
+            "Expected legacy replay {path} to use 100x spatial normalization"
+        );
+    }
+}
+
+#[test]
+fn test_modern_replays_keep_native_spatial_scale() {
+    for path in [
+        "assets/replays/old_boost_format.replay",
+        "assets/replays/new_boost_format.replay",
+        "assets/replays/tourny.replay",
+        "assets/replays/dodges_refreshed_counter.replay",
+    ] {
+        let replay = parse_replay(path);
+        let processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
+        assert_eq!(
+            processor.spatial_normalization_factor(),
+            1.0,
+            "Expected modern replay {path} to keep native spatial scale"
+        );
+    }
+}
+
+#[test]
+fn test_legacy_replay_player_positions_are_normalized_to_field_units() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for rlcs.replay");
+    let max_abs_player_position = max_abs_player_position_from_replay_data(&replay_data);
+    assert!(
+        max_abs_player_position > 1000.0,
+        "Expected normalized player positions for rlcs.replay to reach Rocket League field units, got {max_abs_player_position}"
+    );
+    assert!(
+        max_abs_player_position < 10000.0,
+        "Expected normalized player positions for rlcs.replay to stay within plausible Rocket League field bounds, got {max_abs_player_position}"
+    );
+}
+
+#[test]
+fn test_modern_replay_player_positions_are_not_overscaled() {
+    let replay = parse_replay("assets/replays/old_boost_format.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for old_boost_format.replay");
+    let max_abs_player_position = max_abs_player_position_from_replay_data(&replay_data);
+    assert!(
+        max_abs_player_position > 1000.0,
+        "Expected modern replay positions to remain in Rocket League field units, got {max_abs_player_position}"
+    );
+    assert!(
+        max_abs_player_position < 10000.0,
+        "Expected modern replay positions not to be multiplied again, got {max_abs_player_position}"
+    );
+}
+
+#[test]
+fn test_legacy_replay_ndarray_positions_are_normalized_to_field_units() {
+    for path in ["assets/replays/rlcs.replay", "assets/replays/soccar-lan.replay"] {
+        let replay = parse_replay(path);
+        let max_abs_position = max_abs_position_from_ndarray(
+            &replay,
+            &["InterpolatedBallRigidBodyNoVelocities"],
+            &["InterpolatedPlayerRigidBodyNoVelocities"],
+        );
+        assert!(
+            max_abs_position > 1000.0,
+            "Expected ndarray positions for {path} to reach Rocket League field units, got {max_abs_position}"
+        );
+        assert!(
+            max_abs_position < 10000.0,
+            "Expected ndarray positions for {path} to stay within plausible Rocket League field bounds, got {max_abs_position}"
+        );
+    }
 }
 
 #[test]
@@ -360,8 +485,8 @@ fn test_processor_extracts_flip_reset_events() {
         tracker
             .flip_reset_events()
             .iter()
-            .all(|event| event.closest_approach_distance <= 8.0),
-        "Expected flip-reset candidates to be backed by very close attributed touches"
+            .all(|event| event.closest_approach_distance <= 220.0),
+        "Expected flip-reset candidates to be backed by close attributed touches in Rocket League units"
     );
     assert!(
         tracker.flip_reset_events().iter().all(|event| {
