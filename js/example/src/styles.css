@@ -13,7 +13,11 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#app {
+  min-height: 100dvh;
 }
 
 button,
@@ -24,10 +28,12 @@ input {
 
 .shell {
   min-height: 100dvh;
-  padding: 2rem;
+  height: 100dvh;
+  padding: clamp(0.9rem, 2vw, 2rem);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 1.5rem;
+  overflow: hidden;
 }
 
 .hero {
@@ -71,9 +77,11 @@ input {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 1.25rem;
   min-height: 0;
+  align-items: stretch;
 }
 
 .viewport-panel,
@@ -86,8 +94,8 @@ input {
 }
 
 .viewport-panel {
-  min-height: 38rem;
-  aspect-ratio: 16 / 10;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -114,7 +122,9 @@ input {
 
 .sidebar {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+  min-height: 0;
 }
 
 .panel {
@@ -192,14 +202,17 @@ dt {
     gap: 1rem;
   }
 
-  .hero,
-  .workspace {
+  .hero {
     grid-template-columns: 1fr;
     display: grid;
   }
 
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+
   .viewport-panel {
-    min-height: 24rem;
-    aspect-ratio: 16 / 11;
+    min-height: 20rem;
+    height: auto;
   }
 }
