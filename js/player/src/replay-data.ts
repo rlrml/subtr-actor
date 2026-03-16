@@ -4,37 +4,21 @@ import type {
   PlaybackFrame,
   PlayerSample,
   RawBallFrame,
-  RawPlayerInfo,
   RawPlayerFrame,
+  RawPlayerInfo,
   RawReplayFramesData,
   ReplayModel,
   ReplayPlayerTrack,
   Vec3,
+  Quaternion,
 } from "./types";
 
-const UNIT_SCALE = 0.01;
 const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
   distance: 270,
   height: 100,
   pitch: -4,
   fov: 110,
 };
-
-function scaleVector(value: Vec3): Vec3 {
-  return {
-    x: value.x * UNIT_SCALE,
-    y: value.y * UNIT_SCALE,
-    z: value.z * UNIT_SCALE,
-  };
-}
-
-function mapVectorToScene(value: Vec3): Vec3 {
-  return {
-    x: value.x,
-    y: value.z,
-    z: value.y,
-  };
-}
 
 function playerIdToString(playerId: Record<string, string>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
@@ -54,12 +38,7 @@ function normalizeVector(value: Vec3): Vec3 | null {
   };
 }
 
-function normalizeQuaternion(raw: {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-}): { x: number; y: number; z: number; w: number } | null {
+function normalizeQuaternion(raw: Quaternion): Quaternion | null {
   const magnitude = Math.hypot(raw.x, raw.y, raw.z, raw.w);
   if (magnitude < 0.000001) {
     return null;
@@ -73,38 +52,16 @@ function normalizeQuaternion(raw: {
   };
 }
 
-function multiplyQuaternions(
-  left: { x: number; y: number; z: number; w: number },
-  right: { x: number; y: number; z: number; w: number }
-): { x: number; y: number; z: number; w: number } {
+function multiplyQuaternions(left: Quaternion, right: Quaternion): Quaternion {
   return {
-    w:
-      left.w * right.w -
-      left.x * right.x -
-      left.y * right.y -
-      left.z * right.z,
-    x:
-      left.w * right.x +
-      left.x * right.w +
-      left.y * right.z -
-      left.z * right.y,
-    y:
-      left.w * right.y -
-      left.x * right.z +
-      left.y * right.w +
-      left.z * right.x,
-    z:
-      left.w * right.z +
-      left.x * right.y -
-      left.y * right.x +
-      left.z * right.w,
+    w: left.w * right.w - left.x * right.x - left.y * right.y - left.z * right.z,
+    x: left.w * right.x + left.x * right.w + left.y * right.z - left.z * right.y,
+    y: left.w * right.y - left.x * right.z + left.y * right.w + left.z * right.x,
+    z: left.w * right.z + left.x * right.y - left.y * right.x + left.z * right.w,
   };
 }
 
-function rotateVectorByQuaternion(
-  vector: Vec3,
-  quaternion: { x: number; y: number; z: number; w: number }
-): Vec3 {
+function rotateVectorByQuaternion(vector: Vec3, quaternion: Quaternion): Vec3 {
   const rotated = multiplyQuaternions(
     multiplyQuaternions(quaternion, {
       x: vector.x,
@@ -129,11 +86,20 @@ function rotateVectorByQuaternion(
 
 function parseBallFrame(frame: RawBallFrame): BallSample {
   if (frame === "Empty") {
-    return { position: null };
+    return {
+      position: null,
+      linearVelocity: null,
+      angularVelocity: null,
+      rotation: null,
+    };
   }
 
+  const rigidBody = frame.Data.rigid_body;
   return {
-    position: scaleVector(frame.Data.rigid_body.location),
+    position: rigidBody.location,
+    linearVelocity: rigidBody.linear_velocity,
+    angularVelocity: rigidBody.angular_velocity,
+    rotation: normalizeQuaternion(rigidBody.rotation),
   };
 }
 
@@ -141,34 +107,43 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   if (frame === "Empty") {
     return {
       position: null,
-      velocity: null,
+      linearVelocity: null,
+      angularVelocity: null,
+      rotation: null,
       forward: null,
       up: null,
       boostAmount: 0,
+      boostFraction: 0,
       boostActive: false,
+      powerslideActive: false,
       jumpActive: false,
+      doubleJumpActive: false,
       dodgeActive: false,
     };
   }
 
-  const rotation = normalizeQuaternion(frame.Data.rigid_body.rotation);
-  const forwardRl = rotation
-    ? rotateVectorByQuaternion({ x: 1, y: 0, z: 0 }, rotation)
+  const rigidBody = frame.Data.rigid_body;
+  const rotation = normalizeQuaternion(rigidBody.rotation);
+  const forward = rotation
+    ? normalizeVector(rotateVectorByQuaternion({ x: 1, y: 0, z: 0 }, rotation))
     : null;
-  const upRl = rotation
-    ? rotateVectorByQuaternion({ x: 0, y: 0, z: 1 }, rotation)
+  const up = rotation
+    ? normalizeVector(rotateVectorByQuaternion({ x: 0, y: 0, z: 1 }, rotation))
     : null;
 
   return {
-    position: scaleVector(frame.Data.rigid_body.location),
-    velocity: mapVectorToScene(scaleVector(frame.Data.rigid_body.linear_velocity)),
-    forward: forwardRl
-      ? normalizeVector(mapVectorToScene(forwardRl))
-      : null,
-    up: upRl ? normalizeVector(mapVectorToScene(upRl)) : null,
+    position: rigidBody.location,
+    linearVelocity: rigidBody.linear_velocity,
+    angularVelocity: rigidBody.angular_velocity,
+    rotation,
+    forward,
+    up,
     boostAmount: frame.Data.boost_amount,
+    boostFraction: Math.max(0, Math.min(1, frame.Data.boost_amount / 255)),
     boostActive: frame.Data.boost_active,
+    powerslideActive: frame.Data.powerslide_active,
     jumpActive: frame.Data.jump_active,
+    doubleJumpActive: frame.Data.double_jump_active,
     dodgeActive: frame.Data.dodge_active,
   };
 }
@@ -203,9 +178,7 @@ function inferTeamSide(
   return true;
 }
 
-function getStatEntries(
-  stats: RawPlayerInfo["stats"]
-): Array<[string, unknown]> {
+function getStatEntries(stats: RawPlayerInfo["stats"]): Array<[string, unknown]> {
   if (!stats) {
     return [];
   }
@@ -229,17 +202,12 @@ function extractCameraSettings(playerInfo?: RawPlayerInfo): CameraSettings {
   const entries = getStatEntries(playerInfo?.stats);
   return {
     fov: extractNumericSetting(entries, "CameraFOV") ?? DEFAULT_CAMERA_SETTINGS.fov,
-    height:
-      extractNumericSetting(entries, "CameraHeight") ??
-      DEFAULT_CAMERA_SETTINGS.height,
-    pitch:
-      extractNumericSetting(entries, "CameraPitch") ?? DEFAULT_CAMERA_SETTINGS.pitch,
+    height: extractNumericSetting(entries, "CameraHeight") ?? DEFAULT_CAMERA_SETTINGS.height,
+    pitch: extractNumericSetting(entries, "CameraPitch") ?? DEFAULT_CAMERA_SETTINGS.pitch,
     distance:
-      extractNumericSetting(entries, "CameraDistance") ??
-      DEFAULT_CAMERA_SETTINGS.distance,
+      extractNumericSetting(entries, "CameraDistance") ?? DEFAULT_CAMERA_SETTINGS.distance,
     stiffness:
-      extractNumericSetting(entries, "CameraStiffness") ??
-      DEFAULT_CAMERA_SETTINGS.stiffness,
+      extractNumericSetting(entries, "CameraStiffness") ?? DEFAULT_CAMERA_SETTINGS.stiffness,
     swivelSpeed:
       extractNumericSetting(entries, "CameraSwivelSpeed") ??
       DEFAULT_CAMERA_SETTINGS.swivelSpeed,
@@ -279,7 +247,7 @@ function buildPlayerTracks(raw: RawReplayFramesData): ReplayPlayerTrack[] {
     const name =
       firstFrame !== undefined && firstFrame.Data.player_name
         ? firstFrame.Data.player_name
-        : playerIdString;
+        : replayPlayers.byId.get(playerIdString)?.name ?? playerIdString;
     const replayPlayerInfo =
       replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
 

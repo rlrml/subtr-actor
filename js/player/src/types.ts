@@ -70,13 +70,24 @@ export interface RawReplayFramesData {
     team_one: RawPlayerInfo[];
     all_headers: unknown[];
   };
-  demolish_infos: unknown[];
+  demolish_infos?: unknown[];
+  boost_pad_events?: unknown[];
+  goal_events?: unknown[];
+  touch_events?: unknown[];
+  player_stat_events?: unknown[];
 }
 
 export interface Vec3 {
   x: number;
   y: number;
   z: number;
+}
+
+export interface Quaternion {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
 }
 
 export interface CameraSettings {
@@ -97,16 +108,24 @@ export interface PlaybackFrame {
 
 export interface BallSample {
   position: Vec3 | null;
+  linearVelocity: Vec3 | null;
+  angularVelocity: Vec3 | null;
+  rotation: Quaternion | null;
 }
 
 export interface PlayerSample {
   position: Vec3 | null;
-  velocity: Vec3 | null;
+  linearVelocity: Vec3 | null;
+  angularVelocity: Vec3 | null;
+  rotation: Quaternion | null;
   forward: Vec3 | null;
   up: Vec3 | null;
   boostAmount: number;
+  boostFraction: number;
   boostActive: boolean;
+  powerslideActive: boolean;
   jumpActive: boolean;
+  doubleJumpActive: boolean;
   dodgeActive: boolean;
 }
 
@@ -133,17 +152,18 @@ export interface ReplayLoadResult {
   raw: RawReplayFramesData;
 }
 
+export type CameraMode = "overview" | "attached" | "third-person";
+
 export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
   initialCameraMode?: CameraMode;
-  initialTrackedPlayerId?: string;
+  initialTrackedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
+  initialPlaybackRate?: number;
 }
 
-export type CameraMode = "overview" | "attached" | "third-person";
-
-export interface ReplayPlayerSnapshot {
+export interface ReplayPlayerState {
   currentTime: number;
   duration: number;
   frameIndex: number;
@@ -153,3 +173,12 @@ export interface ReplayPlayerSnapshot {
   trackedPlayerId: string | null;
   ballCamEnabled: boolean;
 }
+
+export type ReplayPlayerSnapshot = ReplayPlayerState;
+
+export type ReplayPlayerStatePatch = Partial<
+  Pick<
+    ReplayPlayerState,
+    "currentTime" | "playing" | "speed" | "cameraMode" | "trackedPlayerId" | "ballCamEnabled"
+  >
+>;

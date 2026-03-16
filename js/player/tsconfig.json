@@ -13,13 +13,7 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "@subtr-actor-wasm": [
-        "../pkg/rl_replay_subtr_actor.js"
-      ]
-    }
+    "skipLibCheck": true
   },
   "include": [
     "src"

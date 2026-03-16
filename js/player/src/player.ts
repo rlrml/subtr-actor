@@ -6,25 +6,28 @@ import type {
   ReplayModel,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
+  ReplayPlayerState,
+  ReplayPlayerStatePatch,
+  Vec3,
 } from "./types";
 
-const UP_OFFSET = 0.25;
-const BALL_RADIUS = 1.82;
-const CAMERA_DISTANCE_SCALE = 0.01;
-const CAMERA_HEIGHT_SCALE = 0.01;
-const ATTACHED_DISTANCE_MULTIPLIER = 1.8;
-const THIRD_PERSON_DISTANCE_MULTIPLIER = 2.7;
-const ATTACHED_HEIGHT_MULTIPLIER = 1.2;
-const THIRD_PERSON_HEIGHT_MULTIPLIER = 1.6;
+const DEFAULT_FIELD_SCALE = 1;
+const CAMERA_DISTANCE_MULTIPLIER_ATTACHED = 1.8;
+const CAMERA_DISTANCE_MULTIPLIER_THIRD_PERSON = 2.7;
+const CAMERA_HEIGHT_MULTIPLIER_ATTACHED = 1.2;
+const CAMERA_HEIGHT_MULTIPLIER_THIRD_PERSON = 1.6;
 const CAMERA_SMOOTHING = 0.18;
-const MIN_CAMERA_HEIGHT = 0.9;
-const GROUND_HEIGHT_THRESHOLD = 1.2;
-const BALL_CAM_HEIGHT_BIAS = 0.45;
+const GROUND_HEIGHT_THRESHOLD_UU = 120;
+const MIN_CAMERA_HEIGHT_UU = 90;
+const PLAYER_FOCUS_HEIGHT_UU = 40;
+const BALL_CAM_HEIGHT_BIAS_UU = 45;
 const BALL_CAM_LOOK_BLEND = 0.58;
 const BALL_CAM_DIRECTION_BLEND = 0.82;
 const BALL_CAM_MAX_FOV = 132;
-const DEFAULT_FORWARD = new THREE.Vector3(0, 0, 1);
-const DEFAULT_UP = new THREE.Vector3(0, 1, 0);
+const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
+const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
+
+type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
@@ -32,6 +35,11 @@ export class ReplayPlayer extends EventTarget {
   readonly options: ReplayPlayerOptions;
 
   private readonly sceneState: ReplayScene;
+  private readonly fieldScale: number;
+  private readonly desiredCameraPosition = new THREE.Vector3();
+  private readonly desiredLookTarget = new THREE.Vector3();
+  private readonly boundWindowResize = () => this.sceneState.resize();
+  private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private playing = false;
@@ -40,9 +48,6 @@ export class ReplayPlayer extends EventTarget {
   private cameraMode: CameraMode;
   private trackedPlayerId: string | null;
   private ballCamEnabled: boolean;
-  private readonly desiredCameraPosition = new THREE.Vector3();
-  private readonly desiredLookTarget = new THREE.Vector3();
-  private boundResize = () => this.sceneState.resize();
 
   constructor(
     container: HTMLElement,
@@ -53,14 +58,17 @@ export class ReplayPlayer extends EventTarget {
     this.container = container;
     this.replay = replay;
     this.options = options;
-    this.sceneState = createReplayScene(container, replay);
+    this.fieldScale = options.fieldScale ?? DEFAULT_FIELD_SCALE;
+    this.sceneState = createReplayScene(container, replay, this.fieldScale);
+    this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
     this.cameraMode = options.initialCameraMode ?? "overview";
     this.trackedPlayerId =
       options.initialTrackedPlayerId ?? replay.players[0]?.id ?? null;
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
 
-    window.addEventListener("resize", this.boundResize);
+    this.installResizeHandling();
     this.render();
+    this.emitChange();
 
     if (options.autoplay) {
       this.play();
@@ -74,11 +82,15 @@ export class ReplayPlayer extends EventTarget {
 
     this.playing = true;
     this.lastTickTime = performance.now();
-    this.tick();
+    this.animationFrameId = requestAnimationFrame(this.tick);
     this.emitChange();
   }
 
   pause(): void {
+    if (!this.playing && this.animationFrameId === null) {
+      return;
+    }
+
     this.playing = false;
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -106,7 +118,7 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
-  setTrackedPlayer(playerId: string): void {
+  setTrackedPlayer(playerId: string | null): void {
     this.trackedPlayerId = playerId;
     this.render();
     this.emitChange();
@@ -124,7 +136,45 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
-  getSnapshot(): ReplayPlayerSnapshot {
+  setState(nextState: ReplayPlayerStatePatch): void {
+    if (nextState.speed !== undefined) {
+      this.speed = Math.max(0.1, nextState.speed);
+    }
+    if (nextState.cameraMode !== undefined) {
+      this.cameraMode = nextState.cameraMode;
+    }
+    if (nextState.trackedPlayerId !== undefined) {
+      this.trackedPlayerId = nextState.trackedPlayerId;
+    }
+    if (nextState.ballCamEnabled !== undefined) {
+      this.ballCamEnabled = nextState.ballCamEnabled;
+    }
+    if (nextState.currentTime !== undefined) {
+      this.currentTime = THREE.MathUtils.clamp(
+        nextState.currentTime,
+        0,
+        this.replay.duration
+      );
+    }
+    if (nextState.playing !== undefined && nextState.playing !== this.playing) {
+      if (nextState.playing) {
+        this.playing = true;
+        this.lastTickTime = performance.now();
+        this.animationFrameId = requestAnimationFrame(this.tick);
+      } else {
+        this.playing = false;
+        if (this.animationFrameId !== null) {
+          cancelAnimationFrame(this.animationFrameId);
+          this.animationFrameId = null;
+        }
+      }
+    }
+
+    this.render();
+    this.emitChange();
+  }
+
+  getState(): ReplayPlayerState {
     return {
       currentTime: this.currentTime,
       duration: this.replay.duration,
@@ -137,10 +187,46 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
-  dispose(): void {
+  getSnapshot(): ReplayPlayerSnapshot {
+    return this.getState();
+  }
+
+  subscribe(listener: ReplayPlayerListener): () => void {
+    const handleChange = (event: Event): void => {
+      listener((event as CustomEvent<ReplayPlayerState>).detail);
+    };
+    this.addEventListener("change", handleChange);
+    listener(this.getState());
+    return () => {
+      this.removeEventListener("change", handleChange);
+    };
+  }
+
+  destroy(): void {
     this.pause();
-    window.removeEventListener("resize", this.boundResize);
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    } else {
+      window.removeEventListener("resize", this.boundWindowResize);
+    }
     this.sceneState.dispose();
+  }
+
+  dispose(): void {
+    this.destroy();
+  }
+
+  private installResizeHandling(): void {
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.sceneState.resize();
+      });
+      this.resizeObserver.observe(this.container);
+      return;
+    }
+
+    window.addEventListener("resize", this.boundWindowResize);
   }
 
   private tick = (): void => {
@@ -155,7 +241,11 @@ export class ReplayPlayer extends EventTarget {
 
     if (this.currentTime >= this.replay.duration) {
       this.currentTime = this.replay.duration;
-      this.pause();
+      this.playing = false;
+      this.animationFrameId = null;
+      this.render();
+      this.emitChange();
+      return;
     }
 
     this.render();
@@ -166,17 +256,21 @@ export class ReplayPlayer extends EventTarget {
   private render(): void {
     const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
     const ballFrame = this.replay.ballFrames[frameIndex];
-    const ballPosition = ballFrame?.position
-      ? new THREE.Vector3(
-          ballFrame.position.x,
-          ballFrame.position.z + BALL_RADIUS,
-          ballFrame.position.y
-        )
-      : null;
+    const ballPosition = ballFrame?.position ? this.worldPosition(ballFrame.position) : null;
 
-    if (ballPosition) {
+    if (ballFrame?.position) {
       this.sceneState.ballMesh.visible = true;
-      this.sceneState.ballMesh.position.copy(ballPosition);
+      this.sceneState.ballMesh.position.copy(this.rootPosition(ballFrame.position));
+      if (ballFrame.rotation) {
+        this.sceneState.ballMesh.quaternion.set(
+          ballFrame.rotation.x,
+          ballFrame.rotation.y,
+          ballFrame.rotation.z,
+          ballFrame.rotation.w
+        );
+      } else {
+        this.sceneState.ballMesh.quaternion.identity();
+      }
     } else {
       this.sceneState.ballMesh.visible = false;
     }
@@ -194,20 +288,16 @@ export class ReplayPlayer extends EventTarget {
       }
 
       mesh.visible = true;
-      mesh.position.set(
-        frame.position.x,
-        frame.position.z + UP_OFFSET,
-        frame.position.y
-      );
-
-      const orientation = this.getOrientationVectors(frame);
-      if (orientation) {
-        const basis = new THREE.Matrix4().makeBasis(
-          orientation.right,
-          orientation.up,
-          orientation.forward
+      mesh.position.copy(this.rootPosition(frame.position));
+      if (frame.rotation) {
+        mesh.quaternion.set(
+          frame.rotation.x,
+          frame.rotation.y,
+          frame.rotation.z,
+          frame.rotation.w
         );
-        mesh.quaternion.setFromRotationMatrix(basis);
+      } else {
+        mesh.quaternion.identity();
       }
     }
 
@@ -235,38 +325,33 @@ export class ReplayPlayer extends EventTarget {
     const trackedPlayer = this.replay.players.find(
       (player) => player.id === this.trackedPlayerId
     );
-    const trackedMesh = this.sceneState.playerMeshes.get(this.trackedPlayerId);
     const frame = trackedPlayer?.frames[frameIndex];
 
-    if (!trackedPlayer || !trackedMesh || !frame?.position) {
+    if (!trackedPlayer || !frame?.position) {
       controls.enabled = true;
       return;
     }
 
     controls.enabled = false;
 
-    const basePosition = new THREE.Vector3(
-      frame.position.x,
-      frame.position.z + UP_OFFSET,
-      frame.position.y
-    );
+    const basePosition = this.worldPosition(frame.position);
     const orientation = this.getOrientationVectors(frame);
     const forward = orientation?.forward ?? DEFAULT_FORWARD.clone();
-    const right = orientation?.right ?? new THREE.Vector3(1, 0, 0);
+    const right = orientation?.right ?? new THREE.Vector3(0, 1, 0);
 
     const cameraSettings = trackedPlayer.cameraSettings;
     const distance =
       (cameraSettings.distance ?? 270) *
-      CAMERA_DISTANCE_SCALE *
+      this.fieldScale *
       (this.cameraMode === "attached"
-        ? ATTACHED_DISTANCE_MULTIPLIER
-        : THIRD_PERSON_DISTANCE_MULTIPLIER);
+        ? CAMERA_DISTANCE_MULTIPLIER_ATTACHED
+        : CAMERA_DISTANCE_MULTIPLIER_THIRD_PERSON);
     const height =
       (cameraSettings.height ?? 100) *
-      CAMERA_HEIGHT_SCALE *
+      this.fieldScale *
       (this.cameraMode === "attached"
-        ? ATTACHED_HEIGHT_MULTIPLIER
-        : THIRD_PERSON_HEIGHT_MULTIPLIER);
+        ? CAMERA_HEIGHT_MULTIPLIER_ATTACHED
+        : CAMERA_HEIGHT_MULTIPLIER_THIRD_PERSON);
     const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4);
     const lookDirection = forward
       .clone()
@@ -277,13 +362,13 @@ export class ReplayPlayer extends EventTarget {
       .addScaledVector(DEFAULT_UP, height);
     const playerFocusPoint = basePosition
       .clone()
-      .addScaledVector(DEFAULT_UP, Math.max(0.35, height * 0.35));
+      .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * this.fieldScale);
     let targetFov = cameraSettings.fov ?? 110;
 
     if (this.ballCamEnabled && ballPosition) {
       const ballFocusPoint = ballPosition
         .clone()
-        .addScaledVector(DEFAULT_UP, BALL_CAM_HEIGHT_BIAS);
+        .addScaledVector(DEFAULT_UP, BALL_CAM_HEIGHT_BIAS_UU * this.fieldScale);
       const playerToBall = ballFocusPoint.clone().sub(playerFocusPoint);
       const ballCamDirection = (
         playerToBall.lengthSq() > 0.0001
@@ -297,9 +382,9 @@ export class ReplayPlayer extends EventTarget {
       this.desiredCameraPosition
         .copy(chaseAnchor)
         .addScaledVector(ballCamDirection, -distance);
-      this.desiredCameraPosition.y = Math.max(
-        MIN_CAMERA_HEIGHT,
-        this.desiredCameraPosition.y
+      this.desiredCameraPosition.z = Math.max(
+        MIN_CAMERA_HEIGHT_UU * this.fieldScale,
+        this.desiredCameraPosition.z
       );
       this.desiredLookTarget
         .copy(playerFocusPoint)
@@ -310,24 +395,21 @@ export class ReplayPlayer extends EventTarget {
         const separationAngle = cameraToPlayer.angleTo(cameraToBall);
         targetFov = Math.min(
           BALL_CAM_MAX_FOV,
-          Math.max(
-            targetFov,
-            THREE.MathUtils.radToDeg(separationAngle) * 1.7
-          )
+          Math.max(targetFov, THREE.MathUtils.radToDeg(separationAngle) * 1.7)
         );
       }
     } else {
       this.desiredCameraPosition
         .copy(chaseAnchor)
         .addScaledVector(forward, -distance);
-      this.desiredCameraPosition.y = Math.max(
-        MIN_CAMERA_HEIGHT,
-        this.desiredCameraPosition.y
+      this.desiredCameraPosition.z = Math.max(
+        MIN_CAMERA_HEIGHT_UU * this.fieldScale,
+        this.desiredCameraPosition.z
       );
       this.desiredLookTarget
         .copy(basePosition)
-        .addScaledVector(lookDirection, distance + 8)
-        .addScaledVector(DEFAULT_UP, 0.8);
+        .addScaledVector(lookDirection, distance + 8 * this.fieldScale)
+        .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * this.fieldScale);
     }
 
     this.sceneState.camera.position.lerp(
@@ -345,33 +427,31 @@ export class ReplayPlayer extends EventTarget {
     this.sceneState.camera.lookAt(controls.target);
   }
 
-  private getOrientationVectors(frame: ReplayModel["players"][number]["frames"][number]): {
+  private getOrientationVectors(
+    frame: ReplayModel["players"][number]["frames"][number]
+  ): {
     forward: THREE.Vector3;
     up: THREE.Vector3;
     right: THREE.Vector3;
   } | null {
-    const velocity = frame.velocity
-      ? new THREE.Vector3(frame.velocity.x, frame.velocity.y, frame.velocity.z)
-      : null;
-    const rawForward = frame.forward
-      ? new THREE.Vector3(frame.forward.x, frame.forward.y, frame.forward.z)
-      : null;
-    const rawUp = frame.up
-      ? new THREE.Vector3(frame.up.x, frame.up.y, frame.up.z)
-      : null;
-
-    const grounded = (frame.position?.z ?? Infinity) < GROUND_HEIGHT_THRESHOLD;
+    const velocity = frame.linearVelocity ? this.worldDirection(frame.linearVelocity) : null;
+    const rawForward = frame.forward ? this.worldDirection(frame.forward) : null;
+    const rawUp = frame.up ? this.worldDirection(frame.up) : null;
+    const grounded = (frame.position?.z ?? Infinity) < GROUND_HEIGHT_THRESHOLD_UU;
 
     if (grounded) {
       const forward = (rawForward ?? velocity ?? DEFAULT_FORWARD.clone())
         .clone()
-        .setY(0);
+        .setZ(0);
 
       if (forward.lengthSq() < 0.0001) {
         return null;
       }
 
       forward.normalize();
+      if (velocity && velocity.lengthSq() > 0.0001 && forward.dot(velocity) < 0) {
+        forward.negate();
+      }
       const right = new THREE.Vector3()
         .crossVectors(DEFAULT_UP, forward)
         .normalize();
@@ -394,10 +474,26 @@ export class ReplayPlayer extends EventTarget {
     return { forward, up, right };
   }
 
+  private rootPosition(position: Vec3): THREE.Vector3 {
+    return new THREE.Vector3(position.x, position.y, position.z);
+  }
+
+  private worldPosition(position: Vec3): THREE.Vector3 {
+    return new THREE.Vector3(
+      -position.x * this.fieldScale,
+      position.y * this.fieldScale,
+      position.z * this.fieldScale
+    );
+  }
+
+  private worldDirection(direction: Vec3): THREE.Vector3 {
+    return new THREE.Vector3(-direction.x, direction.y, direction.z).normalize();
+  }
+
   private emitChange(): void {
     this.dispatchEvent(
-      new CustomEvent<ReplayPlayerSnapshot>("change", {
-        detail: this.getSnapshot(),
+      new CustomEvent<ReplayPlayerState>("change", {
+        detail: this.getState(),
       })
     );
   }

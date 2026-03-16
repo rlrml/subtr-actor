@@ -1,0 +1,33 @@
+import { defineConfig } from "vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+const srcDir = path.resolve(rootDir, "src");
+const distDir = path.resolve(rootDir, "dist");
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "@": srcDir,
+    },
+  },
+  server: {
+    fs: {
+      allow: [path.resolve(rootDir, "..")],
+    },
+  },
+  build: {
+    outDir: distDir,
+    emptyOutDir: true,
+    lib: {
+      entry: path.resolve(srcDir, "lib.ts"),
+      name: "SubtrActorPlayer",
+      fileName: "subtr-actor-player",
+      formats: ["es"],
+    },
+    rollupOptions: {
+      external: ["three"],
+    },
+  },
+});

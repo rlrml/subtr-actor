@@ -189,6 +189,11 @@ Tests:
 npm --prefix js test
 ```
 
+Local packages built on top of these bindings:
+
+- [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
+- [`js/example`](./example/README.md): example/demo app that exercises the local player library.
+
 The example app under [`js/example`](./example/README.md) uses the web target and expects `js/pkg/` to be built with `wasm-pack build --target web --out-dir pkg`.
 
 ## Publishing Notes

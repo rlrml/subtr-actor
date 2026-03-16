@@ -1,14 +1,13 @@
 {
-  "name": "subtr-actor-three-player",
+  "name": "subtr-actor-player",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist/subtr-actor-player.js",
   "scripts": {
     "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin npm --prefix .. run build",
-    "dev": "npm run build:bindings && vite",
-    "build": "npm run build:bindings && npm run check && vite build && vite build --mode library",
-    "preview": "vite preview",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "build": "npm run build:bindings && npm run check && vite build"
   },
   "dependencies": {
     "three": "^0.180.0"
