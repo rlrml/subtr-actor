@@ -404,6 +404,36 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.player.seek(targetTime);
   }
 
+  setReplayFrameIndex(frameIndex: number): boolean {
+    if (!this.player) {
+      return false;
+    }
+
+    this.playbackIntent = false;
+    this.player.setFrameIndex(frameIndex);
+    this.emitChange();
+    return true;
+  }
+
+  stepFrames(delta: number): boolean {
+    if (!this.player || !Number.isFinite(delta)) {
+      return false;
+    }
+
+    this.playbackIntent = false;
+    this.player.stepFrames(delta);
+    this.emitChange();
+    return true;
+  }
+
+  stepForwardFrame(): boolean {
+    return this.stepFrames(1);
+  }
+
+  stepBackwardFrame(): boolean {
+    return this.stepFrames(-1);
+  }
+
   setPlaybackRate(speed: number): void {
     this.preferences.speed = Math.max(0.1, speed);
     this.player?.setPlaybackRate(this.preferences.speed);

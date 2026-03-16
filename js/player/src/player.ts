@@ -47,6 +47,18 @@ type InstalledReplayPlayerPlugin = {
   plugin: ReplayPlayerPlugin;
 };
 
+function clampFrameIndex(replay: ReplayModel, frameIndex: number): number {
+  if (replay.frames.length === 0) {
+    return 0;
+  }
+
+  return THREE.MathUtils.clamp(
+    Math.round(frameIndex),
+    0,
+    replay.frames.length - 1
+  );
+}
+
 function inferLiveGameState(replay: ReplayModel): number | null {
   if (replay.frames.length === 0) {
     return null;
@@ -258,6 +270,37 @@ export class ReplayPlayer extends EventTarget {
     }
     this.render();
     this.emitChange();
+  }
+
+  setFrameIndex(frameIndex: number): void {
+    const nextFrameIndex = clampFrameIndex(this.replay, frameIndex);
+    const nextTime = this.replay.frames[nextFrameIndex]?.time ?? 0;
+    const wasPlaying = this.playing;
+    const changed = this.currentTime !== nextTime || wasPlaying;
+
+    this.playing = false;
+    this.currentTime = nextTime;
+    this.render();
+    if (changed) {
+      this.emitChange();
+    }
+  }
+
+  stepFrames(delta: number): void {
+    if (!Number.isFinite(delta) || this.replay.frames.length === 0) {
+      return;
+    }
+
+    const currentFrameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
+    this.setFrameIndex(currentFrameIndex + Math.trunc(delta));
+  }
+
+  stepForwardFrame(): void {
+    this.stepFrames(1);
+  }
+
+  stepBackwardFrame(): void {
+    this.stepFrames(-1);
   }
 
   setState(nextState: ReplayPlayerStatePatch): void {
