@@ -1,6 +1,7 @@
 import "./styles.css";
 import {
   createBallchasingOverlayPlugin,
+  createBoostPadOverlayPlugin,
   ReplayPlayer,
   loadReplayFromBytes,
 } from "../../player/src/lib.ts";
@@ -191,13 +192,9 @@ function createBoostModule(): StatModule {
     id: "boost",
     label: "Boost",
 
-    setup(ctx) {
-      ctx.player.setBoostMeterEnabled(true);
-    },
+    setup() {},
 
-    teardown() {
-      // boost meter is on the base player; we'll disable it
-    },
+    teardown() {},
 
     onBeforeRender() {
       // boost meter updates are handled by the base player
@@ -284,8 +281,6 @@ function teardownActiveModules(): void {
   for (const mod of activeModules) {
     mod.teardown();
   }
-  // disable boost meter if boost module was active
-  replayPlayer?.setBoostMeterEnabled(false);
   activeModules = [];
 }
 
@@ -399,7 +394,10 @@ async function loadReplay(file: File): Promise<void> {
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: 2.25,
-    plugins: [createBallchasingOverlayPlugin()],
+    plugins: [
+      createBallchasingOverlayPlugin(),
+      createBoostPadOverlayPlugin(),
+    ],
   });
 
   setupActiveModules();
