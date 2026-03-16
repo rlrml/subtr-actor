@@ -261,6 +261,7 @@ function updateZone(
   fieldScale: number,
 ): void {
   const depth = descriptor.halfDepth * 2 * fieldScale;
+  const fieldWidth = FIELD_HALF_X * 2 * fieldScale;
   const laneWidth = lane.width * fieldScale;
   const laneCenterX = lane.centerX * fieldScale;
   const stripeWidth = TEAM_STRIPE_WIDTH * fieldScale;
@@ -272,8 +273,8 @@ function updateZone(
 
   zone.group.position.y = descriptor.centerY * fieldScale;
 
-  zone.floorMesh.position.x = laneCenterX;
-  zone.floorMesh.scale.set(laneWidth, depth, 1);
+  zone.floorMesh.position.x = 0;
+  zone.floorMesh.scale.set(fieldWidth, depth, 1);
 
   zone.stripeMesh.position.x = laneCenterX;
   zone.stripeMesh.scale.set(stripeWidth, depth, 1);
