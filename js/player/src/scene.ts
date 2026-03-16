@@ -20,6 +20,7 @@ interface WallPanel {
   mesh: THREE.Mesh;
   material: THREE.Material;
   outwardLocal: THREE.Vector3;
+  fixedOpacity: number | null;
 }
 
 const OPAQUE_WALL_OPACITY = 1;
@@ -57,6 +58,18 @@ function createVerticalWallBox(
   );
 }
 
+function createHorizontalWallBox(
+  width: number,
+  depth: number,
+  thickness: number,
+  material: THREE.Material
+): THREE.Mesh {
+  return new THREE.Mesh(
+    new THREE.BoxGeometry(width, depth, thickness, 6, 6, 1),
+    material
+  );
+}
+
 function createExampleSoccarField(scale: number): {
   stadium: THREE.Group;
   wallPanels: WallPanel[];
@@ -71,13 +84,18 @@ function createExampleSoccarField(scale: number): {
   const WALL_THICKNESS = Math.max(1, scale);
   const wallPanels: WallPanel[] = [];
 
-  function registerWall(mesh: THREE.Mesh, outwardLocal: THREE.Vector3): THREE.Mesh {
+  function registerWall(
+    mesh: THREE.Mesh,
+    outwardLocal: THREE.Vector3,
+    fixedOpacity: number | null = null
+  ): THREE.Mesh {
     const material = (mesh.material as THREE.Material).clone();
     mesh.material = material;
     wallPanels.push({
       mesh,
       material,
       outwardLocal: outwardLocal.clone().normalize(),
+      fixedOpacity,
     });
     return mesh;
   }
@@ -204,7 +222,8 @@ function createExampleSoccarField(scale: number): {
         WALL_THICKNESS,
         wallMaterial
       ),
-      new THREE.Vector3(0, 1, 0)
+      new THREE.Vector3(0, 1, 0),
+      OUTSIDE_WALL_OPACITY
     );
     farPost.position.set(
       -GOAL_WIDTH / 2,
@@ -221,7 +240,8 @@ function createExampleSoccarField(scale: number): {
         WALL_THICKNESS,
         wallMaterial
       ),
-      new THREE.Vector3(0, -1, 0)
+      new THREE.Vector3(0, -1, 0),
+      OUTSIDE_WALL_OPACITY
     );
     nearPost.position.set(
       GOAL_WIDTH / 2,
@@ -230,6 +250,40 @@ function createExampleSoccarField(scale: number): {
     );
     nearPost.rotateZ(Math.PI / 2);
     res.add(nearPost);
+
+    const goalRoof = registerWall(
+      createHorizontalWallBox(
+        GOAL_WIDTH,
+        GOAL_DEPTH,
+        WALL_THICKNESS,
+        wallMaterial
+      ),
+      new THREE.Vector3(0, 0, 1),
+      OUTSIDE_WALL_OPACITY
+    );
+    goalRoof.position.set(
+      0,
+      SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
+      GOAL_HEIGHT
+    );
+    res.add(goalRoof);
+
+    const goalBack = registerWall(
+      createVerticalWallBox(
+        GOAL_WIDTH,
+        GOAL_HEIGHT,
+        WALL_THICKNESS,
+        wallMaterial
+      ),
+      new THREE.Vector3(0, 1, 0),
+      OUTSIDE_WALL_OPACITY
+    );
+    goalBack.position.set(
+      0,
+      SOCCAR_YSIZE / 2 + GOAL_DEPTH,
+      GOAL_HEIGHT / 2
+    );
+    res.add(goalBack);
 
     const backWall = createBackWall(color, inverted);
     backWall.position.y = SOCCAR_YSIZE / 2;
@@ -532,11 +586,19 @@ export function createReplayScene(
   const updateWallVisibility = (): void => {
     scene.updateMatrixWorld(true);
     for (const panel of wallPanels) {
+      if (panel.fixedOpacity !== null) {
+        panel.material.transparent = true;
+        panel.material.opacity = panel.fixedOpacity;
+        panel.material.depthWrite = false;
+        continue;
+      }
+
       panel.mesh.getWorldPosition(wallCenter);
       panel.mesh.getWorldQuaternion(wallQuaternion);
       wallNormal.copy(panel.outwardLocal).applyQuaternion(wallQuaternion).normalize();
       wallToCamera.copy(camera.position).sub(wallCenter);
       const isOutside = wallNormal.dot(wallToCamera) > 0;
+      panel.material.transparent = true;
       panel.material.opacity = isOutside
         ? OUTSIDE_WALL_OPACITY
         : OPAQUE_WALL_OPACITY;
