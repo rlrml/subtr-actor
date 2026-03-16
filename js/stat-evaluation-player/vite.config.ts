@@ -51,6 +51,7 @@ function ensureWasmBindingsPlugin() {
 }
 
 export default defineConfig({
+  base: "./",
   plugins: [wasm(), ensureWasmBindingsPlugin()],
   resolve: {
     alias: {
@@ -58,6 +59,7 @@ export default defineConfig({
         import.meta.dirname,
         "../pkg/rl_replay_subtr_actor.js"
       ),
+      three: path.resolve(import.meta.dirname, "node_modules/three"),
     },
   },
   server: {

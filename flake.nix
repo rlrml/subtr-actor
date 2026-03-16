@@ -107,15 +107,15 @@
           doCheck = false;
           dontCargoInstall = true;
         };
-        packages.js-example-pages = pkgs.buildNpmPackage rec {
-          pname = "subtr-actor-js-example-pages";
+        packages.js-stat-evaluation-pages = pkgs.buildNpmPackage rec {
+          pname = "subtr-actor-js-stat-evaluation-pages";
           version = "0.1.17";
           src = ./.;
-          npmRoot = "js/example";
+          npmRoot = "js/stat-evaluation-player";
           npmDeps = pkgs.fetchNpmDeps {
             inherit pname version;
-            src = ./js/example;
-            hash = "sha256-aeaptp5VT6sIHOChZqqdRjXdN92GQTkYiHKDPTHbVlc=";
+            src = ./js/stat-evaluation-player;
+            hash = "sha256-p/mOPpEhDZttGSiUsQVXPceoEhzI/iLKH9JaV3Q2x/4=";
           };
           preBuild = ''
             rm -rf js/pkg
@@ -124,7 +124,7 @@
           '';
           buildPhase = ''
             runHook preBuild
-            pushd js/example
+            pushd js/stat-evaluation-player
             SUBTR_ACTOR_SKIP_WASM_BUILD=1 npm run build
             popd
             runHook postBuild
@@ -133,7 +133,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out
-            cp -r js/example/dist/. $out/
+            cp -r js/stat-evaluation-player/dist/. $out/
             runHook postInstall
           '';
         };
