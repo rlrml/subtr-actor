@@ -48,7 +48,7 @@ The package ships with reusable UI plugins:
 - `createBoostPadOverlayPlugin()` for in-stadium standard Soccar boost pad
   availability markers driven by replay pad events
 - `createTimelineOverlayPlugin()` for a bottom-docked replay scrubber with
-  time readouts, clickable event markers, default replay markers
+  integrated play/pause, time readouts, clickable event markers, default replay markers
   (goals/saves), and caller-supplied custom events
 
 For multi-replay workflows, the playlist layer is intentionally generic. Each

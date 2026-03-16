@@ -79,6 +79,53 @@ function ensureStyles(): void {
       gap: 0.85rem;
     }
 
+    .sap-tl-primary {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      min-width: 0;
+    }
+
+    .sap-tl-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      min-width: 4.9rem;
+      padding: 0.42rem 0.72rem;
+      border: 1px solid rgba(184, 214, 236, 0.24);
+      border-radius: 999px;
+      background: rgba(18, 30, 42, 0.92);
+      color: #f5fbff;
+      font: inherit;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition:
+        transform 140ms ease,
+        border-color 140ms ease,
+        background 140ms ease;
+    }
+
+    .sap-tl-toggle:hover {
+      border-color: rgba(184, 214, 236, 0.4);
+      background: rgba(28, 45, 61, 0.96);
+      transform: translateY(-1px);
+    }
+
+    .sap-tl-toggle:focus-visible {
+      outline: 2px solid rgba(123, 180, 255, 0.9);
+      outline-offset: 2px;
+    }
+
+    .sap-tl-toggle-icon {
+      width: 0.85rem;
+      text-align: center;
+      font-size: 0.7rem;
+      line-height: 1;
+    }
+
     .sap-tl-current {
       color: #f5fbff;
     }
@@ -378,6 +425,9 @@ export function createTimelineOverlayPlugin(
   let root: HTMLDivElement | null = null;
   let shell: HTMLDivElement | null = null;
   let range: HTMLInputElement | null = null;
+  let toggleButton: HTMLButtonElement | null = null;
+  let toggleButtonIcon: HTMLSpanElement | null = null;
+  let toggleButtonLabel: HTMLSpanElement | null = null;
   let currentTimeText: HTMLSpanElement | null = null;
   let remainingTimeText: HTMLSpanElement | null = null;
   let markers: HTMLDivElement | null = null;
@@ -391,7 +441,15 @@ export function createTimelineOverlayPlugin(
   const markerElements = new Map<string, HTMLButtonElement>();
 
   function syncState(context: ReplayPlayerPluginStateContext): void {
-    if (!range || !currentTimeText || !remainingTimeText || !shell) {
+    if (
+      !range ||
+      !toggleButton ||
+      !toggleButtonIcon ||
+      !toggleButtonLabel ||
+      !currentTimeText ||
+      !remainingTimeText ||
+      !shell
+    ) {
       return;
     }
 
@@ -401,6 +459,14 @@ export function createTimelineOverlayPlugin(
     range.max = `${duration}`;
     range.step = "0.01";
     range.value = `${Math.min(currentTime, duration)}`;
+    toggleButton.dataset.playing = context.state.playing ? "true" : "false";
+    toggleButton.setAttribute(
+      "aria-label",
+      context.state.playing ? "Pause replay" : "Play replay"
+    );
+    toggleButton.title = context.state.playing ? "Pause replay" : "Play replay";
+    toggleButtonIcon.textContent = context.state.playing ? "||" : ">";
+    toggleButtonLabel.textContent = context.state.playing ? "Pause" : "Play";
     currentTimeText.textContent = formatPlaybackTime(currentTime);
     remainingTimeText.textContent = `-${formatPlaybackTime(duration - currentTime)}`;
     shell.dataset.scrubbing = scrubbing ? "true" : "false";
@@ -520,6 +586,23 @@ export function createTimelineOverlayPlugin(
       const topLine = document.createElement("div");
       topLine.className = "sap-tl-topline";
 
+      const primary = document.createElement("div");
+      primary.className = "sap-tl-primary";
+
+      toggleButton = document.createElement("button");
+      toggleButton.type = "button";
+      toggleButton.className = "sap-tl-toggle";
+      toggleButtonIcon = document.createElement("span");
+      toggleButtonIcon.className = "sap-tl-toggle-icon";
+      toggleButtonIcon.setAttribute("aria-hidden", "true");
+      toggleButtonIcon.textContent = ">";
+      toggleButtonLabel = document.createElement("span");
+      toggleButtonLabel.textContent = "Play";
+      toggleButton.append(toggleButtonIcon, toggleButtonLabel);
+      toggleButton.addEventListener("click", () => {
+        context.player.togglePlayback();
+      });
+
       currentTimeText = document.createElement("span");
       currentTimeText.className = "sap-tl-current";
       currentTimeText.textContent = "0:00.00";
@@ -528,7 +611,8 @@ export function createTimelineOverlayPlugin(
       remainingTimeText.className = "sap-tl-remaining";
       remainingTimeText.textContent = "-0:00.00";
 
-      topLine.append(currentTimeText, remainingTimeText);
+      primary.append(toggleButton, currentTimeText);
+      topLine.append(primary, remainingTimeText);
 
       const trackWrap = document.createElement("div");
       trackWrap.className = "sap-tl-track-wrap";
@@ -595,6 +679,9 @@ export function createTimelineOverlayPlugin(
       root = null;
       shell = null;
       range = null;
+      toggleButton = null;
+      toggleButtonIcon = null;
+      toggleButtonLabel = null;
       currentTimeText = null;
       remainingTimeText = null;
       markers = null;
