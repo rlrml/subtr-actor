@@ -629,11 +629,19 @@ impl BoostReducer {
             BoostPadSize::Small => 4.0,
         }
     }
+
+    fn tracks_boost_time(sample: &StatsSample, live_play: bool) -> bool {
+        live_play
+            || (sample.ball_has_been_hit == Some(false)
+                && sample.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
+                && sample.kickoff_countdown_time.is_none_or(|t| t <= 0))
+    }
 }
 
 impl StatsReducer for BoostReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
+        let track_boost_time = Self::tracks_boost_time(sample, live_play);
         let kickoff_phase_active = sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || sample.kickoff_countdown_time.is_some_and(|t| t > 0)
             || sample.ball_has_been_hit == Some(false);
@@ -678,7 +686,7 @@ impl StatsReducer for BoostReducer {
                 .copied()
                 .or(speed);
 
-            if live_play {
+            if track_boost_time {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 let time_zero_boost = sample.dt
                     * Self::interval_fraction_in_boost_range(
@@ -808,7 +816,7 @@ impl StatsReducer for BoostReducer {
         for event in &sample.boost_pad_events {
             match event.kind {
                 BoostPadEventKind::PickedUp { sequence } => {
-                    if !live_play && !self.config.include_non_live_pickups {
+                    if !track_boost_time && !self.config.include_non_live_pickups {
                         continue;
                     }
                     if self.unavailable_pads.contains(&event.pad_id) {

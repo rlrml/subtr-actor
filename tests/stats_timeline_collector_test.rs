@@ -9,6 +9,30 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
 }
 
+fn frame_total_goals(frame: &ReplayStatsFrame) -> i32 {
+    frame.team_zero.core.goals + frame.team_one.core.goals
+}
+
+fn normalized_team_stats_for_live_play_comparison(
+    snapshot: &TeamStatsSnapshot,
+) -> TeamStatsSnapshot {
+    let mut normalized = snapshot.clone();
+    normalized.core = CoreTeamStats::default();
+    normalized.boost.amount_used = 0.0;
+    normalized.demo = DemoTeamStats::default();
+    normalized
+}
+
+fn normalized_player_stats_for_live_play_comparison(
+    snapshot: &PlayerStatsSnapshot,
+) -> PlayerStatsSnapshot {
+    let mut normalized = snapshot.clone();
+    normalized.core = CorePlayerStats::default();
+    normalized.boost.amount_used = 0.0;
+    normalized.demo = DemoPlayerStats::default();
+    normalized
+}
+
 /// Check that a cumulative stat field never decreases between consecutive frames
 /// for any player in the timeline.
 fn assert_player_boost_field_monotonic(
@@ -467,6 +491,80 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
         "Expected emitted timeline events to be time sorted"
     );
     assert_boost_pickup_nominal_amounts_consistent(&timeline);
+}
+
+#[test]
+fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected replay data");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline data");
+
+    let first_goal = replay_data
+        .goal_events
+        .first()
+        .expect("Expected at least one goal event");
+    let kickoff_countdown_start = replay_data
+        .frame_data
+        .metadata_frames
+        .iter()
+        .skip(first_goal.frame + 1)
+        .find(|metadata| metadata.replicated_game_state_time_remaining > 0)
+        .map(|metadata| metadata.time)
+        .expect("Expected a kickoff countdown after the first goal");
+    let post_goal_frames: Vec<_> = timeline
+        .frames
+        .iter()
+        .filter(|frame| frame.time >= first_goal.time && frame.time < kickoff_countdown_start)
+        .collect();
+
+    assert!(
+        post_goal_frames.len() > 1,
+        "Expected multiple frames between the goal and the next kickoff countdown"
+    );
+    assert!(
+        post_goal_frames.iter().all(|frame| !frame.is_live_play),
+        "Expected all post-goal reset frames to be inactive"
+    );
+
+    let first_post_goal_frame = post_goal_frames
+        .first()
+        .expect("Expected a first post-goal frame");
+    let last_post_goal_frame = post_goal_frames
+        .last()
+        .expect("Expected a last post-goal frame");
+
+    assert_eq!(
+        frame_total_goals(first_post_goal_frame),
+        frame_total_goals(last_post_goal_frame),
+        "Expected the score to stay fixed throughout the post-goal reset"
+    );
+    assert_eq!(
+        last_post_goal_frame.possession,
+        first_post_goal_frame.possession
+    );
+    assert_eq!(
+        normalized_team_stats_for_live_play_comparison(&last_post_goal_frame.team_zero),
+        normalized_team_stats_for_live_play_comparison(&first_post_goal_frame.team_zero),
+    );
+    assert_eq!(
+        normalized_team_stats_for_live_play_comparison(&last_post_goal_frame.team_one),
+        normalized_team_stats_for_live_play_comparison(&first_post_goal_frame.team_one),
+    );
+    let normalized_last_players: Vec<_> = last_post_goal_frame
+        .players
+        .iter()
+        .map(normalized_player_stats_for_live_play_comparison)
+        .collect();
+    let normalized_first_players: Vec<_> = first_post_goal_frame
+        .players
+        .iter()
+        .map(normalized_player_stats_for_live_play_comparison)
+        .collect();
+    assert_eq!(normalized_last_players, normalized_first_players);
 }
 
 #[test]

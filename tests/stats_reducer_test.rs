@@ -101,6 +101,7 @@ fn sample_stats(
         demo_events: Vec::new(),
         boost_pad_events: Vec::new(),
         touch_events: Vec::new(),
+        dodge_refreshed_events: Vec::new(),
         player_stat_events: Vec::new(),
         goal_events: Vec::new(),
     }
@@ -367,6 +368,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -396,6 +398,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -425,6 +428,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -463,6 +467,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -492,6 +497,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -539,6 +545,7 @@ fn test_powerslide_reducer_allows_small_suspension_height() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -684,6 +691,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -714,6 +722,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: vec![GoalEvent {
                 time: 1.25,
@@ -764,6 +773,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -796,6 +806,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: vec![GoalEvent {
                 time: 1.5,
@@ -842,6 +853,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -872,6 +884,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: vec![
                 PlayerStatEvent {
                     time: 1.5,
@@ -969,6 +982,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -997,6 +1011,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1025,6 +1040,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1033,6 +1049,74 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
     let stats = reducer.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.tracked_time, 1.0);
     assert!((stats.total_distance - 10.0).abs() < 0.001);
+}
+
+#[test]
+fn test_movement_reducer_tracks_pre_touch_kickoff_time() {
+    let player_id = epic_id("movement-pre-touch-kickoff");
+    let mut reducer = MovementReducer::new();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: Some(58),
+            ball_has_been_hit: Some(false),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 1.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(58),
+            ball_has_been_hit: Some(false),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(1000.0, 0.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.tracked_time, 1.0);
+    assert_eq!(stats.total_distance, 1000.0);
 }
 
 #[test]
@@ -1063,6 +1147,7 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1091,6 +1176,7 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1165,6 +1251,7 @@ fn test_positioning_reducer_uses_field_marking_zone_boundary() {
                 demo_events: Vec::new(),
                 boost_pad_events: Vec::new(),
                 touch_events: Vec::new(),
+                dodge_refreshed_events: Vec::new(),
                 player_stat_events: Vec::new(),
                 goal_events: Vec::new(),
             })
@@ -1207,6 +1294,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1237,6 +1325,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1267,6 +1356,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1297,6 +1387,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1418,6 +1509,7 @@ fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating()
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -1434,137 +1526,6 @@ fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating()
     assert_eq!(middle_stats.time_mid_role, 0.0);
     assert_eq!(middle_stats.time_other_role, 0.0);
 }
-
-#[test]
-fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
-    let front_id = epic_id("positioning-front-leave");
-    let back_id = epic_id("positioning-back-leave");
-    let mut reducer = PositioningReducer::new();
-    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
-
-    reducer
-        .on_sample(&sample_stats(
-            1,
-            1.0,
-            0.0,
-            ball,
-            vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-        ))
-        .unwrap();
-
-    reducer
-        .on_sample(&StatsSample {
-            frame_number: 2,
-            time: 2.0,
-            dt: 1.0,
-            seconds_remaining: Some(100),
-            game_state: Some(0),
-            ball_has_been_hit: Some(true),
-            kickoff_countdown_time: None,
-            team_zero_score: None,
-            team_one_score: None,
-            possession_team_is_team_0: None,
-            scored_on_team_is_team_0: None,
-            current_in_game_team_player_counts: Some([2, 0]),
-            ball: ball.map(|rigid_body| BallSample { rigid_body }),
-            players: vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-            active_demos: Vec::new(),
-            demo_events: Vec::new(),
-            boost_pad_events: Vec::new(),
-            touch_events: Vec::new(),
-            player_stat_events: Vec::new(),
-            goal_events: Vec::new(),
-        })
-        .unwrap();
-
-    let front_stats = reducer.player_stats().get(&front_id).unwrap();
-    let back_stats = reducer.player_stats().get(&back_id).unwrap();
-    assert_eq!(front_stats.time_most_forward, 1.0);
-    assert_eq!(front_stats.time_most_back, 0.0);
-    assert_eq!(back_stats.time_most_back, 1.0);
-    assert_eq!(back_stats.time_most_forward, 0.0);
-}
-
-#[test]
-fn test_positioning_reducer_records_mid_role_for_unclassified_middle_player() {
-    let front_id = epic_id("positioning-front-middle");
-    let middle_id = epic_id("positioning-middle-middle");
-    let back_id = epic_id("positioning-back-middle");
-    let mut reducer = PositioningReducer::new();
-    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
-
-    reducer
-        .on_sample(&sample_stats(
-            1,
-            1.0,
-            0.0,
-            ball,
-            vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
-                    ..sample_player(middle_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-        ))
-        .unwrap();
-
-    reducer
-        .on_sample(&sample_stats(
-            2,
-            2.0,
-            1.0,
-            ball,
-            vec![
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
-                    ..sample_player(front_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
-                    ..sample_player(middle_id.clone(), true)
-                },
-                PlayerSample {
-                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
-                    ..sample_player(back_id.clone(), true)
-                },
-            ],
-        ))
-        .unwrap();
-
-    let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
-    assert_eq!(middle_stats.active_game_time, 1.0);
-    assert_eq!(middle_stats.time_mid_role, 1.0);
-    assert_eq!(middle_stats.time_most_back, 0.0);
-    assert_eq!(middle_stats.time_most_forward, 0.0);
-    assert_eq!(middle_stats.time_other_role, 0.0);
-}
-
 
 #[test]
 fn test_positioning_reducer_tracks_pre_touch_kickoff_time() {
@@ -1642,6 +1603,138 @@ fn test_positioning_reducer_ignores_frozen_kickoff_countdown_time() {
     assert_eq!(stats.active_game_time, 0.0);
     assert_eq!(stats.tracked_time, 0.0);
 }
+
+#[test]
+fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
+    let front_id = epic_id("positioning-front-leave");
+    let back_id = epic_id("positioning-back-leave");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball,
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: Some(100),
+            game_state: Some(0),
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([2, 0]),
+            ball: ball.map(|rigid_body| BallSample { rigid_body }),
+            players: vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    let front_stats = reducer.player_stats().get(&front_id).unwrap();
+    let back_stats = reducer.player_stats().get(&back_id).unwrap();
+    assert_eq!(front_stats.time_most_forward, 1.0);
+    assert_eq!(front_stats.time_most_back, 0.0);
+    assert_eq!(back_stats.time_most_back, 1.0);
+    assert_eq!(back_stats.time_most_forward, 0.0);
+}
+
+#[test]
+fn test_positioning_reducer_records_mid_role_for_unclassified_middle_player() {
+    let front_id = epic_id("positioning-front-middle");
+    let middle_id = epic_id("positioning-middle-middle");
+    let back_id = epic_id("positioning-back-middle");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            1.0,
+            0.0,
+            ball,
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(middle_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    reducer
+        .on_sample(&sample_stats(
+            2,
+            2.0,
+            1.0,
+            ball,
+            vec![
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
+                    ..sample_player(front_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, 0.0, 17.0)),
+                    ..sample_player(middle_id.clone(), true)
+                },
+                PlayerSample {
+                    rigid_body: Some(sample_rigid_body(0.0, -1200.0, 17.0)),
+                    ..sample_player(back_id.clone(), true)
+                },
+            ],
+        ))
+        .unwrap();
+
+    let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
+    assert_eq!(middle_stats.active_game_time, 1.0);
+    assert_eq!(middle_stats.time_mid_role, 1.0);
+    assert_eq!(middle_stats.time_most_back, 0.0);
+    assert_eq!(middle_stats.time_most_forward, 0.0);
+    assert_eq!(middle_stats.time_other_role, 0.0);
+}
+
 #[test]
 fn test_positioning_reducer_other_role_requires_full_team_clustered_within_threshold() {
     let player_ids = [
@@ -1783,6 +1876,7 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2161,6 +2255,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
                 player: Some(team_zero_id.clone()),
                 closest_approach_distance: None,
             }],
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2186,6 +2281,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2217,6 +2313,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
                 player: Some(team_one_id.clone()),
                 closest_approach_distance: None,
             }],
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2242,6 +2339,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2311,6 +2409,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2339,6 +2438,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2367,6 +2467,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2409,6 +2510,7 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2441,6 +2543,7 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2590,6 +2693,7 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2622,6 +2726,7 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2663,6 +2768,7 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2695,6 +2801,7 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2732,6 +2839,7 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2760,6 +2868,7 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2804,6 +2913,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2839,6 +2949,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2874,6 +2985,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2916,6 +3028,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2952,6 +3065,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -2987,6 +3101,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3033,6 +3148,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3068,6 +3184,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3084,7 +3201,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
 }
 
 #[test]
-fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
+fn test_boost_reducer_tracks_pre_touch_kickoff_time_and_pickups() {
     let player_id = epic_id("boost-pre-touch-kickoff");
     let mut reducer = BoostReducer::new();
 
@@ -3119,6 +3236,7 @@ fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3154,6 +3272,7 @@ fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3164,8 +3283,8 @@ fn test_boost_reducer_ignores_pre_touch_kickoff_time_and_pickups() {
         .get(&player_id)
         .cloned()
         .unwrap_or_default();
-    assert_eq!(stats.amount_collected, 0.0);
-    assert_eq!(stats.tracked_time, 10.0);
+    assert!((stats.amount_collected - 55.0).abs() < 0.001);
+    assert_eq!(stats.tracked_time, 11.0);
 }
 
 #[test]
@@ -3212,6 +3331,7 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
                 },
             ],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3247,6 +3367,7 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3293,6 +3414,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3328,6 +3450,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3372,6 +3495,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
                 },
             ],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3411,6 +3535,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3457,6 +3582,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3492,6 +3618,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3527,6 +3654,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::PickedUp { sequence: 2 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3565,6 +3693,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3600,6 +3729,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::PickedUp { sequence: 3 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3638,6 +3768,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3673,6 +3804,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
                 kind: BoostPadEventKind::PickedUp { sequence: 4 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3719,6 +3851,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3754,6 +3887,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3816,6 +3950,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3874,6 +4009,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -3932,6 +4068,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4138,6 +4275,7 @@ fn test_boost_reducer_aligns_canonical_pickups_with_boost_jump_frame() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4174,6 +4312,7 @@ fn test_boost_reducer_aligns_canonical_pickups_with_boost_jump_frame() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4219,6 +4358,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4248,6 +4388,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4298,6 +4439,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
             }],
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4327,6 +4469,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4491,6 +4634,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4549,6 +4693,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4607,6 +4752,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
                 kind: BoostPadEventKind::Available,
             }],
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4644,6 +4790,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4668,6 +4815,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4712,6 +4860,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
                 player: Some(team_zero.player_id.clone()),
                 closest_approach_distance: None,
             }],
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4737,6 +4886,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4768,6 +4918,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
                 player: Some(team_one.player_id.clone()),
                 closest_approach_distance: None,
             }],
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4793,6 +4944,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
             touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: Vec::new(),
         })
@@ -4836,6 +4988,7 @@ fn test_demo_reducer_counts_events_and_dedupes_consecutive_frames() {
                 demo_events: Vec::new(),
                 boost_pad_events: Vec::new(),
                 touch_events: Vec::new(),
+                dodge_refreshed_events: Vec::new(),
                 player_stat_events: Vec::new(),
                 goal_events: Vec::new(),
             })

@@ -159,7 +159,7 @@ impl LivePlayTracker {
             || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
     }
 
-    pub fn is_live_play(&mut self, sample: &StatsSample) -> bool {
+    fn live_play_internal(&mut self, sample: &StatsSample) -> bool {
         let kickoff_phase_active = Self::kickoff_phase_active(sample);
         let score_changed = Self::current_score(sample)
             .zip(self.last_score)
@@ -184,6 +184,10 @@ impl LivePlayTracker {
         }
 
         live_play
+    }
+
+    pub fn is_live_play(&mut self, sample: &StatsSample) -> bool {
+        self.live_play_internal(sample)
     }
 }
 

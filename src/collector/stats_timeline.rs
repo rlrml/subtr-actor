@@ -232,6 +232,8 @@ pub struct StatsTimelineCollector {
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
     last_sample: Option<StatsSample>,
+    last_live_play: Option<bool>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl StatsTimelineCollector {
@@ -312,14 +314,19 @@ impl StatsTimelineCollector {
         }
     }
 
-    fn snapshot_frame(&self, sample: &StatsSample, replay_meta: &ReplayMeta) -> ReplayStatsFrame {
+    fn snapshot_frame(
+        &self,
+        sample: &StatsSample,
+        replay_meta: &ReplayMeta,
+        live_play: bool,
+    ) -> ReplayStatsFrame {
         ReplayStatsFrame {
             frame_number: sample.frame_number,
             time: sample.time,
             dt: sample.dt,
             seconds_remaining: sample.seconds_remaining,
             game_state: sample.game_state,
-            is_live_play: sample.is_live_play(),
+            is_live_play: live_play,
             possession: self.reducers.possession.stats().clone(),
             team_zero: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_zero_stats(),
@@ -427,14 +434,17 @@ impl Collector for StatsTimelineCollector {
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
         let sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        let live_play = self.live_play_tracker.is_live_play(&sample);
         self.reducers.on_sample(&sample)?;
         self.last_sample_time = Some(current_time);
+        self.last_live_play = Some(live_play);
 
         let replay_meta = self
             .replay_meta
             .as_ref()
             .expect("replay metadata should be initialized before snapshotting");
-        self.frames.push(self.snapshot_frame(&sample, replay_meta));
+        self.frames
+            .push(self.snapshot_frame(&sample, replay_meta, live_play));
         self.last_sample = Some(sample);
 
         Ok(TimeAdvance::NextFrame)
@@ -448,7 +458,11 @@ impl Collector for StatsTimelineCollector {
         let Some(replay_meta) = self.replay_meta.as_ref() else {
             return Ok(());
         };
-        let final_snapshot = self.snapshot_frame(last_sample, replay_meta);
+        let final_snapshot = self.snapshot_frame(
+            last_sample,
+            replay_meta,
+            self.last_live_play.unwrap_or(false),
+        );
         if let Some(last_frame) = self.frames.last_mut() {
             *last_frame = final_snapshot;
         }
