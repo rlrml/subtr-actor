@@ -13,6 +13,7 @@ export interface ReplayScene {
   ballMesh: THREE.Mesh;
   playerMeshes: Map<string, THREE.Object3D>;
   playerBoostTrails: Map<string, THREE.Group>;
+  playerBoostMeters: Map<string, BoostMeter>;
   updateWallVisibility: () => void;
 }
 
@@ -453,6 +454,67 @@ function createBoostTrail(): THREE.Group {
   return trail;
 }
 
+export interface BoostMeter {
+  group: THREE.Group;
+  fillMesh: THREE.Mesh;
+  fillMaterial: THREE.MeshBasicMaterial;
+}
+
+function createBoostMeter(): BoostMeter {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  // Position above the car
+  group.position.set(0, 0, 160);
+
+  const barWidth = 120;
+  const barHeight = 12;
+
+  // Background (dark)
+  const bgGeometry = new THREE.PlaneGeometry(barWidth, barHeight);
+  const bgMaterial = new THREE.MeshBasicMaterial({
+    color: 0x222222,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
+  group.add(bgMesh);
+
+  // Fill (yellow-gold, scales with boost amount)
+  const fillGeometry = new THREE.PlaneGeometry(barWidth, barHeight);
+  const fillMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffcc00,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial);
+  // Anchor fill to the left so it grows rightward
+  fillMesh.position.x = 0;
+  group.add(fillMesh);
+
+  return { group, fillMesh, fillMaterial };
+}
+
+export function updateBoostMeter(
+  meter: BoostMeter,
+  fraction: number,
+  camera: THREE.Camera,
+): void {
+  // Scale fill bar horizontally by fraction
+  meter.fillMesh.scale.x = Math.max(0.001, fraction);
+  // Shift fill so it stays left-aligned: at scale=1 it's centered,
+  // so offset = (1 - scale) * halfWidth
+  const halfWidth = 60; // barWidth / 2
+  meter.fillMesh.position.x = -(1 - fraction) * halfWidth;
+
+  // Billboard: face the camera
+  meter.group.quaternion.copy(camera.quaternion);
+}
+
 function makeLights(scene: THREE.Scene): void {
   scene.add(new THREE.AmbientLight("#d8ecff", 1.6));
 
@@ -513,13 +575,17 @@ export function createReplayScene(
 
   const playerMeshes = new Map<string, THREE.Object3D>();
   const playerBoostTrails = new Map<string, THREE.Group>();
+  const playerBoostMeters = new Map<string, BoostMeter>();
   for (const player of replay.players) {
     const mesh = createExampleCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40");
     const boostTrail = createBoostTrail();
     mesh.add(boostTrail);
+    const boostMeter = createBoostMeter();
+    mesh.add(boostMeter.group);
     replayRoot.add(mesh);
     playerMeshes.set(player.id, mesh);
     playerBoostTrails.set(player.id, boostTrail);
+    playerBoostMeters.set(player.id, boostMeter);
   }
 
   const resize = (): void => {
@@ -576,6 +642,7 @@ export function createReplayScene(
     ballMesh,
     playerMeshes,
     playerBoostTrails,
+    playerBoostMeters,
     updateWallVisibility,
   };
 }

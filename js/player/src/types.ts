@@ -186,6 +186,28 @@ export interface PlaylistItem {
   meta?: Record<string, unknown>;
 }
 
+export interface PlaylistManifestReplay {
+  id: string;
+  path?: string;
+  label?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface PlaylistManifestItem {
+  replay: string;
+  start: PlaybackBound;
+  end: PlaybackBound;
+  label?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface PlaylistManifest {
+  replays?: PlaylistManifestReplay[];
+  items: PlaylistManifestItem[];
+  label?: string;
+  meta?: Record<string, unknown>;
+}
+
 export interface ResolvedPlaybackBound {
   frameIndex: number;
   time: number;
@@ -199,12 +221,30 @@ export interface ResolvedPlaylistItem {
   duration: number;
 }
 
+export interface ReplayPreloadContext {
+  items: PlaylistItem[];
+  currentIndex: number;
+  currentItem: PlaylistItem;
+}
+
+export type ReplayPreloadPolicy =
+  | { kind: "none" }
+  | { kind: "all" }
+  | { kind: "adjacent"; ahead: number; behind?: number }
+  | {
+      kind: "custom";
+      pick: (
+        context: ReplayPreloadContext
+      ) => Iterable<string | ReplaySource>;
+    };
+
 export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
   initialCameraDistanceScale?: number;
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
+  initialBoostMeterEnabled?: boolean;
   initialPlaybackRate?: number;
   initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
@@ -215,6 +255,7 @@ export interface ReplayPlaylistPlayerOptions
   autoplay?: boolean;
   advanceOnEnd?: boolean;
   initialItemIndex?: number;
+  preloadPolicy?: ReplayPreloadPolicy;
   preloadRadius?: number;
 }
 
@@ -228,6 +269,7 @@ export interface ReplayPlayerState {
   cameraDistanceScale: number;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  boostMeterEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -244,6 +286,7 @@ export interface ReplayPlaylistPlayerState {
   replayCurrentTime: number;
   replayDuration: number;
   frameIndex: number;
+  activeMetadata: ReplayPlayerActiveMetadata | null;
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
@@ -265,6 +308,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "cameraDistanceScale"
     | "attachedPlayerId"
     | "ballCamEnabled"
+    | "boostMeterEnabled"
     | "skipPostGoalTransitionsEnabled"
     | "skipKickoffsEnabled"
   >

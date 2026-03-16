@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createReplayScene, type ReplayScene } from "./scene";
+import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
   BeforeRenderCallback,
@@ -102,6 +102,7 @@ export class ReplayPlayer extends EventTarget {
   private cameraDistanceScale: number;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
+  private boostMeterEnabled: boolean;
   private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
@@ -125,6 +126,7 @@ export class ReplayPlayer extends EventTarget {
     );
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
+    this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
     this.skipPostGoalTransitionsEnabled =
       options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
@@ -198,6 +200,17 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setBoostMeterEnabled(enabled: boolean): void {
+    this.boostMeterEnabled = enabled;
+    if (!enabled) {
+      for (const meter of this.sceneState.playerBoostMeters.values()) {
+        meter.group.visible = false;
+      }
+    }
+    this.render();
+    this.emitChange();
+  }
+
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.skipPostGoalTransitionsEnabled = enabled;
     if (enabled) {
@@ -245,6 +258,14 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
     }
+    if (nextState.boostMeterEnabled !== undefined) {
+      this.boostMeterEnabled = nextState.boostMeterEnabled;
+      if (!this.boostMeterEnabled) {
+        for (const meter of this.sceneState.playerBoostMeters.values()) {
+          meter.group.visible = false;
+        }
+      }
+    }
     if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
       this.skipPostGoalTransitionsEnabled =
         nextState.skipPostGoalTransitionsEnabled;
@@ -291,6 +312,7 @@ export class ReplayPlayer extends EventTarget {
       cameraDistanceScale: this.cameraDistanceScale,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
+      boostMeterEnabled: this.boostMeterEnabled,
       skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
       skipKickoffsEnabled: this.skipKickoffsEnabled,
     };
@@ -476,14 +498,15 @@ export class ReplayPlayer extends EventTarget {
         mesh.quaternion.identity();
       }
 
+      const currentBoostFraction = frame?.boostFraction ?? 0;
+      const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
+      const boostFraction = THREE.MathUtils.lerp(
+        currentBoostFraction,
+        nextBoostFraction,
+        frameWindow.alpha
+      );
+
       if (boostTrail) {
-        const currentBoostFraction = frame?.boostFraction ?? 0;
-        const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
-        const boostFraction = THREE.MathUtils.lerp(
-          currentBoostFraction,
-          nextBoostFraction,
-          frameWindow.alpha
-        );
         const boostActive =
           (frameWindow.alpha >= 0.5
             ? nextFrame?.boostActive
@@ -498,6 +521,20 @@ export class ReplayPlayer extends EventTarget {
           this.currentTime,
           playerIndex
         );
+      }
+
+      const boostMeter = this.sceneState.playerBoostMeters.get(player.id);
+      if (boostMeter) {
+        if (this.boostMeterEnabled) {
+          boostMeter.group.visible = true;
+          updateBoostMeter(
+            boostMeter,
+            boostFraction,
+            this.sceneState.camera
+          );
+        } else {
+          boostMeter.group.visible = false;
+        }
       }
     }
 
