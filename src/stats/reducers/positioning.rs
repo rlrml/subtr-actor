@@ -14,6 +14,7 @@ pub struct PositioningStats {
     pub time_no_teammates: f32,
     pub time_most_back: f32,
     pub time_most_forward: f32,
+    pub time_mid_role: f32,
     pub time_other_role: f32,
     #[serde(rename = "time_defensive_third")]
     pub time_defensive_zone: f32,
@@ -25,7 +26,6 @@ pub struct PositioningStats {
     pub time_offensive_half: f32,
     pub time_closest_to_ball: f32,
     pub time_farthest_from_ball: f32,
-    pub time_even: f32,
     pub time_behind_ball: f32,
     pub time_in_front_of_ball: f32,
 }
@@ -79,6 +79,14 @@ impl PositioningStats {
         self.pct(self.time_most_forward)
     }
 
+    pub fn mid_role_pct(&self) -> f32 {
+        self.pct(self.time_mid_role)
+    }
+
+    pub fn other_role_pct(&self) -> f32 {
+        self.pct(self.time_other_role)
+    }
+
     pub fn defensive_third_pct(&self) -> f32 {
         self.pct(self.time_defensive_zone)
     }
@@ -117,10 +125,6 @@ impl PositioningStats {
 
     pub fn farthest_from_ball_pct(&self) -> f32 {
         self.pct(self.time_farthest_from_ball)
-    }
-
-    pub fn even_pct(&self) -> f32 {
-        self.pct(self.time_even)
     }
 
     pub fn behind_ball_pct(&self) -> f32 {
@@ -356,16 +360,18 @@ impl StatsReducer for PositioningReducer {
                         - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
 
                     if team_spread <= self.config.most_back_forward_threshold_y {
-                        // "Even" means the whole live team is compressed inside the threshold band.
+                        // When the whole live team is compressed inside the threshold band, treat the
+                        // shared lane as an "other" state rather than overloading the midpoint bucket.
                         for (player_id, _) in &sorted_team {
                             self.player_stats
                                 .entry(player_id.clone())
                                 .or_default()
-                                .time_even += sample.dt;
+                                .time_other_role += sample.dt;
                         }
                     } else {
                         let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
                         let max_y = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0);
+                        let can_assign_mid_role = sorted_team.len() == 3;
 
                         for (player_id, y) in &sorted_team {
                             let near_back =
@@ -383,6 +389,11 @@ impl StatsReducer for PositioningReducer {
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_most_forward += sample.dt;
+                            } else if can_assign_mid_role {
+                                self.player_stats
+                                    .entry(player_id.clone())
+                                    .or_default()
+                                    .time_mid_role += sample.dt;
                             } else {
                                 self.player_stats
                                     .entry(player_id.clone())

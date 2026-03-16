@@ -53,11 +53,11 @@ test("team one back and forward bands reverse direction in world space", () => {
   ]);
 });
 
-test("even bands keep both team-relative directions", () => {
+test("other bands keep both team-relative directions", () => {
   const descriptors = computeTeamBandDescriptors([-1400, -1280, -1200], false, 236);
 
   assert.deepEqual(descriptors, [{
-    kind: "even",
+    kind: "other",
     centerY: -1300,
     halfDepth: 136,
     directions: [1, -1],

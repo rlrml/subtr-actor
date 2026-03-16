@@ -102,15 +102,15 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_other_role",
+            "time_mid_role",
             StatUnit::Seconds,
-            self.time_other_role,
+            self.time_mid_role,
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_even",
+            "time_other_role",
             StatUnit::Seconds,
-            self.time_even,
+            self.time_other_role,
         ));
         visitor(ExportedStat::float(
             "positioning",
@@ -180,9 +180,15 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "percent_even",
+            "percent_mid_role",
             StatUnit::Percent,
-            self.even_pct(),
+            self.mid_role_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "percent_other_role",
+            StatUnit::Percent,
+            self.other_role_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",

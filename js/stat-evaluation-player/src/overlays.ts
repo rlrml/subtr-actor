@@ -25,7 +25,7 @@ const MIN_ARROW_LENGTH = 220;
 const ARROW_HEAD_LENGTH = 100;
 const ARROW_HEAD_WIDTH = 120;
 
-type BandKind = "back" | "forward" | "even";
+type BandKind = "back" | "forward" | "other";
 
 export interface TeamLaneBounds {
   minX: number;
@@ -102,9 +102,9 @@ export function computeTeamBandDescriptors(
 
   if (spread <= threshold) {
     return [{
-      kind: "even",
+      kind: "other",
       centerY: (rawMin + rawMax) / 2,
-      // Use the overlap of the back/front threshold bands for the even state.
+      // Use the overlap of the back/front threshold bands for the collapsed other state.
       halfDepth: Math.max(threshold - spread / 2, threshold * 0.35),
       directions: [backDirection, forwardDirection],
     }];
@@ -314,19 +314,19 @@ export class ThresholdZoneOverlay {
   private replay: ReplayModel;
   private blueBack: ThresholdZone;
   private blueForward: ThresholdZone;
-  private blueEven: ThresholdZone;
+  private blueOther: ThresholdZone;
   private orangeBack: ThresholdZone;
   private orangeForward: ThresholdZone;
-  private orangeEven: ThresholdZone;
+  private orangeOther: ThresholdZone;
 
   constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
     this.replay = replay;
     this.blueBack = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
     this.blueForward = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
-    this.blueEven = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
+    this.blueOther = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
     this.orangeBack = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
     this.orangeForward = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
-    this.orangeEven = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
+    this.orangeOther = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
 
     for (const zone of this.getZones()) {
       scene.add(zone.group);
@@ -386,14 +386,14 @@ export class ThresholdZoneOverlay {
       return new Map<BandKind, ThresholdZone>([
         ["back", this.blueBack],
         ["forward", this.blueForward],
-        ["even", this.blueEven],
+        ["other", this.blueOther],
       ]);
     }
 
     return new Map<BandKind, ThresholdZone>([
       ["back", this.orangeBack],
       ["forward", this.orangeForward],
-      ["even", this.orangeEven],
+      ["other", this.orangeOther],
     ]);
   }
 
@@ -401,10 +401,10 @@ export class ThresholdZoneOverlay {
     return [
       this.blueBack,
       this.blueForward,
-      this.blueEven,
+      this.blueOther,
       this.orangeBack,
       this.orangeForward,
-      this.orangeEven,
+      this.orangeOther,
     ];
   }
 }

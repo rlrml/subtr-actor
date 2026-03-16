@@ -59,8 +59,8 @@ export interface PlayerStatsSnapshot {
     time_no_teammates: number;
     time_most_back: number;
     time_most_forward: number;
+    time_mid_role: number;
     time_other_role: number;
-    time_even: number;
     [key: string]: unknown;
   };
   boost?: {

@@ -22,7 +22,8 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_no_teammates: 2.0,
         time_most_back: 3.0,
         time_most_forward: 1.0,
-        time_other_role: 1.0,
+        time_mid_role: 1.0,
+        time_other_role: 2.0,
         time_defensive_zone: 4.0,
         time_neutral_zone: 3.0,
         time_offensive_zone: 3.0,
@@ -30,7 +31,6 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_offensive_half: 4.0,
         time_closest_to_ball: 2.0,
         time_farthest_from_ball: 4.0,
-        time_even: 0.0,
         time_behind_ball: 7.0,
         time_in_front_of_ball: 3.0,
     };
@@ -70,8 +70,12 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         StatValue::Float(2.0)
     );
     assert_eq!(
-        find_field(&fields, "positioning", "time_other_role").value,
+        find_field(&fields, "positioning", "time_mid_role").value,
         StatValue::Float(1.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "time_other_role").value,
+        StatValue::Float(2.0)
     );
     assert_eq!(
         find_field(&fields, "positioning", "percent_neutral_third").value,

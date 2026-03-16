@@ -1357,8 +1357,9 @@ fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_bucket
     assert_eq!(front_stats.active_game_time, 1.0);
     assert_eq!(front_stats.time_most_forward, 0.0);
     assert_eq!(front_stats.time_most_back, 0.0);
+    assert_eq!(front_stats.time_mid_role, 0.0);
+    assert_eq!(front_stats.time_other_role, 0.0);
     assert_eq!(front_stats.time_no_teammates, 1.0);
-    assert_eq!(front_stats.time_even, 0.0);
     assert!(reducer.player_stats().get(&back_id).is_none());
 }
 
@@ -1426,10 +1427,12 @@ fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating()
     let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
     assert_eq!(front_stats.time_most_forward, 0.0);
     assert_eq!(front_stats.time_most_back, 0.0);
-    assert_eq!(front_stats.time_even, 0.0);
+    assert_eq!(front_stats.time_mid_role, 0.0);
+    assert_eq!(front_stats.time_other_role, 0.0);
     assert_eq!(middle_stats.time_most_forward, 0.0);
     assert_eq!(middle_stats.time_most_back, 0.0);
-    assert_eq!(middle_stats.time_even, 0.0);
+    assert_eq!(middle_stats.time_mid_role, 0.0);
+    assert_eq!(middle_stats.time_other_role, 0.0);
 }
 
 #[test]
@@ -1501,7 +1504,7 @@ fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
 }
 
 #[test]
-fn test_positioning_reducer_records_other_role_for_unclassified_middle_player() {
+fn test_positioning_reducer_records_mid_role_for_unclassified_middle_player() {
     let front_id = epic_id("positioning-front-middle");
     let middle_id = epic_id("positioning-middle-middle");
     let back_id = epic_id("positioning-back-middle");
@@ -1556,10 +1559,10 @@ fn test_positioning_reducer_records_other_role_for_unclassified_middle_player() 
 
     let middle_stats = reducer.player_stats().get(&middle_id).unwrap();
     assert_eq!(middle_stats.active_game_time, 1.0);
-    assert_eq!(middle_stats.time_other_role, 1.0);
+    assert_eq!(middle_stats.time_mid_role, 1.0);
     assert_eq!(middle_stats.time_most_back, 0.0);
     assert_eq!(middle_stats.time_most_forward, 0.0);
-    assert_eq!(middle_stats.time_even, 0.0);
+    assert_eq!(middle_stats.time_other_role, 0.0);
 }
 
 
@@ -1640,7 +1643,7 @@ fn test_positioning_reducer_ignores_frozen_kickoff_countdown_time() {
     assert_eq!(stats.tracked_time, 0.0);
 }
 #[test]
-fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold() {
+fn test_positioning_reducer_other_role_requires_full_team_clustered_within_threshold() {
     let player_ids = [
         epic_id("positioning-even-1"),
         epic_id("positioning-even-2"),
@@ -1697,7 +1700,8 @@ fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold()
 
     for player_id in player_ids {
         let stats = reducer.player_stats().get(&player_id).unwrap();
-        assert_eq!(stats.time_even, 1.0);
+        assert_eq!(stats.time_other_role, 1.0);
+        assert_eq!(stats.time_mid_role, 0.0);
         assert_eq!(stats.time_most_back, 0.0);
         assert_eq!(stats.time_most_forward, 0.0);
     }
@@ -1792,8 +1796,8 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
     assert_eq!(
         live_stats.time_most_back
             + live_stats.time_most_forward
+            + live_stats.time_mid_role
             + live_stats.time_other_role
-            + live_stats.time_even
             + live_stats.time_no_teammates
             + live_stats.time_demolished,
         live_stats.active_game_time
@@ -1807,8 +1811,8 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
     assert_eq!(
         victim_stats.time_most_back
             + victim_stats.time_most_forward
+            + victim_stats.time_mid_role
             + victim_stats.time_other_role
-            + victim_stats.time_even
             + victim_stats.time_no_teammates
             + victim_stats.time_demolished,
         victim_stats.active_game_time
@@ -1948,9 +1952,10 @@ fn test_positioning_reducer_treats_single_teammate_demo_in_3v3_like_2v2() {
                 - previous_player.positioning.time_most_back)
                 + (current_player.positioning.time_most_forward
                     - previous_player.positioning.time_most_forward)
+                + (current_player.positioning.time_mid_role
+                    - previous_player.positioning.time_mid_role)
                 + (current_player.positioning.time_other_role
-                    - previous_player.positioning.time_other_role)
-                + (current_player.positioning.time_even - previous_player.positioning.time_even);
+                    - previous_player.positioning.time_other_role);
 
             assert!(
                 no_teammates_delta.abs() < 1e-4,
@@ -1980,7 +1985,7 @@ fn test_positioning_reducer_treats_single_teammate_demo_in_3v3_like_2v2() {
 }
 
 #[test]
-fn test_positioning_reducer_even_uses_two_car_length_default_threshold() {
+fn test_positioning_reducer_other_role_uses_two_car_length_default_threshold() {
     let player_ids = [
         epic_id("positioning-even-two-cars-1"),
         epic_id("positioning-even-two-cars-2"),
@@ -2037,7 +2042,8 @@ fn test_positioning_reducer_even_uses_two_car_length_default_threshold() {
 
     for player_id in player_ids {
         let stats = reducer.player_stats().get(&player_id).unwrap();
-        assert_eq!(stats.time_even, 1.0);
+        assert_eq!(stats.time_other_role, 1.0);
+        assert_eq!(stats.time_mid_role, 0.0);
         assert_eq!(stats.time_most_back, 0.0);
         assert_eq!(stats.time_most_forward, 0.0);
     }
