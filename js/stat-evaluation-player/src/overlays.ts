@@ -10,8 +10,8 @@ const ROLE_COLORS = {
   mid: 0xffaa33,
 } as const;
 
-// Must match Rust constant MOST_BACK_FORWARD_THRESHOLD_Y
-const MOST_BACK_FORWARD_THRESHOLD_Y = 800.0;
+// Must match Rust DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y (approx one car length)
+const MOST_BACK_FORWARD_THRESHOLD_Y = 118.0;
 
 type Role = "back" | "forward" | "even" | "mid";
 
@@ -115,6 +115,124 @@ export class RoleOverlay {
       ring.removeFromParent();
     }
     this.rings.clear();
+  }
+}
+
+// Dynamic threshold lines showing most-back/most-forward demarcation per team
+const FIELD_HALF_X = 4120;
+const WALL_HEIGHT = 1960;
+
+interface ThresholdLine {
+  group: THREE.Group;
+  positionAttr: THREE.BufferAttribute;
+}
+
+function makeThresholdLineMesh(
+  fieldScale: number,
+  color: number,
+  opacity: number,
+): ThresholdLine {
+  const hw = FIELD_HALF_X * fieldScale;
+  const wh = WALL_HEIGHT * fieldScale;
+
+  // U-shape: down left wall, across floor, up right wall
+  const points = [
+    new THREE.Vector3(-hw, 0, wh),
+    new THREE.Vector3(-hw, 0, 0),
+    new THREE.Vector3(hw, 0, 0),
+    new THREE.Vector3(hw, 0, wh),
+  ];
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  });
+  const line = new THREE.Line(geometry, material);
+  const group = new THREE.Group();
+  group.add(line);
+  group.visible = false;
+  return {
+    group,
+    positionAttr: geometry.getAttribute("position") as THREE.BufferAttribute,
+  };
+}
+
+export class ThresholdLineOverlay {
+  private replay: ReplayModel;
+  // 2 lines per team: back boundary and forward boundary
+  private blueBack: ThresholdLine;
+  private blueFront: ThresholdLine;
+  private orangeBack: ThresholdLine;
+  private orangeFront: ThresholdLine;
+
+  constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
+    this.replay = replay;
+    this.blueBack = makeThresholdLineMesh(fieldScale, 0x5577ff, 0.35);
+    this.blueFront = makeThresholdLineMesh(fieldScale, 0x5577ff, 0.35);
+    this.orangeBack = makeThresholdLineMesh(fieldScale, 0xff9944, 0.35);
+    this.orangeFront = makeThresholdLineMesh(fieldScale, 0xff9944, 0.35);
+    scene.add(this.blueBack.group);
+    scene.add(this.blueFront.group);
+    scene.add(this.orangeBack.group);
+    scene.add(this.orangeFront.group);
+  }
+
+  update(info: FrameRenderInfo, fieldScale: number): void {
+    const { frameIndex } = info;
+
+    for (const isTeamZero of [true, false]) {
+      const teamPlayers: number[] = []; // raw Y positions
+      for (const player of this.replay.players) {
+        if (player.isTeamZero !== isTeamZero) continue;
+        const frame = player.frames[frameIndex];
+        if (!frame?.position) continue;
+        teamPlayers.push(frame.position.y);
+      }
+
+      const backLine = isTeamZero ? this.blueBack : this.orangeBack;
+      const frontLine = isTeamZero ? this.blueFront : this.orangeFront;
+
+      if (teamPlayers.length < 2) {
+        backLine.group.visible = false;
+        frontLine.group.visible = false;
+        continue;
+      }
+
+      // For team 0: most back = min raw Y, most forward = max raw Y
+      // For team 1: most back = max raw Y, most forward = min raw Y
+      const rawMin = Math.min(...teamPlayers);
+      const rawMax = Math.max(...teamPlayers);
+
+      // Back boundary (the Y beyond which you're no longer "most back"):
+      // Team 0: minY + threshold, Team 1: maxY - threshold
+      const backBoundaryRawY = isTeamZero
+        ? rawMin + MOST_BACK_FORWARD_THRESHOLD_Y
+        : rawMax - MOST_BACK_FORWARD_THRESHOLD_Y;
+      // Forward boundary (the Y beyond which you're no longer "most forward"):
+      // Team 0: maxY - threshold, Team 1: minY + threshold
+      const frontBoundaryRawY = isTeamZero
+        ? rawMax - MOST_BACK_FORWARD_THRESHOLD_Y
+        : rawMin + MOST_BACK_FORWARD_THRESHOLD_Y;
+
+      backLine.group.position.y = backBoundaryRawY * fieldScale;
+      backLine.group.visible = true;
+      frontLine.group.position.y = frontBoundaryRawY * fieldScale;
+      frontLine.group.visible = true;
+    }
+  }
+
+  dispose(): void {
+    for (const tl of [this.blueBack, this.blueFront, this.orangeBack, this.orangeFront]) {
+      tl.group.removeFromParent();
+      tl.group.traverse((node) => {
+        if (node instanceof THREE.Line) {
+          node.geometry.dispose();
+          (node.material as THREE.Material).dispose();
+        }
+      });
+    }
   }
 }
 

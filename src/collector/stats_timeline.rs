@@ -3,7 +3,13 @@ use serde::Serialize;
 use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StatsTimelineConfig {
+    pub most_back_forward_threshold_y: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayStatsTimeline {
+    pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub frames: Vec<ReplayStatsFrame>,
@@ -11,6 +17,7 @@ pub struct ReplayStatsTimeline {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DynamicReplayStatsTimeline {
+    pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub frames: Vec<DynamicReplayStatsFrame>,
@@ -149,6 +156,15 @@ struct StatsTimelineReducers {
     demo: DemoReducer,
 }
 
+impl StatsTimelineReducers {
+    fn with_positioning_config(config: PositioningReducerConfig) -> Self {
+        Self {
+            positioning: PositioningReducer::with_config(config),
+            ..Self::default()
+        }
+    }
+}
+
 impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.possession.on_replay_meta(meta)?;
@@ -201,6 +217,13 @@ impl StatsTimelineCollector {
         Self::default()
     }
 
+    pub fn with_positioning_config(config: PositioningReducerConfig) -> Self {
+        Self {
+            reducers: StatsTimelineReducers::with_positioning_config(config),
+            ..Self::default()
+        }
+    }
+
     pub fn get_replay_data(
         mut self,
         replay: &boxcars::Replay,
@@ -223,10 +246,18 @@ impl StatsTimelineCollector {
         let replay_meta = self
             .replay_meta
             .expect("replay metadata should be initialized before building a stats timeline");
+        let config = StatsTimelineConfig {
+            most_back_forward_threshold_y: self
+                .reducers
+                .positioning
+                .config()
+                .most_back_forward_threshold_y,
+        };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
         timeline_events.sort_by(|left, right| left.time.total_cmp(&right.time));
         ReplayStatsTimeline {
+            config,
             replay_meta,
             timeline_events,
             frames: self.frames,
@@ -237,10 +268,18 @@ impl StatsTimelineCollector {
         let replay_meta = self
             .replay_meta
             .expect("replay metadata should be initialized before building a stats timeline");
+        let config = StatsTimelineConfig {
+            most_back_forward_threshold_y: self
+                .reducers
+                .positioning
+                .config()
+                .most_back_forward_threshold_y,
+        };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
         timeline_events.sort_by(|left, right| left.time.total_cmp(&right.time));
         DynamicReplayStatsTimeline {
+            config,
             replay_meta,
             timeline_events,
             frames: self

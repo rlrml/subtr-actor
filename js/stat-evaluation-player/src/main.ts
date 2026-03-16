@@ -6,7 +6,7 @@ import {
 import type {
   ReplayPlayerState,
 } from "../../player/src/lib.ts";
-import { RoleOverlay, createZoneBoundaryLines } from "./overlays.ts";
+import { RoleOverlay, ThresholdLineOverlay, createZoneBoundaryLines } from "./overlays.ts";
 
 // WASM module - init is the default export, get_stats_timeline is named
 import wasmInit, {
@@ -54,26 +54,14 @@ app.innerHTML = `
         <option value="1" selected>1.0x</option>
         <option value="2">2.0x</option>
       </select>
+      <span id="time-readout" class="readout">0.00s</span>
+      <span id="frame-readout" class="readout">0</span>
       <input id="timeline" type="range" min="0" max="0" step="0.01" value="0" disabled style="flex:1" />
     </div>
     <div id="viewport" class="viewport"></div>
-    <aside class="sidebar">
-      <div class="panel">
-        <h2>Playback</h2>
-        <div class="stat-row">
-          <span class="label">Time</span>
-          <span class="value" id="time-readout">0.00s</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Frame</span>
-          <span class="value" id="frame-readout">0</span>
-        </div>
-      </div>
-      <div id="stats-container" class="panel">
-        <h2>Player Stats</h2>
-        <div id="player-stats">Load a replay to see stats.</div>
-      </div>
-    </aside>
+    <div id="stats-panel" class="stats-panel">
+      <div id="player-stats" class="player-stats-grid">Load a replay to see stats.</div>
+    </div>
   </div>
 `;
 
@@ -81,7 +69,10 @@ let replayPlayer: ReplayPlayer | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let unsubscribe: (() => void) | null = null;
 let roleOverlay: RoleOverlay | null = null;
+let thresholdLineOverlay: ThresholdLineOverlay | null = null;
 let removeRenderHook: (() => void) | null = null;
+
+const MOST_BACK_FORWARD_THRESHOLD_Y = 118.0;
 
 const fileInput = document.getElementById("replay-file") as HTMLInputElement;
 const viewport = document.getElementById("viewport")!;
@@ -92,25 +83,84 @@ const timeReadout = document.getElementById("time-readout")!;
 const frameReadout = document.getElementById("frame-readout")!;
 const playerStatsEl = document.getElementById("player-stats")!;
 
+type Role = "back" | "forward" | "even" | "mid";
+
+function getCurrentRole(
+  playerId: string,
+  frameIndex: number,
+): Role {
+  if (!replayPlayer) return "even";
+  const replay = replayPlayer.replay;
+
+  const player = replay.players.find((p) => p.id === playerId);
+  if (!player) return "even";
+  const frame = player.frames[frameIndex];
+  if (!frame?.position) return "even";
+
+  const isTeamZero = player.isTeamZero;
+  const teammates = replay.players.filter(
+    (p) => p.isTeamZero === isTeamZero && p.id !== playerId,
+  );
+
+  const normalizedY = isTeamZero ? frame.position.y : -frame.position.y;
+
+  const allYs = [normalizedY];
+  for (const t of teammates) {
+    const tf = t.frames[frameIndex];
+    if (!tf?.position) continue;
+    allYs.push(isTeamZero ? tf.position.y : -tf.position.y);
+  }
+
+  const minY = Math.min(...allYs);
+  const maxY = Math.max(...allYs);
+  const spread = maxY - minY;
+
+  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "even";
+
+  const nearBack = (normalizedY - minY) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+  const nearFront = (maxY - normalizedY) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+
+  if (nearBack && !nearFront) return "back";
+  if (nearFront && !nearBack) return "forward";
+  return "mid";
+}
+
+const ROLE_LABELS: Record<Role, string> = {
+  back: "Back",
+  forward: "Fwd",
+  even: "Even",
+  mid: "Mid",
+};
+
 function renderStats(frameIndex: number): void {
   if (!statsTimeline) return;
 
   const statsFrame = statsTimeline.frames[frameIndex];
   if (!statsFrame) return;
 
-  const lines: string[] = [];
-  for (const player of statsFrame.players) {
-    const pos = player.positioning;
-    lines.push(`<div class="player-stats-group">`);
-    lines.push(`<h3>${player.name} ${player.is_team_0 ? "(Blue)" : "(Orange)"}</h3>`);
-    if (pos) {
-      lines.push(`<div class="stat-row"><span class="label">Most back</span><span class="value">${pos.time_most_back?.toFixed(1) ?? "?"}s</span></div>`);
-      lines.push(`<div class="stat-row"><span class="label">Most forward</span><span class="value">${pos.time_most_forward?.toFixed(1) ?? "?"}s</span></div>`);
-      lines.push(`<div class="stat-row"><span class="label">Even</span><span class="value">${pos.time_even?.toFixed(1) ?? "?"}s</span></div>`);
-    }
-    lines.push(`</div>`);
+  const bluePlayers = statsFrame.players.filter((p) => p.is_team_0);
+  const orangePlayers = statsFrame.players.filter((p) => !p.is_team_0);
+
+  function renderTeam(players: PlayerStatsSnapshot[], teamClass: string): string {
+    return players.map((player) => {
+      const pos = player.positioning;
+      const pid = Object.entries(player.player_id).map(([k, v]) => `${k}:${v}`).join(",");
+      const role = getCurrentRole(pid, frameIndex);
+      return `<div class="player-card ${teamClass}">
+        <div class="player-card-header">
+          <span class="player-name">${player.name}</span>
+          <span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>
+        </div>
+        <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
+        <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
+        <div class="stat-row"><span class="label">Even</span><span class="value">${pos?.time_even?.toFixed(1) ?? "?"}s</span></div>
+      </div>`;
+    }).join("");
   }
-  playerStatsEl.innerHTML = lines.join("\n");
+
+  playerStatsEl.innerHTML =
+    renderTeam(bluePlayers, "team-blue") +
+    renderTeam(orangePlayers, "team-orange");
 }
 
 function onStateChange(state: ReplayPlayerState): void {
@@ -141,18 +191,23 @@ async function loadReplay(file: File): Promise<void> {
 
   // Clean up previous overlays
   roleOverlay?.dispose();
+  thresholdLineOverlay?.dispose();
   removeRenderHook?.();
 
   // Set up overlays
+  const fs = replayPlayer.options.fieldScale ?? 1;
   roleOverlay = new RoleOverlay(replayPlayer.sceneState, replay);
+  thresholdLineOverlay = new ThresholdLineOverlay(
+    replayPlayer.sceneState.scene,
+    replay,
+    fs,
+  );
   removeRenderHook = replayPlayer.onBeforeRender((info) => {
     roleOverlay?.update(info);
+    thresholdLineOverlay?.update(info, fs);
   });
 
-  createZoneBoundaryLines(
-    replayPlayer.sceneState.scene,
-    replayPlayer.options.fieldScale ?? 1,
-  );
+  createZoneBoundaryLines(replayPlayer.sceneState.scene, fs);
 
   unsubscribe = replayPlayer.subscribe(onStateChange);
 

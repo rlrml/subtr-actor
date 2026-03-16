@@ -637,7 +637,8 @@ const HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 // soccar lane markings more closely than a literal geometric third of the full
 // playable length.
 const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
-const MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 800.0;
+/// Approximate length of the Octane hitbox in Unreal units.
+const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 118.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
@@ -1638,8 +1639,22 @@ impl PositioningStats {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PositioningReducerConfig {
+    pub most_back_forward_threshold_y: f32,
+}
+
+impl Default for PositioningReducerConfig {
+    fn default() -> Self {
+        Self {
+            most_back_forward_threshold_y: DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PositioningReducer {
+    config: PositioningReducerConfig,
     player_stats: HashMap<PlayerId, PositioningStats>,
     current_possession_team_is_team_0: Option<bool>,
     previous_ball_position: Option<glam::Vec3>,
@@ -1649,6 +1664,17 @@ pub struct PositioningReducer {
 impl PositioningReducer {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_config(config: PositioningReducerConfig) -> Self {
+        Self {
+            config,
+            ..Self::default()
+        }
+    }
+
+    pub fn config(&self) -> &PositioningReducerConfig {
+        &self.config
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
@@ -1794,7 +1820,7 @@ impl StatsReducer for PositioningReducer {
                 let team_spread = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0)
                     - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
 
-                if team_spread <= MOST_BACK_FORWARD_THRESHOLD_Y {
+                if team_spread <= self.config.most_back_forward_threshold_y {
                     // All players are even
                     for (player_id, _) in &sorted_team {
                         self.player_stats
@@ -1807,8 +1833,8 @@ impl StatsReducer for PositioningReducer {
                     let max_y = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0);
 
                     for (player_id, y) in &sorted_team {
-                        let near_back = (*y - min_y) <= MOST_BACK_FORWARD_THRESHOLD_Y;
-                        let near_front = (max_y - *y) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+                        let near_back = (*y - min_y) <= self.config.most_back_forward_threshold_y;
+                        let near_front = (max_y - *y) <= self.config.most_back_forward_threshold_y;
 
                         if near_back && !near_front {
                             self.player_stats
