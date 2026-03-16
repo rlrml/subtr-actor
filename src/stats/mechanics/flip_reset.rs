@@ -549,7 +549,8 @@ impl FlipResetTracker {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id)
+            else {
                 self.previous_dodge_active.remove(player_id);
                 continue;
             };
@@ -564,7 +565,8 @@ impl FlipResetTracker {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id)
+            else {
                 continue;
             };
             let is_grounded = Self::player_is_grounded_for_wall_sequence(&player_rigid_body);
@@ -616,7 +618,8 @@ impl FlipResetTracker {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
         for player_id in &player_ids {
-            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id)
+            else {
                 self.recent_flip_reset_candidates.remove(player_id);
                 continue;
             };
@@ -636,7 +639,8 @@ impl FlipResetTracker {
         }
 
         for player_id in &self.current_frame_dodge_rising_edges {
-            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id) else {
+            let Ok(player_rigid_body) = processor.get_normalized_player_rigid_body(player_id)
+            else {
                 continue;
             };
             if Self::player_is_grounded_for_wall_sequence(&player_rigid_body) {

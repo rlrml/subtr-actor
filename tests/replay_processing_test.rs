@@ -33,8 +33,9 @@ fn max_abs_position_from_ndarray(
     global_feature_adders: &[&str],
     player_feature_adders: &[&str],
 ) -> f32 {
-    let collector = NDArrayCollector::<f32>::from_strings(global_feature_adders, player_feature_adders)
-        .expect("Should create collector");
+    let collector =
+        NDArrayCollector::<f32>::from_strings(global_feature_adders, player_feature_adders)
+            .expect("Should create collector");
     let (meta, array) = collector
         .process_replay(replay)
         .expect("Should process replay")
@@ -156,7 +157,10 @@ fn test_replay_data_exposes_powerslide_activity() {
 
 #[test]
 fn test_legacy_replays_use_spatial_normalization() {
-    for path in ["assets/replays/rlcs.replay", "assets/replays/soccar-lan.replay"] {
+    for path in [
+        "assets/replays/rlcs.replay",
+        "assets/replays/soccar-lan.replay",
+    ] {
         let replay = parse_replay(path);
         let processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
         assert_eq!(
@@ -221,7 +225,10 @@ fn test_modern_replay_player_positions_are_not_overscaled() {
 
 #[test]
 fn test_legacy_replay_ndarray_positions_are_normalized_to_field_units() {
-    for path in ["assets/replays/rlcs.replay", "assets/replays/soccar-lan.replay"] {
+    for path in [
+        "assets/replays/rlcs.replay",
+        "assets/replays/soccar-lan.replay",
+    ] {
         let replay = parse_replay(path);
         let max_abs_position = max_abs_position_from_ndarray(
             &replay,
