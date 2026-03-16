@@ -18,6 +18,12 @@ export interface StatsFrame {
     team_one_time: number;
     [key: string]: unknown;
   };
+  pressure?: {
+    tracked_time: number;
+    team_zero_side_time: number;
+    team_one_side_time: number;
+    [key: string]: unknown;
+  };
   players: PlayerStatsSnapshot[];
   [key: string]: unknown;
 }

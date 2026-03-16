@@ -107,6 +107,34 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
 }
 
 #[test]
+fn test_pressure_stats_export_includes_side_totals_and_percentages() {
+    let stats = PressureStats {
+        tracked_time: 10.0,
+        team_zero_side_time: 4.0,
+        team_one_side_time: 6.0,
+    };
+
+    let fields = stats.stat_fields();
+
+    assert_eq!(
+        find_field(&fields, "pressure", "team_zero_side_time").value,
+        StatValue::Float(4.0)
+    );
+    assert_eq!(
+        find_field(&fields, "pressure", "team_one_side_time").value,
+        StatValue::Float(6.0)
+    );
+    assert_eq!(
+        find_field(&fields, "pressure", "team_zero_side_pct").value,
+        StatValue::Float(40.0)
+    );
+    assert_eq!(
+        find_field(&fields, "pressure", "team_one_side_pct").value,
+        StatValue::Float(60.0)
+    );
+}
+
+#[test]
 fn test_boost_stats_export_includes_respawn_and_used_fields() {
     let stats = BoostStats {
         amount_collected_big: 55.0,

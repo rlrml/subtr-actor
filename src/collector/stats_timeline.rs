@@ -48,6 +48,7 @@ pub struct ReplayStatsFrame {
     pub game_state: Option<i32>,
     pub is_live_play: bool,
     pub possession: PossessionStats,
+    pub pressure: PressureStats,
     pub team_zero: TeamStatsSnapshot,
     pub team_one: TeamStatsSnapshot,
     pub players: Vec<PlayerStatsSnapshot>,
@@ -62,6 +63,7 @@ pub struct DynamicReplayStatsFrame {
     pub game_state: Option<i32>,
     pub is_live_play: bool,
     pub possession: Vec<ExportedStat>,
+    pub pressure: Vec<ExportedStat>,
     pub team_zero: DynamicTeamStatsSnapshot,
     pub team_one: DynamicTeamStatsSnapshot,
     pub players: Vec<DynamicPlayerStatsSnapshot>,
@@ -139,6 +141,7 @@ impl ReplayStatsFrame {
             game_state: self.game_state,
             is_live_play: self.is_live_play,
             possession: self.possession.stat_fields(),
+            pressure: self.pressure.stat_fields(),
             team_zero: DynamicTeamStatsSnapshot {
                 stats: self.team_zero.stat_fields(),
             },
@@ -165,6 +168,7 @@ impl ReplayStatsFrame {
 #[derive(Debug, Clone, Default)]
 struct StatsTimelineReducers {
     possession: PossessionReducer,
+    pressure: PressureReducer,
     match_stats: MatchStatsReducer,
     ball_carry: BallCarryReducer,
     boost: BoostReducer,
@@ -187,6 +191,7 @@ impl StatsTimelineReducers {
 impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.possession.on_replay_meta(meta)?;
+        self.pressure.on_replay_meta(meta)?;
         self.match_stats.on_replay_meta(meta)?;
         self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
@@ -200,6 +205,7 @@ impl StatsReducer for StatsTimelineReducers {
 
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         self.possession.on_sample(sample)?;
+        self.pressure.on_sample(sample)?;
         self.match_stats.on_sample(sample)?;
         self.ball_carry.on_sample(sample)?;
         self.boost.on_sample(sample)?;
@@ -213,6 +219,7 @@ impl StatsReducer for StatsTimelineReducers {
 
     fn finish(&mut self) -> SubtrActorResult<()> {
         self.possession.finish()?;
+        self.pressure.finish()?;
         self.match_stats.finish()?;
         self.ball_carry.finish()?;
         self.boost.finish()?;
@@ -328,6 +335,7 @@ impl StatsTimelineCollector {
             game_state: sample.game_state,
             is_live_play: live_play,
             possession: self.reducers.possession.stats().clone(),
+            pressure: self.reducers.pressure.stats().clone(),
             team_zero: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_zero_stats(),
                 ball_carry: self.reducers.ball_carry.team_zero_stats().clone(),

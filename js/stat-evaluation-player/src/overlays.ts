@@ -13,10 +13,13 @@ const BAND_ARROW_COLOR = 0x111111;
 const BLUE_TEAM_ACCENT_COLOR = 0x59c3ff;
 const ORANGE_TEAM_ACCENT_COLOR = 0xffc15c;
 const TEAM_STRIPE_OPACITY = 0.55;
+const HALF_FIELD_BASE_OPACITY = 0.12;
+const HALF_FIELD_ACTIVE_OPACITY = 0.28;
 
 const BAND_BASE_Z = 3;
 const STRIPE_Z = 4;
 const ARROW_Z = 5;
+const HALF_FIELD_Z = 2;
 
 const TEAM_LANE_EDGE_INSET_X = 220;
 const TEAM_LANE_GAP_X = 200;
@@ -61,6 +64,11 @@ interface ThresholdZone {
   stripeMaterial: THREE.MeshBasicMaterial;
   primaryMarker: DirectionMarker;
   secondaryMarker: DirectionMarker;
+}
+
+interface HalfFieldSide {
+  mesh: THREE.Mesh;
+  material: THREE.MeshBasicMaterial;
 }
 
 export function getTeamLaneBounds(isTeamZero: boolean): TeamLaneBounds {
@@ -406,6 +414,71 @@ export class ThresholdZoneOverlay {
       this.orangeForward,
       this.orangeOther,
     ];
+  }
+}
+
+export function getBallSideFromY(ballY: number | null | undefined): "team-zero" | "team-one" | null {
+  if (ballY === null || ballY === undefined || Number.isNaN(ballY)) {
+    return null;
+  }
+
+  return ballY < 0 ? "team-zero" : "team-one";
+}
+
+export class HalfFieldOverlay {
+  private group: THREE.Group;
+  private teamZeroSide: HalfFieldSide;
+  private teamOneSide: HalfFieldSide;
+
+  constructor(scene: THREE.Scene, fieldScale: number) {
+    this.group = new THREE.Group();
+    this.teamZeroSide = this.createHalfFieldSide(BLUE_TEAM_ACCENT_COLOR);
+    this.teamOneSide = this.createHalfFieldSide(ORANGE_TEAM_ACCENT_COLOR);
+
+    const halfWidth = FIELD_HALF_X * fieldScale;
+    const halfDepth = 5120 * fieldScale;
+
+    this.teamZeroSide.mesh.position.set(0, -halfDepth / 2, HALF_FIELD_Z);
+    this.teamZeroSide.mesh.scale.set(halfWidth * 2, halfDepth, 1);
+    this.teamOneSide.mesh.position.set(0, halfDepth / 2, HALF_FIELD_Z);
+    this.teamOneSide.mesh.scale.set(halfWidth * 2, halfDepth, 1);
+
+    this.group.add(this.teamZeroSide.mesh);
+    this.group.add(this.teamOneSide.mesh);
+    scene.add(this.group);
+  }
+
+  update(ballY: number | null | undefined): void {
+    const ballSide = getBallSideFromY(ballY);
+    this.teamZeroSide.material.opacity = ballSide === "team-zero"
+      ? HALF_FIELD_ACTIVE_OPACITY
+      : HALF_FIELD_BASE_OPACITY;
+    this.teamOneSide.material.opacity = ballSide === "team-one"
+      ? HALF_FIELD_ACTIVE_OPACITY
+      : HALF_FIELD_BASE_OPACITY;
+  }
+
+  dispose(): void {
+    this.group.removeFromParent();
+    this.teamZeroSide.mesh.geometry.dispose();
+    this.teamZeroSide.material.dispose();
+    this.teamOneSide.mesh.geometry.dispose();
+    this.teamOneSide.material.dispose();
+  }
+
+  private createHalfFieldSide(color: number): HalfFieldSide {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: HALF_FIELD_BASE_OPACITY,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 18;
+    return { mesh, material };
   }
 }
 

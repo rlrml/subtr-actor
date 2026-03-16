@@ -12,7 +12,11 @@ import type {
   ReplayPlayerState,
   ReplayPlayerTrack,
 } from "../../player/src/lib.ts";
-import { ThresholdZoneOverlay, createZoneBoundaryLines } from "./overlays.ts";
+import {
+  HalfFieldOverlay,
+  ThresholdZoneOverlay,
+  createZoneBoundaryLines,
+} from "./overlays.ts";
 import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
@@ -346,6 +350,25 @@ function renderPossessionStats(
   `;
 }
 
+function renderPressureStats(
+  pressure: StatsFrame["pressure"],
+  isTeamZero: boolean,
+): string {
+  const teamSideTime = isTeamZero
+    ? pressure?.team_zero_side_time
+    : pressure?.team_one_side_time;
+  const opponentSideTime = isTeamZero
+    ? pressure?.team_one_side_time
+    : pressure?.team_zero_side_time;
+  const trackedTime = pressure?.tracked_time;
+
+  return `
+    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Own half</span><span class="value">${formatTimeShare(teamSideTime, trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Opp half</span><span class="value">${formatTimeShare(opponentSideTime, trackedTime)}</span></div>
+  `;
+}
+
 function createPlayerStatsModule<T>(options: {
   id: string;
   label: string;
@@ -634,6 +657,64 @@ function createPossessionModule(): StatModule {
   };
 }
 
+function createPressureModule(): StatModule {
+  let halfFieldOverlay: HalfFieldOverlay | null = null;
+
+  return {
+    id: "pressure",
+    label: "Ball Side",
+
+    setup(ctx) {
+      halfFieldOverlay = new HalfFieldOverlay(
+        ctx.player.sceneState.scene,
+        ctx.fieldScale,
+      );
+    },
+
+    teardown() {
+      halfFieldOverlay?.dispose();
+      halfFieldOverlay = null;
+    },
+
+    onBeforeRender(info) {
+      const ballFrame = replayPlayer?.replay.ballFrames[info.frameIndex];
+      halfFieldOverlay?.update(ballFrame?.position?.y ?? null);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame?.pressure) return "";
+
+      return [
+        renderPlayerCard(
+          "Blue Half",
+          true,
+          renderPressureStats(statsFrame.pressure, true),
+        ),
+        renderPlayerCard(
+          "Orange Half",
+          false,
+          renderPressureStats(statsFrame.pressure, false),
+        ),
+      ].join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!statsFrame?.pressure || !player) return "";
+
+      return renderPressureStats(statsFrame.pressure, player.is_team_0);
+    },
+  };
+}
+
 function createBallCarryModule(): StatModule {
   return createPlayerStatsModule({
     id: "ball-carry",
@@ -684,6 +765,7 @@ const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 const ALL_MODULES = [
   createCoreModule,
   createPossessionModule,
+  createPressureModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
   createDodgeResetModule,

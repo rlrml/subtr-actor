@@ -232,6 +232,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 game_state: None,
                 is_live_play: true,
                 possession: PossessionStats::default(),
+                pressure: PressureStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -258,6 +259,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 game_state: None,
                 is_live_play: true,
                 possession: PossessionStats::default(),
+                pressure: PressureStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -284,6 +286,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 game_state: None,
                 is_live_play: true,
                 possession: PossessionStats::default(),
+                pressure: PressureStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -325,6 +328,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let final_frame = timeline.frames.last().expect("Expected at least one frame");
 
     let mut possession_collector = ReducerCollector::new(PossessionReducer::new());
+    let mut pressure_collector = ReducerCollector::new(PressureReducer::new());
     let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
     let mut ball_carry_collector = ReducerCollector::new(BallCarryReducer::new());
     let mut boost_collector = ReducerCollector::new(BoostReducer::new());
@@ -334,8 +338,9 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let mut demo_collector = ReducerCollector::new(DemoReducer::new());
 
     let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
-    let mut collectors: [&mut dyn Collector; 8] = [
+    let mut collectors: [&mut dyn Collector; 9] = [
         &mut possession_collector,
+        &mut pressure_collector,
         &mut match_collector,
         &mut ball_carry_collector,
         &mut boost_collector,
@@ -349,6 +354,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
         .expect("Expected reducers to process replay");
 
     let possession = possession_collector.into_inner();
+    let pressure = pressure_collector.into_inner();
     let match_stats = match_collector.into_inner();
     let ball_carry = ball_carry_collector.into_inner();
     let boost = boost_collector.into_inner();
@@ -358,6 +364,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let demo = demo_collector.into_inner();
 
     assert_eq!(final_frame.possession, possession.stats().clone());
+    assert_eq!(final_frame.pressure, pressure.stats().clone());
     assert_eq!(final_frame.team_zero.core, match_stats.team_zero_stats());
     assert_eq!(final_frame.team_one.core, match_stats.team_one_stats());
     assert_eq!(
@@ -672,6 +679,10 @@ fn test_stats_timeline_collector_can_export_dynamic_stats() {
     assert_eq!(
         find_field(&dynamic_frame.possession, "possession", "team_zero_time").value,
         StatValue::Float(typed_frame.possession.team_zero_time)
+    );
+    assert_eq!(
+        find_field(&dynamic_frame.pressure, "pressure", "team_zero_side_time").value,
+        StatValue::Float(typed_frame.pressure.team_zero_side_time)
     );
     assert_eq!(
         find_field(&dynamic_frame.team_zero.stats, "core", "goals").value,

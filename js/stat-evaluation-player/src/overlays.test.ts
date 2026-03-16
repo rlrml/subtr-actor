@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   computeTeamBandDescriptors,
+  getBallSideFromY,
   getTeamLaneBounds,
 } from "./overlays.ts";
 
@@ -62,4 +63,11 @@ test("other bands keep both team-relative directions", () => {
     halfDepth: 136,
     directions: [1, -1],
   }]);
+});
+
+test("ball side helper maps field halves to team-side labels", () => {
+  assert.equal(getBallSideFromY(-1), "team-zero");
+  assert.equal(getBallSideFromY(0), "team-one");
+  assert.equal(getBallSideFromY(1), "team-one");
+  assert.equal(getBallSideFromY(null), null);
 });
