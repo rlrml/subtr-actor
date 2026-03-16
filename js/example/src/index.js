@@ -156,8 +156,43 @@ function setControlsEnabled(enabled) {
   timeline.disabled = !enabled;
 }
 
+function getKickoffDisplayCountdown(replay, snapshot) {
+  const currentFrame = replay.frames[snapshot.frameIndex];
+  if (!currentFrame || currentFrame.kickoffCountdown <= 0) {
+    return null;
+  }
+
+  let startIndex = snapshot.frameIndex;
+  while (
+    startIndex > 0 &&
+    (replay.frames[startIndex - 1]?.kickoffCountdown ?? 0) > 0
+  ) {
+    startIndex -= 1;
+  }
+
+  let endIndex = snapshot.frameIndex + 1;
+  while (
+    endIndex < replay.frames.length &&
+    replay.frames[endIndex].kickoffCountdown > 0
+  ) {
+    endIndex += 1;
+  }
+
+  let maxCountdown = 0;
+  for (let index = startIndex; index < endIndex; index += 1) {
+    maxCountdown = Math.max(maxCountdown, replay.frames[index].kickoffCountdown);
+  }
+
+  const kickoffEndTime = replay.frames[endIndex]?.time ?? replay.duration;
+  const secondsRemaining = Math.max(0, kickoffEndTime - snapshot.currentTime);
+  return Math.max(1, Math.min(maxCountdown, Math.ceil(secondsRemaining)));
+}
+
 function renderSnapshot(snapshot) {
   const metadata = replayPlayer?.replay.frames[snapshot.frameIndex];
+  const kickoffDisplayCountdown = replayPlayer
+    ? getKickoffDisplayCountdown(replayPlayer.replay, snapshot)
+    : null;
 
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${snapshot.frameIndex}`;
@@ -175,10 +210,10 @@ function renderSnapshot(snapshot) {
   remainingReadout.textContent =
     metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
 
-  const inKickoff = (metadata?.kickoffCountdown ?? 0) > 0;
+  const inKickoff = kickoffDisplayCountdown !== null;
   kickoffOverlay.hidden = !inKickoff;
   if (inKickoff) {
-    kickoffCountdown.textContent = `${metadata.kickoffCountdown}`;
+    kickoffCountdown.textContent = `${kickoffDisplayCountdown}`;
   }
 }
 
