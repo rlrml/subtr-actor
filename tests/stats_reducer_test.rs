@@ -1562,6 +1562,83 @@ fn test_positioning_reducer_records_other_role_for_unclassified_middle_player() 
     assert_eq!(middle_stats.time_even, 0.0);
 }
 
+
+#[test]
+fn test_positioning_reducer_tracks_pre_touch_kickoff_time() {
+    let player_id = epic_id("positioning-pre-touch-kickoff");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            0.0,
+            0.0,
+            ball,
+            vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+
+    let mut pre_touch_sample = sample_stats(
+        2,
+        1.0,
+        1.0,
+        ball,
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body(0.0, 2000.0, 17.0)),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    pre_touch_sample.game_state = Some(58);
+    pre_touch_sample.ball_has_been_hit = Some(false);
+    reducer.on_sample(&pre_touch_sample).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.active_game_time, 1.0);
+    assert_eq!(stats.tracked_time, 1.0);
+}
+
+#[test]
+fn test_positioning_reducer_ignores_frozen_kickoff_countdown_time() {
+    let player_id = epic_id("positioning-kickoff-countdown");
+    let mut reducer = PositioningReducer::new();
+    let ball = Some(sample_rigid_body(0.0, 0.0, 92.75));
+
+    reducer
+        .on_sample(&sample_stats(
+            1,
+            0.0,
+            0.0,
+            ball,
+            vec![PlayerSample {
+                rigid_body: Some(sample_rigid_body(0.0, 1000.0, 17.0)),
+                ..sample_player(player_id.clone(), true)
+            }],
+        ))
+        .unwrap();
+
+    let mut countdown_sample = sample_stats(
+        2,
+        1.0,
+        1.0,
+        ball,
+        vec![PlayerSample {
+            rigid_body: Some(sample_rigid_body(0.0, 2000.0, 17.0)),
+            ..sample_player(player_id.clone(), true)
+        }],
+    );
+    countdown_sample.game_state = Some(55);
+    countdown_sample.kickoff_countdown_time = Some(3);
+    countdown_sample.ball_has_been_hit = Some(false);
+    reducer.on_sample(&countdown_sample).unwrap();
+
+    let stats = reducer.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.active_game_time, 0.0);
+    assert_eq!(stats.tracked_time, 0.0);
+}
 #[test]
 fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold() {
     let player_ids = [

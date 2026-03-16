@@ -154,8 +154,8 @@ impl LivePlayTracker {
     }
 
     fn kickoff_phase_active(sample: &StatsSample) -> bool {
-        sample.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || matches!(sample.ball_has_been_hit, Some(false))
+        sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+            || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
     }
 
     pub fn is_live_play(&mut self, sample: &StatsSample) -> bool {
@@ -290,8 +290,8 @@ impl StatsSample {
     /// Returns whether time-based stats should treat this sample as live play.
     ///
     /// We exclude frozen kickoff countdown frames and post-goal replay frames,
-    /// but keep unknown states live so we do not accidentally discard stats
-    /// from replay variants whose state enum values we have not catalogued yet.
+    /// but keep the movable pre-touch kickoff approach live.
+    ///
     /// Use [`LivePlayTracker`] when you need to exclude the full post-goal
     /// reset segment that can continue after the goal frame itself.
     pub fn is_live_play(&self) -> bool {
@@ -302,7 +302,7 @@ impl StatsSample {
             return false;
         }
 
-        !matches!(self.ball_has_been_hit, Some(false))
+        true
     }
 
     pub fn current_in_game_team_player_count(&self, is_team_0: bool) -> usize {
