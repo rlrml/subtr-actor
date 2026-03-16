@@ -43,10 +43,12 @@ export class ReplayPlayer extends EventTarget {
   private readonly boundWindowResize = () => this.sceneState.resize();
   private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
-  private lastTickTime = 0;
+  private disposed = false;
   private playing = false;
   private speed = 1;
   private currentTime = 0;
+  private playbackStartedAt = 0;
+  private playbackStartedTime = 0;
   private cameraDistanceScale: number;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
@@ -72,6 +74,7 @@ export class ReplayPlayer extends EventTarget {
 
     this.installResizeHandling();
     this.render();
+    this.scheduleAnimationFrame();
     this.emitChange();
 
     if (options.autoplay) {
@@ -85,21 +88,17 @@ export class ReplayPlayer extends EventTarget {
     }
 
     this.playing = true;
-    this.lastTickTime = performance.now();
-    this.animationFrameId = requestAnimationFrame(this.tick);
+    this.reanchorPlaybackClock();
     this.emitChange();
   }
 
   pause(): void {
-    if (!this.playing && this.animationFrameId === null) {
+    if (!this.playing) {
       return;
     }
 
+    this.syncPlaybackClock();
     this.playing = false;
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
     this.emitChange();
   }
 
@@ -112,7 +111,13 @@ export class ReplayPlayer extends EventTarget {
   }
 
   setPlaybackRate(speed: number): void {
+    if (this.playing) {
+      this.syncPlaybackClock();
+    }
     this.speed = Math.max(0.1, speed);
+    if (this.playing) {
+      this.reanchorPlaybackClock();
+    }
     this.emitChange();
   }
 
@@ -136,12 +141,19 @@ export class ReplayPlayer extends EventTarget {
 
   seek(time: number): void {
     this.currentTime = THREE.MathUtils.clamp(time, 0, this.replay.duration);
+    if (this.playing) {
+      this.reanchorPlaybackClock();
+    }
     this.render();
     this.emitChange();
   }
 
   setState(nextState: ReplayPlayerStatePatch): void {
+    const now = performance.now();
     if (nextState.speed !== undefined) {
+      if (this.playing) {
+        this.syncPlaybackClock(now);
+      }
       this.speed = Math.max(0.1, nextState.speed);
     }
     if (nextState.cameraDistanceScale !== undefined) {
@@ -163,15 +175,15 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.playing !== undefined && nextState.playing !== this.playing) {
       if (nextState.playing) {
         this.playing = true;
-        this.lastTickTime = performance.now();
-        this.animationFrameId = requestAnimationFrame(this.tick);
       } else {
-        this.playing = false;
-        if (this.animationFrameId !== null) {
-          cancelAnimationFrame(this.animationFrameId);
-          this.animationFrameId = null;
+        if (nextState.currentTime === undefined) {
+          this.syncPlaybackClock(now);
         }
+        this.playing = false;
       }
+    }
+    if (this.playing) {
+      this.reanchorPlaybackClock(now);
     }
 
     this.render();
@@ -207,7 +219,14 @@ export class ReplayPlayer extends EventTarget {
   }
 
   destroy(): void {
-    this.pause();
+    if (this.playing) {
+      this.pause();
+    }
+    this.disposed = true;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
@@ -233,28 +252,55 @@ export class ReplayPlayer extends EventTarget {
     window.addEventListener("resize", this.boundWindowResize);
   }
 
-  private tick = (): void => {
-    if (!this.playing) {
+  private scheduleAnimationFrame(): void {
+    if (this.animationFrameId !== null || this.disposed) {
       return;
     }
 
-    const now = performance.now();
-    const elapsedSeconds = (now - this.lastTickTime) / 1000;
-    this.lastTickTime = now;
-    this.currentTime += elapsedSeconds * this.speed;
+    this.animationFrameId = requestAnimationFrame(this.tick);
+  }
 
-    if (this.currentTime >= this.replay.duration) {
-      this.currentTime = this.replay.duration;
-      this.playing = false;
-      this.animationFrameId = null;
-      this.render();
-      this.emitChange();
+  private reanchorPlaybackClock(now = performance.now()): void {
+    this.playbackStartedAt = now;
+    this.playbackStartedTime = this.currentTime;
+  }
+
+  private syncPlaybackClock(now = performance.now()): boolean {
+    if (!this.playing) {
+      return false;
+    }
+
+    const elapsedSeconds = (now - this.playbackStartedAt) / 1000;
+    const nextTime = THREE.MathUtils.clamp(
+      this.playbackStartedTime + elapsedSeconds * this.speed,
+      0,
+      this.replay.duration
+    );
+    const timeChanged = nextTime !== this.currentTime;
+    this.currentTime = nextTime;
+    return timeChanged;
+  }
+
+  private tick = (now: number): void => {
+    this.animationFrameId = null;
+    if (this.disposed) {
       return;
+    }
+
+    let shouldEmitChange = false;
+    if (this.playing) {
+      shouldEmitChange = this.syncPlaybackClock(now);
+      if (this.currentTime >= this.replay.duration) {
+        this.playing = false;
+        shouldEmitChange = true;
+      }
     }
 
     this.render();
-    this.emitChange();
-    this.animationFrameId = requestAnimationFrame(this.tick);
+    if (shouldEmitChange) {
+      this.emitChange();
+    }
+    this.scheduleAnimationFrame();
   };
 
   private render(): void {
