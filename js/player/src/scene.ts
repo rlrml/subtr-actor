@@ -74,6 +74,8 @@ function createExampleSoccarField(scale: number): {
   stadium: THREE.Group;
   wallPanels: WallPanel[];
 } {
+  type MirrorSign = 1 | -1;
+
   const SOCCAR_YSIZE = 10280 * scale;
   const SOCCAR_XSIZE = 8240 * scale;
   const SOCCAR_DEPTH = 1960 * scale;
@@ -83,6 +85,7 @@ function createExampleSoccarField(scale: number): {
   const GOAL_DEPTH = 900 * scale;
   const WALL_THICKNESS = Math.max(1, scale);
   const wallPanels: WallPanel[] = [];
+  const mirroredSigns: MirrorSign[] = [1, -1];
 
   function registerWall(
     mesh: THREE.Mesh,
@@ -100,77 +103,47 @@ function createExampleSoccarField(scale: number): {
     return mesh;
   }
 
-  function createBackWall(color: number, inverted: boolean): THREE.Group {
+  function createBackWall(color: number): THREE.Group {
     const backWall = new THREE.Group();
     const wallMaterial = createWallMaterial(color);
     const sideWallWidth = SOCCAR_XSIZE / 2 - STADIUM_CORNER - GOAL_WIDTH / 2;
 
-    const left = registerWall(
-      createVerticalWallBox(
-        sideWallWidth,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
-    );
-    left.position.set(
-      sideWallWidth / 2 + GOAL_WIDTH / 2,
-      0,
-      SOCCAR_DEPTH / 2
-    );
-    backWall.add(left);
-
     const cornerWidth = Math.sqrt(2 * Math.pow(STADIUM_CORNER, 2));
-    const leftCorner = registerWall(
-      createVerticalWallBox(
-        cornerWidth,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
-    );
-    leftCorner.position.set(
-      SOCCAR_XSIZE / 2 - STADIUM_CORNER / 2,
-      -STADIUM_CORNER / 2,
-      SOCCAR_DEPTH / 2
-    );
-    leftCorner.rotateZ(-Math.PI / 4);
-    backWall.add(leftCorner);
 
-    const rightCorner = registerWall(
-      createVerticalWallBox(
-        cornerWidth,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
-    );
-    rightCorner.position.set(
-      -SOCCAR_XSIZE / 2 + STADIUM_CORNER / 2,
-      -STADIUM_CORNER / 2,
-      SOCCAR_DEPTH / 2
-    );
-    rightCorner.rotateZ(Math.PI / 4);
-    backWall.add(rightCorner);
+    for (const xSign of mirroredSigns) {
+      const sideWall = registerWall(
+        createVerticalWallBox(
+          sideWallWidth,
+          SOCCAR_DEPTH,
+          WALL_THICKNESS,
+          wallMaterial
+        ),
+        new THREE.Vector3(0, 1, 0)
+      );
+      sideWall.position.set(
+        xSign * (sideWallWidth / 2 + GOAL_WIDTH / 2),
+        0,
+        SOCCAR_DEPTH / 2
+      );
+      backWall.add(sideWall);
 
-    const right = registerWall(
-      createVerticalWallBox(
-        sideWallWidth,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
-    );
-    right.position.set(
-      -sideWallWidth / 2 - GOAL_WIDTH / 2,
-      0,
-      SOCCAR_DEPTH / 2
-    );
-    backWall.add(right);
+      const corner = registerWall(
+        createVerticalWallBox(
+          cornerWidth,
+          SOCCAR_DEPTH,
+          WALL_THICKNESS,
+          wallMaterial
+        ),
+        new THREE.Vector3(0, 1, 0)
+      );
+      corner.position.set(
+        xSign * (SOCCAR_XSIZE / 2 - STADIUM_CORNER / 2),
+        -STADIUM_CORNER / 2,
+        SOCCAR_DEPTH / 2
+      );
+      corner.rotateZ(-xSign * Math.PI / 4);
+      backWall.add(corner);
+    }
 
     const top = registerWall(
       createVerticalWallBox(
@@ -187,20 +160,29 @@ function createExampleSoccarField(scale: number): {
     return backWall;
   }
 
-  function createHalf(color: number, inverted: boolean): THREE.Group {
+  function createHalf(color: number, mirrored: boolean): THREE.Group {
     const res = new THREE.Group();
+    const floorOutline: Array<[number, number]> = [
+      [SOCCAR_XSIZE / 2, 0],
+      [-SOCCAR_XSIZE / 2, 0],
+      [-SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER],
+      [-SOCCAR_XSIZE / 2 + STADIUM_CORNER, SOCCAR_YSIZE / 2],
+      [-GOAL_WIDTH / 2, SOCCAR_YSIZE / 2],
+      [-GOAL_WIDTH / 2, SOCCAR_YSIZE / 2 + GOAL_DEPTH],
+      [GOAL_WIDTH / 2, SOCCAR_YSIZE / 2 + GOAL_DEPTH],
+      [GOAL_WIDTH / 2, SOCCAR_YSIZE / 2],
+      [SOCCAR_XSIZE / 2 - STADIUM_CORNER, SOCCAR_YSIZE / 2],
+      [SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER],
+      [SOCCAR_XSIZE / 2, 0],
+    ];
     const floor = new THREE.Shape();
-    floor.moveTo(SOCCAR_XSIZE / 2, 0);
-    floor.lineTo(-SOCCAR_XSIZE / 2, 0);
-    floor.lineTo(-SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER);
-    floor.lineTo(-SOCCAR_XSIZE / 2 + STADIUM_CORNER, SOCCAR_YSIZE / 2);
-    floor.lineTo(-GOAL_WIDTH / 2, SOCCAR_YSIZE / 2);
-    floor.lineTo(-GOAL_WIDTH / 2, SOCCAR_YSIZE / 2 + GOAL_DEPTH);
-    floor.lineTo(GOAL_WIDTH / 2, SOCCAR_YSIZE / 2 + GOAL_DEPTH);
-    floor.lineTo(GOAL_WIDTH / 2, SOCCAR_YSIZE / 2);
-    floor.lineTo(SOCCAR_XSIZE / 2 - STADIUM_CORNER, SOCCAR_YSIZE / 2);
-    floor.lineTo(SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER);
-    floor.lineTo(SOCCAR_XSIZE / 2, 0);
+    floorOutline.forEach(([x, y], index) => {
+      if (index === 0) {
+        floor.moveTo(x, y);
+      } else {
+        floor.lineTo(x, y);
+      }
+    });
 
     const floorMaterial = createFloorMaterial(color);
     const wallMaterial = createWallMaterial(color);
@@ -215,41 +197,25 @@ function createExampleSoccarField(scale: number): {
     floorMesh.receiveShadow = true;
     res.add(floorMesh);
 
-    const farPost = registerWall(
-      createVerticalWallBox(
-        GOAL_DEPTH,
-        GOAL_HEIGHT,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0),
-      OUTSIDE_WALL_OPACITY
-    );
-    farPost.position.set(
-      -GOAL_WIDTH / 2,
-      SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
-      GOAL_HEIGHT / 2
-    );
-    farPost.rotateZ(Math.PI / 2);
-    res.add(farPost);
-
-    const nearPost = registerWall(
-      createVerticalWallBox(
-        GOAL_DEPTH,
-        GOAL_HEIGHT,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, -1, 0),
-      OUTSIDE_WALL_OPACITY
-    );
-    nearPost.position.set(
-      GOAL_WIDTH / 2,
-      SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
-      GOAL_HEIGHT / 2
-    );
-    nearPost.rotateZ(Math.PI / 2);
-    res.add(nearPost);
+    for (const xSign of mirroredSigns) {
+      const goalPost = registerWall(
+        createVerticalWallBox(
+          GOAL_DEPTH,
+          GOAL_HEIGHT,
+          WALL_THICKNESS,
+          wallMaterial
+        ),
+        new THREE.Vector3(0, -xSign, 0),
+        OUTSIDE_WALL_OPACITY
+      );
+      goalPost.position.set(
+        xSign * GOAL_WIDTH / 2,
+        SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
+        GOAL_HEIGHT / 2
+      );
+      goalPost.rotateZ(Math.PI / 2);
+      res.add(goalPost);
+    }
 
     const goalRoof = registerWall(
       createHorizontalWallBox(
@@ -285,52 +251,39 @@ function createExampleSoccarField(scale: number): {
     );
     res.add(goalBack);
 
-    const backWall = createBackWall(color, inverted);
+    const backWall = createBackWall(color);
     backWall.position.y = SOCCAR_YSIZE / 2;
     res.add(backWall);
 
-    const sideWallA = registerWall(
-      createVerticalWallBox(
-        SOCCAR_YSIZE / 2 - STADIUM_CORNER,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, -1, 0)
-    );
-    sideWallA.position.set(
-      SOCCAR_XSIZE / 2,
-      (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
-      SOCCAR_DEPTH / 2
-    );
-    sideWallA.rotateZ(Math.PI / 2);
-    res.add(sideWallA);
+    for (const xSign of mirroredSigns) {
+      const sideWall = registerWall(
+        createVerticalWallBox(
+          SOCCAR_YSIZE / 2 - STADIUM_CORNER,
+          SOCCAR_DEPTH,
+          WALL_THICKNESS,
+          wallMaterial
+        ),
+        new THREE.Vector3(0, -xSign, 0)
+      );
+      sideWall.position.set(
+        xSign * SOCCAR_XSIZE / 2,
+        (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
+        SOCCAR_DEPTH / 2
+      );
+      sideWall.rotateZ(Math.PI / 2);
+      res.add(sideWall);
+    }
 
-    const sideWallB = registerWall(
-      createVerticalWallBox(
-        SOCCAR_YSIZE / 2 - STADIUM_CORNER,
-        SOCCAR_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
-    );
-    sideWallB.position.set(
-      -SOCCAR_XSIZE / 2,
-      (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
-      SOCCAR_DEPTH / 2
-    );
-    sideWallB.rotateZ(Math.PI / 2);
-    res.add(sideWallB);
+    if (mirrored) {
+      res.rotateZ(Math.PI);
+    }
 
     return res;
   }
 
   const stadium = new THREE.Group();
   stadium.add(createHalf(0xffe8b3, false));
-  const blueHalf = createHalf(0x7fe3ff, true);
-  blueHalf.rotateZ(Math.PI);
-  stadium.add(blueHalf);
+  stadium.add(createHalf(0x7fe3ff, true));
   return { stadium, wallPanels };
 }
 
