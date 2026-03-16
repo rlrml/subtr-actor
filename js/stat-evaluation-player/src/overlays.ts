@@ -169,10 +169,11 @@ export class ThresholdLineOverlay {
 
   constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
     this.replay = replay;
-    this.blueBack = makeThresholdLineMesh(fieldScale, 0x5577ff, 0.35);
-    this.blueFront = makeThresholdLineMesh(fieldScale, 0x5577ff, 0.35);
-    this.orangeBack = makeThresholdLineMesh(fieldScale, 0xff9944, 0.35);
-    this.orangeFront = makeThresholdLineMesh(fieldScale, 0xff9944, 0.35);
+    // Back boundaries = red, forward boundaries = green (matches role ring colors)
+    this.blueBack = makeThresholdLineMesh(fieldScale, 0xff5577, 0.4);
+    this.blueFront = makeThresholdLineMesh(fieldScale, 0x55ff77, 0.4);
+    this.orangeBack = makeThresholdLineMesh(fieldScale, 0xff5577, 0.4);
+    this.orangeFront = makeThresholdLineMesh(fieldScale, 0x55ff77, 0.4);
     scene.add(this.blueBack.group);
     scene.add(this.blueFront.group);
     scene.add(this.orangeBack.group);
