@@ -9,8 +9,8 @@ It provides:
 - state snapshots and change subscriptions so callers can build their own controls
 
 The player exposes camera state as data, not fixed UI assumptions. The built-in
-camera API is currently an `overview` mode plus a tracked camera with tunable
-distance scaling.
+camera API is a free camera when no player is attached and an attached chase
+camera with tunable distance scaling when a player is selected.
 
 The package does not assume any specific UI. The demo app under
 [`js/example`](../example/README.md) is the reference consumer.

@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { createReplayScene, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
-  CameraMode,
   ReplayModel,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
@@ -48,9 +47,8 @@ export class ReplayPlayer extends EventTarget {
   private playing = false;
   private speed = 1;
   private currentTime = 0;
-  private cameraMode: CameraMode;
   private cameraDistanceScale: number;
-  private trackedPlayerId: string | null;
+  private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
 
   constructor(
@@ -65,13 +63,11 @@ export class ReplayPlayer extends EventTarget {
     this.fieldScale = options.fieldScale ?? DEFAULT_FIELD_SCALE;
     this.sceneState = createReplayScene(container, replay, this.fieldScale);
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
-    this.cameraMode = options.initialCameraMode ?? "overview";
     this.cameraDistanceScale = Math.max(
       0.25,
       options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
     );
-    this.trackedPlayerId =
-      options.initialTrackedPlayerId ?? replay.players[0]?.id ?? null;
+    this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
 
     this.installResizeHandling();
@@ -120,20 +116,14 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
-  setCameraMode(mode: CameraMode): void {
-    this.cameraMode = mode;
-    this.render();
-    this.emitChange();
-  }
-
   setCameraDistanceScale(scale: number): void {
     this.cameraDistanceScale = Math.max(0.25, scale);
     this.render();
     this.emitChange();
   }
 
-  setTrackedPlayer(playerId: string | null): void {
-    this.trackedPlayerId = playerId;
+  setAttachedPlayer(playerId: string | null): void {
+    this.attachedPlayerId = playerId;
     this.render();
     this.emitChange();
   }
@@ -154,14 +144,11 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.speed !== undefined) {
       this.speed = Math.max(0.1, nextState.speed);
     }
-    if (nextState.cameraMode !== undefined) {
-      this.cameraMode = nextState.cameraMode;
-    }
     if (nextState.cameraDistanceScale !== undefined) {
       this.cameraDistanceScale = Math.max(0.25, nextState.cameraDistanceScale);
     }
-    if (nextState.trackedPlayerId !== undefined) {
-      this.trackedPlayerId = nextState.trackedPlayerId;
+    if (nextState.attachedPlayerId !== undefined) {
+      this.attachedPlayerId = nextState.attachedPlayerId;
     }
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
@@ -198,9 +185,8 @@ export class ReplayPlayer extends EventTarget {
       frameIndex: findFrameIndexAtTime(this.replay, this.currentTime),
       playing: this.playing,
       speed: this.speed,
-      cameraMode: this.cameraMode,
       cameraDistanceScale: this.cameraDistanceScale,
-      trackedPlayerId: this.trackedPlayerId,
+      attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
     };
   }
@@ -351,19 +337,19 @@ export class ReplayPlayer extends EventTarget {
   ): void {
     const controls = this.sceneState.controls;
 
-    if (this.cameraMode === "overview" || !this.trackedPlayerId) {
+    if (!this.attachedPlayerId) {
       controls.enabled = true;
       this.sceneState.camera.fov = 48;
       this.sceneState.camera.updateProjectionMatrix();
       return;
     }
 
-    const trackedPlayer = this.replay.players.find(
-      (player) => player.id === this.trackedPlayerId
+    const attachedPlayer = this.replay.players.find(
+      (player) => player.id === this.attachedPlayerId
     );
-    const frame = trackedPlayer?.frames[frameIndex];
+    const frame = attachedPlayer?.frames[frameIndex];
 
-    if (!trackedPlayer || !frame?.position) {
+    if (!attachedPlayer || !frame?.position) {
       controls.enabled = true;
       return;
     }
@@ -375,7 +361,7 @@ export class ReplayPlayer extends EventTarget {
     const forward = orientation?.forward ?? DEFAULT_FORWARD.clone();
     const right = orientation?.right ?? new THREE.Vector3(0, 1, 0);
 
-    const cameraSettings = trackedPlayer.cameraSettings;
+    const cameraSettings = attachedPlayer.cameraSettings;
     const distance =
       (cameraSettings.distance ?? 270) *
       this.fieldScale *

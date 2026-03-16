@@ -152,14 +152,11 @@ export interface ReplayLoadResult {
   raw: RawReplayFramesData;
 }
 
-export type CameraMode = "overview" | "tracked";
-
 export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
-  initialCameraMode?: CameraMode;
   initialCameraDistanceScale?: number;
-  initialTrackedPlayerId?: string | null;
+  initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
   initialPlaybackRate?: number;
 }
@@ -170,9 +167,8 @@ export interface ReplayPlayerState {
   frameIndex: number;
   playing: boolean;
   speed: number;
-  cameraMode: CameraMode;
   cameraDistanceScale: number;
-  trackedPlayerId: string | null;
+  attachedPlayerId: string | null;
   ballCamEnabled: boolean;
 }
 
@@ -184,9 +180,8 @@ export type ReplayPlayerStatePatch = Partial<
     | "currentTime"
     | "playing"
     | "speed"
-    | "cameraMode"
     | "cameraDistanceScale"
-    | "trackedPlayerId"
+    | "attachedPlayerId"
     | "ballCamEnabled"
   >
 >;

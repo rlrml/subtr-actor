@@ -23,8 +23,11 @@ input {
 }
 
 .shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 2rem;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1.5rem;
 }
 
 .hero {
@@ -32,7 +35,6 @@ input {
   gap: 1.5rem;
   align-items: end;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
 }
 
 .eyebrow {
@@ -71,6 +73,7 @@ input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
   gap: 1.25rem;
+  min-height: 0;
 }
 
 .viewport-panel,
@@ -84,6 +87,7 @@ input {
 
 .viewport-panel {
   min-height: 38rem;
+  aspect-ratio: 16 / 10;
   overflow: hidden;
 }
 
@@ -185,6 +189,7 @@ dt {
 @media (max-width: 960px) {
   .shell {
     padding: 1rem;
+    gap: 1rem;
   }
 
   .hero,
@@ -195,5 +200,6 @@ dt {
 
   .viewport-panel {
     min-height: 24rem;
+    aspect-ratio: 16 / 11;
   }
 }

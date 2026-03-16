@@ -3,7 +3,6 @@ export { findFrameIndexAtTime, normalizeReplayData } from "./replay-data";
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
 export type {
   BallSample,
-  CameraMode,
   CameraSettings,
   PlaybackFrame,
   PlayerSample,

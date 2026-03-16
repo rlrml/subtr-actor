@@ -39,12 +39,8 @@ app.innerHTML = `
         <div class="panel">
           <h2>Camera</h2>
           <div class="transport-row">
-            <select id="camera-mode" disabled>
-              <option value="overview" selected>Overview</option>
-              <option value="tracked">Tracked</option>
-            </select>
-            <select id="tracked-player" disabled>
-              <option value="">No player</option>
+            <select id="attached-player" disabled>
+              <option value="">Free camera</option>
             </select>
           </div>
           <label>
@@ -124,10 +120,9 @@ const viewport = mustElement("#viewport");
 const emptyState = mustElement("#empty-state");
 const togglePlayback = mustElement("#toggle-playback");
 const playbackRate = mustElement("#playback-rate");
-const cameraMode = mustElement("#camera-mode");
 const cameraDistance = mustElement("#camera-distance");
 const cameraDistanceReadout = mustElement("#camera-distance-readout");
-const trackedPlayer = mustElement("#tracked-player");
+const attachedPlayer = mustElement("#attached-player");
 const ballCam = mustElement("#ball-cam");
 const timeline = mustElement("#timeline");
 const statusReadout = mustElement("#status-readout");
@@ -144,9 +139,8 @@ let unsubscribe = null;
 function setControlsEnabled(enabled) {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
-  cameraMode.disabled = !enabled;
+  attachedPlayer.disabled = !enabled;
   cameraDistance.disabled = !enabled;
-  trackedPlayer.disabled = !enabled;
   ballCam.disabled = !enabled;
   timeline.disabled = !enabled;
 }
@@ -157,16 +151,31 @@ function renderSnapshot(snapshot) {
   durationReadout.textContent = `${snapshot.duration.toFixed(2)}s`;
   timeline.value = `${snapshot.currentTime}`;
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
-  cameraMode.value = snapshot.cameraMode;
   cameraDistance.value = `${snapshot.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${snapshot.cameraDistanceScale.toFixed(2)}x`;
   ballCam.checked = snapshot.ballCamEnabled;
-  trackedPlayer.value = snapshot.trackedPlayerId ?? "";
+  attachedPlayer.value = snapshot.attachedPlayerId ?? "";
+  cameraDistance.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
+  ballCam.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
 
   if (replayPlayer) {
     const metadata = replayPlayer.replay.frames[snapshot.frameIndex];
     remainingReadout.textContent =
       metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
+  }
+}
+
+function populateAttachedPlayerOptions(players) {
+  attachedPlayer.replaceChildren();
+  attachedPlayer.append(new Option("Free camera", ""));
+
+  for (const player of players) {
+    attachedPlayer.append(
+      new Option(
+        `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
+        player.id
+      )
+    );
   }
 }
 
@@ -186,20 +195,13 @@ async function loadReplayFile(file) {
   const { replay } = await loadReplayFromBytes(bytes);
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
-    initialCameraMode: "overview",
     initialCameraDistanceScale: 2.25,
-    initialTrackedPlayerId: replay.players[0]?.id ?? null,
+    initialAttachedPlayerId: null,
     initialBallCamEnabled: false,
   });
   unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
-  trackedPlayer.innerHTML = [
-    '<option value="">No player</option>',
-    ...replay.players.map(
-      (player) =>
-        `<option value="${player.id}">${player.name} (${player.isTeamZero ? "Blue" : "Orange"})</option>`
-    ),
-  ].join("");
+  populateAttachedPlayerOptions(replay.players);
 
   emptyState.hidden = true;
   timeline.min = "0";
@@ -209,6 +211,7 @@ async function loadReplayFile(file) {
   playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
   statusReadout.textContent = `Loaded ${file.name}`;
   setControlsEnabled(true);
+  renderSnapshot(replayPlayer.getSnapshot());
 }
 
 fileInput.addEventListener("change", async () => {
@@ -233,16 +236,12 @@ playbackRate.addEventListener("change", () => {
   replayPlayer?.setPlaybackRate(Number(playbackRate.value));
 });
 
-cameraMode.addEventListener("change", () => {
-  replayPlayer?.setCameraMode(cameraMode.value);
-});
-
 cameraDistance.addEventListener("input", () => {
   replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
 });
 
-trackedPlayer.addEventListener("change", () => {
-  replayPlayer?.setTrackedPlayer(trackedPlayer.value || null);
+attachedPlayer.addEventListener("change", () => {
+  replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
 });
 
 ballCam.addEventListener("change", () => {

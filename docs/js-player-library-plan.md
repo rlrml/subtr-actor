@@ -183,7 +183,7 @@ The library should own:
 - replay normalization from WASM output into a typed playback model
 - playback clock and seeking
 - three.js scene construction and entity updates
-- camera modes and tracked-player logic
+- camera attachment state and tracked-player logic
 - a small public imperative API for apps to control playback
 
 The example app should own:
@@ -287,8 +287,7 @@ with `ReplayPlayer` providing:
 - `play()`
 - `pause()`
 - `seek(time)`
-- `setTrackedPlayer(id | null)`
-- `setCameraMode(mode)`
+- `setAttachedPlayer(id | null)`
 - `destroy()`
 - snapshot/state subscriptions for UI integration
 
