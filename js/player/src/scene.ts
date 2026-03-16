@@ -14,6 +14,25 @@ export interface ReplayScene {
   playerMeshes: Map<string, THREE.Object3D>;
 }
 
+function createWallMaterial(color: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+  });
+}
+
+function createVerticalWallBox(
+  length: number,
+  height: number,
+  thickness: number,
+  material: THREE.Material
+): THREE.Mesh {
+  return new THREE.Mesh(
+    new THREE.BoxGeometry(length, thickness, height, 6, 1, 6),
+    material
+  );
+}
+
 function createExampleSoccarField(scale: number): THREE.Group {
   const SOCCAR_YSIZE = 10280 * scale;
   const SOCCAR_XSIZE = 8240 * scale;
@@ -22,20 +41,18 @@ function createExampleSoccarField(scale: number): THREE.Group {
   const GOAL_WIDTH = 1900 * scale;
   const GOAL_HEIGHT = 800 * scale;
   const GOAL_DEPTH = 900 * scale;
+  const WALL_THICKNESS = Math.max(1, scale);
 
   function createBackWall(color: number, inverted: boolean): THREE.Group {
     const backWall = new THREE.Group();
-    const opaqueMaterial = new THREE.MeshLambertMaterial({ color });
-    const transparentMaterial = new THREE.MeshLambertMaterial({
-      color,
-      transparent: true,
-      opacity: 0.6,
-    });
+    const wallMaterial = createWallMaterial(color);
     const sideWallWidth = SOCCAR_XSIZE / 2 - STADIUM_CORNER - GOAL_WIDTH / 2;
 
-    const left = new THREE.Mesh(
-      new THREE.BoxGeometry(sideWallWidth, scale, SOCCAR_DEPTH, 20, 15, 1),
-      inverted ? opaqueMaterial : transparentMaterial
+    const left = createVerticalWallBox(
+      sideWallWidth,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
     );
     left.position.set(
       sideWallWidth / 2 + GOAL_WIDTH / 2,
@@ -45,9 +62,11 @@ function createExampleSoccarField(scale: number): THREE.Group {
     backWall.add(left);
 
     const cornerWidth = Math.sqrt(2 * Math.pow(STADIUM_CORNER, 2));
-    const leftCorner = new THREE.Mesh(
-      new THREE.BoxGeometry(cornerWidth, scale, SOCCAR_DEPTH, 20, 15, 1),
-      inverted ? opaqueMaterial : transparentMaterial
+    const leftCorner = createVerticalWallBox(
+      cornerWidth,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
     );
     leftCorner.position.set(
       SOCCAR_XSIZE / 2 - STADIUM_CORNER / 2,
@@ -57,9 +76,25 @@ function createExampleSoccarField(scale: number): THREE.Group {
     leftCorner.rotateZ(-Math.PI / 4);
     backWall.add(leftCorner);
 
-    const right = new THREE.Mesh(
-      new THREE.BoxGeometry(sideWallWidth, scale, SOCCAR_DEPTH, 20, 15, 1),
-      transparentMaterial
+    const rightCorner = createVerticalWallBox(
+      cornerWidth,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
+    );
+    rightCorner.position.set(
+      -SOCCAR_XSIZE / 2 + STADIUM_CORNER / 2,
+      -STADIUM_CORNER / 2,
+      SOCCAR_DEPTH / 2
+    );
+    rightCorner.rotateZ(Math.PI / 4);
+    backWall.add(rightCorner);
+
+    const right = createVerticalWallBox(
+      sideWallWidth,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
     );
     right.position.set(
       -sideWallWidth / 2 - GOAL_WIDTH / 2,
@@ -68,16 +103,11 @@ function createExampleSoccarField(scale: number): THREE.Group {
     );
     backWall.add(right);
 
-    const top = new THREE.Mesh(
-      new THREE.BoxGeometry(
-        GOAL_WIDTH,
-        scale,
-        SOCCAR_DEPTH - GOAL_HEIGHT,
-        20,
-        15,
-        1
-      ),
-      transparentMaterial
+    const top = createVerticalWallBox(
+      GOAL_WIDTH,
+      SOCCAR_DEPTH - GOAL_HEIGHT,
+      WALL_THICKNESS,
+      wallMaterial
     );
     top.position.set(0, 0, SOCCAR_DEPTH / 2 + GOAL_HEIGHT / 2);
     backWall.add(top);
@@ -100,12 +130,11 @@ function createExampleSoccarField(scale: number): THREE.Group {
     floor.lineTo(SOCCAR_XSIZE / 2, SOCCAR_YSIZE / 2 - STADIUM_CORNER);
     floor.lineTo(SOCCAR_XSIZE / 2, 0);
 
-    const opaqueMaterial = new THREE.MeshLambertMaterial({ color });
-    const transparentMaterial = new THREE.MeshLambertMaterial({
+    const opaqueMaterial = new THREE.MeshLambertMaterial({
       color,
-      transparent: true,
-      opacity: 0.5,
+      side: THREE.DoubleSide,
     });
+    const wallMaterial = createWallMaterial(color);
 
     const floorMesh = new THREE.Mesh(
       new THREE.ShapeGeometry(floor),
@@ -114,66 +143,64 @@ function createExampleSoccarField(scale: number): THREE.Group {
     floorMesh.receiveShadow = true;
     res.add(floorMesh);
 
-    const farPost = new THREE.Mesh(
-      new THREE.PlaneGeometry(GOAL_HEIGHT, GOAL_DEPTH, 6, 6),
-      inverted ? transparentMaterial : opaqueMaterial
+    const farPost = createVerticalWallBox(
+      GOAL_DEPTH,
+      GOAL_HEIGHT,
+      WALL_THICKNESS,
+      wallMaterial
     );
     farPost.position.set(
       -GOAL_WIDTH / 2,
       SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
       GOAL_HEIGHT / 2
     );
-    farPost.rotateY(inverted ? -Math.PI / 2 : Math.PI / 2);
+    farPost.rotateZ(Math.PI / 2);
     res.add(farPost);
 
-    const nearPost = new THREE.Mesh(
-      new THREE.PlaneGeometry(GOAL_HEIGHT, GOAL_DEPTH, 6, 6),
-      inverted ? opaqueMaterial : transparentMaterial
+    const nearPost = createVerticalWallBox(
+      GOAL_DEPTH,
+      GOAL_HEIGHT,
+      WALL_THICKNESS,
+      wallMaterial
     );
     nearPost.position.set(
       GOAL_WIDTH / 2,
       SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
       GOAL_HEIGHT / 2
     );
-    nearPost.rotateY(inverted ? -Math.PI / 2 : Math.PI / 2);
+    nearPost.rotateZ(Math.PI / 2);
     res.add(nearPost);
 
     const backWall = createBackWall(color, inverted);
     backWall.position.y = SOCCAR_YSIZE / 2;
     res.add(backWall);
 
-    const sideWallA = new THREE.Mesh(
-      new THREE.PlaneGeometry(
-        SOCCAR_DEPTH,
-        SOCCAR_YSIZE / 2 - STADIUM_CORNER,
-        6,
-        6
-      ),
-      inverted ? opaqueMaterial : transparentMaterial
+    const sideWallA = createVerticalWallBox(
+      SOCCAR_YSIZE / 2 - STADIUM_CORNER,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
     );
     sideWallA.position.set(
       SOCCAR_XSIZE / 2,
       (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
       SOCCAR_DEPTH / 2
     );
-    sideWallA.rotateY(inverted ? -Math.PI / 2 : Math.PI / 2);
+    sideWallA.rotateZ(Math.PI / 2);
     res.add(sideWallA);
 
-    const sideWallB = new THREE.Mesh(
-      new THREE.PlaneGeometry(
-        SOCCAR_DEPTH,
-        SOCCAR_YSIZE / 2 - STADIUM_CORNER,
-        6,
-        6
-      ),
-      inverted ? transparentMaterial : opaqueMaterial
+    const sideWallB = createVerticalWallBox(
+      SOCCAR_YSIZE / 2 - STADIUM_CORNER,
+      SOCCAR_DEPTH,
+      WALL_THICKNESS,
+      wallMaterial
     );
     sideWallB.position.set(
       -SOCCAR_XSIZE / 2,
       (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
       SOCCAR_DEPTH / 2
     );
-    sideWallB.rotateY(inverted ? -Math.PI / 2 : Math.PI / 2);
+    sideWallB.rotateZ(Math.PI / 2);
     res.add(sideWallB);
 
     return res;

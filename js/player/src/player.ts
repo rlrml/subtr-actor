@@ -28,6 +28,11 @@ const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
 const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
+type FrameWindow = {
+  frameIndex: number;
+  nextFrameIndex: number;
+  alpha: number;
+};
 
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
@@ -254,14 +259,25 @@ export class ReplayPlayer extends EventTarget {
   };
 
   private render(): void {
-    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
+    const frameWindow = this.getFrameWindow(this.currentTime);
+    const frameIndex = frameWindow.frameIndex;
     const ballFrame = this.replay.ballFrames[frameIndex];
-    const ballPosition = ballFrame?.position ? this.worldPosition(ballFrame.position) : null;
+    const nextBallFrame = this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
+    const interpolatedBallPosition = this.interpolatePosition(
+      ballFrame?.position ?? null,
+      nextBallFrame?.position ?? null,
+      frameWindow.alpha
+    );
+    const ballPosition = interpolatedBallPosition
+      ? this.worldPosition(interpolatedBallPosition)
+      : null;
 
-    if (ballFrame?.position) {
+    if (interpolatedBallPosition) {
       this.sceneState.ballMesh.visible = true;
-      this.sceneState.ballMesh.position.copy(this.rootPosition(ballFrame.position));
-      if (ballFrame.rotation) {
+      this.sceneState.ballMesh.position.copy(
+        this.rootPosition(interpolatedBallPosition)
+      );
+      if (ballFrame?.rotation) {
         this.sceneState.ballMesh.quaternion.set(
           ballFrame.rotation.x,
           ballFrame.rotation.y,
@@ -282,14 +298,20 @@ export class ReplayPlayer extends EventTarget {
       }
 
       const frame = player.frames[frameIndex];
-      if (!frame?.position) {
+      const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
+      const interpolatedPosition = this.interpolatePosition(
+        frame?.position ?? null,
+        nextFrame?.position ?? null,
+        frameWindow.alpha
+      );
+      if (!interpolatedPosition) {
         mesh.visible = false;
         continue;
       }
 
       mesh.visible = true;
-      mesh.position.copy(this.rootPosition(frame.position));
-      if (frame.rotation) {
+      mesh.position.copy(this.rootPosition(interpolatedPosition));
+      if (frame?.rotation) {
         mesh.quaternion.set(
           frame.rotation.x,
           frame.rotation.y,
@@ -472,6 +494,47 @@ export class ReplayPlayer extends EventTarget {
       .normalize();
 
     return { forward, up, right };
+  }
+
+  private getFrameWindow(time: number): FrameWindow {
+    const frameIndex = findFrameIndexAtTime(this.replay, time);
+    const nextFrameIndex = Math.min(frameIndex + 1, this.replay.frames.length - 1);
+
+    if (nextFrameIndex === frameIndex) {
+      return { frameIndex, nextFrameIndex, alpha: 0 };
+    }
+
+    const startTime = this.replay.frames[frameIndex]?.time ?? 0;
+    const endTime = this.replay.frames[nextFrameIndex]?.time ?? startTime;
+    if (endTime <= startTime) {
+      return { frameIndex, nextFrameIndex, alpha: 0 };
+    }
+
+    return {
+      frameIndex,
+      nextFrameIndex,
+      alpha: THREE.MathUtils.clamp((time - startTime) / (endTime - startTime), 0, 1),
+    };
+  }
+
+  private interpolatePosition(
+    current: Vec3 | null,
+    next: Vec3 | null,
+    alpha: number
+  ): Vec3 | null {
+    if (!current) {
+      return next;
+    }
+
+    if (!next || alpha <= 0) {
+      return current;
+    }
+
+    return {
+      x: THREE.MathUtils.lerp(current.x, next.x, alpha),
+      y: THREE.MathUtils.lerp(current.y, next.y, alpha),
+      z: THREE.MathUtils.lerp(current.z, next.z, alpha),
+    };
   }
 
   private rootPosition(position: Vec3): THREE.Vector3 {
