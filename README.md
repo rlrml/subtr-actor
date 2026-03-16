@@ -16,7 +16,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - Rust: [`subtr-actor`](https://crates.io/crates/subtr-actor)
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM bindings: [`subtr-actor`](https://www.npmjs.com/package/subtr-actor)
-- JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) ([GitHub Pages](https://rlrml.github.io/subtr-actor/))
+- JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
 
 ## What You Get
 
