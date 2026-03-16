@@ -181,8 +181,7 @@ fn list_replay_paths(input_dir: &Path) -> Result<Vec<PathBuf>> {
 }
 
 fn replay_id_from_path(path: &Path) -> Result<String> {
-    Ok(path
-        .file_stem()
+    path.file_stem()
         .and_then(|stem| stem.to_str())
         .map(ToOwned::to_owned)
         .with_context(|| {
@@ -190,7 +189,7 @@ fn replay_id_from_path(path: &Path) -> Result<String> {
                 "Replay path is missing a valid file stem: {}",
                 path.display()
             )
-        })?)
+        })
 }
 
 fn relative_replay_path(replay_path: &Path, output_path: &Path) -> String {

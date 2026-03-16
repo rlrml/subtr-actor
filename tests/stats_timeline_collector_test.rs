@@ -478,7 +478,8 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
     dump_final_boost_stats(&timeline);
 
     // Invariant 1: All cumulative boost stats must be monotonically non-decreasing
-    let monotonic_checks: Vec<(&str, fn(&BoostStats) -> f64)> = vec![
+    type BoostStatGetter = fn(&BoostStats) -> f64;
+    let monotonic_checks: &[(&str, BoostStatGetter)] = &[
         ("amount_collected", |b| b.amount_collected as f64),
         ("amount_collected_big", |b| b.amount_collected_big as f64),
         ("amount_collected_small", |b| {
@@ -496,7 +497,7 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
         // NOTE: amount_used is NOT monotonic because kickoff resets set
         // current_boost to 85 without it being "used", lowering amount_used.
     ];
-    for (name, getter) in &monotonic_checks {
+    for (name, getter) in monotonic_checks {
         assert_player_boost_field_monotonic(&timeline, name, *getter);
     }
 

@@ -1323,7 +1323,7 @@ fn test_positioning_reducer_requires_full_live_multi_player_team_for_role_bucket
             1,
             1.0,
             0.0,
-            ball.clone(),
+            ball,
             vec![
                 PlayerSample {
                     rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
@@ -1372,7 +1372,7 @@ fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating()
             1,
             1.0,
             0.0,
-            ball.clone(),
+            ball,
             vec![
                 PlayerSample {
                     rigid_body: Some(sample_rigid_body(3584.0, 0.0, 73.0)),
@@ -1442,7 +1442,7 @@ fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
             1,
             1.0,
             0.0,
-            ball.clone(),
+            ball,
             vec![
                 PlayerSample {
                     rigid_body: Some(sample_rigid_body(0.0, 1200.0, 17.0)),
@@ -1513,7 +1513,7 @@ fn test_positioning_reducer_even_requires_full_team_clustered_within_threshold()
             1,
             1.0,
             0.0,
-            ball.clone(),
+            ball,
             vec![
                 PlayerSample {
                     rigid_body: Some(sample_rigid_body(0.0, -40.0, 17.0)),
@@ -3365,7 +3365,7 @@ fn test_boost_reducer_overrides_small_position_guess_when_gain_exceeds_small_pad
             None,
             vec![PlayerSample {
                 boost_amount: Some(0.0),
-                rigid_body: Some(small_pad_position.clone()),
+                rigid_body: Some(small_pad_position),
                 ..sample_player(player_id.clone(), true)
             }],
         ))
@@ -3379,7 +3379,7 @@ fn test_boost_reducer_overrides_small_position_guess_when_gain_exceeds_small_pad
         None,
         vec![PlayerSample {
             boost_amount: Some(255.0),
-            rigid_body: Some(small_pad_position.clone()),
+            rigid_body: Some(small_pad_position),
             ..sample_player(player_id.clone(), true)
         }],
     );
@@ -3417,7 +3417,7 @@ fn test_boost_reducer_keeps_small_when_gain_is_consistent() {
             None,
             vec![PlayerSample {
                 boost_amount: Some(100.0),
-                rigid_body: Some(small_pad_position.clone()),
+                rigid_body: Some(small_pad_position),
                 ..sample_player(player_id.clone(), true)
             }],
         ))
@@ -3431,7 +3431,7 @@ fn test_boost_reducer_keeps_small_when_gain_is_consistent() {
         None,
         vec![PlayerSample {
             boost_amount: Some(130.6),
-            rigid_body: Some(small_pad_position.clone()),
+            rigid_body: Some(small_pad_position),
             ..sample_player(player_id.clone(), true)
         }],
     );
@@ -3477,7 +3477,7 @@ fn test_boost_reducer_trusts_big_position_with_small_gain_near_full_boost() {
             None,
             vec![PlayerSample {
                 boost_amount: Some(240.0),
-                rigid_body: Some(big_pad_position.clone()),
+                rigid_body: Some(big_pad_position),
                 ..sample_player(player_id.clone(), true)
             }],
         ))
@@ -3491,7 +3491,7 @@ fn test_boost_reducer_trusts_big_position_with_small_gain_near_full_boost() {
         None,
         vec![PlayerSample {
             boost_amount: Some(255.0),
-            rigid_body: Some(big_pad_position.clone()),
+            rigid_body: Some(big_pad_position),
             ..sample_player(player_id.clone(), true)
         }],
     );

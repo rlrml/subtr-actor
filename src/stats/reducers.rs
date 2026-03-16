@@ -3006,15 +3006,12 @@ impl StatsReducer for BoostReducer {
             // Grant initial kickoff respawn the first time we see each player.
             // This handles replays that start after the kickoff countdown has
             // already ended (game_state != 55 on the first frame).
-            if self
+            let first_seen_player = self
                 .initial_respawn_awarded
-                .insert(player.player_id.clone())
-            {
-                respawn_amount += BOOST_KICKOFF_START_AMOUNT;
-                self.kickoff_respawn_awarded
-                    .insert(player.player_id.clone());
-            } else if kickoff_phase_active
-                && !self.kickoff_respawn_awarded.contains(&player.player_id)
+                .insert(player.player_id.clone());
+            if first_seen_player
+                || (kickoff_phase_active
+                    && !self.kickoff_respawn_awarded.contains(&player.player_id))
             {
                 respawn_amount += BOOST_KICKOFF_START_AMOUNT;
                 self.kickoff_respawn_awarded
