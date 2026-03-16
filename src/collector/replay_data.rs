@@ -43,17 +43,17 @@ use crate::*;
 
 /// Represents the ball state for a single frame in a Rocket League replay.
 ///
-/// The ball can either be in an empty state (when sleeping or when ball syncing
-/// is disabled) or contain full physics data including position, rotation, and
-/// velocity information.
+/// The ball can either be in an empty state (when ball syncing is disabled or
+/// the rigid body is unavailable) or contain full physics data including
+/// position, rotation, and velocity information.
 ///
 /// # Variants
 ///
-/// - [`Empty`](BallFrame::Empty) - Indicates the ball is sleeping or ball syncing is disabled
+/// - [`Empty`](BallFrame::Empty) - Indicates the ball is unavailable or ball syncing is disabled
 /// - [`Data`](BallFrame::Data) - Contains the ball's rigid body physics information
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BallFrame {
-    /// Empty frame indicating the ball is sleeping or ball syncing is disabled
+    /// Empty frame indicating the ball is unavailable or ball syncing is disabled
     Empty,
     /// Frame containing the ball's rigid body physics data
     Data {
@@ -66,7 +66,7 @@ impl BallFrame {
     /// Creates a new [`BallFrame`] from a [`ReplayProcessor`] at the specified time.
     ///
     /// This method extracts the ball's state from the replay processor, handling
-    /// cases where ball syncing is disabled or the ball is in a sleeping state.
+    /// cases where ball syncing is disabled or the rigid body is unavailable.
     ///
     /// # Arguments
     ///
@@ -78,7 +78,6 @@ impl BallFrame {
     /// Returns a [`BallFrame`] which will be [`Empty`](BallFrame::Empty) if:
     /// - Ball syncing is disabled in the replay
     /// - The ball's rigid body cannot be retrieved
-    /// - The ball is in a sleeping state
     ///
     /// Otherwise returns [`Data`](BallFrame::Data) containing the ball's rigid body.
     fn new_from_processor(processor: &ReplayProcessor, current_time: f32) -> Self {
@@ -100,14 +99,11 @@ impl BallFrame {
     ///
     /// # Returns
     ///
-    /// Returns [`Empty`](BallFrame::Empty) if the rigid body is in a sleeping state,
-    /// otherwise returns [`Data`](BallFrame::Data) containing the rigid body.
+    /// Returns [`Data`](BallFrame::Data) containing the rigid body even when the
+    /// ball is sleeping, so stationary kickoff frames still retain the ball's
+    /// position for downstream consumers such as the JS player.
     fn new_from_rigid_body(rigid_body: boxcars::RigidBody) -> Self {
-        if rigid_body.sleeping {
-            Self::Empty
-        } else {
-            Self::Data { rigid_body }
-        }
+        Self::Data { rigid_body }
     }
 }
 

@@ -355,6 +355,7 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Reset the state of the [`ReplayProcessor`].
     pub fn reset(&mut self) {
+        self.ball_actor_id = None;
         self.player_to_car = HashMap::new();
         self.player_to_team = HashMap::new();
         self.player_to_actor_id = HashMap::new();
