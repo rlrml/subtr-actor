@@ -2,71 +2,39 @@ import "./styles.css";
 import {
   createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
+  createTimelineOverlayPlugin,
   ReplayPlayer,
   loadReplayFromBytes,
 } from "../../player/src/lib.ts";
 import type {
+  FrameRenderInfo,
   ReplayModel,
   ReplayPlayerState,
-  FrameRenderInfo,
+  ReplayPlayerTrack,
 } from "../../player/src/lib.ts";
-import type { ReplayScene } from "../../player/src/scene.ts";
-import { RoleOverlay, ThresholdZoneOverlay, createZoneBoundaryLines } from "./overlays.ts";
+import { ThresholdZoneOverlay, createZoneBoundaryLines } from "./overlays.ts";
+import {
+  createStatsFrameLookup,
+  getStatsFrameForReplayFrame,
+} from "./statsTimeline.ts";
+import {
+  formatCollectedWithRespawnBound,
+  formatBoostDisplayAmount,
+  toBoostDisplayUnits,
+} from "./boostFormatting.ts";
+import type {
+  PlayerStatsSnapshot,
+  StatsFrame,
+  StatsTimeline,
+} from "./statsTimeline.ts";
 
-// WASM module - init is the default export, get_stats_timeline is named
-import wasmInit, {
-  get_stats_timeline,
-} from "../../pkg/rl_replay_subtr_actor.js";
-
-// --- Stat types ---
-
-interface StatsTimeline {
-  replay_meta: unknown;
-  timeline_events: unknown[];
-  frames: StatsFrame[];
-}
-
-interface StatsFrame {
-  frame_number: number;
-  time: number;
-  dt: number;
-  players: PlayerStatsSnapshot[];
-  [key: string]: unknown;
-}
-
-interface PlayerStatsSnapshot {
-  player_id: Record<string, string>;
-  name: string;
-  is_team_0: boolean;
-  positioning?: {
-    time_most_back: number;
-    time_most_forward: number;
-    time_even: number;
-    [key: string]: unknown;
-  };
-  boost?: {
-    amount_collected: number;
-    amount_collected_big: number;
-    amount_collected_small: number;
-    amount_stolen: number;
-    big_pads_collected: number;
-    small_pads_collected: number;
-    amount_used_while_supersonic: number;
-    time_zero_boost: number;
-    time_hundred_boost: number;
-    boost_integral: number;
-    tracked_time: number;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-// --- Stat Module interface ---
+import * as subtrActor from "subtr-actor";
 
 interface StatModuleContext {
   player: ReplayPlayer;
   replay: ReplayModel;
   statsTimeline: StatsTimeline;
+  statsFrameLookup: Map<number, StatsFrame>;
   fieldScale: number;
 }
 
@@ -77,12 +45,18 @@ interface StatModule {
   teardown(): void;
   onBeforeRender(info: FrameRenderInfo): void;
   renderStats(frameIndex: number, ctx: StatModuleContext): string;
+  renderFocusedPlayerStats(
+    playerId: string,
+    frameIndex: number,
+    ctx: StatModuleContext,
+  ): string;
 }
 
-// --- Positioning module ---
+const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;
+const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 
-const MOST_BACK_FORWARD_THRESHOLD_Y = 118.0;
 type Role = "back" | "forward" | "even" | "mid";
+
 const ROLE_LABELS: Record<Role, string> = {
   back: "Back",
   forward: "Fwd",
@@ -90,28 +64,73 @@ const ROLE_LABELS: Record<Role, string> = {
   mid: "Mid",
 };
 
+function playerIdToString(playerId: Record<string, string>): string {
+  const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
+  return `${kind}:${value}`;
+}
+
+function getTeamClass(isTeamZero: boolean): string {
+  return isTeamZero ? "team-blue" : "team-orange";
+}
+
+function renderPlayerCard(
+  name: string,
+  isTeamZero: boolean,
+  bodyHtml: string,
+  metaHtml = "",
+): string {
+  return `<div class="player-card ${getTeamClass(isTeamZero)}">
+    <div class="player-card-header">
+      <span class="player-name">${name}</span>
+      ${metaHtml}
+    </div>
+    ${bodyHtml}
+  </div>`;
+}
+
+function getStatsPlayerSnapshot(
+  ctx: StatModuleContext,
+  frameIndex: number,
+  playerId: string,
+): PlayerStatsSnapshot | null {
+  const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+  if (!statsFrame) return null;
+
+  return statsFrame.players.find(
+    (player) => playerIdToString(player.player_id) === playerId,
+  ) ?? null;
+}
+
 function getCurrentRole(
   replay: ReplayModel,
   playerId: string,
   frameIndex: number,
 ): Role {
-  const player = replay.players.find((p) => p.id === playerId);
+  const player = replay.players.find((candidate) => candidate.id === playerId);
   if (!player) return "mid";
+
   const frame = player.frames[frameIndex];
   if (!frame?.position) return "mid";
 
   const isTeamZero = player.isTeamZero;
-  const teamRosterCount = replay.players.filter((p) => p.isTeamZero === isTeamZero).length;
+  const teamRosterCount = replay.players.filter(
+    (candidate) => candidate.isTeamZero === isTeamZero,
+  ).length;
   const allYs: number[] = [];
   let normalizedY = 0;
 
-  for (const p of replay.players) {
-    if (p.isTeamZero !== isTeamZero) continue;
-    const f = p.frames[frameIndex];
-    if (!f?.position) continue;
-    const ny = isTeamZero ? f.position.y : -f.position.y;
-    allYs.push(ny);
-    if (p.id === playerId) normalizedY = ny;
+  for (const candidate of replay.players) {
+    if (candidate.isTeamZero !== isTeamZero) continue;
+    const candidateFrame = candidate.frames[frameIndex];
+    if (!candidateFrame?.position) continue;
+
+    const value = isTeamZero
+      ? candidateFrame.position.y
+      : -candidateFrame.position.y;
+    allYs.push(value);
+    if (candidate.id === playerId) {
+      normalizedY = value;
+    }
   }
 
   if (teamRosterCount < 2 || allYs.length !== teamRosterCount) return "mid";
@@ -122,70 +141,160 @@ function getCurrentRole(
 
   if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "even";
 
-  const nearBack = (normalizedY - minY) <= MOST_BACK_FORWARD_THRESHOLD_Y;
-  const nearFront = (maxY - normalizedY) <= MOST_BACK_FORWARD_THRESHOLD_Y;
+  const nearBack = normalizedY - minY <= MOST_BACK_FORWARD_THRESHOLD_Y;
+  const nearFront = maxY - normalizedY <= MOST_BACK_FORWARD_THRESHOLD_Y;
 
   if (nearBack && !nearFront) return "back";
   if (nearFront && !nearBack) return "forward";
   return "mid";
 }
 
-function createPositioningModule(): StatModule {
-  let roleOverlay: RoleOverlay | null = null;
+function disposeIfPossible(value: unknown): void {
+  if (
+    value &&
+    typeof value === "object" &&
+    "dispose" in value &&
+    typeof value.dispose === "function"
+  ) {
+    value.dispose();
+  }
+}
+
+function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
+  return `
+    <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Even</span><span class="value">${pos?.time_even?.toFixed(1) ?? "?"}s</span></div>
+  `;
+}
+
+function renderAbsolutePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
+  return `
+    <div class="stat-row"><span class="label">Def zone</span><span class="value">${pos?.time_defensive_zone?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Neutral zone</span><span class="value">${pos?.time_neutral_zone?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Off zone</span><span class="value">${pos?.time_offensive_zone?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Def half</span><span class="value">${pos?.time_defensive_half?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Off half</span><span class="value">${pos?.time_offensive_half?.toFixed(1) ?? "?"}s</span></div>
+  `;
+}
+
+function createRelativePositioningModule(): StatModule {
   let thresholdZoneOverlay: ThresholdZoneOverlay | null = null;
   let fieldScale = 1;
 
   return {
-    id: "positioning",
-    label: "Positioning",
+    id: "relative-positioning",
+    label: "Relative Positioning",
 
     setup(ctx) {
       fieldScale = ctx.fieldScale;
-      roleOverlay = new RoleOverlay(ctx.player.sceneState, ctx.replay);
       thresholdZoneOverlay = new ThresholdZoneOverlay(
         ctx.player.sceneState.scene,
         ctx.replay,
         fieldScale,
       );
-      createZoneBoundaryLines(ctx.player.sceneState.scene, fieldScale);
     },
 
     teardown() {
-      roleOverlay?.dispose();
       thresholdZoneOverlay?.dispose();
-      roleOverlay = null;
       thresholdZoneOverlay = null;
     },
 
     onBeforeRender(info) {
-      roleOverlay?.update(info);
       thresholdZoneOverlay?.update(info, fieldScale);
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = ctx.statsTimeline.frames[frameIndex];
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
       if (!statsFrame) return "";
 
       return statsFrame.players.map((player) => {
         const pos = player.positioning;
-        const pid = Object.entries(player.player_id).map(([k, v]) => `${k}:${v}`).join(",");
-        const role = getCurrentRole(ctx.replay, pid, frameIndex);
-        const teamClass = player.is_team_0 ? "team-blue" : "team-orange";
-        return `<div class="player-card ${teamClass}">
-          <div class="player-card-header">
-            <span class="player-name">${player.name}</span>
-            <span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>
-          </div>
-          <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
-          <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
-          <div class="stat-row"><span class="label">Even</span><span class="value">${pos?.time_even?.toFixed(1) ?? "?"}s</span></div>
-        </div>`;
+        const role = getCurrentRole(
+          ctx.replay,
+          playerIdToString(player.player_id),
+          frameIndex,
+        );
+        return renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderRelativePositioningStats(pos),
+          `<span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>`,
+        );
       }).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      const pos = player?.positioning;
+      if (!player) return "";
+
+      return renderRelativePositioningStats(pos);
     },
   };
 }
 
-// --- Boost module ---
+function createAbsolutePositioningModule(): StatModule {
+  let zoneBoundaryLines: ReturnType<typeof createZoneBoundaryLines> | null = null;
+
+  return {
+    id: "absolute-positioning",
+    label: "Absolute Positioning",
+
+    setup(ctx) {
+      zoneBoundaryLines = createZoneBoundaryLines(
+        ctx.player.sceneState.scene,
+        ctx.fieldScale,
+      );
+    },
+
+    teardown() {
+      if (zoneBoundaryLines) {
+        zoneBoundaryLines.removeFromParent();
+        zoneBoundaryLines.traverse((node) => {
+          const geometry = "geometry" in node ? node.geometry : null;
+          disposeIfPossible(geometry);
+
+          const material = "material" in node ? node.material : null;
+          if (Array.isArray(material)) {
+            for (const entry of material) {
+              disposeIfPossible(entry);
+            }
+          } else {
+            disposeIfPossible(material);
+          }
+        });
+      }
+      zoneBoundaryLines = null;
+    },
+
+    onBeforeRender() {},
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderAbsolutePositioningStats(player.positioning),
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderAbsolutePositioningStats(player.positioning);
+    },
+  };
+}
 
 function createBoostModule(): StatModule {
   return {
@@ -196,57 +305,95 @@ function createBoostModule(): StatModule {
 
     teardown() {},
 
-    onBeforeRender() {
-      // boost meter updates are handled by the base player
-    },
+    onBeforeRender() {},
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = ctx.statsTimeline.frames[frameIndex];
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
       if (!statsFrame) return "";
 
       return statsFrame.players.map((player) => {
-        const b = player.boost;
-        const teamClass = player.is_team_0 ? "team-blue" : "team-orange";
-        const avgBoost = (b && b.tracked_time > 0)
-          ? (b.boost_integral / b.tracked_time * 100 / 255).toFixed(0)
-          : "?";
-        return `<div class="player-card ${teamClass}">
-          <div class="player-card-header">
-            <span class="player-name">${player.name}</span>
-          </div>
-          <div class="stat-row"><span class="label">Collected</span><span class="value">${b?.amount_collected?.toFixed(0) ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Amount from big pads</span><span class="value">${b?.amount_collected_big?.toFixed(0) ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Amount from small pads</span><span class="value">${b?.amount_collected_small?.toFixed(0) ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Big pads collected</span><span class="value">${b?.big_pads_collected ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Small pads collected</span><span class="value">${b?.small_pads_collected ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Stolen</span><span class="value">${b?.amount_stolen?.toFixed(0) ?? "?"}</span></div>
+        const boost = player.boost;
+        const avgBoost =
+          boost && boost.tracked_time > 0
+            ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
+            : "?";
+        return renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          `
+          <div class="stat-row"><span class="label">Collected</span><span class="value">${formatCollectedWithRespawnBound(boost?.amount_collected, boost?.amount_respawned)}</span></div>
+          <div class="stat-row"><span class="label">Big pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_big)}</span></div>
+          <div class="stat-row"><span class="label">Small pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_small)}</span></div>
+          <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
+          <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
+          <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
+          <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
+          <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
           <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
-          <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${b?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
-          <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${b?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
-        </div>`;
+          <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
+          <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
+        `,
+        );
       }).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      const boost = player?.boost;
+      if (!player) return "";
+
+      const avgBoost =
+        boost && boost.tracked_time > 0
+          ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
+          : "?";
+
+      return `
+        <div class="stat-row"><span class="label">Collected</span><span class="value">${formatCollectedWithRespawnBound(boost?.amount_collected, boost?.amount_respawned)}</span></div>
+        <div class="stat-row"><span class="label">Big pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_big)}</span></div>
+        <div class="stat-row"><span class="label">Small pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_small)}</span></div>
+        <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
+        <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
+        <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
+        <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
+        <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
+        <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
+        <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
+        <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
+        <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
+      `;
     },
   };
 }
 
-// --- Module registry and state ---
+const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 
-const ALL_MODULES = [createPositioningModule, createBoostModule];
+const ALL_MODULES = [
+  createRelativePositioningModule,
+  createAbsolutePositioningModule,
+  createBoostModule,
+];
 
 let activeModules: StatModule[] = [];
-let activeModuleIds = new Set<string>(["positioning"]); // positioning on by default
+let activeModuleIds = new Set<string>([RELATIVE_POSITIONING_MODULE_ID]);
 let removeRenderHook: (() => void) | null = null;
 
 let replayPlayer: ReplayPlayer | null = null;
 let statsTimeline: StatsTimeline | null = null;
+let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 
 function getModuleContext(): StatModuleContext | null {
-  if (!replayPlayer || !statsTimeline) return null;
+  if (!replayPlayer || !statsTimeline || !statsFrameLookup) return null;
+
   return {
     player: replayPlayer,
     replay: replayPlayer.replay,
     statsTimeline,
+    statsFrameLookup,
     fieldScale: replayPlayer.options.fieldScale ?? 1,
   };
 }
@@ -259,8 +406,8 @@ function setupActiveModules(): void {
 
   activeModules = ALL_MODULES
     .filter((factory) => {
-      const tmp = factory();
-      return activeModuleIds.has(tmp.id);
+      const mod = factory();
+      return activeModuleIds.has(mod.id);
     })
     .map((factory) => {
       const mod = factory();
@@ -278,6 +425,7 @@ function setupActiveModules(): void {
 function teardownActiveModules(): void {
   removeRenderHook?.();
   removeRenderHook = null;
+
   for (const mod of activeModules) {
     mod.teardown();
   }
@@ -290,139 +438,589 @@ function toggleModule(id: string, enabled: boolean): void {
   } else {
     activeModuleIds.delete(id);
   }
+
   setupActiveModules();
-  // re-render stats immediately
+  renderModuleSummary();
   if (replayPlayer) {
-    renderStats(replayPlayer.getState().frameIndex);
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
   }
 }
 
-// --- DOM ---
+function mustElement<T extends HTMLElement>(selector: string): T {
+  const element = document.querySelector(selector);
+  if (!(element instanceof HTMLElement)) {
+    throw new Error(`Missing element for selector: ${selector}`);
+  }
 
-const app = document.getElementById("app")!;
-
-app.innerHTML = `
-  <div class="shell">
-    <div class="header">
-      <h1>Stat Evaluation Player</h1>
-      <input id="replay-file" type="file" accept=".replay" />
-      <button id="toggle-playback" disabled>Play</button>
-      <select id="playback-rate" disabled>
-        <option value="0.25">0.25x</option>
-        <option value="0.5">0.5x</option>
-        <option value="1" selected>1.0x</option>
-        <option value="2">2.0x</option>
-      </select>
-      <span id="time-readout" class="readout">0.00s</span>
-      <span id="frame-readout" class="readout">0</span>
-      <input id="timeline" type="range" min="0" max="0" step="0.01" value="0" disabled style="flex:1" />
-    </div>
-    <div class="module-toggles" id="module-toggles"></div>
-    <div id="viewport" class="viewport"></div>
-    <div id="stats-panel" class="stats-panel">
-      <div id="player-stats" class="player-stats-grid">Load a replay to see stats.</div>
-    </div>
-  </div>
-`;
-
-// Build module toggle checkboxes
-const moduleTogglesEl = document.getElementById("module-toggles")!;
-for (const factory of ALL_MODULES) {
-  const mod = factory();
-  const label = document.createElement("label");
-  label.className = "module-toggle";
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = activeModuleIds.has(mod.id);
-  checkbox.addEventListener("change", () => {
-    toggleModule(mod.id, checkbox.checked);
-  });
-  label.appendChild(checkbox);
-  label.appendChild(document.createTextNode(` ${mod.label}`));
-  moduleTogglesEl.appendChild(label);
+  return element as T;
 }
 
-const fileInput = document.getElementById("replay-file") as HTMLInputElement;
-const viewport = document.getElementById("viewport")!;
-const togglePlayback = document.getElementById("toggle-playback") as HTMLButtonElement;
-const playbackRate = document.getElementById("playback-rate") as HTMLSelectElement;
-const timeline = document.getElementById("timeline") as HTMLInputElement;
-const timeReadout = document.getElementById("time-readout")!;
-const frameReadout = document.getElementById("frame-readout")!;
-const playerStatsEl = document.getElementById("player-stats")!;
+const app = mustElement<HTMLDivElement>("#app");
+
+app.innerHTML = `
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">subtr-actor / stats replay viewer</p>
+        <h1>Stat Evaluation Player</h1>
+        <p class="lede">
+          Compare stat modules against the in-replay camera view, switch to any
+          player's camera profile, and scrub with the shared timeline plugin.
+        </p>
+      </div>
+      <label class="file-picker">
+        <span>Choose replay</span>
+        <input id="replay-file" type="file" accept=".replay" />
+      </label>
+    </section>
+
+    <section class="workspace">
+      <div class="viewport-column">
+        <div class="viewport-panel">
+          <div id="viewport" class="viewport"></div>
+          <button
+            id="viewport-toggle-playback"
+            class="viewport-play-button"
+            type="button"
+            disabled
+            hidden
+          >
+            <span id="viewport-toggle-playback-icon" aria-hidden="true">▶</span>
+            <span id="viewport-toggle-playback-label">Play replay</span>
+          </button>
+          <div
+            id="followed-player-overlay"
+            class="followed-player-overlay"
+            hidden
+          ></div>
+          <div id="empty-state" class="empty-state">
+            Choose a replay to start the viewer.
+          </div>
+        </div>
+
+        <section class="stats-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-eyebrow">Module output</p>
+              <h2>Per-player stats</h2>
+            </div>
+          </div>
+          <div id="player-stats" class="player-stats-stack">
+            Load a replay to see stats.
+          </div>
+        </section>
+      </div>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <p class="panel-eyebrow">Camera</p>
+          <h2>Replay camera</h2>
+          <label>
+            <span class="label">Camera profile</span>
+            <select id="attached-player" disabled>
+              <option value="">Free camera</option>
+            </select>
+          </label>
+          <label>
+            <span class="label">Follow distance</span>
+            <input
+              id="camera-distance"
+              type="range"
+              min="0.75"
+              max="4"
+              step="0.05"
+              value="${DEFAULT_CAMERA_DISTANCE_SCALE}"
+              disabled
+            />
+          </label>
+          <strong id="camera-distance-readout" class="metric-readout">
+            ${DEFAULT_CAMERA_DISTANCE_SCALE.toFixed(2)}x
+          </strong>
+          <label class="toggle">
+            <input id="ball-cam" type="checkbox" disabled />
+            <span>Ball cam</span>
+          </label>
+          <dl class="detail-grid">
+            <div>
+              <dt>Profile</dt>
+              <dd id="camera-profile-readout">Free camera</dd>
+            </div>
+            <div>
+              <dt>FOV</dt>
+              <dd id="camera-fov-readout">--</dd>
+            </div>
+            <div>
+              <dt>Height</dt>
+              <dd id="camera-height-readout">--</dd>
+            </div>
+            <div>
+              <dt>Pitch</dt>
+              <dd id="camera-pitch-readout">--</dd>
+            </div>
+            <div>
+              <dt>Distance</dt>
+              <dd id="camera-base-distance-readout">--</dd>
+            </div>
+            <div>
+              <dt>Stiffness</dt>
+              <dd id="camera-stiffness-readout">--</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="panel">
+          <p class="panel-eyebrow">Modules</p>
+          <h2>Overlay modules</h2>
+          <p class="panel-copy">
+            Toggle stat overlays independently while keeping the timeline and
+            replay camera controls active.
+          </p>
+          <label class="toggle">
+            <input id="show-followed-player-overlay" type="checkbox" />
+            <span>Show followed player in viewport</span>
+          </label>
+          <div class="module-list" id="module-summary"></div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-eyebrow">Transport</p>
+          <h2>Playback</h2>
+          <div class="transport-row">
+            <button id="toggle-playback" disabled>Play</button>
+            <select id="playback-rate" disabled>
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1.0x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2.0x</option>
+            </select>
+          </div>
+          <label class="toggle">
+            <input id="skip-post-goal-transitions" type="checkbox" checked />
+            <span>Skip post-goal resets</span>
+          </label>
+          <label class="toggle">
+            <input id="skip-kickoffs" type="checkbox" />
+            <span>Skip kickoffs</span>
+          </label>
+          <div class="detail-grid">
+            <div>
+              <dt>Time</dt>
+              <dd id="time-readout">0.00s</dd>
+            </div>
+            <div>
+              <dt>Frame</dt>
+              <dd id="frame-readout">0</dd>
+            </div>
+            <div>
+              <dt>Duration</dt>
+              <dd id="duration-readout">0.00s</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd id="playback-status-readout">Stopped</dd>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-eyebrow">Replay</p>
+          <h2>Loaded file</h2>
+          <dl class="detail-grid">
+            <div>
+              <dt>Status</dt>
+              <dd id="status-readout">Waiting for file</dd>
+            </div>
+            <div>
+              <dt>Players</dt>
+              <dd id="players-readout">--</dd>
+            </div>
+            <div>
+              <dt>Frames</dt>
+              <dd id="frames-readout">--</dd>
+            </div>
+            <div>
+              <dt>Timeline events</dt>
+              <dd id="events-readout">--</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+    </section>
+  </main>
+`;
+
+const fileInput = mustElement<HTMLInputElement>("#replay-file");
+const viewport = mustElement<HTMLDivElement>("#viewport");
+const emptyState = mustElement<HTMLDivElement>("#empty-state");
+const togglePlayback = mustElement<HTMLButtonElement>("#toggle-playback");
+const viewportTogglePlayback = mustElement<HTMLButtonElement>(
+  "#viewport-toggle-playback",
+);
+const viewportTogglePlaybackIcon = mustElement<HTMLElement>(
+  "#viewport-toggle-playback-icon",
+);
+const viewportTogglePlaybackLabel = mustElement<HTMLElement>(
+  "#viewport-toggle-playback-label",
+);
+const followedPlayerOverlay = mustElement<HTMLDivElement>(
+  "#followed-player-overlay",
+);
+const playbackRate = mustElement<HTMLSelectElement>("#playback-rate");
+const attachedPlayer = mustElement<HTMLSelectElement>("#attached-player");
+const cameraDistance = mustElement<HTMLInputElement>("#camera-distance");
+const cameraDistanceReadout = mustElement<HTMLElement>("#camera-distance-readout");
+const ballCam = mustElement<HTMLInputElement>("#ball-cam");
+const showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
+  "#show-followed-player-overlay",
+);
+const moduleSummaryEl = mustElement<HTMLDivElement>("#module-summary");
+const timeReadout = mustElement<HTMLElement>("#time-readout");
+const frameReadout = mustElement<HTMLElement>("#frame-readout");
+const durationReadout = mustElement<HTMLElement>("#duration-readout");
+const playbackStatusReadout = mustElement<HTMLElement>("#playback-status-readout");
+const statusReadout = mustElement<HTMLElement>("#status-readout");
+const playersReadout = mustElement<HTMLElement>("#players-readout");
+const framesReadout = mustElement<HTMLElement>("#frames-readout");
+const eventsReadout = mustElement<HTMLElement>("#events-readout");
+const playerStatsEl = mustElement<HTMLDivElement>("#player-stats");
+const cameraProfileReadout = mustElement<HTMLElement>("#camera-profile-readout");
+const cameraFovReadout = mustElement<HTMLElement>("#camera-fov-readout");
+const cameraHeightReadout = mustElement<HTMLElement>("#camera-height-readout");
+const cameraPitchReadout = mustElement<HTMLElement>("#camera-pitch-readout");
+const cameraBaseDistanceReadout = mustElement<HTMLElement>("#camera-base-distance-readout");
+const cameraStiffnessReadout = mustElement<HTMLElement>("#camera-stiffness-readout");
+const skipPostGoalTransitions = mustElement<HTMLInputElement>(
+  "#skip-post-goal-transitions",
+);
+const skipKickoffs = mustElement<HTMLInputElement>("#skip-kickoffs");
+
+function renderModuleSummary(): void {
+  moduleSummaryEl.replaceChildren();
+
+  for (const factory of ALL_MODULES) {
+    const mod = factory();
+    const active = activeModuleIds.has(mod.id);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "module-summary-item";
+    item.dataset.active = active ? "true" : "false";
+    item.setAttribute("aria-pressed", active ? "true" : "false");
+    item.addEventListener("click", () => {
+      toggleModule(mod.id, !activeModuleIds.has(mod.id));
+    });
+
+    const name = document.createElement("span");
+    name.textContent = mod.label;
+
+    const state = document.createElement("strong");
+    state.textContent = active ? "On" : "Off";
+
+    item.append(name, state);
+    moduleSummaryEl.append(item);
+  }
+}
+
+function formatSetting(
+  value: number | undefined,
+  suffix = "",
+  digits = 0,
+): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return "--";
+  }
+
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
+function setTransportEnabled(enabled: boolean): void {
+  togglePlayback.disabled = !enabled;
+  viewportTogglePlayback.disabled = !enabled;
+  viewportTogglePlayback.hidden = !enabled;
+  playbackRate.disabled = !enabled;
+  attachedPlayer.disabled = !enabled;
+}
+
+function syncCameraControlAvailability(state?: ReplayPlayerState): void {
+  const attached = state?.attachedPlayerId ?? null;
+  const hasAttachedCamera = replayPlayer !== null && attached !== null;
+  cameraDistance.disabled = !hasAttachedCamera;
+  ballCam.disabled = !hasAttachedCamera;
+}
+
+function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
+  attachedPlayer.replaceChildren();
+  attachedPlayer.append(new Option("Free camera", ""));
+
+  for (const player of players) {
+    attachedPlayer.append(
+      new Option(
+        `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
+        player.id,
+      ),
+    );
+  }
+}
+
+function renderCameraProfile(attachedPlayerId: string | null): void {
+  if (!replayPlayer || attachedPlayerId === null) {
+    cameraProfileReadout.textContent = "Free camera";
+    cameraFovReadout.textContent = "--";
+    cameraHeightReadout.textContent = "--";
+    cameraPitchReadout.textContent = "--";
+    cameraBaseDistanceReadout.textContent = "--";
+    cameraStiffnessReadout.textContent = "--";
+    return;
+  }
+
+  const player = replayPlayer.replay.players.find(
+    (candidate) => candidate.id === attachedPlayerId,
+  );
+  if (!player) {
+    cameraProfileReadout.textContent = "Unknown";
+    cameraFovReadout.textContent = "--";
+    cameraHeightReadout.textContent = "--";
+    cameraPitchReadout.textContent = "--";
+    cameraBaseDistanceReadout.textContent = "--";
+    cameraStiffnessReadout.textContent = "--";
+    return;
+  }
+
+  const { cameraSettings } = player;
+  cameraProfileReadout.textContent = player.name;
+  cameraFovReadout.textContent = formatSetting(cameraSettings.fov, "", 0);
+  cameraHeightReadout.textContent = formatSetting(cameraSettings.height, "", 0);
+  cameraPitchReadout.textContent = formatSetting(cameraSettings.pitch, "", 0);
+  cameraBaseDistanceReadout.textContent = formatSetting(
+    cameraSettings.distance,
+    "",
+    0,
+  );
+  cameraStiffnessReadout.textContent = formatSetting(
+    cameraSettings.stiffness,
+    "",
+    2,
+  );
+}
 
 function renderStats(frameIndex: number): void {
   const ctx = getModuleContext();
   if (!ctx) return;
 
-  const sections = activeModules.map((mod) => {
-    const html = mod.renderStats(frameIndex, ctx);
-    if (!html) return "";
-    return `<div class="stat-module-section">
-      <div class="stat-module-label">${mod.label}</div>
-      <div class="player-stats-grid">${html}</div>
-    </div>`;
-  }).filter(Boolean);
+  const sections = activeModules
+    .map((mod) => {
+      const html = mod.renderStats(frameIndex, ctx);
+      if (!html) return "";
+      return `<section class="stat-module-section">
+        <div class="stat-module-label">${mod.label}</div>
+        <div class="player-stats-grid">${html}</div>
+      </section>`;
+    })
+    .filter(Boolean);
 
   playerStatsEl.innerHTML = sections.length > 0
     ? sections.join("")
     : "No stat modules active.";
 }
 
-function onStateChange(state: ReplayPlayerState): void {
+function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
+  const ctx = getModuleContext();
+  if (!ctx || !state || !showFollowedPlayerOverlay.checked) {
+    followedPlayerOverlay.hidden = true;
+    followedPlayerOverlay.innerHTML = "";
+    return;
+  }
+
+  const attachedPlayerId = state.attachedPlayerId;
+  if (!attachedPlayerId) {
+    followedPlayerOverlay.hidden = true;
+    followedPlayerOverlay.innerHTML = "";
+    return;
+  }
+
+  const player = getStatsPlayerSnapshot(ctx, state.frameIndex, attachedPlayerId);
+  if (!player) {
+    followedPlayerOverlay.hidden = true;
+    followedPlayerOverlay.innerHTML = "";
+    return;
+  }
+
+  const sections = activeModules.map((mod) => {
+    const body = mod.renderFocusedPlayerStats(attachedPlayerId, state.frameIndex, ctx);
+    if (!body) return "";
+
+    return `<section class="focused-player-module">
+      <div class="focused-player-module-label">${mod.label}</div>
+      <div class="focused-player-module-body">${body}</div>
+    </section>`;
+  }).filter(Boolean);
+
+  if (sections.length === 0) {
+    followedPlayerOverlay.hidden = true;
+    followedPlayerOverlay.innerHTML = "";
+    return;
+  }
+
+  const showRoleIndicator = activeModuleIds.has(RELATIVE_POSITIONING_MODULE_ID);
+  const role = showRoleIndicator
+    ? getCurrentRole(ctx.replay, attachedPlayerId, state.frameIndex)
+    : null;
+  followedPlayerOverlay.innerHTML = `
+    <div class="followed-player-overlay-card ${getTeamClass(player.is_team_0)}">
+      <div class="followed-player-overlay-header">
+        <div class="followed-player-overlay-title">
+          <p class="followed-player-overlay-eyebrow">Follow cam</p>
+          <div class="followed-player-overlay-name-row">
+            <span class="player-name">${player.name}</span>
+            ${role ? `<span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>` : ""}
+          </div>
+        </div>
+        <strong class="followed-player-overlay-team">
+          ${player.is_team_0 ? "Blue" : "Orange"}
+        </strong>
+      </div>
+      <div class="followed-player-overlay-body">${sections.join("")}</div>
+    </div>
+  `;
+  followedPlayerOverlay.hidden = false;
+}
+
+function renderSnapshot(state: ReplayPlayerState): void {
   timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${state.frameIndex}`;
-  timeline.value = `${state.currentTime}`;
+  durationReadout.textContent = `${state.duration.toFixed(2)}s`;
+  playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
   togglePlayback.textContent = state.playing ? "Pause" : "Play";
+  viewportTogglePlayback.dataset.playing = state.playing ? "true" : "false";
+  viewportTogglePlaybackIcon.textContent = state.playing ? "❚❚" : "▶";
+  viewportTogglePlaybackLabel.textContent = state.playing ? "Pause replay" : "Play replay";
+  viewportTogglePlayback.setAttribute(
+    "aria-label",
+    state.playing ? "Pause replay" : "Play replay",
+  );
+  playbackRate.value = `${state.speed}`;
+  cameraDistance.value = `${state.cameraDistanceScale}`;
+  cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
+  ballCam.checked = state.ballCamEnabled;
+  attachedPlayer.value = state.attachedPlayerId ?? "";
+  skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
+  skipKickoffs.checked = state.skipKickoffsEnabled;
+  emptyState.hidden = true;
+
+  syncCameraControlAvailability(state);
+  renderCameraProfile(state.attachedPlayerId);
   renderStats(state.frameIndex);
+  renderFocusedPlayerOverlay(state);
 }
 
 async function loadReplay(file: File): Promise<void> {
+  statusReadout.textContent = "Parsing replay...";
+  setTransportEnabled(false);
+  syncCameraControlAvailability();
+  emptyState.hidden = false;
+
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;
   }
+
   teardownActiveModules();
   replayPlayer?.destroy();
   replayPlayer = null;
+  statsTimeline = null;
+  statsFrameLookup = null;
 
-  await wasmInit();
   const bytes = new Uint8Array(await file.arrayBuffer());
-
   const { replay } = await loadReplayFromBytes(bytes);
-  statsTimeline = get_stats_timeline(bytes) as unknown as StatsTimeline;
+  const maybeInit = (subtrActor as typeof subtrActor & {
+    default?: () => Promise<unknown>;
+  }).default;
+  if (typeof maybeInit === "function") {
+    await maybeInit();
+  }
+
+  statsTimeline = subtrActor.get_stats_timeline(bytes) as unknown as StatsTimeline;
+  statsFrameLookup = createStatsFrameLookup(statsTimeline);
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
-    initialCameraDistanceScale: 2.25,
+    initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
+    initialAttachedPlayerId: null,
+    initialBallCamEnabled: false,
+    initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
+    initialSkipKickoffsEnabled: skipKickoffs.checked,
     plugins: [
       createBallchasingOverlayPlugin(),
       createBoostPadOverlayPlugin(),
+      createTimelineOverlayPlugin(),
     ],
   });
 
   setupActiveModules();
+  unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
-  unsubscribe = replayPlayer.subscribe(onStateChange);
-
-  timeline.min = "0";
-  timeline.max = `${replay.duration}`;
-
-  togglePlayback.disabled = false;
-  playbackRate.disabled = false;
-  timeline.disabled = false;
+  populateAttachedPlayerOptions(replay.players);
+  emptyState.hidden = true;
+  statusReadout.textContent = `Loaded ${file.name}`;
+  playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+  framesReadout.textContent = `${replay.frameCount}`;
+  eventsReadout.textContent = `${replay.timelineEvents.length}`;
+  setTransportEnabled(true);
+  syncCameraControlAvailability(replayPlayer.getState());
+  renderSnapshot(replayPlayer.getState());
 }
 
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
-  if (file) {
-    try {
-      await loadReplay(file);
-    } catch (error) {
-      console.error("Failed to load replay:", error);
-    }
+  if (!file) return;
+
+  try {
+    await loadReplay(file);
+  } catch (error) {
+    console.error("Failed to load replay:", error);
+    statusReadout.textContent =
+      error instanceof Error ? error.message : "Failed to load replay";
   }
 });
 
-togglePlayback.addEventListener("click", () => replayPlayer?.togglePlayback());
-playbackRate.addEventListener("change", () => replayPlayer?.setPlaybackRate(Number(playbackRate.value)));
-timeline.addEventListener("input", () => replayPlayer?.seek(Number(timeline.value)));
+togglePlayback.addEventListener("click", () => {
+  replayPlayer?.togglePlayback();
+});
+
+viewportTogglePlayback.addEventListener("click", () => {
+  replayPlayer?.togglePlayback();
+});
+
+playbackRate.addEventListener("change", () => {
+  replayPlayer?.setPlaybackRate(Number(playbackRate.value));
+});
+
+cameraDistance.addEventListener("input", () => {
+  replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
+});
+
+attachedPlayer.addEventListener("change", () => {
+  replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
+});
+
+ballCam.addEventListener("change", () => {
+  replayPlayer?.setBallCamEnabled(ballCam.checked);
+});
+
+showFollowedPlayerOverlay.addEventListener("change", () => {
+  renderFocusedPlayerOverlay(replayPlayer?.getState());
+});
+
+skipPostGoalTransitions.addEventListener("change", () => {
+  replayPlayer?.setSkipPostGoalTransitionsEnabled(
+    skipPostGoalTransitions.checked,
+  );
+});
+
+skipKickoffs.addEventListener("change", () => {
+  replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
+});
+
+renderModuleSummary();
+renderCameraProfile(null);

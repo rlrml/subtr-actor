@@ -41,6 +41,7 @@ function ensureStyles(): void {
     }
 
     .sap-tl-shell {
+      --sap-tl-thumb-size: 1.35rem;
       position: absolute;
       left: 0.8rem;
       right: 0.8rem;
@@ -126,8 +127,8 @@ function ensureStyles(): void {
     .sap-tl-range::-webkit-slider-thumb {
       appearance: none;
       margin-top: -0.38rem;
-      width: 1.35rem;
-      height: 1.35rem;
+      width: var(--sap-tl-thumb-size);
+      height: var(--sap-tl-thumb-size);
       border: 0;
       border-radius: 50%;
       background:
@@ -136,8 +137,8 @@ function ensureStyles(): void {
     }
 
     .sap-tl-range::-moz-range-thumb {
-      width: 1.35rem;
-      height: 1.35rem;
+      width: var(--sap-tl-thumb-size);
+      height: var(--sap-tl-thumb-size);
       border: 0;
       border-radius: 50%;
       background:
@@ -154,7 +155,7 @@ function ensureStyles(): void {
 
     .sap-tl-markers {
       position: absolute;
-      inset: 0 0 auto;
+      inset: 0 calc(var(--sap-tl-thumb-size) / 2) auto;
       height: 1rem;
       pointer-events: none;
       z-index: 1;
@@ -361,6 +362,13 @@ function markerSeekTime(
   return context.player.projectTimelineTimeToReplay(nextTimelineTime);
 }
 
+function markerLeftPercent(
+  timelineTime: number,
+  duration: number
+): string {
+  return `${(timelineTime / Math.max(duration, 0.0001)) * 100}%`;
+}
+
 export function createTimelineOverlayPlugin(
   options: TimelineOverlayPluginOptions = {}
 ): ReplayPlayerPlugin {
@@ -403,6 +411,7 @@ export function createTimelineOverlayPlugin(
         continue;
       }
       const projection = context.player.projectReplayTimeToTimeline(bucket.time);
+      marker.style.left = markerLeftPercent(projection.timelineTime, duration);
       const timeSinceEvent = currentTime - projection.timelineTime;
       const active =
         timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
@@ -441,7 +450,7 @@ export function createTimelineOverlayPlugin(
       const marker = document.createElement("button");
       marker.type = "button";
       marker.className = "sap-tl-marker";
-      marker.style.left = `${(projection.timelineTime / duration) * 100}%`;
+      marker.style.left = markerLeftPercent(projection.timelineTime, duration);
       marker.style.color = eventAccent(primaryEvent);
       marker.title = bucketTitle(bucket);
       marker.textContent = eventBadgeText(bucket);

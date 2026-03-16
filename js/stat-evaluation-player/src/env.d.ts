@@ -6,7 +6,6 @@ declare module "*.wasm?url" {
 }
 
 declare module "subtr-actor" {
-  export default function init(): Promise<unknown>;
   export function get_replay_frames_data(data: Uint8Array): unknown;
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import path from "node:path";
+import wasm from "vite-plugin-wasm";
 import {
   ensureWasmPackageFresh,
   getWasmWatchTargets,
@@ -50,7 +51,7 @@ function ensureWasmBindingsPlugin() {
 }
 
 export default defineConfig({
-  plugins: [ensureWasmBindingsPlugin()],
+  plugins: [wasm(), ensureWasmBindingsPlugin()],
   resolve: {
     alias: {
       "subtr-actor": path.resolve(
@@ -69,5 +70,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["subtr-actor"],
   },
-  assetsInclude: ["**/*.wasm"],
 });

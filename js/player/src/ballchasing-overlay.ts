@@ -56,6 +56,16 @@ function ensureStyles(): void {
       will-change: transform;
     }
 
+    .sap-bc-player-selectable {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .sap-bc-player-selectable:focus-visible {
+      outline: 2px solid rgba(255, 255, 255, 0.88);
+      outline-offset: 2px;
+    }
+
     .sap-bc-floating-track[hidden] {
       display: none;
     }
@@ -74,6 +84,10 @@ function ensureStyles(): void {
       background: rgba(6, 11, 17, 0.42);
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
       backdrop-filter: blur(6px);
+      transition:
+        border-color 0.12s ease-out,
+        box-shadow 0.12s ease-out,
+        transform 0.12s ease-out;
     }
 
     .sap-bc-boost-bar-blue {
@@ -171,6 +185,10 @@ function ensureStyles(): void {
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.26);
       background: rgba(0, 0, 0, 0.44);
+      transition:
+        border-color 0.12s ease-out,
+        box-shadow 0.12s ease-out,
+        transform 0.12s ease-out;
     }
 
     .sap-bc-hud-boost-fill {
@@ -205,6 +223,23 @@ function ensureStyles(): void {
 
     .sap-bc-hud-player-inactive {
       opacity: 0.45;
+    }
+
+    .sap-bc-player-selectable:hover .sap-bc-boost-bar,
+    .sap-bc-player-selectable:hover .sap-bc-hud-boost-bar,
+    .sap-bc-player-selectable:focus-visible .sap-bc-boost-bar,
+    .sap-bc-player-selectable:focus-visible .sap-bc-hud-boost-bar {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.56);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+    }
+
+    .sap-bc-player-following .sap-bc-boost-bar,
+    .sap-bc-player-following .sap-bc-hud-boost-bar {
+      border-color: rgba(255, 255, 255, 0.82);
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.22),
+        0 12px 28px rgba(0, 0, 0, 0.28);
     }
 
     @media (max-width: 900px) {
@@ -251,6 +286,36 @@ function setBoostBar(
   text.textContent = `${percent} ${playerName}`;
 }
 
+function makePlayerSelectable(
+  element: HTMLDivElement | null,
+  context: ReplayPlayerPluginContext,
+  playerId: string,
+  playerName: string
+): void {
+  if (!element) {
+    return;
+  }
+
+  const followPlayer = (): void => {
+    context.player.setAttachedPlayer(playerId);
+  };
+
+  element.classList.add("sap-bc-player-selectable");
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  element.setAttribute("aria-label", `Follow ${playerName}`);
+  element.title = `Follow ${playerName}`;
+  element.addEventListener("click", followPlayer);
+  element.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    followPlayer();
+  });
+}
+
 function projectToContainer(
   mesh: THREE.Object3D,
   worldOffset: THREE.Vector3,
@@ -294,6 +359,16 @@ export function createBallchasingOverlayPlugin(
   const playerElements = new Map<string, PlayerOverlayElements>();
   const projected = new THREE.Vector3();
   const floatingOffset = new THREE.Vector3(0, 0, 255);
+
+  function syncAttachedPlayer(attachedPlayerId: string | null): void {
+    for (const [playerId, elements] of playerElements.entries()) {
+      const isAttached = playerId === attachedPlayerId;
+      elements.floatingRoot?.classList.toggle("sap-bc-player-following", isAttached);
+      elements.teamHudEntry?.classList.toggle("sap-bc-player-following", isAttached);
+      elements.floatingRoot?.setAttribute("aria-pressed", isAttached ? "true" : "false");
+      elements.teamHudEntry?.setAttribute("aria-pressed", isAttached ? "true" : "false");
+    }
+  }
 
   function buildHud(
     context: ReplayPlayerPluginContext,
@@ -353,6 +428,7 @@ export function createBallchasingOverlayPlugin(
           floatingRoot.append(floatingBoostBar);
         }
 
+        makePlayerSelectable(floatingRoot, context, track.id, track.name);
         floatingLayer.append(floatingRoot);
       }
 
@@ -375,6 +451,7 @@ export function createBallchasingOverlayPlugin(
         teamHudText.className = "sap-bc-hud-boost-text";
         teamHudBar.append(teamHudFill, teamHudText);
         teamHudEntry.append(teamHudBar);
+        makePlayerSelectable(teamHudEntry, context, track.id, track.name);
 
         const hudContainer = track.isTeamZero ? blueHud : orangeHud;
         hudContainer?.append(teamHudEntry);
@@ -392,12 +469,16 @@ export function createBallchasingOverlayPlugin(
 
     floatingOffset.set(0, 0, 255 * (context.options.fieldScale ?? 1));
     container.append(root);
+    syncAttachedPlayer(context.player.getState().attachedPlayerId);
   }
 
   return {
     id: "ballchasing-overlay",
     setup(context): void {
       buildHud(context, context.container);
+    },
+    onStateChange(context): void {
+      syncAttachedPlayer(context.state.attachedPlayerId);
     },
     teardown(context): void {
       root?.remove();

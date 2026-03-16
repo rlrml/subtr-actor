@@ -1,7 +1,4 @@
-import init, {
-  get_replay_frames_data,
-  validate_replay,
-} from "subtr-actor";
+import * as subtrActor from "subtr-actor";
 import type { RawReplayFramesData, ReplayLoadResult } from "./types";
 import { normalizeReplayData } from "./replay-data";
 
@@ -37,7 +34,12 @@ function toPlainData<T>(value: T): T {
 
 export async function ensureBindingsReady(): Promise<void> {
   if (!bindingsReady) {
-    bindingsReady = init();
+    const maybeInit = (subtrActor as typeof subtrActor & {
+      default?: () => Promise<unknown>;
+    }).default;
+    bindingsReady = typeof maybeInit === "function"
+      ? maybeInit()
+      : Promise.resolve();
   }
   await bindingsReady;
 }
@@ -52,7 +54,9 @@ export async function loadReplayFromBytes(
     throw new Error(validation.error ?? "Replay validation failed");
   }
 
-  const raw = toPlainData(get_replay_frames_data(data)) as RawReplayFramesData;
+  const raw = toPlainData(
+    subtrActor.get_replay_frames_data(data),
+  ) as RawReplayFramesData;
   return {
     raw,
     replay: normalizeReplayData(raw),
@@ -61,7 +65,7 @@ export async function loadReplayFromBytes(
 
 export function validateReplayBytes(data: Uint8Array): ReplayValidation {
   const result = toPlainData(
-    validate_replay(data) as ReplayValidation | Map<string, unknown>
+    subtrActor.validate_replay(data) as ReplayValidation | Map<string, unknown>
   );
   return result as ReplayValidation;
 }

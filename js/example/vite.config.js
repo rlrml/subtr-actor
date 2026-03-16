@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import wasm from "vite-plugin-wasm";
 import {
   ensureWasmPackageFresh,
   getWasmWatchTargets,
@@ -55,7 +56,7 @@ function ensureWasmBindingsPlugin() {
 
 export default defineConfig({
   base: "./",
-  plugins: [ensureWasmBindingsPlugin()],
+  plugins: [wasm(), ensureWasmBindingsPlugin()],
   server: {
     fs: {
       allow: [".."],
@@ -73,5 +74,4 @@ export default defineConfig({
       three: path.resolve(exampleDir, "node_modules/three"),
     },
   },
-  assetsInclude: ["**/*.wasm"],
 });
