@@ -325,6 +325,7 @@ export class ReplayPlayer extends EventTarget {
 
     this.updateCamera(frameIndex, ballPosition);
     this.sceneState.controls.update();
+    this.sceneState.updateWallVisibility();
     this.sceneState.renderer.render(
       this.sceneState.scene,
       this.sceneState.camera
