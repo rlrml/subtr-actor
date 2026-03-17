@@ -13,6 +13,22 @@ fn frame_total_goals(frame: &ReplayStatsFrame) -> i32 {
     frame.team_zero.core.goals + frame.team_one.core.goals
 }
 
+fn player_snapshot_by_name<'a>(
+    frame: &'a ReplayStatsFrame,
+    player_name: &str,
+) -> &'a PlayerStatsSnapshot {
+    frame
+        .players
+        .iter()
+        .find(|player| player.name == player_name)
+        .unwrap_or_else(|| {
+            panic!(
+                "Missing player {player_name} in frame {} (t={:.3})",
+                frame.frame_number, frame.time
+            )
+        })
+}
+
 fn normalized_team_stats_for_live_play_comparison(
     snapshot: &TeamStatsSnapshot,
 ) -> TeamStatsSnapshot {
@@ -655,6 +671,76 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
             first.frame_number, first.time, first.game_state, first.is_live_play
         );
     }
+}
+
+#[test]
+fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
+    let replay = parse_replay("assets/replays/dodges_refreshed_counter.replay");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline data");
+
+    let pre_reset_frame = timeline
+        .frame_by_number(2114)
+        .expect("Expected pre-reset frame in timeline");
+    let reset_frame = timeline
+        .frame_by_number(2117)
+        .expect("Expected dodge-reset frame in timeline");
+    let post_reset_window = (2115..=2118)
+        .map(|frame_number| {
+            timeline
+                .frame_by_number(frame_number)
+                .unwrap_or_else(|| panic!("Expected frame {frame_number} in timeline"))
+        })
+        .collect::<Vec<_>>();
+
+    let pre_reset_player = player_snapshot_by_name(pre_reset_frame, "rayman ty");
+    let reset_player = player_snapshot_by_name(reset_frame, "rayman ty");
+    let max_touch_count_in_window = post_reset_window
+        .iter()
+        .map(|frame| player_snapshot_by_name(frame, "rayman ty").touch.touch_count)
+        .max()
+        .expect("Expected non-empty post-reset window");
+
+    assert_eq!(
+        reset_player.dodge_reset.on_ball_count,
+        pre_reset_player.dodge_reset.on_ball_count + 1,
+        "Expected rayman ty to get an on-ball reset by frame 2117"
+    );
+    assert!(
+        max_touch_count_in_window > pre_reset_player.touch.touch_count,
+        "Expected rayman ty's touch count to increase within frames 2115..=2118 after the on-ball reset, but it stayed at {}",
+        pre_reset_player.touch.touch_count
+    );
+}
+
+#[test]
+fn test_stats_timeline_first_kickoff_credits_both_players() {
+    let replay = parse_replay("assets/replays/dodges_refreshed_counter.replay");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline data");
+
+    let baseline_frame = timeline
+        .frame_by_number(170)
+        .expect("Expected baseline kickoff frame in timeline");
+    let kickoff_resolution_frame = timeline
+        .frame_by_number(205)
+        .expect("Expected kickoff-resolution frame in timeline");
+
+    let baseline_orange = player_snapshot_by_name(baseline_frame, "tykop");
+    let baseline_blue = player_snapshot_by_name(baseline_frame, "mrtyzz.");
+    let kickoff_resolution_orange = player_snapshot_by_name(kickoff_resolution_frame, "tykop");
+    let kickoff_resolution_blue = player_snapshot_by_name(kickoff_resolution_frame, "mrtyzz.");
+
+    assert!(
+        kickoff_resolution_orange.touch.touch_count > baseline_orange.touch.touch_count,
+        "Expected tykop to receive a credited touch during the first kickoff sequence by frame 205"
+    );
+    assert!(
+        kickoff_resolution_blue.touch.touch_count > baseline_blue.touch.touch_count,
+        "Expected mrtyzz. to receive a credited touch during the first kickoff sequence by frame 205"
+    );
 }
 
 #[test]

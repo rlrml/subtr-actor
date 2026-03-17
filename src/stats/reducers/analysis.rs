@@ -199,6 +199,7 @@ pub struct TouchStateSignal {
     previous_ball_linear_velocity: Option<glam::Vec3>,
     previous_ball_angular_velocity: Option<glam::Vec3>,
     current_last_touch: Option<TouchEvent>,
+    recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
     live_play_tracker: LivePlayTracker,
 }
 
@@ -220,6 +221,14 @@ impl TouchStateSignal {
         }
 
         candidate.frame.saturating_sub(previous_touch.frame) >= SAME_PLAYER_TOUCH_COOLDOWN_FRAMES
+    }
+
+    fn prune_recent_touch_candidates(&mut self, current_frame: usize) {
+        const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
+
+        self.recent_touch_candidates.retain(|_, candidate| {
+            current_frame.saturating_sub(candidate.frame) <= TOUCH_CANDIDATE_WINDOW_FRAMES
+        });
     }
 
     fn current_ball_angular_velocity(sample: &StatsSample) -> Option<glam::Vec3> {
@@ -269,18 +278,23 @@ impl TouchStateSignal {
             || angular_velocity_delta.length() > TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD
     }
 
-    fn candidate_touch_event(&self, sample: &StatsSample) -> Option<TouchEvent> {
+    fn proximity_touch_candidates(
+        &self,
+        sample: &StatsSample,
+        max_collision_distance: f32,
+    ) -> Vec<TouchEvent> {
         const OCTANE_HITBOX_LENGTH: f32 = 118.01;
         const OCTANE_HITBOX_WIDTH: f32 = 84.2;
         const OCTANE_HITBOX_HEIGHT: f32 = 36.16;
         const OCTANE_HITBOX_OFFSET: f32 = 13.88;
         const OCTANE_HITBOX_ELEVATION: f32 = 17.05;
-        const TOUCH_COLLISION_DISTANCE_THRESHOLD: f32 = 300.0;
 
-        let ball = sample.ball.as_ref()?;
+        let Some(ball) = sample.ball.as_ref() else {
+            return Vec::new();
+        };
         let ball_position = vec_to_glam(&ball.rigid_body.location);
 
-        let best_candidate = sample
+        let mut candidates = sample
             .players
             .iter()
             .filter_map(|player| {
@@ -289,9 +303,13 @@ impl TouchStateSignal {
                 let local_ball_position =
                     quat_to_glam(&rigid_body.rotation).inverse() * (ball_position - player_position);
 
-                let x_distance = if local_ball_position.x < -OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET {
+                let x_distance = if local_ball_position.x
+                    < -OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
+                {
                     (-OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET) - local_ball_position.x
-                } else if local_ball_position.x > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET {
+                } else if local_ball_position.x
+                    > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
+                {
                     local_ball_position.x - (OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET)
                 } else {
                     0.0
@@ -303,41 +321,121 @@ impl TouchStateSignal {
                 } else {
                     0.0
                 };
-                let z_distance =
-                    if local_ball_position.z < -OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION {
-                        (-OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION) - local_ball_position.z
-                    } else if local_ball_position.z
-                        > OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
-                    {
-                        local_ball_position.z
-                            - (OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION)
-                    } else {
-                        0.0
-                    };
+                let z_distance = if local_ball_position.z
+                    < -OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
+                {
+                    (-OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION) - local_ball_position.z
+                } else if local_ball_position.z
+                    > OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
+                {
+                    local_ball_position.z - (OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION)
+                } else {
+                    0.0
+                };
 
                 let collision_distance =
                     glam::Vec3::new(x_distance, y_distance, z_distance).length();
-                Some((player, collision_distance))
+                if collision_distance > max_collision_distance {
+                    return None;
+                }
+
+                Some(TouchEvent {
+                    time: sample.time,
+                    frame: sample.frame_number,
+                    team_is_team_0: player.is_team_0,
+                    player: Some(player.player_id.clone()),
+                    closest_approach_distance: Some(collision_distance),
+                })
             })
-            .min_by(|(_, left), (_, right)| left.total_cmp(right));
+            .collect::<Vec<_>>();
 
-        let (player, team_is_team_0, collision_distance) = best_candidate
-            .filter(|(_, distance)| *distance <= TOUCH_COLLISION_DISTANCE_THRESHOLD)
-            .map(|(player, distance)| {
-                (
-                    Some(player.player_id.clone()),
-                    player.is_team_0,
-                    Some(distance),
-                )
-            })?;
+        candidates.sort_by(|left, right| {
+            let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
+            let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
+            left_distance.total_cmp(&right_distance)
+        });
+        candidates
+    }
 
-        Some(TouchEvent {
-            time: sample.time,
-            frame: sample.frame_number,
-            team_is_team_0,
-            player,
-            closest_approach_distance: collision_distance,
-        })
+    fn candidate_touch_event(&self, sample: &StatsSample) -> Option<TouchEvent> {
+        const TOUCH_COLLISION_DISTANCE_THRESHOLD: f32 = 300.0;
+
+        self.proximity_touch_candidates(sample, TOUCH_COLLISION_DISTANCE_THRESHOLD)
+            .into_iter()
+            .next()
+    }
+
+    fn update_recent_touch_candidates(&mut self, sample: &StatsSample) {
+        const PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD: f32 = 220.0;
+
+        for candidate in
+            self.proximity_touch_candidates(sample, PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD)
+        {
+            let Some(player_id) = candidate.player.clone() else {
+                continue;
+            };
+
+            self.recent_touch_candidates.insert(player_id, candidate);
+        }
+    }
+
+    fn candidate_for_player(&self, player_id: &PlayerId) -> Option<TouchEvent> {
+        self.recent_touch_candidates.get(player_id).cloned()
+    }
+
+    fn contested_touch_candidates(&self, primary: &TouchEvent) -> Vec<TouchEvent> {
+        const CONTESTED_TOUCH_DISTANCE_MARGIN: f32 = 80.0;
+
+        let primary_distance = primary.closest_approach_distance.unwrap_or(f32::INFINITY);
+
+        let best_opposing_candidate = self
+            .recent_touch_candidates
+            .values()
+            .filter(|candidate| candidate.team_is_team_0 != primary.team_is_team_0)
+            .filter(|candidate| {
+                candidate.closest_approach_distance.unwrap_or(f32::INFINITY)
+                    <= primary_distance + CONTESTED_TOUCH_DISTANCE_MARGIN
+            })
+            .min_by(|left, right| {
+                let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
+                let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
+                left_distance.total_cmp(&right_distance)
+            })
+            .cloned();
+
+        best_opposing_candidate.into_iter().collect()
+    }
+
+    fn confirmed_touch_events(&self, sample: &StatsSample) -> Vec<TouchEvent> {
+        let mut touch_events = Vec::new();
+        let mut confirmed_players = HashSet::new();
+
+        if self.is_touch_candidate(sample) {
+            if let Some(candidate) = self.candidate_touch_event(sample) {
+                for contested_candidate in self.contested_touch_candidates(&candidate) {
+                    if let Some(player_id) = contested_candidate.player.clone() {
+                        confirmed_players.insert(player_id);
+                    }
+                    touch_events.push(contested_candidate);
+                }
+                if let Some(player_id) = candidate.player.clone() {
+                    confirmed_players.insert(player_id);
+                }
+                touch_events.push(candidate);
+            }
+        }
+
+        for dodge_refresh in &sample.dodge_refreshed_events {
+            if !confirmed_players.insert(dodge_refresh.player.clone()) {
+                continue;
+            }
+            let Some(candidate) = self.candidate_for_player(&dodge_refresh.player) else {
+                continue;
+            };
+            touch_events.push(candidate);
+        }
+
+        touch_events
     }
 }
 
@@ -352,10 +450,12 @@ impl DerivedSignal for TouchStateSignal {
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         let live_play = self.live_play_tracker.is_live_play(sample);
-        let touch_events = if live_play && self.is_touch_candidate(sample) {
-            self.candidate_touch_event(sample)
-                .filter(|candidate| self.should_emit_candidate(candidate))
+        let touch_events = if live_play {
+            self.prune_recent_touch_candidates(sample.frame_number);
+            self.update_recent_touch_candidates(sample);
+            self.confirmed_touch_events(sample)
                 .into_iter()
+                .filter(|candidate| self.should_emit_candidate(candidate))
                 .collect()
         } else {
             Vec::new()
@@ -605,6 +705,38 @@ mod tests {
             Some(RemoteId::Steam(1))
         );
         reducer.on_sample_with_context(&third, third_ctx).unwrap();
+
+        let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
+        assert_eq!(stats.touch_count, 1);
+        assert!(stats.is_last_touch);
+    }
+
+    #[test]
+    fn touch_signal_confirms_nearby_candidate_from_dodge_refresh() {
+        let mut graph = default_derived_signal_graph();
+        let mut reducer = TouchReducer::new();
+
+        let first = sample(0, 0.0, 0.0);
+        let mut second = sample(1, 1.0 / 120.0, 0.0);
+        second.dodge_refreshed_events.push(DodgeRefreshedEvent {
+            time: second.time,
+            frame: second.frame_number,
+            player: RemoteId::Steam(1),
+            is_team_0: true,
+            counter_value: 1,
+        });
+
+        let first_ctx = graph.evaluate(&first).unwrap();
+        reducer.on_sample_with_context(&first, first_ctx).unwrap();
+
+        let second_ctx = graph.evaluate(&second).unwrap();
+        let second_touch_state = second_ctx.get::<TouchState>(TOUCH_STATE_SIGNAL_ID).unwrap();
+        assert_eq!(second_touch_state.touch_events.len(), 1);
+        assert_eq!(
+            second_touch_state.last_touch_player,
+            Some(RemoteId::Steam(1))
+        );
+        reducer.on_sample_with_context(&second, second_ctx).unwrap();
 
         let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
         assert_eq!(stats.touch_count, 1);
