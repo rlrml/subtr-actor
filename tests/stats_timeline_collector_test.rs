@@ -698,7 +698,11 @@ fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
     let reset_player = player_snapshot_by_name(reset_frame, "rayman ty");
     let max_touch_count_in_window = post_reset_window
         .iter()
-        .map(|frame| player_snapshot_by_name(frame, "rayman ty").touch.touch_count)
+        .map(|frame| {
+            player_snapshot_by_name(frame, "rayman ty")
+                .touch
+                .touch_count
+        })
         .max()
         .expect("Expected non-empty post-reset window");
 

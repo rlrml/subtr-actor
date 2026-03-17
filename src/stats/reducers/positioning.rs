@@ -155,7 +155,7 @@ pub struct PositioningReducer {
     player_stats: HashMap<PlayerId, PositioningStats>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
-    current_possession_team_is_team_0: Option<bool>,
+    possession_tracker: PossessionTracker,
     live_play_tracker: LivePlayTracker,
 }
 
@@ -435,20 +435,11 @@ impl PositioningReducer {
 
 impl StatsReducer for PositioningReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let possession_team_before_sample = if sample.touch_events.is_empty() {
-            self.current_possession_team_is_team_0
-                .or(sample.possession_team_is_team_0)
-        } else {
-            self.current_possession_team_is_team_0
-        };
+        let possession_team_before_sample = self
+            .possession_tracker
+            .update(sample, &sample.touch_events)
+            .active_team_before_sample;
         self.process_sample(sample, possession_team_before_sample)?;
-        if let Some(last_touch) = sample.touch_events.last() {
-            self.current_possession_team_is_team_0 = Some(last_touch.team_is_team_0);
-        } else {
-            self.current_possession_team_is_team_0 = sample
-                .possession_team_is_team_0
-                .or(self.current_possession_team_is_team_0);
-        }
         Ok(())
     }
 
@@ -460,15 +451,8 @@ impl StatsReducer for PositioningReducer {
         let possession_team_before_sample = ctx
             .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
             .map(|state| state.active_team_before_sample)
-            .flatten()
-            .or(sample.possession_team_is_team_0);
+            .flatten();
         self.process_sample(sample, possession_team_before_sample)?;
-        self.current_possession_team_is_team_0 = ctx
-            .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
-            .map(|state| state.current_team_is_team_0)
-            .flatten()
-            .or(sample.possession_team_is_team_0)
-            .or(self.current_possession_team_is_team_0);
         Ok(())
     }
 }

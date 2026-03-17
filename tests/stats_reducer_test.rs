@@ -2423,6 +2423,38 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
             possession_team_is_team_0: Some(false),
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: None,
+            ball: Some(ball.clone()),
+            players: vec![team_zero_player.clone(), team_one_player.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 4.0,
+                frame: 4,
+                team_is_team_0: false,
+                player: Some(team_one_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 5,
+            time: 5.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: Some(false),
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
             ball: Some(ball),
             players: vec![team_zero_player, team_one_player],
             active_demos: Vec::new(),
@@ -2437,10 +2469,10 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
 
     let team_zero_stats = reducer.player_stats().get(&team_zero_id).unwrap();
     let team_one_stats = reducer.player_stats().get(&team_one_id).unwrap();
-    assert_eq!(team_zero_stats.time_has_possession, 2.0);
+    assert_eq!(team_zero_stats.time_has_possession, 3.0);
     assert_eq!(team_zero_stats.time_no_possession, 1.0);
     assert_eq!(team_one_stats.time_has_possession, 1.0);
-    assert_eq!(team_one_stats.time_no_possession, 2.0);
+    assert_eq!(team_one_stats.time_no_possession, 3.0);
 }
 
 #[test]
@@ -4864,14 +4896,14 @@ fn test_possession_reducer_tracks_team_possession_time() {
         .on_sample(&StatsSample {
             frame_number: 1,
             time: 1.0,
-            dt: 1.5,
+            dt: 1.0,
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
             kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
-            possession_team_is_team_0: Some(true),
+            possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: None,
             ball: None,
@@ -4889,18 +4921,49 @@ fn test_possession_reducer_tracks_team_possession_time() {
         .on_sample(&StatsSample {
             frame_number: 2,
             time: 2.0,
-            dt: 0.5,
+            dt: 0.0,
             seconds_remaining: None,
             game_state: None,
             ball_has_been_hit: None,
             kickoff_countdown_time: None,
             team_zero_score: None,
             team_one_score: None,
-            possession_team_is_team_0: Some(false),
+            possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: None,
             ball: None,
-            players: vec![team_zero, team_one],
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 2.0,
+                frame: 2,
+                team_is_team_0: true,
+                player: Some(team_zero.player_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
@@ -4912,10 +4975,12 @@ fn test_possession_reducer_tracks_team_possession_time() {
         .unwrap();
 
     assert_eq!(reducer.stats().tracked_time, 2.0);
-    assert_eq!(reducer.stats().team_zero_time, 2.0);
+    assert_eq!(reducer.stats().team_zero_time, 1.0);
     assert_eq!(reducer.stats().team_one_time, 0.0);
-    assert!((reducer.stats().team_zero_pct() - 100.0).abs() < 0.001);
+    assert_eq!(reducer.stats().neutral_time, 1.0);
+    assert!((reducer.stats().team_zero_pct() - 50.0).abs() < 0.001);
     assert!((reducer.stats().team_one_pct() - 0.0).abs() < 0.001);
+    assert!((reducer.stats().neutral_pct() - 50.0).abs() < 0.001);
 }
 
 #[test]
@@ -5029,6 +5094,166 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: None,
             ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 4.0,
+                frame: 4,
+                team_is_team_0: false,
+                player: Some(team_one.player_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 5,
+            time: 5.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: Some(false),
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    assert_eq!(reducer.stats().tracked_time, 4.0);
+    assert_eq!(reducer.stats().team_zero_time, 3.0);
+    assert_eq!(reducer.stats().team_one_time, 1.0);
+    assert_eq!(reducer.stats().neutral_time, 0.0);
+}
+
+#[test]
+fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
+    let mut reducer = PossessionReducer::new();
+    let team_zero = sample_player(epic_id("team-zero-challenge"), true);
+    let team_one = sample_player(epic_id("team-one-challenge"), false);
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 1.0,
+                frame: 1,
+                team_is_team_0: true,
+                player: Some(team_zero.player_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 2.0,
+                frame: 2,
+                team_is_team_0: false,
+                player: Some(team_one.player_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 4,
+            time: 4.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: None,
+            team_one_score: None,
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
             players: vec![team_zero, team_one],
             active_demos: Vec::new(),
             demo_events: Vec::new(),
@@ -5042,7 +5267,8 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
 
     assert_eq!(reducer.stats().tracked_time, 3.0);
     assert_eq!(reducer.stats().team_zero_time, 2.0);
-    assert_eq!(reducer.stats().team_one_time, 1.0);
+    assert_eq!(reducer.stats().team_one_time, 0.0);
+    assert_eq!(reducer.stats().neutral_time, 1.0);
 }
 
 #[test]

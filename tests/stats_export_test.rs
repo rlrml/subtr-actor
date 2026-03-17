@@ -135,6 +135,27 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
 }
 
 #[test]
+fn test_possession_stats_export_includes_neutral_fields() {
+    let stats = PossessionStats {
+        tracked_time: 10.0,
+        team_zero_time: 4.0,
+        team_one_time: 3.0,
+        neutral_time: 3.0,
+    };
+
+    let fields = stats.stat_fields();
+
+    assert_eq!(
+        find_field(&fields, "possession", "neutral_time").value,
+        StatValue::Float(3.0)
+    );
+    assert_eq!(
+        find_field(&fields, "possession", "neutral_pct").value,
+        StatValue::Float(30.0)
+    );
+}
+
+#[test]
 fn test_boost_stats_export_includes_respawn_and_used_fields() {
     let stats = BoostStats {
         amount_collected_big: 55.0,
@@ -254,7 +275,9 @@ fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
         StatValue::Float(420.0)
     );
     assert_eq!(
-        find_field(&fields, "touch", "average_ball_speed_change").descriptor.unit,
+        find_field(&fields, "touch", "average_ball_speed_change")
+            .descriptor
+            .unit,
         StatUnit::UnrealUnitsPerSecond
     );
     assert_eq!(

@@ -654,7 +654,9 @@ impl<'a> ReplayProcessor<'a> {
                     if let Some(attribute) = frames.frames[index]
                         .updated_actors
                         .iter()
-                        .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
+                        .find(|update| {
+                            &update.actor_id == actor_id && &update.object_id == object_id
+                        })
                         .map(|update| update.attribute.clone())
                     {
                         return Ok((attribute, index));
@@ -666,7 +668,9 @@ impl<'a> ReplayProcessor<'a> {
                     if let Some(attribute) = frames.frames[index]
                         .updated_actors
                         .iter()
-                        .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
+                        .find(|update| {
+                            &update.actor_id == actor_id && &update.object_id == object_id
+                        })
                         .map(|update| update.attribute.clone())
                     {
                         return Ok((attribute, index));

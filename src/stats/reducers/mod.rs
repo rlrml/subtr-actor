@@ -671,6 +671,7 @@ pub struct PossessionStats {
     pub tracked_time: f32,
     pub team_zero_time: f32,
     pub team_one_time: f32,
+    pub neutral_time: f32,
 }
 
 impl PossessionStats {
@@ -689,12 +690,136 @@ impl PossessionStats {
             self.team_one_time * 100.0 / self.tracked_time
         }
     }
+
+    pub fn neutral_pct(&self) -> f32 {
+        if self.tracked_time == 0.0 {
+            0.0
+        } else {
+            self.neutral_time * 100.0 / self.tracked_time
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct PossessionTrackerState {
+    current_team_is_team_0: Option<bool>,
+    last_possession_touch_time: Option<f32>,
+    pending_turnover_team_is_team_0: Option<bool>,
+    pending_turnover_touch_time: Option<f32>,
+}
+
+impl PossessionTrackerState {
+    fn clear_pending_turnover(&mut self) {
+        self.pending_turnover_team_is_team_0 = None;
+        self.pending_turnover_touch_time = None;
+    }
+
+    fn reset(&mut self) {
+        self.current_team_is_team_0 = None;
+        self.last_possession_touch_time = None;
+        self.clear_pending_turnover();
+    }
+
+    fn expire_pending_turnover(&mut self, time: f32) {
+        const PENDING_TURNOVER_CONFIRMATION_WINDOW_SECONDS: f32 = 1.25;
+
+        let Some(pending_time) = self.pending_turnover_touch_time else {
+            return;
+        };
+        if time - pending_time < PENDING_TURNOVER_CONFIRMATION_WINDOW_SECONDS {
+            return;
+        }
+
+        self.current_team_is_team_0 = None;
+        self.last_possession_touch_time = None;
+        self.clear_pending_turnover();
+    }
+
+    fn expire_loose_ball(&mut self, time: f32) {
+        const LOOSE_BALL_TIMEOUT_SECONDS: f32 = 3.0;
+
+        if self.pending_turnover_team_is_team_0.is_some() {
+            return;
+        }
+        let Some(last_touch_time) = self.last_possession_touch_time else {
+            return;
+        };
+        if time - last_touch_time < LOOSE_BALL_TIMEOUT_SECONDS {
+            return;
+        }
+
+        self.current_team_is_team_0 = None;
+        self.last_possession_touch_time = None;
+    }
+
+    fn register_single_team_touch(&mut self, team_is_team_0: bool, time: f32) {
+        if self.current_team_is_team_0 == Some(team_is_team_0) {
+            self.last_possession_touch_time = Some(time);
+            self.clear_pending_turnover();
+            return;
+        }
+
+        if self.current_team_is_team_0.is_none() {
+            self.current_team_is_team_0 = Some(team_is_team_0);
+            self.last_possession_touch_time = Some(time);
+            self.clear_pending_turnover();
+            return;
+        }
+
+        if self.pending_turnover_team_is_team_0 == Some(team_is_team_0) {
+            self.current_team_is_team_0 = Some(team_is_team_0);
+            self.last_possession_touch_time = Some(time);
+            self.clear_pending_turnover();
+            return;
+        }
+
+        self.pending_turnover_team_is_team_0 = Some(team_is_team_0);
+        self.pending_turnover_touch_time = Some(time);
+    }
+
+    fn register_contested_touch(&mut self, time: f32) {
+        let Some(current_team_is_team_0) = self.current_team_is_team_0 else {
+            self.clear_pending_turnover();
+            return;
+        };
+
+        self.last_possession_touch_time = Some(time);
+        self.pending_turnover_team_is_team_0 = Some(!current_team_is_team_0);
+        self.pending_turnover_touch_time = Some(time);
+    }
+
+    fn update(
+        &mut self,
+        sample: &StatsSample,
+        touch_events: &[TouchEvent],
+    ) -> (Option<bool>, Option<bool>) {
+        if !sample.is_live_play() {
+            self.reset();
+            return (None, None);
+        }
+
+        self.expire_pending_turnover(sample.time);
+        self.expire_loose_ball(sample.time);
+
+        let active_team_before_sample = self.current_team_is_team_0;
+        let touched_team_zero = touch_events.iter().any(|touch| touch.team_is_team_0);
+        let touched_team_one = touch_events.iter().any(|touch| !touch.team_is_team_0);
+
+        match (touched_team_zero, touched_team_one) {
+            (true, true) => self.register_contested_touch(sample.time),
+            (true, false) => self.register_single_team_touch(true, sample.time),
+            (false, true) => self.register_single_team_touch(false, sample.time),
+            (false, false) => {}
+        }
+
+        (active_team_before_sample, self.current_team_is_team_0)
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionReducer {
     stats: PossessionStats,
-    current_team_is_team_0: Option<bool>,
+    tracker: PossessionTrackerState,
     live_play_tracker: LivePlayTracker,
 }
 
@@ -711,30 +836,19 @@ impl PossessionReducer {
 impl StatsReducer for PossessionReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
-        let active_team_before_sample = if sample.touch_events.is_empty() {
-            self.current_team_is_team_0
-                .or(sample.possession_team_is_team_0)
-        } else {
-            self.current_team_is_team_0
-        };
+        let (active_team_before_sample, _) = self.tracker.update(sample, &sample.touch_events);
 
         if live_play {
+            self.stats.tracked_time += sample.dt;
             if let Some(possession_team_is_team_0) = active_team_before_sample {
-                self.stats.tracked_time += sample.dt;
                 if possession_team_is_team_0 {
                     self.stats.team_zero_time += sample.dt;
                 } else {
                     self.stats.team_one_time += sample.dt;
                 }
+            } else {
+                self.stats.neutral_time += sample.dt;
             }
-        }
-
-        if let Some(last_touch) = sample.touch_events.last() {
-            self.current_team_is_team_0 = Some(last_touch.team_is_team_0);
-        } else {
-            self.current_team_is_team_0 = sample
-                .possession_team_is_team_0
-                .or(self.current_team_is_team_0);
         }
         Ok(())
     }
@@ -748,17 +862,18 @@ impl StatsReducer for PossessionReducer {
         let active_team_before_sample = ctx
             .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
             .map(|state| state.active_team_before_sample)
-            .flatten()
-            .or(sample.possession_team_is_team_0);
+            .flatten();
 
         if live_play {
+            self.stats.tracked_time += sample.dt;
             if let Some(possession_team_is_team_0) = active_team_before_sample {
-                self.stats.tracked_time += sample.dt;
                 if possession_team_is_team_0 {
                     self.stats.team_zero_time += sample.dt;
                 } else {
                     self.stats.team_one_time += sample.dt;
                 }
+            } else {
+                self.stats.neutral_time += sample.dt;
             }
         }
         Ok(())

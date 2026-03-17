@@ -57,15 +57,12 @@ impl TouchReducer {
         };
 
         let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * sample.dt.max(0.0));
-        let residual_linear_impulse = ball.velocity() - previous_ball_velocity - expected_linear_delta;
+        let residual_linear_impulse =
+            ball.velocity() - previous_ball_velocity - expected_linear_delta;
         residual_linear_impulse.length()
     }
 
-    fn classify_touch(
-        stats: &mut TouchStats,
-        player_height: Option<f32>,
-        ball_speed_change: f32,
-    ) {
+    fn classify_touch(stats: &mut TouchStats, player_height: Option<f32>, ball_speed_change: f32) {
         const SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 320.0;
         const HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 900.0;
         const AERIAL_TOUCH_Z_THRESHOLD: f32 = 180.0;

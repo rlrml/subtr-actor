@@ -55,7 +55,7 @@ pub trait DerivedSignal {
     fn evaluate(
         &mut self,
         sample: &StatsSample,
-        ctx: &AnalysisContext,
+        _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>>;
 
     fn finish(&mut self) -> SubtrActorResult<()> {
@@ -141,10 +141,7 @@ impl DerivedSignalGraph {
             )?;
         }
 
-        self.evaluation_order = order
-            .into_iter()
-            .map(|id| id_to_index[&id])
-            .collect();
+        self.evaluation_order = order.into_iter().map(|id| id_to_index[&id]).collect();
         self.order_dirty = false;
         Ok(())
     }
@@ -161,11 +158,9 @@ impl DerivedSignalGraph {
             return Ok(());
         }
         if !visiting.insert(node_id) {
-            return SubtrActorError::new_result(
-                SubtrActorErrorVariant::DerivedSignalGraphError(format!(
-                "Cycle detected in derived signal graph at {node_id}"
-            )),
-            );
+            return SubtrActorError::new_result(SubtrActorErrorVariant::DerivedSignalGraphError(
+                format!("Cycle detected in derived signal graph at {node_id}"),
+            ));
         }
 
         let node = &nodes[id_to_index[&node_id]];
@@ -173,18 +168,11 @@ impl DerivedSignalGraph {
             if !id_to_index.contains_key(dependency) {
                 return SubtrActorError::new_result(
                     SubtrActorErrorVariant::DerivedSignalGraphError(format!(
-                    "Missing derived signal dependency {dependency} for {node_id}"
-                )),
+                        "Missing derived signal dependency {dependency} for {node_id}"
+                    )),
                 );
             }
-            Self::visit_node(
-                dependency,
-                id_to_index,
-                nodes,
-                visiting,
-                visited,
-                order,
-            )?;
+            Self::visit_node(dependency, id_to_index, nodes, visiting, visited, order)?;
         }
 
         visiting.remove(&node_id);
@@ -215,7 +203,8 @@ impl TouchStateSignal {
             return true;
         };
 
-        let same_player = previous_touch.player.is_some() && previous_touch.player == candidate.player;
+        let same_player =
+            previous_touch.player.is_some() && previous_touch.player == candidate.player;
         if !same_player {
             return true;
         }
@@ -300,15 +289,14 @@ impl TouchStateSignal {
             .filter_map(|player| {
                 let rigid_body = player.rigid_body.as_ref()?;
                 let player_position = vec_to_glam(&rigid_body.location);
-                let local_ball_position =
-                    quat_to_glam(&rigid_body.rotation).inverse() * (ball_position - player_position);
+                let local_ball_position = quat_to_glam(&rigid_body.rotation).inverse()
+                    * (ball_position - player_position);
 
                 let x_distance = if local_ball_position.x
                     < -OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
                 {
                     (-OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET) - local_ball_position.x
-                } else if local_ball_position.x
-                    > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
+                } else if local_ball_position.x > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
                 {
                     local_ball_position.x - (OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET)
                 } else {
@@ -485,7 +473,7 @@ impl DerivedSignal for TouchStateSignal {
 
 #[derive(Default)]
 pub struct PossessionStateSignal {
-    current_team_is_team_0: Option<bool>,
+    tracker: PossessionTracker,
 }
 
 impl PossessionStateSignal {
@@ -512,26 +500,9 @@ impl DerivedSignal for PossessionStateSignal {
             .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
             .cloned()
             .unwrap_or_default();
-
-        let active_team_before_sample = if touch_state.touch_events.is_empty() {
-            self.current_team_is_team_0
-                .or(sample.possession_team_is_team_0)
-        } else {
-            self.current_team_is_team_0
-        };
-
-        if let Some(team_is_team_0) = touch_state.last_touch_team_is_team_0 {
-            self.current_team_is_team_0 = Some(team_is_team_0);
-        } else {
-            self.current_team_is_team_0 = sample
-                .possession_team_is_team_0
-                .or(self.current_team_is_team_0);
-        }
-
-        Ok(Some(Box::new(PossessionState {
-            active_team_before_sample,
-            current_team_is_team_0: self.current_team_is_team_0,
-        })))
+        Ok(Some(Box::new(
+            self.tracker.update(sample, &touch_state.touch_events),
+        )))
     }
 }
 
@@ -544,8 +515,8 @@ pub fn default_derived_signal_graph() -> DerivedSignalGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
     use crate::stats::reducers::TouchReducer;
+    use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
     #[derive(Default)]
     struct TestSignal {
@@ -578,10 +549,7 @@ mod tests {
                 id: "c",
                 deps: &["b"],
             })
-            .with_signal(TestSignal {
-                id: "a",
-                deps: &[],
-            })
+            .with_signal(TestSignal { id: "a", deps: &[] })
             .with_signal(TestSignal {
                 id: "b",
                 deps: &["a"],

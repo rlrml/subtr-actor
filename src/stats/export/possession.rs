@@ -24,6 +24,12 @@ impl StatFieldProvider for PossessionStats {
         ));
         visitor(ExportedStat::float(
             "possession",
+            "neutral_time",
+            StatUnit::Seconds,
+            self.neutral_time,
+        ));
+        visitor(ExportedStat::float(
+            "possession",
             "team_zero_pct",
             StatUnit::Percent,
             self.team_zero_pct(),
@@ -33,6 +39,12 @@ impl StatFieldProvider for PossessionStats {
             "team_one_pct",
             StatUnit::Percent,
             self.team_one_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "possession",
+            "neutral_pct",
+            StatUnit::Percent,
+            self.neutral_pct(),
         ));
     }
 }
