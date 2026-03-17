@@ -328,7 +328,17 @@ pub trait StatsReducer {
         Ok(())
     }
 
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()>;
+    fn on_sample(&mut self, _sample: &StatsSample) -> SubtrActorResult<()> {
+        Ok(())
+    }
+
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        _ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        self.on_sample(sample)
+    }
 
     fn finish(&mut self) -> SubtrActorResult<()> {
         Ok(())
@@ -378,6 +388,17 @@ impl StatsReducer for CompositeStatsReducer {
         Ok(())
     }
 
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        for child in &mut self.children {
+            child.on_sample_with_context(sample, ctx)?;
+        }
+        Ok(())
+    }
+
     fn finish(&mut self) -> SubtrActorResult<()> {
         for child in &mut self.children {
             child.finish()?;
@@ -388,6 +409,7 @@ impl StatsReducer for CompositeStatsReducer {
 
 pub struct ReducerCollector<R> {
     reducer: R,
+    derived_signals: DerivedSignalGraph,
     last_sample_time: Option<f32>,
     replay_meta_initialized: bool,
     last_demolish_count: usize,
@@ -401,6 +423,7 @@ impl<R> ReducerCollector<R> {
     pub fn new(reducer: R) -> Self {
         Self {
             reducer,
+            derived_signals: default_derived_signal_graph(),
             last_sample_time: None,
             replay_meta_initialized: false,
             last_demolish_count: 0,
@@ -440,6 +463,7 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
     ) -> SubtrActorResult<TimeAdvance> {
         if !self.replay_meta_initialized {
             let replay_meta = processor.get_replay_meta()?;
+            self.derived_signals.on_replay_meta(&replay_meta)?;
             self.reducer.on_replay_meta(&replay_meta)?;
             self.replay_meta_initialized = true;
         }
@@ -457,7 +481,9 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
         sample.player_stat_events =
             processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
         sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
-        self.reducer.on_sample(&sample)?;
+        let analysis_context = self.derived_signals.evaluate(&sample)?;
+        self.reducer
+            .on_sample_with_context(&sample, analysis_context)?;
         self.last_sample_time = Some(current_time);
         self.last_demolish_count = processor.demolishes.len();
         self.last_boost_pad_event_count = processor.boost_pad_events.len();
@@ -469,6 +495,7 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
     }
 
     fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.derived_signals.finish()?;
         self.reducer.finish()
     }
 }
@@ -708,6 +735,31 @@ impl StatsReducer for PossessionReducer {
             self.current_team_is_team_0 = sample
                 .possession_team_is_team_0
                 .or(self.current_team_is_team_0);
+        }
+        Ok(())
+    }
+
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        let live_play = self.live_play_tracker.is_live_play(sample);
+        let active_team_before_sample = ctx
+            .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
+            .map(|state| state.active_team_before_sample)
+            .flatten()
+            .or(sample.possession_team_is_team_0);
+
+        if live_play {
+            if let Some(possession_team_is_team_0) = active_team_before_sample {
+                self.stats.tracked_time += sample.dt;
+                if possession_team_is_team_0 {
+                    self.stats.team_zero_time += sample.dt;
+                } else {
+                    self.stats.team_one_time += sample.dt;
+                }
+            }
         }
         Ok(())
     }
@@ -953,6 +1005,8 @@ fn get_header_f32(stats: &HashMap<String, HeaderProp>, keys: &[&str]) -> Option<
 pub mod powerslide;
 #[allow(unused_imports)]
 pub use powerslide::*;
+pub mod analysis;
+pub use analysis::*;
 pub mod pressure;
 #[allow(unused_imports)]
 pub use pressure::*;

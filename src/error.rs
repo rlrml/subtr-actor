@@ -112,6 +112,9 @@ pub enum SubtrActorErrorVariant {
 
     #[error("{0:?} was not a recognized feature adder")]
     UnknownFeatureAdderName(String),
+
+    #[error("Derived signal graph error: {0}")]
+    DerivedSignalGraphError(String),
 }
 
 /// [`SubtrActorError`] struct provides an error variant

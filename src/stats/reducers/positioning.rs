@@ -153,9 +153,9 @@ impl Default for PositioningReducerConfig {
 pub struct PositioningReducer {
     config: PositioningReducerConfig,
     player_stats: HashMap<PlayerId, PositioningStats>,
-    current_possession_team_is_team_0: Option<bool>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
+    current_possession_team_is_team_0: Option<bool>,
     live_play_tracker: LivePlayTracker,
 }
 
@@ -178,10 +178,12 @@ impl PositioningReducer {
     pub fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
         &self.player_stats
     }
-}
 
-impl StatsReducer for PositioningReducer {
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+    fn process_sample(
+        &mut self,
+        sample: &StatsSample,
+        possession_team_before_sample: Option<bool>,
+    ) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         if sample.dt == 0.0 {
             if let Some(ball) = &sample.ball {
@@ -205,12 +207,6 @@ impl StatsReducer for PositioningReducer {
             .iter()
             .map(|demo| demo.victim.clone())
             .collect();
-        let possession_team_before_sample = if sample.touch_events.is_empty() {
-            self.current_possession_team_is_team_0
-                .or(sample.possession_team_is_team_0)
-        } else {
-            self.current_possession_team_is_team_0
-        };
 
         for player in &sample.players {
             let is_demoed = demoed_players.contains(&player.player_id);
@@ -349,7 +345,6 @@ impl StatsReducer for PositioningReducer {
                             .time_no_teammates += sample.dt;
                     }
                 } else {
-                    // These role buckets only make sense when the full multi-player team is live.
                     let mut sorted_team: Vec<_> = team_players
                         .iter()
                         .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))
@@ -360,8 +355,6 @@ impl StatsReducer for PositioningReducer {
                         - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
 
                     if team_spread <= self.config.most_back_forward_threshold_y {
-                        // When the whole live team is compressed inside the threshold band, treat the
-                        // shared lane as an "other" state rather than overloading the midpoint bucket.
                         for (player_id, _) in &sorted_team {
                             self.player_stats
                                 .entry(player_id.clone())
@@ -428,14 +421,6 @@ impl StatsReducer for PositioningReducer {
             }
         }
 
-        if let Some(last_touch) = sample.touch_events.last() {
-            self.current_possession_team_is_team_0 = Some(last_touch.team_is_team_0);
-        } else {
-            self.current_possession_team_is_team_0 = sample
-                .possession_team_is_team_0
-                .or(self.current_possession_team_is_team_0);
-        }
-
         self.previous_ball_position = Some(ball_position);
         for player in &sample.players {
             if let Some(position) = player.position() {
@@ -444,6 +429,46 @@ impl StatsReducer for PositioningReducer {
             }
         }
 
+        Ok(())
+    }
+}
+
+impl StatsReducer for PositioningReducer {
+    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let possession_team_before_sample = if sample.touch_events.is_empty() {
+            self.current_possession_team_is_team_0
+                .or(sample.possession_team_is_team_0)
+        } else {
+            self.current_possession_team_is_team_0
+        };
+        self.process_sample(sample, possession_team_before_sample)?;
+        if let Some(last_touch) = sample.touch_events.last() {
+            self.current_possession_team_is_team_0 = Some(last_touch.team_is_team_0);
+        } else {
+            self.current_possession_team_is_team_0 = sample
+                .possession_team_is_team_0
+                .or(self.current_possession_team_is_team_0);
+        }
+        Ok(())
+    }
+
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        let possession_team_before_sample = ctx
+            .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
+            .map(|state| state.active_team_before_sample)
+            .flatten()
+            .or(sample.possession_team_is_team_0);
+        self.process_sample(sample, possession_team_before_sample)?;
+        self.current_possession_team_is_team_0 = ctx
+            .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
+            .map(|state| state.current_team_is_team_0)
+            .flatten()
+            .or(sample.possession_team_is_team_0)
+            .or(self.current_possession_team_is_team_0);
         Ok(())
     }
 }

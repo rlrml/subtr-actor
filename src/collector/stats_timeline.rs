@@ -207,18 +207,22 @@ impl StatsReducer for StatsTimelineReducers {
         Ok(())
     }
 
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        self.possession.on_sample(sample)?;
-        self.pressure.on_sample(sample)?;
-        self.match_stats.on_sample(sample)?;
-        self.touch.on_sample(sample)?;
-        self.ball_carry.on_sample(sample)?;
-        self.boost.on_sample(sample)?;
-        self.movement.on_sample(sample)?;
-        self.positioning.on_sample(sample)?;
-        self.powerslide.on_sample(sample)?;
-        self.demo.on_sample(sample)?;
-        self.dodge_reset.on_sample(sample)?;
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        self.possession.on_sample_with_context(sample, ctx)?;
+        self.pressure.on_sample_with_context(sample, ctx)?;
+        self.match_stats.on_sample_with_context(sample, ctx)?;
+        self.touch.on_sample_with_context(sample, ctx)?;
+        self.ball_carry.on_sample_with_context(sample, ctx)?;
+        self.boost.on_sample_with_context(sample, ctx)?;
+        self.movement.on_sample_with_context(sample, ctx)?;
+        self.positioning.on_sample_with_context(sample, ctx)?;
+        self.powerslide.on_sample_with_context(sample, ctx)?;
+        self.demo.on_sample_with_context(sample, ctx)?;
+        self.dodge_reset.on_sample_with_context(sample, ctx)?;
         Ok(())
     }
 
@@ -238,15 +242,30 @@ impl StatsReducer for StatsTimelineReducers {
     }
 }
 
-#[derive(Debug, Clone, Default)]
 pub struct StatsTimelineCollector {
     reducers: StatsTimelineReducers,
+    derived_signals: DerivedSignalGraph,
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
     last_sample: Option<StatsSample>,
     last_live_play: Option<bool>,
     live_play_tracker: LivePlayTracker,
+}
+
+impl Default for StatsTimelineCollector {
+    fn default() -> Self {
+        Self {
+            reducers: StatsTimelineReducers::default(),
+            derived_signals: default_derived_signal_graph(),
+            replay_meta: None,
+            frames: Vec::new(),
+            last_sample_time: None,
+            last_sample: None,
+            last_live_play: None,
+            live_play_tracker: LivePlayTracker::default(),
+        }
+    }
 }
 
 impl StatsTimelineCollector {
@@ -446,6 +465,7 @@ impl Collector for StatsTimelineCollector {
     ) -> SubtrActorResult<TimeAdvance> {
         if self.replay_meta.is_none() {
             let replay_meta = processor.get_replay_meta()?;
+            self.derived_signals.on_replay_meta(&replay_meta)?;
             self.reducers.on_replay_meta(&replay_meta)?;
             self.replay_meta = Some(replay_meta);
         }
@@ -456,7 +476,9 @@ impl Collector for StatsTimelineCollector {
             .unwrap_or(0.0);
         let sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
         let live_play = self.live_play_tracker.is_live_play(&sample);
-        self.reducers.on_sample(&sample)?;
+        let analysis_context = self.derived_signals.evaluate(&sample)?;
+        self.reducers
+            .on_sample_with_context(&sample, analysis_context)?;
         self.last_sample_time = Some(current_time);
         self.last_live_play = Some(live_play);
 
@@ -472,6 +494,7 @@ impl Collector for StatsTimelineCollector {
     }
 
     fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.derived_signals.finish()?;
         self.reducers.finish()?;
         let Some(last_sample) = self.last_sample.as_ref() else {
             return Ok(());

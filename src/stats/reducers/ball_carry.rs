@@ -251,11 +251,12 @@ impl BallCarryReducer {
         stats.average_horizontal_gap_sum += event.average_horizontal_gap;
         stats.average_vertical_gap_sum += event.average_vertical_gap;
     }
-}
 
-impl StatsReducer for BallCarryReducer {
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let controlling_player = self.last_touch_player.clone();
+    fn process_sample(
+        &mut self,
+        sample: &StatsSample,
+        controlling_player: Option<PlayerId>,
+    ) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let carry_candidate = if live_play && sample.dt > 0.0 {
             if let (Some(ball), Some(player_id)) = (&sample.ball, controlling_player.as_ref()) {
@@ -293,16 +294,36 @@ impl StatsReducer for BallCarryReducer {
             (None, None) => {}
         }
 
-        if let Some(last_touch) = sample.touch_events.last() {
-            self.last_touch_player = last_touch.player.clone();
-            if let Some(active_carry) = &self.active_carry {
-                if self.last_touch_player.as_ref() != Some(&active_carry.player_id) {
-                    self.finalize_active_carry();
-                }
+        if let Some(active_carry) = &self.active_carry {
+            if controlling_player.as_ref() != Some(&active_carry.player_id) {
+                self.finalize_active_carry();
             }
         }
 
+        self.last_touch_player = controlling_player;
         Ok(())
+    }
+}
+
+impl StatsReducer for BallCarryReducer {
+    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        let controlling_player = sample
+            .touch_events
+            .last()
+            .and_then(|touch_event| touch_event.player.clone())
+            .or_else(|| self.last_touch_player.clone());
+        self.process_sample(sample, controlling_player)
+    }
+
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        let controlling_player = ctx
+            .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
+            .and_then(|state| state.last_touch_player.clone());
+        self.process_sample(sample, controlling_player)
     }
 
     fn finish(&mut self) -> SubtrActorResult<()> {

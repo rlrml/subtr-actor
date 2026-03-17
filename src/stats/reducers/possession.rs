@@ -72,4 +72,29 @@ impl StatsReducer for PossessionReducer {
         }
         Ok(())
     }
+
+    fn on_sample_with_context(
+        &mut self,
+        sample: &StatsSample,
+        ctx: &AnalysisContext,
+    ) -> SubtrActorResult<()> {
+        let live_play = self.live_play_tracker.is_live_play(sample);
+        let active_team_before_sample = ctx
+            .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
+            .map(|state| state.active_team_before_sample)
+            .flatten()
+            .or(sample.possession_team_is_team_0);
+
+        if live_play {
+            if let Some(possession_team_is_team_0) = active_team_before_sample {
+                self.stats.tracked_time += sample.dt;
+                if possession_team_is_team_0 {
+                    self.stats.team_zero_time += sample.dt;
+                } else {
+                    self.stats.team_one_time += sample.dt;
+                }
+            }
+        }
+        Ok(())
+    }
 }
