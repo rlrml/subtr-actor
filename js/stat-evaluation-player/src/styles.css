@@ -469,6 +469,41 @@ input[type="range"] {
   gap: 0.5rem;
 }
 
+.module-settings {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.module-settings-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.module-settings-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.module-settings-header h3 {
+  margin: 0.1rem 0 0;
+  font-size: 0.96rem;
+}
+
+.module-settings-eyebrow {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #87afd4;
+}
+
 .module-summary-item {
   appearance: none;
   display: inline-flex;

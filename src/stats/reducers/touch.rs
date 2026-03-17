@@ -25,14 +25,8 @@ impl TouchReducer {
     pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
         &self.player_stats
     }
-}
 
-impl StatsReducer for TouchReducer {
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        if !self.live_play_tracker.is_live_play(sample) {
-            return Ok(());
-        }
-
+    fn begin_sample(&mut self, sample: &StatsSample) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_touch = false;
             stats.time_since_last_touch = stats
@@ -42,8 +36,10 @@ impl StatsReducer for TouchReducer {
                 .last_touch_frame
                 .map(|frame| sample.frame_number.saturating_sub(frame));
         }
+    }
 
-        for touch_event in &sample.touch_events {
+    fn apply_touch_events(&mut self, sample: &StatsSample, touch_events: &[TouchEvent]) {
+        for touch_event in touch_events {
             let Some(player_id) = touch_event.player.as_ref() else {
                 continue;
             };
@@ -56,7 +52,7 @@ impl StatsReducer for TouchReducer {
                 Some(sample.frame_number.saturating_sub(touch_event.frame));
         }
 
-        if let Some(last_touch) = sample.touch_events.last() {
+        if let Some(last_touch) = touch_events.last() {
             self.current_last_touch_player = last_touch.player.clone();
         }
 
@@ -65,6 +61,17 @@ impl StatsReducer for TouchReducer {
                 stats.is_last_touch = true;
             }
         }
+    }
+}
+
+impl StatsReducer for TouchReducer {
+    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        if !self.live_play_tracker.is_live_play(sample) {
+            return Ok(());
+        }
+
+        self.begin_sample(sample);
+        self.apply_touch_events(sample, &sample.touch_events);
 
         Ok(())
     }
@@ -83,30 +90,14 @@ impl StatsReducer for TouchReducer {
             .cloned()
             .unwrap_or_default();
 
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_touch = false;
-            stats.time_since_last_touch = stats
-                .last_touch_time
-                .map(|time| (sample.time - time).max(0.0));
-            stats.frames_since_last_touch = stats
-                .last_touch_frame
-                .map(|frame| sample.frame_number.saturating_sub(frame));
-        }
-
-        for touch_event in &touch_state.touch_events {
-            let Some(player_id) = touch_event.player.as_ref() else {
-                continue;
-            };
-            let stats = self.player_stats.entry(player_id.clone()).or_default();
-            stats.touch_count += 1;
-            stats.last_touch_time = Some(touch_event.time);
-            stats.last_touch_frame = Some(touch_event.frame);
-            stats.time_since_last_touch = Some((sample.time - touch_event.time).max(0.0));
-            stats.frames_since_last_touch =
-                Some(sample.frame_number.saturating_sub(touch_event.frame));
-        }
+        self.begin_sample(sample);
+        self.apply_touch_events(sample, &touch_state.touch_events);
 
         if let Some(player_id) = touch_state.last_touch_player.as_ref() {
+            self.current_last_touch_player = Some(player_id.clone());
+        }
+
+        if let Some(player_id) = self.current_last_touch_player.as_ref() {
             if let Some(stats) = self.player_stats.get_mut(player_id) {
                 stats.is_last_touch = true;
             }

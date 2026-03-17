@@ -196,6 +196,7 @@ impl DerivedSignalGraph {
 
 #[derive(Default)]
 pub struct TouchStateSignal {
+    previous_ball_linear_velocity: Option<glam::Vec3>,
     previous_ball_angular_velocity: Option<glam::Vec3>,
     current_last_touch: Option<TouchEvent>,
     live_play_tracker: LivePlayTracker,
@@ -204,6 +205,21 @@ pub struct TouchStateSignal {
 impl TouchStateSignal {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn should_emit_candidate(&self, candidate: &TouchEvent) -> bool {
+        const SAME_PLAYER_TOUCH_COOLDOWN_FRAMES: usize = 7;
+
+        let Some(previous_touch) = self.current_last_touch.as_ref() else {
+            return true;
+        };
+
+        let same_player = previous_touch.player.is_some() && previous_touch.player == candidate.player;
+        if !same_player {
+            return true;
+        }
+
+        candidate.frame.saturating_sub(previous_touch.frame) >= SAME_PLAYER_TOUCH_COOLDOWN_FRAMES
     }
 
     fn current_ball_angular_velocity(sample: &StatsSample) -> Option<glam::Vec3> {
@@ -222,17 +238,35 @@ impl TouchStateSignal {
             .map(|velocity| vec_to_glam(&velocity))
     }
 
+    fn current_ball_linear_velocity(sample: &StatsSample) -> Option<glam::Vec3> {
+        sample.ball.as_ref().map(BallSample::velocity)
+    }
+
     fn is_touch_candidate(&self, sample: &StatsSample) -> bool {
-        const TOUCH_ANGULAR_VELOCITY_DELTA_EPSILON: f32 = 1e-3;
+        const BALL_GRAVITY_Z: f32 = -650.0;
+        const TOUCH_LINEAR_IMPULSE_THRESHOLD: f32 = 120.0;
+        const TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD: f32 = 0.5;
 
-        let Some(current_velocity) = Self::current_ball_angular_velocity(sample) else {
+        let Some(current_linear_velocity) = Self::current_ball_linear_velocity(sample) else {
             return false;
         };
-        let Some(previous_velocity) = self.previous_ball_angular_velocity else {
+        let Some(previous_linear_velocity) = self.previous_ball_linear_velocity else {
+            return false;
+        };
+        let Some(current_angular_velocity) = Self::current_ball_angular_velocity(sample) else {
+            return false;
+        };
+        let Some(previous_angular_velocity) = self.previous_ball_angular_velocity else {
             return false;
         };
 
-        (current_velocity - previous_velocity).abs().max_element() > TOUCH_ANGULAR_VELOCITY_DELTA_EPSILON
+        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * sample.dt.max(0.0));
+        let residual_linear_impulse =
+            current_linear_velocity - previous_linear_velocity - expected_linear_delta;
+        let angular_velocity_delta = current_angular_velocity - previous_angular_velocity;
+
+        residual_linear_impulse.length() > TOUCH_LINEAR_IMPULSE_THRESHOLD
+            || angular_velocity_delta.length() > TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD
     }
 
     fn candidate_touch_event(&self, sample: &StatsSample) -> Option<TouchEvent> {
@@ -249,12 +283,6 @@ impl TouchStateSignal {
         let best_candidate = sample
             .players
             .iter()
-            .filter(|player| {
-                sample
-                    .possession_team_is_team_0
-                    .map(|team_is_team_0| player.is_team_0 == team_is_team_0)
-                    .unwrap_or(true)
-            })
             .filter_map(|player| {
                 let rigid_body = player.rigid_body.as_ref()?;
                 let player_position = vec_to_glam(&rigid_body.location);
@@ -293,13 +321,15 @@ impl TouchStateSignal {
             })
             .min_by(|(_, left), (_, right)| left.total_cmp(right));
 
-        let team_is_team_0 = sample.possession_team_is_team_0.or_else(|| {
-            best_candidate.map(|(player, _)| player.is_team_0)
-        })?;
-        let (player, collision_distance) = best_candidate
+        let (player, team_is_team_0, collision_distance) = best_candidate
             .filter(|(_, distance)| *distance <= TOUCH_COLLISION_DISTANCE_THRESHOLD)
-            .map(|(player, distance)| (Some(player.player_id.clone()), Some(distance)))
-            .unwrap_or((None, None));
+            .map(|(player, distance)| {
+                (
+                    Some(player.player_id.clone()),
+                    player.is_team_0,
+                    Some(distance),
+                )
+            })?;
 
         Some(TouchEvent {
             time: sample.time,
@@ -323,7 +353,10 @@ impl DerivedSignal for TouchStateSignal {
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let touch_events = if live_play && self.is_touch_candidate(sample) {
-            self.candidate_touch_event(sample).into_iter().collect()
+            self.candidate_touch_event(sample)
+                .filter(|candidate| self.should_emit_candidate(candidate))
+                .into_iter()
+                .collect()
         } else {
             Vec::new()
         };
@@ -331,6 +364,7 @@ impl DerivedSignal for TouchStateSignal {
         if let Some(last_touch) = touch_events.last() {
             self.current_last_touch = Some(last_touch.clone());
         }
+        self.previous_ball_linear_velocity = Self::current_ball_linear_velocity(sample);
         self.previous_ball_angular_velocity = Self::current_ball_angular_velocity(sample);
 
         let output = TouchState {
@@ -543,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn touch_signal_detects_same_player_consecutive_touches() {
+    fn touch_signal_dedupes_same_player_consecutive_touches() {
         let mut graph = default_derived_signal_graph();
         let mut reducer = TouchReducer::new();
 
@@ -565,7 +599,7 @@ mod tests {
 
         let third_ctx = graph.evaluate(&third).unwrap();
         let third_touch_state = third_ctx.get::<TouchState>(TOUCH_STATE_SIGNAL_ID).unwrap();
-        assert_eq!(third_touch_state.touch_events.len(), 1);
+        assert_eq!(third_touch_state.touch_events.len(), 0);
         assert_eq!(
             third_touch_state.last_touch_player,
             Some(RemoteId::Steam(1))
@@ -573,7 +607,7 @@ mod tests {
         reducer.on_sample_with_context(&third, third_ctx).unwrap();
 
         let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
-        assert_eq!(stats.touch_count, 2);
+        assert_eq!(stats.touch_count, 1);
         assert!(stats.is_last_touch);
     }
 }

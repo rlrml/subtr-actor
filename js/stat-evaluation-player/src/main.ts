@@ -18,8 +18,8 @@ import {
   createZoneBoundaryLines,
 } from "./overlays.ts";
 import {
-  LastTouchOverlay,
-  getLastTouchPlayer,
+  TouchEventOverlay,
+  playerIdToString,
 } from "./touchOverlay.ts";
 import {
   createStatsFrameLookup,
@@ -54,6 +54,7 @@ interface StatModule {
   teardown(): void;
   onBeforeRender(info: FrameRenderInfo): void;
   renderStats(frameIndex: number, ctx: StatModuleContext): string;
+  renderSettings?(ctx: StatModuleContext | null): HTMLElement | null;
   renderFocusedPlayerStats(
     playerId: string,
     frameIndex: number,
@@ -72,11 +73,6 @@ const ROLE_LABELS: Record<Role, string> = {
   other: "Other",
   mid: "Mid",
 };
-
-function playerIdToString(playerId: Record<string, string>): string {
-  const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
-}
 
 function getTeamClass(isTeamZero: boolean): string {
   return isTeamZero ? "team-blue" : "team-orange";
@@ -750,34 +746,31 @@ function createDodgeResetModule(): StatModule {
 }
 
 function createTouchModule(): StatModule {
-  let overlay: LastTouchOverlay | null = null;
-  let statsFrameLookup: Map<number, StatsFrame> | null = null;
+  let overlay: TouchEventOverlay | null = null;
+  let settingsEl: HTMLDivElement | null = null;
+  let decayReadoutEl: HTMLElement | null = null;
 
   return {
     id: "touch",
     label: "Touch",
 
     setup(ctx) {
-      statsFrameLookup = ctx.statsFrameLookup;
-      overlay = new LastTouchOverlay(ctx.player.sceneState, ctx.fieldScale);
+      overlay = new TouchEventOverlay(
+        ctx.player.sceneState,
+        ctx.player.container,
+        ctx.replay,
+        ctx.statsTimeline,
+      );
+      syncTouchSettingsUi();
     },
 
     teardown() {
       overlay?.dispose();
       overlay = null;
-      statsFrameLookup = null;
     },
 
     onBeforeRender(info) {
-      const statsFrame = statsFrameLookup
-        ? getStatsFrameForReplayFrame(statsFrameLookup, info.frameIndex)
-        : null;
-      const lastTouchPlayer = statsFrame ? getLastTouchPlayer(statsFrame) : null;
-      overlay?.update(
-        lastTouchPlayer ? playerIdToString(lastTouchPlayer.player_id) : null,
-        lastTouchPlayer?.is_team_0 ?? null,
-        lastTouchPlayer?.touch?.time_since_last_touch ?? null,
-      );
+      overlay?.update(info.currentTime);
     },
 
     renderStats(frameIndex, ctx) {
@@ -803,7 +796,67 @@ function createTouchModule(): StatModule {
 
       return renderTouchStats(player.touch);
     },
+
+    renderSettings() {
+      if (!settingsEl) {
+        settingsEl = document.createElement("div");
+        settingsEl.className = "module-settings-card";
+
+        const header = document.createElement("div");
+        header.className = "module-settings-header";
+
+        const text = document.createElement("div");
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "module-settings-eyebrow";
+        eyebrow.textContent = "Touch markers";
+        const title = document.createElement("h3");
+        title.textContent = "Touch decay";
+        text.append(eyebrow, title);
+
+        decayReadoutEl = document.createElement("strong");
+        decayReadoutEl.className = "metric-readout";
+        header.append(text, decayReadoutEl);
+
+        const label = document.createElement("label");
+        const labelText = document.createElement("span");
+        labelText.className = "label";
+        labelText.textContent = "Keep each marker visible after the touch";
+
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = "1";
+        input.max = "10";
+        input.step = "0.5";
+        input.value = `${overlay?.getDecaySeconds() ?? 5}`;
+        input.addEventListener("input", () => {
+          const nextValue = Number(input.value);
+          overlay?.setDecaySeconds(nextValue);
+          syncTouchSettingsUi(nextValue);
+        });
+
+        label.append(labelText, input);
+        settingsEl.append(header, label);
+      }
+
+      syncTouchSettingsUi();
+      return settingsEl;
+    },
   };
+
+  function syncTouchSettingsUi(nextValue?: number): void {
+    if (!settingsEl) {
+      return;
+    }
+
+    const value = nextValue ?? overlay?.getDecaySeconds() ?? 5;
+    const input = settingsEl.querySelector("input");
+    if (input instanceof HTMLInputElement) {
+      input.value = `${value}`;
+    }
+    if (decayReadoutEl) {
+      decayReadoutEl.textContent = `${value.toFixed(1)}s`;
+    }
+  }
 }
 
 function createMovementModule(): StatModule {
@@ -835,7 +888,7 @@ function createDemoModule(): StatModule {
 
 const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 
-const ALL_MODULES = [
+const MODULE_FACTORIES = [
   createCoreModule,
   createPossessionModule,
   createPressureModule,
@@ -850,6 +903,7 @@ const ALL_MODULES = [
   createDemoModule,
 ];
 
+const MODULES = MODULE_FACTORIES.map((factory) => factory());
 let activeModules: StatModule[] = [];
 let activeModuleIds = new Set<string>([RELATIVE_POSITIONING_MODULE_ID]);
 let removeRenderHook: (() => void) | null = null;
@@ -877,16 +931,10 @@ function setupActiveModules(): void {
   const ctx = getModuleContext();
   if (!ctx) return;
 
-  activeModules = ALL_MODULES
-    .filter((factory) => {
-      const mod = factory();
-      return activeModuleIds.has(mod.id);
-    })
-    .map((factory) => {
-      const mod = factory();
-      mod.setup(ctx);
-      return mod;
-    });
+  activeModules = MODULES.filter((mod) => activeModuleIds.has(mod.id));
+  for (const mod of activeModules) {
+    mod.setup(ctx);
+  }
 
   removeRenderHook = ctx.player.onBeforeRender((info) => {
     for (const mod of activeModules) {
@@ -914,6 +962,7 @@ function toggleModule(id: string, enabled: boolean): void {
 
   setupActiveModules();
   renderModuleSummary();
+  renderModuleSettings();
   if (replayPlayer) {
     const state = replayPlayer.getState();
     renderStats(state.frameIndex);
@@ -1045,6 +1094,7 @@ app.innerHTML = `
             <span>Show followed player in viewport</span>
           </label>
           <div class="module-list" id="module-summary"></div>
+          <div id="module-settings" class="module-settings" hidden></div>
         </section>
 
         <section class="panel">
@@ -1131,6 +1181,7 @@ const showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
   "#show-followed-player-overlay",
 );
 const moduleSummaryEl = mustElement<HTMLDivElement>("#module-summary");
+const moduleSettingsEl = mustElement<HTMLDivElement>("#module-settings");
 const timeReadout = mustElement<HTMLElement>("#time-readout");
 const frameReadout = mustElement<HTMLElement>("#frame-readout");
 const durationReadout = mustElement<HTMLElement>("#duration-readout");
@@ -1154,8 +1205,7 @@ const skipKickoffs = mustElement<HTMLInputElement>("#skip-kickoffs");
 function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
 
-  for (const factory of ALL_MODULES) {
-    const mod = factory();
+  for (const mod of MODULES) {
     const active = activeModuleIds.has(mod.id);
     const item = document.createElement("button");
     item.type = "button";
@@ -1175,6 +1225,23 @@ function renderModuleSummary(): void {
     item.append(name, state);
     moduleSummaryEl.append(item);
   }
+}
+
+function renderModuleSettings(): void {
+  moduleSettingsEl.replaceChildren();
+
+  const ctx = getModuleContext();
+  const panels = activeModules
+    .map((mod) => mod.renderSettings?.(ctx) ?? null)
+    .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
+
+  if (panels.length === 0) {
+    moduleSettingsEl.hidden = true;
+    return;
+  }
+
+  moduleSettingsEl.hidden = false;
+  moduleSettingsEl.append(...panels);
 }
 
 function formatSetting(
@@ -1376,6 +1443,7 @@ async function loadReplay(file: File): Promise<void> {
   replayPlayer = null;
   statsTimeline = null;
   statsFrameLookup = null;
+  renderModuleSettings();
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { replay } = await loadReplayFromBytes(bytes);
@@ -1416,6 +1484,7 @@ async function loadReplay(file: File): Promise<void> {
   setTransportEnabled(true);
   syncCameraControlAvailability(replayPlayer.getState());
   renderSnapshot(replayPlayer.getState());
+  renderModuleSettings();
 }
 
 fileInput.addEventListener("change", async () => {
@@ -1466,4 +1535,5 @@ skipKickoffs.addEventListener("change", () => {
 });
 
 renderModuleSummary();
+renderModuleSettings();
 renderCameraProfile(null);
