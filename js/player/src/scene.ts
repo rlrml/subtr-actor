@@ -27,6 +27,7 @@ interface WallPanel {
 const OPAQUE_WALL_OPACITY = 1;
 const OUTSIDE_WALL_OPACITY = 0.32;
 const BALL_TEXTURE_SIZE = 1024;
+const KEYBOARD_PAN_SPEED = 16;
 
 function createWallMaterial(color: number): THREE.MeshBasicMaterial {
   const material = new THREE.MeshBasicMaterial({
@@ -842,13 +843,22 @@ export function createReplayScene(
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.domElement.tabIndex = 0;
+  renderer.domElement.setAttribute("aria-label", "Replay player viewport");
   container.replaceChildren(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxDistance = 160000 * fieldScale;
+  controls.keyPanSpeed = KEYBOARD_PAN_SPEED;
   controls.target.set(0, 0, 600 * fieldScale);
+  controls.listenToKeyEvents(renderer.domElement);
   controls.update();
+
+  const focusViewport = (): void => {
+    renderer.domElement.focus();
+  };
+  renderer.domElement.addEventListener("pointerdown", focusViewport);
 
   const { stadium, wallPanels } = createExampleSoccarField(fieldScale);
   scene.add(stadium);
@@ -914,6 +924,8 @@ export function createReplayScene(
   };
 
   const dispose = (): void => {
+    renderer.domElement.removeEventListener("pointerdown", focusViewport);
+    controls.stopListenToKeyEvents();
     controls.dispose();
     ballTexture.dispose();
     renderer.dispose();
