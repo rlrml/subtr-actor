@@ -648,24 +648,38 @@ impl<'a> ReplayProcessor<'a> {
             .ok_or(SubtrActorError::new(
                 SubtrActorErrorVariant::NoNetworkFrames,
             ))?;
-
-        let predicate = |frame: &boxcars::Frame| {
-            frame
-                .updated_actors
-                .iter()
-                .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
-                .map(|update| &update.attribute)
-                .cloned()
-        };
-
-        match util::find_in_direction(&frames.frames, current_index, direction, predicate) {
-            Some((index, attribute)) => Ok((attribute, index)),
-            None => SubtrActorError::new_result(SubtrActorErrorVariant::NoUpdateAfterFrame {
-                actor_id: *actor_id,
-                object_id: *object_id,
-                frame_index: current_index,
-            }),
+        match direction {
+            SearchDirection::Forward => {
+                for index in (current_index + 1)..frames.frames.len() {
+                    if let Some(attribute) = frames.frames[index]
+                        .updated_actors
+                        .iter()
+                        .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
+                        .map(|update| update.attribute.clone())
+                    {
+                        return Ok((attribute, index));
+                    }
+                }
+            }
+            SearchDirection::Backward => {
+                for index in (0..current_index).rev() {
+                    if let Some(attribute) = frames.frames[index]
+                        .updated_actors
+                        .iter()
+                        .find(|update| &update.actor_id == actor_id && &update.object_id == object_id)
+                        .map(|update| update.attribute.clone())
+                    {
+                        return Ok((attribute, index));
+                    }
+                }
+            }
         }
+
+        SubtrActorError::new_result(SubtrActorErrorVariant::NoUpdateAfterFrame {
+            actor_id: *actor_id,
+            object_id: *object_id,
+            frame_index: current_index,
+        })
     }
 
     // Update functions
@@ -713,36 +727,36 @@ impl<'a> ReplayProcessor<'a> {
     /// deleted, the function removes the actor's ID from the `player_to_car`
     /// mapping.
     fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
+        let player_type_actor_ids = self.get_actor_ids_by_type(PLAYER_TYPE)?.to_vec();
+        let car_type_actor_ids = self.get_actor_ids_by_type(CAR_TYPE)?.to_vec();
+        let boost_type_actor_ids = self.get_actor_ids_by_type(BOOST_TYPE)?.to_vec();
+        let dodge_type_actor_ids = self.get_actor_ids_by_type(DODGE_TYPE)?.to_vec();
+        let jump_type_actor_ids = self.get_actor_ids_by_type(JUMP_TYPE)?.to_vec();
+        let double_jump_type_actor_ids = self.get_actor_ids_by_type(DOUBLE_JUMP_TYPE)?.to_vec();
+        let unique_id_object_id = *self.get_object_id_for_key(UNIQUE_ID_KEY)?;
+        let team_object_id = *self.get_object_id_for_key(TEAM_KEY)?;
+        let player_replication_object_id = *self.get_object_id_for_key(PLAYER_REPLICATION_KEY)?;
+        let vehicle_object_id = *self.get_object_id_for_key(VEHICLE_KEY)?;
+
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_type:expr, $attr:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
-                    if &update.object_id == self.get_object_id_for_key(&$attr)? {
-                        if self
-                            .get_actor_ids_by_type($actor_type)?
-                            .iter()
-                            .any(|id| id == &update.actor_id)
-                        {
-                            let value = get_actor_attribute_matching!(
-                                self,
-                                &update.actor_id,
-                                $attr,
-                                $type
-                            )?;
-                            let _key = $get_key(update.actor_id, value);
-                            let _new_value = $get_value(update.actor_id, value);
-                            if true $(&& _new_value != $skip)? {
-                                let _ = $map.insert(_key, _new_value);
-                            }
+                ($map:expr, $actor_ids:expr, $object_id:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
+                    if update.object_id == $object_id && $actor_ids.contains(&update.actor_id) {
+                        let value = attribute_match!(&update.attribute, $type)?;
+                        let _key = $get_key(update.actor_id, value);
+                        let _new_value = $get_value(update.actor_id, value);
+                        if true $(&& _new_value != $skip)? {
+                            let _ = $map.insert(_key, _new_value);
                         }
                     }
                 }};
             }
             macro_rules! maintain_actor_link {
-                ($map:expr, $actor_type:expr, $attr:expr $(, skip_value $skip:expr)?) => {
+                ($map:expr, $actor_ids:expr, $object_id:expr $(, skip_value $skip:expr)?) => {
                     maintain_link!(
                         $map,
-                        $actor_type,
-                        $attr,
+                        $actor_ids,
+                        $object_id,
                         // This is slightly confusing, but in these cases we are
                         // using the attribute as the key to the current actor.
                         get_actor_id_from_active_actor,
@@ -753,45 +767,49 @@ impl<'a> ReplayProcessor<'a> {
                 };
             }
             macro_rules! maintain_vehicle_key_link {
-                ($map:expr, $actor_type:expr) => {
-                    maintain_actor_link!($map, $actor_type, VEHICLE_KEY)
+                ($map:expr, $actor_ids:expr) => {
+                    maintain_actor_link!($map, $actor_ids, vehicle_object_id)
                 };
             }
             maintain_link!(
                 self.player_to_actor_id,
-                PLAYER_TYPE,
-                UNIQUE_ID_KEY,
+                player_type_actor_ids,
+                unique_id_object_id,
                 |_, unique_id: &boxcars::UniqueId| unique_id.remote_id.clone(),
                 use_update_actor,
                 boxcars::Attribute::UniqueId
             );
             maintain_link!(
                 self.player_to_team,
-                PLAYER_TYPE,
-                TEAM_KEY,
+                player_type_actor_ids,
+                team_object_id,
                 // In this case we are using the update actor as the key.
                 use_update_actor,
                 get_actor_id_from_active_actor,
                 boxcars::Attribute::ActiveActor,
                 skip_value boxcars::ActorId(-1)
             );
-            maintain_actor_link!(self.player_to_car, CAR_TYPE, PLAYER_REPLICATION_KEY);
+            maintain_actor_link!(
+                self.player_to_car,
+                car_type_actor_ids,
+                player_replication_object_id
+            );
             // `car_to_player` is intentionally the reverse of `player_to_car`:
             // key = car actor, value = player actor. We still skip `ActorId(-1)`
             // so same-frame demolition cleanup does not erase the last valid owner.
             maintain_link!(
                 self.car_to_player,
-                CAR_TYPE,
-                PLAYER_REPLICATION_KEY,
+                car_type_actor_ids,
+                player_replication_object_id,
                 use_update_actor,
                 get_actor_id_from_active_actor,
                 boxcars::Attribute::ActiveActor,
                 skip_value boxcars::ActorId(-1)
             );
-            maintain_vehicle_key_link!(self.car_to_boost, BOOST_TYPE);
-            maintain_vehicle_key_link!(self.car_to_dodge, DODGE_TYPE);
-            maintain_vehicle_key_link!(self.car_to_jump, JUMP_TYPE);
-            maintain_vehicle_key_link!(self.car_to_double_jump, DOUBLE_JUMP_TYPE);
+            maintain_vehicle_key_link!(self.car_to_boost, boost_type_actor_ids);
+            maintain_vehicle_key_link!(self.car_to_dodge, dodge_type_actor_ids);
+            maintain_vehicle_key_link!(self.car_to_jump, jump_type_actor_ids);
+            maintain_vehicle_key_link!(self.car_to_double_jump, double_jump_type_actor_ids);
         }
 
         for actor_id in frame.deleted_actors.iter() {
@@ -842,11 +860,19 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<()> {
         let kickoff_phase_active = self.kickoff_phase_active();
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
+        let boost_replicated_object_id = self.name_to_object_id.get(BOOST_REPLICATED_KEY).copied();
+        let boost_amount_object_id = self.name_to_object_id.get(BOOST_AMOUNT_KEY).copied();
+        let component_active_object_id = self.name_to_object_id.get(COMPONENT_ACTIVE_KEY).copied();
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
                 let (actor_amount_value, last_value, _, derived_value, is_active) =
-                    self.get_current_boost_values(actor_state);
+                    Self::get_current_boost_values(
+                        actor_state,
+                        boost_replicated_object_id,
+                        boost_amount_object_id,
+                        component_active_object_id,
+                    );
                 let mut current_value = if kickoff_phase_started {
                     // Some replays do not publish a trustworthy boost amount
                     // until after kickoff begins, so seed the standard spawn
@@ -918,48 +944,54 @@ impl<'a> ReplayProcessor<'a> {
     /// * Boost active value (1 if active, 0 otherwise)
     /// * Derived boost amount
     /// * Whether the boost is active (true if active, false otherwise)
-    fn get_current_boost_values(&self, actor_state: &ActorState) -> (u8, u8, u8, f32, bool) {
-        // Try to get boost amount from ReplicatedBoost attribute first (new format)
-        let amount_value = if let Ok(boxcars::Attribute::ReplicatedBoost(replicated_boost)) =
-            self.get_attribute(&actor_state.attributes, BOOST_REPLICATED_KEY)
-        {
-            replicated_boost.boost_amount
-        } else {
-            // Fall back to ReplicatedBoostAmount (old format)
-            get_attribute_errors_expected!(
-                self,
-                &actor_state.attributes,
-                BOOST_AMOUNT_KEY,
-                boxcars::Attribute::Byte
-            )
-            .cloned()
-            .unwrap_or(0)
-        };
-        let active_value = get_attribute_errors_expected!(
-            self,
-            &actor_state.attributes,
-            COMPONENT_ACTIVE_KEY,
-            boxcars::Attribute::Byte
-        )
-        .cloned()
-        .unwrap_or(0);
+    fn get_current_boost_values(
+        actor_state: &ActorState,
+        boost_replicated_object_id: Option<boxcars::ObjectId>,
+        boost_amount_object_id: Option<boxcars::ObjectId>,
+        component_active_object_id: Option<boxcars::ObjectId>,
+    ) -> (u8, u8, u8, f32, bool) {
+        // Try to get boost amount from ReplicatedBoost attribute first (new format).
+        let amount_value = boost_replicated_object_id
+            .and_then(|object_id| actor_state.attributes.get(&object_id))
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::ReplicatedBoost(replicated_boost) => {
+                    Some(replicated_boost.boost_amount)
+                }
+                _ => None,
+            })
+            .or_else(|| {
+                boost_amount_object_id
+                    .and_then(|object_id| actor_state.attributes.get(&object_id))
+                    .and_then(|(attribute, _)| match attribute {
+                        boxcars::Attribute::Byte(value) => Some(*value),
+                        _ => None,
+                    })
+            })
+            .unwrap_or(0);
+        let active_value = component_active_object_id
+            .and_then(|object_id| actor_state.attributes.get(&object_id))
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Byte(value) => Some(*value),
+                _ => None,
+            })
+            .unwrap_or(0);
         let is_active = active_value % 2 == 1;
         let derived_value = actor_state
             .derived_attributes
             .get(BOOST_AMOUNT_KEY)
-            .cloned()
-            .and_then(|v| attribute_match!(v.0, boxcars::Attribute::Float).ok())
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Float(value) => Some(*value),
+                _ => None,
+            })
             .unwrap_or(0.0);
-        let last_boost_amount = attribute_match!(
-            actor_state
-                .derived_attributes
-                .get(LAST_BOOST_AMOUNT_KEY)
-                .cloned()
-                .map(|v| v.0)
-                .unwrap_or_else(|| boxcars::Attribute::Byte(amount_value)),
-            boxcars::Attribute::Byte
-        )
-        .unwrap_or(0);
+        let last_boost_amount = actor_state
+            .derived_attributes
+            .get(LAST_BOOST_AMOUNT_KEY)
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Byte(value) => Some(*value),
+                _ => None,
+            })
+            .unwrap_or(amount_value);
         (
             amount_value,
             last_boost_amount,

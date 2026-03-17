@@ -512,15 +512,16 @@ pub fn find_in_direction<T, F, R>(
 where
     F: Fn(&T) -> Option<R>,
 {
-    let mut iter: Box<dyn Iterator<Item = (usize, &T)>> = match direction {
-        SearchDirection::Forward => Box::new(
-            items[current_index + 1..]
-                .iter()
-                .enumerate()
-                .map(move |(i, item)| (i + current_index + 1, item)),
-        ),
-        SearchDirection::Backward => Box::new(items[..current_index].iter().enumerate().rev()),
-    };
-
-    iter.find_map(|(i, item)| predicate(item).map(|res| (i, res)))
+    match direction {
+        SearchDirection::Forward => items
+            .iter()
+            .enumerate()
+            .skip(current_index + 1)
+            .find_map(|(i, item)| predicate(item).map(|res| (i, res))),
+        SearchDirection::Backward => items[..current_index]
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, item)| predicate(item).map(|res| (i, res))),
+    }
 }
