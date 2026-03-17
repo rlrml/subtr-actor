@@ -31,6 +31,7 @@ import {
   formatBoostDisplayAmount,
   toBoostDisplayUnits,
 } from "./boostFormatting.ts";
+import { renderTouchStats } from "./touchFormatting.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -329,17 +330,6 @@ function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): 
   return `
     <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
     <div class="stat-row"><span class="label">On-ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
-  `;
-}
-
-function renderTouchStats(touch: PlayerStatsSnapshot["touch"]): string {
-  return `
-    <div class="stat-row"><span class="label">Touches</span><span class="value">${formatInteger(touch?.touch_count)}</span></div>
-    <div class="stat-row"><span class="label">Current</span><span class="value">${touch?.is_last_touch ? "Yes" : "No"}</span></div>
-    <div class="stat-row"><span class="label">Touch time</span><span class="value">${formatNumber(touch?.last_touch_time, 2, "s")}</span></div>
-    <div class="stat-row"><span class="label">Touch frame</span><span class="value">${formatInteger(touch?.last_touch_frame)}</span></div>
-    <div class="stat-row"><span class="label">Since touch</span><span class="value">${formatNumber(touch?.time_since_last_touch, 2, "s")}</span></div>
-    <div class="stat-row"><span class="label">Frames since</span><span class="value">${formatInteger(touch?.frames_since_last_touch)}</span></div>
   `;
 }
 

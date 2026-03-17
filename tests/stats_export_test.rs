@@ -206,3 +206,63 @@ fn test_dodge_reset_stats_export_includes_on_ball_count() {
         StatValue::Unsigned(3)
     );
 }
+
+#[test]
+fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
+    let stats = TouchStats {
+        touch_count: 7,
+        dribble_touch_count: 2,
+        control_touch_count: 1,
+        medium_hit_count: 3,
+        hard_hit_count: 1,
+        aerial_touch_count: 2,
+        high_aerial_touch_count: 1,
+        last_ball_speed_change: Some(420.0),
+        max_ball_speed_change: 960.0,
+        cumulative_ball_speed_change: 2_100.0,
+        ..TouchStats::default()
+    };
+
+    let fields = stats.stat_fields();
+
+    assert_eq!(
+        find_field(&fields, "touch", "dribble_touch_count").value,
+        StatValue::Unsigned(2)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "control_touch_count").value,
+        StatValue::Unsigned(1)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "medium_hit_count").value,
+        StatValue::Unsigned(3)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "hard_hit_count").value,
+        StatValue::Unsigned(1)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "aerial_touch_count").value,
+        StatValue::Unsigned(2)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "high_aerial_touch_count").value,
+        StatValue::Unsigned(1)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "last_ball_speed_change").value,
+        StatValue::Float(420.0)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "average_ball_speed_change").descriptor.unit,
+        StatUnit::UnrealUnitsPerSecond
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "average_ball_speed_change").value,
+        StatValue::Float(300.0)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "max_ball_speed_change").value,
+        StatValue::Float(960.0)
+    );
+}

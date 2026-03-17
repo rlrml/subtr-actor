@@ -43,11 +43,20 @@ export interface PlayerStatsSnapshot {
   };
   touch?: {
     touch_count: number;
+    dribble_touch_count?: number;
+    control_touch_count?: number;
+    medium_hit_count?: number;
+    hard_hit_count?: number;
+    aerial_touch_count?: number;
+    high_aerial_touch_count?: number;
     is_last_touch: boolean;
     last_touch_time?: number;
     last_touch_frame?: number;
     time_since_last_touch?: number;
     frames_since_last_touch?: number;
+    last_ball_speed_change?: number;
+    average_ball_speed_change?: number;
+    max_ball_speed_change?: number;
     [key: string]: unknown;
   };
   dodge_reset?: {

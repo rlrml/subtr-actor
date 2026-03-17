@@ -12,6 +12,42 @@ impl StatFieldProvider for TouchStats {
         ));
         visitor(ExportedStat::unsigned(
             "touch",
+            "dribble_touch_count",
+            StatUnit::Count,
+            self.dribble_touch_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "control_touch_count",
+            StatUnit::Count,
+            self.control_touch_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "medium_hit_count",
+            StatUnit::Count,
+            self.medium_hit_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "hard_hit_count",
+            StatUnit::Count,
+            self.hard_hit_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "aerial_touch_count",
+            StatUnit::Count,
+            self.aerial_touch_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "high_aerial_touch_count",
+            StatUnit::Count,
+            self.high_aerial_touch_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "touch",
             "is_last_touch",
             StatUnit::Count,
             u32::from(self.is_last_touch),
@@ -48,5 +84,25 @@ impl StatFieldProvider for TouchStats {
                 u32::try_from(value).unwrap_or(u32::MAX),
             ));
         }
+        if let Some(value) = self.last_ball_speed_change {
+            visitor(ExportedStat::float(
+                "touch",
+                "last_ball_speed_change",
+                StatUnit::UnrealUnitsPerSecond,
+                value,
+            ));
+        }
+        visitor(ExportedStat::float(
+            "touch",
+            "average_ball_speed_change",
+            StatUnit::UnrealUnitsPerSecond,
+            self.average_ball_speed_change(),
+        ));
+        visitor(ExportedStat::float(
+            "touch",
+            "max_ball_speed_change",
+            StatUnit::UnrealUnitsPerSecond,
+            self.max_ball_speed_change,
+        ));
     }
 }
