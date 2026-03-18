@@ -46,6 +46,15 @@ impl StatFieldProvider for TouchStats {
             StatUnit::Count,
             self.high_aerial_touch_count,
         ));
+        for entry in &self.labeled_touch_counts.entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "touch",
+                "touch_count",
+                StatUnit::Count,
+                entry.labels.clone(),
+                entry.count,
+            ));
+        }
         visitor(ExportedStat::unsigned(
             "touch",
             "is_last_touch",
@@ -104,5 +113,43 @@ impl StatFieldProvider for TouchStats {
             StatUnit::UnrealUnitsPerSecond,
             self.max_ball_speed_change,
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn touch_export_includes_labeled_touch_count_stats() {
+        let mut stats = TouchStats::default();
+        stats.touch_count = 2;
+        stats.labeled_touch_counts.increment([
+            StatLabel::new("kind", "hard_hit"),
+            StatLabel::new("aerial", "true"),
+        ]);
+        stats.labeled_touch_counts.increment([
+            StatLabel::new("kind", "hard_hit"),
+            StatLabel::new("aerial", "true"),
+        ]);
+
+        let labeled_touch_stats: Vec<_> = stats
+            .stat_fields()
+            .into_iter()
+            .filter(|stat| {
+                stat.descriptor.name == "touch_count"
+                    && stat.descriptor.variant == LABELED_STAT_VARIANT
+            })
+            .collect();
+
+        assert_eq!(labeled_touch_stats.len(), 1);
+        assert_eq!(
+            labeled_touch_stats[0].descriptor.labels,
+            vec![
+                StatLabel::new("aerial", "true"),
+                StatLabel::new("kind", "hard_hit"),
+            ]
+        );
+        assert_eq!(labeled_touch_stats[0].value, StatValue::Unsigned(2));
     }
 }

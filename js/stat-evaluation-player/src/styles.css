@@ -483,6 +483,18 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.035);
 }
 
+.module-settings-subgroup {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.module-settings-options {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .module-settings-header {
   display: flex;
   align-items: start;

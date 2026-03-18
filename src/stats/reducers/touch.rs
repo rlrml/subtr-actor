@@ -1,5 +1,49 @@
 use super::*;
 
+const SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 320.0;
+const HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 900.0;
+const AERIAL_TOUCH_Z_THRESHOLD: f32 = 180.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TouchKind {
+    Dribble,
+    Control,
+    MediumHit,
+    HardHit,
+}
+
+impl TouchKind {
+    fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::Dribble => "dribble",
+            Self::Control => "control",
+            Self::MediumHit => "medium_hit",
+            Self::HardHit => "hard_hit",
+        };
+        StatLabel::new("kind", value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TouchClassification {
+    kind: TouchKind,
+    is_aerial: bool,
+    is_high_aerial: bool,
+}
+
+impl TouchClassification {
+    fn labels(self) -> [StatLabel; 3] {
+        [
+            self.kind.as_label(),
+            StatLabel::new("aerial", if self.is_aerial { "true" } else { "false" }),
+            StatLabel::new(
+                "high_aerial",
+                if self.is_high_aerial { "true" } else { "false" },
+            ),
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct TouchStats {
     pub touch_count: u32,
@@ -17,6 +61,8 @@ pub struct TouchStats {
     pub last_ball_speed_change: Option<f32>,
     pub max_ball_speed_change: f32,
     pub cumulative_ball_speed_change: f32,
+    #[serde(skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_touch_counts: LabeledCounts,
 }
 
 impl TouchStats {
@@ -26,6 +72,10 @@ impl TouchStats {
         } else {
             self.cumulative_ball_speed_change / self.touch_count as f32
         }
+    }
+
+    pub fn touch_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_touch_counts.count_matching(labels)
     }
 }
 
@@ -62,33 +112,48 @@ impl TouchReducer {
         residual_linear_impulse.length()
     }
 
-    fn classify_touch(stats: &mut TouchStats, player_height: Option<f32>, ball_speed_change: f32) {
-        const SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 320.0;
-        const HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 900.0;
-        const AERIAL_TOUCH_Z_THRESHOLD: f32 = 180.0;
-
+    fn classify_touch(player_height: Option<f32>, ball_speed_change: f32) -> TouchClassification {
         let player_height = player_height.unwrap_or(0.0);
         let is_aerial_touch = player_height >= AERIAL_TOUCH_Z_THRESHOLD;
         let is_high_aerial_touch = player_height >= HIGH_AIR_Z_THRESHOLD;
 
-        if is_aerial_touch {
+        let kind = if ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
+            if is_aerial_touch {
+                TouchKind::Control
+            } else {
+                TouchKind::Dribble
+            }
+        } else if ball_speed_change < HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
+            TouchKind::MediumHit
+        } else {
+            TouchKind::HardHit
+        };
+
+        TouchClassification {
+            kind,
+            is_aerial: is_aerial_touch,
+            is_high_aerial: is_high_aerial_touch,
+        }
+    }
+
+    fn apply_touch_classification(stats: &mut TouchStats, classification: TouchClassification) {
+        if classification.is_aerial {
             stats.aerial_touch_count += 1;
         }
-        if is_high_aerial_touch {
+        if classification.is_high_aerial {
             stats.high_aerial_touch_count += 1;
         }
 
-        if ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
-            if is_aerial_touch {
-                stats.control_touch_count += 1;
-            } else {
-                stats.dribble_touch_count += 1;
-            }
-        } else if ball_speed_change < HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
-            stats.medium_hit_count += 1;
-        } else {
-            stats.hard_hit_count += 1;
+        match classification.kind {
+            TouchKind::Dribble => stats.dribble_touch_count += 1,
+            TouchKind::Control => stats.control_touch_count += 1,
+            TouchKind::MediumHit => stats.medium_hit_count += 1,
+            TouchKind::HardHit => stats.hard_hit_count += 1,
         }
+
+        stats
+            .labeled_touch_counts
+            .increment(classification.labels());
     }
 
     fn begin_sample(&mut self, sample: &StatsSample) {
@@ -116,9 +181,10 @@ impl TouchReducer {
                 .find(|player| player.player_id == *player_id)
                 .and_then(PlayerSample::position)
                 .map(|position| position.z);
+            let classification = Self::classify_touch(player_height, ball_speed_change);
             let stats = self.player_stats.entry(player_id.clone()).or_default();
             stats.touch_count += 1;
-            Self::classify_touch(stats, player_height, ball_speed_change);
+            Self::apply_touch_classification(stats, classification);
             stats.last_touch_time = Some(touch_event.time);
             stats.last_touch_frame = Some(touch_event.frame);
             stats.time_since_last_touch = Some((sample.time - touch_event.time).max(0.0));
@@ -315,6 +381,28 @@ mod tests {
         assert_eq!(stats.hard_hit_count, 1);
         assert_eq!(stats.aerial_touch_count, 2);
         assert_eq!(stats.high_aerial_touch_count, 1);
+        assert_eq!(
+            stats.touch_count_with_labels(&[StatLabel::new("kind", "dribble")]),
+            1
+        );
+        assert_eq!(
+            stats.touch_count_with_labels(&[StatLabel::new("aerial", "true")]),
+            2
+        );
+        assert_eq!(
+            stats.touch_count_with_labels(&[
+                StatLabel::new("kind", "hard_hit"),
+                StatLabel::new("aerial", "true"),
+            ]),
+            1
+        );
+        assert_eq!(
+            stats.touch_count_with_labels(&[
+                StatLabel::new("kind", "hard_hit"),
+                StatLabel::new("high_aerial", "true"),
+            ]),
+            1
+        );
         assert!(stats.last_ball_speed_change.is_some());
         assert!(stats.max_ball_speed_change >= stats.average_ball_speed_change());
     }

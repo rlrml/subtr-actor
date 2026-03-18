@@ -144,6 +144,19 @@ pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
+/// Get dynamically-described cumulative stats snapshots for each replay sample.
+#[wasm_bindgen]
+pub fn get_dynamic_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+
+    let stats_timeline = StatsTimelineCollector::new()
+        .get_dynamic_replay_data(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+
+    serde_wasm_bindgen::to_value(&stats_timeline)
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
+}
+
 /// Validate that a replay file can be parsed
 #[wasm_bindgen]
 pub fn validate_replay(data: &[u8]) -> Result<JsValue, JsValue> {

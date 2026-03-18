@@ -22,7 +22,9 @@ import {
   playerIdToString,
 } from "./touchOverlay.ts";
 import {
+  createDynamicStatsFrameLookup,
   createStatsFrameLookup,
+  getDynamicStatsFrameForReplayFrame,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
 import type { Object3D } from "three";
@@ -33,10 +35,14 @@ import {
 } from "./boostFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
+  DynamicPlayerStatsSnapshot,
+  DynamicStatsFrame,
+  DynamicStatsTimeline,
   PlayerStatsSnapshot,
   StatsFrame,
   StatsTimeline,
 } from "./statsTimeline.ts";
+import type { TouchBreakdownClass } from "./touchFormatting.ts";
 
 import * as subtrActor from "subtr-actor";
 
@@ -45,6 +51,8 @@ interface StatModuleContext {
   replay: ReplayModel;
   statsTimeline: StatsTimeline;
   statsFrameLookup: Map<number, StatsFrame>;
+  dynamicStatsTimeline: DynamicStatsTimeline;
+  dynamicStatsFrameLookup: Map<number, DynamicStatsFrame>;
   fieldScale: number;
 }
 
@@ -100,6 +108,22 @@ function getStatsPlayerSnapshot(
   playerId: string,
 ): PlayerStatsSnapshot | null {
   const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+  if (!statsFrame) return null;
+
+  return statsFrame.players.find(
+    (player) => playerIdToString(player.player_id) === playerId,
+  ) ?? null;
+}
+
+function getDynamicStatsPlayerSnapshot(
+  ctx: StatModuleContext,
+  frameIndex: number,
+  playerId: string,
+): DynamicPlayerStatsSnapshot | null {
+  const statsFrame = getDynamicStatsFrameForReplayFrame(
+    ctx.dynamicStatsFrameLookup,
+    frameIndex,
+  );
   if (!statsFrame) return null;
 
   return statsFrame.players.find(
@@ -739,6 +763,13 @@ function createTouchModule(): StatModule {
   let overlay: TouchEventOverlay | null = null;
   let settingsEl: HTMLDivElement | null = null;
   let decayReadoutEl: HTMLElement | null = null;
+  let breakdownReadoutEl: HTMLElement | null = null;
+  const activeBreakdownClasses = new Set<TouchBreakdownClass>();
+  const orderedBreakdownClasses: TouchBreakdownClass[] = [
+    "kind",
+    "aerial",
+    "high_aerial",
+  ];
 
   return {
     id: "touch",
@@ -773,7 +804,14 @@ function createTouchModule(): StatModule {
       return statsFrame.players.map((player) => renderPlayerCard(
         player.name,
         player.is_team_0,
-        renderTouchStats(player.touch),
+        renderTouchStats(player.touch, {
+          breakdownClasses: getActiveBreakdownClasses(),
+          exportedStats: getDynamicStatsPlayerSnapshot(
+            ctx,
+            frameIndex,
+            playerIdToString(player.player_id),
+          )?.stats,
+        }),
         player.touch?.is_last_touch
           ? '<span class="role-indicator role-forward">Last Touch</span>'
           : "",
@@ -784,7 +822,10 @@ function createTouchModule(): StatModule {
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       if (!player) return "";
 
-      return renderTouchStats(player.touch);
+      return renderTouchStats(player.touch, {
+        breakdownClasses: getActiveBreakdownClasses(),
+        exportedStats: getDynamicStatsPlayerSnapshot(ctx, frameIndex, playerId)?.stats,
+      });
     },
 
     renderSettings() {
@@ -825,7 +866,56 @@ function createTouchModule(): StatModule {
         });
 
         label.append(labelText, input);
-        settingsEl.append(header, label);
+        const breakdownSection = document.createElement("div");
+        breakdownSection.className = "module-settings-subgroup";
+
+        const breakdownHeader = document.createElement("div");
+        breakdownHeader.className = "module-settings-header";
+
+        const breakdownText = document.createElement("div");
+        const breakdownEyebrow = document.createElement("p");
+        breakdownEyebrow.className = "module-settings-eyebrow";
+        breakdownEyebrow.textContent = "Stat display";
+        const breakdownTitle = document.createElement("h3");
+        breakdownTitle.textContent = "Touch breakdown";
+        breakdownText.append(breakdownEyebrow, breakdownTitle);
+
+        breakdownReadoutEl = document.createElement("strong");
+        breakdownReadoutEl.className = "metric-readout";
+        breakdownHeader.append(breakdownText, breakdownReadoutEl);
+
+        const breakdownOptions = document.createElement("div");
+        breakdownOptions.className = "module-settings-options";
+
+        for (const option of [
+          { className: "kind", label: "Kind" },
+          { className: "aerial", label: "Aerial" },
+          { className: "high_aerial", label: "High aerial" },
+        ] satisfies Array<{ className: TouchBreakdownClass; label: string }>) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "toggle";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.breakdownClass = option.className;
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+              activeBreakdownClasses.add(option.className);
+            } else {
+              activeBreakdownClasses.delete(option.className);
+            }
+            syncTouchSettingsUi();
+            rerenderTouchStats();
+          });
+
+          const optionText = document.createElement("span");
+          optionText.textContent = option.label;
+          optionLabel.append(checkbox, optionText);
+          breakdownOptions.append(optionLabel);
+        }
+
+        breakdownSection.append(breakdownHeader, breakdownOptions);
+        settingsEl.append(header, label, breakdownSection);
       }
 
       syncTouchSettingsUi();
@@ -846,6 +936,38 @@ function createTouchModule(): StatModule {
     if (decayReadoutEl) {
       decayReadoutEl.textContent = `${value.toFixed(1)}s`;
     }
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-breakdown-class]",
+    )) {
+      const className = checkbox.dataset.breakdownClass as TouchBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
+    }
+    if (breakdownReadoutEl) {
+      const active = getActiveBreakdownClasses();
+      breakdownReadoutEl.textContent = active.length > 0
+        ? active.map((className) => ({
+          kind: "Kind",
+          aerial: "Aerial",
+          high_aerial: "High aerial",
+        }[className])).join(" + ")
+        : "Total only";
+    }
+  }
+
+  function getActiveBreakdownClasses(): TouchBreakdownClass[] {
+    return orderedBreakdownClasses.filter((className) =>
+      activeBreakdownClasses.has(className)
+    );
+  }
+
+  function rerenderTouchStats(): void {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
   }
 }
 
@@ -901,16 +1023,28 @@ let removeRenderHook: (() => void) | null = null;
 let replayPlayer: ReplayPlayer | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
+let dynamicStatsTimeline: DynamicStatsTimeline | null = null;
+let dynamicStatsFrameLookup: Map<number, DynamicStatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 
 function getModuleContext(): StatModuleContext | null {
-  if (!replayPlayer || !statsTimeline || !statsFrameLookup) return null;
+  if (
+    !replayPlayer ||
+    !statsTimeline ||
+    !statsFrameLookup ||
+    !dynamicStatsTimeline ||
+    !dynamicStatsFrameLookup
+  ) {
+    return null;
+  }
 
   return {
     player: replayPlayer,
     replay: replayPlayer.replay,
     statsTimeline,
     statsFrameLookup,
+    dynamicStatsTimeline,
+    dynamicStatsFrameLookup,
     fieldScale: replayPlayer.options.fieldScale ?? 1,
   };
 }
@@ -1433,6 +1567,8 @@ async function loadReplay(file: File): Promise<void> {
   replayPlayer = null;
   statsTimeline = null;
   statsFrameLookup = null;
+  dynamicStatsTimeline = null;
+  dynamicStatsFrameLookup = null;
   renderModuleSettings();
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1446,6 +1582,8 @@ async function loadReplay(file: File): Promise<void> {
 
   statsTimeline = subtrActor.get_stats_timeline(bytes) as unknown as StatsTimeline;
   statsFrameLookup = createStatsFrameLookup(statsTimeline);
+  dynamicStatsTimeline = subtrActor.get_dynamic_stats_timeline(bytes) as unknown as DynamicStatsTimeline;
+  dynamicStatsFrameLookup = createDynamicStatsFrameLookup(dynamicStatsTimeline);
 
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
