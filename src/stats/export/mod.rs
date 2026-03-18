@@ -82,7 +82,8 @@ impl LabeledCounts {
         }
 
         self.entries.push(LabeledCountEntry { labels, count: 1 });
-        self.entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+        self.entries
+            .sort_by(|left, right| left.labels.cmp(&right.labels));
     }
 
     pub fn count_matching(&self, required_labels: &[StatLabel]) -> u32 {
@@ -94,6 +95,52 @@ impl LabeledCounts {
                     .all(|required_label| entry.labels.contains(required_label))
             })
             .map(|entry| entry.count)
+            .sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct LabeledFloatSumEntry {
+    pub labels: Vec<StatLabel>,
+    pub value: f32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct LabeledFloatSums {
+    pub entries: Vec<LabeledFloatSumEntry>,
+}
+
+impl LabeledFloatSums {
+    pub fn add<I>(&mut self, labels: I, value: f32)
+    where
+        I: IntoIterator<Item = StatLabel>,
+    {
+        let mut labels: Vec<_> = labels.into_iter().collect();
+        labels.sort();
+
+        if let Some(entry) = self.entries.iter_mut().find(|entry| entry.labels == labels) {
+            entry.value += value;
+            return;
+        }
+
+        self.entries.push(LabeledFloatSumEntry { labels, value });
+        self.entries
+            .sort_by(|left, right| left.labels.cmp(&right.labels));
+    }
+
+    pub fn sum_matching(&self, required_labels: &[StatLabel]) -> f32 {
+        self.entries
+            .iter()
+            .filter(|entry| {
+                required_labels
+                    .iter()
+                    .all(|required_label| entry.labels.contains(required_label))
+            })
+            .map(|entry| entry.value)
             .sum()
     }
 
@@ -165,6 +212,25 @@ impl ExportedStat {
                 labels,
             },
             value: StatValue::Unsigned(value),
+        }
+    }
+
+    pub fn float_labeled(
+        domain: &'static str,
+        name: &'static str,
+        unit: StatUnit,
+        labels: Vec<StatLabel>,
+        value: f32,
+    ) -> Self {
+        Self {
+            descriptor: StatDescriptor {
+                domain,
+                name,
+                variant: LABELED_STAT_VARIANT,
+                unit,
+                labels,
+            },
+            value: StatValue::Float(value),
         }
     }
 }

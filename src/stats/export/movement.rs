@@ -6,6 +6,21 @@ impl StatFieldProvider for MovementStats {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         visitor(ExportedStat::float(
             "movement",
+            "tracked_time",
+            StatUnit::Seconds,
+            self.tracked_time,
+        ));
+        for entry in &self.labeled_tracked_time.entries {
+            visitor(ExportedStat::float_labeled(
+                "movement",
+                "tracked_time",
+                StatUnit::Seconds,
+                entry.labels.clone(),
+                entry.value,
+            ));
+        }
+        visitor(ExportedStat::float(
+            "movement",
             "total_distance",
             StatUnit::UnrealUnits,
             self.total_distance,
@@ -94,5 +109,43 @@ impl StatFieldProvider for MovementStats {
             StatUnit::Percent,
             self.high_air_pct(),
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn movement_export_includes_labeled_tracked_time_stats() {
+        let mut stats = MovementStats::default();
+        stats.tracked_time = 3.0;
+        stats.labeled_tracked_time.add(
+            [
+                StatLabel::new("speed_band", "boost"),
+                StatLabel::new("height_band", "low_air"),
+            ],
+            1.25,
+        );
+
+        let labeled_stats: Vec<_> = stats
+            .stat_fields()
+            .into_iter()
+            .filter(|stat| {
+                stat.descriptor.domain == "movement"
+                    && stat.descriptor.name == "tracked_time"
+                    && stat.descriptor.variant == LABELED_STAT_VARIANT
+            })
+            .collect();
+
+        assert_eq!(labeled_stats.len(), 1);
+        assert_eq!(
+            labeled_stats[0].descriptor.labels,
+            vec![
+                StatLabel::new("height_band", "low_air"),
+                StatLabel::new("speed_band", "boost"),
+            ]
+        );
+        assert_eq!(labeled_stats[0].value, StatValue::Float(1.25));
     }
 }

@@ -33,6 +33,7 @@ import {
   formatBoostDisplayAmount,
   toBoostDisplayUnits,
 } from "./boostFormatting.ts";
+import { renderMovementStats } from "./movementFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
   DynamicPlayerStatsSnapshot,
@@ -42,6 +43,7 @@ import type {
   StatsFrame,
   StatsTimeline,
 } from "./statsTimeline.ts";
+import type { MovementBreakdownClass } from "./movementFormatting.ts";
 import type { TouchBreakdownClass } from "./touchFormatting.ts";
 
 import * as subtrActor from "subtr-actor";
@@ -299,27 +301,6 @@ function renderBallCarryStats(ballCarry: PlayerStatsSnapshot["ball_carry"]): str
     <div class="stat-row"><span class="label">Avg speed</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.carry_speed_sum / carryCount : undefined, 0, " uu/s") : carryCount === 0 ? "0 uu/s" : "?"}</span></div>
     <div class="stat-row"><span class="label">Avg h gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_horizontal_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
     <div class="stat-row"><span class="label">Avg v gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_vertical_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
-  `;
-}
-
-function renderMovementStats(movement: PlayerStatsSnapshot["movement"]): string {
-  const trackedTime = movement?.tracked_time;
-  const averageSpeed = movement && trackedTime && trackedTime > 0
-    ? movement.speed_integral / trackedTime
-    : trackedTime === 0
-      ? 0
-      : undefined;
-
-  return `
-    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Distance</span><span class="value">${formatNumber(movement?.total_distance, 0, " uu")}</span></div>
-    <div class="stat-row"><span class="label">Avg speed</span><span class="value">${formatNumber(averageSpeed, 0, " uu/s")}</span></div>
-    <div class="stat-row"><span class="label">Slow</span><span class="value">${formatTimeShare(movement?.time_slow_speed, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Boost</span><span class="value">${formatTimeShare(movement?.time_boost_speed, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Super</span><span class="value">${formatTimeShare(movement?.time_supersonic_speed, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Ground</span><span class="value">${formatTimeShare(movement?.time_on_ground, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Low air</span><span class="value">${formatTimeShare(movement?.time_low_air, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">High air</span><span class="value">${formatTimeShare(movement?.time_high_air, trackedTime)}</span></div>
   `;
 }
 
@@ -972,12 +953,153 @@ function createTouchModule(): StatModule {
 }
 
 function createMovementModule(): StatModule {
-  return createPlayerStatsModule({
+  let settingsEl: HTMLDivElement | null = null;
+  let breakdownReadoutEl: HTMLElement | null = null;
+  const activeBreakdownClasses = new Set<MovementBreakdownClass>();
+  const orderedBreakdownClasses: MovementBreakdownClass[] = [
+    "speed_band",
+    "height_band",
+  ];
+
+  return {
     id: "movement",
     label: "Movement",
-    select: (player) => player.movement,
-    render: (movement) => renderMovementStats(movement),
-  });
+
+    setup() {
+      syncMovementSettingsUi();
+    },
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderMovementStats(player.movement, {
+          breakdownClasses: getActiveBreakdownClasses(),
+          exportedStats: getDynamicStatsPlayerSnapshot(
+            ctx,
+            frameIndex,
+            playerIdToString(player.player_id),
+          )?.stats,
+        }),
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderMovementStats(player.movement, {
+        breakdownClasses: getActiveBreakdownClasses(),
+        exportedStats: getDynamicStatsPlayerSnapshot(ctx, frameIndex, playerId)?.stats,
+      });
+    },
+
+    renderSettings() {
+      if (!settingsEl) {
+        settingsEl = document.createElement("div");
+        settingsEl.className = "module-settings-card";
+
+        const header = document.createElement("div");
+        header.className = "module-settings-header";
+
+        const text = document.createElement("div");
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "module-settings-eyebrow";
+        eyebrow.textContent = "Stat display";
+        const title = document.createElement("h3");
+        title.textContent = "Movement breakdown";
+        text.append(eyebrow, title);
+
+        breakdownReadoutEl = document.createElement("strong");
+        breakdownReadoutEl.className = "metric-readout";
+        header.append(text, breakdownReadoutEl);
+
+        const options = document.createElement("div");
+        options.className = "module-settings-options";
+
+        for (const option of [
+          { className: "speed_band", label: "Speed band" },
+          { className: "height_band", label: "Height band" },
+        ] satisfies Array<{ className: MovementBreakdownClass; label: string }>) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "toggle";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.breakdownClass = option.className;
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+              activeBreakdownClasses.add(option.className);
+            } else {
+              activeBreakdownClasses.delete(option.className);
+            }
+            syncMovementSettingsUi();
+            rerenderMovementStats();
+          });
+
+          const optionText = document.createElement("span");
+          optionText.textContent = option.label;
+          optionLabel.append(checkbox, optionText);
+          options.append(optionLabel);
+        }
+
+        settingsEl.append(header, options);
+      }
+
+      syncMovementSettingsUi();
+      return settingsEl;
+    },
+  };
+
+  function syncMovementSettingsUi(): void {
+    if (!settingsEl) {
+      return;
+    }
+
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-breakdown-class]",
+    )) {
+      const className = checkbox.dataset.breakdownClass as MovementBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
+    }
+
+    if (breakdownReadoutEl) {
+      const active = getActiveBreakdownClasses();
+      breakdownReadoutEl.textContent = active.length > 0
+        ? active.map((className) => ({
+          speed_band: "Speed band",
+          height_band: "Height band",
+        }[className])).join(" + ")
+        : "Total only";
+    }
+  }
+
+  function getActiveBreakdownClasses(): MovementBreakdownClass[] {
+    return orderedBreakdownClasses.filter((className) =>
+      activeBreakdownClasses.has(className)
+    );
+  }
+
+  function rerenderMovementStats(): void {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
+  }
+}
 }
 
 function createPowerslideModule(): StatModule {
