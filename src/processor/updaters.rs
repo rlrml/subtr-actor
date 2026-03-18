@@ -138,6 +138,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Refreshes the cached ball actor id, clearing it if the current ball was deleted.
     pub(crate) fn update_ball_id(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         // XXX: This assumes there is only ever one ball, which is safe (I think?)
         if let Some(actor_id) = self.ball_actor_id {
@@ -153,6 +154,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Updates derived boost amounts for each boost component actor in the current frame.
     pub(crate) fn update_boost_amounts(
         &mut self,
         frame: &boxcars::Frame,
@@ -273,6 +275,7 @@ impl<'a> ReplayProcessor<'a> {
         )
     }
 
+    /// Detects and records demolishes observed in actor state and frame updates.
     pub(crate) fn update_demolishes(
         &mut self,
         frame: &boxcars::Frame,
@@ -333,6 +336,7 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    /// Detects boost-pad pickup and respawn events in the current frame.
     pub(crate) fn update_boost_pad_events(
         &mut self,
         frame: &boxcars::Frame,
@@ -441,6 +445,7 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    /// Detects ball touch events and estimates the responsible player when possible.
     pub(crate) fn update_touch_events(
         &mut self,
         frame: &boxcars::Frame,
@@ -477,6 +482,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Detects dodge-refresh counter increments for players in the current frame.
     pub(crate) fn update_dodge_refreshed_events(
         &mut self,
         frame: &boxcars::Frame,
@@ -532,6 +538,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Detects goal explosions and records derived goal events for the current frame.
     pub(crate) fn update_goal_events(
         &mut self,
         frame: &boxcars::Frame,
@@ -790,6 +797,7 @@ impl<'a> ReplayProcessor<'a> {
             .map(|(player_id, _)| player_id)
     }
 
+    /// Detects shot, save, and assist counter increments for players.
     pub(crate) fn update_player_stat_events(
         &mut self,
         frame: &boxcars::Frame,

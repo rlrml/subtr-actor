@@ -14,6 +14,7 @@ type RigidBodyArrayResult<F> = SubtrActorResult<[F; 12]>;
 type RigidBodyQuaternionArrayResult<F> = SubtrActorResult<[F; 13]>;
 type RigidBodyBasisArrayResult<F> = SubtrActorResult<[F; 15]>;
 
+/// Converts a rigid body into position, Euler rotation, and velocity features.
 pub fn get_rigid_body_properties<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
 ) -> RigidBodyArrayResult<F>
@@ -46,6 +47,7 @@ where
     )
 }
 
+/// Converts a rigid body into position, quaternion rotation, and velocity features.
 pub fn get_rigid_body_properties_quaternion<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
 ) -> RigidBodyQuaternionArrayResult<F>
@@ -77,6 +79,7 @@ where
     )
 }
 
+/// Converts a rigid body into position, basis vectors, and velocity features.
 pub fn get_rigid_body_properties_basis<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
 ) -> RigidBodyBasisArrayResult<F>
@@ -113,6 +116,7 @@ where
     )
 }
 
+/// Converts a rigid body into position and quaternion-rotation features only.
 pub fn get_rigid_body_properties_no_velocities<F: TryFrom<f32>>(
     rigid_body: &boxcars::RigidBody,
 ) -> SubtrActorResult<[F; 7]>
@@ -276,6 +280,7 @@ build_global_feature_adder!(
     "Ball - rotation w",
 );
 
+/// Global feature adder that samples an interpolated ball rigid body.
 #[derive(derive_new::new)]
 pub struct InterpolatedBallRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
@@ -283,6 +288,7 @@ pub struct InterpolatedBallRigidBodyNoVelocities<F> {
 }
 
 impl<F> InterpolatedBallRigidBodyNoVelocities<F> {
+    /// Creates the feature adder with the tolerated snap-to-frame threshold.
     pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
         Arc::new(Self::new(close_enough_to_frame_time))
     }
@@ -368,6 +374,7 @@ build_player_feature_adder!(
     "rotation w"
 );
 
+/// Per-player feature adder that samples an interpolated car rigid body.
 #[derive(derive_new::new)]
 pub struct InterpolatedPlayerRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
@@ -375,6 +382,7 @@ pub struct InterpolatedPlayerRigidBodyNoVelocities<F> {
 }
 
 impl<F> InterpolatedPlayerRigidBodyNoVelocities<F> {
+    /// Creates the feature adder with the tolerated snap-to-frame threshold.
     pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
         Arc::new(Self::new(close_enough_to_frame_time))
     }

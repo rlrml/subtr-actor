@@ -1,6 +1,7 @@
 use super::*;
 
 impl<'a> ReplayProcessor<'a> {
+    /// Attempts to seed player ordering from replay headers before falling back to frames.
     pub(crate) fn set_player_order_from_headers(&mut self) -> SubtrActorResult<()> {
         let _player_stats = self
             .replay
@@ -49,6 +50,7 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
+    /// Rebuilds team ordering by sampling early replay frames for player/team links.
     pub(crate) fn set_player_order_from_frames(&mut self) -> SubtrActorResult<()> {
         self.process_long_enough_to_get_actor_ids()?;
         let player_to_team_0: HashMap<PlayerId, bool> = self
@@ -79,6 +81,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(())
     }
 
+    /// Verifies that the discovered in-replay players match the stored player ordering.
     pub fn check_player_id_set(&self) -> SubtrActorResult<()> {
         let known_players =
             std::collections::HashSet::<_>::from_iter(self.player_to_actor_id.keys());

@@ -7,13 +7,17 @@ use boxcars;
 use serde::Serialize;
 use std::sync::Arc;
 
+/// Column headers for the frame matrix emitted by [`NDArrayCollector`].
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NDArrayColumnHeaders {
+    /// Column names emitted once per frame, independent of player ordering.
     pub global_headers: Vec<String>,
+    /// Column names repeated once for each player in replay order.
     pub player_headers: Vec<String>,
 }
 
 impl NDArrayColumnHeaders {
+    /// Builds a header set from global and per-player column names.
     pub fn new(global_headers: Vec<String>, player_headers: Vec<String>) -> Self {
         Self {
             global_headers,
@@ -22,17 +26,22 @@ impl NDArrayColumnHeaders {
     }
 }
 
+/// Replay metadata bundled with the ndarray column layout used to produce it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayMetaWithHeaders {
+    /// Replay metadata describing the teams and player ordering.
     pub replay_meta: ReplayMeta,
+    /// Column headers associated with the emitted ndarray rows.
     pub column_headers: NDArrayColumnHeaders,
 }
 
 impl ReplayMetaWithHeaders {
+    /// Flattens the global and per-player headers using a default player prefix.
     pub fn headers_vec(&self) -> Vec<String> {
         self.headers_vec_from(|_, _info, index| format!("Player {index} - "))
     }
 
+    /// Flattens the global and per-player headers with a custom player prefix.
     pub fn headers_vec_from<F>(&self, player_prefix_getter: F) -> Vec<String>
     where
         F: Fn(&Self, &PlayerInfo, usize) -> String,
@@ -54,6 +63,7 @@ impl ReplayMetaWithHeaders {
     }
 }
 
+/// Collects replay frames into a dense 2D feature matrix.
 pub struct NDArrayCollector<F> {
     feature_adders: FeatureAdders<F>,
     player_feature_adders: PlayerFeatureAdders<F>,
@@ -63,6 +73,7 @@ pub struct NDArrayCollector<F> {
 }
 
 impl<F> NDArrayCollector<F> {
+    /// Creates a collector from explicit global and per-player feature adders.
     pub fn new(
         feature_adders: FeatureAdders<F>,
         player_feature_adders: PlayerFeatureAdders<F>,
@@ -76,6 +87,7 @@ impl<F> NDArrayCollector<F> {
         }
     }
 
+    /// Returns the column headers implied by the configured feature adders.
     pub fn get_column_headers(&self) -> NDArrayColumnHeaders {
         let global_headers = self
             .feature_adders
@@ -98,10 +110,12 @@ impl<F> NDArrayCollector<F> {
         NDArrayColumnHeaders::new(global_headers, player_headers)
     }
 
+    /// Finalizes collection and returns only the ndarray payload.
     pub fn get_ndarray(self) -> SubtrActorResult<ndarray::Array2<F>> {
         self.get_meta_and_ndarray().map(|a| a.1)
     }
 
+    /// Finalizes collection and returns replay metadata alongside the ndarray.
     pub fn get_meta_and_ndarray(
         self,
     ) -> SubtrActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
@@ -122,6 +136,7 @@ impl<F> NDArrayCollector<F> {
         ))
     }
 
+    /// Processes enough of a replay to determine metadata and column headers.
     pub fn process_and_get_meta_and_headers(
         &mut self,
         replay: &boxcars::Replay,
@@ -282,6 +297,7 @@ where
     F: TryFrom<f32> + Send + Sync + 'static,
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
+    /// Builds a collector from the registered string names of feature adders.
     pub fn from_strings_typed(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
         let feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>> = fa_names
             .iter()
@@ -308,6 +324,7 @@ where
 }
 
 impl NDArrayCollector<f32> {
+    /// Builds an `f32` collector from the registered string names of feature adders.
     pub fn from_strings(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
         Self::from_strings_typed(fa_names, pfa_names)
     }

@@ -1,6 +1,7 @@
 use super::*;
 
 impl<'a> ReplayProcessor<'a> {
+    /// Rewrites an attribute map to use object-name keys instead of object ids.
     pub fn map_attribute_keys(
         &self,
         hash_map: &HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
@@ -16,6 +17,7 @@ impl<'a> ReplayProcessor<'a> {
             .collect()
     }
 
+    /// Returns a formatted dump of the processor's main actor-link mappings.
     pub fn all_mappings_string(&self) -> String {
         let pairs = [
             ("player_to_car", &self.player_to_car),
@@ -34,6 +36,7 @@ impl<'a> ReplayProcessor<'a> {
         strings.join("\n")
     }
 
+    /// Returns a formatted dump of a single actor's current attribute state.
     pub fn actor_state_string(&self, actor_id: &boxcars::ActorId) -> String {
         if let Ok(actor_state) = self.get_actor_state(actor_id) {
             format!("{:?}", self.map_attribute_keys(&actor_state.attributes))
@@ -42,6 +45,7 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
+    /// Prints the named actor states for the provided actor ids.
     pub fn print_actors_by_id<'b>(&self, actor_ids: impl Iterator<Item = &'b boxcars::ActorId>) {
         actor_ids.for_each(|actor_id| {
             let state = self.get_actor_state(actor_id).unwrap();
@@ -53,6 +57,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
+    /// Logs all actors of a specific object type with their mapped attributes.
     pub fn print_actors_of_type(&self, actor_type: &'static str) {
         self.iter_actors_by_type(actor_type)
             .unwrap()
@@ -61,6 +66,7 @@ impl<'a> ReplayProcessor<'a> {
             });
     }
 
+    /// Logs the set of actor object types currently present in the state model.
     pub fn print_actor_types(&self) {
         let types: Vec<_> = self
             .actor_state
@@ -71,6 +77,7 @@ impl<'a> ReplayProcessor<'a> {
         log::debug!("{types:?}");
     }
 
+    /// Logs every currently known actor with its mapped state.
     pub fn print_all_actors(&self) {
         self.actor_state
             .actor_states

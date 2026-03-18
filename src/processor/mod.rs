@@ -149,34 +149,55 @@ mod updaters;
 /// * [`Collector`]: A trait implemented by objects that wish to collect data as
 ///   the `ReplayProcessor` processes a replay.
 pub struct ReplayProcessor<'a> {
+    /// The replay currently being traversed.
     pub replay: &'a boxcars::Replay,
     spatial_normalization_factor: f32,
+    /// Modeled actor state for the current replay frame.
     pub actor_state: ActorStateModeler,
+    /// Mapping from object ids to their replay object names.
     pub object_id_to_name: HashMap<boxcars::ObjectId, String>,
+    /// Reverse lookup from replay object names to object ids.
     pub name_to_object_id: HashMap<String, boxcars::ObjectId>,
+    /// Cached actor id for the replay ball when known.
     pub ball_actor_id: Option<boxcars::ActorId>,
+    /// Stable ordering of team 0 players.
     pub team_zero: Vec<PlayerId>,
+    /// Stable ordering of team 1 players.
     pub team_one: Vec<PlayerId>,
+    /// Mapping from player ids to their player-controller actor ids.
     pub player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
+    /// Mapping from player-controller actors to car actors.
     pub player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from player-controller actors to team actors.
     pub player_to_team: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Reverse mapping from car actors to player-controller actors.
     pub car_to_player: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from car actors to boost component actors.
     pub car_to_boost: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from car actors to jump component actors.
     pub car_to_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from car actors to double-jump component actors.
     pub car_to_double_jump: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from car actors to dodge component actors.
     pub car_to_dodge: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// All boost-pad events observed so far in the replay.
     pub boost_pad_events: Vec<BoostPadEvent>,
     current_frame_boost_pad_events: Vec<BoostPadEvent>,
+    /// All touch events observed so far in the replay.
     pub touch_events: Vec<TouchEvent>,
     current_frame_touch_events: Vec<TouchEvent>,
+    /// All dodge-refresh events observed so far in the replay.
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     current_frame_dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     dodge_refreshed_counters: HashMap<PlayerId, i32>,
+    /// All goal events observed so far in the replay.
     pub goal_events: Vec<GoalEvent>,
     current_frame_goal_events: Vec<GoalEvent>,
+    /// All shot/save/assist-style stat events observed so far in the replay.
     pub player_stat_events: Vec<PlayerStatEvent>,
     current_frame_player_stat_events: Vec<PlayerStatEvent>,
     player_stat_counters: HashMap<(PlayerId, PlayerStatEventKind), i32>,
+    /// All demolishes observed so far in the replay.
     pub demolishes: Vec<DemolishInfo>,
     known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
@@ -250,6 +271,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(processor)
     }
 
+    /// Returns the scale factor applied when normalizing replay spatial values.
     pub fn spatial_normalization_factor(&self) -> f32 {
         self.spatial_normalization_factor
     }

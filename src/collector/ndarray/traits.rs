@@ -1,9 +1,12 @@
 use crate::*;
 use boxcars;
+/// Re-export of `derive_new` used by the public ndarray feature macros.
 pub use derive_new;
+/// Re-export of `paste` used by the public ndarray feature macros.
 pub use paste;
 use std::sync::Arc;
 
+/// Object-safe interface for frame-level feature extraction.
 pub trait FeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -21,8 +24,10 @@ pub trait FeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+/// Heterogeneous collection of frame-level feature adders.
 pub type FeatureAdders<F> = Vec<Arc<dyn FeatureAdder<F> + Send + Sync>>;
 
+/// Fixed-width feature extractor with compile-time column count validation.
 pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     fn get_column_headers_array(&self) -> &[&str; N];
 
@@ -35,6 +40,7 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
     ) -> SubtrActorResult<[F; N]>;
 }
 
+/// Implements [`FeatureAdder`] for a type that already satisfies [`LengthCheckedFeatureAdder`].
 #[macro_export]
 macro_rules! impl_feature_adder {
     ($struct_name:ident) => {
@@ -67,6 +73,7 @@ macro_rules! impl_feature_adder {
     };
 }
 
+/// Object-safe interface for per-player feature extraction.
 pub trait PlayerFeatureAdder<F> {
     fn features_added(&self) -> usize {
         self.get_column_headers().len()
@@ -85,8 +92,10 @@ pub trait PlayerFeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+/// Heterogeneous collection of per-player feature adders.
 pub type PlayerFeatureAdders<F> = Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>>;
 
+/// Fixed-width per-player feature extractor with compile-time column count validation.
 pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
     fn get_column_headers_array(&self) -> &[&str; N];
 
@@ -100,6 +109,7 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
     ) -> SubtrActorResult<[F; N]>;
 }
 
+/// Implements [`PlayerFeatureAdder`] for a type that satisfies [`LengthCheckedPlayerFeatureAdder`].
 #[macro_export]
 macro_rules! impl_player_feature_adder {
     ($struct_name:ident) => {
@@ -181,6 +191,7 @@ where
     }
 }
 
+/// Declares a new global feature-adder type and wires it into the ndarray traits.
 #[macro_export]
 macro_rules! build_global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -206,6 +217,7 @@ macro_rules! build_global_feature_adder {
     }
 }
 
+/// Implements the ndarray feature-adder traits for an existing global feature type.
 #[macro_export]
 macro_rules! global_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -240,6 +252,7 @@ macro_rules! global_feature_adder {
     }
 }
 
+/// Declares a new per-player feature-adder type and wires it into the ndarray traits.
 #[macro_export]
 macro_rules! build_player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -264,6 +277,7 @@ macro_rules! build_player_feature_adder {
     }
 }
 
+/// Implements the ndarray feature-adder traits for an existing per-player feature type.
 #[macro_export]
 macro_rules! player_feature_adder {
     ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
@@ -299,10 +313,12 @@ macro_rules! player_feature_adder {
     }
 }
 
+/// Maps arbitrary conversion failures into a generic float-conversion error.
 pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
     SubtrActorError::new(SubtrActorErrorVariant::FloatConversionError)
 }
 
+/// Converts a fixed list of values with a caller-supplied error mapper.
 #[macro_export]
 macro_rules! convert_all {
     ($err:expr, $( $item:expr ),* $(,)?) => {{
@@ -312,6 +328,7 @@ macro_rules! convert_all {
 	}};
 }
 
+/// Converts a fixed list of float-like values using [`convert_float_conversion_error`].
 #[macro_export]
 macro_rules! convert_all_floats {
     ($( $item:expr ),* $(,)?) => {{
