@@ -46,6 +46,7 @@ import { renderPossessionStats } from "./possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
 import { renderPressureStats } from "./pressureFormatting.ts";
 import type { PressureBreakdownClass } from "./pressureFormatting.ts";
+import { renderRushStats } from "./rushFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
   DynamicPlayerStatsSnapshot,
@@ -982,6 +983,51 @@ function createPressureModule(): StatModule {
   }
 }
 
+function createRushModule(): StatModule {
+  return {
+    id: "rush",
+    label: "Rush",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame?.rush) return "";
+
+      return [
+        renderPlayerCard(
+          "Blue Team",
+          true,
+          renderRushStats(statsFrame.rush, true),
+        ),
+        renderPlayerCard(
+          "Orange Team",
+          false,
+          renderRushStats(statsFrame.rush, false),
+        ),
+      ].join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!statsFrame?.rush || !player) return "";
+
+      return renderRushStats(statsFrame.rush, player.is_team_0);
+    },
+  };
+}
+
 function createBallCarryModule(): StatModule {
   return createPlayerStatsModule({
     id: "ball-carry",
@@ -1383,6 +1429,7 @@ const MODULE_FACTORIES = [
   createPossessionModule,
   createFiftyFiftyModule,
   createPressureModule,
+  createRushModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
   createTouchModule,
