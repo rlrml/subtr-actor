@@ -224,6 +224,19 @@ export interface ReplayTimelineEvent {
   color?: string;
 }
 
+export interface ReplayTimelineRange {
+  id?: string;
+  startTime: number;
+  endTime: number;
+  lane?: string;
+  laneLabel?: string;
+  label?: string;
+  shortLabel?: string;
+  isTeamZero?: boolean | null;
+  color?: string;
+  className?: string;
+}
+
 export interface ReplayPlayerTimelineSegment {
   startTime: number;
   endTime: number;
@@ -395,6 +408,10 @@ export type ReplayPlayerPluginDefinition =
 export type ReplayTimelineEventSource =
   | ReplayTimelineEvent[]
   | ((context: ReplayPlayerPluginContext) => ReplayTimelineEvent[]);
+
+export type ReplayTimelineRangeSource =
+  | ReplayTimelineRange[]
+  | ((context: ReplayPlayerPluginContext) => ReplayTimelineRange[]);
 
 export interface ReplayPlayerOptions {
   autoplay?: boolean;

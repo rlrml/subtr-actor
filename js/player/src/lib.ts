@@ -70,6 +70,8 @@ export type {
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,
+  ReplayTimelineRange,
+  ReplayTimelineRangeSource,
   ResolvedPlaybackBound,
   ResolvedPlaylistItem,
 } from "./types";

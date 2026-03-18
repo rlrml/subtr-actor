@@ -11,6 +11,9 @@ import type {
   ReplayModel,
   ReplayPlayerState,
   ReplayPlayerTrack,
+  ReplayTimelineEvent,
+  ReplayTimelineRange,
+  TimelineOverlayPlugin,
 } from "../../player/src/lib.ts";
 import {
   HalfFieldOverlay,
@@ -57,6 +60,15 @@ import type {
   StatsTimeline,
 } from "./statsTimeline.ts";
 import type { TouchBreakdownClass } from "./touchFormatting.ts";
+import {
+  buildFiftyFiftyTimelineEvents,
+  countEnabledTimelineEvents,
+  filterReplayTimelineEvents,
+} from "./timelineMarkers.ts";
+import {
+  buildPossessionTimelineRanges,
+  buildPressureTimelineRanges,
+} from "./timelineRanges.ts";
 
 import * as subtrActor from "subtr-actor";
 
@@ -76,6 +88,8 @@ interface StatModule {
   setup(ctx: StatModuleContext): void;
   teardown(): void;
   onBeforeRender(info: FrameRenderInfo): void;
+  getTimelineEvents?(ctx: StatModuleContext): ReplayTimelineEvent[];
+  getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
   renderStats(frameIndex: number, ctx: StatModuleContext): string;
   renderSettings?(ctx: StatModuleContext | null): HTMLElement | null;
   renderFocusedPlayerStats(
@@ -365,6 +379,10 @@ function createPlayerStatsModule<T>(options: {
     teardown() {},
 
     onBeforeRender() {},
+
+    getTimelineRanges(ctx) {
+      return buildPossessionTimelineRanges(ctx.dynamicStatsTimeline);
+    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
@@ -776,6 +794,10 @@ function createFiftyFiftyModule(): StatModule {
       overlay?.update(info.currentTime);
     },
 
+    getTimelineEvents(ctx) {
+      return buildFiftyFiftyTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
@@ -841,6 +863,10 @@ function createPressureModule(): StatModule {
     onBeforeRender(info) {
       const ballFrame = replayPlayer?.replay.ballFrames[info.frameIndex];
       halfFieldOverlay?.update(ballFrame?.position?.y ?? null);
+    },
+
+    getTimelineRanges(ctx) {
+      return buildPressureTimelineRanges(ctx.dynamicStatsTimeline);
     },
 
     renderStats(frameIndex, ctx) {
@@ -1447,11 +1473,14 @@ let activeModuleIds = new Set<string>([RELATIVE_POSITIONING_MODULE_ID]);
 let removeRenderHook: (() => void) | null = null;
 
 let replayPlayer: ReplayPlayer | null = null;
+let timelineOverlay: TimelineOverlayPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let dynamicStatsTimeline: DynamicStatsTimeline | null = null;
 let dynamicStatsFrameLookup: Map<number, DynamicStatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
+const timelineSourceRemovers = new Map<string, () => void>();
+const timelineRangeSourceRemovers = new Map<string, () => void>();
 
 function getModuleContext(): StatModuleContext | null {
   if (
@@ -1491,11 +1520,16 @@ function setupActiveModules(): void {
       mod.onBeforeRender(info);
     }
   });
+
+  syncTimelineEvents();
+  syncTimelineRanges();
 }
 
 function teardownActiveModules(): void {
   removeRenderHook?.();
   removeRenderHook = null;
+  clearTimelineEventSources();
+  clearTimelineRangeSources();
 
   for (const mod of activeModules) {
     mod.teardown();
@@ -1518,6 +1552,74 @@ function toggleModule(id: string, enabled: boolean): void {
     renderStats(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   }
+  renderTimelineEventCount();
+}
+
+function clearTimelineEventSources(): void {
+  for (const removeSource of timelineSourceRemovers.values()) {
+    removeSource();
+  }
+  timelineSourceRemovers.clear();
+}
+
+function clearTimelineRangeSources(): void {
+  for (const removeSource of timelineRangeSourceRemovers.values()) {
+    removeSource();
+  }
+  timelineRangeSourceRemovers.clear();
+}
+
+function syncTimelineEvents(): void {
+  clearTimelineEventSources();
+
+  const ctx = getModuleContext();
+  if (!timelineOverlay || !ctx) {
+    return;
+  }
+
+  for (const mod of activeModules) {
+    const events = mod.getTimelineEvents?.(ctx);
+    if (!events || events.length === 0) {
+      continue;
+    }
+
+    timelineSourceRemovers.set(mod.id, timelineOverlay.addEventSource(events));
+  }
+
+  timelineOverlay.refreshEvents();
+}
+
+function syncTimelineRanges(): void {
+  clearTimelineRangeSources();
+
+  const ctx = getModuleContext();
+  if (!timelineOverlay || !ctx) {
+    return;
+  }
+
+  for (const mod of activeModules) {
+    const ranges = mod.getTimelineRanges?.(ctx);
+    if (!ranges || ranges.length === 0) {
+      continue;
+    }
+
+    timelineRangeSourceRemovers.set(mod.id, timelineOverlay.addRangeSource(ranges));
+  }
+
+  timelineOverlay.refreshRanges();
+}
+
+function renderTimelineEventCount(): void {
+  if (!replayPlayer || !statsTimeline) {
+    eventsReadout.textContent = "--";
+    return;
+  }
+
+  eventsReadout.textContent = `${countEnabledTimelineEvents(
+    activeModuleIds,
+    replayPlayer.replay,
+    statsTimeline,
+  )}`;
 }
 
 function mustElement<T extends HTMLElement>(selector: string): T {
@@ -1991,10 +2093,14 @@ async function loadReplay(file: File): Promise<void> {
   teardownActiveModules();
   replayPlayer?.destroy();
   replayPlayer = null;
+  timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
   dynamicStatsTimeline = null;
   dynamicStatsFrameLookup = null;
+  clearTimelineEventSources();
+  clearTimelineRangeSources();
+  renderTimelineEventCount();
   renderModuleSettings();
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -2011,6 +2117,11 @@ async function loadReplay(file: File): Promise<void> {
   dynamicStatsTimeline = subtrActor.get_dynamic_stats_timeline(bytes) as unknown as DynamicStatsTimeline;
   dynamicStatsFrameLookup = createDynamicStatsFrameLookup(dynamicStatsTimeline);
 
+  timelineOverlay = createTimelineOverlayPlugin({
+    replayEvents: (context) =>
+      filterReplayTimelineEvents(context.replay, activeModuleIds),
+  });
+
   replayPlayer = new ReplayPlayer(viewport, replay, {
     initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
     initialAttachedPlayerId: null,
@@ -2020,9 +2131,7 @@ async function loadReplay(file: File): Promise<void> {
     plugins: [
       createBallchasingOverlayPlugin(),
       createBoostPadOverlayPlugin(),
-      createTimelineOverlayPlugin({
-        replayEventKinds: ["goal", "save", "demo"],
-      }),
+      timelineOverlay,
     ],
   });
 
@@ -2034,7 +2143,7 @@ async function loadReplay(file: File): Promise<void> {
   statusReadout.textContent = `Loaded ${file.name}`;
   playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
   framesReadout.textContent = `${replay.frameCount}`;
-  eventsReadout.textContent = `${replay.timelineEvents.length}`;
+  renderTimelineEventCount();
   setTransportEnabled(true);
   syncCameraControlAvailability(replayPlayer.getState());
   renderSnapshot(replayPlayer.getState());

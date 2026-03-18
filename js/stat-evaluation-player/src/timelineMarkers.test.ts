@@ -1,0 +1,144 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import type { ReplayModel } from "../../player/src/types.ts";
+import type { StatsTimeline } from "./statsTimeline.ts";
+import {
+  buildFiftyFiftyTimelineEvents,
+  countEnabledTimelineEvents,
+  filterReplayTimelineEvents,
+  getReplayTimelineEventKinds,
+} from "./timelineMarkers.ts";
+
+test("timeline defaults to goals and adds core and demo replay events when enabled", () => {
+  assert.deepEqual(getReplayTimelineEventKinds([]), ["goal"]);
+  assert.deepEqual(
+    getReplayTimelineEventKinds(["core", "demo"]),
+    ["goal", "save", "shot", "demo"],
+  );
+});
+
+test("filterReplayTimelineEvents keeps only goal markers by default", () => {
+  const replay = {
+    timelineEvents: [
+      { kind: "goal", time: 10 },
+      { kind: "save", time: 12 },
+      { kind: "shot", time: 13 },
+      { kind: "demo", time: 14 },
+    ],
+  } as ReplayModel;
+
+  assert.deepEqual(
+    filterReplayTimelineEvents(replay, []).map((event) => event.kind),
+    ["goal"],
+  );
+  assert.deepEqual(
+    filterReplayTimelineEvents(replay, ["core", "demo"]).map((event) => event.kind),
+    ["goal", "save", "shot", "demo"],
+  );
+});
+
+test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
+  const replay = {
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+      {
+        id: "Steam:orange-id",
+        name: "Orange",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    fifty_fifty_events: [
+      {
+        start_time: 1,
+        start_frame: 20,
+        resolve_time: 2,
+        resolve_frame: 40,
+        is_kickoff: false,
+        team_zero_player: { Steam: "blue-id" },
+        team_one_player: { Steam: "orange-id" },
+        team_zero_position: [0, 0, 0],
+        team_one_position: [10, 0, 0],
+        midpoint: [5, 0, 0],
+        plane_normal: [1, 0, 0],
+        winning_team_is_team_0: true,
+        possession_team_is_team_0: true,
+      },
+    ],
+    frames: [],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildFiftyFiftyTimelineEvents(statsTimeline, replay), [
+    {
+      id: "fifty-fifty:20:Steam:blue-id:Steam:orange-id",
+      time: 2,
+      kind: "fifty-fifty",
+      label: "50/50: Blue vs Orange | blue win | blue poss",
+      shortLabel: "50",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("countEnabledTimelineEvents includes enabled custom module markers", () => {
+  const replay = {
+    timelineEvents: [
+      { kind: "goal", time: 10 },
+      { kind: "save", time: 12 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+      {
+        id: "Steam:orange-id",
+        name: "Orange",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    fifty_fifty_events: [
+      {
+        start_time: 1,
+        start_frame: 20,
+        resolve_time: 2,
+        resolve_frame: 40,
+        is_kickoff: false,
+        team_zero_player: { Steam: "blue-id" },
+        team_one_player: { Steam: "orange-id" },
+        team_zero_position: [0, 0, 0],
+        team_one_position: [10, 0, 0],
+        midpoint: [5, 0, 0],
+        plane_normal: [1, 0, 0],
+        winning_team_is_team_0: true,
+        possession_team_is_team_0: true,
+      },
+    ],
+    frames: [
+      {
+        frame_number: 1,
+        time: 1.25,
+        dt: 0.1,
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.equal(countEnabledTimelineEvents([], replay, statsTimeline), 1);
+  assert.equal(
+    countEnabledTimelineEvents(["core", "fifty-fifty"], replay, statsTimeline),
+    3,
+  );
+});

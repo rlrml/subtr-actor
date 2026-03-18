@@ -13,7 +13,7 @@ const NEUTRAL_COLOR = 0xf3f6f8;
 const LABEL_HEIGHT = 180;
 const DEFAULT_DECAY_SECONDS = 4;
 
-interface FiftyFiftyMarker {
+export interface FiftyFiftyMarker {
   id: string;
   time: number;
   label: string;
