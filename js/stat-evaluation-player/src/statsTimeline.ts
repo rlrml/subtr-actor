@@ -156,6 +156,8 @@ export interface DynamicStatsFrame {
   frame_number: number;
   time: number;
   dt: number;
+  possession?: ExportedStat[];
+  pressure?: ExportedStat[];
   players: DynamicPlayerStatsSnapshot[];
   [key: string]: unknown;
 }

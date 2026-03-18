@@ -3,12 +3,32 @@ use super::*;
 const PENDING_TURNOVER_CONFIRMATION_WINDOW_SECONDS: f32 = 1.25;
 const LOOSE_BALL_TIMEOUT_SECONDS: f32 = 3.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PossessionStateLabel {
+    TeamZero,
+    TeamOne,
+    Neutral,
+}
+
+impl PossessionStateLabel {
+    fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::TeamZero => "team_zero",
+            Self::TeamOne => "team_one",
+            Self::Neutral => "neutral",
+        };
+        StatLabel::new("possession_state", value)
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
     pub team_zero_time: f32,
     pub team_one_time: f32,
     pub neutral_time: f32,
+    #[serde(skip_serializing_if = "LabeledFloatSums::is_empty")]
+    pub labeled_time: LabeledFloatSums,
 }
 
 impl PossessionStats {
@@ -35,6 +55,10 @@ impl PossessionStats {
             self.neutral_time * 100.0 / self.tracked_time
         }
     }
+
+    pub fn time_with_labels(&self, labels: &[StatLabel]) -> f32 {
+        self.labeled_time.sum_matching(labels)
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -51,7 +75,7 @@ impl PossessionTracker {
         self.pending_turnover_touch_time = None;
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.current_team_is_team_0 = None;
         self.last_possession_touch_time = None;
         self.clear_pending_turnover();
@@ -126,14 +150,6 @@ impl PossessionTracker {
         sample: &StatsSample,
         touch_events: &[TouchEvent],
     ) -> PossessionState {
-        if !sample.is_live_play() {
-            self.reset();
-            return PossessionState {
-                active_team_before_sample: None,
-                current_team_is_team_0: None,
-            };
-        }
-
         self.expire_pending_turnover(sample.time);
         self.expire_loose_ball(sample.time);
 
@@ -170,24 +186,44 @@ impl PossessionReducer {
     pub fn stats(&self) -> &PossessionStats {
         &self.stats
     }
+
+    fn apply_possession_time(stats: &mut PossessionStats, state: PossessionStateLabel, dt: f32) {
+        match state {
+            PossessionStateLabel::TeamZero => stats.team_zero_time += dt,
+            PossessionStateLabel::TeamOne => stats.team_one_time += dt,
+            PossessionStateLabel::Neutral => stats.neutral_time += dt,
+        }
+        stats.labeled_time.add([state.as_label()], dt);
+    }
 }
 
 impl StatsReducer for PossessionReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
-        let possession_state = self.tracker.update(sample, &sample.touch_events);
-        let active_team_before_sample = possession_state.active_team_before_sample;
+        let active_team_before_sample = if live_play {
+            self.tracker
+                .update(sample, &sample.touch_events)
+                .active_team_before_sample
+        } else {
+            self.tracker.reset();
+            None
+        };
 
         if live_play {
             self.stats.tracked_time += sample.dt;
             if let Some(possession_team_is_team_0) = active_team_before_sample {
-                if possession_team_is_team_0 {
-                    self.stats.team_zero_time += sample.dt;
+                let state = if possession_team_is_team_0 {
+                    PossessionStateLabel::TeamZero
                 } else {
-                    self.stats.team_one_time += sample.dt;
-                }
+                    PossessionStateLabel::TeamOne
+                };
+                Self::apply_possession_time(&mut self.stats, state, sample.dt);
             } else {
-                self.stats.neutral_time += sample.dt;
+                Self::apply_possession_time(
+                    &mut self.stats,
+                    PossessionStateLabel::Neutral,
+                    sample.dt,
+                );
             }
         }
         Ok(())
@@ -207,15 +243,97 @@ impl StatsReducer for PossessionReducer {
         if live_play {
             self.stats.tracked_time += sample.dt;
             if let Some(possession_team_is_team_0) = active_team_before_sample {
-                if possession_team_is_team_0 {
-                    self.stats.team_zero_time += sample.dt;
+                let state = if possession_team_is_team_0 {
+                    PossessionStateLabel::TeamZero
                 } else {
-                    self.stats.team_one_time += sample.dt;
-                }
+                    PossessionStateLabel::TeamOne
+                };
+                Self::apply_possession_time(&mut self.stats, state, sample.dt);
             } else {
-                self.stats.neutral_time += sample.dt;
+                Self::apply_possession_time(
+                    &mut self.stats,
+                    PossessionStateLabel::Neutral,
+                    sample.dt,
+                );
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use boxcars::RemoteId;
+
+    use super::*;
+
+    fn sample(
+        frame_number: usize,
+        time: f32,
+        touch_teams: &[bool],
+    ) -> StatsSample {
+        StatsSample {
+            frame_number,
+            time,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([1, 1]),
+            ball: None,
+            players: Vec::new(),
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: touch_teams
+                .iter()
+                .enumerate()
+                .map(|(index, &team_is_team_0)| TouchEvent {
+                    time,
+                    frame: frame_number,
+                    player: Some(RemoteId::Steam(index as u64 + 1)),
+                    team_is_team_0,
+                    closest_approach_distance: None,
+                })
+                .collect(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn possession_reducer_tracks_labeled_possession_time() {
+        let mut reducer = PossessionReducer::new();
+
+        reducer.on_sample(&sample(0, 0.0, &[])).unwrap();
+        reducer.on_sample(&sample(1, 1.0, &[true])).unwrap();
+        reducer.on_sample(&sample(2, 2.0, &[])).unwrap();
+        reducer.on_sample(&sample(3, 3.0, &[false])).unwrap();
+        reducer.on_sample(&sample(4, 4.0, &[false])).unwrap();
+        reducer.on_sample(&sample(5, 5.0, &[])).unwrap();
+
+        let stats = reducer.stats();
+        assert_eq!(stats.tracked_time, 6.0);
+        assert_eq!(stats.neutral_time, 2.0);
+        assert_eq!(stats.team_zero_time, 3.0);
+        assert_eq!(stats.team_one_time, 1.0);
+        assert_eq!(
+            stats.time_with_labels(&[StatLabel::new("possession_state", "neutral")]),
+            2.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[StatLabel::new("possession_state", "team_zero")]),
+            3.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[StatLabel::new("possession_state", "team_one")]),
+            1.0
+        );
     }
 }

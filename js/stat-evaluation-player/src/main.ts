@@ -34,6 +34,10 @@ import {
   toBoostDisplayUnits,
 } from "./boostFormatting.ts";
 import { renderMovementStats } from "./movementFormatting.ts";
+import { renderPossessionStats } from "./possessionFormatting.ts";
+import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
+import { renderPressureStats } from "./pressureFormatting.ts";
+import type { PressureBreakdownClass } from "./pressureFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
   DynamicPlayerStatsSnapshot,
@@ -338,44 +342,6 @@ function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): 
   `;
 }
 
-function renderPossessionStats(
-  possession: StatsFrame["possession"],
-  isTeamZero: boolean,
-): string {
-  const teamTime = isTeamZero
-    ? possession?.team_zero_time
-    : possession?.team_one_time;
-  const opponentTime = isTeamZero
-    ? possession?.team_one_time
-    : possession?.team_zero_time;
-  const trackedTime = possession?.tracked_time;
-
-  return `
-    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Team control</span><span class="value">${formatTimeShare(teamTime, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Opp control</span><span class="value">${formatTimeShare(opponentTime, trackedTime)}</span></div>
-  `;
-}
-
-function renderPressureStats(
-  pressure: StatsFrame["pressure"],
-  isTeamZero: boolean,
-): string {
-  const teamSideTime = isTeamZero
-    ? pressure?.team_zero_side_time
-    : pressure?.team_one_side_time;
-  const opponentSideTime = isTeamZero
-    ? pressure?.team_one_side_time
-    : pressure?.team_zero_side_time;
-  const trackedTime = pressure?.tracked_time;
-
-  return `
-    <div class="stat-row"><span class="label">Tracked</span><span class="value">${formatNumber(trackedTime, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Own half</span><span class="value">${formatTimeShare(teamSideTime, trackedTime)}</span></div>
-    <div class="stat-row"><span class="label">Opp half</span><span class="value">${formatTimeShare(opponentSideTime, trackedTime)}</span></div>
-  `;
-}
-
 function createPlayerStatsModule<T>(options: {
   id: string;
   label: string;
@@ -620,11 +586,18 @@ function createCoreModule(): StatModule {
 }
 
 function createPossessionModule(): StatModule {
+  let settingsEl: HTMLDivElement | null = null;
+  let breakdownReadoutEl: HTMLElement | null = null;
+  const activeBreakdownClasses = new Set<PossessionBreakdownClass>();
+  const orderedBreakdownClasses: PossessionBreakdownClass[] = ["possession_state"];
+
   return {
     id: "possession",
     label: "Possession",
 
-    setup() {},
+    setup() {
+      syncPossessionSettingsUi();
+    },
 
     teardown() {},
 
@@ -635,18 +608,30 @@ function createPossessionModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
+      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
+        ctx.dynamicStatsFrameLookup,
+        frameIndex,
+      );
       if (!statsFrame?.possession) return "";
 
       return [
         renderPlayerCard(
           "Blue Team",
           true,
-          renderPossessionStats(statsFrame.possession, true),
+          renderPossessionStats(statsFrame.possession, {
+            isTeamZero: true,
+            breakdownClasses: getActiveBreakdownClasses(),
+            exportedStats: dynamicStatsFrame?.possession,
+          }),
         ),
         renderPlayerCard(
           "Orange Team",
           false,
-          renderPossessionStats(statsFrame.possession, false),
+          renderPossessionStats(statsFrame.possession, {
+            isTeamZero: false,
+            breakdownClasses: getActiveBreakdownClasses(),
+            exportedStats: dynamicStatsFrame?.possession,
+          }),
         ),
       ].join("");
     },
@@ -656,16 +641,114 @@ function createPossessionModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
+      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
+        ctx.dynamicStatsFrameLookup,
+        frameIndex,
+      );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       if (!statsFrame?.possession || !player) return "";
 
-      return renderPossessionStats(statsFrame.possession, player.is_team_0);
+      return renderPossessionStats(statsFrame.possession, {
+        isTeamZero: player.is_team_0,
+        breakdownClasses: getActiveBreakdownClasses(),
+        exportedStats: dynamicStatsFrame?.possession,
+      });
+    },
+
+    renderSettings() {
+      if (!settingsEl) {
+        settingsEl = document.createElement("div");
+        settingsEl.className = "module-settings-card";
+
+        const header = document.createElement("div");
+        header.className = "module-settings-header";
+
+        const text = document.createElement("div");
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "module-settings-eyebrow";
+        eyebrow.textContent = "Stat display";
+        const title = document.createElement("h3");
+        title.textContent = "Possession breakdown";
+        text.append(eyebrow, title);
+
+        breakdownReadoutEl = document.createElement("strong");
+        breakdownReadoutEl.className = "metric-readout";
+        header.append(text, breakdownReadoutEl);
+
+        const options = document.createElement("div");
+        options.className = "module-settings-options";
+
+        const optionLabel = document.createElement("label");
+        optionLabel.className = "toggle";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.breakdownClass = "possession_state";
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            activeBreakdownClasses.add("possession_state");
+          } else {
+            activeBreakdownClasses.delete("possession_state");
+          }
+          syncPossessionSettingsUi();
+          rerenderPossessionStats();
+        });
+
+        const optionText = document.createElement("span");
+        optionText.textContent = "Control";
+        optionLabel.append(checkbox, optionText);
+        options.append(optionLabel);
+
+        settingsEl.append(header, options);
+      }
+
+      syncPossessionSettingsUi();
+      return settingsEl;
     },
   };
+
+  function syncPossessionSettingsUi(): void {
+    if (!settingsEl) {
+      return;
+    }
+
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-breakdown-class]",
+    )) {
+      const className = checkbox.dataset.breakdownClass as PossessionBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
+    }
+
+    if (breakdownReadoutEl) {
+      breakdownReadoutEl.textContent = activeBreakdownClasses.has("possession_state")
+        ? "Control"
+        : "Total only";
+    }
+  }
+
+  function getActiveBreakdownClasses(): PossessionBreakdownClass[] {
+    return orderedBreakdownClasses.filter((className) =>
+      activeBreakdownClasses.has(className)
+    );
+  }
+
+  function rerenderPossessionStats(): void {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
+  }
 }
 
 function createPressureModule(): StatModule {
   let halfFieldOverlay: HalfFieldOverlay | null = null;
+  let settingsEl: HTMLDivElement | null = null;
+  let breakdownReadoutEl: HTMLElement | null = null;
+  const activeBreakdownClasses = new Set<PressureBreakdownClass>();
+  const orderedBreakdownClasses: PressureBreakdownClass[] = ["field_half"];
 
   return {
     id: "pressure",
@@ -676,6 +759,7 @@ function createPressureModule(): StatModule {
         ctx.player.sceneState.scene,
         ctx.fieldScale,
       );
+      syncPressureSettingsUi();
     },
 
     teardown() {
@@ -693,18 +777,30 @@ function createPressureModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
+      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
+        ctx.dynamicStatsFrameLookup,
+        frameIndex,
+      );
       if (!statsFrame?.pressure) return "";
 
       return [
         renderPlayerCard(
           "Blue Half",
           true,
-          renderPressureStats(statsFrame.pressure, true),
+          renderPressureStats(statsFrame.pressure, {
+            isTeamZero: true,
+            breakdownClasses: getActiveBreakdownClasses(),
+            exportedStats: dynamicStatsFrame?.pressure,
+          }),
         ),
         renderPlayerCard(
           "Orange Half",
           false,
-          renderPressureStats(statsFrame.pressure, false),
+          renderPressureStats(statsFrame.pressure, {
+            isTeamZero: false,
+            breakdownClasses: getActiveBreakdownClasses(),
+            exportedStats: dynamicStatsFrame?.pressure,
+          }),
         ),
       ].join("");
     },
@@ -714,12 +810,106 @@ function createPressureModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
+      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
+        ctx.dynamicStatsFrameLookup,
+        frameIndex,
+      );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       if (!statsFrame?.pressure || !player) return "";
 
-      return renderPressureStats(statsFrame.pressure, player.is_team_0);
+      return renderPressureStats(statsFrame.pressure, {
+        isTeamZero: player.is_team_0,
+        breakdownClasses: getActiveBreakdownClasses(),
+        exportedStats: dynamicStatsFrame?.pressure,
+      });
+    },
+
+    renderSettings() {
+      if (!settingsEl) {
+        settingsEl = document.createElement("div");
+        settingsEl.className = "module-settings-card";
+
+        const header = document.createElement("div");
+        header.className = "module-settings-header";
+
+        const text = document.createElement("div");
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "module-settings-eyebrow";
+        eyebrow.textContent = "Stat display";
+        const title = document.createElement("h3");
+        title.textContent = "Ball side breakdown";
+        text.append(eyebrow, title);
+
+        breakdownReadoutEl = document.createElement("strong");
+        breakdownReadoutEl.className = "metric-readout";
+        header.append(text, breakdownReadoutEl);
+
+        const options = document.createElement("div");
+        options.className = "module-settings-options";
+
+        const optionLabel = document.createElement("label");
+        optionLabel.className = "toggle";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.breakdownClass = "field_half";
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            activeBreakdownClasses.add("field_half");
+          } else {
+            activeBreakdownClasses.delete("field_half");
+          }
+          syncPressureSettingsUi();
+          rerenderPressureStats();
+        });
+
+        const optionText = document.createElement("span");
+        optionText.textContent = "Field half";
+        optionLabel.append(checkbox, optionText);
+        options.append(optionLabel);
+
+        settingsEl.append(header, options);
+      }
+
+      syncPressureSettingsUi();
+      return settingsEl;
     },
   };
+
+  function syncPressureSettingsUi(): void {
+    if (!settingsEl) {
+      return;
+    }
+
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-breakdown-class]",
+    )) {
+      const className = checkbox.dataset.breakdownClass as PressureBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
+    }
+
+    if (breakdownReadoutEl) {
+      breakdownReadoutEl.textContent = activeBreakdownClasses.has("field_half")
+        ? "Field half"
+        : "Total only";
+    }
+  }
+
+  function getActiveBreakdownClasses(): PressureBreakdownClass[] {
+    return orderedBreakdownClasses.filter((className) =>
+      activeBreakdownClasses.has(className)
+    );
+  }
+
+  function rerenderPressureStats(): void {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
+  }
 }
 
 function createBallCarryModule(): StatModule {
