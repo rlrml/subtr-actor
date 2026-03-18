@@ -5,23 +5,75 @@ export interface StatsTimeline {
   };
   replay_meta: unknown;
   timeline_events: unknown[];
+  fifty_fifty_events?: FiftyFiftyEvent[];
   frames: StatsFrame[];
+}
+
+export interface FiftyFiftyEvent {
+  start_time: number;
+  start_frame: number;
+  resolve_time: number;
+  resolve_frame: number;
+  is_kickoff: boolean;
+  team_zero_player?: Record<string, string>;
+  team_one_player?: Record<string, string>;
+  team_zero_position: [number, number, number];
+  team_one_position: [number, number, number];
+  midpoint: [number, number, number];
+  plane_normal: [number, number, number];
+  winning_team_is_team_0?: boolean;
+  possession_team_is_team_0?: boolean;
 }
 
 export interface StatsFrame {
   frame_number: number;
   time: number;
   dt: number;
+  fifty_fifty?: {
+    count: number;
+    team_zero_wins: number;
+    team_one_wins: number;
+    neutral_outcomes: number;
+    kickoff_count: number;
+    kickoff_team_zero_wins: number;
+    kickoff_team_one_wins: number;
+    kickoff_neutral_outcomes: number;
+    team_zero_possession_after_count: number;
+    team_one_possession_after_count: number;
+    neutral_possession_after_count: number;
+    kickoff_team_zero_possession_after_count?: number;
+    kickoff_team_one_possession_after_count?: number;
+    kickoff_neutral_possession_after_count?: number;
+    [key: string]: unknown;
+  };
   possession?: {
     tracked_time: number;
     team_zero_time: number;
     team_one_time: number;
+    neutral_time?: number;
     [key: string]: unknown;
   };
   pressure?: {
     tracked_time: number;
     team_zero_side_time: number;
     team_one_side_time: number;
+    [key: string]: unknown;
+  };
+  rush?: {
+    team_zero_count: number;
+    team_zero_two_v_one_count: number;
+    team_zero_two_v_two_count: number;
+    team_zero_two_v_three_count: number;
+    team_zero_three_v_one_count: number;
+    team_zero_three_v_two_count: number;
+    team_zero_three_v_three_count: number;
+    team_one_count: number;
+    team_one_two_v_one_count: number;
+    team_one_two_v_two_count: number;
+    team_one_two_v_three_count: number;
+    team_one_three_v_one_count: number;
+    team_one_three_v_two_count: number;
+    team_one_three_v_three_count: number;
     [key: string]: unknown;
   };
   players: PlayerStatsSnapshot[];
@@ -39,6 +91,19 @@ export interface PlayerStatsSnapshot {
     saves: number;
     shots: number;
     goals_conceded_while_last_defender: number;
+    [key: string]: unknown;
+  };
+  fifty_fifty?: {
+    count: number;
+    wins: number;
+    losses: number;
+    neutral_outcomes: number;
+    kickoff_count: number;
+    kickoff_wins: number;
+    kickoff_losses: number;
+    kickoff_neutral_outcomes: number;
+    possession_after_count: number;
+    kickoff_possession_after_count: number;
     [key: string]: unknown;
   };
   touch?: {

@@ -21,6 +21,7 @@ import {
   TouchEventOverlay,
   playerIdToString,
 } from "./touchOverlay.ts";
+import { FiftyFiftyOverlay } from "./fiftyFiftyOverlay.ts";
 import {
   createDynamicStatsFrameLookup,
   createStatsFrameLookup,
@@ -33,7 +34,14 @@ import {
   formatBoostDisplayAmount,
   toBoostDisplayUnits,
 } from "./boostFormatting.ts";
-import { renderMovementStats } from "./movementFormatting.ts";
+import {
+  renderFiftyFiftySummary,
+  renderPlayerFiftyFiftyStats,
+} from "./fiftyFiftyFormatting.ts";
+import {
+  renderMovementStats,
+} from "./movementFormatting.ts";
+import type { MovementBreakdownClass } from "./movementFormatting.ts";
 import { renderPossessionStats } from "./possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
 import { renderPressureStats } from "./pressureFormatting.ts";
@@ -47,7 +55,6 @@ import type {
   StatsFrame,
   StatsTimeline,
 } from "./statsTimeline.ts";
-import type { MovementBreakdownClass } from "./movementFormatting.ts";
 import type { TouchBreakdownClass } from "./touchFormatting.ts";
 
 import * as subtrActor from "subtr-actor";
@@ -743,6 +750,69 @@ function createPossessionModule(): StatModule {
   }
 }
 
+function createFiftyFiftyModule(): StatModule {
+  let overlay: FiftyFiftyOverlay | null = null;
+
+  return {
+    id: "fifty-fifty",
+    label: "50/50",
+
+    setup(ctx) {
+      overlay = new FiftyFiftyOverlay(
+        ctx.player.sceneState,
+        ctx.player.container,
+        ctx.replay,
+        ctx.statsTimeline,
+      );
+    },
+
+    teardown() {
+      overlay?.dispose();
+      overlay = null;
+    },
+
+    onBeforeRender(info) {
+      overlay?.update(info.currentTime);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      const summary = [
+        renderPlayerCard(
+          "Blue Team",
+          true,
+          renderFiftyFiftySummary(statsFrame.fifty_fifty, true),
+        ),
+        renderPlayerCard(
+          "Orange Team",
+          false,
+          renderFiftyFiftySummary(statsFrame.fifty_fifty, false),
+        ),
+      ].join("");
+
+      const players = statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderPlayerFiftyFiftyStats(player.fifty_fifty),
+      )).join("");
+
+      return summary + players;
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderPlayerFiftyFiftyStats(player.fifty_fifty);
+    },
+  };
+}
+
 function createPressureModule(): StatModule {
   let halfFieldOverlay: HalfFieldOverlay | null = null;
   let settingsEl: HTMLDivElement | null = null;
@@ -1287,7 +1357,6 @@ function createMovementModule(): StatModule {
     renderFocusedPlayerOverlay(state);
   }
 }
-}
 
 function createPowerslideModule(): StatModule {
   return createPlayerStatsModule({
@@ -1312,6 +1381,7 @@ const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 const MODULE_FACTORIES = [
   createCoreModule,
   createPossessionModule,
+  createFiftyFiftyModule,
   createPressureModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
