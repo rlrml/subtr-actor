@@ -112,6 +112,7 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
         tracked_time: 10.0,
         team_zero_side_time: 4.0,
         team_one_side_time: 6.0,
+        labeled_time: LabeledFloatSums::default(),
     };
 
     let fields = stats.stat_fields();
@@ -141,6 +142,7 @@ fn test_possession_stats_export_includes_neutral_fields() {
         team_zero_time: 4.0,
         team_one_time: 3.0,
         neutral_time: 3.0,
+        labeled_time: LabeledFloatSums::default(),
     };
 
     let fields = stats.stat_fields();

@@ -12,6 +12,13 @@ enum TouchKind {
     HardHit,
 }
 
+const ALL_TOUCH_KINDS: [TouchKind; 4] = [
+    TouchKind::Dribble,
+    TouchKind::Control,
+    TouchKind::MediumHit,
+    TouchKind::HardHit,
+];
+
 impl TouchKind {
     fn as_label(self) -> StatLabel {
         let value = match self {
@@ -30,6 +37,12 @@ enum TouchHeightBand {
     LowAir,
     HighAir,
 }
+
+const ALL_TOUCH_HEIGHT_BANDS: [TouchHeightBand; 3] = [
+    TouchHeightBand::Ground,
+    TouchHeightBand::LowAir,
+    TouchHeightBand::HighAir,
+];
 
 impl TouchHeightBand {
     fn as_label(self) -> StatLabel {
@@ -86,6 +99,31 @@ impl TouchStats {
 
     pub fn touch_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
         self.labeled_touch_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_touch_counts(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = ALL_TOUCH_HEIGHT_BANDS
+            .into_iter()
+            .flat_map(|height_band| {
+                ALL_TOUCH_KINDS.into_iter().map(move |kind| {
+                    let mut labels = vec![kind.as_label(), height_band.as_label()];
+                    labels.sort();
+                    LabeledCountEntry {
+                        count: self.labeled_touch_counts.count_exact(&labels),
+                        labels,
+                    }
+                })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledCounts { entries }
+    }
+
+    pub fn with_complete_labeled_touch_counts(mut self) -> Self {
+        self.labeled_touch_counts = self.complete_labeled_touch_counts();
+        self
     }
 }
 
@@ -144,10 +182,7 @@ impl TouchReducer {
             TouchKind::HardHit
         };
 
-        TouchClassification {
-            kind,
-            height_band,
-        }
+        TouchClassification { kind, height_band }
     }
 
     fn apply_touch_classification(stats: &mut TouchStats, classification: TouchClassification) {
@@ -418,5 +453,32 @@ mod tests {
         );
         assert!(stats.last_ball_speed_change.is_some());
         assert!(stats.max_ball_speed_change >= stats.average_ball_speed_change());
+    }
+
+    #[test]
+    fn touch_stats_complete_labeled_touch_counts_adds_zero_entries() {
+        let mut stats = TouchStats::default();
+        stats.labeled_touch_counts.increment([
+            StatLabel::new("kind", "hard_hit"),
+            StatLabel::new("height_band", "high_air"),
+        ]);
+
+        let completed = stats.complete_labeled_touch_counts();
+
+        assert_eq!(completed.entries.len(), 12);
+        assert_eq!(
+            completed.count_exact(&[
+                StatLabel::new("kind", "hard_hit"),
+                StatLabel::new("height_band", "high_air"),
+            ]),
+            1
+        );
+        assert_eq!(
+            completed.count_exact(&[
+                StatLabel::new("kind", "dribble"),
+                StatLabel::new("height_band", "ground"),
+            ]),
+            0
+        );
     }
 }

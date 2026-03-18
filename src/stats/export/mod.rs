@@ -5,11 +5,13 @@ mod boost;
 mod core;
 mod demo;
 mod dodge_reset;
+mod fifty_fifty;
 mod movement;
 mod positioning;
 mod possession;
 mod powerslide;
 mod pressure;
+mod rush;
 mod touch;
 
 pub const LEGACY_STAT_VARIANT: &str = "legacy";
@@ -98,6 +100,17 @@ impl LabeledCounts {
             .sum()
     }
 
+    pub fn count_exact(&self, labels: &[StatLabel]) -> u32 {
+        let mut normalized_labels = labels.to_vec();
+        normalized_labels.sort();
+
+        self.entries
+            .iter()
+            .find(|entry| entry.labels == normalized_labels)
+            .map(|entry| entry.count)
+            .unwrap_or(0)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -142,6 +155,17 @@ impl LabeledFloatSums {
             })
             .map(|entry| entry.value)
             .sum()
+    }
+
+    pub fn sum_exact(&self, labels: &[StatLabel]) -> f32 {
+        let mut normalized_labels = labels.to_vec();
+        normalized_labels.sort();
+
+        self.entries
+            .iter()
+            .find(|entry| entry.labels == normalized_labels)
+            .map(|entry| entry.value)
+            .unwrap_or(0.0)
     }
 
     pub fn is_empty(&self) -> bool {

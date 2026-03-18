@@ -10,12 +10,12 @@ impl StatFieldProvider for MovementStats {
             StatUnit::Seconds,
             self.tracked_time,
         ));
-        for entry in &self.labeled_tracked_time.entries {
+        for entry in self.complete_labeled_tracked_time().entries {
             visitor(ExportedStat::float_labeled(
                 "movement",
                 "tracked_time",
                 StatUnit::Seconds,
-                entry.labels.clone(),
+                entry.labels,
                 entry.value,
             ));
         }
@@ -138,14 +138,52 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(labeled_stats.len(), 1);
+        assert_eq!(labeled_stats.len(), 9);
         assert_eq!(
-            labeled_stats[0].descriptor.labels,
+            labeled_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "low_air"),
+                            StatLabel::new("speed_band", "boost"),
+                        ]
+                })
+                .unwrap()
+                .descriptor
+                .labels,
             vec![
                 StatLabel::new("height_band", "low_air"),
                 StatLabel::new("speed_band", "boost"),
             ]
         );
-        assert_eq!(labeled_stats[0].value, StatValue::Float(1.25));
+        assert_eq!(
+            labeled_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "low_air"),
+                            StatLabel::new("speed_band", "boost"),
+                        ]
+                })
+                .unwrap()
+                .value,
+            StatValue::Float(1.25)
+        );
+        assert_eq!(
+            labeled_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "ground"),
+                            StatLabel::new("speed_band", "slow"),
+                        ]
+                })
+                .unwrap()
+                .value,
+            StatValue::Float(0.0)
+        );
     }
 }

@@ -46,12 +46,12 @@ impl StatFieldProvider for TouchStats {
             StatUnit::Count,
             self.high_aerial_touch_count,
         ));
-        for entry in &self.labeled_touch_counts.entries {
+        for entry in self.complete_labeled_touch_counts().entries {
             visitor(ExportedStat::unsigned_labeled(
                 "touch",
                 "touch_count",
                 StatUnit::Count,
-                entry.labels.clone(),
+                entry.labels,
                 entry.count,
             ));
         }
@@ -142,14 +142,52 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(labeled_touch_stats.len(), 1);
+        assert_eq!(labeled_touch_stats.len(), 12);
         assert_eq!(
-            labeled_touch_stats[0].descriptor.labels,
+            labeled_touch_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "high_air"),
+                            StatLabel::new("kind", "hard_hit"),
+                        ]
+                })
+                .unwrap()
+                .descriptor
+                .labels,
             vec![
                 StatLabel::new("height_band", "high_air"),
                 StatLabel::new("kind", "hard_hit"),
             ]
         );
-        assert_eq!(labeled_touch_stats[0].value, StatValue::Unsigned(2));
+        assert_eq!(
+            labeled_touch_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "high_air"),
+                            StatLabel::new("kind", "hard_hit"),
+                        ]
+                })
+                .unwrap()
+                .value,
+            StatValue::Unsigned(2)
+        );
+        assert_eq!(
+            labeled_touch_stats
+                .iter()
+                .find(|stat| {
+                    stat.descriptor.labels
+                        == vec![
+                            StatLabel::new("height_band", "ground"),
+                            StatLabel::new("kind", "dribble"),
+                        ]
+                })
+                .unwrap()
+                .value,
+            StatValue::Unsigned(0)
+        );
     }
 }

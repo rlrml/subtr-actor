@@ -12,6 +12,7 @@ pub struct ReplayStatsTimeline {
     pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
+    pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub frames: Vec<ReplayStatsFrame>,
 }
 
@@ -28,6 +29,7 @@ pub struct DynamicReplayStatsTimeline {
     pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
+    pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub frames: Vec<DynamicReplayStatsFrame>,
 }
 
@@ -47,8 +49,10 @@ pub struct ReplayStatsFrame {
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
     pub is_live_play: bool,
+    pub fifty_fifty: FiftyFiftyStats,
     pub possession: PossessionStats,
     pub pressure: PressureStats,
+    pub rush: RushStats,
     pub team_zero: TeamStatsSnapshot,
     pub team_one: TeamStatsSnapshot,
     pub players: Vec<PlayerStatsSnapshot>,
@@ -62,8 +66,10 @@ pub struct DynamicReplayStatsFrame {
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
     pub is_live_play: bool,
+    pub fifty_fifty: Vec<ExportedStat>,
     pub possession: Vec<ExportedStat>,
     pub pressure: Vec<ExportedStat>,
+    pub rush: Vec<ExportedStat>,
     pub team_zero: DynamicTeamStatsSnapshot,
     pub team_one: DynamicTeamStatsSnapshot,
     pub players: Vec<DynamicPlayerStatsSnapshot>,
@@ -90,6 +96,7 @@ pub struct PlayerStatsSnapshot {
     pub name: String,
     pub is_team_0: bool,
     pub core: CorePlayerStats,
+    pub fifty_fifty: FiftyFiftyPlayerStats,
     pub touch: TouchStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,
@@ -122,6 +129,7 @@ impl StatFieldProvider for TeamStatsSnapshot {
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.fifty_fifty.visit_stat_fields(visitor);
         self.touch.visit_stat_fields(visitor);
         self.dodge_reset.visit_stat_fields(visitor);
         self.ball_carry.visit_stat_fields(visitor);
@@ -142,8 +150,10 @@ impl ReplayStatsFrame {
             seconds_remaining: self.seconds_remaining,
             game_state: self.game_state,
             is_live_play: self.is_live_play,
+            fifty_fifty: self.fifty_fifty.stat_fields(),
             possession: self.possession.stat_fields(),
             pressure: self.pressure.stat_fields(),
+            rush: self.rush.stat_fields(),
             team_zero: DynamicTeamStatsSnapshot {
                 stats: self.team_zero.stat_fields(),
             },
@@ -169,8 +179,10 @@ impl ReplayStatsFrame {
 
 #[derive(Debug, Clone, Default)]
 struct StatsTimelineReducers {
+    fifty_fifty: FiftyFiftyReducer,
     possession: PossessionReducer,
     pressure: PressureReducer,
+    rush: RushReducer,
     match_stats: MatchStatsReducer,
     touch: TouchReducer,
     ball_carry: BallCarryReducer,
@@ -195,7 +207,9 @@ impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.possession.on_replay_meta(meta)?;
         self.pressure.on_replay_meta(meta)?;
+        self.rush.on_replay_meta(meta)?;
         self.match_stats.on_replay_meta(meta)?;
+        self.fifty_fifty.on_replay_meta(meta)?;
         self.touch.on_replay_meta(meta)?;
         self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
@@ -214,7 +228,9 @@ impl StatsReducer for StatsTimelineReducers {
     ) -> SubtrActorResult<()> {
         self.possession.on_sample_with_context(sample, ctx)?;
         self.pressure.on_sample_with_context(sample, ctx)?;
+        self.rush.on_sample_with_context(sample, ctx)?;
         self.match_stats.on_sample_with_context(sample, ctx)?;
+        self.fifty_fifty.on_sample_with_context(sample, ctx)?;
         self.touch.on_sample_with_context(sample, ctx)?;
         self.ball_carry.on_sample_with_context(sample, ctx)?;
         self.boost.on_sample_with_context(sample, ctx)?;
@@ -229,7 +245,9 @@ impl StatsReducer for StatsTimelineReducers {
     fn finish(&mut self) -> SubtrActorResult<()> {
         self.possession.finish()?;
         self.pressure.finish()?;
+        self.rush.finish()?;
         self.match_stats.finish()?;
+        self.fifty_fifty.finish()?;
         self.touch.finish()?;
         self.ball_carry.finish()?;
         self.boost.finish()?;
@@ -316,6 +334,7 @@ impl StatsTimelineCollector {
             config,
             replay_meta,
             timeline_events,
+            fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             frames: self.frames,
         }
     }
@@ -338,6 +357,7 @@ impl StatsTimelineCollector {
             config,
             replay_meta,
             timeline_events,
+            fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             frames: self
                 .frames
                 .into_iter()
@@ -359,8 +379,10 @@ impl StatsTimelineCollector {
             seconds_remaining: sample.seconds_remaining,
             game_state: sample.game_state,
             is_live_play: live_play,
+            fifty_fifty: self.reducers.fifty_fifty.stats().clone(),
             possession: self.reducers.possession.stats().clone(),
             pressure: self.reducers.pressure.stats().clone(),
+            rush: self.reducers.rush.stats().clone(),
             team_zero: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_zero_stats(),
                 ball_carry: self.reducers.ball_carry.team_zero_stats().clone(),
@@ -393,13 +415,21 @@ impl StatsTimelineCollector {
                         .get(&player.remote_id)
                         .cloned()
                         .unwrap_or_default(),
+                    fifty_fifty: self
+                        .reducers
+                        .fifty_fifty
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
                     touch: self
                         .reducers
                         .touch
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
-                        .unwrap_or_default(),
+                        .unwrap_or_default()
+                        .with_complete_labeled_touch_counts(),
                     dodge_reset: self
                         .reducers
                         .dodge_reset
@@ -427,7 +457,8 @@ impl StatsTimelineCollector {
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
-                        .unwrap_or_default(),
+                        .unwrap_or_default()
+                        .with_complete_labeled_tracked_time(),
                     positioning: self
                         .reducers
                         .positioning

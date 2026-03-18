@@ -7,6 +7,12 @@ enum MovementSpeedBand {
     Supersonic,
 }
 
+const ALL_MOVEMENT_SPEED_BANDS: [MovementSpeedBand; 3] = [
+    MovementSpeedBand::Slow,
+    MovementSpeedBand::Boost,
+    MovementSpeedBand::Supersonic,
+];
+
 impl MovementSpeedBand {
     fn as_label(self) -> StatLabel {
         let value = match self {
@@ -24,6 +30,12 @@ enum MovementHeightBand {
     LowAir,
     HighAir,
 }
+
+const ALL_MOVEMENT_HEIGHT_BANDS: [MovementHeightBand; 3] = [
+    MovementHeightBand::Ground,
+    MovementHeightBand::LowAir,
+    MovementHeightBand::HighAir,
+];
 
 impl MovementHeightBand {
     fn as_label(self) -> StatLabel {
@@ -126,6 +138,31 @@ impl MovementStats {
 
     pub fn tracked_time_with_labels(&self, labels: &[StatLabel]) -> f32 {
         self.labeled_tracked_time.sum_matching(labels)
+    }
+
+    pub fn complete_labeled_tracked_time(&self) -> LabeledFloatSums {
+        let mut entries: Vec<_> = ALL_MOVEMENT_HEIGHT_BANDS
+            .into_iter()
+            .flat_map(|height_band| {
+                ALL_MOVEMENT_SPEED_BANDS.into_iter().map(move |speed_band| {
+                    let mut labels = vec![speed_band.as_label(), height_band.as_label()];
+                    labels.sort();
+                    LabeledFloatSumEntry {
+                        value: self.labeled_tracked_time.sum_exact(&labels),
+                        labels,
+                    }
+                })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledFloatSums { entries }
+    }
+
+    pub fn with_complete_labeled_tracked_time(mut self) -> Self {
+        self.labeled_tracked_time = self.complete_labeled_tracked_time();
+        self
     }
 }
 
@@ -355,6 +392,36 @@ mod tests {
                 StatLabel::new("height_band", "high_air"),
             ]),
             1.0
+        );
+    }
+
+    #[test]
+    fn movement_stats_complete_labeled_time_adds_zero_entries() {
+        let mut stats = MovementStats::default();
+        stats.labeled_tracked_time.add(
+            [
+                StatLabel::new("speed_band", "boost"),
+                StatLabel::new("height_band", "low_air"),
+            ],
+            1.25,
+        );
+
+        let completed = stats.complete_labeled_tracked_time();
+
+        assert_eq!(completed.entries.len(), 9);
+        assert_eq!(
+            completed.sum_exact(&[
+                StatLabel::new("speed_band", "boost"),
+                StatLabel::new("height_band", "low_air"),
+            ]),
+            1.25
+        );
+        assert_eq!(
+            completed.sum_exact(&[
+                StatLabel::new("speed_band", "slow"),
+                StatLabel::new("height_band", "ground"),
+            ]),
+            0.0
         );
     }
 }

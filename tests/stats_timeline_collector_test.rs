@@ -239,6 +239,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             all_headers: Vec::new(),
         },
         timeline_events: Vec::new(),
+        fifty_fifty_events: Vec::new(),
         frames: vec![
             ReplayStatsFrame {
                 frame_number: 10,
@@ -247,8 +248,10 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
+                fifty_fifty: FiftyFiftyStats::default(),
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
+                rush: RushStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -274,8 +277,10 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
+                fifty_fifty: FiftyFiftyStats::default(),
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
+                rush: RushStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -301,8 +306,10 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
+                fifty_fifty: FiftyFiftyStats::default(),
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
+                rush: RushStats::default(),
                 team_zero: TeamStatsSnapshot {
                     core: CoreTeamStats::default(),
                     ball_carry: BallCarryStats::default(),
@@ -448,6 +455,7 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
                 .get(&player.player_id)
                 .cloned()
                 .unwrap_or_default()
+                .with_complete_labeled_tracked_time()
         );
         assert_eq!(
             player.positioning,

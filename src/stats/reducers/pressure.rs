@@ -126,7 +126,11 @@ mod tests {
         BallSample {
             rigid_body: RigidBody {
                 sleeping: false,
-                location: Vector3f { x: 0.0, y, z: 100.0 },
+                location: Vector3f {
+                    x: 0.0,
+                    y,
+                    z: 100.0,
+                },
                 rotation: Quaternion {
                     x: 0.0,
                     y: 0.0,

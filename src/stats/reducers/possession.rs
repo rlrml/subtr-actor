@@ -267,11 +267,7 @@ mod tests {
 
     use super::*;
 
-    fn sample(
-        frame_number: usize,
-        time: f32,
-        touch_teams: &[bool],
-    ) -> StatsSample {
+    fn sample(frame_number: usize, time: f32, touch_teams: &[bool]) -> StatsSample {
         StatsSample {
             frame_number,
             time,
