@@ -1,0 +1,883 @@
+use super::*;
+
+impl<'a> ReplayProcessor<'a> {
+    pub fn find_update_in_direction(
+        &self,
+        current_index: usize,
+        actor_id: &boxcars::ActorId,
+        object_id: &boxcars::ObjectId,
+        direction: SearchDirection,
+    ) -> SubtrActorResult<(boxcars::Attribute, usize)> {
+        let frames = self
+            .replay
+            .network_frames
+            .as_ref()
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?;
+        match direction {
+            SearchDirection::Forward => {
+                for index in (current_index + 1)..frames.frames.len() {
+                    if let Some(attribute) = frames.frames[index]
+                        .updated_actors
+                        .iter()
+                        .find(|update| {
+                            &update.actor_id == actor_id && &update.object_id == object_id
+                        })
+                        .map(|update| update.attribute.clone())
+                    {
+                        return Ok((attribute, index));
+                    }
+                }
+            }
+            SearchDirection::Backward => {
+                for index in (0..current_index).rev() {
+                    if let Some(attribute) = frames.frames[index]
+                        .updated_actors
+                        .iter()
+                        .find(|update| {
+                            &update.actor_id == actor_id && &update.object_id == object_id
+                        })
+                        .map(|update| update.attribute.clone())
+                    {
+                        return Ok((attribute, index));
+                    }
+                }
+            }
+        }
+
+        SubtrActorError::new_result(SubtrActorErrorVariant::NoUpdateAfterFrame {
+            actor_id: *actor_id,
+            object_id: *object_id,
+            frame_index: current_index,
+        })
+    }
+
+    pub fn get_player_id_from_car_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<PlayerId> {
+        self.get_player_id_from_actor_id(&self.get_player_actor_id_from_car_actor_id(actor_id)?)
+    }
+
+    pub(crate) fn get_player_id_from_actor_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<PlayerId> {
+        for (player_id, player_actor_id) in self.player_to_actor_id.iter() {
+            if actor_id == player_actor_id {
+                return Ok(player_id.clone());
+            }
+        }
+        SubtrActorError::new_result(SubtrActorErrorVariant::NoMatchingPlayerId {
+            actor_id: *actor_id,
+        })
+    }
+
+    fn get_player_actor_id_from_car_actor_id(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<boxcars::ActorId> {
+        self.car_to_player.get(actor_id).copied().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::NoMatchingPlayerId {
+                actor_id: *actor_id,
+            })
+        })
+    }
+
+    pub(crate) fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
+        self.known_demolishes
+            .iter()
+            .any(|(existing, existing_frame_index)| {
+                existing == demo
+                    && frame_index
+                        .checked_sub(*existing_frame_index)
+                        .or_else(|| existing_frame_index.checked_sub(frame_index))
+                        .unwrap()
+                        < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+            })
+    }
+
+    pub fn get_demolish_format(&self) -> Option<DemolishFormat> {
+        self.demolish_format
+    }
+
+    pub fn current_frame_boost_pad_events(&self) -> &[BoostPadEvent] {
+        &self.current_frame_boost_pad_events
+    }
+
+    pub fn current_frame_touch_events(&self) -> &[TouchEvent] {
+        &self.current_frame_touch_events
+    }
+
+    pub fn current_frame_dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
+        &self.current_frame_dodge_refreshed_events
+    }
+
+    pub fn current_frame_goal_events(&self) -> &[GoalEvent] {
+        &self.current_frame_goal_events
+    }
+
+    pub fn current_frame_player_stat_events(&self) -> &[PlayerStatEvent] {
+        &self.current_frame_player_stat_events
+    }
+
+    pub fn detect_demolish_format(&self) -> Option<DemolishFormat> {
+        let actors = self.iter_actors_by_type_err(CAR_TYPE).ok()?;
+        for (_actor_id, state) in actors {
+            if get_attribute_errors_expected!(
+                self,
+                &state.attributes,
+                DEMOLISH_EXTENDED_KEY,
+                boxcars::Attribute::DemolishExtended
+            )
+            .is_ok()
+            {
+                return Some(DemolishFormat::Extended);
+            }
+            if get_attribute_errors_expected!(
+                self,
+                &state.attributes,
+                DEMOLISH_GOAL_EXPLOSION_KEY,
+                boxcars::Attribute::DemolishFx
+            )
+            .is_ok()
+            {
+                return Some(DemolishFormat::Fx);
+            }
+        }
+        None
+    }
+
+    pub fn get_active_demos(
+        &self,
+    ) -> SubtrActorResult<impl Iterator<Item = DemolishAttribute> + '_> {
+        let format = self.demolish_format;
+        let actors: Vec<_> = self.iter_actors_by_type_err(CAR_TYPE)?.collect();
+        Ok(actors
+            .into_iter()
+            .filter_map(move |(_actor_id, state)| match format {
+                Some(DemolishFormat::Extended) => get_attribute_errors_expected!(
+                    self,
+                    &state.attributes,
+                    DEMOLISH_EXTENDED_KEY,
+                    boxcars::Attribute::DemolishExtended
+                )
+                .ok()
+                .map(|demo| DemolishAttribute::Extended(**demo)),
+                Some(DemolishFormat::Fx) => get_attribute_errors_expected!(
+                    self,
+                    &state.attributes,
+                    DEMOLISH_GOAL_EXPLOSION_KEY,
+                    boxcars::Attribute::DemolishFx
+                )
+                .ok()
+                .map(|demo| DemolishAttribute::Fx(**demo)),
+                None => None,
+            }))
+    }
+
+    fn get_frame(&self, frame_index: usize) -> SubtrActorResult<&boxcars::Frame> {
+        self.replay
+            .network_frames
+            .as_ref()
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::NoNetworkFrames,
+            ))?
+            .frames
+            .get(frame_index)
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::FrameIndexOutOfBounds,
+            ))
+    }
+
+    fn velocities_applied_rigid_body(
+        &self,
+        rigid_body: &boxcars::RigidBody,
+        rb_frame_index: usize,
+        target_time: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        let rb_frame = self.get_frame(rb_frame_index)?;
+        let interpolation_amount = target_time - rb_frame.time;
+        Ok(self.normalize_rigid_body(&apply_velocities_to_rigid_body(
+            rigid_body,
+            interpolation_amount,
+        )))
+    }
+
+    pub fn get_interpolated_actor_rigid_body(
+        &self,
+        actor_id: &boxcars::ActorId,
+        time: f32,
+        close_enough: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        let (frame_body, frame_index) = self.get_actor_rigid_body(actor_id)?;
+        let frame_time = self.get_frame(*frame_index)?.time;
+        let time_and_frame_difference = time - frame_time;
+
+        if time_and_frame_difference.abs() <= close_enough.abs() {
+            return Ok(self.normalize_rigid_body(frame_body));
+        }
+
+        let search_direction = if time_and_frame_difference > 0.0 {
+            util::SearchDirection::Forward
+        } else {
+            util::SearchDirection::Backward
+        };
+
+        let object_id = self.get_object_id_for_key(RIGID_BODY_STATE_KEY)?;
+
+        let (attribute, found_frame) =
+            self.find_update_in_direction(*frame_index, actor_id, object_id, search_direction)?;
+        let found_time = self.get_frame(found_frame)?.time;
+
+        let found_body = attribute_match!(attribute, boxcars::Attribute::RigidBody)?;
+
+        if (found_time - time).abs() <= close_enough {
+            return Ok(self.normalize_rigid_body(&found_body));
+        }
+
+        let (start_body, start_time, end_body, end_time) = match search_direction {
+            util::SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
+            util::SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
+        };
+
+        util::get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
+            .map(|rigid_body| self.normalize_rigid_body(&rigid_body))
+    }
+
+    pub fn get_object_id_for_key(
+        &self,
+        name: &'static str,
+    ) -> SubtrActorResult<&boxcars::ObjectId> {
+        self.name_to_object_id
+            .get(name)
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
+    }
+
+    pub fn get_actor_ids_by_type(
+        &self,
+        name: &'static str,
+    ) -> SubtrActorResult<&[boxcars::ActorId]> {
+        self.get_object_id_for_key(name)
+            .map(|object_id| self.get_actor_ids_by_object_id(object_id))
+    }
+
+    fn get_actor_ids_by_object_id(&self, object_id: &boxcars::ObjectId) -> &[boxcars::ActorId] {
+        self.actor_state
+            .actor_ids_by_type
+            .get(object_id)
+            .map(|v| &v[..])
+            .unwrap_or_else(|| &EMPTY_ACTOR_IDS)
+    }
+
+    pub(crate) fn get_actor_state(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<&ActorState> {
+        self.actor_state.actor_states.get(actor_id).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
+                actor_id: *actor_id,
+            })
+        })
+    }
+
+    pub(crate) fn get_actor_state_or_recently_deleted(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<&ActorState> {
+        self.actor_state
+            .actor_states
+            .get(actor_id)
+            .or_else(|| self.actor_state.recently_deleted_actor_states.get(actor_id))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::NoStateForActorId {
+                    actor_id: *actor_id,
+                })
+            })
+    }
+
+    fn get_actor_attribute<'b>(
+        &'b self,
+        actor_id: &boxcars::ActorId,
+        property: &'static str,
+    ) -> SubtrActorResult<&'b boxcars::Attribute> {
+        self.get_attribute(&self.get_actor_state(actor_id)?.attributes, property)
+    }
+
+    pub fn get_attribute<'b>(
+        &'b self,
+        map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
+        property: &'static str,
+    ) -> SubtrActorResult<&'b boxcars::Attribute> {
+        self.get_attribute_and_updated(map, property).map(|v| &v.0)
+    }
+
+    pub fn get_attribute_and_updated<'b>(
+        &'b self,
+        map: &'b HashMap<boxcars::ObjectId, (boxcars::Attribute, usize)>,
+        property: &'static str,
+    ) -> SubtrActorResult<&'b (boxcars::Attribute, usize)> {
+        let attribute_object_id = self.get_object_id_for_key(property)?;
+        map.get(attribute_object_id).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState { property })
+        })
+    }
+
+    pub(crate) fn find_ball_actor(&self) -> Option<boxcars::ActorId> {
+        BALL_TYPES
+            .iter()
+            .filter_map(|ball_type| self.iter_actors_by_type(ball_type))
+            .flatten()
+            .map(|(actor_id, _)| *actor_id)
+            .next()
+    }
+
+    pub fn get_ball_actor_id(&self) -> SubtrActorResult<boxcars::ActorId> {
+        self.ball_actor_id.ok_or(SubtrActorError::new(
+            SubtrActorErrorVariant::BallActorNotFound,
+        ))
+    }
+
+    pub fn get_metadata_actor_id(&self) -> SubtrActorResult<&boxcars::ActorId> {
+        self.get_actor_ids_by_type(GAME_TYPE)?
+            .iter()
+            .next()
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))
+    }
+
+    pub fn get_player_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+        self.player_to_actor_id
+            .get(player_id)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name: "ActorId",
+                    player_id: player_id.clone(),
+                })
+            })
+            .cloned()
+    }
+
+    pub fn get_car_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+        self.player_to_car
+            .get(&self.get_player_actor_id(player_id)?)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name: "Car",
+                    player_id: player_id.clone(),
+                })
+            })
+            .cloned()
+    }
+
+    pub fn get_car_connected_actor_id(
+        &self,
+        player_id: &PlayerId,
+        map: &HashMap<boxcars::ActorId, boxcars::ActorId>,
+        name: &'static str,
+    ) -> SubtrActorResult<boxcars::ActorId> {
+        map.get(&self.get_car_actor_id(player_id)?)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name,
+                    player_id: player_id.clone(),
+                })
+            })
+            .cloned()
+    }
+
+    pub fn get_boost_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+        self.get_car_connected_actor_id(player_id, &self.car_to_boost, "Boost")
+    }
+
+    pub fn get_jump_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+        self.get_car_connected_actor_id(player_id, &self.car_to_jump, "Jump")
+    }
+
+    pub fn get_double_jump_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<boxcars::ActorId> {
+        self.get_car_connected_actor_id(player_id, &self.car_to_double_jump, "Double Jump")
+    }
+
+    pub fn get_dodge_actor_id(&self, player_id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+        self.get_car_connected_actor_id(player_id, &self.car_to_dodge, "Dodge")
+    }
+
+    pub fn get_actor_rigid_body(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        get_attribute_and_updated!(
+            self,
+            &self.get_actor_state(actor_id)?.attributes,
+            RIGID_BODY_STATE_KEY,
+            boxcars::Attribute::RigidBody
+        )
+    }
+
+    pub fn get_actor_rigid_body_or_recently_deleted(
+        &self,
+        actor_id: &boxcars::ActorId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        get_attribute_and_updated!(
+            self,
+            &self
+                .get_actor_state_or_recently_deleted(actor_id)?
+                .attributes,
+            RIGID_BODY_STATE_KEY,
+            boxcars::Attribute::RigidBody
+        )
+    }
+
+    pub fn iter_player_ids_in_order(&self) -> impl Iterator<Item = &PlayerId> {
+        self.team_zero.iter().chain(self.team_one.iter())
+    }
+
+    pub fn current_in_game_team_player_counts(&self) -> [usize; 2] {
+        let mut counts = [0, 0];
+        let Ok(player_actor_ids) = self.get_actor_ids_by_type(PLAYER_TYPE) else {
+            return counts;
+        };
+        let mut seen_players = std::collections::HashSet::new();
+
+        for actor_id in player_actor_ids {
+            let Ok(player_id) = self.get_player_id_from_actor_id(actor_id) else {
+                continue;
+            };
+            if !seen_players.insert(player_id) {
+                continue;
+            }
+
+            let Some(team_actor_id) = self.player_to_team.get(actor_id) else {
+                continue;
+            };
+            let Ok(team_state) = self.get_actor_state(team_actor_id) else {
+                continue;
+            };
+            let Some(team_name) = self.object_id_to_name.get(&team_state.object_id) else {
+                continue;
+            };
+
+            match team_name.chars().last() {
+                Some('0') => counts[0] += 1,
+                Some('1') => counts[1] += 1,
+                _ => {}
+            }
+        }
+
+        counts
+    }
+
+    pub fn player_count(&self) -> usize {
+        self.iter_player_ids_in_order().count()
+    }
+
+    pub fn get_player_names(&self) -> HashMap<PlayerId, String> {
+        self.iter_player_ids_in_order()
+            .filter_map(|player_id| {
+                self.get_player_name(player_id)
+                    .ok()
+                    .map(|name| (player_id.clone(), name))
+            })
+            .collect()
+    }
+
+    pub(crate) fn iter_actors_by_type_err(
+        &self,
+        name: &'static str,
+    ) -> SubtrActorResult<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>> {
+        Ok(self.iter_actors_by_object_id(self.get_object_id_for_key(name)?))
+    }
+
+    pub fn iter_actors_by_type(
+        &self,
+        name: &'static str,
+    ) -> Option<impl Iterator<Item = (&boxcars::ActorId, &ActorState)>> {
+        self.iter_actors_by_type_err(name).ok()
+    }
+
+    pub fn iter_actors_by_object_id<'b>(
+        &'b self,
+        object_id: &'b boxcars::ObjectId,
+    ) -> impl Iterator<Item = (&'b boxcars::ActorId, &'b ActorState)> + 'b {
+        let actor_ids = self
+            .actor_state
+            .actor_ids_by_type
+            .get(object_id)
+            .map(|v| &v[..])
+            .unwrap_or_else(|| &EMPTY_ACTOR_IDS);
+
+        actor_ids
+            .iter()
+            .map(move |id| (id, self.actor_state.actor_states.get(id).unwrap()))
+    }
+
+    pub fn get_seconds_remaining(&self) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            SECONDS_REMAINING_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_replicated_state_name(&self) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_STATE_NAME_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_replicated_game_state_time_remaining(&self) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_GAME_STATE_TIME_REMAINING_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_ball_has_been_hit(&self) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            BALL_HAS_BEEN_HIT_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
+    pub fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
+        let actor_id = self.get_ball_actor_id()?;
+        get_actor_attribute_matching!(
+            self,
+            &actor_id,
+            IGNORE_SYNCING_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
+    pub fn get_ball_rigid_body(&self) -> SubtrActorResult<&boxcars::RigidBody> {
+        self.ball_actor_id
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::BallActorNotFound,
+            ))
+            .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
+    }
+
+    pub fn get_normalized_ball_rigid_body(&self) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_ball_rigid_body()
+            .map(|rigid_body| self.normalize_rigid_body(rigid_body))
+    }
+
+    pub fn ball_rigid_body_exists(&self) -> SubtrActorResult<bool> {
+        Ok(self
+            .get_ball_rigid_body()
+            .map(|rb| !rb.sleeping)
+            .unwrap_or(false))
+    }
+
+    pub fn get_ball_rigid_body_and_updated(
+        &self,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        self.ball_actor_id
+            .ok_or(SubtrActorError::new(
+                SubtrActorErrorVariant::BallActorNotFound,
+            ))
+            .and_then(|actor_id| {
+                get_attribute_and_updated!(
+                    self,
+                    &self.get_actor_state(&actor_id)?.attributes,
+                    RIGID_BODY_STATE_KEY,
+                    boxcars::Attribute::RigidBody
+                )
+            })
+    }
+
+    pub fn get_velocity_applied_ball_rigid_body(
+        &self,
+        target_time: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        let (current_rigid_body, frame_index) = self.get_ball_rigid_body_and_updated()?;
+        self.velocities_applied_rigid_body(current_rigid_body, *frame_index, target_time)
+    }
+
+    pub fn get_interpolated_ball_rigid_body(
+        &self,
+        time: f32,
+        close_enough: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_interpolated_actor_rigid_body(&self.get_ball_actor_id()?, time, close_enough)
+    }
+
+    pub fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_actor_id(player_id)?,
+            PLAYER_NAME_KEY,
+            boxcars::Attribute::String
+        )
+        .cloned()
+    }
+
+    fn get_player_int_stat(
+        &self,
+        player_id: &PlayerId,
+        key: &'static str,
+    ) -> SubtrActorResult<i32> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_actor_id(player_id)?,
+            key,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
+        let team_actor_id = self
+            .player_to_team
+            .get(&self.get_player_actor_id(player_id)?)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::UnknownPlayerTeam {
+                    player_id: player_id.clone(),
+                })
+            })?;
+        let state = self.get_actor_state(team_actor_id)?;
+        self.object_id_to_name
+            .get(&state.object_id)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::UnknownPlayerTeam {
+                    player_id: player_id.clone(),
+                })
+            })
+            .cloned()
+    }
+
+    pub fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        Ok(self
+            .get_player_team_key(player_id)?
+            .chars()
+            .last()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::EmptyTeamName {
+                    player_id: player_id.clone(),
+                })
+            })?
+            == '0')
+    }
+
+    pub(crate) fn get_team_actor_id_for_side(
+        &self,
+        is_team_0: bool,
+    ) -> SubtrActorResult<boxcars::ActorId> {
+        let player_id = if is_team_0 {
+            self.team_zero.first()
+        } else {
+            self.team_one.first()
+        }
+        .ok_or(SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))?;
+
+        self.player_to_team
+            .get(&self.get_player_actor_id(player_id)?)
+            .copied()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name: "Team",
+                    player_id: player_id.clone(),
+                })
+            })
+    }
+
+    pub fn get_team_score(&self, is_team_0: bool) -> SubtrActorResult<i32> {
+        let team_actor_id = self.get_team_actor_id_for_side(is_team_0)?;
+        get_actor_attribute_matching!(
+            self,
+            &team_actor_id,
+            TEAM_GAME_SCORE_KEY,
+            boxcars::Attribute::Int
+        )
+        .cloned()
+    }
+
+    pub fn get_team_scores(&self) -> SubtrActorResult<(i32, i32)> {
+        Ok((self.get_team_score(true)?, self.get_team_score(false)?))
+    }
+
+    pub fn get_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<&boxcars::RigidBody> {
+        self.get_car_actor_id(player_id)
+            .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
+    }
+
+    pub fn get_normalized_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_player_rigid_body(player_id)
+            .map(|rigid_body| self.normalize_rigid_body(rigid_body))
+    }
+
+    pub fn get_player_rigid_body_and_updated(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        self.get_car_actor_id(player_id).and_then(|actor_id| {
+            get_attribute_and_updated!(
+                self,
+                &self.get_actor_state(&actor_id)?.attributes,
+                RIGID_BODY_STATE_KEY,
+                boxcars::Attribute::RigidBody
+            )
+        })
+    }
+
+    pub fn get_player_rigid_body_and_updated_or_recently_deleted(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
+        self.get_car_actor_id(player_id)
+            .and_then(|actor_id| self.get_actor_rigid_body_or_recently_deleted(&actor_id))
+    }
+
+    pub fn get_velocity_applied_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        target_time: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        let (current_rigid_body, frame_index) =
+            self.get_player_rigid_body_and_updated(player_id)?;
+        self.velocities_applied_rigid_body(current_rigid_body, *frame_index, target_time)
+    }
+
+    pub fn get_interpolated_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        time: f32,
+        close_enough: f32,
+    ) -> SubtrActorResult<boxcars::RigidBody> {
+        self.get_car_actor_id(player_id).and_then(|car_actor_id| {
+            self.get_interpolated_actor_rigid_body(&car_actor_id, time, close_enough)
+        })
+    }
+
+    pub fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_boost_actor_id(player_id).and_then(|actor_id| {
+            let boost_state = self.get_actor_state(&actor_id)?;
+            get_derived_attribute!(
+                boost_state.derived_attributes,
+                BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Float
+            )
+            .cloned()
+        })
+    }
+
+    pub fn get_player_last_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_boost_actor_id(player_id).and_then(|actor_id| {
+            let boost_state = self.get_actor_state(&actor_id)?;
+            get_derived_attribute!(
+                boost_state.derived_attributes,
+                LAST_BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Byte
+            )
+            .map(|value| *value as f32)
+        })
+    }
+
+    pub fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_player_boost_level(player_id)
+            .map(boost_amount_to_percent)
+    }
+
+    pub fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_ASSISTS_KEY)
+    }
+
+    pub fn get_player_match_goals(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_GOALS_KEY)
+    }
+
+    pub fn get_player_match_saves(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SAVES_KEY)
+    }
+
+    pub fn get_player_match_score(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SCORE_KEY)
+    }
+
+    pub fn get_player_match_shots(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        self.get_player_int_stat(player_id, MATCH_SHOTS_KEY)
+    }
+
+    pub fn get_ball_hit_team_num(&self) -> SubtrActorResult<u8> {
+        let ball_actor_id = self.get_ball_actor_id()?;
+        get_actor_attribute_matching!(
+            self,
+            &ball_actor_id,
+            BALL_HIT_TEAM_NUM_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    pub fn get_scored_on_team_num(&self) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            self.get_metadata_actor_id()?,
+            REPLICATED_SCORED_ON_TEAM_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    pub fn get_component_active(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            &actor_id,
+            COMPONENT_ACTIVE_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    pub fn get_boost_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        self.get_boost_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        self.get_jump_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_double_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        self.get_double_jump_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_dodge_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        self.get_dodge_actor_id(player_id)
+            .and_then(|actor_id| self.get_component_active(&actor_id))
+    }
+
+    pub fn get_powerslide_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_car_actor_id(player_id)?,
+            HANDBRAKE_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+}
