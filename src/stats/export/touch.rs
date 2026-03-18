@@ -126,11 +126,11 @@ mod tests {
         stats.touch_count = 2;
         stats.labeled_touch_counts.increment([
             StatLabel::new("kind", "hard_hit"),
-            StatLabel::new("aerial", "true"),
+            StatLabel::new("height_band", "high_air"),
         ]);
         stats.labeled_touch_counts.increment([
             StatLabel::new("kind", "hard_hit"),
-            StatLabel::new("aerial", "true"),
+            StatLabel::new("height_band", "high_air"),
         ]);
 
         let labeled_touch_stats: Vec<_> = stats
@@ -146,7 +146,7 @@ mod tests {
         assert_eq!(
             labeled_touch_stats[0].descriptor.labels,
             vec![
-                StatLabel::new("aerial", "true"),
+                StatLabel::new("height_band", "high_air"),
                 StatLabel::new("kind", "hard_hit"),
             ]
         );

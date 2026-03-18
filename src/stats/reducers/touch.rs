@@ -25,22 +25,32 @@ impl TouchKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TouchHeightBand {
+    Ground,
+    LowAir,
+    HighAir,
+}
+
+impl TouchHeightBand {
+    fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::Ground => "ground",
+            Self::LowAir => "low_air",
+            Self::HighAir => "high_air",
+        };
+        StatLabel::new("height_band", value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TouchClassification {
     kind: TouchKind,
-    is_aerial: bool,
-    is_high_aerial: bool,
+    height_band: TouchHeightBand,
 }
 
 impl TouchClassification {
-    fn labels(self) -> [StatLabel; 3] {
-        [
-            self.kind.as_label(),
-            StatLabel::new("aerial", if self.is_aerial { "true" } else { "false" }),
-            StatLabel::new(
-                "high_aerial",
-                if self.is_high_aerial { "true" } else { "false" },
-            ),
-        ]
+    fn labels(self) -> [StatLabel; 2] {
+        [self.kind.as_label(), self.height_band.as_label()]
     }
 }
 
@@ -114,11 +124,16 @@ impl TouchReducer {
 
     fn classify_touch(player_height: Option<f32>, ball_speed_change: f32) -> TouchClassification {
         let player_height = player_height.unwrap_or(0.0);
-        let is_aerial_touch = player_height >= AERIAL_TOUCH_Z_THRESHOLD;
-        let is_high_aerial_touch = player_height >= HIGH_AIR_Z_THRESHOLD;
+        let height_band = if player_height >= HIGH_AIR_Z_THRESHOLD {
+            TouchHeightBand::HighAir
+        } else if player_height >= AERIAL_TOUCH_Z_THRESHOLD {
+            TouchHeightBand::LowAir
+        } else {
+            TouchHeightBand::Ground
+        };
 
         let kind = if ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
-            if is_aerial_touch {
+            if height_band != TouchHeightBand::Ground {
                 TouchKind::Control
             } else {
                 TouchKind::Dribble
@@ -131,17 +146,18 @@ impl TouchReducer {
 
         TouchClassification {
             kind,
-            is_aerial: is_aerial_touch,
-            is_high_aerial: is_high_aerial_touch,
+            height_band,
         }
     }
 
     fn apply_touch_classification(stats: &mut TouchStats, classification: TouchClassification) {
-        if classification.is_aerial {
-            stats.aerial_touch_count += 1;
-        }
-        if classification.is_high_aerial {
-            stats.high_aerial_touch_count += 1;
+        match classification.height_band {
+            TouchHeightBand::Ground => {}
+            TouchHeightBand::LowAir => stats.aerial_touch_count += 1,
+            TouchHeightBand::HighAir => {
+                stats.aerial_touch_count += 1;
+                stats.high_aerial_touch_count += 1;
+            }
         }
 
         match classification.kind {
@@ -355,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn touch_reducer_classifies_touch_strength_and_aerials() {
+    fn touch_reducer_classifies_touch_strength_and_height_bands() {
         let mut reducer = TouchReducer::new();
 
         let baseline = sample(0, 0.0, 0.0, 0.0, false);
@@ -386,20 +402,17 @@ mod tests {
             1
         );
         assert_eq!(
-            stats.touch_count_with_labels(&[StatLabel::new("aerial", "true")]),
-            2
+            stats.touch_count_with_labels(&[StatLabel::new("height_band", "low_air")]),
+            1
         );
         assert_eq!(
-            stats.touch_count_with_labels(&[
-                StatLabel::new("kind", "hard_hit"),
-                StatLabel::new("aerial", "true"),
-            ]),
+            stats.touch_count_with_labels(&[StatLabel::new("height_band", "high_air")]),
             1
         );
         assert_eq!(
             stats.touch_count_with_labels(&[
                 StatLabel::new("kind", "hard_hit"),
-                StatLabel::new("high_aerial", "true"),
+                StatLabel::new("height_band", "high_air"),
             ]),
             1
         );

@@ -49,6 +49,12 @@ export interface PlayerStatsSnapshot {
     hard_hit_count?: number;
     aerial_touch_count?: number;
     high_aerial_touch_count?: number;
+    labeled_touch_counts?: {
+      entries: Array<{
+        labels: StatLabel[];
+        count: number;
+      }>;
+    };
     is_last_touch: boolean;
     last_touch_time?: number;
     last_touch_frame?: number;

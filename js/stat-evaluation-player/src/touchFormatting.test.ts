@@ -3,19 +3,12 @@ import assert from "node:assert/strict";
 
 import { renderTouchStats } from "./touchFormatting.ts";
 
-test("renderTouchStats includes touch classification and momentum rows", () => {
+test("renderTouchStats shows only total and selected breakdown rows", () => {
   const html = renderTouchStats({
     touch_count: 8,
     is_last_touch: true,
-    last_touch_time: 12.34,
-    last_touch_frame: 456,
-    time_since_last_touch: 0.75,
-    frames_since_last_touch: 9,
-    last_ball_speed_change: 321.4,
-    average_ball_speed_change: 512.2,
-    max_ball_speed_change: 911.9,
   }, {
-    breakdownClasses: ["kind", "aerial"],
+    breakdownClasses: ["kind", "height_band"],
     exportedStats: [
       {
         domain: "touch",
@@ -24,8 +17,7 @@ test("renderTouchStats includes touch classification and momentum rows", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "dribble" },
-          { key: "aerial", value: "false" },
-          { key: "high_aerial", value: "false" },
+          { key: "height_band", value: "ground" },
         ],
         value_type: "unsigned",
         value: 2,
@@ -37,8 +29,7 @@ test("renderTouchStats includes touch classification and momentum rows", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "control" },
-          { key: "aerial", value: "true" },
-          { key: "high_aerial", value: "false" },
+          { key: "height_band", value: "low_air" },
         ],
         value_type: "unsigned",
         value: 1,
@@ -50,8 +41,7 @@ test("renderTouchStats includes touch classification and momentum rows", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "medium_hit" },
-          { key: "aerial", value: "false" },
-          { key: "high_aerial", value: "false" },
+          { key: "height_band", value: "ground" },
         ],
         value_type: "unsigned",
         value: 3,
@@ -63,8 +53,7 @@ test("renderTouchStats includes touch classification and momentum rows", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "hard_hit" },
-          { key: "aerial", value: "true" },
-          { key: "high_aerial", value: "true" },
+          { key: "height_band", value: "high_air" },
         ],
         value_type: "unsigned",
         value: 2,
@@ -74,23 +63,21 @@ test("renderTouchStats includes touch classification and momentum rows", () => {
 
   assert.match(html, /Touches<\/span><span class="value">8/);
   assert.match(html, /Dribble \/ Ground<\/span><span class="value">2/);
-  assert.match(html, /Control \/ Aerial<\/span><span class="value">1/);
+  assert.match(html, /Control \/ Low air<\/span><span class="value">1/);
   assert.match(html, /Medium \/ Ground<\/span><span class="value">3/);
-  assert.match(html, /Hard \/ Aerial<\/span><span class="value">2/);
-  assert.match(html, /Last change<\/span><span class="value">321\.4/);
-  assert.match(html, /Avg change<\/span><span class="value">512\.2/);
-  assert.match(html, /Max change<\/span><span class="value">911\.9/);
+  assert.match(html, /Hard \/ High air<\/span><span class="value">2/);
+  assert.doesNotMatch(html, /Current<\/span>/);
 });
 
-test("renderTouchStats falls back to unknowns for missing momentum values", () => {
+test("renderTouchStats defaults to total touches when no classes are selected", () => {
   const html = renderTouchStats({
     touch_count: 1,
     is_last_touch: false,
   });
 
-  assert.doesNotMatch(html, /Dribbles<\/span>/);
-  assert.doesNotMatch(html, /Aerials<\/span>/);
-  assert.match(html, /Last change<\/span><span class="value">\?/);
+  assert.match(html, /Touches<\/span><span class="value">1/);
+  assert.doesNotMatch(html, /Dribble<\/span>/);
+  assert.doesNotMatch(html, /Ground<\/span>/);
 });
 
 test("renderTouchStats aggregates labeled rows by the selected class", () => {
@@ -98,7 +85,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
     touch_count: 6,
     is_last_touch: false,
   }, {
-    breakdownClasses: ["aerial"],
+    breakdownClasses: ["height_band"],
     exportedStats: [
       {
         domain: "touch",
@@ -107,8 +94,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "dribble" },
-          { key: "aerial", value: "false" },
-          { key: "high_aerial", value: "false" },
+          { key: "height_band", value: "ground" },
         ],
         value_type: "unsigned",
         value: 2,
@@ -120,8 +106,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "control" },
-          { key: "aerial", value: "true" },
-          { key: "high_aerial", value: "false" },
+          { key: "height_band", value: "low_air" },
         ],
         value_type: "unsigned",
         value: 1,
@@ -133,8 +118,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
         unit: "count",
         labels: [
           { key: "kind", value: "hard_hit" },
-          { key: "aerial", value: "true" },
-          { key: "high_aerial", value: "true" },
+          { key: "height_band", value: "high_air" },
         ],
         value_type: "unsigned",
         value: 3,
@@ -142,6 +126,64 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
     ],
   });
 
-  assert.match(html, /Aerial<\/span><span class="value">4/);
   assert.match(html, /Ground<\/span><span class="value">2/);
+  assert.match(html, /Low air<\/span><span class="value">1/);
+  assert.match(html, /High air<\/span><span class="value">3/);
+});
+
+test("renderTouchStats falls back to typed labeled counts for combined breakdowns", () => {
+  const html = renderTouchStats({
+    touch_count: 4,
+    is_last_touch: false,
+    labeled_touch_counts: {
+      entries: [
+        {
+          labels: [
+            { key: "kind", value: "dribble" },
+            { key: "height_band", value: "ground" },
+          ],
+          count: 1,
+        },
+        {
+          labels: [
+            { key: "kind", value: "control" },
+            { key: "height_band", value: "low_air" },
+          ],
+          count: 1,
+        },
+        {
+          labels: [
+            { key: "kind", value: "hard_hit" },
+            { key: "height_band", value: "high_air" },
+          ],
+          count: 2,
+        },
+      ],
+    },
+  }, {
+    breakdownClasses: ["kind", "height_band"],
+  });
+
+  assert.match(html, /Dribble \/ Ground<\/span><span class="value">1/);
+  assert.match(html, /Control \/ Low air<\/span><span class="value">1/);
+  assert.match(html, /Hard \/ High air<\/span><span class="value">2/);
+});
+
+test("renderTouchStats falls back to legacy counts for single-class breakdowns", () => {
+  const html = renderTouchStats({
+    touch_count: 7,
+    dribble_touch_count: 2,
+    control_touch_count: 1,
+    medium_hit_count: 3,
+    hard_hit_count: 1,
+    aerial_touch_count: 2,
+    high_aerial_touch_count: 1,
+    is_last_touch: false,
+  }, {
+    breakdownClasses: ["height_band"],
+  });
+
+  assert.match(html, /Ground<\/span><span class="value">5/);
+  assert.match(html, /Low air<\/span><span class="value">1/);
+  assert.match(html, /High air<\/span><span class="value">1/);
 });

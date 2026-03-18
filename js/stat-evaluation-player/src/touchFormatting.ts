@@ -1,6 +1,6 @@
-import type { ExportedStat, PlayerStatsSnapshot } from "./statsTimeline.ts";
+import type { ExportedStat, PlayerStatsSnapshot, StatLabel } from "./statsTimeline.ts";
 
-export type TouchBreakdownClass = "kind" | "aerial" | "high_aerial";
+export type TouchBreakdownClass = "kind" | "height_band";
 
 interface TouchRenderOptions {
   breakdownClasses?: TouchBreakdownClass[];
@@ -8,6 +8,11 @@ interface TouchRenderOptions {
 }
 
 type TouchBreakdownValueMap = Record<TouchBreakdownClass, string>;
+
+interface TouchBreakdownEntry {
+  labels: StatLabel[];
+  count: number;
+}
 
 const BREAKDOWN_CLASS_METADATA: Record<
   TouchBreakdownClass,
@@ -27,15 +32,14 @@ const BREAKDOWN_CLASS_METADATA: Record<
       hard_hit: "Hard",
     }[value] ?? value),
   },
-  aerial: {
-    label: "Aerial",
-    valueOrder: ["true", "false"],
-    formatValue: (value) => value === "true" ? "Aerial" : "Ground",
-  },
-  high_aerial: {
-    label: "High Aerial",
-    valueOrder: ["true", "false"],
-    formatValue: (value) => value === "true" ? "High aerial" : "Not high aerial",
+  height_band: {
+    label: "Height",
+    valueOrder: ["ground", "low_air", "high_air"],
+    formatValue: (value) => ({
+      ground: "Ground",
+      low_air: "Low air",
+      high_air: "High air",
+    }[value] ?? value),
   },
 };
 
@@ -61,18 +65,6 @@ function formatInteger(value: number | undefined): string {
   }
 
   return `${Math.round(value)}`;
-}
-
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return "?";
-  }
-
-  return `${value.toFixed(digits)}${suffix}`;
 }
 
 function escapeHtml(value: string): string {
@@ -121,28 +113,44 @@ function formatBreakdownLabel(
     .join(" / ");
 }
 
-function renderTouchBreakdownRows(
+function labeledEntriesFromExportedStats(
   exportedStats: ExportedStat[] | undefined,
+): TouchBreakdownEntry[] {
+  return (exportedStats ?? [])
+    .filter((stat) =>
+      stat.domain === "touch"
+      && stat.name === "touch_count"
+      && stat.variant === "labeled"
+      && stat.value_type === "unsigned"
+      && Number.isFinite(stat.value)
+    )
+    .map((stat) => ({
+      labels: stat.labels ?? [],
+      count: Math.round(stat.value),
+    }));
+}
+
+function labeledEntriesFromTouchSnapshot(
+  touch: PlayerStatsSnapshot["touch"],
+): TouchBreakdownEntry[] {
+  return (touch?.labeled_touch_counts?.entries ?? []).map((entry) => ({
+    labels: entry.labels,
+    count: entry.count,
+  }));
+}
+
+function renderTouchBreakdownRows(
+  labeledEntries: TouchBreakdownEntry[],
   breakdownClasses: TouchBreakdownClass[],
 ): string {
-  if (breakdownClasses.length === 0 || !exportedStats || exportedStats.length === 0) {
+  if (breakdownClasses.length === 0 || labeledEntries.length === 0) {
     return "";
   }
 
   const groups = new Map<string, { values: TouchBreakdownValueMap; count: number }>();
 
-  for (const stat of exportedStats) {
-    if (
-      stat.domain !== "touch" ||
-      stat.name !== "touch_count" ||
-      stat.variant !== "labeled" ||
-      stat.value_type !== "unsigned" ||
-      !Number.isFinite(stat.value)
-    ) {
-      continue;
-    }
-
-    const labelMap = new Map((stat.labels ?? []).map((label) => [label.key, label.value]));
+  for (const entry of labeledEntries) {
+    const labelMap = new Map(entry.labels.map((label) => [label.key, label.value]));
     const values = {} as TouchBreakdownValueMap;
     let complete = true;
     for (const className of breakdownClasses) {
@@ -158,23 +166,53 @@ function renderTouchBreakdownRows(
     }
 
     const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
-    const count = Math.round(stat.value);
     const existing = groups.get(key);
     if (existing) {
-      existing.count += count;
+      existing.count += entry.count;
     } else {
-      groups.set(key, { values, count });
+      groups.set(key, { values, count: entry.count });
     }
   }
 
-  const rows = [...groups.values()]
+  return [...groups.values()]
     .sort((left, right) => compareBreakdownValues(left.values, right.values, breakdownClasses))
     .map((entry) => renderStatRow(
       formatBreakdownLabel(entry.values, breakdownClasses),
       formatInteger(entry.count),
-    ));
+    ))
+    .join("");
+}
 
-  return rows.join("");
+function renderTouchBreakdownFallbackRows(
+  touch: PlayerStatsSnapshot["touch"],
+  breakdownClasses: TouchBreakdownClass[],
+): string {
+  if (!touch || breakdownClasses.length !== 1) {
+    return "";
+  }
+
+  const [className] = breakdownClasses;
+  if (className === "kind") {
+    return [
+      renderStatRow("Dribble", formatInteger(touch.dribble_touch_count)),
+      renderStatRow("Control", formatInteger(touch.control_touch_count)),
+      renderStatRow("Medium", formatInteger(touch.medium_hit_count)),
+      renderStatRow("Hard", formatInteger(touch.hard_hit_count)),
+    ].join("");
+  }
+
+  if (className === "height_band") {
+    const highAir = touch.high_aerial_touch_count ?? 0;
+    const lowAir = (touch.aerial_touch_count ?? 0) - highAir;
+    const ground = (touch.touch_count ?? 0) - (touch.aerial_touch_count ?? 0);
+    return [
+      renderStatRow("Ground", formatInteger(ground)),
+      renderStatRow("Low air", formatInteger(lowAir)),
+      renderStatRow("High air", formatInteger(highAir)),
+    ].join("");
+  }
+
+  return "";
 }
 
 export function renderTouchStats(
@@ -182,18 +220,14 @@ export function renderTouchStats(
   options: TouchRenderOptions = {},
 ): string {
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
-  const breakdownRows = renderTouchBreakdownRows(options.exportedStats, breakdownClasses);
+  const labeledEntries = labeledEntriesFromExportedStats(options.exportedStats);
+  const fallbackEntries = labeledEntriesFromTouchSnapshot(touch);
+  const breakdownRows = renderTouchBreakdownRows(labeledEntries, breakdownClasses)
+    || renderTouchBreakdownRows(fallbackEntries, breakdownClasses)
+    || renderTouchBreakdownFallbackRows(touch, breakdownClasses);
 
   return `
     ${renderStatRow("Touches", formatInteger(touch?.touch_count))}
     ${breakdownRows}
-    ${renderStatRow("Current", touch?.is_last_touch ? "Yes" : "No")}
-    ${renderStatRow("Touch time", formatNumber(touch?.last_touch_time, 2, "s"))}
-    ${renderStatRow("Touch frame", formatInteger(touch?.last_touch_frame))}
-    ${renderStatRow("Since touch", formatNumber(touch?.time_since_last_touch, 2, "s"))}
-    ${renderStatRow("Frames since", formatInteger(touch?.frames_since_last_touch))}
-    ${renderStatRow("Last change", formatNumber(touch?.last_ball_speed_change, 1))}
-    ${renderStatRow("Avg change", formatNumber(touch?.average_ball_speed_change, 1))}
-    ${renderStatRow("Max change", formatNumber(touch?.max_ball_speed_change, 1))}
   `;
 }

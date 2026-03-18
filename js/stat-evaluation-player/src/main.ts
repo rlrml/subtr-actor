@@ -938,8 +938,7 @@ function createTouchModule(): StatModule {
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
   const orderedBreakdownClasses: TouchBreakdownClass[] = [
     "kind",
-    "aerial",
-    "high_aerial",
+    "height_band",
   ];
 
   return {
@@ -1060,8 +1059,7 @@ function createTouchModule(): StatModule {
 
         for (const option of [
           { className: "kind", label: "Kind" },
-          { className: "aerial", label: "Aerial" },
-          { className: "high_aerial", label: "High aerial" },
+          { className: "height_band", label: "Height" },
         ] satisfies Array<{ className: TouchBreakdownClass; label: string }>) {
           const optionLabel = document.createElement("label");
           optionLabel.className = "toggle";
@@ -1118,8 +1116,7 @@ function createTouchModule(): StatModule {
       breakdownReadoutEl.textContent = active.length > 0
         ? active.map((className) => ({
           kind: "Kind",
-          aerial: "Aerial",
-          high_aerial: "High aerial",
+          height_band: "Height",
         }[className])).join(" + ")
         : "Total only";
     }
