@@ -1,5 +1,6 @@
 use subtr_actor::{
-    collector::replay_data::ReplayDataCollector, FrameRateDecorator, NDArrayCollector,
+    collector::replay_data::{ReplayDataCollector, ReplayDataSupplementalData},
+    BoostReducer, FlipResetTracker, FrameRateDecorator, NDArrayCollector, ReducerCollector,
     ReplayProcessor, StatsTimelineCollector,
 };
 use wasm_bindgen::prelude::*;
@@ -121,11 +122,28 @@ pub fn get_column_headers(
 pub fn get_replay_frames_data(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    // Process without FPS resampling to match Python behavior
-    // This ensures goal frame numbers in all_headers align with the returned frame data
-    let replay_data = ReplayDataCollector::new()
-        .get_replay_data(&replay)
+    // Keep replay-data assembly explicit so additional collectors can be
+    // composed in the same processor pass without coupling them to
+    // ReplayDataCollector itself.
+    let mut processor = ReplayProcessor::new(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
+    let mut replay_data_collector = ReplayDataCollector::new();
+    let mut flip_reset_tracker = FlipResetTracker::new();
+    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+
+    processor
+        .process_all(&mut [
+            &mut replay_data_collector,
+            &mut flip_reset_tracker,
+            &mut boost_pad_collector,
+        ])
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+
+    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+    let replay_data = replay_data_collector
+        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&replay_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))

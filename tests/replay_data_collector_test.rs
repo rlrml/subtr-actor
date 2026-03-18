@@ -1,6 +1,10 @@
 use std::path::Path;
-use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
-use subtr_actor::BOOST_KICKOFF_START_AMOUNT;
+use subtr_actor::collector::replay_data::{
+    BallFrame, PlayerFrame, ReplayDataCollector, ReplayDataSupplementalData,
+};
+use subtr_actor::{
+    BoostReducer, FlipResetTracker, ReducerCollector, ReplayProcessor, BOOST_KICKOFF_START_AMOUNT,
+};
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -108,4 +112,59 @@ fn kickoff_player_boost_frames_start_initialized() {
             .all(|boost| (*boost - BOOST_KICKOFF_START_AMOUNT).abs() < f32::EPSILON),
         "Expected kickoff player boosts to start at {BOOST_KICKOFF_START_AMOUNT}, got {kickoff_boosts:?}"
     );
+}
+
+#[test]
+fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let expected = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to collect replay data from convenience API");
+
+    let mut processor = ReplayProcessor::new(&replay).expect("Failed to build replay processor");
+    let mut replay_data_collector = ReplayDataCollector::new();
+    let mut flip_reset_tracker = FlipResetTracker::new();
+    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+
+    processor
+        .process_all(&mut [
+            &mut replay_data_collector,
+            &mut flip_reset_tracker,
+            &mut boost_pad_collector,
+        ])
+        .expect("Failed to process replay with composed collectors");
+
+    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+
+    let actual = replay_data_collector
+        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .expect("Failed to assemble replay data from composed collectors");
+
+    assert_eq!(actual.frame_data, expected.frame_data);
+    assert_eq!(actual.meta.team_zero, expected.meta.team_zero);
+    assert_eq!(actual.meta.team_one, expected.meta.team_one);
+    assert_eq!(actual.meta.all_headers.len(), expected.meta.all_headers.len());
+    assert_eq!(actual.demolish_infos, expected.demolish_infos);
+    assert_eq!(actual.boost_pad_events, expected.boost_pad_events);
+    assert_eq!(actual.boost_pads.len(), expected.boost_pads.len());
+    for (actual_pad, expected_pad) in actual.boost_pads.iter().zip(expected.boost_pads.iter()) {
+        assert_eq!(actual_pad.index, expected_pad.index);
+        assert_eq!(actual_pad.size, expected_pad.size);
+        assert_eq!(actual_pad.position, expected_pad.position);
+        assert_eq!(actual_pad.pad_id.is_some(), expected_pad.pad_id.is_some());
+    }
+    assert_eq!(actual.touch_events, expected.touch_events);
+    assert_eq!(actual.dodge_refreshed_events, expected.dodge_refreshed_events);
+    assert_eq!(actual.flip_reset_events, expected.flip_reset_events);
+    assert_eq!(
+        actual.post_wall_dodge_events,
+        expected.post_wall_dodge_events
+    );
+    assert_eq!(
+        actual.flip_reset_followup_dodge_events,
+        expected.flip_reset_followup_dodge_events
+    );
+    assert_eq!(actual.player_stat_events, expected.player_stat_events);
+    assert_eq!(actual.goal_events, expected.goal_events);
 }

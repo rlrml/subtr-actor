@@ -310,8 +310,24 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
 
-    let replay_data = subtr_actor::ReplayDataCollector::new()
-        .get_replay_data(&replay)
+    let mut processor = ReplayProcessor::new(&replay).map_err(handle_frames_exception)?;
+    let mut replay_data_collector = ReplayDataCollector::new();
+    let mut flip_reset_tracker = FlipResetTracker::new();
+    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+
+    processor
+        .process_all(&mut [
+            &mut replay_data_collector,
+            &mut flip_reset_tracker,
+            &mut boost_pad_collector,
+        ])
+        .map_err(handle_frames_exception)?;
+
+    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+
+    let replay_data = replay_data_collector
+        .into_replay_data_with_supplemental_data(processor, supplemental_data)
         .map_err(handle_frames_exception)?;
 
     Ok(convert_to_py(

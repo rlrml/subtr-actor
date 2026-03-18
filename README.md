@@ -81,6 +81,11 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
+If you want replay data plus outputs from other collectors, run them together in
+one pass with `ReplayProcessor::process_all()` and then assemble the final
+payload from the pieces. `ReplayDataCollector::get_replay_data()` remains a
+convenience wrapper around that pattern.
+
 ### Rust: build an ndarray for ML
 
 ```rust

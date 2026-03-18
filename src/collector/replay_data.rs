@@ -553,6 +553,34 @@ pub struct ReplayData {
     pub goal_events: Vec<GoalEvent>,
 }
 
+/// Optional replay-data enrichments produced by collectors that run alongside
+/// [`ReplayDataCollector`] in the same processor pass.
+#[derive(Debug, Clone, Default)]
+pub struct ReplayDataSupplementalData {
+    pub boost_pads: Vec<ResolvedBoostPad>,
+    pub flip_reset_events: Vec<FlipResetEvent>,
+    pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,
+    pub flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
+}
+
+impl ReplayDataSupplementalData {
+    pub fn from_flip_reset_tracker(tracker: FlipResetTracker) -> Self {
+        let (flip_reset_events, post_wall_dodge_events, flip_reset_followup_dodge_events) =
+            tracker.into_events();
+        Self {
+            boost_pads: Vec::new(),
+            flip_reset_events,
+            post_wall_dodge_events,
+            flip_reset_followup_dodge_events,
+        }
+    }
+
+    pub fn with_boost_pads(mut self, boost_pads: Vec<ResolvedBoostPad>) -> Self {
+        self.boost_pads = boost_pads;
+        self
+    }
+}
+
 impl ReplayData {
     /// Serializes the replay data to a JSON string.
     ///
@@ -727,6 +755,42 @@ impl ReplayDataCollector {
         self.frame_data
     }
 
+    /// Builds replay data from this collector and an already-processed
+    /// [`ReplayProcessor`].
+    ///
+    /// This keeps replay-data collection composable: callers can run
+    /// [`ReplayDataCollector`] alongside any other collectors with
+    /// [`ReplayProcessor::process_all`] and then decide which enrichments to
+    /// merge into the final payload.
+    pub fn into_replay_data(self, processor: ReplayProcessor<'_>) -> SubtrActorResult<ReplayData> {
+        self.into_replay_data_with_supplemental_data(
+            processor,
+            ReplayDataSupplementalData::default(),
+        )
+    }
+
+    pub fn into_replay_data_with_supplemental_data(
+        self,
+        processor: ReplayProcessor<'_>,
+        supplemental_data: ReplayDataSupplementalData,
+    ) -> SubtrActorResult<ReplayData> {
+        let meta = processor.get_replay_meta()?;
+        Ok(ReplayData {
+            meta,
+            demolish_infos: processor.demolishes,
+            boost_pad_events: processor.boost_pad_events,
+            boost_pads: supplemental_data.boost_pads,
+            touch_events: processor.touch_events,
+            dodge_refreshed_events: processor.dodge_refreshed_events,
+            flip_reset_events: supplemental_data.flip_reset_events,
+            post_wall_dodge_events: supplemental_data.post_wall_dodge_events,
+            flip_reset_followup_dodge_events: supplemental_data.flip_reset_followup_dodge_events,
+            player_stat_events: processor.player_stat_events,
+            goal_events: processor.goal_events,
+            frame_data: self.get_frame_data(),
+        })
+    }
+
     /// Processes a replay and returns complete replay data.
     ///
     /// This method processes the entire replay using a [`ReplayProcessor`] and
@@ -772,24 +836,10 @@ impl ReplayDataCollector {
             &mut flip_reset_tracker,
             &mut boost_pad_collector,
         ])?;
-        let meta = processor.get_replay_meta()?;
-        let (flip_reset_events, post_wall_dodge_events, flip_reset_followup_dodge_events) =
-            flip_reset_tracker.into_events();
-        let boost_pads = boost_pad_collector.into_inner().resolved_boost_pads();
-        Ok(ReplayData {
-            meta,
-            demolish_infos: processor.demolishes,
-            boost_pad_events: processor.boost_pad_events,
-            boost_pads,
-            touch_events: processor.touch_events,
-            dodge_refreshed_events: processor.dodge_refreshed_events,
-            flip_reset_events,
-            post_wall_dodge_events,
-            flip_reset_followup_dodge_events,
-            player_stat_events: processor.player_stat_events,
-            goal_events: processor.goal_events,
-            frame_data: self.get_frame_data(),
-        })
+        let supplemental_data =
+            ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+                .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+        self.into_replay_data_with_supplemental_data(processor, supplemental_data)
     }
 
     /// Extracts player frame data for all players at the specified time.
