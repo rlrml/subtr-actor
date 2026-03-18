@@ -144,7 +144,10 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
     assert_eq!(actual.frame_data, expected.frame_data);
     assert_eq!(actual.meta.team_zero, expected.meta.team_zero);
     assert_eq!(actual.meta.team_one, expected.meta.team_one);
-    assert_eq!(actual.meta.all_headers.len(), expected.meta.all_headers.len());
+    assert_eq!(
+        actual.meta.all_headers.len(),
+        expected.meta.all_headers.len()
+    );
     assert_eq!(actual.demolish_infos, expected.demolish_infos);
     assert_eq!(actual.boost_pad_events, expected.boost_pad_events);
     assert_eq!(actual.boost_pads.len(), expected.boost_pads.len());
@@ -155,7 +158,10 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
         assert_eq!(actual_pad.pad_id.is_some(), expected_pad.pad_id.is_some());
     }
     assert_eq!(actual.touch_events, expected.touch_events);
-    assert_eq!(actual.dodge_refreshed_events, expected.dodge_refreshed_events);
+    assert_eq!(
+        actual.dodge_refreshed_events,
+        expected.dodge_refreshed_events
+    );
     assert_eq!(actual.flip_reset_events, expected.flip_reset_events);
     assert_eq!(
         actual.post_wall_dodge_events,

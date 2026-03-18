@@ -386,38 +386,38 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let powerslide = powerslide_collector.into_inner();
     let demo = demo_collector.into_inner();
 
-    let assert_core_team_stats_match =
-        |actual: &CoreTeamStats, expected: &CoreTeamStats, team_label: &str| {
-            assert_eq!(actual.score, expected.score, "{team_label} score");
-            assert_eq!(actual.goals, expected.goals, "{team_label} goals");
-            assert_eq!(actual.assists, expected.assists, "{team_label} assists");
-            assert_eq!(actual.saves, expected.saves, "{team_label} saves");
-            assert_eq!(actual.shots, expected.shots, "{team_label} shots");
-            assert_eq!(
-                actual.goal_after_kickoff.kickoff_goal_count,
-                expected.goal_after_kickoff.kickoff_goal_count,
-                "{team_label} kickoff-goal bucket counts",
-            );
-            assert_eq!(
-                actual.goal_after_kickoff.short_goal_count,
-                expected.goal_after_kickoff.short_goal_count,
-                "{team_label} short-goal bucket counts",
-            );
-            assert_eq!(
-                actual.goal_after_kickoff.medium_goal_count,
-                expected.goal_after_kickoff.medium_goal_count,
-                "{team_label} medium-goal bucket counts",
-            );
-            assert_eq!(
-                actual.goal_after_kickoff.long_goal_count,
-                expected.goal_after_kickoff.long_goal_count,
-                "{team_label} long-goal bucket counts",
-            );
-            assert_eq!(
-                actual.goal_buildup, expected.goal_buildup,
-                "{team_label} goal buildup classifications",
-            );
-        };
+    let assert_core_team_stats_match = |actual: &CoreTeamStats,
+                                        expected: &CoreTeamStats,
+                                        team_label: &str| {
+        assert_eq!(actual.score, expected.score, "{team_label} score");
+        assert_eq!(actual.goals, expected.goals, "{team_label} goals");
+        assert_eq!(actual.assists, expected.assists, "{team_label} assists");
+        assert_eq!(actual.saves, expected.saves, "{team_label} saves");
+        assert_eq!(actual.shots, expected.shots, "{team_label} shots");
+        assert_eq!(
+            actual.goal_after_kickoff.kickoff_goal_count,
+            expected.goal_after_kickoff.kickoff_goal_count,
+            "{team_label} kickoff-goal bucket counts",
+        );
+        assert_eq!(
+            actual.goal_after_kickoff.short_goal_count,
+            expected.goal_after_kickoff.short_goal_count,
+            "{team_label} short-goal bucket counts",
+        );
+        assert_eq!(
+            actual.goal_after_kickoff.medium_goal_count,
+            expected.goal_after_kickoff.medium_goal_count,
+            "{team_label} medium-goal bucket counts",
+        );
+        assert_eq!(
+            actual.goal_after_kickoff.long_goal_count, expected.goal_after_kickoff.long_goal_count,
+            "{team_label} long-goal bucket counts",
+        );
+        assert_eq!(
+            actual.goal_buildup, expected.goal_buildup,
+            "{team_label} goal buildup classifications",
+        );
+    };
 
     let assert_core_player_stats_match =
         |actual: &CorePlayerStats, expected: &CorePlayerStats, player_label: &str| {
