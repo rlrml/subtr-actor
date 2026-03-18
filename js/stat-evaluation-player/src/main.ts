@@ -68,6 +68,7 @@ import {
 import {
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
+  buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
 
 import * as subtrActor from "subtr-actor";
@@ -380,10 +381,6 @@ function createPlayerStatsModule<T>(options: {
 
     onBeforeRender() {},
 
-    getTimelineRanges(ctx) {
-      return buildPossessionTimelineRanges(ctx.dynamicStatsTimeline);
-    },
-
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
@@ -629,6 +626,10 @@ function createPossessionModule(): StatModule {
 
     onBeforeRender() {},
 
+    getTimelineRanges(ctx) {
+      return buildPossessionTimelineRanges(ctx.dynamicStatsTimeline);
+    },
+
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
@@ -845,7 +846,7 @@ function createPressureModule(): StatModule {
 
   return {
     id: "pressure",
-    label: "Ball Side",
+    label: "Half Control",
 
     setup(ctx) {
       halfFieldOverlay = new HalfFieldOverlay(
@@ -1007,6 +1008,44 @@ function createPressureModule(): StatModule {
     renderStats(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   }
+}
+
+function createTimeInZoneModule(): StatModule {
+  return {
+    id: "time-in-zone",
+    label: "Time In Zone",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineRanges(ctx) {
+      return buildTimeInZoneTimelineRanges(ctx.dynamicStatsTimeline);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderAbsolutePositioningStats(player.positioning),
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderAbsolutePositioningStats(player.positioning);
+    },
+  };
 }
 
 function createRushModule(): StatModule {
@@ -1458,6 +1497,7 @@ const MODULE_FACTORIES = [
   createRushModule,
   createRelativePositioningModule,
   createAbsolutePositioningModule,
+  createTimeInZoneModule,
   createTouchModule,
   createDodgeResetModule,
   createBoostModule,

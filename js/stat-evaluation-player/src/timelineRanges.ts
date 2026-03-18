@@ -1,6 +1,7 @@
 import type { ReplayTimelineRange } from "../../player/src/types.ts";
 import type {
   DynamicStatsFrame,
+  DynamicPlayerStatsSnapshot,
   DynamicStatsTimeline,
   ExportedStat,
 } from "./statsTimeline.ts";
@@ -176,4 +177,113 @@ export function buildPressureTimelineRanges(
       },
     ],
   });
+}
+
+interface PlayerZoneSpec {
+  fieldName: string;
+  label: string;
+  color: string;
+}
+
+const PLAYER_ZONE_SPECS: PlayerZoneSpec[] = [
+  {
+    fieldName: "time_defensive_third",
+    label: "Def third",
+    color: "rgba(89, 195, 255, 0.74)",
+  },
+  {
+    fieldName: "time_neutral_third",
+    label: "Neutral third",
+    color: "rgba(209, 217, 224, 0.68)",
+  },
+  {
+    fieldName: "time_offensive_third",
+    label: "Off third",
+    color: "rgba(255, 193, 92, 0.78)",
+  },
+];
+
+function playerIdToString(playerId: Record<string, string>): string {
+  const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
+  return `${kind}:${value}`;
+}
+
+function extractPlayerStatValue(
+  player: DynamicPlayerStatsSnapshot,
+  fieldName: string,
+): number {
+  const stat = player.stats.find((entry) =>
+    entry.domain === "positioning" &&
+    entry.name === fieldName &&
+    entry.value_type === "float" &&
+    Number.isFinite(entry.value)
+  );
+  return stat?.value ?? 0;
+}
+
+export function buildTimeInZoneTimelineRanges(
+  timeline: DynamicStatsTimeline,
+): ReplayTimelineRange[] {
+  const previousValues = new Map<string, Map<string, number>>();
+  const ranges: ReplayTimelineRange[] = [];
+
+  for (const frame of timeline.frames) {
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      continue;
+    }
+
+    const startTime = Math.max(0, frame.time - frame.dt);
+    const endTime = frame.time;
+    if (endTime - startTime <= DELTA_EPSILON) {
+      continue;
+    }
+
+    for (const player of frame.players) {
+      const playerId = playerIdToString(player.player_id);
+      const previous = previousValues.get(playerId) ?? new Map<string, number>();
+
+      let winningSpec: PlayerZoneSpec | null = null;
+      let winningDelta = 0;
+
+      for (const spec of PLAYER_ZONE_SPECS) {
+        const value = extractPlayerStatValue(player, spec.fieldName);
+        const delta = value - (previous.get(spec.fieldName) ?? 0);
+        if (delta > winningDelta + DELTA_EPSILON) {
+          winningDelta = delta;
+          winningSpec = spec;
+        }
+        previous.set(spec.fieldName, value);
+      }
+
+      previousValues.set(playerId, previous);
+
+      if (!winningSpec) {
+        continue;
+      }
+
+      const previousRange = ranges[ranges.length - 1];
+      if (
+        previousRange &&
+        previousRange.lane === `time-in-zone:${playerId}` &&
+        previousRange.label === winningSpec.label &&
+        Math.abs(previousRange.endTime - startTime) <= RANGE_MERGE_EPSILON_SECONDS
+      ) {
+        previousRange.endTime = endTime;
+        continue;
+      }
+
+      ranges.push({
+        id: `time-in-zone:${playerId}:${winningSpec.fieldName}:${startTime.toFixed(3)}`,
+        startTime,
+        endTime,
+        lane: `time-in-zone:${playerId}`,
+        laneLabel: player.name,
+        label: winningSpec.label,
+        color: winningSpec.color,
+        isTeamZero: player.is_team_0,
+      });
+    }
+  }
+
+  return ranges;
 }
