@@ -229,6 +229,7 @@ export interface DynamicStatsFrame {
   dt: number;
   possession?: ExportedStat[];
   pressure?: ExportedStat[];
+  rush?: ExportedStat[];
   players: DynamicPlayerStatsSnapshot[];
   [key: string]: unknown;
 }
