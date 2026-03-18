@@ -42,9 +42,63 @@ impl StatFieldProvider for CorePlayerStats {
         ));
         visitor(ExportedStat::float(
             "core",
+            "average_goal_time_after_kickoff",
+            StatUnit::Seconds,
+            self.average_goal_time_after_kickoff(),
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "median_goal_time_after_kickoff",
+            StatUnit::Seconds,
+            self.median_goal_time_after_kickoff(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "kickoff_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.kickoff_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "short_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.short_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "medium_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.medium_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "long_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.long_goal_count,
+        ));
+        visitor(ExportedStat::float(
+            "core",
             "shooting_percentage",
             StatUnit::Percent,
             self.shooting_percentage(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "counter_attack_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.counter_attack_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "sustained_pressure_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.sustained_pressure_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "other_buildup_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.other_buildup_goal_count,
         ));
     }
 }
@@ -83,9 +137,63 @@ impl StatFieldProvider for CoreTeamStats {
         ));
         visitor(ExportedStat::float(
             "core",
+            "average_goal_time_after_kickoff",
+            StatUnit::Seconds,
+            self.average_goal_time_after_kickoff(),
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "median_goal_time_after_kickoff",
+            StatUnit::Seconds,
+            self.median_goal_time_after_kickoff(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "kickoff_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.kickoff_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "short_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.short_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "medium_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.medium_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "long_goal_count",
+            StatUnit::Count,
+            self.goal_after_kickoff.long_goal_count,
+        ));
+        visitor(ExportedStat::float(
+            "core",
             "shooting_percentage",
             StatUnit::Percent,
             self.shooting_percentage(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "counter_attack_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.counter_attack_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "sustained_pressure_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.sustained_pressure_goal_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "other_buildup_goal_count",
+            StatUnit::Count,
+            self.goal_buildup.other_buildup_goal_count,
         ));
     }
 }

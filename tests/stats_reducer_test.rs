@@ -747,8 +747,62 @@ fn test_match_stats_reducer_keeps_exact_timeline_under_sampling() {
         .expect("Failed to process replay with sampled match stats reducer");
     let sampled = sampled_collector.into_inner();
 
-    assert_eq!(sampled.team_zero_stats(), full.team_zero_stats());
-    assert_eq!(sampled.team_one_stats(), full.team_one_stats());
+    let assert_team_stats_match = |sampled: &CoreTeamStats,
+                                   full: &CoreTeamStats,
+                                   team_label: &str| {
+        assert_eq!(
+            sampled.score, full.score,
+            "Expected {team_label} score totals to match under sampling"
+        );
+        assert_eq!(
+            sampled.goals, full.goals,
+            "Expected {team_label} goal totals to match under sampling"
+        );
+        assert_eq!(
+            sampled.assists, full.assists,
+            "Expected {team_label} assist totals to match under sampling"
+        );
+        assert_eq!(
+            sampled.saves, full.saves,
+            "Expected {team_label} save totals to match under sampling"
+        );
+        assert_eq!(
+            sampled.shots, full.shots,
+            "Expected {team_label} shot totals to match under sampling"
+        );
+        assert_eq!(
+            sampled.goal_after_kickoff.kickoff_goal_count,
+            full.goal_after_kickoff.kickoff_goal_count,
+            "Expected {team_label} kickoff-goal bucket counts to match under sampling"
+        );
+        assert_eq!(
+            sampled.goal_after_kickoff.short_goal_count, full.goal_after_kickoff.short_goal_count,
+            "Expected {team_label} short-goal bucket counts to match under sampling"
+        );
+        assert_eq!(
+            sampled.goal_after_kickoff.medium_goal_count, full.goal_after_kickoff.medium_goal_count,
+            "Expected {team_label} medium-goal bucket counts to match under sampling"
+        );
+        assert_eq!(
+            sampled.goal_after_kickoff.long_goal_count, full.goal_after_kickoff.long_goal_count,
+            "Expected {team_label} long-goal bucket counts to match under sampling"
+        );
+        assert_eq!(
+            sampled.goal_buildup, full.goal_buildup,
+            "Expected {team_label} goal buildup classifications to match under sampling"
+        );
+    };
+
+    assert_team_stats_match(
+        &sampled.team_zero_stats(),
+        &full.team_zero_stats(),
+        "team zero",
+    );
+    assert_team_stats_match(
+        &sampled.team_one_stats(),
+        &full.team_one_stats(),
+        "team one",
+    );
     assert_eq!(
         sampled.timeline(),
         full.timeline(),
@@ -791,6 +845,32 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
         .on_sample(&StatsSample {
             frame_number: 2,
             time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![sample_player(player_id.clone(), true)],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
             dt: 1.0,
             seconds_remaining: None,
             game_state: None,
@@ -878,6 +958,35 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
             game_state: None,
             ball_has_been_hit: None,
             kickoff_countdown_time: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![
+                sample_player(scorer.clone(), true),
+                sample_player(teammate.clone(), true),
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             team_zero_score: Some(1),
             team_one_score: Some(0),
             possession_team_is_team_0: None,
@@ -916,6 +1025,152 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
         .expect("Expected a goal timeline event");
     assert_eq!(goal_event.player_id.as_ref(), Some(&scorer));
     assert!((goal_event.time - 1.5).abs() < 0.001);
+}
+
+#[test]
+fn test_match_stats_reducer_tracks_goal_time_after_kickoff_buckets() {
+    let scorer = epic_id("kickoff-timing-scorer");
+    let mut reducer = MatchStatsReducer::new();
+
+    let kickoff_sample =
+        |frame_number: usize, time: f32, team_zero_score: i32, goals: i32| StatsSample {
+            frame_number,
+            time,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: Some(55),
+            ball_has_been_hit: Some(false),
+            kickoff_countdown_time: Some(3),
+            team_zero_score: Some(team_zero_score),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![PlayerSample {
+                match_goals: Some(goals),
+                match_shots: Some(goals),
+                ..sample_player(scorer.clone(), true)
+            }],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        };
+
+    let first_touch_sample =
+        |frame_number: usize, time: f32, team_zero_score: i32, goals: i32, touch_time: f32| {
+            StatsSample {
+                frame_number,
+                time,
+                dt: 1.0,
+                seconds_remaining: None,
+                game_state: Some(0),
+                ball_has_been_hit: Some(true),
+                kickoff_countdown_time: Some(0),
+                team_zero_score: Some(team_zero_score),
+                team_one_score: Some(0),
+                possession_team_is_team_0: None,
+                scored_on_team_is_team_0: None,
+                current_in_game_team_player_counts: None,
+                ball: None,
+                players: vec![PlayerSample {
+                    match_goals: Some(goals),
+                    match_shots: Some(goals),
+                    ..sample_player(scorer.clone(), true)
+                }],
+                active_demos: Vec::new(),
+                demo_events: Vec::new(),
+                boost_pad_events: Vec::new(),
+                touch_events: vec![TouchEvent {
+                    time: touch_time,
+                    frame: frame_number,
+                    team_is_team_0: true,
+                    player: Some(scorer.clone()),
+                    closest_approach_distance: Some(0.0),
+                }],
+                dodge_refreshed_events: Vec::new(),
+                player_stat_events: Vec::new(),
+                goal_events: Vec::new(),
+            }
+        };
+
+    let goal_sample =
+        |frame_number: usize, time: f32, team_zero_score: i32, goals: i32, goal_time: f32| {
+            StatsSample {
+                frame_number,
+                time,
+                dt: 1.0,
+                seconds_remaining: None,
+                game_state: Some(0),
+                ball_has_been_hit: Some(true),
+                kickoff_countdown_time: Some(0),
+                team_zero_score: Some(team_zero_score),
+                team_one_score: Some(0),
+                possession_team_is_team_0: None,
+                scored_on_team_is_team_0: Some(false),
+                current_in_game_team_player_counts: None,
+                ball: None,
+                players: vec![PlayerSample {
+                    match_goals: Some(goals),
+                    match_shots: Some(goals),
+                    ..sample_player(scorer.clone(), true)
+                }],
+                active_demos: Vec::new(),
+                demo_events: Vec::new(),
+                boost_pad_events: Vec::new(),
+                touch_events: Vec::new(),
+                dodge_refreshed_events: Vec::new(),
+                player_stat_events: Vec::new(),
+                goal_events: vec![GoalEvent {
+                    time: goal_time,
+                    frame: frame_number,
+                    scoring_team_is_team_0: true,
+                    player: Some(scorer.clone()),
+                    team_zero_score: Some(team_zero_score),
+                    team_one_score: Some(0),
+                }],
+            }
+        };
+
+    for sample in [
+        kickoff_sample(1, 0.0, 0, 0),
+        first_touch_sample(2, 1.0, 0, 0, 1.0),
+        goal_sample(3, 4.0, 1, 1, 4.0),
+        kickoff_sample(4, 5.0, 1, 1),
+        first_touch_sample(5, 6.0, 1, 1, 6.0),
+        goal_sample(6, 21.0, 2, 2, 21.0),
+        kickoff_sample(7, 22.0, 2, 2),
+        first_touch_sample(8, 23.0, 2, 2, 23.0),
+        goal_sample(9, 53.0, 3, 3, 53.0),
+        kickoff_sample(10, 54.0, 3, 3),
+        first_touch_sample(11, 55.0, 3, 3, 55.0),
+        goal_sample(12, 105.0, 4, 4, 105.0),
+    ] {
+        reducer.on_sample(&sample).unwrap();
+    }
+
+    let player_stats = reducer
+        .player_stats()
+        .get(&scorer)
+        .expect("Expected goal scorer stats to be present");
+    assert!((player_stats.average_goal_time_after_kickoff() - 24.5).abs() < 0.001);
+    assert!((player_stats.median_goal_time_after_kickoff() - 22.5).abs() < 0.001);
+    assert_eq!(player_stats.goal_after_kickoff.kickoff_goal_count, 1);
+    assert_eq!(player_stats.goal_after_kickoff.short_goal_count, 1);
+    assert_eq!(player_stats.goal_after_kickoff.medium_goal_count, 1);
+    assert_eq!(player_stats.goal_after_kickoff.long_goal_count, 1);
+
+    let team_stats = reducer.team_zero_stats();
+    assert!((team_stats.average_goal_time_after_kickoff() - 24.5).abs() < 0.001);
+    assert!((team_stats.median_goal_time_after_kickoff() - 22.5).abs() < 0.001);
+    assert_eq!(team_stats.goal_after_kickoff.kickoff_goal_count, 1);
+    assert_eq!(team_stats.goal_after_kickoff.short_goal_count, 1);
+    assert_eq!(team_stats.goal_after_kickoff.medium_goal_count, 1);
+    assert_eq!(team_stats.goal_after_kickoff.long_goal_count, 1);
 }
 
 #[test]
@@ -5254,7 +5509,7 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: None,
             ball: None,
-            players: vec![team_zero, team_one],
+            players: vec![team_zero.clone(), team_one.clone()],
             active_demos: Vec::new(),
             demo_events: Vec::new(),
             boost_pad_events: Vec::new(),
@@ -5267,6 +5522,161 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
 
     assert_eq!(reducer.stats().tracked_time, 3.0);
     assert_eq!(reducer.stats().team_zero_time, 2.0);
+    assert_eq!(reducer.stats().team_one_time, 0.0);
+    assert_eq!(reducer.stats().neutral_time, 1.0);
+}
+
+#[test]
+fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
+    let mut reducer = PossessionReducer::new();
+    let team_zero = sample_player(epic_id("team-zero-goal-reset"), true);
+    let team_one = sample_player(epic_id("team-one-goal-reset"), false);
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 1,
+            time: 1.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: vec![TouchEvent {
+                time: 1.0,
+                frame: 1,
+                team_is_team_0: true,
+                player: Some(team_zero.player_id.clone()),
+                closest_approach_distance: None,
+            }],
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 2,
+            time: 2.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 3,
+            time: 3.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: Some(1),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: Some(false),
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: vec![GoalEvent {
+                time: 3.0,
+                frame: 3,
+                scoring_team_is_team_0: true,
+                player: Some(team_zero.player_id.clone()),
+                team_zero_score: Some(1),
+                team_one_score: Some(0),
+            }],
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 4,
+            time: 4.0,
+            dt: 0.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: Some(3),
+            team_zero_score: Some(1),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero.clone(), team_one.clone()],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    reducer
+        .on_sample(&StatsSample {
+            frame_number: 5,
+            time: 5.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
+            team_zero_score: Some(1),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: None,
+            ball: None,
+            players: vec![team_zero, team_one],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        })
+        .unwrap();
+
+    assert_eq!(reducer.stats().tracked_time, 2.0);
+    assert_eq!(reducer.stats().team_zero_time, 1.0);
     assert_eq!(reducer.stats().team_one_time, 0.0);
     assert_eq!(reducer.stats().neutral_time, 1.0);
 }

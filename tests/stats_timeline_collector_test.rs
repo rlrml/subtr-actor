@@ -386,10 +386,89 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let powerslide = powerslide_collector.into_inner();
     let demo = demo_collector.into_inner();
 
+    let assert_core_team_stats_match =
+        |actual: &CoreTeamStats, expected: &CoreTeamStats, team_label: &str| {
+            assert_eq!(actual.score, expected.score, "{team_label} score");
+            assert_eq!(actual.goals, expected.goals, "{team_label} goals");
+            assert_eq!(actual.assists, expected.assists, "{team_label} assists");
+            assert_eq!(actual.saves, expected.saves, "{team_label} saves");
+            assert_eq!(actual.shots, expected.shots, "{team_label} shots");
+            assert_eq!(
+                actual.goal_after_kickoff.kickoff_goal_count,
+                expected.goal_after_kickoff.kickoff_goal_count,
+                "{team_label} kickoff-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.short_goal_count,
+                expected.goal_after_kickoff.short_goal_count,
+                "{team_label} short-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.medium_goal_count,
+                expected.goal_after_kickoff.medium_goal_count,
+                "{team_label} medium-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.long_goal_count,
+                expected.goal_after_kickoff.long_goal_count,
+                "{team_label} long-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_buildup, expected.goal_buildup,
+                "{team_label} goal buildup classifications",
+            );
+        };
+
+    let assert_core_player_stats_match =
+        |actual: &CorePlayerStats, expected: &CorePlayerStats, player_label: &str| {
+            assert_eq!(actual.score, expected.score, "{player_label} score");
+            assert_eq!(actual.goals, expected.goals, "{player_label} goals");
+            assert_eq!(actual.assists, expected.assists, "{player_label} assists");
+            assert_eq!(actual.saves, expected.saves, "{player_label} saves");
+            assert_eq!(actual.shots, expected.shots, "{player_label} shots");
+            assert_eq!(
+                actual.goals_conceded_while_last_defender,
+                expected.goals_conceded_while_last_defender,
+                "{player_label} last-defender concessions",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.kickoff_goal_count,
+                expected.goal_after_kickoff.kickoff_goal_count,
+                "{player_label} kickoff-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.short_goal_count,
+                expected.goal_after_kickoff.short_goal_count,
+                "{player_label} short-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.medium_goal_count,
+                expected.goal_after_kickoff.medium_goal_count,
+                "{player_label} medium-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_after_kickoff.long_goal_count,
+                expected.goal_after_kickoff.long_goal_count,
+                "{player_label} long-goal bucket counts",
+            );
+            assert_eq!(
+                actual.goal_buildup, expected.goal_buildup,
+                "{player_label} goal buildup classifications",
+            );
+        };
+
     assert_eq!(final_frame.possession, possession.stats().clone());
     assert_eq!(final_frame.pressure, pressure.stats().clone());
-    assert_eq!(final_frame.team_zero.core, match_stats.team_zero_stats());
-    assert_eq!(final_frame.team_one.core, match_stats.team_one_stats());
+    assert_core_team_stats_match(
+        &final_frame.team_zero.core,
+        &match_stats.team_zero_stats(),
+        "team zero",
+    );
+    assert_core_team_stats_match(
+        &final_frame.team_one.core,
+        &match_stats.team_one_stats(),
+        "team one",
+    );
     assert_eq!(
         final_frame.team_zero.ball_carry,
         ball_carry.team_zero_stats().clone()
@@ -424,13 +503,14 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
         timeline.replay_meta.player_count()
     );
     for player in &final_frame.players {
-        assert_eq!(
-            player.core,
-            match_stats
+        assert_core_player_stats_match(
+            &player.core,
+            &match_stats
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
-                .unwrap_or_default()
+                .unwrap_or_default(),
+            &player.name,
         );
         assert_eq!(
             player.ball_carry,

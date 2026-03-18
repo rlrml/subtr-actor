@@ -64,12 +64,13 @@ mod tests {
 
     #[test]
     fn possession_export_includes_labeled_time_stats() {
-        let mut stats = PossessionStats::default();
-        stats.tracked_time = 5.0;
-        stats.labeled_time.add(
-            [StatLabel::new("possession_state", "team_zero")],
-            2.5,
-        );
+        let mut stats = PossessionStats {
+            tracked_time: 5.0,
+            ..Default::default()
+        };
+        stats
+            .labeled_time
+            .add([StatLabel::new("possession_state", "team_zero")], 2.5);
 
         let labeled_stats: Vec<_> = stats
             .stat_fields()

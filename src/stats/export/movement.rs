@@ -118,8 +118,10 @@ mod tests {
 
     #[test]
     fn movement_export_includes_labeled_tracked_time_stats() {
-        let mut stats = MovementStats::default();
-        stats.tracked_time = 3.0;
+        let mut stats = MovementStats {
+            tracked_time: 3.0,
+            ..Default::default()
+        };
         stats.labeled_tracked_time.add(
             [
                 StatLabel::new("speed_band", "boost"),

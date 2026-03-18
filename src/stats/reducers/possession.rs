@@ -237,8 +237,7 @@ impl StatsReducer for PossessionReducer {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let active_team_before_sample = ctx
             .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
-            .map(|state| state.active_team_before_sample)
-            .flatten();
+            .and_then(|state| state.active_team_before_sample);
 
         if live_play {
             self.stats.tracked_time += sample.dt;

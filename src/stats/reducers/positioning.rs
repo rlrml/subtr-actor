@@ -1,5 +1,9 @@
 use super::*;
 
+const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
+const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
+const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PositioningStats {
     pub active_game_time: f32,
@@ -28,6 +32,7 @@ pub struct PositioningStats {
     pub time_farthest_from_ball: f32,
     pub time_behind_ball: f32,
     pub time_in_front_of_ball: f32,
+    pub times_caught_ahead_of_play_on_conceded_goals: u32,
 }
 
 impl PositioningStats {
@@ -179,6 +184,38 @@ impl PositioningReducer {
         &self.player_stats
     }
 
+    fn record_goal_positioning_events(&mut self, sample: &StatsSample, ball_position: glam::Vec3) {
+        for goal_event in &sample.goal_events {
+            let defending_team_is_team_0 = !goal_event.scoring_team_is_team_0;
+            let normalized_ball_y = normalized_y(defending_team_is_team_0, ball_position);
+            if normalized_ball_y > GOAL_CAUGHT_AHEAD_MAX_BALL_Y {
+                continue;
+            }
+
+            for player in sample
+                .players
+                .iter()
+                .filter(|player| player.is_team_0 == defending_team_is_team_0)
+            {
+                let Some(position) = player.position() else {
+                    continue;
+                };
+                let normalized_player_y = normalized_y(defending_team_is_team_0, position);
+                if normalized_player_y < GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y {
+                    continue;
+                }
+                if normalized_player_y - normalized_ball_y < GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y {
+                    continue;
+                }
+
+                self.player_stats
+                    .entry(player.player_id.clone())
+                    .or_default()
+                    .times_caught_ahead_of_play_on_conceded_goals += 1;
+            }
+        }
+    }
+
     fn process_sample(
         &mut self,
         sample: &StatsSample,
@@ -202,6 +239,9 @@ impl PositioningReducer {
             return Ok(());
         };
         let ball_position = ball.position();
+        if !sample.goal_events.is_empty() {
+            self.record_goal_positioning_events(sample, ball_position);
+        }
         let demoed_players: HashSet<_> = sample
             .active_demos
             .iter()
@@ -435,10 +475,15 @@ impl PositioningReducer {
 
 impl StatsReducer for PositioningReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        let possession_team_before_sample = self
-            .possession_tracker
-            .update(sample, &sample.touch_events)
-            .active_team_before_sample;
+        let live_play = self.live_play_tracker.is_live_play(sample);
+        let possession_team_before_sample = if live_play {
+            self.possession_tracker
+                .update(sample, &sample.touch_events)
+                .active_team_before_sample
+        } else {
+            self.possession_tracker.reset();
+            None
+        };
         self.process_sample(sample, possession_team_before_sample)?;
         Ok(())
     }
@@ -450,9 +495,124 @@ impl StatsReducer for PositioningReducer {
     ) -> SubtrActorResult<()> {
         let possession_team_before_sample = ctx
             .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
-            .map(|state| state.active_team_before_sample)
-            .flatten();
+            .and_then(|state| state.active_team_before_sample);
         self.process_sample(sample, possession_team_before_sample)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
+
+    use super::*;
+
+    fn rigid_body(y: f32) -> RigidBody {
+        RigidBody {
+            sleeping: false,
+            location: Vector3f { x: 0.0, y, z: 17.0 },
+            rotation: Quaternion {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                w: 1.0,
+            },
+            linear_velocity: Some(Vector3f {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            }),
+            angular_velocity: Some(Vector3f {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            }),
+        }
+    }
+
+    fn player(player_id: u64, is_team_0: bool, y: f32) -> PlayerSample {
+        PlayerSample {
+            player_id: RemoteId::Steam(player_id),
+            is_team_0,
+            rigid_body: Some(rigid_body(y)),
+            boost_amount: None,
+            last_boost_amount: None,
+            boost_active: false,
+            powerslide_active: false,
+            match_goals: Some(0),
+            match_assists: Some(0),
+            match_saves: Some(0),
+            match_shots: Some(0),
+            match_score: Some(0),
+        }
+    }
+
+    #[test]
+    fn counts_defenders_caught_ahead_of_play_on_goal_frames() {
+        let mut reducer = PositioningReducer::new();
+        let sample = StatsSample {
+            frame_number: 10,
+            time: 10.0,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: None,
+            ball_has_been_hit: Some(true),
+            kickoff_countdown_time: None,
+            team_zero_score: Some(1),
+            team_one_score: Some(0),
+            possession_team_is_team_0: Some(true),
+            scored_on_team_is_team_0: Some(false),
+            current_in_game_team_player_counts: Some([1, 3]),
+            ball: Some(BallSample {
+                rigid_body: rigid_body(4800.0),
+            }),
+            players: vec![
+                player(1, true, 0.0),
+                player(2, false, -1800.0),
+                player(3, false, -700.0),
+                player(4, false, 3200.0),
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: vec![GoalEvent {
+                time: 10.0,
+                frame: 10,
+                scoring_team_is_team_0: true,
+                player: Some(RemoteId::Steam(1)),
+                team_zero_score: Some(1),
+                team_one_score: Some(0),
+            }],
+        };
+
+        reducer.on_sample(&sample).unwrap();
+
+        assert_eq!(
+            reducer
+                .player_stats()
+                .get(&RemoteId::Steam(2))
+                .unwrap()
+                .times_caught_ahead_of_play_on_conceded_goals,
+            1
+        );
+        assert_eq!(
+            reducer
+                .player_stats()
+                .get(&RemoteId::Steam(3))
+                .unwrap()
+                .times_caught_ahead_of_play_on_conceded_goals,
+            1
+        );
+        assert_eq!(
+            reducer
+                .player_stats()
+                .get(&RemoteId::Steam(4))
+                .unwrap()
+                .times_caught_ahead_of_play_on_conceded_goals,
+            0
+        );
     }
 }

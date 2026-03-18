@@ -202,5 +202,11 @@ impl StatFieldProvider for PositioningStats {
             StatUnit::Percent,
             self.farthest_from_ball_pct(),
         ));
+        visitor(ExportedStat::unsigned(
+            "positioning",
+            "times_caught_ahead_of_play_on_conceded_goals",
+            StatUnit::Count,
+            self.times_caught_ahead_of_play_on_conceded_goals,
+        ));
     }
 }

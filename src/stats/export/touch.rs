@@ -122,8 +122,10 @@ mod tests {
 
     #[test]
     fn touch_export_includes_labeled_touch_count_stats() {
-        let mut stats = TouchStats::default();
-        stats.touch_count = 2;
+        let mut stats = TouchStats {
+            touch_count: 2,
+            ..Default::default()
+        };
         stats.labeled_touch_counts.increment([
             StatLabel::new("kind", "hard_hit"),
             StatLabel::new("height_band", "high_air"),

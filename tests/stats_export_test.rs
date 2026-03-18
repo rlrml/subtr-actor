@@ -33,6 +33,7 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_farthest_from_ball: 4.0,
         time_behind_ball: 7.0,
         time_in_front_of_ball: 3.0,
+        times_caught_ahead_of_play_on_conceded_goals: 0,
     };
 
     let fields = stats.stat_fields();
@@ -89,6 +90,10 @@ fn test_positioning_stats_export_includes_derived_metrics() {
 
 #[test]
 fn test_core_player_stats_export_uses_legacy_variant_metadata() {
+    let mut goal_after_kickoff = GoalAfterKickoffStats::default();
+    goal_after_kickoff.record_goal(6.0);
+    goal_after_kickoff.record_goal(15.0);
+
     let stats = CorePlayerStats {
         score: 500,
         goals: 2,
@@ -96,6 +101,8 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
         saves: 3,
         shots: 4,
         goals_conceded_while_last_defender: 1,
+        goal_after_kickoff,
+        goal_buildup: GoalBuildupStats::default(),
     };
 
     let fields = stats.stat_fields();
@@ -104,6 +111,24 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
     assert_eq!(shooting.descriptor.variant, LEGACY_STAT_VARIANT);
     assert_eq!(shooting.descriptor.unit, StatUnit::Percent);
     assert_eq!(shooting.value, StatValue::Float(50.0));
+    assert_eq!(
+        find_field(&fields, "core", "average_goal_time_after_kickoff").value,
+        StatValue::Float(10.5)
+    );
+    assert_eq!(
+        find_field(&fields, "core", "average_goal_time_after_kickoff")
+            .descriptor
+            .unit,
+        StatUnit::Seconds
+    );
+    assert_eq!(
+        find_field(&fields, "core", "median_goal_time_after_kickoff").value,
+        StatValue::Float(10.5)
+    );
+    assert_eq!(
+        find_field(&fields, "core", "kickoff_goal_count").value,
+        StatValue::Unsigned(1)
+    );
 }
 
 #[test]

@@ -52,8 +52,10 @@ mod tests {
 
     #[test]
     fn pressure_export_includes_labeled_time_stats() {
-        let mut stats = PressureStats::default();
-        stats.tracked_time = 4.0;
+        let mut stats = PressureStats {
+            tracked_time: 4.0,
+            ..Default::default()
+        };
         stats
             .labeled_time
             .add([StatLabel::new("field_half", "team_zero_side")], 1.5);
