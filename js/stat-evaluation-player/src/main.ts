@@ -6,1489 +6,101 @@ import {
   ReplayPlayer,
 } from "subtr-actor-player";
 import type {
-  FrameRenderInfo,
-  ReplayModel,
   ReplayPlayerState,
   ReplayPlayerTrack,
-  ReplayTimelineEvent,
-  ReplayTimelineRange,
   TimelineOverlayPlugin,
 } from "subtr-actor-player";
+import { getAppTemplate } from "./appTemplate.ts";
+import { createReplayLoadModal } from "./replayLoadModal.ts";
+import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import {
-  HalfFieldOverlay,
-  ThresholdZoneOverlay,
-  createZoneBoundaryLines,
-} from "./overlays.ts";
+  createStatModules,
+  getCurrentRole,
+  getStatsPlayerSnapshot,
+  getTeamClass,
+  RELATIVE_POSITIONING_MODULE_ID,
+  ROLE_LABELS,
+} from "./statModules.ts";
+import type { StatModule, StatModuleContext } from "./statModules.ts";
+import { createStatsFrameLookup } from "./statsTimeline.ts";
+import type { StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 import {
-  TouchEventOverlay,
-  playerIdToString,
-} from "./touchOverlay.ts";
-import { FiftyFiftyOverlay } from "./fiftyFiftyOverlay.ts";
-import {
-  createStatsFrameLookup,
-  getStatsFrameForReplayFrame,
-} from "./statsTimeline.ts";
-import type { Object3D } from "three";
-import {
-  formatCollectedWithRespawnBound,
-  formatBoostDisplayAmount,
-  toBoostDisplayUnits,
-} from "./boostFormatting.ts";
-import {
-  renderFiftyFiftySummary,
-  renderPlayerFiftyFiftyStats,
-} from "./fiftyFiftyFormatting.ts";
-import {
-  renderMovementStats,
-} from "./movementFormatting.ts";
-import type { MovementBreakdownClass } from "./movementFormatting.ts";
-import { renderPossessionStats } from "./possessionFormatting.ts";
-import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
-import { renderPressureStats } from "./pressureFormatting.ts";
-import { renderRushStats } from "./rushFormatting.ts";
-import { renderTouchStats } from "./touchFormatting.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsTimeline,
-} from "./statsTimeline.ts";
-import type { TouchBreakdownClass } from "./touchFormatting.ts";
-import {
-  buildFiftyFiftyTimelineEvents,
-  buildRushTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
 } from "./timelineMarkers.ts";
 import {
-  buildPossessionTimelineRanges,
-  buildPressureTimelineRanges,
-  buildTimeInZoneTimelineRanges,
-} from "./timelineRanges.ts";
-import {
   formatReplayLoadProgress,
-  getReplayLoadCompletion,
   loadReplayBundleInWorker,
-  type ReplayLoadProgress,
 } from "./replayLoader.ts";
 
-interface StatModuleContext {
-  player: ReplayPlayer;
-  replay: ReplayModel;
-  statsTimeline: StatsTimeline;
-  statsFrameLookup: Map<number, StatsFrame>;
-  fieldScale: number;
-}
-
-interface StatModule {
-  readonly id: string;
-  readonly label: string;
-  setup(ctx: StatModuleContext): void;
-  teardown(): void;
-  onBeforeRender(info: FrameRenderInfo): void;
-  getTimelineEvents?(ctx: StatModuleContext): ReplayTimelineEvent[];
-  getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
-  renderStats(frameIndex: number, ctx: StatModuleContext): string;
-  renderSettings?(ctx: StatModuleContext | null): HTMLElement | null;
-  renderFocusedPlayerStats(
-    playerId: string,
-    frameIndex: number,
-    ctx: StatModuleContext,
-  ): string;
-}
-
-const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
-
-type Role = "back" | "forward" | "other" | "mid";
-
-const ROLE_LABELS: Record<Role, string> = {
-  back: "Back",
-  forward: "Fwd",
-  other: "Other",
-  mid: "Mid",
-};
-
-function getTeamClass(isTeamZero: boolean): string {
-  return isTeamZero ? "team-blue" : "team-orange";
-}
-
-interface ReplayLoadModalController {
-  show(fileName: string, status?: string): void;
-  update(progress: ReplayLoadProgress): void;
-  hide(): void;
-  destroy(): void;
-}
-
-function createReplayLoadModal(root: HTMLElement): ReplayLoadModalController {
-  const modal = document.createElement("div");
-  modal.className = "replay-load-modal";
-  modal.hidden = true;
-
-  const dialog = document.createElement("div");
-  dialog.className = "replay-load-modal__dialog";
-  dialog.setAttribute("role", "dialog");
-  dialog.setAttribute("aria-modal", "true");
-  dialog.setAttribute("aria-labelledby", "replay-load-modal-title");
-
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "replay-load-modal__eyebrow";
-  eyebrow.textContent = "Replay loading";
-
-  const percent = document.createElement("h2");
-  percent.id = "replay-load-modal-title";
-  percent.className = "replay-load-modal__percent";
-  percent.textContent = "0%";
-
-  const status = document.createElement("p");
-  status.className = "replay-load-modal__status";
-  status.textContent = "Preparing replay...";
-
-  const bar = document.createElement("div");
-  bar.className = "replay-load-modal__bar";
-
-  const fill = document.createElement("div");
-  fill.className = "replay-load-modal__fill";
-  bar.append(fill);
-
-  const meta = document.createElement("p");
-  meta.className = "replay-load-modal__meta";
-
-  dialog.append(eyebrow, percent, status, bar, meta);
-  modal.append(dialog);
-  root.append(modal);
-
-  let activeFileName = "";
-
-  const setProgress = (fraction: number) => {
-    const bounded = Math.max(0, Math.min(1, fraction));
-    fill.style.width = `${bounded * 100}%`;
-    percent.textContent = `${Math.round(bounded * 100)}%`;
-  };
-
-  const setVisible = (visible: boolean) => {
-    modal.hidden = !visible;
-  };
-
-  return {
-    show(fileName, nextStatus = "Preparing replay...") {
-      activeFileName = fileName;
-      setVisible(true);
-      setProgress(0);
-      status.textContent = nextStatus;
-      meta.textContent = `Loading ${fileName}`;
-    },
-    update(progress) {
-      setVisible(true);
-      setProgress(getReplayLoadCompletion(progress));
-      status.textContent = formatReplayLoadProgress(progress);
-      if (
-        progress.stage === "processing" &&
-        progress.totalFrames !== undefined
-      ) {
-        meta.textContent = `${progress.processedFrames ?? 0}/${progress.totalFrames} frames`;
-        return;
-      }
-      meta.textContent = activeFileName ? `Loading ${activeFileName}` : "";
-    },
-    hide() {
-      setVisible(false);
-    },
-    destroy() {
-      modal.remove();
-    },
-  };
-}
-
-function renderPlayerCard(
-  name: string,
-  isTeamZero: boolean,
-  bodyHtml: string,
-  metaHtml = "",
-): string {
-  return `<div class="player-card ${getTeamClass(isTeamZero)}">
-    <div class="player-card-header">
-      <span class="player-name">${name}</span>
-      ${metaHtml}
-    </div>
-    ${bodyHtml}
-  </div>`;
-}
-
-function getStatsPlayerSnapshot(
-  ctx: StatModuleContext,
-  frameIndex: number,
-  playerId: string,
-): PlayerStatsSnapshot | null {
-  const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
-  if (!statsFrame) return null;
-
-  return statsFrame.players.find(
-    (player) => playerIdToString(player.player_id) === playerId,
-  ) ?? null;
-}
-
-function getCurrentRole(
-  replay: ReplayModel,
-  playerId: string,
-  frameIndex: number,
-): Role {
-  const player = replay.players.find((candidate) => candidate.id === playerId);
-  if (!player) return "mid";
-
-  const frame = player.frames[frameIndex];
-  if (!frame?.position) return "mid";
-
-  const isTeamZero = player.isTeamZero;
-  const teamRosterCount = replay.players.filter(
-    (candidate) => candidate.isTeamZero === isTeamZero,
-  ).length;
-  const allYs: number[] = [];
-  let normalizedY = 0;
-
-  for (const candidate of replay.players) {
-    if (candidate.isTeamZero !== isTeamZero) continue;
-    const candidateFrame = candidate.frames[frameIndex];
-    if (!candidateFrame?.position) continue;
-
-    const value = isTeamZero
-      ? candidateFrame.position.y
-      : -candidateFrame.position.y;
-    allYs.push(value);
-    if (candidate.id === playerId) {
-      normalizedY = value;
-    }
-  }
-
-  if (teamRosterCount < 2 || allYs.length !== teamRosterCount) return "mid";
-
-  const minY = Math.min(...allYs);
-  const maxY = Math.max(...allYs);
-  const spread = maxY - minY;
-
-  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "other";
-
-  const nearBack = normalizedY - minY <= MOST_BACK_FORWARD_THRESHOLD_Y;
-  const nearFront = maxY - normalizedY <= MOST_BACK_FORWARD_THRESHOLD_Y;
-
-  if (nearBack && !nearFront) return "back";
-  if (nearFront && !nearBack) return "forward";
-  return "mid";
-}
-
-function disposeIfPossible(value: unknown): void {
-  if (
-    value &&
-    typeof value === "object" &&
-    "dispose" in value &&
-    typeof value.dispose === "function"
-  ) {
-    value.dispose();
-  }
-}
-
-function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
-  return `
-    <div class="stat-row"><span class="label">Active</span><span class="value">${pos?.active_game_time?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Back</span><span class="value">${pos?.time_most_back?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Forward</span><span class="value">${pos?.time_most_forward?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Mid</span><span class="value">${pos?.time_mid_role?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Other</span><span class="value">${pos?.time_other_role?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">No teammate</span><span class="value">${pos?.time_no_teammates?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Demoed</span><span class="value">${pos?.time_demolished?.toFixed(1) ?? "?"}s</span></div>
-  `;
-}
-
-function renderAbsolutePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
-  const defensiveThird = getPositioningZoneTime(pos, "time_defensive_third", "time_defensive_zone");
-  const neutralThird = getPositioningZoneTime(pos, "time_neutral_third", "time_neutral_zone");
-  const offensiveThird = getPositioningZoneTime(pos, "time_offensive_third", "time_offensive_zone");
-
-  return `
-    <div class="stat-row"><span class="label">Def third</span><span class="value">${defensiveThird?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Neutral third</span><span class="value">${neutralThird?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Off third</span><span class="value">${offensiveThird?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Def half</span><span class="value">${pos?.time_defensive_half?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Off half</span><span class="value">${pos?.time_offensive_half?.toFixed(1) ?? "?"}s</span></div>
-  `;
-}
-
-function getPositioningZoneTime(
-  pos: PlayerStatsSnapshot["positioning"],
-  primaryKey: "time_defensive_third" | "time_neutral_third" | "time_offensive_third",
-  fallbackKey: "time_defensive_zone" | "time_neutral_zone" | "time_offensive_zone",
-): number | undefined {
-  const primaryValue = pos?.[primaryKey];
-  if (typeof primaryValue === "number" && Number.isFinite(primaryValue)) {
-    return primaryValue;
-  }
-
-  const fallbackValue = (pos as Record<string, unknown> | undefined)?.[fallbackKey];
-  return typeof fallbackValue === "number" && Number.isFinite(fallbackValue)
-    ? fallbackValue
-    : undefined;
-}
-
-function formatInteger(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return "?";
-  }
-
-  return `${Math.round(value)}`;
-}
-
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return "?";
-  }
-
-  return `${value.toFixed(digits)}${suffix}`;
-}
-
-function formatPercentage(
-  numerator: number | undefined,
-  denominator: number | undefined,
-  digits = 1,
-): string {
-  if (
-    numerator === undefined ||
-    denominator === undefined ||
-    Number.isNaN(numerator) ||
-    Number.isNaN(denominator) ||
-    denominator <= 0
-  ) {
-    return "?";
-  }
-
-  return `${(numerator * 100 / denominator).toFixed(digits)}%`;
-}
-
-function formatTimeShare(
-  value: number | undefined,
-  total: number | undefined,
-  digits = 1,
-): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return "?";
-  }
-
-  const percentage = formatPercentage(value, total, digits);
-  if (percentage === "?") {
-    return `${value.toFixed(digits)}s`;
-  }
-
-  return `${value.toFixed(digits)}s (${percentage})`;
-}
-
-function renderCoreStats(core: PlayerStatsSnapshot["core"]): string {
-  const shootingPercentage = core
-    ? core.shots > 0
-      ? formatPercentage(core.goals, core.shots)
-      : "0.0%"
-    : "?";
-
-  return `
-    <div class="stat-row"><span class="label">Score</span><span class="value">${formatInteger(core?.score)}</span></div>
-    <div class="stat-row"><span class="label">Goals</span><span class="value">${formatInteger(core?.goals)}</span></div>
-    <div class="stat-row"><span class="label">Assists</span><span class="value">${formatInteger(core?.assists)}</span></div>
-    <div class="stat-row"><span class="label">Saves</span><span class="value">${formatInteger(core?.saves)}</span></div>
-    <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(core?.shots)}</span></div>
-    <div class="stat-row"><span class="label">Shooting</span><span class="value">${shootingPercentage}</span></div>
-    <div class="stat-row"><span class="label">GA as last</span><span class="value">${formatInteger(core?.goals_conceded_while_last_defender)}</span></div>
-  `;
-}
-
-function renderBallCarryStats(ballCarry: PlayerStatsSnapshot["ball_carry"]): string {
-  const carryCount = ballCarry?.carry_count;
-  return `
-    <div class="stat-row"><span class="label">Carries</span><span class="value">${formatInteger(carryCount)}</span></div>
-    <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(ballCarry?.total_carry_time, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Avg carry</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_carry_time / carryCount : undefined, 1, "s") : carryCount === 0 ? "0.0s" : "?"}</span></div>
-    <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(ballCarry?.longest_carry_time, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Furthest</span><span class="value">${formatNumber(ballCarry?.furthest_carry_distance, 0, " uu")}</span></div>
-    <div class="stat-row"><span class="label">Avg straight</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_straight_line_distance / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
-    <div class="stat-row"><span class="label">Avg path</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.total_path_distance / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
-    <div class="stat-row"><span class="label">Fastest</span><span class="value">${formatNumber(ballCarry?.fastest_carry_speed, 0, " uu/s")}</span></div>
-    <div class="stat-row"><span class="label">Avg speed</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.carry_speed_sum / carryCount : undefined, 0, " uu/s") : carryCount === 0 ? "0 uu/s" : "?"}</span></div>
-    <div class="stat-row"><span class="label">Avg h gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_horizontal_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
-    <div class="stat-row"><span class="label">Avg v gap</span><span class="value">${carryCount ? formatNumber(ballCarry ? ballCarry.average_vertical_gap_sum / carryCount : undefined, 0, " uu") : carryCount === 0 ? "0 uu" : "?"}</span></div>
-  `;
-}
-
-function renderPowerslideStats(powerslide: PlayerStatsSnapshot["powerslide"]): string {
-  const pressCount = powerslide?.press_count;
-  const averageDuration = powerslide && pressCount && pressCount > 0
-    ? powerslide.total_duration / pressCount
-    : pressCount === 0
-      ? 0
-      : undefined;
-
-  return `
-    <div class="stat-row"><span class="label">Presses</span><span class="value">${formatInteger(pressCount)}</span></div>
-    <div class="stat-row"><span class="label">Total duration</span><span class="value">${formatNumber(powerslide?.total_duration, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Avg duration</span><span class="value">${formatNumber(averageDuration, 2, "s")}</span></div>
-  `;
-}
-
-function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
-  const differential = demo
-    ? demo.demos_inflicted - demo.demos_taken
-    : undefined;
-
-  return `
-    <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(demo?.demos_inflicted)}</span></div>
-    <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(demo?.demos_taken)}</span></div>
-    <div class="stat-row"><span class="label">Diff</span><span class="value">${differential === undefined ? "?" : `${differential > 0 ? "+" : ""}${differential}`}</span></div>
-  `;
-}
-
-function renderDodgeResetStats(dodgeReset: PlayerStatsSnapshot["dodge_reset"]): string {
-  return `
-    <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
-    <div class="stat-row"><span class="label">On-ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
-  `;
-}
-
-function createPlayerStatsModule<T>(options: {
-  id: string;
-  label: string;
-  select: (player: PlayerStatsSnapshot) => T | undefined;
-  render: (stats: T | undefined, player: PlayerStatsSnapshot) => string;
-}): StatModule {
-  return {
-    id: options.id,
-    label: options.label,
-
-    setup() {},
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        options.render(options.select(player), player),
-      )).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return options.render(options.select(player), player);
-    },
-  };
-}
-
-function createRelativePositioningModule(): StatModule {
-  let thresholdZoneOverlay: ThresholdZoneOverlay | null = null;
-  let fieldScale = 1;
-
-  return {
-    id: "relative-positioning",
-    label: "Relative Positioning",
-
-    setup(ctx) {
-      fieldScale = ctx.fieldScale;
-      thresholdZoneOverlay = new ThresholdZoneOverlay(
-        ctx.player.sceneState.scene,
-        ctx.replay,
-        fieldScale,
-      );
-    },
-
-    teardown() {
-      thresholdZoneOverlay?.dispose();
-      thresholdZoneOverlay = null;
-    },
-
-    onBeforeRender(info) {
-      thresholdZoneOverlay?.update(info, fieldScale);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => {
-        const pos = player.positioning;
-        const role = getCurrentRole(
-          ctx.replay,
-          playerIdToString(player.player_id),
-          frameIndex,
-        );
-        return renderPlayerCard(
-          player.name,
-          player.is_team_0,
-          renderRelativePositioningStats(pos),
-          `<span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>`,
-        );
-      }).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      const pos = player?.positioning;
-      if (!player) return "";
-
-      return renderRelativePositioningStats(pos);
-    },
-  };
-}
-
-function createAbsolutePositioningModule(): StatModule {
-  let zoneBoundaryLines: ReturnType<typeof createZoneBoundaryLines> | null = null;
-
-  return {
-    id: "absolute-positioning",
-    label: "Absolute Positioning",
-
-    setup(ctx) {
-      zoneBoundaryLines = createZoneBoundaryLines(
-        ctx.player.sceneState.scene,
-        ctx.fieldScale,
-      );
-    },
-
-    teardown() {
-      if (zoneBoundaryLines) {
-        zoneBoundaryLines.removeFromParent();
-        zoneBoundaryLines.traverse((node: Object3D) => {
-          const geometry = "geometry" in node ? node.geometry : null;
-          disposeIfPossible(geometry);
-
-          const material = "material" in node ? node.material : null;
-          if (Array.isArray(material)) {
-            for (const entry of material) {
-              disposeIfPossible(entry);
-            }
-          } else {
-            disposeIfPossible(material);
-          }
-        });
-      }
-      zoneBoundaryLines = null;
-    },
-
-    onBeforeRender() {},
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderAbsolutePositioningStats(player.positioning),
-      )).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderAbsolutePositioningStats(player.positioning);
-    },
-  };
-}
-
-function createBoostModule(): StatModule {
-  return {
-    id: "boost",
-    label: "Boost",
-
-    setup() {},
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => {
-        const boost = player.boost;
-        const avgBoost =
-          boost && boost.tracked_time > 0
-            ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
-            : "?";
-        return renderPlayerCard(
-          player.name,
-          player.is_team_0,
-          `
-          <div class="stat-row"><span class="label">Collected</span><span class="value">${formatCollectedWithRespawnBound(boost?.amount_collected, boost?.amount_respawned)}</span></div>
-          <div class="stat-row"><span class="label">Big pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_big)}</span></div>
-          <div class="stat-row"><span class="label">Small pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_small)}</span></div>
-          <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
-          <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
-          <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
-          <div class="stat-row"><span class="label">Used ground</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_grounded)}</span></div>
-          <div class="stat-row"><span class="label">Used air</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_airborne)}</span></div>
-          <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
-          <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
-          <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
-          <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
-          <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
-        `,
-        );
-      }).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      const boost = player?.boost;
-      if (!player) return "";
-
-      const avgBoost =
-        boost && boost.tracked_time > 0
-          ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
-          : "?";
-
-      return `
-        <div class="stat-row"><span class="label">Collected</span><span class="value">${formatCollectedWithRespawnBound(boost?.amount_collected, boost?.amount_respawned)}</span></div>
-        <div class="stat-row"><span class="label">Big pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_big)}</span></div>
-        <div class="stat-row"><span class="label">Small pads amt</span><span class="value">${formatBoostDisplayAmount(boost?.amount_collected_small)}</span></div>
-        <div class="stat-row"><span class="label">Respawns</span><span class="value">${formatBoostDisplayAmount(boost?.amount_respawned)}</span></div>
-        <div class="stat-row"><span class="label">Overfill</span><span class="value">${formatBoostDisplayAmount(boost?.overfill_total)}</span></div>
-        <div class="stat-row"><span class="label">Used</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used)}</span></div>
-        <div class="stat-row"><span class="label">Used ground</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_grounded)}</span></div>
-        <div class="stat-row"><span class="label">Used air</span><span class="value">${formatBoostDisplayAmount(boost?.amount_used_while_airborne)}</span></div>
-        <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
-        <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
-        <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
-        <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
-        <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
-        <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
-      `;
-    },
-  };
-}
-
-function createCoreModule(): StatModule {
-  return createPlayerStatsModule({
-    id: "core",
-    label: "Core",
-    select: (player) => player.core,
-    render: (core) => renderCoreStats(core),
-  });
-}
-
-function createPossessionModule(): StatModule {
-  let settingsEl: HTMLDivElement | null = null;
-  let breakdownReadoutEl: HTMLElement | null = null;
-  const activeBreakdownClasses = new Set<PossessionBreakdownClass>();
-  const orderedBreakdownClasses: PossessionBreakdownClass[] = ["possession_state"];
-
-  return {
-    id: "possession",
-    label: "Possession",
-
-    setup() {
-      syncPossessionSettingsUi();
-    },
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    getTimelineRanges(ctx) {
-      return buildPossessionTimelineRanges(ctx.statsTimeline, undefined, ctx.replay);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame?.possession) return "";
-
-      return [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderPossessionStats(statsFrame.possession, {
-            isTeamZero: true,
-            breakdownClasses: getActiveBreakdownClasses(),
-          }),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderPossessionStats(statsFrame.possession, {
-            isTeamZero: false,
-            breakdownClasses: getActiveBreakdownClasses(),
-          }),
-        ),
-      ].join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.possession || !player) return "";
-
-      return renderPossessionStats(statsFrame.possession, {
-        isTeamZero: player.is_team_0,
-        breakdownClasses: getActiveBreakdownClasses(),
-      });
-    },
-
-    renderSettings() {
-      if (!settingsEl) {
-        settingsEl = document.createElement("div");
-        settingsEl.className = "module-settings-card";
-
-        const header = document.createElement("div");
-        header.className = "module-settings-header";
-
-        const text = document.createElement("div");
-        const eyebrow = document.createElement("p");
-        eyebrow.className = "module-settings-eyebrow";
-        eyebrow.textContent = "Stat display";
-        const title = document.createElement("h3");
-        title.textContent = "Possession breakdown";
-        text.append(eyebrow, title);
-
-        breakdownReadoutEl = document.createElement("strong");
-        breakdownReadoutEl.className = "metric-readout";
-        header.append(text, breakdownReadoutEl);
-
-        const options = document.createElement("div");
-        options.className = "module-settings-options";
-
-        const optionLabel = document.createElement("label");
-        optionLabel.className = "toggle";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.dataset.breakdownClass = "possession_state";
-        checkbox.addEventListener("change", () => {
-          if (checkbox.checked) {
-            activeBreakdownClasses.add("possession_state");
-          } else {
-            activeBreakdownClasses.delete("possession_state");
-          }
-          syncPossessionSettingsUi();
-          rerenderPossessionStats();
-        });
-
-        const optionText = document.createElement("span");
-        optionText.textContent = "Control";
-        optionLabel.append(checkbox, optionText);
-        options.append(optionLabel);
-
-        settingsEl.append(header, options);
-      }
-
-      syncPossessionSettingsUi();
-      return settingsEl;
-    },
-  };
-
-  function syncPossessionSettingsUi(): void {
-    if (!settingsEl) {
-      return;
-    }
-
-    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-breakdown-class]",
-    )) {
-      const className = checkbox.dataset.breakdownClass as PossessionBreakdownClass | undefined;
-      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
-    }
-
-    if (breakdownReadoutEl) {
-      breakdownReadoutEl.textContent = activeBreakdownClasses.has("possession_state")
-        ? "Control"
-        : "Total only";
-    }
-  }
-
-  function getActiveBreakdownClasses(): PossessionBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
-  }
-
-  function rerenderPossessionStats(): void {
-    if (!replayPlayer) {
-      return;
-    }
-
-    const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
-  }
-}
-
-function createFiftyFiftyModule(): StatModule {
-  let overlay: FiftyFiftyOverlay | null = null;
-
-  return {
-    id: "fifty-fifty",
-    label: "50/50",
-
-    setup(ctx) {
-      overlay = new FiftyFiftyOverlay(
-        ctx.player.sceneState,
-        ctx.player.container,
-        ctx.replay,
-        ctx.statsTimeline,
-      );
-    },
-
-    teardown() {
-      overlay?.dispose();
-      overlay = null;
-    },
-
-    onBeforeRender(info) {
-      overlay?.update(info.currentTime);
-    },
-
-    getTimelineEvents(ctx) {
-      return buildFiftyFiftyTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      const summary = [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderFiftyFiftySummary(statsFrame.fifty_fifty, true),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderFiftyFiftySummary(statsFrame.fifty_fifty, false),
-        ),
-      ].join("");
-
-      const players = statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderPlayerFiftyFiftyStats(player.fifty_fifty),
-      )).join("");
-
-      return summary + players;
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderPlayerFiftyFiftyStats(player.fifty_fifty);
-    },
-  };
-}
-
-function createPressureModule(): StatModule {
-  let halfFieldOverlay: HalfFieldOverlay | null = null;
-
-  return {
-    id: "pressure",
-    label: "Half Control",
-
-    setup(ctx) {
-      halfFieldOverlay = new HalfFieldOverlay(
-        ctx.player.sceneState.scene,
-        ctx.fieldScale,
-      );
-    },
-
-    teardown() {
-      halfFieldOverlay?.dispose();
-      halfFieldOverlay = null;
-    },
-
-    onBeforeRender(info) {
-      const ballFrame = replayPlayer?.replay.ballFrames[info.frameIndex];
-      halfFieldOverlay?.update(ballFrame?.position?.y ?? null);
-    },
-
-    getTimelineRanges(ctx) {
-      return buildPressureTimelineRanges(ctx.statsTimeline, undefined, ctx.replay);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame?.pressure) return "";
-
-      return [
-        renderPlayerCard(
-          "Blue Half",
-          true,
-          renderPressureStats(statsFrame?.pressure, {
-            isTeamZero: true,
-          }),
-        ),
-        renderPlayerCard(
-          "Orange Half",
-          false,
-          renderPressureStats(statsFrame?.pressure, {
-            isTeamZero: false,
-          }),
-        ),
-      ].join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.pressure || !player) return "";
-
-      return renderPressureStats(statsFrame?.pressure, {
-        isTeamZero: player.is_team_0,
-      });
-    },
-  };
-}
-
-function createTimeInZoneModule(): StatModule {
-  return {
-    id: "time-in-zone",
-    label: "Time In Zone",
-
-    setup() {},
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    getTimelineRanges(ctx) {
-      return buildTimeInZoneTimelineRanges(ctx.statsTimeline, ctx.replay);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderAbsolutePositioningStats(player.positioning),
-      )).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderAbsolutePositioningStats(player.positioning);
-    },
-  };
-}
-
-function createRushModule(): StatModule {
-  return {
-    id: "rush",
-    label: "Rush",
-
-    setup() {},
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildRushTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame?.rush) return "";
-
-      return [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderRushStats(statsFrame.rush, true),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderRushStats(statsFrame.rush, false),
-        ),
-      ].join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.rush || !player) return "";
-
-      return renderRushStats(statsFrame.rush, player.is_team_0);
-    },
-  };
-}
-
-function createBallCarryModule(): StatModule {
-  return createPlayerStatsModule({
-    id: "ball-carry",
-    label: "Ball Carry",
-    select: (player) => player.ball_carry,
-    render: (ballCarry) => renderBallCarryStats(ballCarry),
-  });
-}
-
-function createDodgeResetModule(): StatModule {
-  return createPlayerStatsModule({
-    id: "dodge-reset",
-    label: "Dodge Reset",
-    select: (player) => player.dodge_reset,
-    render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
-  });
-}
-
-function createTouchModule(): StatModule {
-  let overlay: TouchEventOverlay | null = null;
-  let settingsEl: HTMLDivElement | null = null;
-  let decayReadoutEl: HTMLElement | null = null;
-  let breakdownReadoutEl: HTMLElement | null = null;
-  const activeBreakdownClasses = new Set<TouchBreakdownClass>();
-  const orderedBreakdownClasses: TouchBreakdownClass[] = [
-    "kind",
-    "height_band",
-  ];
-
-  return {
-    id: "touch",
-    label: "Touch",
-
-    setup(ctx) {
-      overlay = new TouchEventOverlay(
-        ctx.player.sceneState,
-        ctx.player.container,
-        ctx.replay,
-        ctx.statsTimeline,
-      );
-      syncTouchSettingsUi();
-    },
-
-    teardown() {
-      overlay?.dispose();
-      overlay = null;
-    },
-
-    onBeforeRender(info) {
-      overlay?.update(info.currentTime);
-    },
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderTouchStats(player.touch, {
-          breakdownClasses: getActiveBreakdownClasses(),
-        }),
-        player.touch?.is_last_touch
-          ? '<span class="role-indicator role-forward">Last Touch</span>'
-          : "",
-      )).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderTouchStats(player.touch, {
-        breakdownClasses: getActiveBreakdownClasses(),
-      });
-    },
-
-    renderSettings() {
-      if (!settingsEl) {
-        settingsEl = document.createElement("div");
-        settingsEl.className = "module-settings-card";
-
-        const header = document.createElement("div");
-        header.className = "module-settings-header";
-
-        const text = document.createElement("div");
-        const eyebrow = document.createElement("p");
-        eyebrow.className = "module-settings-eyebrow";
-        eyebrow.textContent = "Touch markers";
-        const title = document.createElement("h3");
-        title.textContent = "Touch decay";
-        text.append(eyebrow, title);
-
-        decayReadoutEl = document.createElement("strong");
-        decayReadoutEl.className = "metric-readout";
-        header.append(text, decayReadoutEl);
-
-        const label = document.createElement("label");
-        const labelText = document.createElement("span");
-        labelText.className = "label";
-        labelText.textContent = "Keep each marker visible after the touch";
-
-        const input = document.createElement("input");
-        input.type = "range";
-        input.min = "1";
-        input.max = "10";
-        input.step = "0.5";
-        input.value = `${overlay?.getDecaySeconds() ?? 5}`;
-        input.addEventListener("input", () => {
-          const nextValue = Number(input.value);
-          overlay?.setDecaySeconds(nextValue);
-          syncTouchSettingsUi(nextValue);
-        });
-
-        label.append(labelText, input);
-        const breakdownSection = document.createElement("div");
-        breakdownSection.className = "module-settings-subgroup";
-
-        const breakdownHeader = document.createElement("div");
-        breakdownHeader.className = "module-settings-header";
-
-        const breakdownText = document.createElement("div");
-        const breakdownEyebrow = document.createElement("p");
-        breakdownEyebrow.className = "module-settings-eyebrow";
-        breakdownEyebrow.textContent = "Stat display";
-        const breakdownTitle = document.createElement("h3");
-        breakdownTitle.textContent = "Touch breakdown";
-        breakdownText.append(breakdownEyebrow, breakdownTitle);
-
-        breakdownReadoutEl = document.createElement("strong");
-        breakdownReadoutEl.className = "metric-readout";
-        breakdownHeader.append(breakdownText, breakdownReadoutEl);
-
-        const breakdownOptions = document.createElement("div");
-        breakdownOptions.className = "module-settings-options";
-
-        for (const option of [
-          { className: "kind", label: "Kind" },
-          { className: "height_band", label: "Height" },
-        ] satisfies Array<{ className: TouchBreakdownClass; label: string }>) {
-          const optionLabel = document.createElement("label");
-          optionLabel.className = "toggle";
-
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.dataset.breakdownClass = option.className;
-          checkbox.addEventListener("change", () => {
-            if (checkbox.checked) {
-              activeBreakdownClasses.add(option.className);
-            } else {
-              activeBreakdownClasses.delete(option.className);
-            }
-            syncTouchSettingsUi();
-            rerenderTouchStats();
-          });
-
-          const optionText = document.createElement("span");
-          optionText.textContent = option.label;
-          optionLabel.append(checkbox, optionText);
-          breakdownOptions.append(optionLabel);
-        }
-
-        breakdownSection.append(breakdownHeader, breakdownOptions);
-        settingsEl.append(header, label, breakdownSection);
-      }
-
-      syncTouchSettingsUi();
-      return settingsEl;
-    },
-  };
-
-  function syncTouchSettingsUi(nextValue?: number): void {
-    if (!settingsEl) {
-      return;
-    }
-
-    const value = nextValue ?? overlay?.getDecaySeconds() ?? 5;
-    const input = settingsEl.querySelector("input");
-    if (input instanceof HTMLInputElement) {
-      input.value = `${value}`;
-    }
-    if (decayReadoutEl) {
-      decayReadoutEl.textContent = `${value.toFixed(1)}s`;
-    }
-    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-breakdown-class]",
-    )) {
-      const className = checkbox.dataset.breakdownClass as TouchBreakdownClass | undefined;
-      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
-    }
-    if (breakdownReadoutEl) {
-      const active = getActiveBreakdownClasses();
-      breakdownReadoutEl.textContent = active.length > 0
-        ? active.map((className) => ({
-          kind: "Kind",
-          height_band: "Height",
-        }[className])).join(" + ")
-        : "Total only";
-    }
-  }
-
-  function getActiveBreakdownClasses(): TouchBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
-  }
-
-  function rerenderTouchStats(): void {
-    if (!replayPlayer) {
-      return;
-    }
-
-    const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
-  }
-}
-
-function createMovementModule(): StatModule {
-  let settingsEl: HTMLDivElement | null = null;
-  let breakdownReadoutEl: HTMLElement | null = null;
-  const activeBreakdownClasses = new Set<MovementBreakdownClass>();
-  const orderedBreakdownClasses: MovementBreakdownClass[] = [
-    "speed_band",
-    "height_band",
-  ];
-
-  return {
-    id: "movement",
-    label: "Movement",
-
-    setup() {
-      syncMovementSettingsUi();
-    },
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame) return "";
-
-      return statsFrame.players.map((player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderMovementStats(player.movement, {
-          breakdownClasses: getActiveBreakdownClasses(),
-        }),
-      )).join("");
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderMovementStats(player.movement, {
-        breakdownClasses: getActiveBreakdownClasses(),
-      });
-    },
-
-    renderSettings() {
-      if (!settingsEl) {
-        settingsEl = document.createElement("div");
-        settingsEl.className = "module-settings-card";
-
-        const header = document.createElement("div");
-        header.className = "module-settings-header";
-
-        const text = document.createElement("div");
-        const eyebrow = document.createElement("p");
-        eyebrow.className = "module-settings-eyebrow";
-        eyebrow.textContent = "Stat display";
-        const title = document.createElement("h3");
-        title.textContent = "Movement breakdown";
-        text.append(eyebrow, title);
-
-        breakdownReadoutEl = document.createElement("strong");
-        breakdownReadoutEl.className = "metric-readout";
-        header.append(text, breakdownReadoutEl);
-
-        const options = document.createElement("div");
-        options.className = "module-settings-options";
-
-        for (const option of [
-          { className: "speed_band", label: "Speed band" },
-          { className: "height_band", label: "Height band" },
-        ] satisfies Array<{ className: MovementBreakdownClass; label: string }>) {
-          const optionLabel = document.createElement("label");
-          optionLabel.className = "toggle";
-
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.dataset.breakdownClass = option.className;
-          checkbox.addEventListener("change", () => {
-            if (checkbox.checked) {
-              activeBreakdownClasses.add(option.className);
-            } else {
-              activeBreakdownClasses.delete(option.className);
-            }
-            syncMovementSettingsUi();
-            rerenderMovementStats();
-          });
-
-          const optionText = document.createElement("span");
-          optionText.textContent = option.label;
-          optionLabel.append(checkbox, optionText);
-          options.append(optionLabel);
-        }
-
-        settingsEl.append(header, options);
-      }
-
-      syncMovementSettingsUi();
-      return settingsEl;
-    },
-  };
-
-  function syncMovementSettingsUi(): void {
-    if (!settingsEl) {
-      return;
-    }
-
-    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-breakdown-class]",
-    )) {
-      const className = checkbox.dataset.breakdownClass as MovementBreakdownClass | undefined;
-      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
-    }
-
-    if (breakdownReadoutEl) {
-      const active = getActiveBreakdownClasses();
-      breakdownReadoutEl.textContent = active.length > 0
-        ? active.map((className) => ({
-          speed_band: "Speed band",
-          height_band: "Height band",
-        }[className])).join(" + ")
-        : "Total only";
-    }
-  }
-
-  function getActiveBreakdownClasses(): MovementBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
-  }
-
-  function rerenderMovementStats(): void {
-    if (!replayPlayer) {
-      return;
-    }
-
-    const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
-  }
-}
-
-function createPowerslideModule(): StatModule {
-  return createPlayerStatsModule({
-    id: "powerslide",
-    label: "Powerslide",
-    select: (player) => player.powerslide,
-    render: (powerslide) => renderPowerslideStats(powerslide),
-  });
-}
-
-function createDemoModule(): StatModule {
-  return createPlayerStatsModule({
-    id: "demo",
-    label: "Demo",
-    select: (player) => player.demo,
-    render: (demo) => renderDemoStats(demo),
-  });
-}
-
-const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
-
-const MODULE_FACTORIES = [
-  createCoreModule,
-  createPossessionModule,
-  createFiftyFiftyModule,
-  createPressureModule,
-  createRushModule,
-  createRelativePositioningModule,
-  createAbsolutePositioningModule,
-  createTimeInZoneModule,
-  createTouchModule,
-  createDodgeResetModule,
-  createBoostModule,
-  createBallCarryModule,
-  createMovementModule,
-  createPowerslideModule,
-  createDemoModule,
-];
-
-const MODULES = MODULE_FACTORIES.map((factory) => factory());
-let activeModules: StatModule[] = [];
-let activeModuleIds = new Set<string>();
-let removeRenderHook: (() => void) | null = null;
 
 let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
+let removeRenderHook: (() => void) | null = null;
+
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
 
+const MODULES = createStatModules({
+  rerenderCurrentState() {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    renderStats(state.frameIndex);
+    renderFocusedPlayerOverlay(state);
+  },
+});
+
+let activeModules: StatModule[] = [];
+let activeModuleIds = new Set<string>();
+
+export interface StatEvaluationPlayerHandle {
+  readonly root: HTMLElement;
+  destroy(): void;
+}
+
+let appRoot: HTMLElement | null = null;
+let fileInput!: HTMLInputElement;
+let viewport!: HTMLDivElement;
+let emptyState!: HTMLDivElement;
+let togglePlayback!: HTMLButtonElement;
+let followedPlayerOverlay!: HTMLDivElement;
+let playbackRate!: HTMLSelectElement;
+let attachedPlayer!: HTMLSelectElement;
+let cameraDistance!: HTMLInputElement;
+let cameraDistanceReadout!: HTMLElement;
+let ballCam!: HTMLInputElement;
+let showFollowedPlayerOverlay!: HTMLInputElement;
+let moduleSummaryEl!: HTMLDivElement;
+let moduleSettingsEl!: HTMLDivElement;
+let timeReadout!: HTMLElement;
+let frameReadout!: HTMLElement;
+let durationReadout!: HTMLElement;
+let playbackStatusReadout!: HTMLElement;
+let statusReadout!: HTMLElement;
+let playersReadout!: HTMLElement;
+let framesReadout!: HTMLElement;
+let eventsReadout!: HTMLElement;
+let playerStatsEl!: HTMLDivElement;
+let cameraProfileReadout!: HTMLElement;
+let cameraFovReadout!: HTMLElement;
+let cameraHeightReadout!: HTMLElement;
+let cameraPitchReadout!: HTMLElement;
+let cameraBaseDistanceReadout!: HTMLElement;
+let cameraStiffnessReadout!: HTMLElement;
+let skipPostGoalTransitions!: HTMLInputElement;
+let replayLoadModal: ReplayLoadModalController | null = null;
+let skipKickoffs!: HTMLInputElement;
+let currentMountCleanup: (() => void) | null = null;
+
 function getModuleContext(): StatModuleContext | null {
-  if (
-    !replayPlayer ||
-    !statsTimeline ||
-    !statsFrameLookup
-  ) {
+  if (!replayPlayer || !statsTimeline || !statsFrameLookup) {
     return null;
   }
 
@@ -1619,7 +231,10 @@ function renderTimelineEventCount(): void {
   )}`;
 }
 
-function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
+function mustElement<T extends HTMLElement>(
+  root: ParentNode,
+  selector: string,
+): T {
   const element = root.querySelector(selector);
   if (!(element instanceof HTMLElement)) {
     throw new Error(`Missing element for selector: ${selector}`);
@@ -1627,229 +242,6 @@ function mustElement<T extends HTMLElement>(root: ParentNode, selector: string):
 
   return element as T;
 }
-
-export interface StatEvaluationPlayerHandle {
-  readonly root: HTMLElement;
-  destroy(): void;
-}
-
-const APP_TEMPLATE = `
-  <main class="shell">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">subtr-actor / stats replay viewer</p>
-        <h1>Stat Evaluation Player</h1>
-        <p class="lede">
-          Compare stat modules against the in-replay camera view, switch to any
-          player's camera profile, and scrub with the shared timeline plugin.
-        </p>
-      </div>
-      <label class="file-picker">
-        <span>Choose replay</span>
-        <input id="replay-file" type="file" accept=".replay" />
-      </label>
-    </section>
-
-    <section class="workspace">
-      <div class="viewport-column">
-        <div class="viewport-panel">
-          <div id="viewport" class="viewport"></div>
-          <div
-            id="followed-player-overlay"
-            class="followed-player-overlay"
-            hidden
-          ></div>
-          <div id="empty-state" class="empty-state">
-            Choose a replay to start the viewer.
-          </div>
-        </div>
-
-        <section class="stats-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="panel-eyebrow">Module output</p>
-              <h2>Per-player stats</h2>
-            </div>
-          </div>
-          <div id="player-stats" class="player-stats-stack">
-            Load a replay to see stats.
-          </div>
-        </section>
-      </div>
-
-      <aside class="sidebar">
-        <section class="panel">
-          <p class="panel-eyebrow">Camera</p>
-          <h2>Replay camera</h2>
-          <label>
-            <span class="label">Camera profile</span>
-            <select id="attached-player" disabled>
-              <option value="">Free camera</option>
-            </select>
-          </label>
-          <label>
-            <span class="label">Follow distance</span>
-            <input
-              id="camera-distance"
-              type="range"
-              min="0.75"
-              max="4"
-              step="0.05"
-              value="${DEFAULT_CAMERA_DISTANCE_SCALE}"
-              disabled
-            />
-          </label>
-          <strong id="camera-distance-readout" class="metric-readout">
-            ${DEFAULT_CAMERA_DISTANCE_SCALE.toFixed(2)}x
-          </strong>
-          <label class="toggle">
-            <input id="ball-cam" type="checkbox" disabled />
-            <span>Ball cam</span>
-          </label>
-          <dl class="detail-grid">
-            <div>
-              <dt>Profile</dt>
-              <dd id="camera-profile-readout">Free camera</dd>
-            </div>
-            <div>
-              <dt>FOV</dt>
-              <dd id="camera-fov-readout">--</dd>
-            </div>
-            <div>
-              <dt>Height</dt>
-              <dd id="camera-height-readout">--</dd>
-            </div>
-            <div>
-              <dt>Pitch</dt>
-              <dd id="camera-pitch-readout">--</dd>
-            </div>
-            <div>
-              <dt>Distance</dt>
-              <dd id="camera-base-distance-readout">--</dd>
-            </div>
-            <div>
-              <dt>Stiffness</dt>
-              <dd id="camera-stiffness-readout">--</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="panel">
-          <p class="panel-eyebrow">Modules</p>
-          <h2>Overlay modules</h2>
-          <p class="panel-copy">
-            Toggle stat overlays independently while keeping the timeline and
-            replay camera controls active.
-          </p>
-          <label class="toggle">
-            <input id="show-followed-player-overlay" type="checkbox" />
-            <span>Show followed player in viewport</span>
-          </label>
-          <div class="module-list" id="module-summary"></div>
-          <div id="module-settings" class="module-settings" hidden></div>
-        </section>
-
-        <section class="panel">
-          <p class="panel-eyebrow">Transport</p>
-          <h2>Playback</h2>
-          <div class="transport-row">
-            <button id="toggle-playback" disabled>Play</button>
-            <select id="playback-rate" disabled>
-              <option value="0.25">0.25x</option>
-              <option value="0.5">0.5x</option>
-              <option value="1" selected>1.0x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2.0x</option>
-            </select>
-          </div>
-          <label class="toggle">
-            <input id="skip-post-goal-transitions" type="checkbox" checked />
-            <span>Skip post-goal resets</span>
-          </label>
-          <label class="toggle">
-            <input id="skip-kickoffs" type="checkbox" />
-            <span>Skip kickoffs</span>
-          </label>
-          <div class="detail-grid">
-            <div>
-              <dt>Time</dt>
-              <dd id="time-readout">0.00s</dd>
-            </div>
-            <div>
-              <dt>Frame</dt>
-              <dd id="frame-readout">0</dd>
-            </div>
-            <div>
-              <dt>Duration</dt>
-              <dd id="duration-readout">0.00s</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd id="playback-status-readout">Stopped</dd>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <p class="panel-eyebrow">Replay</p>
-          <h2>Loaded file</h2>
-          <dl class="detail-grid">
-            <div>
-              <dt>Status</dt>
-              <dd id="status-readout">Waiting for file</dd>
-            </div>
-            <div>
-              <dt>Players</dt>
-              <dd id="players-readout">--</dd>
-            </div>
-            <div>
-              <dt>Frames</dt>
-              <dd id="frames-readout">--</dd>
-            </div>
-            <div>
-              <dt>Timeline events</dt>
-              <dd id="events-readout">--</dd>
-            </div>
-          </dl>
-        </section>
-      </aside>
-    </section>
-  </main>
-`;
-
-let appRoot: HTMLElement | null = null;
-let fileInput!: HTMLInputElement;
-let viewport!: HTMLDivElement;
-let emptyState!: HTMLDivElement;
-let togglePlayback!: HTMLButtonElement;
-let followedPlayerOverlay!: HTMLDivElement;
-let playbackRate!: HTMLSelectElement;
-let attachedPlayer!: HTMLSelectElement;
-let cameraDistance!: HTMLInputElement;
-let cameraDistanceReadout!: HTMLElement;
-let ballCam!: HTMLInputElement;
-let showFollowedPlayerOverlay!: HTMLInputElement;
-let moduleSummaryEl!: HTMLDivElement;
-let moduleSettingsEl!: HTMLDivElement;
-let timeReadout!: HTMLElement;
-let frameReadout!: HTMLElement;
-let durationReadout!: HTMLElement;
-let playbackStatusReadout!: HTMLElement;
-let statusReadout!: HTMLElement;
-let playersReadout!: HTMLElement;
-let framesReadout!: HTMLElement;
-let eventsReadout!: HTMLElement;
-let playerStatsEl!: HTMLDivElement;
-let cameraProfileReadout!: HTMLElement;
-let cameraFovReadout!: HTMLElement;
-let cameraHeightReadout!: HTMLElement;
-let cameraPitchReadout!: HTMLElement;
-let cameraBaseDistanceReadout!: HTMLElement;
-let cameraStiffnessReadout!: HTMLElement;
-let skipPostGoalTransitions!: HTMLInputElement;
-let replayLoadModal: ReplayLoadModalController | null = null;
-let skipKickoffs!: HTMLInputElement;
-let currentMountCleanup: (() => void) | null = null;
 
 function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
@@ -2016,7 +408,11 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   }
 
   const sections = activeModules.map((mod) => {
-    const body = mod.renderFocusedPlayerStats(attachedPlayerId, state.frameIndex, ctx);
+    const body = mod.renderFocusedPlayerStats(
+      attachedPlayerId,
+      state.frameIndex,
+      ctx,
+    );
     if (!body) return "";
 
     return `<section class="focused-player-module">
@@ -2137,7 +533,8 @@ async function loadReplay(file: File): Promise<void> {
     populateAttachedPlayerOptions(replay.players);
     emptyState.hidden = true;
     statusReadout.textContent = `Loaded ${file.name}`;
-    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+    playersReadout.textContent = replay.players.map((player) => player.name)
+      .join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
     renderTimelineEventCount();
     setTransportEnabled(true);
@@ -2153,10 +550,12 @@ async function loadReplay(file: File): Promise<void> {
   }
 }
 
-export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
+export function mountStatEvaluationPlayer(
+  root: HTMLElement,
+): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
-  root.innerHTML = APP_TEMPLATE;
+  root.innerHTML = getAppTemplate(DEFAULT_CAMERA_DISTANCE_SCALE);
   appRoot = root;
   replayLoadModal = createReplayLoadModal(root);
 
@@ -2171,7 +570,10 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
   cameraDistance = mustElement<HTMLInputElement>(root, "#camera-distance");
-  cameraDistanceReadout = mustElement<HTMLElement>(root, "#camera-distance-readout");
+  cameraDistanceReadout = mustElement<HTMLElement>(
+    root,
+    "#camera-distance-readout",
+  );
   ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
   showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
     root,
@@ -2182,13 +584,19 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
   frameReadout = mustElement<HTMLElement>(root, "#frame-readout");
   durationReadout = mustElement<HTMLElement>(root, "#duration-readout");
-  playbackStatusReadout = mustElement<HTMLElement>(root, "#playback-status-readout");
+  playbackStatusReadout = mustElement<HTMLElement>(
+    root,
+    "#playback-status-readout",
+  );
   statusReadout = mustElement<HTMLElement>(root, "#status-readout");
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
   playerStatsEl = mustElement<HTMLDivElement>(root, "#player-stats");
-  cameraProfileReadout = mustElement<HTMLElement>(root, "#camera-profile-readout");
+  cameraProfileReadout = mustElement<HTMLElement>(
+    root,
+    "#camera-profile-readout",
+  );
   cameraFovReadout = mustElement<HTMLElement>(root, "#camera-fov-readout");
   cameraHeightReadout = mustElement<HTMLElement>(root, "#camera-height-readout");
   cameraPitchReadout = mustElement<HTMLElement>(root, "#camera-pitch-readout");
@@ -2196,7 +604,10 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
     root,
     "#camera-base-distance-readout",
   );
-  cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
+  cameraStiffnessReadout = mustElement<HTMLElement>(
+    root,
+    "#camera-stiffness-readout",
+  );
   skipPostGoalTransitions = mustElement<HTMLInputElement>(
     root,
     "#skip-post-goal-transitions",
