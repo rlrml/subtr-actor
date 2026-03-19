@@ -6,6 +6,12 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.2.2 - 2026-03-19
+
+- Rename the npm stats viewer package to `subtr-actor-stats-player`.
+- Refresh the Pages build metadata after the stats player lockfile update.
+- Refresh release metadata to `0.2.2`.
+
 ## v0.2.1 - 2026-03-19
 
 - Refactor the stats player into reusable scaffolding, templates, and module
@@ -15,7 +21,7 @@ README, or refactor-only commit.
 
 ## v0.2.0 - 2026-03-19
 
-- Package `subtr-actor-stat-evaluation-player` as a publishable npm library
+- Package `subtr-actor-stats-player` as a publishable npm library
   with a reusable mount API, package metadata, smoke-install checks, and
   README/license assets.
 - Wire the new stats player package into CI, npm release automation, and release

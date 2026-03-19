@@ -14,18 +14,21 @@ async function main() {
   const bindingsPackage = JSON.parse(
     await readFile(path.resolve(packageDir, "..", "package.json"), "utf8"),
   );
+  const playerPackage = JSON.parse(
+    await readFile(path.resolve(packageDir, "..", "player", "package.json"), "utf8"),
+  );
   const publishPackage = {
     ...sourcePackage,
     dependencies: {
       [bindingsPackage.name]: sourcePackage.version,
-      "subtr-actor-player": sourcePackage.version,
+      [playerPackage.name]: sourcePackage.version,
     },
   };
   delete publishPackage.scripts;
   delete publishPackage.devDependencies;
 
   const outputDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-stat-evaluation-player-package-"),
+    path.join(os.tmpdir(), "subtr-actor-stats-player-package-"),
   );
 
   await cp(distDir, path.join(outputDir, "dist"), { recursive: true });

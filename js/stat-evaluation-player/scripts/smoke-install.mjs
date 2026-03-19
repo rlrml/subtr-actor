@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,8 +30,14 @@ async function packTarball(cwd, packDir) {
 }
 
 async function main() {
+  const sourcePackage = JSON.parse(
+    await readFile(path.resolve(packageDir, "package.json"), "utf8"),
+  );
+  const playerPackage = JSON.parse(
+    await readFile(path.resolve(jsDir, "player", "package.json"), "utf8"),
+  );
   const scratchDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-stat-evaluation-player-smoke-"),
+    path.join(os.tmpdir(), "subtr-actor-stats-player-smoke-"),
   );
   let playerPublishDir = null;
   let statsPublishDir = null;
@@ -66,7 +72,7 @@ async function main() {
       path.join(consumerDir, "package.json"),
       JSON.stringify(
         {
-          name: "subtr-actor-stat-evaluation-player-smoke-consumer",
+          name: "subtr-actor-stats-player-smoke-consumer",
           private: true,
           type: "module",
           scripts: {
@@ -75,8 +81,8 @@ async function main() {
           },
           dependencies: {
             "@colonelpanic8/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
-            "subtr-actor-player": `file:${path.relative(consumerDir, playerTarballPath)}`,
-            "subtr-actor-stat-evaluation-player": `file:${path.relative(consumerDir, statsTarballPath)}`,
+            [playerPackage.name]: `file:${path.relative(consumerDir, playerTarballPath)}`,
+            [sourcePackage.name]: `file:${path.relative(consumerDir, statsTarballPath)}`,
             three: "^0.180.0",
           },
           devDependencies: {
@@ -130,7 +136,7 @@ async function main() {
         '  createStatsFrameLookup,',
         '  mountStatEvaluationPlayer,',
         '  type StatEvaluationPlayerHandle,',
-        '} from "subtr-actor-stat-evaluation-player";',
+        `} from "${sourcePackage.name}";`,
         "",
         'const root = document.getElementById("app");',
         'if (!(root instanceof HTMLElement)) {',

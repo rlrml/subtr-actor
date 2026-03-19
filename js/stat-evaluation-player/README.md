@@ -1,12 +1,12 @@
-# subtr-actor-stat-evaluation-player
+# subtr-actor-stats-player
 
-`subtr-actor-stat-evaluation-player` packages the stats-focused replay viewer UI
+`subtr-actor-stats-player` packages the stats-focused replay viewer UI
 from this repository as a reusable npm library.
 
 ## Installation
 
 ```bash
-npm install subtr-actor-stat-evaluation-player three
+npm install subtr-actor-stats-player three
 ```
 
 `three` is a peer dependency. The published package pulls in the matching
@@ -15,7 +15,7 @@ npm install subtr-actor-stat-evaluation-player three
 ## Usage
 
 ```ts
-import { mountStatEvaluationPlayer } from "subtr-actor-stat-evaluation-player";
+import { mountStatEvaluationPlayer } from "subtr-actor-stats-player";
 
 const root = document.getElementById("app");
 if (!(root instanceof HTMLElement)) {

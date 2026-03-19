@@ -8,7 +8,7 @@ Related npm packages:
 
 - [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor): low-level WebAssembly bindings
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player): replay player package built on top of these bindings
-- [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player): stats-focused replay viewer UI built on top of the player package
+- [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player): stats-focused replay viewer UI built on top of the player package
 
 ## Installation
 
@@ -198,7 +198,7 @@ npm --prefix js test
 Local packages built on top of these bindings:
 
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
-- [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player) / [`js/stat-evaluation-player`](./stat-evaluation-player/README.md): stats-focused replay viewer package with timeline overlays and per-module stat panels.
+- [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) / [`js/stat-evaluation-player`](./stat-evaluation-player/README.md): stats-focused replay viewer package with timeline overlays and per-module stat panels.
 - [`js/example`](./example/README.md): example/demo app that exercises the local player library.
 
 The mechanics evaluation player was moved to the sibling `subtr-actor-mechanics`
@@ -213,7 +213,7 @@ This binding depends on the workspace crate via:
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.2.1"
+version = "0.2.2"
 ```
 
 That keeps local development wired to the workspace crate while still pinning the published crate version. Use `just bump <version>` to update the versions together.

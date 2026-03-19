@@ -9,7 +9,7 @@ The project publishes five packages:
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
 - **JavaScript bindings**: `@colonelpanic8/subtr-actor` on [npm](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
 - **JavaScript player**: `subtr-actor-player` on [npm](https://www.npmjs.com/package/subtr-actor-player)
-- **JavaScript stats player**: `subtr-actor-stat-evaluation-player` on [npm](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player)
+- **JavaScript stats player**: `subtr-actor-stats-player` on [npm](https://www.npmjs.com/package/subtr-actor-stats-player)
 
 ## Automated Releases (GitHub Actions)
 
@@ -112,7 +112,7 @@ git push origin master --tags
   - https://pypi.org/project/subtr-actor-py/
   - https://www.npmjs.com/package/@colonelpanic8/subtr-actor
   - https://www.npmjs.com/package/subtr-actor-player
-  - https://www.npmjs.com/package/subtr-actor-stat-evaluation-player
+  - https://www.npmjs.com/package/subtr-actor-stats-player
 
 ## Manual Release (Alternative)
 

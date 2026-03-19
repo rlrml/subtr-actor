@@ -1,6 +1,6 @@
 # subtr-actor
 
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm bindings](https://img.shields.io/npm/v/%40colonelpanic8%2Fsubtr-actor?style=flat-square)](https://www.npmjs.com/package/@colonelpanic8/subtr-actor) [![npm player](https://img.shields.io/npm/v/subtr-actor-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-player) [![npm stats player](https://img.shields.io/npm/v/subtr-actor-stat-evaluation-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm bindings](https://img.shields.io/npm/v/%40colonelpanic8%2Fsubtr-actor?style=flat-square)](https://www.npmjs.com/package/@colonelpanic8/subtr-actor) [![npm player](https://img.shields.io/npm/v/subtr-actor-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-player) [![npm stats player](https://img.shields.io/npm/v/subtr-actor-stats-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-stats-player) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
 `subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
@@ -21,7 +21,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM bindings: [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
 - JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
-- JavaScript stats player: [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player)
+- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player)
 
 ## What You Get
 
@@ -37,7 +37,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 ```toml
 [dependencies]
-subtr-actor = "0.2.1"
+subtr-actor = "0.2.2"
 ```
 
 ### Python

@@ -7,6 +7,7 @@ const srcDir = path.resolve(rootDir, "src");
 const distDir = path.resolve(rootDir, "dist");
 
 export default defineConfig({
+  base: "./",
   resolve: {
     alias: {
       "@": srcDir,
