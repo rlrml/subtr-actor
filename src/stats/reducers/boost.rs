@@ -107,6 +107,7 @@ pub struct BoostReducer {
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
     pending_demo_respawns: HashSet<PlayerId>,
+    previous_boost_levels_live: Option<bool>,
     active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
     live_play_tracker: LivePlayTracker,
 }
@@ -630,7 +631,15 @@ impl BoostReducer {
         }
     }
 
-    fn tracks_boost_time(sample: &StatsSample, live_play: bool) -> bool {
+    fn boost_levels_live(sample: &StatsSample, live_play: bool) -> bool {
+        live_play && sample.ball_has_been_hit != Some(false)
+    }
+
+    fn tracks_boost_levels(boost_levels_live: bool) -> bool {
+        boost_levels_live
+    }
+
+    fn tracks_boost_pickups(sample: &StatsSample, live_play: bool) -> bool {
         live_play
             || (sample.ball_has_been_hit == Some(false)
                 && sample.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
@@ -641,7 +650,11 @@ impl BoostReducer {
 impl StatsReducer for BoostReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
-        let track_boost_time = Self::tracks_boost_time(sample, live_play);
+        let boost_levels_live = Self::boost_levels_live(sample, live_play);
+        let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
+        let track_boost_pickups = Self::tracks_boost_pickups(sample, live_play);
+        let boost_levels_resumed_this_sample =
+            boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
         let kickoff_phase_active = sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || sample.kickoff_countdown_time.is_some_and(|t| t > 0)
             || sample.ball_has_been_hit == Some(false);
@@ -679,14 +692,24 @@ impl StatsReducer for BoostReducer {
                     .copied()
                     .unwrap_or(boost_amount)
             });
+            let previous_boost_amount = if boost_levels_resumed_this_sample {
+                boost_amount
+            } else {
+                previous_boost_amount
+            };
             let speed = player.speed();
             let previous_speed = self
                 .previous_player_speeds
                 .get(&player.player_id)
                 .copied()
                 .or(speed);
+            let previous_speed = if boost_levels_resumed_this_sample {
+                speed
+            } else {
+                previous_speed
+            };
 
-            if track_boost_time {
+            if track_boost_levels {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 let time_zero_boost = sample.dt
                     * Self::interval_fraction_in_boost_range(
@@ -816,7 +839,7 @@ impl StatsReducer for BoostReducer {
         for event in &sample.boost_pad_events {
             match event.kind {
                 BoostPadEventKind::PickedUp { sequence } => {
-                    if !track_boost_time && !self.config.include_non_live_pickups {
+                    if !track_boost_pickups && !self.config.include_non_live_pickups {
                         continue;
                     }
                     if self.unavailable_pads.contains(&event.pad_id) {
@@ -970,7 +993,104 @@ impl StatsReducer for BoostReducer {
         self.team_one_stats.amount_used = team_one_used;
         self.warn_for_sample_boost_invariants(sample);
         self.kickoff_phase_active_last_frame = kickoff_phase_active;
+        self.previous_boost_levels_live = Some(boost_levels_live);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use boxcars::RemoteId;
+
+    fn player(player_id: u64, boost_amount: f32) -> PlayerSample {
+        PlayerSample {
+            player_id: RemoteId::Steam(player_id),
+            is_team_0: true,
+            rigid_body: None,
+            boost_amount: Some(boost_amount),
+            last_boost_amount: None,
+            boost_active: false,
+            powerslide_active: false,
+            match_goals: None,
+            match_assists: None,
+            match_saves: None,
+            match_shots: None,
+            match_score: None,
+        }
+    }
+
+    fn sample(
+        frame_number: usize,
+        time: f32,
+        boost_amount: f32,
+        game_state: Option<i32>,
+        ball_has_been_hit: Option<bool>,
+        kickoff_countdown_time: Option<i32>,
+    ) -> StatsSample {
+        StatsSample {
+            frame_number,
+            time,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state,
+            ball_has_been_hit,
+            kickoff_countdown_time,
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([1, 0]),
+            ball: None,
+            players: vec![player(1, boost_amount)],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: Vec::new(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn boost_levels_skip_pre_kickoff_dead_time() {
+        let mut reducer = BoostReducer::new();
+        let player_id = RemoteId::Steam(1);
+        reducer.initial_respawn_awarded.insert(player_id.clone());
+        reducer.kickoff_respawn_awarded.insert(player_id.clone());
+
+        reducer
+            .on_sample(&sample(0, 0.0, BOOST_MAX_AMOUNT, None, Some(false), None))
+            .unwrap();
+        reducer
+            .on_sample(&sample(1, 1.0, 0.0, None, Some(true), None))
+            .unwrap();
+        reducer
+            .on_sample(&sample(2, 2.0, 0.0, None, Some(true), None))
+            .unwrap();
+
+        let stats = reducer.player_stats().get(&player_id).unwrap();
+        assert_eq!(stats.tracked_time, 2.0);
+        assert_eq!(stats.average_boost_amount(), 0.0);
+    }
+
+    #[test]
+    fn boost_levels_still_track_when_replay_starts_live() {
+        let mut reducer = BoostReducer::new();
+        let player_id = RemoteId::Steam(1);
+        reducer.initial_respawn_awarded.insert(player_id.clone());
+
+        reducer
+            .on_sample(&sample(0, 0.0, 42.0, None, Some(true), None))
+            .unwrap();
+        reducer
+            .on_sample(&sample(1, 1.0, 42.0, None, Some(true), None))
+            .unwrap();
+
+        let stats = reducer.player_stats().get(&player_id).unwrap();
+        assert_eq!(stats.tracked_time, 2.0);
+        assert_eq!(stats.average_boost_amount(), 42.0);
     }
 }
