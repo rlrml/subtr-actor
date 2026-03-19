@@ -6,6 +6,13 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.2.3 - 2026-03-19
+
+- Fix PyPI wheel builds by keeping the `reqwest` and `ring` dependency chain
+  out of the Python binding build unless the Ballchasing comparison CLI is
+  explicitly enabled.
+- Refresh Rust, Python, and JavaScript release metadata to `0.2.3`.
+
 ## v0.2.2 - 2026-03-19
 
 - Rename the npm stats viewer package to `subtr-actor-stats-player`.

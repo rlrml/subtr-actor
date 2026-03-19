@@ -3,7 +3,7 @@ members = [".", "js", "python"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"
@@ -29,6 +29,10 @@ include = [
     "/src/**",
 ]
 
+[features]
+default = []
+ballchasing-cli = ["dep:reqwest"]
+
 [dependencies]
 anyhow = "1.0.98"
 boxcars.workspace = true
@@ -38,10 +42,15 @@ glam = "0.31.0"
 log = "0.4.27"
 ndarray = "0.17.2"
 paste = "1.0.15"
-reqwest = { version = "0.12.15", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12.15", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.140"
 thiserror = "2.0.12"
+
+[[bin]]
+name = "ballchasing_compare"
+path = "src/bin/ballchasing_compare.rs"
+required-features = ["ballchasing-cli"]
 
 [badges.github]
 repository = "rlrml/subtr-actor"
