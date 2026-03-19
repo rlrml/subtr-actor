@@ -35,9 +35,9 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
-  rawReplayData: RawReplayFramesData;
-  statsTimeline: StatsTimeline;
-  dynamicStatsTimeline: DynamicStatsTimeline;
+  rawReplayDataBuffer: ArrayBuffer;
+  statsTimelineBuffer: ArrayBuffer;
+  dynamicStatsTimelineBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -87,10 +87,20 @@ export async function loadReplayBundleInWorker(
       }
 
       cleanup();
+      const decoder = new TextDecoder();
+      const rawReplayData = JSON.parse(
+        decoder.decode(new Uint8Array(message.rawReplayDataBuffer)),
+      ) as RawReplayFramesData;
+      const statsTimeline = JSON.parse(
+        decoder.decode(new Uint8Array(message.statsTimelineBuffer)),
+      ) as StatsTimeline;
+      const dynamicStatsTimeline = JSON.parse(
+        decoder.decode(new Uint8Array(message.dynamicStatsTimelineBuffer)),
+      ) as DynamicStatsTimeline;
       resolve({
-        replay: normalizeReplayData(message.rawReplayData),
-        statsTimeline: message.statsTimeline,
-        dynamicStatsTimeline: message.dynamicStatsTimeline,
+        replay: normalizeReplayData(rawReplayData),
+        statsTimeline,
+        dynamicStatsTimeline,
       });
     };
 

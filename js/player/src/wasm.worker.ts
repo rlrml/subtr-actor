@@ -1,12 +1,7 @@
 /// <reference lib="webworker" />
 
 import * as subtrActor from "@colonelpanic8/subtr-actor";
-import { normalizeReplayData } from "./replay-data";
-import type {
-  RawReplayFramesData,
-  ReplayLoadProgress,
-  ReplayLoadResult,
-} from "./types";
+import type { ReplayLoadProgress } from "./types";
 
 type ReplayValidation = {
   valid: boolean;
@@ -27,7 +22,7 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
-  result: ReplayLoadResult;
+  rawBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -96,8 +91,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       throw new Error(validation.error ?? "Replay validation failed");
     }
 
-    const raw = toPlainData(
-      subtrActor.get_replay_frames_data_with_progress(
+    const raw = subtrActor.get_replay_frames_data_json_with_progress(
         bytes,
         (progress: unknown) => {
           postMessageToMain({
@@ -106,21 +100,17 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
           });
         },
         event.data.reportEveryNFrames,
-      ),
-    ) as RawReplayFramesData;
+      );
 
     postMessageToMain({
       type: "progress",
       progress: { stage: "normalizing", progress: 0 },
     });
 
-    postMessageToMain({
+    self.postMessage({
       type: "done",
-      result: {
-        raw,
-        replay: normalizeReplayData(raw),
-      },
-    });
+      rawBuffer: raw.buffer,
+    }, [raw.buffer]);
   } catch (error: unknown) {
     postMessageToMain({
       type: "error",

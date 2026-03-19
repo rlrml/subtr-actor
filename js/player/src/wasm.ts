@@ -70,7 +70,7 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
-  result: ReplayLoadResult;
+  rawBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -97,7 +97,7 @@ async function loadReplayFromBytesWithWorker(
       worker.terminate();
     };
 
-    worker.onmessage = (event: MessageEvent<ReplayWorkerMessage>) => {
+    worker.onmessage = async (event: MessageEvent<ReplayWorkerMessage>) => {
       const message = event.data;
       if (message.type === "progress") {
         options.onProgress?.(message.progress);
@@ -111,7 +111,16 @@ async function loadReplayFromBytesWithWorker(
       }
 
       cleanup();
-      resolve(message.result);
+      options.onProgress?.({ stage: "normalizing", progress: 0 });
+      if (typeof requestAnimationFrame === "function") {
+        await new Promise<void>((done) => requestAnimationFrame(() => done()));
+      }
+      const rawJson = new TextDecoder().decode(new Uint8Array(message.rawBuffer));
+      const raw = JSON.parse(rawJson) as RawReplayFramesData;
+      resolve({
+        raw,
+        replay: normalizeReplayData(raw),
+      });
     };
 
     worker.onerror = (event) => {

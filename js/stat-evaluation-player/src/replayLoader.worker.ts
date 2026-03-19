@@ -1,8 +1,6 @@
 /// <reference lib="webworker" />
 
 import * as subtrActor from "@colonelpanic8/subtr-actor";
-import type { RawReplayFramesData } from "subtr-actor-player";
-import type { DynamicStatsTimeline, StatsTimeline } from "./statsTimeline";
 import type { ReplayLoadProgress } from "./replayLoader";
 
 interface ReplayLoadRequest {
@@ -18,9 +16,9 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
-  rawReplayData: RawReplayFramesData;
-  statsTimeline: StatsTimeline;
-  dynamicStatsTimeline: DynamicStatsTimeline;
+  rawReplayDataBuffer: ArrayBuffer;
+  statsTimelineBuffer: ArrayBuffer;
+  dynamicStatsTimelineBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -89,8 +87,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       throw new Error(validation.error ?? "Replay validation failed");
     }
 
-    const rawReplayData = toPlainData(
-      subtrActor.get_replay_frames_data_with_progress(
+    const rawReplayData = subtrActor.get_replay_frames_data_json_with_progress(
         bytes,
         (progress: unknown) => {
           postMessageToMain({
@@ -99,36 +96,35 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
           });
         },
         event.data.reportEveryNFrames,
-      ),
-    ) as RawReplayFramesData;
+      );
 
     postMessageToMain({
       type: "progress",
       progress: { stage: "stats-timeline", progress: 0 },
     });
-    const statsTimeline = toPlainData(
-      subtrActor.get_stats_timeline(bytes) as unknown,
-    ) as StatsTimeline;
+    const statsTimeline = subtrActor.get_stats_timeline_json(bytes);
 
     postMessageToMain({
       type: "progress",
       progress: { stage: "dynamic-stats-timeline", progress: 0 },
     });
-    const dynamicStatsTimeline = toPlainData(
-      subtrActor.get_dynamic_stats_timeline(bytes) as unknown,
-    ) as DynamicStatsTimeline;
+    const dynamicStatsTimeline = subtrActor.get_dynamic_stats_timeline_json(bytes);
 
     postMessageToMain({
       type: "progress",
       progress: { stage: "normalizing", progress: 0 },
     });
 
-    postMessageToMain({
+    self.postMessage({
       type: "done",
-      rawReplayData,
-      statsTimeline,
-      dynamicStatsTimeline,
-    });
+      rawReplayDataBuffer: rawReplayData.buffer,
+      statsTimelineBuffer: statsTimeline.buffer,
+      dynamicStatsTimelineBuffer: dynamicStatsTimeline.buffer,
+    }, [
+      rawReplayData.buffer,
+      statsTimeline.buffer,
+      dynamicStatsTimeline.buffer,
+    ]);
   } catch (error: unknown) {
     postMessageToMain({
       type: "error",
