@@ -8,10 +8,7 @@ import {
   getExportedStatVariant,
 } from "./exportedStats.ts";
 
-export type PressureBreakdownClass = "field_half";
-
 interface PressureRenderOptions {
-  breakdownClasses?: PressureBreakdownClass[];
   exportedStats?: ExportedStat[];
   isTeamZero: boolean;
 }
@@ -76,22 +73,6 @@ function renderStatRow(label: string, value: string): string {
   return `<div class="stat-row"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(value)}</span></div>`;
 }
 
-function normalizeBreakdownClasses(
-  breakdownClasses: PressureBreakdownClass[] | undefined,
-): PressureBreakdownClass[] {
-  const seen = new Set<PressureBreakdownClass>();
-  const result: PressureBreakdownClass[] = [];
-
-  for (const className of breakdownClasses ?? []) {
-    if (!seen.has(className)) {
-      seen.add(className);
-      result.push(className);
-    }
-  }
-
-  return result;
-}
-
 function formatFieldHalfLabel(value: string, isTeamZero: boolean): string {
   if (value === "neutral") {
     return "Neutral zone";
@@ -103,19 +84,19 @@ function formatFieldHalfLabel(value: string, isTeamZero: boolean): string {
 function renderPressureBreakdownRows(
   pressure: StatsFrame["pressure"],
   exportedStats: ExportedStat[] | undefined,
-  breakdownClasses: PressureBreakdownClass[],
   trackedTime: number | undefined,
   isTeamZero: boolean,
 ): string {
-  if (breakdownClasses.length === 0 || !breakdownClasses.includes("field_half")) {
-    return "";
-  }
-  if (!pressure?.labeled_time?.entries?.length && (!exportedStats || exportedStats.length === 0)) {
-    return "";
+  const totals = new Map<string, number>();
+
+  if (pressure) {
+    totals.set("team_zero_side", pressure.team_zero_side_time);
+    totals.set("neutral", pressure.neutral_time ?? 0);
+    totals.set("team_one_side", pressure.team_one_side_time);
   }
 
-  const totals = new Map<string, number>();
   if (pressure?.labeled_time?.entries?.length) {
+    totals.clear();
     for (const entry of pressure.labeled_time.entries) {
       const half = entry.labels.find((label) => label.key === "field_half")?.value;
       if (!half) {
@@ -124,7 +105,7 @@ function renderPressureBreakdownRows(
 
       totals.set(half, (totals.get(half) ?? 0) + entry.value);
     }
-  } else {
+  } else if (totals.size === 0) {
     for (const stat of exportedStats ?? []) {
       const domain = getExportedStatDomain(stat);
       const name = getExportedStatName(stat);
@@ -150,7 +131,12 @@ function renderPressureBreakdownRows(
     }
   }
 
-  return ["team_zero_side", "neutral", "team_one_side"]
+  const orderedHalves = ["team_zero_side", "neutral", "team_one_side"];
+  if (!orderedHalves.some((half) => (totals.get(half) ?? 0) > 0)) {
+    return "";
+  }
+
+  return orderedHalves
     .filter((half) => totals.has(half))
     .map((half) => renderStatRow(
       formatFieldHalfLabel(half, isTeamZero),
@@ -172,11 +158,9 @@ export function renderPressureStats(
   );
   const trackedTime = pressure?.tracked_time
     ?? (trackedTimeStat ? getExportedStatValue(trackedTimeStat) : undefined);
-  const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderPressureBreakdownRows(
     pressure,
     options.exportedStats,
-    breakdownClasses,
     trackedTime,
     options.isTeamZero,
   );

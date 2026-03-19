@@ -13,7 +13,6 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
     },
     {
       isTeamZero: true,
-      breakdownClasses: ["field_half"],
       exportedStats: [
         {
           domain: "pressure",
@@ -46,17 +45,18 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
     },
   );
 
-  assert.match(html, /Tracked<\/span><span class="value">8\.0s/);
+  assert.doesNotMatch(html, /Tracked<\/span>/);
   assert.match(html, /Own half<\/span><span class="value">4\.0s \(50\.0%\)/);
   assert.match(html, /Neutral zone<\/span><span class="value">1\.0s \(12\.5%\)/);
   assert.match(html, /Opp half<\/span><span class="value">3\.0s \(37\.5%\)/);
 });
 
-test("renderPressureStats omits breakdown rows when no classes are selected", () => {
+test("renderPressureStats uses snapshot pressure totals without labeled exports", () => {
   const html = renderPressureStats(
     {
       tracked_time: 4,
       team_zero_side_time: 2,
+      neutral_time: 0,
       team_one_side_time: 2,
     },
     {
@@ -64,6 +64,25 @@ test("renderPressureStats omits breakdown rows when no classes are selected", ()
     },
   );
 
+  assert.doesNotMatch(html, /Tracked<\/span>/);
+  assert.match(html, /Own half<\/span><span class="value">2\.0s \(50\.0%\)/);
+  assert.match(html, /Opp half<\/span><span class="value">2\.0s \(50\.0%\)/);
+});
+
+test("renderPressureStats falls back to tracked time when no breakdown data exists", () => {
+  const html = renderPressureStats(
+    {
+      tracked_time: 4,
+      team_zero_side_time: 0,
+      neutral_time: 0,
+      team_one_side_time: 0,
+    },
+    {
+      isTeamZero: false,
+    },
+  );
+
+  assert.match(html, /Tracked<\/span><span class="value">4\.0s/);
   assert.doesNotMatch(html, /Own half<\/span>/);
   assert.doesNotMatch(html, /Opp half<\/span>/);
 });

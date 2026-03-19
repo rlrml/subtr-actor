@@ -45,7 +45,6 @@ import type { MovementBreakdownClass } from "./movementFormatting.ts";
 import { renderPossessionStats } from "./possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
 import { renderPressureStats } from "./pressureFormatting.ts";
-import type { PressureBreakdownClass } from "./pressureFormatting.ts";
 import { renderRushStats } from "./rushFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
@@ -916,10 +915,6 @@ function createFiftyFiftyModule(): StatModule {
 
 function createPressureModule(): StatModule {
   let halfFieldOverlay: HalfFieldOverlay | null = null;
-  let settingsEl: HTMLDivElement | null = null;
-  let breakdownReadoutEl: HTMLElement | null = null;
-  const activeBreakdownClasses = new Set<PressureBreakdownClass>(["field_half"]);
-  const orderedBreakdownClasses: PressureBreakdownClass[] = ["field_half"];
 
   return {
     id: "pressure",
@@ -930,7 +925,6 @@ function createPressureModule(): StatModule {
         ctx.player.sceneState.scene,
         ctx.fieldScale,
       );
-      syncPressureSettingsUi();
     },
 
     teardown() {
@@ -960,7 +954,6 @@ function createPressureModule(): StatModule {
           true,
           renderPressureStats(statsFrame?.pressure, {
             isTeamZero: true,
-            breakdownClasses: getActiveBreakdownClasses(),
           }),
         ),
         renderPlayerCard(
@@ -968,7 +961,6 @@ function createPressureModule(): StatModule {
           false,
           renderPressureStats(statsFrame?.pressure, {
             isTeamZero: false,
-            breakdownClasses: getActiveBreakdownClasses(),
           }),
         ),
       ].join("");
@@ -984,96 +976,9 @@ function createPressureModule(): StatModule {
 
       return renderPressureStats(statsFrame?.pressure, {
         isTeamZero: player.is_team_0,
-        breakdownClasses: getActiveBreakdownClasses(),
       });
     },
-
-    renderSettings() {
-      if (!settingsEl) {
-        settingsEl = document.createElement("div");
-        settingsEl.className = "module-settings-card";
-
-        const header = document.createElement("div");
-        header.className = "module-settings-header";
-
-        const text = document.createElement("div");
-        const eyebrow = document.createElement("p");
-        eyebrow.className = "module-settings-eyebrow";
-        eyebrow.textContent = "Stat display";
-        const title = document.createElement("h3");
-        title.textContent = "Ball side breakdown";
-        text.append(eyebrow, title);
-
-        breakdownReadoutEl = document.createElement("strong");
-        breakdownReadoutEl.className = "metric-readout";
-        header.append(text, breakdownReadoutEl);
-
-        const options = document.createElement("div");
-        options.className = "module-settings-options";
-
-        const optionLabel = document.createElement("label");
-        optionLabel.className = "toggle";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.dataset.breakdownClass = "field_half";
-        checkbox.addEventListener("change", () => {
-          if (checkbox.checked) {
-            activeBreakdownClasses.add("field_half");
-          } else {
-            activeBreakdownClasses.delete("field_half");
-          }
-          syncPressureSettingsUi();
-          rerenderPressureStats();
-        });
-
-        const optionText = document.createElement("span");
-        optionText.textContent = "Field half";
-        optionLabel.append(checkbox, optionText);
-        options.append(optionLabel);
-
-        settingsEl.append(header, options);
-      }
-
-      syncPressureSettingsUi();
-      return settingsEl;
-    },
   };
-
-  function syncPressureSettingsUi(): void {
-    if (!settingsEl) {
-      return;
-    }
-
-    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-breakdown-class]",
-    )) {
-      const className = checkbox.dataset.breakdownClass as PressureBreakdownClass | undefined;
-      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
-    }
-
-    if (breakdownReadoutEl) {
-      breakdownReadoutEl.textContent = activeBreakdownClasses.has("field_half")
-        ? "Field half"
-        : "Total only";
-    }
-  }
-
-  function getActiveBreakdownClasses(): PressureBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
-  }
-
-  function rerenderPressureStats(): void {
-    if (!replayPlayer) {
-      return;
-    }
-
-    const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
-  }
 }
 
 function createTimeInZoneModule(): StatModule {
