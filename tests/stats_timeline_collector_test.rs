@@ -232,6 +232,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         config: StatsTimelineConfig {
             most_back_forward_threshold_y: PositioningReducerConfig::default()
                 .most_back_forward_threshold_y,
+            pressure_neutral_zone_half_width_y: PressureReducerConfig::default()
+                .neutral_zone_half_width_y,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),

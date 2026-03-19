@@ -33,6 +33,12 @@ impl StatFieldProvider for PressureStats {
         ));
         visitor(ExportedStat::float(
             "pressure",
+            "neutral_time",
+            StatUnit::Seconds,
+            self.neutral_time,
+        ));
+        visitor(ExportedStat::float(
+            "pressure",
             "team_zero_side_pct",
             StatUnit::Percent,
             self.team_zero_side_pct(),
@@ -42,6 +48,12 @@ impl StatFieldProvider for PressureStats {
             "team_one_side_pct",
             StatUnit::Percent,
             self.team_one_side_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "pressure",
+            "neutral_pct",
+            StatUnit::Percent,
+            self.neutral_pct(),
         ));
     }
 }

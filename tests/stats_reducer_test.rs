@@ -2724,10 +2724,10 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
 
     let team_zero_stats = reducer.player_stats().get(&team_zero_id).unwrap();
     let team_one_stats = reducer.player_stats().get(&team_one_id).unwrap();
-    assert_eq!(team_zero_stats.time_has_possession, 3.0);
+    assert_eq!(team_zero_stats.time_has_possession, 2.0);
     assert_eq!(team_zero_stats.time_no_possession, 1.0);
     assert_eq!(team_one_stats.time_has_possession, 1.0);
-    assert_eq!(team_one_stats.time_no_possession, 3.0);
+    assert_eq!(team_one_stats.time_no_possession, 2.0);
 }
 
 #[test]

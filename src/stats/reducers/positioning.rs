@@ -219,9 +219,9 @@ impl PositioningReducer {
     fn process_sample(
         &mut self,
         sample: &StatsSample,
-        possession_team_before_sample: Option<bool>,
+        live_play: bool,
+        possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
         if sample.dt == 0.0 {
             if let Some(ball) = &sample.ball {
                 self.previous_ball_position = Some(ball.position());
@@ -283,11 +283,11 @@ impl PositioningReducer {
                 stats.tracked_time += sample.dt;
                 stats.sum_distance_to_ball += position.distance(ball_position) * sample.dt;
 
-                if possession_team_before_sample == Some(player.is_team_0) {
+                if possession_player_before_sample == Some(&player.player_id) {
                     stats.time_has_possession += sample.dt;
                     stats.sum_distance_to_ball_has_possession +=
                         position.distance(ball_position) * sample.dt;
-                } else if possession_team_before_sample.is_some() {
+                } else if possession_player_before_sample.is_some() {
                     stats.time_no_possession += sample.dt;
                     stats.sum_distance_to_ball_no_possession +=
                         position.distance(ball_position) * sample.dt;
@@ -476,15 +476,14 @@ impl PositioningReducer {
 impl StatsReducer for PositioningReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
-        let possession_team_before_sample = if live_play {
-            self.possession_tracker
-                .update(sample, &sample.touch_events)
-                .active_team_before_sample
+        let possession_player_before_sample = if live_play {
+            let possession_state = self.possession_tracker.update(sample, &sample.touch_events);
+            possession_state.active_player_before_sample
         } else {
             self.possession_tracker.reset();
             None
         };
-        self.process_sample(sample, possession_team_before_sample)?;
+        self.process_sample(sample, live_play, possession_player_before_sample.as_ref())?;
         Ok(())
     }
 
@@ -493,10 +492,11 @@ impl StatsReducer for PositioningReducer {
         sample: &StatsSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
-        let possession_team_before_sample = ctx
+        let live_play = self.live_play_tracker.is_live_play(sample);
+        let possession_player_before_sample = ctx
             .get::<PossessionState>(POSSESSION_STATE_SIGNAL_ID)
-            .and_then(|state| state.active_team_before_sample);
-        self.process_sample(sample, possession_team_before_sample)?;
+            .and_then(|state| state.active_player_before_sample.as_ref());
+        self.process_sample(sample, live_play, possession_player_before_sample)?;
         Ok(())
     }
 }
@@ -544,6 +544,52 @@ mod tests {
             match_saves: Some(0),
             match_shots: Some(0),
             match_score: Some(0),
+        }
+    }
+
+    fn sample(
+        frame_number: usize,
+        time: f32,
+        touch_players: &[(u64, bool)],
+        kickoff_phase_active: bool,
+    ) -> StatsSample {
+        StatsSample {
+            frame_number,
+            time,
+            dt: 1.0,
+            seconds_remaining: None,
+            game_state: kickoff_phase_active.then_some(55),
+            ball_has_been_hit: Some(!kickoff_phase_active),
+            kickoff_countdown_time: kickoff_phase_active.then_some(3),
+            team_zero_score: Some(0),
+            team_one_score: Some(0),
+            possession_team_is_team_0: None,
+            scored_on_team_is_team_0: None,
+            current_in_game_team_player_counts: Some([2, 1]),
+            ball: Some(BallSample {
+                rigid_body: rigid_body(0.0),
+            }),
+            players: vec![
+                player(1, true, -400.0),
+                player(2, true, -100.0),
+                player(3, false, 300.0),
+            ],
+            active_demos: Vec::new(),
+            demo_events: Vec::new(),
+            boost_pad_events: Vec::new(),
+            touch_events: touch_players
+                .iter()
+                .map(|(player_id, team_is_team_0)| TouchEvent {
+                    time,
+                    frame: frame_number,
+                    player: Some(RemoteId::Steam(*player_id)),
+                    team_is_team_0: *team_is_team_0,
+                    closest_approach_distance: None,
+                })
+                .collect(),
+            dodge_refreshed_events: Vec::new(),
+            player_stat_events: Vec::new(),
+            goal_events: Vec::new(),
         }
     }
 
@@ -614,5 +660,39 @@ mod tests {
                 .times_caught_ahead_of_play_on_conceded_goals,
             0
         );
+    }
+
+    #[test]
+    fn player_possession_is_exclusive_and_resets_on_kickoff() {
+        let mut reducer = PositioningReducer::new();
+
+        reducer.on_sample(&sample(0, 0.0, &[], false)).unwrap();
+        reducer
+            .on_sample(&sample(1, 1.0, &[(1, true)], false))
+            .unwrap();
+        reducer.on_sample(&sample(2, 2.0, &[], false)).unwrap();
+        reducer
+            .on_sample(&sample(3, 3.0, &[(2, true)], false))
+            .unwrap();
+        reducer.on_sample(&sample(4, 4.0, &[], false)).unwrap();
+        reducer.on_sample(&sample(5, 5.0, &[], true)).unwrap();
+        reducer.on_sample(&sample(6, 6.0, &[], false)).unwrap();
+
+        let player_one = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
+        let player_two = reducer.player_stats().get(&RemoteId::Steam(2)).unwrap();
+        let player_three = reducer.player_stats().get(&RemoteId::Steam(3)).unwrap();
+
+        assert_eq!(player_one.time_has_possession, 2.0);
+        assert_eq!(player_two.time_has_possession, 1.0);
+        assert_eq!(player_three.time_has_possession, 0.0);
+        assert_eq!(
+            player_one.time_has_possession
+                + player_two.time_has_possession
+                + player_three.time_has_possession,
+            3.0
+        );
+        assert_eq!(player_one.time_no_possession, 1.0);
+        assert_eq!(player_two.time_no_possession, 2.0);
+        assert_eq!(player_three.time_no_possession, 3.0);
     }
 }

@@ -261,6 +261,8 @@ impl TouchReducer {
 impl StatsReducer for TouchReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample) {
+            self.current_last_touch_player = None;
+            self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
             return Ok(());
         }
 
@@ -277,6 +279,8 @@ impl StatsReducer for TouchReducer {
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample) {
+            self.current_last_touch_player = None;
+            self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
             return Ok(());
         }
 

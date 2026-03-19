@@ -136,7 +136,8 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
     let stats = PressureStats {
         tracked_time: 10.0,
         team_zero_side_time: 4.0,
-        team_one_side_time: 6.0,
+        team_one_side_time: 5.0,
+        neutral_time: 1.0,
         labeled_time: LabeledFloatSums::default(),
     };
 
@@ -148,7 +149,11 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
     );
     assert_eq!(
         find_field(&fields, "pressure", "team_one_side_time").value,
-        StatValue::Float(6.0)
+        StatValue::Float(5.0)
+    );
+    assert_eq!(
+        find_field(&fields, "pressure", "neutral_time").value,
+        StatValue::Float(1.0)
     );
     assert_eq!(
         find_field(&fields, "pressure", "team_zero_side_pct").value,
@@ -156,7 +161,11 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
     );
     assert_eq!(
         find_field(&fields, "pressure", "team_one_side_pct").value,
-        StatValue::Float(60.0)
+        StatValue::Float(50.0)
+    );
+    assert_eq!(
+        find_field(&fields, "pressure", "neutral_pct").value,
+        StatValue::Float(10.0)
     );
 }
 

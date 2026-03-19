@@ -64,6 +64,7 @@ impl PossessionStats {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct PossessionTracker {
     current_team_is_team_0: Option<bool>,
+    current_player: Option<PlayerId>,
     last_possession_touch_time: Option<f32>,
     pending_turnover_team_is_team_0: Option<bool>,
     pending_turnover_touch_time: Option<f32>,
@@ -77,6 +78,7 @@ impl PossessionTracker {
 
     pub(crate) fn reset(&mut self) {
         self.current_team_is_team_0 = None;
+        self.current_player = None;
         self.last_possession_touch_time = None;
         self.clear_pending_turnover();
     }
@@ -90,6 +92,7 @@ impl PossessionTracker {
         }
 
         self.current_team_is_team_0 = None;
+        self.current_player = None;
         self.last_possession_touch_time = None;
         self.clear_pending_turnover();
     }
@@ -106,6 +109,7 @@ impl PossessionTracker {
         }
 
         self.current_team_is_team_0 = None;
+        self.current_player = None;
         self.last_possession_touch_time = None;
     }
 
@@ -145,6 +149,37 @@ impl PossessionTracker {
         self.pending_turnover_touch_time = Some(time);
     }
 
+    fn update_player_control(
+        &mut self,
+        active_team_before_sample: Option<bool>,
+        touched_team_zero_player: Option<&PlayerId>,
+        touched_team_one_player: Option<&PlayerId>,
+    ) {
+        let Some(current_team_is_team_0) = self.current_team_is_team_0 else {
+            self.current_player = None;
+            return;
+        };
+
+        if self.pending_turnover_team_is_team_0.is_some() {
+            self.current_player = None;
+            return;
+        }
+
+        let controlling_touch_player = if current_team_is_team_0 {
+            touched_team_zero_player
+        } else {
+            touched_team_one_player
+        };
+        if let Some(player) = controlling_touch_player {
+            self.current_player = Some(player.clone());
+            return;
+        }
+
+        if active_team_before_sample != self.current_team_is_team_0 {
+            self.current_player = None;
+        }
+    }
+
     pub(crate) fn update(
         &mut self,
         sample: &StatsSample,
@@ -154,8 +189,19 @@ impl PossessionTracker {
         self.expire_loose_ball(sample.time);
 
         let active_team_before_sample = self.current_team_is_team_0;
+        let active_player_before_sample = self.current_player.clone();
         let touched_team_zero = touch_events.iter().any(|touch| touch.team_is_team_0);
         let touched_team_one = touch_events.iter().any(|touch| !touch.team_is_team_0);
+        let touched_team_zero_player = touch_events
+            .iter()
+            .rev()
+            .find(|touch| touch.team_is_team_0)
+            .and_then(|touch| touch.player.clone());
+        let touched_team_one_player = touch_events
+            .iter()
+            .rev()
+            .find(|touch| !touch.team_is_team_0)
+            .and_then(|touch| touch.player.clone());
 
         match (touched_team_zero, touched_team_one) {
             (true, true) => self.register_contested_touch(sample.time),
@@ -163,10 +209,17 @@ impl PossessionTracker {
             (false, true) => self.register_single_team_touch(false, sample.time),
             (false, false) => {}
         }
+        self.update_player_control(
+            active_team_before_sample,
+            touched_team_zero_player.as_ref(),
+            touched_team_one_player.as_ref(),
+        );
 
         PossessionState {
             active_team_before_sample,
             current_team_is_team_0: self.current_team_is_team_0,
+            active_player_before_sample,
+            current_player: self.current_player.clone(),
         }
     }
 }

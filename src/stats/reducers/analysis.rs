@@ -20,6 +20,8 @@ pub struct TouchState {
 pub struct PossessionState {
     pub active_team_before_sample: Option<bool>,
     pub current_team_is_team_0: Option<bool>,
+    pub active_player_before_sample: Option<PlayerId>,
+    pub current_player: Option<PlayerId>,
 }
 
 #[derive(Default)]
@@ -446,6 +448,8 @@ impl DerivedSignal for TouchStateSignal {
                 .filter(|candidate| self.should_emit_candidate(candidate))
                 .collect()
         } else {
+            self.current_last_touch = None;
+            self.recent_touch_candidates.clear();
             Vec::new()
         };
 
@@ -503,6 +507,8 @@ impl DerivedSignal for PossessionStateSignal {
             return Ok(Some(Box::new(PossessionState {
                 active_team_before_sample: None,
                 current_team_is_team_0: None,
+                active_player_before_sample: None,
+                current_player: None,
             })));
         }
 
@@ -872,5 +878,34 @@ mod tests {
         let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
         assert_eq!(stats.touch_count, 1);
         assert!(stats.is_last_touch);
+    }
+
+    #[test]
+    fn touch_signal_clears_last_touch_across_kickoff() {
+        let mut graph = default_derived_signal_graph();
+
+        let first = sample(0, 0.0, 0.0);
+        let second = sample(1, 1.0 / 120.0, 5.0);
+        let mut kickoff = sample(2, 2.0 / 120.0, 10.0);
+        kickoff.game_state = Some(55);
+        kickoff.kickoff_countdown_time = Some(3);
+        kickoff.ball_has_been_hit = Some(false);
+
+        graph.evaluate(&first).unwrap();
+        let second_ctx = graph.evaluate(&second).unwrap();
+        let second_touch_state = second_ctx.get::<TouchState>(TOUCH_STATE_SIGNAL_ID).unwrap();
+        assert_eq!(
+            second_touch_state.last_touch_player,
+            Some(RemoteId::Steam(1))
+        );
+
+        let kickoff_ctx = graph.evaluate(&kickoff).unwrap();
+        let kickoff_touch_state = kickoff_ctx
+            .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
+            .unwrap();
+        assert!(kickoff_touch_state.touch_events.is_empty());
+        assert_eq!(kickoff_touch_state.last_touch, None);
+        assert_eq!(kickoff_touch_state.last_touch_player, None);
+        assert_eq!(kickoff_touch_state.last_touch_team_is_team_0, None);
     }
 }

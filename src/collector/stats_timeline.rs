@@ -5,6 +5,7 @@ use crate::*;
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StatsTimelineConfig {
     pub most_back_forward_threshold_y: f32,
+    pub pressure_neutral_zone_half_width_y: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -201,6 +202,13 @@ impl StatsTimelineReducers {
             ..Self::default()
         }
     }
+
+    fn with_pressure_config(config: PressureReducerConfig) -> Self {
+        Self {
+            pressure: PressureReducer::with_config(config),
+            ..Self::default()
+        }
+    }
 }
 
 impl StatsReducer for StatsTimelineReducers {
@@ -298,6 +306,13 @@ impl StatsTimelineCollector {
         }
     }
 
+    pub fn with_pressure_config(config: PressureReducerConfig) -> Self {
+        Self {
+            reducers: StatsTimelineReducers::with_pressure_config(config),
+            ..Self::default()
+        }
+    }
+
     pub fn get_replay_data(
         mut self,
         replay: &boxcars::Replay,
@@ -326,6 +341,11 @@ impl StatsTimelineCollector {
                 .positioning
                 .config()
                 .most_back_forward_threshold_y,
+            pressure_neutral_zone_half_width_y: self
+                .reducers
+                .pressure
+                .config()
+                .neutral_zone_half_width_y,
         };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
@@ -349,6 +369,11 @@ impl StatsTimelineCollector {
                 .positioning
                 .config()
                 .most_back_forward_threshold_y,
+            pressure_neutral_zone_half_width_y: self
+                .reducers
+                .pressure
+                .config()
+                .neutral_zone_half_width_y,
         };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
