@@ -2251,9 +2251,9 @@ async function loadReplay(file: File): Promise<void> {
 export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
-  replayLoadModal = createReplayLoadModal(root);
   root.innerHTML = APP_TEMPLATE;
   appRoot = root;
+  replayLoadModal = createReplayLoadModal(root);
 
   fileInput = mustElement<HTMLInputElement>(root, "#replay-file");
   viewport = mustElement<HTMLDivElement>(root, "#viewport");
