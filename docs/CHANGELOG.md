@@ -6,6 +6,13 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.2.1 - 2026-03-19
+
+- Refactor the stats player into reusable scaffolding, templates, and module
+  builders to make the package easier to extend and maintain.
+- Fix time-in-zone colors so player-relative lanes render correctly.
+- Refresh release metadata to `0.2.1`.
+
 ## v0.2.0 - 2026-03-19
 
 - Package `subtr-actor-stat-evaluation-player` as a publishable npm library
