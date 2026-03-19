@@ -7,7 +7,25 @@ export interface StatsTimeline {
   replay_meta: unknown;
   timeline_events: unknown[];
   fifty_fifty_events?: FiftyFiftyEvent[];
+  speed_flip_events?: SpeedFlipEvent[];
   frames: StatsFrame[];
+}
+
+export interface SpeedFlipEvent {
+  time: number;
+  frame: number;
+  player?: Record<string, string>;
+  is_team_0: boolean;
+  time_since_kickoff_start: number;
+  start_position: [number, number, number];
+  end_position: [number, number, number];
+  start_speed: number;
+  max_speed: number;
+  best_alignment: number;
+  diagonal_score: number;
+  cancel_score: number;
+  speed_score: number;
+  confidence: number;
 }
 
 export interface FiftyFiftyEvent {
@@ -128,6 +146,19 @@ export interface PlayerStatsSnapshot {
     kickoff_possession_after_count: number;
     [key: string]: unknown;
   };
+  speed_flip?: {
+    count: number;
+    high_confidence_count: number;
+    is_last_speed_flip: boolean;
+    last_speed_flip_time?: number;
+    last_speed_flip_frame?: number;
+    time_since_last_speed_flip?: number;
+    frames_since_last_speed_flip?: number;
+    last_quality?: number;
+    average_quality?: number;
+    best_quality?: number;
+    [key: string]: unknown;
+  };
   touch?: {
     touch_count: number;
     dribble_touch_count?: number;
@@ -145,6 +176,20 @@ export interface PlayerStatsSnapshot {
     last_ball_speed_change?: number;
     average_ball_speed_change?: number;
     max_ball_speed_change?: number;
+    [key: string]: unknown;
+  };
+  musty_flick?: {
+    count: number;
+    aerial_count?: number;
+    high_confidence_count?: number;
+    is_last_musty: boolean;
+    last_musty_time?: number;
+    last_musty_frame?: number;
+    time_since_last_musty?: number;
+    frames_since_last_musty?: number;
+    last_confidence?: number;
+    average_confidence?: number;
+    best_confidence?: number;
     [key: string]: unknown;
   };
   dodge_reset?: {

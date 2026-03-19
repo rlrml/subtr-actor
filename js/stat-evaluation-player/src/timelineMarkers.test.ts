@@ -5,6 +5,7 @@ import type { ReplayModel } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildFiftyFiftyTimelineEvents,
+  buildMustyFlickTimelineEvents,
   buildRushTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
@@ -198,6 +199,74 @@ test("buildRushTimelineEvents maps cumulative rush counts to discrete timeline m
   ]);
 });
 
+test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 1.5,
+        dt: 1,
+        players: [
+          {
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            musty_flick: {
+              count: 1,
+              last_musty_frame: 1,
+              last_musty_time: 1.5,
+              is_last_musty: true,
+            },
+          },
+        ],
+      },
+      {
+        frame_number: 2,
+        time: 2.25,
+        dt: 1,
+        players: [
+          {
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            musty_flick: {
+              count: 1,
+              last_musty_frame: 1,
+              last_musty_time: 1.5,
+              is_last_musty: false,
+            },
+          },
+        ],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildMustyFlickTimelineEvents(statsTimeline, replay), [
+    {
+      id: "musty-flick:1:Steam:blue-id:1",
+      time: 1.5,
+      frame: 1,
+      kind: "musty-flick",
+      label: "Blue musty flick",
+      shortLabel: "M",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [
@@ -261,7 +330,19 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
           team_one_three_v_two_count: 0,
           team_one_three_v_three_count: 0,
         },
-        players: [],
+        players: [
+          {
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            musty_flick: {
+              count: 1,
+              last_musty_frame: 1,
+              last_musty_time: 1.25,
+              is_last_musty: true,
+            },
+          },
+        ],
       },
     ],
   } as StatsTimeline;
@@ -274,5 +355,13 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   assert.equal(
     countEnabledTimelineEvents(["core", "fifty-fifty", "rush"], replay, statsTimeline),
     4,
+  );
+  assert.equal(
+    countEnabledTimelineEvents(
+      ["core", "fifty-fifty", "rush", "musty-flick"],
+      replay,
+      statsTimeline,
+    ),
+    5,
   );
 });

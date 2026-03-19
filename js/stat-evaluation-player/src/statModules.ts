@@ -27,6 +27,7 @@ import { renderPossessionStats } from "./possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "./possessionFormatting.ts";
 import { renderPressureStats } from "./pressureFormatting.ts";
 import { renderRushStats } from "./rushFormatting.ts";
+import { SpeedFlipOverlay } from "./speedFlipOverlay.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import type {
   PlayerStatsSnapshot,
@@ -38,6 +39,7 @@ import type { TouchBreakdownClass } from "./touchFormatting.ts";
 import { TouchEventOverlay, playerIdToString } from "./touchOverlay.ts";
 import {
   buildFiftyFiftyTimelineEvents,
+  buildMustyFlickTimelineEvents,
   buildRushTimelineEvents,
 } from "./timelineMarkers.ts";
 import {
@@ -409,6 +411,33 @@ function renderDodgeResetStats(
   return `
     <div class="stat-row"><span class="label">Resets</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
     <div class="stat-row"><span class="label">On-ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
+  `;
+}
+
+function renderMustyFlickStats(
+  mustyFlick: PlayerStatsSnapshot["musty_flick"],
+): string {
+  return `
+    <div class="stat-row"><span class="label">Musties</span><span class="value">${formatInteger(mustyFlick?.count)}</span></div>
+    <div class="stat-row"><span class="label">Aerial</span><span class="value">${formatInteger(mustyFlick?.aerial_count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(mustyFlick?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last conf</span><span class="value">${formatNumber(mustyFlick?.last_confidence, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg conf</span><span class="value">${formatNumber(mustyFlick?.average_confidence, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best conf</span><span class="value">${formatNumber(mustyFlick?.best_confidence, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(mustyFlick?.time_since_last_musty, 2, "s")}</span></div>
+  `;
+}
+
+function renderSpeedFlipStats(
+  speedFlip: PlayerStatsSnapshot["speed_flip"],
+): string {
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(speedFlip?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(speedFlip?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(speedFlip?.last_quality, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(speedFlip?.average_quality, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(speedFlip?.best_quality, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(speedFlip?.time_since_last_speed_flip, 2, "s")}</span></div>
   `;
 }
 
@@ -1034,6 +1063,98 @@ function createDodgeResetModule(): StatModule {
   });
 }
 
+function createMustyFlickModule(): StatModule {
+  return {
+    id: "musty-flick",
+    label: "Musty Flick",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildMustyFlickTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderMustyFlickStats(player.musty_flick),
+        player.musty_flick?.is_last_musty
+          ? '<span class="role-indicator role-forward">Last Musty</span>'
+          : "",
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderMustyFlickStats(player.musty_flick);
+    },
+  };
+}
+
+function createSpeedFlipModule(): StatModule {
+  let overlay: SpeedFlipOverlay | null = null;
+
+  return {
+    id: "speed-flip",
+    label: "Speed Flip",
+
+    setup(ctx) {
+      overlay = new SpeedFlipOverlay(
+        ctx.player.sceneState,
+        ctx.player.container,
+        ctx.replay,
+        ctx.statsTimeline,
+      );
+    },
+
+    teardown() {
+      overlay?.dispose();
+      overlay = null;
+    },
+
+    onBeforeRender(info) {
+      overlay?.update(info.currentTime);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderSpeedFlipStats(player.speed_flip),
+        player.speed_flip?.is_last_speed_flip
+          ? '<span class="role-indicator role-forward">Last Speed Flip</span>'
+          : "",
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderSpeedFlipStats(player.speed_flip);
+    },
+  };
+}
+
 function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlay: TouchEventOverlay | null = null;
   let settingsEl: HTMLDivElement | null = null;
@@ -1397,7 +1518,9 @@ export function createStatModules(runtime: StatModuleRuntime): StatModule[] {
     createRelativePositioningModule(),
     createAbsolutePositioningModule(),
     createTimeInZoneModule(),
+    createSpeedFlipModule(),
     createTouchModule(runtime),
+    createMustyFlickModule(),
     createDodgeResetModule(),
     createBoostModule(),
     createBallCarryModule(),

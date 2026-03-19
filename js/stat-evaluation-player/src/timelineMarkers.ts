@@ -22,6 +22,11 @@ const RUSH_MATCHUPS = [
 
 type RushTeamPrefix = "team_zero" | "team_one";
 
+function playerIdToString(playerId: Record<string, string>): string {
+  const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
+  return `${kind}:${value}`;
+}
+
 function getRushCount(
   rush: StatsTimeline["frames"][number]["rush"] | undefined,
   key: string,
@@ -130,6 +135,50 @@ export function buildRushTimelineEvents(
   return events;
 }
 
+export function buildMustyFlickTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  const events: ReplayTimelineEvent[] = [];
+  const previousCounts = new Map<string, number>();
+
+  for (const frame of statsTimeline.frames) {
+    for (const player of frame.players) {
+      const playerId = playerIdToString(player.player_id);
+      const currentCount = player.musty_flick?.count ?? 0;
+      const previousCount = previousCounts.get(playerId) ?? 0;
+      previousCounts.set(playerId, currentCount);
+
+      const delta = Math.max(0, currentCount - previousCount);
+      if (delta === 0) {
+        continue;
+      }
+
+      const eventFrame = player.musty_flick?.last_musty_frame ?? frame.frame_number;
+      const eventTime = replay.frames[eventFrame]?.time
+        ?? player.musty_flick?.last_musty_time
+        ?? frame.time;
+
+      for (let index = 0; index < delta; index += 1) {
+        events.push({
+          id: `musty-flick:${eventFrame}:${playerId}:${currentCount - delta + index + 1}`,
+          time: eventTime,
+          frame: eventFrame,
+          kind: "musty-flick",
+          label: `${player.name} musty flick`,
+          shortLabel: "M",
+          playerId,
+          playerName: player.name,
+          isTeamZero: player.is_team_0,
+          color: player.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+        });
+      }
+    }
+  }
+
+  return events;
+}
+
 export function countEnabledTimelineEvents(
   activeModuleIds: Iterable<string>,
   replay: ReplayModel,
@@ -144,6 +193,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("rush")) {
     count += buildRushTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("musty-flick")) {
+    count += buildMustyFlickTimelineEvents(statsTimeline, replay).length;
   }
 
   return count;
