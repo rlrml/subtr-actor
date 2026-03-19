@@ -1183,6 +1183,7 @@ fn test_custom_collector_receives_frames() {
 }
 
 #[test]
+#[allow(clippy::result_large_err)]
 fn test_callback_collector_invokes_callback_for_each_frame_by_default() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let mut callback_frames = Vec::new();
@@ -1217,6 +1218,7 @@ fn test_callback_collector_invokes_callback_for_each_frame_by_default() {
 }
 
 #[test]
+#[allow(clippy::result_large_err)]
 fn test_callback_collector_honors_frame_interval() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let frame_interval = 100;
