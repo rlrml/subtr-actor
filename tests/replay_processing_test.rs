@@ -1181,3 +1181,68 @@ fn test_custom_collector_receives_frames() {
         );
     }
 }
+
+#[test]
+fn test_callback_collector_invokes_callback_for_each_frame_by_default() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let mut callback_frames = Vec::new();
+    let mut collector = CallbackCollector::new(|_frame, frame_number, current_time| {
+        callback_frames.push((frame_number, current_time));
+        Ok(())
+    });
+    let mut processor = ReplayProcessor::new(&replay).expect("Should create processor");
+    processor
+        .process(&mut collector)
+        .expect("Should process replay");
+
+    let total_frames = replay
+        .network_frames
+        .as_ref()
+        .expect("Replay should have network frames")
+        .frames
+        .len();
+
+    assert_eq!(
+        callback_frames.len(),
+        total_frames,
+        "Callback should be invoked once per processed frame by default"
+    );
+    assert_eq!(
+        callback_frames
+            .first()
+            .map(|(frame_number, _)| *frame_number),
+        Some(0),
+        "Callback collector should begin at frame zero"
+    );
+}
+
+#[test]
+fn test_callback_collector_honors_frame_interval() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let frame_interval = 100;
+    let mut callback_frames = Vec::new();
+    let mut collector = CallbackCollector::with_frame_interval(
+        |_frame, frame_number, _current_time| {
+            callback_frames.push(frame_number);
+            Ok(())
+        },
+        frame_interval,
+    );
+    let mut processor = ReplayProcessor::new(&replay).expect("Should create processor");
+    processor
+        .process(&mut collector)
+        .expect("Should process replay");
+
+    let total_frames = replay
+        .network_frames
+        .as_ref()
+        .expect("Replay should have network frames")
+        .frames
+        .len();
+    let expected_frames: Vec<usize> = (0..total_frames).step_by(frame_interval).collect();
+
+    assert_eq!(
+        callback_frames, expected_frames,
+        "Callback collector should only invoke the callback at the configured cadence"
+    );
+}
