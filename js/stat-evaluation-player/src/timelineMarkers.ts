@@ -2,7 +2,7 @@ import type {
   ReplayModel,
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
-} from "../../player/src/types.ts";
+} from "subtr-actor-player";
 import {
   buildFiftyFiftyMarkers,
 } from "./fiftyFiftyOverlay.ts";

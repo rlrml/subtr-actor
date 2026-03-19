@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ReplayModel } from "../../player/src/types.ts";
+import type { ReplayModel } from "subtr-actor-player";
 import type { DynamicStatsTimeline, StatsTimeline } from "./statsTimeline.ts";
 import {
   buildPossessionTimelineRanges,

@@ -1,15 +1,61 @@
 {
   "name": "subtr-actor-stat-evaluation-player",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.17",
+  "description": "Stats-focused replay player UI for subtr-actor Rocket League replay workflows",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/lib.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
+    "build:player": "npm --prefix ../player run build",
     "check": "tsc --noEmit",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "build:types": "tsc --project tsconfig.build.json",
+    "build": "npm run build:bindings && npm run build:player && npm run check && vite build && npm run build:types",
+    "prepare:package": "node ./scripts/prepare-package.mjs",
+    "smoke:install": "node ./scripts/smoke-install.mjs"
   },
-  "dependencies": {
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rlrml/subtr-actor.git",
+    "directory": "js/stat-evaluation-player"
+  },
+  "bugs": {
+    "url": "https://github.com/rlrml/subtr-actor/issues"
+  },
+  "homepage": "https://github.com/rlrml/subtr-actor/tree/master/js/stat-evaluation-player#readme",
+  "keywords": [
+    "rocket-league",
+    "replay",
+    "player",
+    "stats",
+    "threejs",
+    "wasm"
+  ],
+  "author": "Ivan Malison <ivanmalison@gmail.com>",
+  "license": "MIT",
+  "peerDependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {

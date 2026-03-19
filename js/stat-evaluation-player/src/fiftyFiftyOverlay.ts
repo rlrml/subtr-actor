@@ -1,6 +1,5 @@
 import * as THREE from "three";
-import type { ReplayModel } from "../../player/src/types.ts";
-import type { ReplayScene } from "../../player/src/scene.ts";
+import type { ReplayModel, ReplayScene } from "subtr-actor-player";
 import type {
   FiftyFiftyEvent,
   StatsTimeline,

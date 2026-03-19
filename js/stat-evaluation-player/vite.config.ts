@@ -50,17 +50,20 @@ function ensureWasmBindingsPlugin() {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: "./",
   plugins: [wasm(), ensureWasmBindingsPlugin()],
   resolve: {
-    alias: {
-      "subtr-actor": path.resolve(
-        import.meta.dirname,
-        "../pkg/rl_replay_subtr_actor.js"
-      ),
-      three: path.resolve(import.meta.dirname, "node_modules/three"),
-    },
+    alias: command === "serve"
+      ? {
+        "subtr-actor": path.resolve(
+          import.meta.dirname,
+          "../pkg/rl_replay_subtr_actor.js",
+        ),
+        "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+        three: path.resolve(import.meta.dirname, "node_modules/three"),
+      }
+      : undefined,
   },
   server: {
     fs: {
@@ -68,6 +71,19 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["subtr-actor"],
+    exclude: ["subtr-actor", "subtr-actor-player"],
   },
-});
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist"),
+    emptyOutDir: true,
+    lib: {
+      entry: path.resolve(import.meta.dirname, "src/lib.ts"),
+      name: "SubtrActorStatEvaluationPlayer",
+      fileName: "index",
+      formats: ["es"],
+    },
+    rollupOptions: {
+      external: ["subtr-actor", "subtr-actor-player", "three"],
+    },
+  },
+}));

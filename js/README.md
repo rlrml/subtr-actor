@@ -8,6 +8,7 @@ Related npm packages:
 
 - [`subtr-actor`](https://www.npmjs.com/package/subtr-actor): low-level WebAssembly bindings
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player): replay player package built on top of these bindings
+- [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player): stats-focused replay viewer UI built on top of the player package
 
 ## Installation
 
@@ -197,6 +198,7 @@ npm --prefix js test
 Local packages built on top of these bindings:
 
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
+- [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player) / [`js/stat-evaluation-player`](./stat-evaluation-player/README.md): stats-focused replay viewer package with timeline overlays and per-module stat panels.
 - [`js/example`](./example/README.md): example/demo app that exercises the local player library.
 
 The mechanics evaluation player was moved to the sibling `subtr-actor-mechanics`

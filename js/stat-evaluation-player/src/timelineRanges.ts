@@ -1,4 +1,4 @@
-import type { ReplayModel, ReplayTimelineRange } from "../../player/src/types.ts";
+import type { ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
 import type {
   DynamicStatsTimeline,
   ExportedStat,

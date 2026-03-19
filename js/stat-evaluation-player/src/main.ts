@@ -5,7 +5,7 @@ import {
   createTimelineOverlayPlugin,
   ReplayPlayer,
   loadReplayFromBytes,
-} from "../../player/src/lib.ts";
+} from "subtr-actor-player";
 import type {
   FrameRenderInfo,
   ReplayModel,
@@ -14,7 +14,7 @@ import type {
   ReplayTimelineEvent,
   ReplayTimelineRange,
   TimelineOverlayPlugin,
-} from "../../player/src/lib.ts";
+} from "subtr-actor-player";
 import {
   HalfFieldOverlay,
   ThresholdZoneOverlay,
@@ -1682,8 +1682,8 @@ function renderTimelineEventCount(): void {
   )}`;
 }
 
-function mustElement<T extends HTMLElement>(selector: string): T {
-  const element = document.querySelector(selector);
+function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
+  const element = root.querySelector(selector);
   if (!(element instanceof HTMLElement)) {
     throw new Error(`Missing element for selector: ${selector}`);
   }
@@ -1691,9 +1691,12 @@ function mustElement<T extends HTMLElement>(selector: string): T {
   return element as T;
 }
 
-const app = mustElement<HTMLDivElement>("#app");
+export interface StatEvaluationPlayerHandle {
+  readonly root: HTMLElement;
+  destroy(): void;
+}
 
-app.innerHTML = `
+const APP_TEMPLATE = `
   <main class="shell">
     <section class="hero">
       <div>
@@ -1877,42 +1880,38 @@ app.innerHTML = `
   </main>
 `;
 
-const fileInput = mustElement<HTMLInputElement>("#replay-file");
-const viewport = mustElement<HTMLDivElement>("#viewport");
-const emptyState = mustElement<HTMLDivElement>("#empty-state");
-const togglePlayback = mustElement<HTMLButtonElement>("#toggle-playback");
-const followedPlayerOverlay = mustElement<HTMLDivElement>(
-  "#followed-player-overlay",
-);
-const playbackRate = mustElement<HTMLSelectElement>("#playback-rate");
-const attachedPlayer = mustElement<HTMLSelectElement>("#attached-player");
-const cameraDistance = mustElement<HTMLInputElement>("#camera-distance");
-const cameraDistanceReadout = mustElement<HTMLElement>("#camera-distance-readout");
-const ballCam = mustElement<HTMLInputElement>("#ball-cam");
-const showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
-  "#show-followed-player-overlay",
-);
-const moduleSummaryEl = mustElement<HTMLDivElement>("#module-summary");
-const moduleSettingsEl = mustElement<HTMLDivElement>("#module-settings");
-const timeReadout = mustElement<HTMLElement>("#time-readout");
-const frameReadout = mustElement<HTMLElement>("#frame-readout");
-const durationReadout = mustElement<HTMLElement>("#duration-readout");
-const playbackStatusReadout = mustElement<HTMLElement>("#playback-status-readout");
-const statusReadout = mustElement<HTMLElement>("#status-readout");
-const playersReadout = mustElement<HTMLElement>("#players-readout");
-const framesReadout = mustElement<HTMLElement>("#frames-readout");
-const eventsReadout = mustElement<HTMLElement>("#events-readout");
-const playerStatsEl = mustElement<HTMLDivElement>("#player-stats");
-const cameraProfileReadout = mustElement<HTMLElement>("#camera-profile-readout");
-const cameraFovReadout = mustElement<HTMLElement>("#camera-fov-readout");
-const cameraHeightReadout = mustElement<HTMLElement>("#camera-height-readout");
-const cameraPitchReadout = mustElement<HTMLElement>("#camera-pitch-readout");
-const cameraBaseDistanceReadout = mustElement<HTMLElement>("#camera-base-distance-readout");
-const cameraStiffnessReadout = mustElement<HTMLElement>("#camera-stiffness-readout");
-const skipPostGoalTransitions = mustElement<HTMLInputElement>(
-  "#skip-post-goal-transitions",
-);
-const skipKickoffs = mustElement<HTMLInputElement>("#skip-kickoffs");
+let appRoot: HTMLElement | null = null;
+let fileInput!: HTMLInputElement;
+let viewport!: HTMLDivElement;
+let emptyState!: HTMLDivElement;
+let togglePlayback!: HTMLButtonElement;
+let followedPlayerOverlay!: HTMLDivElement;
+let playbackRate!: HTMLSelectElement;
+let attachedPlayer!: HTMLSelectElement;
+let cameraDistance!: HTMLInputElement;
+let cameraDistanceReadout!: HTMLElement;
+let ballCam!: HTMLInputElement;
+let showFollowedPlayerOverlay!: HTMLInputElement;
+let moduleSummaryEl!: HTMLDivElement;
+let moduleSettingsEl!: HTMLDivElement;
+let timeReadout!: HTMLElement;
+let frameReadout!: HTMLElement;
+let durationReadout!: HTMLElement;
+let playbackStatusReadout!: HTMLElement;
+let statusReadout!: HTMLElement;
+let playersReadout!: HTMLElement;
+let framesReadout!: HTMLElement;
+let eventsReadout!: HTMLElement;
+let playerStatsEl!: HTMLDivElement;
+let cameraProfileReadout!: HTMLElement;
+let cameraFovReadout!: HTMLElement;
+let cameraHeightReadout!: HTMLElement;
+let cameraPitchReadout!: HTMLElement;
+let cameraBaseDistanceReadout!: HTMLElement;
+let cameraStiffnessReadout!: HTMLElement;
+let skipPostGoalTransitions!: HTMLInputElement;
+let skipKickoffs!: HTMLInputElement;
+let currentMountCleanup: (() => void) | null = null;
 
 function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
@@ -2210,53 +2209,137 @@ async function loadReplay(file: File): Promise<void> {
   renderModuleSettings();
 }
 
-fileInput.addEventListener("change", async () => {
-  const file = fileInput.files?.[0];
-  if (!file) return;
+export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
+  currentMountCleanup?.();
 
-  try {
-    await loadReplay(file);
-  } catch (error) {
-    console.error("Failed to load replay:", error);
-    statusReadout.textContent =
-      error instanceof Error ? error.message : "Failed to load replay";
-  }
-});
+  root.innerHTML = APP_TEMPLATE;
+  appRoot = root;
 
-togglePlayback.addEventListener("click", () => {
-  replayPlayer?.togglePlayback();
-});
-
-playbackRate.addEventListener("change", () => {
-  replayPlayer?.setPlaybackRate(Number(playbackRate.value));
-});
-
-cameraDistance.addEventListener("input", () => {
-  replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
-});
-
-attachedPlayer.addEventListener("change", () => {
-  replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
-});
-
-ballCam.addEventListener("change", () => {
-  replayPlayer?.setBallCamEnabled(ballCam.checked);
-});
-
-showFollowedPlayerOverlay.addEventListener("change", () => {
-  renderFocusedPlayerOverlay(replayPlayer?.getState());
-});
-
-skipPostGoalTransitions.addEventListener("change", () => {
-  replayPlayer?.setSkipPostGoalTransitionsEnabled(
-    skipPostGoalTransitions.checked,
+  fileInput = mustElement<HTMLInputElement>(root, "#replay-file");
+  viewport = mustElement<HTMLDivElement>(root, "#viewport");
+  emptyState = mustElement<HTMLDivElement>(root, "#empty-state");
+  togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
+  followedPlayerOverlay = mustElement<HTMLDivElement>(
+    root,
+    "#followed-player-overlay",
   );
-});
+  playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
+  attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
+  cameraDistance = mustElement<HTMLInputElement>(root, "#camera-distance");
+  cameraDistanceReadout = mustElement<HTMLElement>(root, "#camera-distance-readout");
+  ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
+  showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
+    root,
+    "#show-followed-player-overlay",
+  );
+  moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
+  moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
+  timeReadout = mustElement<HTMLElement>(root, "#time-readout");
+  frameReadout = mustElement<HTMLElement>(root, "#frame-readout");
+  durationReadout = mustElement<HTMLElement>(root, "#duration-readout");
+  playbackStatusReadout = mustElement<HTMLElement>(root, "#playback-status-readout");
+  statusReadout = mustElement<HTMLElement>(root, "#status-readout");
+  playersReadout = mustElement<HTMLElement>(root, "#players-readout");
+  framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
+  eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
+  playerStatsEl = mustElement<HTMLDivElement>(root, "#player-stats");
+  cameraProfileReadout = mustElement<HTMLElement>(root, "#camera-profile-readout");
+  cameraFovReadout = mustElement<HTMLElement>(root, "#camera-fov-readout");
+  cameraHeightReadout = mustElement<HTMLElement>(root, "#camera-height-readout");
+  cameraPitchReadout = mustElement<HTMLElement>(root, "#camera-pitch-readout");
+  cameraBaseDistanceReadout = mustElement<HTMLElement>(
+    root,
+    "#camera-base-distance-readout",
+  );
+  cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
+  skipPostGoalTransitions = mustElement<HTMLInputElement>(
+    root,
+    "#skip-post-goal-transitions",
+  );
+  skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
 
-skipKickoffs.addEventListener("change", () => {
-  replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
-});
+  const listeners = new AbortController();
+  const cleanup = () => {
+    listeners.abort();
+    unsubscribe?.();
+    unsubscribe = null;
+    teardownActiveModules();
+    replayPlayer?.destroy();
+    replayPlayer = null;
+    timelineOverlay = null;
+    statsTimeline = null;
+    statsFrameLookup = null;
+    dynamicStatsTimeline = null;
+    dynamicStatsFrameLookup = null;
+    clearTimelineEventSources();
+    clearTimelineRangeSources();
+    activeModules = [];
+    activeModuleIds = new Set<string>();
+    removeRenderHook = null;
+    if (appRoot === root) {
+      appRoot = null;
+      root.replaceChildren();
+    }
+    if (currentMountCleanup === cleanup) {
+      currentMountCleanup = null;
+    }
+  };
+  currentMountCleanup = cleanup;
 
-renderModuleSummary();
-renderModuleSettings();
-renderCameraProfile(null);
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    try {
+      await loadReplay(file);
+    } catch (error) {
+      console.error("Failed to load replay:", error);
+      statusReadout.textContent =
+        error instanceof Error ? error.message : "Failed to load replay";
+    }
+  }, { signal: listeners.signal });
+
+  togglePlayback.addEventListener("click", () => {
+    replayPlayer?.togglePlayback();
+  }, { signal: listeners.signal });
+
+  playbackRate.addEventListener("change", () => {
+    replayPlayer?.setPlaybackRate(Number(playbackRate.value));
+  }, { signal: listeners.signal });
+
+  cameraDistance.addEventListener("input", () => {
+    replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
+  }, { signal: listeners.signal });
+
+  attachedPlayer.addEventListener("change", () => {
+    replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
+  }, { signal: listeners.signal });
+
+  ballCam.addEventListener("change", () => {
+    replayPlayer?.setBallCamEnabled(ballCam.checked);
+  }, { signal: listeners.signal });
+
+  showFollowedPlayerOverlay.addEventListener("change", () => {
+    renderFocusedPlayerOverlay(replayPlayer?.getState());
+  }, { signal: listeners.signal });
+
+  skipPostGoalTransitions.addEventListener("change", () => {
+    replayPlayer?.setSkipPostGoalTransitionsEnabled(
+      skipPostGoalTransitions.checked,
+    );
+  }, { signal: listeners.signal });
+
+  skipKickoffs.addEventListener("change", () => {
+    replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
+  }, { signal: listeners.signal });
+
+  renderModuleSummary();
+  renderModuleSettings();
+  renderCameraProfile(null);
+  renderTimelineEventCount();
+
+  return {
+    root,
+    destroy: cleanup,
+  };
+}
