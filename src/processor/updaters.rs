@@ -168,17 +168,27 @@ impl<'a> ReplayProcessor<'a> {
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
-                let (actor_amount_value, last_value, _, derived_value, is_active) =
-                    Self::get_current_boost_values(
-                        actor_state,
-                        boost_replicated_object_id,
-                        boost_amount_object_id,
-                        component_active_object_id,
-                    );
+                let (
+                    actor_amount_value,
+                    last_value,
+                    _,
+                    derived_value,
+                    has_derived_value,
+                    is_active,
+                ) = Self::get_current_boost_values(
+                    actor_state,
+                    boost_replicated_object_id,
+                    boost_amount_object_id,
+                    component_active_object_id,
+                );
                 let mut current_value = if kickoff_phase_started {
                     BOOST_KICKOFF_START_AMOUNT
                 } else if actor_amount_value == last_value {
-                    derived_value
+                    if has_derived_value {
+                        derived_value
+                    } else {
+                        actor_amount_value.into()
+                    }
                 } else {
                     actor_amount_value.into()
                 };
@@ -224,7 +234,7 @@ impl<'a> ReplayProcessor<'a> {
         boost_replicated_object_id: Option<boxcars::ObjectId>,
         boost_amount_object_id: Option<boxcars::ObjectId>,
         component_active_object_id: Option<boxcars::ObjectId>,
-    ) -> (u8, u8, u8, f32, bool) {
+    ) -> (u8, u8, u8, f32, bool, bool) {
         let amount_value = boost_replicated_object_id
             .and_then(|object_id| actor_state.attributes.get(&object_id))
             .and_then(|(attribute, _)| match attribute {
@@ -256,8 +266,7 @@ impl<'a> ReplayProcessor<'a> {
             .and_then(|(attribute, _)| match attribute {
                 boxcars::Attribute::Float(value) => Some(*value),
                 _ => None,
-            })
-            .unwrap_or(0.0);
+            });
         let last_boost_amount = actor_state
             .derived_attributes
             .get(LAST_BOOST_AMOUNT_KEY)
@@ -270,7 +279,8 @@ impl<'a> ReplayProcessor<'a> {
             amount_value,
             last_boost_amount,
             active_value,
-            derived_value,
+            derived_value.unwrap_or(0.0),
+            derived_value.is_some(),
             is_active,
         )
     }

@@ -4961,6 +4961,72 @@ fn test_boost_reducer_final_replay_collected_totals_match_size_buckets() {
 }
 
 #[test]
+fn test_dodges_replay_first_counted_boost_frame_starts_at_kickoff_amount() {
+    let replay = parse_replay("assets/replays/dodges_refreshed_counter.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected replay data");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline data");
+
+    for player_name in ["tykop", "mrtyzz."] {
+        let player_id = timeline
+            .replay_meta
+            .player_order()
+            .find(|info| info.name == player_name)
+            .map(|info| info.remote_id.clone())
+            .unwrap_or_else(|| panic!("Expected player id for {player_name}"));
+        let (frame, player) = timeline
+            .frames
+            .iter()
+            .find_map(|frame| {
+                let player = frame
+                    .players
+                    .iter()
+                    .find(|player| player.player_id == player_id)?;
+                (player.boost.tracked_time > 0.0).then_some((frame, player))
+            })
+            .unwrap_or_else(|| panic!("Expected a counted boost frame for {player_name}"));
+        let (_, current_boost_amount) =
+            replay_player_boost_sample_at_frame(&replay_data, &player_id, frame.frame_number)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Expected replay boost data for {player_name} at frame {}",
+                        frame.frame_number
+                    )
+                });
+        let kickoff_start_pct = boost_amount_to_percent(BOOST_KICKOFF_START_AMOUNT);
+
+        assert!(
+            (current_boost_amount - BOOST_KICKOFF_START_AMOUNT).abs() < 1e-3,
+            "Expected {player_name} current boost at first counted frame to match kickoff start \
+             ({kickoff_start_pct:.2}%), but at frame {} (t={:.3}) current_raw={:.3} \
+             current_pct={:.2}% is_live_play={} game_state={:?}",
+            frame.frame_number,
+            frame.time,
+            current_boost_amount,
+            boost_amount_to_percent(current_boost_amount),
+            frame.is_live_play,
+            frame.game_state,
+        );
+        assert!(
+            (player.boost.average_boost_amount() - BOOST_KICKOFF_START_AMOUNT).abs() < 1e-3,
+            "Expected {player_name} first counted boost average to match kickoff start \
+             ({kickoff_start_pct:.2}%), but at frame {} (t={:.3}) tracked_time={:.3} \
+             avg_raw={:.3} avg_pct={:.2}% is_live_play={} game_state={:?}",
+            frame.frame_number,
+            frame.time,
+            player.boost.tracked_time,
+            player.boost.average_boost_amount(),
+            boost_amount_to_percent(player.boost.average_boost_amount()),
+            frame.is_live_play,
+            frame.game_state,
+        );
+    }
+}
+
+#[test]
 fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
     let player_id = epic_id("fallback-midfield-player");
     let mut reducer = BoostReducer::new();
