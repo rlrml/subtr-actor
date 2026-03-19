@@ -617,7 +617,7 @@ function createBoostModule(): StatModule {
           <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
           <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
-          <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
+          <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}</span></div>
           <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
           <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
         `,
@@ -648,7 +648,7 @@ function createBoostModule(): StatModule {
         <div class="stat-row"><span class="label">Big pads</span><span class="value">${boost?.big_pads_collected ?? "?"}</span></div>
         <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
         <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
-        <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}%</span></div>
+        <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}</span></div>
         <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
         <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
       `;
