@@ -3,7 +3,9 @@ import {
   ReplayPlayer,
   createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
+  createReplayLoadOverlay,
   createTimelineOverlayPlugin,
+  formatReplayLoadProgress,
   loadReplayFromBytes,
 } from "../../player/src/lib.ts";
 
@@ -300,35 +302,67 @@ async function loadReplayFile(file) {
   currentReplayRaw = null;
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { replay, raw } = await loadReplayFromBytes(bytes);
-  currentReplayRaw = raw;
-
-  replayPlayer = new ReplayPlayer(viewport, replay, {
-    autoplay: true,
-    initialCameraDistanceScale: 2.25,
-    initialAttachedPlayerId: null,
-    initialBallCamEnabled: false,
-    initialBoostMeterEnabled: false,
-    initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
-    initialSkipKickoffsEnabled: skipKickoffs.checked,
-    plugins: [
-      createBallchasingOverlayPlugin(),
-      createBoostPadOverlayPlugin(),
-      createTimelineOverlayPlugin({
-        replayEventKinds: ["goal", "save", "demo"],
-      }),
-    ],
+  const loadOverlay = createReplayLoadOverlay(viewport, {
+    title: "Replay Loading",
   });
-  unsubscribe = replayPlayer.subscribe(renderSnapshot);
+  let destroyOverlayTimer = null;
 
-  populateAttachedPlayerOptions(replay.players);
+  const destroyOverlaySoon = () => {
+    if (destroyOverlayTimer !== null) {
+      window.clearTimeout(destroyOverlayTimer);
+    }
+    destroyOverlayTimer = window.setTimeout(() => {
+      loadOverlay.destroy();
+      destroyOverlayTimer = null;
+    }, 180);
+  };
 
-  emptyState.hidden = true;
-  teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
-  playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-  statusReadout.textContent = `Loaded ${file.name}`;
-  setControlsEnabled(true);
-  renderSnapshot(replayPlayer.getSnapshot());
+  try {
+    const { replay, raw } = await loadReplayFromBytes(bytes, {
+      useWorker: true,
+      reportEveryNFrames: 500,
+      onProgress(progress) {
+        loadOverlay.update(progress);
+        statusReadout.textContent = formatReplayLoadProgress(progress);
+      },
+    });
+    currentReplayRaw = raw;
+
+    replayPlayer = new ReplayPlayer(viewport, replay, {
+      autoplay: true,
+      initialCameraDistanceScale: 2.25,
+      initialAttachedPlayerId: null,
+      initialBallCamEnabled: false,
+      initialBoostMeterEnabled: false,
+      initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
+      initialSkipKickoffsEnabled: skipKickoffs.checked,
+      plugins: [
+        createBallchasingOverlayPlugin(),
+        createBoostPadOverlayPlugin(),
+        createTimelineOverlayPlugin({
+          replayEventKinds: ["goal", "save", "demo"],
+        }),
+      ],
+    });
+    unsubscribe = replayPlayer.subscribe(renderSnapshot);
+
+    populateAttachedPlayerOptions(replay.players);
+
+    emptyState.hidden = true;
+    teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
+    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+    statusReadout.textContent = `Loaded ${file.name}`;
+    loadOverlay.complete(`Loaded ${file.name}`);
+    destroyOverlaySoon();
+    setControlsEnabled(true);
+    renderSnapshot(replayPlayer.getSnapshot());
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load replay";
+    loadOverlay.fail(message);
+    destroyOverlaySoon();
+    throw error;
+  }
 }
 
 fileInput.addEventListener("change", async () => {

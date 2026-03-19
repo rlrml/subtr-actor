@@ -284,6 +284,37 @@ export interface ReplayLoadResult {
   raw: RawReplayFramesData;
 }
 
+export type ReplayLoadStage =
+  | "validating"
+  | "processing"
+  | "normalizing"
+  | (string & {});
+
+export interface ReplayLoadProgress {
+  stage: ReplayLoadStage;
+  processedFrames?: number;
+  totalFrames?: number;
+  progress?: number;
+}
+
+export interface ReplayLoadOptions {
+  onProgress?: (progress: ReplayLoadProgress) => void;
+  reportEveryNFrames?: number;
+  useWorker?: boolean;
+}
+
+export interface ReplayLoadOverlayOptions {
+  title?: string;
+  formatProgress?: (progress: ReplayLoadProgress) => string;
+}
+
+export interface ReplayLoadOverlayController {
+  update(progress: ReplayLoadProgress): void;
+  complete(message?: string): void;
+  fail(message: string): void;
+  destroy(): void;
+}
+
 export interface LoadedReplay {
   replay: ReplayModel;
   raw?: RawReplayFramesData;

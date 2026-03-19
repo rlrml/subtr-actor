@@ -8,6 +8,8 @@ drives the reusable `ReplayPlayer` API with example controls.
 ## What It Demonstrates
 
 - browser-side replay parsing with the WASM binding
+- worker-backed replay loading with progress callbacks from the player library
+- the built-in replay loading overlay from the player library, alongside a custom status readout
 - example controls layered on top of the player library state API
 - rendering kickoff countdown UI from the player library's semantic metadata
 - free/attached camera selection, follow-distance tuning, seeking, and playback-rate control
@@ -50,7 +52,8 @@ npm run dev-with-wasm
 2. The app validates the uploaded replay with `validate_replay()`.
 3. It collects lightweight metadata with `get_replay_info()` and `get_replay_meta()`.
 4. It loads full structured frame data with `get_replay_frames_data()`.
-5. It passes the bytes into `js/player` via `loadReplayFromBytes()`.
+5. It passes the bytes into `js/player` via `loadReplayFromBytes(..., { useWorker, onProgress })`.
+6. It renders the built-in `createReplayLoadOverlay()` UI while also updating its own custom status text from the same progress events.
 6. It wires the demo controls to `ReplayPlayer` methods and change events.
 
 ## Relevant Files

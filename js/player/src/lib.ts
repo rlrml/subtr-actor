@@ -25,6 +25,10 @@ export {
   timeBound,
 } from "./playlist";
 export { findFrameIndexAtTime, normalizeReplayData } from "./replay-data";
+export {
+  createReplayLoadOverlay,
+  formatReplayLoadProgress,
+} from "./load-ui";
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
 export type {
   ReplayPlayerActiveMetadata,
@@ -44,6 +48,11 @@ export type {
   PlayerSample,
   RawReplayFramesData,
   ReplayLoadResult,
+  ReplayLoadOptions,
+  ReplayLoadOverlayController,
+  ReplayLoadOverlayOptions,
+  ReplayLoadProgress,
+  ReplayLoadStage,
   ReplayModel,
   ReplayPlaylistPlayerOptions,
   ReplayPlaylistPlayerSnapshot,

@@ -1,5 +1,10 @@
 import * as subtrActor from "@colonelpanic8/subtr-actor";
-import type { RawReplayFramesData, ReplayLoadResult } from "./types";
+import type {
+  RawReplayFramesData,
+  ReplayLoadOptions,
+  ReplayLoadProgress,
+  ReplayLoadResult,
+} from "./types";
 import { normalizeReplayData } from "./replay-data";
 
 let bindingsReady: Promise<unknown> | null = null;
@@ -44,19 +49,114 @@ export async function ensureBindingsReady(): Promise<void> {
   await bindingsReady;
 }
 
-export async function loadReplayFromBytes(
-  data: Uint8Array
+function shouldUseWorker(options: ReplayLoadOptions): boolean {
+  if (options.useWorker !== undefined) {
+    return options.useWorker && typeof Worker !== "undefined";
+  }
+
+  return typeof Worker !== "undefined" && options.onProgress !== undefined;
+}
+
+interface ReplayLoadRequest {
+  type: "load-replay";
+  bytes: ArrayBuffer;
+  reportEveryNFrames: number;
+}
+
+interface ReplayProgressMessage {
+  type: "progress";
+  progress: ReplayLoadProgress;
+}
+
+interface ReplayDoneMessage {
+  type: "done";
+  result: ReplayLoadResult;
+}
+
+interface ReplayErrorMessage {
+  type: "error";
+  error: string;
+}
+
+type ReplayWorkerMessage =
+  | ReplayProgressMessage
+  | ReplayDoneMessage
+  | ReplayErrorMessage;
+
+async function loadReplayFromBytesWithWorker(
+  data: Uint8Array,
+  options: ReplayLoadOptions,
 ): Promise<ReplayLoadResult> {
+  const worker = new Worker(new URL("./wasm.worker.ts", import.meta.url), {
+    type: "module",
+  });
+  const workerBytes = data.slice();
+
+  return new Promise<ReplayLoadResult>((resolve, reject) => {
+    const cleanup = () => {
+      worker.terminate();
+    };
+
+    worker.onmessage = (event: MessageEvent<ReplayWorkerMessage>) => {
+      const message = event.data;
+      if (message.type === "progress") {
+        options.onProgress?.(message.progress);
+        return;
+      }
+
+      if (message.type === "error") {
+        cleanup();
+        reject(new Error(message.error));
+        return;
+      }
+
+      cleanup();
+      resolve(message.result);
+    };
+
+    worker.onerror = (event) => {
+      cleanup();
+      reject(new Error(event.message || "Replay loading worker failed"));
+    };
+
+    const request: ReplayLoadRequest = {
+      type: "load-replay",
+      bytes: workerBytes.buffer,
+      reportEveryNFrames: options.reportEveryNFrames ?? 1000,
+    };
+    worker.postMessage(request, [workerBytes.buffer]);
+  });
+}
+
+export async function loadReplayFromBytes(
+  data: Uint8Array,
+  options: ReplayLoadOptions = {},
+): Promise<ReplayLoadResult> {
+  if (shouldUseWorker(options)) {
+    return loadReplayFromBytesWithWorker(data, options);
+  }
+
   await ensureBindingsReady();
 
+  options.onProgress?.({ stage: "validating", progress: 0 });
   const validation = validateReplayBytes(data);
   if (!validation.valid) {
     throw new Error(validation.error ?? "Replay validation failed");
   }
 
+  options.onProgress?.({ stage: "processing", progress: 0 });
   const raw = toPlainData(
-    subtrActor.get_replay_frames_data(data),
+    options.onProgress
+      ? subtrActor.get_replay_frames_data_with_progress(
+        data,
+        (progress: unknown) => {
+          options.onProgress?.(progress as ReplayLoadProgress);
+        },
+        options.reportEveryNFrames ?? 1000,
+      )
+      : subtrActor.get_replay_frames_data(data),
   ) as RawReplayFramesData;
+  options.onProgress?.({ stage: "normalizing", progress: 0 });
   return {
     raw,
     replay: normalizeReplayData(raw),

@@ -14,6 +14,8 @@ npm install subtr-actor-player three
 It provides:
 
 - a typed replay normalization layer on top of `get_replay_frames_data()`
+- worker-backed replay loading with optional progress callbacks
+- a built-in replay loading overlay helper for DOM consumers
 - a `ReplayPlayer` class with imperative playback and camera APIs
 - a `ReplayPlaylistPlayer` wrapper for back-to-back clip playback across replays
 - a plugin host for optional scene and UI extensions
@@ -30,6 +32,14 @@ without imposing any built-in overlay or styling.
 
 The package does not assume any specific UI. The demo app under `js/example/`
 is the reference consumer in this repository.
+
+Replay loading follows the same model. The library exposes:
+
+- `loadReplayFromBytes(bytes, { useWorker, onProgress, reportEveryNFrames })`
+- `createReplayLoadOverlay(container, options)`
+- `formatReplayLoadProgress(progress)`
+
+So callers can choose between the built-in DOM overlay or their own status/progress UI while consuming the same `ReplayLoadProgress` events.
 
 Optional replay extensions can be installed through `ReplayPlayerOptions.plugins`
 or at runtime with `ReplayPlayer.addPlugin(...)`. Plugins receive:
