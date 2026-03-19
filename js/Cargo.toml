@@ -28,9 +28,3 @@ version = "0.3.85"
 features = [
   "console",
 ]
-
-[package.metadata.wasm-pack.profile.release]
-wee-alloc = false
-
-[package.metadata.wasm-pack.profile.dev]
-wee-alloc = false
