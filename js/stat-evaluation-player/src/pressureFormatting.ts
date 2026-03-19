@@ -1,4 +1,12 @@
 import type { ExportedStat, StatsFrame } from "./statsTimeline.ts";
+import {
+  getExportedStatDomain,
+  getExportedStatLabels,
+  getExportedStatName,
+  getExportedStatValue,
+  getExportedStatValueType,
+  getExportedStatVariant,
+} from "./exportedStats.ts";
 
 export type PressureBreakdownClass = "field_half";
 
@@ -85,6 +93,9 @@ function normalizeBreakdownClasses(
 }
 
 function formatFieldHalfLabel(value: string, isTeamZero: boolean): string {
+  if (value === "neutral") {
+    return "Neutral zone";
+  }
   const isOwnHalf = (value === "team_zero_side") === isTeamZero;
   return isOwnHalf ? "Own half" : "Opp half";
 }
@@ -106,25 +117,30 @@ function renderPressureBreakdownRows(
 
   const totals = new Map<string, number>();
   for (const stat of exportedStats) {
+    const domain = getExportedStatDomain(stat);
+    const name = getExportedStatName(stat);
+    const variant = getExportedStatVariant(stat);
+    const valueType = getExportedStatValueType(stat);
+    const value = getExportedStatValue(stat);
     if (
-      stat.domain !== "pressure" ||
-      stat.name !== "time" ||
-      stat.variant !== "labeled" ||
-      stat.value_type !== "float" ||
-      !Number.isFinite(stat.value)
+      domain !== "pressure" ||
+      name !== "time" ||
+      variant !== "labeled" ||
+      valueType !== "float" ||
+      value === undefined
     ) {
       continue;
     }
 
-    const half = stat.labels?.find((label) => label.key === "field_half")?.value;
+    const half = getExportedStatLabels(stat).find((label) => label.key === "field_half")?.value;
     if (!half) {
       continue;
     }
 
-    totals.set(half, (totals.get(half) ?? 0) + stat.value);
+    totals.set(half, (totals.get(half) ?? 0) + value);
   }
 
-  return ["team_zero_side", "team_one_side"]
+  return ["team_zero_side", "neutral", "team_one_side"]
     .filter((half) => totals.has(half))
     .map((half) => renderStatRow(
       formatFieldHalfLabel(half, isTeamZero),
@@ -137,7 +153,15 @@ export function renderPressureStats(
   pressure: StatsFrame["pressure"],
   options: PressureRenderOptions,
 ): string {
-  const trackedTime = pressure?.tracked_time;
+  const trackedTimeStat = options.exportedStats?.find((stat) =>
+    getExportedStatDomain(stat) === "pressure"
+    && getExportedStatName(stat) === "time"
+    && getExportedStatVariant(stat) !== "labeled"
+    && getExportedStatValueType(stat) === "float"
+    && getExportedStatValue(stat) !== undefined
+  );
+  const trackedTime = pressure?.tracked_time
+    ?? (trackedTimeStat ? getExportedStatValue(trackedTimeStat) : undefined);
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderPressureBreakdownRows(
     options.exportedStats,

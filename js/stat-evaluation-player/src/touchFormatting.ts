@@ -1,4 +1,12 @@
 import type { ExportedStat, PlayerStatsSnapshot, StatLabel } from "./statsTimeline.ts";
+import {
+  getExportedStatDomain,
+  getExportedStatLabels,
+  getExportedStatName,
+  getExportedStatValue,
+  getExportedStatValueType,
+  getExportedStatVariant,
+} from "./exportedStats.ts";
 
 export type TouchBreakdownClass = "kind" | "height_band";
 
@@ -118,15 +126,15 @@ function labeledEntriesFromExportedStats(
 ): TouchBreakdownEntry[] {
   return (exportedStats ?? [])
     .filter((stat) =>
-      stat.domain === "touch"
-      && stat.name === "touch_count"
-      && stat.variant === "labeled"
-      && stat.value_type === "unsigned"
-      && Number.isFinite(stat.value)
+      getExportedStatDomain(stat) === "touch"
+      && getExportedStatName(stat) === "touch_count"
+      && getExportedStatVariant(stat) === "labeled"
+      && getExportedStatValueType(stat) === "unsigned"
+      && getExportedStatValue(stat) !== undefined
     )
     .map((stat) => ({
-      labels: stat.labels ?? [],
-      count: Math.round(stat.value),
+      labels: getExportedStatLabels(stat),
+      count: Math.round(getExportedStatValue(stat) ?? 0),
     }));
 }
 

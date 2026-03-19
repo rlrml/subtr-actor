@@ -1,6 +1,7 @@
 export interface StatsTimeline {
   config?: {
     most_back_forward_threshold_y: number;
+    pressure_neutral_zone_half_width_y?: number;
     [key: string]: unknown;
   };
   replay_meta: unknown;
@@ -57,8 +58,9 @@ export interface StatsFrame {
     tracked_time: number;
     team_zero_side_time: number;
     team_one_side_time: number;
+    neutral_time?: number;
     [key: string]: unknown;
-  };
+  } | null;
   rush?: {
     team_zero_count: number;
     team_zero_two_v_one_count: number;
@@ -150,9 +152,12 @@ export interface PlayerStatsSnapshot {
   };
   positioning?: {
     active_game_time: number;
-    time_defensive_third: number;
-    time_neutral_third: number;
-    time_offensive_third: number;
+    time_defensive_third?: number;
+    time_neutral_third?: number;
+    time_offensive_third?: number;
+    time_defensive_zone?: number;
+    time_neutral_zone?: number;
+    time_offensive_zone?: number;
     time_defensive_half: number;
     time_offensive_half: number;
     time_demolished: number;
@@ -245,6 +250,7 @@ export interface DynamicPlayerStatsSnapshot {
 export interface DynamicStatsTimeline {
   config?: {
     most_back_forward_threshold_y: number;
+    pressure_neutral_zone_half_width_y?: number;
     [key: string]: unknown;
   };
   replay_meta: unknown;

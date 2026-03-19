@@ -232,13 +232,33 @@ function renderRelativePositioningStats(pos: PlayerStatsSnapshot["positioning"])
 }
 
 function renderAbsolutePositioningStats(pos: PlayerStatsSnapshot["positioning"]): string {
+  const defensiveThird = getPositioningZoneTime(pos, "time_defensive_third", "time_defensive_zone");
+  const neutralThird = getPositioningZoneTime(pos, "time_neutral_third", "time_neutral_zone");
+  const offensiveThird = getPositioningZoneTime(pos, "time_offensive_third", "time_offensive_zone");
+
   return `
-    <div class="stat-row"><span class="label">Def third</span><span class="value">${pos?.time_defensive_third?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Neutral third</span><span class="value">${pos?.time_neutral_third?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Off third</span><span class="value">${pos?.time_offensive_third?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Def third</span><span class="value">${defensiveThird?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Neutral third</span><span class="value">${neutralThird?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Off third</span><span class="value">${offensiveThird?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Def half</span><span class="value">${pos?.time_defensive_half?.toFixed(1) ?? "?"}s</span></div>
     <div class="stat-row"><span class="label">Off half</span><span class="value">${pos?.time_offensive_half?.toFixed(1) ?? "?"}s</span></div>
   `;
+}
+
+function getPositioningZoneTime(
+  pos: PlayerStatsSnapshot["positioning"],
+  primaryKey: "time_defensive_third" | "time_neutral_third" | "time_offensive_third",
+  fallbackKey: "time_defensive_zone" | "time_neutral_zone" | "time_offensive_zone",
+): number | undefined {
+  const primaryValue = pos?.[primaryKey];
+  if (typeof primaryValue === "number" && Number.isFinite(primaryValue)) {
+    return primaryValue;
+  }
+
+  const fallbackValue = (pos as Record<string, unknown> | undefined)?.[fallbackKey];
+  return typeof fallbackValue === "number" && Number.isFinite(fallbackValue)
+    ? fallbackValue
+    : undefined;
 }
 
 function formatInteger(value: number | undefined): string {
@@ -627,7 +647,7 @@ function createPossessionModule(): StatModule {
     onBeforeRender() {},
 
     getTimelineRanges(ctx) {
-      return buildPossessionTimelineRanges(ctx.dynamicStatsTimeline);
+      return buildPossessionTimelineRanges(ctx.statsTimeline, ctx.dynamicStatsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
@@ -867,7 +887,7 @@ function createPressureModule(): StatModule {
     },
 
     getTimelineRanges(ctx) {
-      return buildPressureTimelineRanges(ctx.dynamicStatsTimeline);
+      return buildPressureTimelineRanges(ctx.statsTimeline, ctx.dynamicStatsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
@@ -879,13 +899,13 @@ function createPressureModule(): StatModule {
         ctx.dynamicStatsFrameLookup,
         frameIndex,
       );
-      if (!statsFrame?.pressure) return "";
+      if (!statsFrame?.pressure && !dynamicStatsFrame?.pressure?.length) return "";
 
       return [
         renderPlayerCard(
           "Blue Half",
           true,
-          renderPressureStats(statsFrame.pressure, {
+          renderPressureStats(statsFrame?.pressure, {
             isTeamZero: true,
             breakdownClasses: getActiveBreakdownClasses(),
             exportedStats: dynamicStatsFrame?.pressure,
@@ -894,7 +914,7 @@ function createPressureModule(): StatModule {
         renderPlayerCard(
           "Orange Half",
           false,
-          renderPressureStats(statsFrame.pressure, {
+          renderPressureStats(statsFrame?.pressure, {
             isTeamZero: false,
             breakdownClasses: getActiveBreakdownClasses(),
             exportedStats: dynamicStatsFrame?.pressure,
@@ -913,9 +933,9 @@ function createPressureModule(): StatModule {
         frameIndex,
       );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.pressure || !player) return "";
+      if ((!statsFrame?.pressure && !dynamicStatsFrame?.pressure?.length) || !player) return "";
 
-      return renderPressureStats(statsFrame.pressure, {
+      return renderPressureStats(statsFrame?.pressure, {
         isTeamZero: player.is_team_0,
         breakdownClasses: getActiveBreakdownClasses(),
         exportedStats: dynamicStatsFrame?.pressure,
@@ -1022,7 +1042,7 @@ function createTimeInZoneModule(): StatModule {
     onBeforeRender() {},
 
     getTimelineRanges(ctx) {
-      return buildTimeInZoneTimelineRanges(ctx.dynamicStatsTimeline);
+      return buildTimeInZoneTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {

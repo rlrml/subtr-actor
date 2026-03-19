@@ -1,4 +1,12 @@
 import type { ExportedStat, StatsFrame } from "./statsTimeline.ts";
+import {
+  getExportedStatDomain,
+  getExportedStatLabels,
+  getExportedStatName,
+  getExportedStatValue,
+  getExportedStatValueType,
+  getExportedStatVariant,
+} from "./exportedStats.ts";
 
 export type PossessionBreakdownClass = "possession_state";
 
@@ -110,22 +118,27 @@ function renderPossessionBreakdownRows(
 
   const totals = new Map<string, number>();
   for (const stat of exportedStats) {
+    const domain = getExportedStatDomain(stat);
+    const name = getExportedStatName(stat);
+    const variant = getExportedStatVariant(stat);
+    const valueType = getExportedStatValueType(stat);
+    const value = getExportedStatValue(stat);
     if (
-      stat.domain !== "possession" ||
-      stat.name !== "time" ||
-      stat.variant !== "labeled" ||
-      stat.value_type !== "float" ||
-      !Number.isFinite(stat.value)
+      domain !== "possession" ||
+      name !== "time" ||
+      variant !== "labeled" ||
+      valueType !== "float" ||
+      value === undefined
     ) {
       continue;
     }
 
-    const state = stat.labels?.find((label) => label.key === "possession_state")?.value;
+    const state = getExportedStatLabels(stat).find((label) => label.key === "possession_state")?.value;
     if (!state) {
       continue;
     }
 
-    totals.set(state, (totals.get(state) ?? 0) + stat.value);
+    totals.set(state, (totals.get(state) ?? 0) + value);
   }
 
   return ["team_zero", "team_one", "neutral"]

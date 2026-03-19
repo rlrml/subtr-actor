@@ -7,7 +7,8 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
   const html = renderPressureStats(
     {
       tracked_time: 8,
-      team_zero_side_time: 5,
+      team_zero_side_time: 4,
+      neutral_time: 1,
       team_one_side_time: 3,
     },
     {
@@ -19,9 +20,18 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
           name: "time",
           variant: "labeled",
           unit: "seconds",
+          labels: [{ key: "field_half", value: "neutral" }],
+          value_type: "float",
+          value: 1,
+        },
+        {
+          domain: "pressure",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
           labels: [{ key: "field_half", value: "team_zero_side" }],
           value_type: "float",
-          value: 5,
+          value: 4,
         },
         {
           domain: "pressure",
@@ -37,7 +47,8 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
   );
 
   assert.match(html, /Tracked<\/span><span class="value">8\.0s/);
-  assert.match(html, /Own half<\/span><span class="value">5\.0s \(62\.5%\)/);
+  assert.match(html, /Own half<\/span><span class="value">4\.0s \(50\.0%\)/);
+  assert.match(html, /Neutral zone<\/span><span class="value">1\.0s \(12\.5%\)/);
   assert.match(html, /Opp half<\/span><span class="value">3\.0s \(37\.5%\)/);
 });
 

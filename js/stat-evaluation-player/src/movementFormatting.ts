@@ -1,4 +1,12 @@
 import type { ExportedStat, PlayerStatsSnapshot } from "./statsTimeline.ts";
+import {
+  getExportedStatDomain,
+  getExportedStatLabels,
+  getExportedStatName,
+  getExportedStatValue,
+  getExportedStatValueType,
+  getExportedStatVariant,
+} from "./exportedStats.ts";
 
 export type MovementBreakdownClass = "speed_band" | "height_band";
 
@@ -136,17 +144,22 @@ function renderMovementBreakdownRows(
   const groups = new Map<string, { values: MovementBreakdownValueMap; total: number }>();
 
   for (const stat of exportedStats) {
+    const domain = getExportedStatDomain(stat);
+    const name = getExportedStatName(stat);
+    const variant = getExportedStatVariant(stat);
+    const valueType = getExportedStatValueType(stat);
+    const value = getExportedStatValue(stat);
     if (
-      stat.domain !== "movement" ||
-      stat.name !== "tracked_time" ||
-      stat.variant !== "labeled" ||
-      stat.value_type !== "float" ||
-      !Number.isFinite(stat.value)
+      domain !== "movement" ||
+      name !== "tracked_time" ||
+      variant !== "labeled" ||
+      valueType !== "float" ||
+      value === undefined
     ) {
       continue;
     }
 
-    const labelMap = new Map((stat.labels ?? []).map((label) => [label.key, label.value]));
+    const labelMap = new Map(getExportedStatLabels(stat).map((label) => [label.key, label.value]));
     const values = {} as MovementBreakdownValueMap;
     let complete = true;
     for (const className of breakdownClasses) {
@@ -164,9 +177,9 @@ function renderMovementBreakdownRows(
     const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
     const existing = groups.get(key);
     if (existing) {
-      existing.total += stat.value;
+      existing.total += value;
     } else {
-      groups.set(key, { values, total: stat.value });
+      groups.set(key, { values, total: value });
     }
   }
 

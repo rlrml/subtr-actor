@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { DynamicStatsTimeline } from "./statsTimeline.ts";
+import type { ReplayModel } from "../../player/src/types.ts";
+import type { DynamicStatsTimeline, StatsTimeline } from "./statsTimeline.ts";
 import {
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
@@ -17,15 +18,45 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
         frame_number: 1,
         time: 1,
         dt: 1,
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 2,
+        dt: 1,
+        players: [],
+      },
+      {
+        frame_number: 3,
+        time: 3,
+        dt: 1,
+        players: [],
+      },
+      {
+        frame_number: 4,
+        time: 4,
+        dt: 1,
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+  const dynamicTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 1,
         possession: [
           {
             domain: "possession",
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "possession_state", value: "team_zero" }],
             value_type: "float",
             value: 1,
-            labels: [{ key: "possession_state", value: "team_zero" }],
           },
         ],
         players: [],
@@ -40,9 +71,9 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "possession_state", value: "team_zero" }],
             value_type: "float",
             value: 2,
-            labels: [{ key: "possession_state", value: "team_zero" }],
           },
         ],
         players: [],
@@ -57,18 +88,18 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "possession_state", value: "team_zero" }],
             value_type: "float",
             value: 2,
-            labels: [{ key: "possession_state", value: "team_zero" }],
           },
           {
             domain: "possession",
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "possession_state", value: "neutral" }],
             value_type: "float",
             value: 1,
-            labels: [{ key: "possession_state", value: "neutral" }],
           },
         ],
         players: [],
@@ -83,27 +114,27 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "possession_state", value: "team_zero" }],
             value_type: "float",
             value: 2,
-            labels: [{ key: "possession_state", value: "team_zero" }],
           },
           {
             domain: "possession",
             name: "time",
             variant: "labeled",
             unit: "seconds",
-            value_type: "float",
-            value: 1,
-            labels: [{ key: "possession_state", value: "neutral" }],
-          },
-          {
-            domain: "possession",
-            name: "time",
-            variant: "labeled",
-            unit: "seconds",
-            value_type: "float",
-            value: 1,
             labels: [{ key: "possession_state", value: "team_one" }],
+            value_type: "float",
+            value: 1,
+          },
+          {
+            domain: "possession",
+            name: "time",
+            variant: "labeled",
+            unit: "seconds",
+            labels: [{ key: "possession_state", value: "neutral" }],
+            value_type: "float",
+            value: 1,
           },
         ],
         players: [],
@@ -111,7 +142,7 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
     ],
   } as DynamicStatsTimeline;
 
-  assert.deepEqual(buildPossessionTimelineRanges(timeline), [
+  assert.deepEqual(buildPossessionTimelineRanges(timeline, dynamicTimeline), [
     {
       id: "possession:team_zero:0.000",
       startTime: 0,
@@ -145,8 +176,26 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
   ]);
 });
 
-test("buildPressureTimelineRanges derives half-control spans from labeled deltas", () => {
+test("buildPressureTimelineRanges derives half-control spans from labeled deltas including neutral", () => {
   const timeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 0.5,
+        dt: 0.5,
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 1,
+        dt: 0.5,
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+  const dynamicTimeline = {
     replay_meta: {},
     timeline_events: [],
     frames: [
@@ -160,9 +209,9 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "field_half", value: "team_zero_side" }],
             value_type: "float",
             value: 0.5,
-            labels: [{ key: "field_half", value: "team_zero_side" }],
           },
         ],
         players: [],
@@ -177,18 +226,18 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "field_half", value: "team_zero_side" }],
             value_type: "float",
             value: 0.5,
-            labels: [{ key: "field_half", value: "team_zero_side" }],
           },
           {
             domain: "pressure",
             name: "time",
             variant: "labeled",
             unit: "seconds",
+            labels: [{ key: "field_half", value: "neutral" }],
             value_type: "float",
             value: 0.5,
-            labels: [{ key: "field_half", value: "team_one_side" }],
           },
         ],
         players: [],
@@ -196,7 +245,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
     ],
   } as DynamicStatsTimeline;
 
-  assert.deepEqual(buildPressureTimelineRanges(timeline), [
+  assert.deepEqual(buildPressureTimelineRanges(timeline, dynamicTimeline), [
     {
       id: "half-control:team_zero_side:0.000",
       startTime: 0,
@@ -208,14 +257,127 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
       isTeamZero: true,
     },
     {
-      id: "half-control:team_one_side:0.500",
+      id: "half-control:neutral:0.500",
       startTime: 0.5,
       endTime: 1,
       lane: "half-control",
       laneLabel: "Half Control",
-      label: "Orange half control",
-      color: "rgba(255, 193, 92, 0.76)",
-      isTeamZero: false,
+      label: "Neutral half control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildPressureTimelineRanges uses replay centerline fallback for legacy half-control stats", () => {
+  const timeline = {
+    config: {
+      most_back_forward_threshold_y: 400,
+      pressure_neutral_zone_half_width_y: 200,
+    },
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 0.5,
+        dt: 0.5,
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 1,
+        dt: 0.5,
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+  const dynamicTimeline = {
+    config: {
+      most_back_forward_threshold_y: 400,
+      pressure_neutral_zone_half_width_y: 200,
+    },
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 0.5,
+        dt: 0.5,
+        pressure: [
+          {
+            domain: "pressure",
+            name: "time",
+            variant: "labeled",
+            unit: "seconds",
+            labels: [{ key: "field_half", value: "team_zero_side" }],
+            value_type: "float",
+            value: 0.5,
+          },
+        ],
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 1,
+        dt: 0.5,
+        pressure: [
+          {
+            domain: "pressure",
+            name: "time",
+            variant: "labeled",
+            unit: "seconds",
+            labels: [{ key: "field_half", value: "team_zero_side" }],
+            value_type: "float",
+            value: 0.5,
+          },
+          {
+            domain: "pressure",
+            name: "time",
+            variant: "labeled",
+            unit: "seconds",
+            labels: [{ key: "field_half", value: "team_one_side" }],
+            value_type: "float",
+            value: 0.5,
+          },
+        ],
+        players: [],
+      },
+    ],
+  } as DynamicStatsTimeline;
+  const replay = {
+    frames: [
+      { time: 0, secondsRemaining: 0, gameState: 0, kickoffCountdown: 0 },
+      { time: 0.5, secondsRemaining: 0, gameState: 0, kickoffCountdown: 0 },
+      { time: 1, secondsRemaining: 0, gameState: 0, kickoffCountdown: 0 },
+    ],
+    ballFrames: [
+      { position: { x: 0, y: 0, z: 0 } },
+      { position: { x: 0, y: -260, z: 0 } },
+      { position: { x: 0, y: 0, z: 0 } },
+    ],
+  } as Partial<ReplayModel> as ReplayModel;
+
+  assert.deepEqual(buildPressureTimelineRanges(timeline, dynamicTimeline, replay), [
+    {
+      id: "half-control:team_zero_side:0.000",
+      startTime: 0,
+      endTime: 0.5,
+      lane: "half-control",
+      laneLabel: "Half Control",
+      label: "Blue half control",
+      color: "rgba(89, 195, 255, 0.76)",
+      isTeamZero: true,
+    },
+    {
+      id: "half-control:neutral:0.500",
+      startTime: 0.5,
+      endTime: 1,
+      lane: "half-control",
+      laneLabel: "Half Control",
+      label: "Neutral half control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
     },
   ]);
 });
@@ -234,16 +396,20 @@ test("buildTimeInZoneTimelineRanges derives per-player third occupancy spans", (
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
-            stats: [
-              {
-                domain: "positioning",
-                name: "time_defensive_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-            ],
+            positioning: {
+              active_game_time: 1,
+              time_defensive_zone: 1,
+              time_neutral_zone: 0,
+              time_offensive_zone: 0,
+              time_defensive_half: 1,
+              time_offensive_half: 0,
+              time_demolished: 0,
+              time_no_teammates: 0,
+              time_most_back: 0,
+              time_most_forward: 0,
+              time_mid_role: 0,
+              time_other_role: 0,
+            },
           },
         ],
       },
@@ -256,24 +422,20 @@ test("buildTimeInZoneTimelineRanges derives per-player third occupancy spans", (
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
-            stats: [
-              {
-                domain: "positioning",
-                name: "time_defensive_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-              {
-                domain: "positioning",
-                name: "time_neutral_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-            ],
+            positioning: {
+              active_game_time: 2,
+              time_defensive_zone: 1,
+              time_neutral_zone: 1,
+              time_offensive_zone: 0,
+              time_defensive_half: 1,
+              time_offensive_half: 1,
+              time_demolished: 0,
+              time_no_teammates: 0,
+              time_most_back: 0,
+              time_most_forward: 0,
+              time_mid_role: 0,
+              time_other_role: 0,
+            },
           },
         ],
       },
@@ -286,37 +448,25 @@ test("buildTimeInZoneTimelineRanges derives per-player third occupancy spans", (
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
-            stats: [
-              {
-                domain: "positioning",
-                name: "time_defensive_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-              {
-                domain: "positioning",
-                name: "time_neutral_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-              {
-                domain: "positioning",
-                name: "time_offensive_third",
-                variant: "total",
-                unit: "seconds",
-                value_type: "float",
-                value: 1,
-              },
-            ],
+            positioning: {
+              active_game_time: 3,
+              time_defensive_zone: 1,
+              time_neutral_zone: 1,
+              time_offensive_zone: 1,
+              time_defensive_half: 1,
+              time_offensive_half: 2,
+              time_demolished: 0,
+              time_no_teammates: 0,
+              time_most_back: 0,
+              time_most_forward: 0,
+              time_mid_role: 0,
+              time_other_role: 0,
+            },
           },
         ],
       },
     ],
-  } as DynamicStatsTimeline;
+  } as StatsTimeline;
 
   assert.deepEqual(buildTimeInZoneTimelineRanges(timeline), [
     {
