@@ -228,10 +228,10 @@ export function renderTouchStats(
   options: TouchRenderOptions = {},
 ): string {
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
-  const labeledEntries = labeledEntriesFromExportedStats(options.exportedStats);
-  const fallbackEntries = labeledEntriesFromTouchSnapshot(touch);
-  const breakdownRows = renderTouchBreakdownRows(labeledEntries, breakdownClasses)
-    || renderTouchBreakdownRows(fallbackEntries, breakdownClasses)
+  const snapshotEntries = labeledEntriesFromTouchSnapshot(touch);
+  const exportedEntries = labeledEntriesFromExportedStats(options.exportedStats);
+  const breakdownRows = renderTouchBreakdownRows(snapshotEntries, breakdownClasses)
+    || renderTouchBreakdownRows(exportedEntries, breakdownClasses)
     || renderTouchBreakdownFallbackRows(touch, breakdownClasses);
 
   return `

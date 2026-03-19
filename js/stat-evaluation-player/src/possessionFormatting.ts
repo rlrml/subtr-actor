@@ -102,43 +102,53 @@ function formatPossessionStateLabel(value: string, isTeamZero: boolean): string 
 }
 
 function renderPossessionBreakdownRows(
+  possession: StatsFrame["possession"],
   exportedStats: ExportedStat[] | undefined,
   breakdownClasses: PossessionBreakdownClass[],
   trackedTime: number | undefined,
   isTeamZero: boolean,
 ): string {
-  if (
-    breakdownClasses.length === 0 ||
-    !breakdownClasses.includes("possession_state") ||
-    !exportedStats ||
-    exportedStats.length === 0
-  ) {
+  if (breakdownClasses.length === 0 || !breakdownClasses.includes("possession_state")) {
+    return "";
+  }
+  if (!possession?.labeled_time?.entries?.length && (!exportedStats || exportedStats.length === 0)) {
     return "";
   }
 
   const totals = new Map<string, number>();
-  for (const stat of exportedStats) {
-    const domain = getExportedStatDomain(stat);
-    const name = getExportedStatName(stat);
-    const variant = getExportedStatVariant(stat);
-    const valueType = getExportedStatValueType(stat);
-    const value = getExportedStatValue(stat);
-    if (
-      domain !== "possession" ||
-      name !== "time" ||
-      variant !== "labeled" ||
-      valueType !== "float" ||
-      value === undefined
-    ) {
-      continue;
-    }
+  if (possession?.labeled_time?.entries?.length) {
+    for (const entry of possession.labeled_time.entries) {
+      const state = entry.labels.find((label) => label.key === "possession_state")?.value;
+      if (!state) {
+        continue;
+      }
 
-    const state = getExportedStatLabels(stat).find((label) => label.key === "possession_state")?.value;
-    if (!state) {
-      continue;
+      totals.set(state, (totals.get(state) ?? 0) + entry.value);
     }
+  } else {
+    for (const stat of exportedStats ?? []) {
+      const domain = getExportedStatDomain(stat);
+      const name = getExportedStatName(stat);
+      const variant = getExportedStatVariant(stat);
+      const valueType = getExportedStatValueType(stat);
+      const value = getExportedStatValue(stat);
+      if (
+        domain !== "possession" ||
+        name !== "time" ||
+        variant !== "labeled" ||
+        valueType !== "float" ||
+        value === undefined
+      ) {
+        continue;
+      }
 
-    totals.set(state, (totals.get(state) ?? 0) + value);
+      const state = getExportedStatLabels(stat).find((label) => label.key === "possession_state")?.value;
+      if (!state) {
+        continue;
+      }
+
+      totals.set(state, (totals.get(state) ?? 0) + value);
+    }
   }
 
   return ["team_zero", "team_one", "neutral"]
@@ -157,6 +167,7 @@ export function renderPossessionStats(
   const trackedTime = possession?.tracked_time;
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderPossessionBreakdownRows(
+    possession,
     options.exportedStats,
     breakdownClasses,
     trackedTime,

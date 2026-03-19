@@ -101,43 +101,53 @@ function formatFieldHalfLabel(value: string, isTeamZero: boolean): string {
 }
 
 function renderPressureBreakdownRows(
+  pressure: StatsFrame["pressure"],
   exportedStats: ExportedStat[] | undefined,
   breakdownClasses: PressureBreakdownClass[],
   trackedTime: number | undefined,
   isTeamZero: boolean,
 ): string {
-  if (
-    breakdownClasses.length === 0 ||
-    !breakdownClasses.includes("field_half") ||
-    !exportedStats ||
-    exportedStats.length === 0
-  ) {
+  if (breakdownClasses.length === 0 || !breakdownClasses.includes("field_half")) {
+    return "";
+  }
+  if (!pressure?.labeled_time?.entries?.length && (!exportedStats || exportedStats.length === 0)) {
     return "";
   }
 
   const totals = new Map<string, number>();
-  for (const stat of exportedStats) {
-    const domain = getExportedStatDomain(stat);
-    const name = getExportedStatName(stat);
-    const variant = getExportedStatVariant(stat);
-    const valueType = getExportedStatValueType(stat);
-    const value = getExportedStatValue(stat);
-    if (
-      domain !== "pressure" ||
-      name !== "time" ||
-      variant !== "labeled" ||
-      valueType !== "float" ||
-      value === undefined
-    ) {
-      continue;
-    }
+  if (pressure?.labeled_time?.entries?.length) {
+    for (const entry of pressure.labeled_time.entries) {
+      const half = entry.labels.find((label) => label.key === "field_half")?.value;
+      if (!half) {
+        continue;
+      }
 
-    const half = getExportedStatLabels(stat).find((label) => label.key === "field_half")?.value;
-    if (!half) {
-      continue;
+      totals.set(half, (totals.get(half) ?? 0) + entry.value);
     }
+  } else {
+    for (const stat of exportedStats ?? []) {
+      const domain = getExportedStatDomain(stat);
+      const name = getExportedStatName(stat);
+      const variant = getExportedStatVariant(stat);
+      const valueType = getExportedStatValueType(stat);
+      const value = getExportedStatValue(stat);
+      if (
+        domain !== "pressure" ||
+        name !== "time" ||
+        variant !== "labeled" ||
+        valueType !== "float" ||
+        value === undefined
+      ) {
+        continue;
+      }
 
-    totals.set(half, (totals.get(half) ?? 0) + value);
+      const half = getExportedStatLabels(stat).find((label) => label.key === "field_half")?.value;
+      if (!half) {
+        continue;
+      }
+
+      totals.set(half, (totals.get(half) ?? 0) + value);
+    }
   }
 
   return ["team_zero_side", "neutral", "team_one_side"]
@@ -164,14 +174,18 @@ export function renderPressureStats(
     ?? (trackedTimeStat ? getExportedStatValue(trackedTimeStat) : undefined);
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderPressureBreakdownRows(
+    pressure,
     options.exportedStats,
     breakdownClasses,
     trackedTime,
     options.isTeamZero,
   );
+  const trackedRow = breakdownRows.length === 0
+    ? renderStatRow("Tracked", formatNumber(trackedTime, 1, "s"))
+    : "";
 
   return `
-    ${renderStatRow("Tracked", formatNumber(trackedTime, 1, "s"))}
+    ${trackedRow}
     ${breakdownRows}
   `;
 }

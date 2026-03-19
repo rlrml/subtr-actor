@@ -25,9 +25,7 @@ import {
 } from "./touchOverlay.ts";
 import { FiftyFiftyOverlay } from "./fiftyFiftyOverlay.ts";
 import {
-  createDynamicStatsFrameLookup,
   createStatsFrameLookup,
-  getDynamicStatsFrameForReplayFrame,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
 import type { Object3D } from "three";
@@ -51,9 +49,6 @@ import type { PressureBreakdownClass } from "./pressureFormatting.ts";
 import { renderRushStats } from "./rushFormatting.ts";
 import { renderTouchStats } from "./touchFormatting.ts";
 import type {
-  DynamicPlayerStatsSnapshot,
-  DynamicStatsFrame,
-  DynamicStatsTimeline,
   PlayerStatsSnapshot,
   StatsFrame,
   StatsTimeline,
@@ -79,8 +74,6 @@ interface StatModuleContext {
   replay: ReplayModel;
   statsTimeline: StatsTimeline;
   statsFrameLookup: Map<number, StatsFrame>;
-  dynamicStatsTimeline: DynamicStatsTimeline;
-  dynamicStatsFrameLookup: Map<number, DynamicStatsFrame>;
   fieldScale: number;
 }
 
@@ -138,22 +131,6 @@ function getStatsPlayerSnapshot(
   playerId: string,
 ): PlayerStatsSnapshot | null {
   const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
-  if (!statsFrame) return null;
-
-  return statsFrame.players.find(
-    (player) => playerIdToString(player.player_id) === playerId,
-  ) ?? null;
-}
-
-function getDynamicStatsPlayerSnapshot(
-  ctx: StatModuleContext,
-  frameIndex: number,
-  playerId: string,
-): DynamicPlayerStatsSnapshot | null {
-  const statsFrame = getDynamicStatsFrameForReplayFrame(
-    ctx.dynamicStatsFrameLookup,
-    frameIndex,
-  );
   if (!statsFrame) return null;
 
   return statsFrame.players.find(
@@ -648,16 +625,12 @@ function createPossessionModule(): StatModule {
     onBeforeRender() {},
 
     getTimelineRanges(ctx) {
-      return buildPossessionTimelineRanges(ctx.statsTimeline, ctx.dynamicStatsTimeline, ctx.replay);
+      return buildPossessionTimelineRanges(ctx.statsTimeline, undefined, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
-        frameIndex,
-      );
-      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
-        ctx.dynamicStatsFrameLookup,
         frameIndex,
       );
       if (!statsFrame?.possession) return "";
@@ -669,7 +642,6 @@ function createPossessionModule(): StatModule {
           renderPossessionStats(statsFrame.possession, {
             isTeamZero: true,
             breakdownClasses: getActiveBreakdownClasses(),
-            exportedStats: dynamicStatsFrame?.possession,
           }),
         ),
         renderPlayerCard(
@@ -678,7 +650,6 @@ function createPossessionModule(): StatModule {
           renderPossessionStats(statsFrame.possession, {
             isTeamZero: false,
             breakdownClasses: getActiveBreakdownClasses(),
-            exportedStats: dynamicStatsFrame?.possession,
           }),
         ),
       ].join("");
@@ -689,17 +660,12 @@ function createPossessionModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
-        ctx.dynamicStatsFrameLookup,
-        frameIndex,
-      );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       if (!statsFrame?.possession || !player) return "";
 
       return renderPossessionStats(statsFrame.possession, {
         isTeamZero: player.is_team_0,
         breakdownClasses: getActiveBreakdownClasses(),
-        exportedStats: dynamicStatsFrame?.possession,
       });
     },
 
@@ -862,7 +828,7 @@ function createPressureModule(): StatModule {
   let halfFieldOverlay: HalfFieldOverlay | null = null;
   let settingsEl: HTMLDivElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
-  const activeBreakdownClasses = new Set<PressureBreakdownClass>();
+  const activeBreakdownClasses = new Set<PressureBreakdownClass>(["field_half"]);
   const orderedBreakdownClasses: PressureBreakdownClass[] = ["field_half"];
 
   return {
@@ -888,7 +854,7 @@ function createPressureModule(): StatModule {
     },
 
     getTimelineRanges(ctx) {
-      return buildPressureTimelineRanges(ctx.statsTimeline, ctx.dynamicStatsTimeline, ctx.replay);
+      return buildPressureTimelineRanges(ctx.statsTimeline, undefined, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
@@ -896,11 +862,7 @@ function createPressureModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
-        ctx.dynamicStatsFrameLookup,
-        frameIndex,
-      );
-      if (!statsFrame?.pressure && !dynamicStatsFrame?.pressure?.length) return "";
+      if (!statsFrame?.pressure) return "";
 
       return [
         renderPlayerCard(
@@ -909,7 +871,6 @@ function createPressureModule(): StatModule {
           renderPressureStats(statsFrame?.pressure, {
             isTeamZero: true,
             breakdownClasses: getActiveBreakdownClasses(),
-            exportedStats: dynamicStatsFrame?.pressure,
           }),
         ),
         renderPlayerCard(
@@ -918,7 +879,6 @@ function createPressureModule(): StatModule {
           renderPressureStats(statsFrame?.pressure, {
             isTeamZero: false,
             breakdownClasses: getActiveBreakdownClasses(),
-            exportedStats: dynamicStatsFrame?.pressure,
           }),
         ),
       ].join("");
@@ -929,17 +889,12 @@ function createPressureModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      const dynamicStatsFrame = getDynamicStatsFrameForReplayFrame(
-        ctx.dynamicStatsFrameLookup,
-        frameIndex,
-      );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if ((!statsFrame?.pressure && !dynamicStatsFrame?.pressure?.length) || !player) return "";
+      if (!statsFrame?.pressure || !player) return "";
 
       return renderPressureStats(statsFrame?.pressure, {
         isTeamZero: player.is_team_0,
         breakdownClasses: getActiveBreakdownClasses(),
-        exportedStats: dynamicStatsFrame?.pressure,
       });
     },
 
@@ -1178,11 +1133,6 @@ function createTouchModule(): StatModule {
         player.is_team_0,
         renderTouchStats(player.touch, {
           breakdownClasses: getActiveBreakdownClasses(),
-          exportedStats: getDynamicStatsPlayerSnapshot(
-            ctx,
-            frameIndex,
-            playerIdToString(player.player_id),
-          )?.stats,
         }),
         player.touch?.is_last_touch
           ? '<span class="role-indicator role-forward">Last Touch</span>'
@@ -1196,7 +1146,6 @@ function createTouchModule(): StatModule {
 
       return renderTouchStats(player.touch, {
         breakdownClasses: getActiveBreakdownClasses(),
-        exportedStats: getDynamicStatsPlayerSnapshot(ctx, frameIndex, playerId)?.stats,
       });
     },
 
@@ -1374,11 +1323,6 @@ function createMovementModule(): StatModule {
         player.is_team_0,
         renderMovementStats(player.movement, {
           breakdownClasses: getActiveBreakdownClasses(),
-          exportedStats: getDynamicStatsPlayerSnapshot(
-            ctx,
-            frameIndex,
-            playerIdToString(player.player_id),
-          )?.stats,
         }),
       )).join("");
     },
@@ -1389,7 +1333,6 @@ function createMovementModule(): StatModule {
 
       return renderMovementStats(player.movement, {
         breakdownClasses: getActiveBreakdownClasses(),
-        exportedStats: getDynamicStatsPlayerSnapshot(ctx, frameIndex, playerId)?.stats,
       });
     },
 
@@ -1537,8 +1480,6 @@ let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
-let dynamicStatsTimeline: DynamicStatsTimeline | null = null;
-let dynamicStatsFrameLookup: Map<number, DynamicStatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
@@ -1547,9 +1488,7 @@ function getModuleContext(): StatModuleContext | null {
   if (
     !replayPlayer ||
     !statsTimeline ||
-    !statsFrameLookup ||
-    !dynamicStatsTimeline ||
-    !dynamicStatsFrameLookup
+    !statsFrameLookup
   ) {
     return null;
   }
@@ -1559,8 +1498,6 @@ function getModuleContext(): StatModuleContext | null {
     replay: replayPlayer.replay,
     statsTimeline,
     statsFrameLookup,
-    dynamicStatsTimeline,
-    dynamicStatsFrameLookup,
     fieldScale: replayPlayer.options.fieldScale ?? 1,
   };
 }
@@ -2156,8 +2093,6 @@ async function loadReplay(file: File): Promise<void> {
   timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
-  dynamicStatsTimeline = null;
-  dynamicStatsFrameLookup = null;
   clearTimelineEventSources();
   clearTimelineRangeSources();
   renderTimelineEventCount();
@@ -2173,8 +2108,6 @@ async function loadReplay(file: File): Promise<void> {
   const { replay } = loadedReplay;
   statsTimeline = loadedReplay.statsTimeline;
   statsFrameLookup = createStatsFrameLookup(statsTimeline);
-  dynamicStatsTimeline = loadedReplay.dynamicStatsTimeline;
-  dynamicStatsFrameLookup = createDynamicStatsFrameLookup(dynamicStatsTimeline);
 
   timelineOverlay = createTimelineOverlayPlugin({
     replayEvents: (context) =>
@@ -2269,8 +2202,6 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
     timelineOverlay = null;
     statsTimeline = null;
     statsFrameLookup = null;
-    dynamicStatsTimeline = null;
-    dynamicStatsFrameLookup = null;
     clearTimelineEventSources();
     clearTimelineRangeSources();
     activeModules = [];

@@ -26,6 +26,24 @@ export interface FiftyFiftyEvent {
   possession_team_is_team_0?: boolean;
 }
 
+export interface LabeledCountEntry {
+  labels: StatLabel[];
+  count: number;
+}
+
+export interface LabeledCounts {
+  entries: LabeledCountEntry[];
+}
+
+export interface LabeledFloatSumEntry {
+  labels: StatLabel[];
+  value: number;
+}
+
+export interface LabeledFloatSums {
+  entries: LabeledFloatSumEntry[];
+}
+
 export interface StatsFrame {
   frame_number: number;
   time: number;
@@ -52,6 +70,7 @@ export interface StatsFrame {
     team_zero_time: number;
     team_one_time: number;
     neutral_time?: number;
+    labeled_time?: LabeledFloatSums;
     [key: string]: unknown;
   };
   pressure?: {
@@ -59,6 +78,7 @@ export interface StatsFrame {
     team_zero_side_time: number;
     team_one_side_time: number;
     neutral_time?: number;
+    labeled_time?: LabeledFloatSums;
     [key: string]: unknown;
   } | null;
   rush?: {
@@ -116,12 +136,7 @@ export interface PlayerStatsSnapshot {
     hard_hit_count?: number;
     aerial_touch_count?: number;
     high_aerial_touch_count?: number;
-    labeled_touch_counts?: {
-      entries: Array<{
-        labels: StatLabel[];
-        count: number;
-      }>;
-    };
+    labeled_touch_counts?: LabeledCounts;
     is_last_touch: boolean;
     last_touch_time?: number;
     last_touch_frame?: number;
@@ -198,6 +213,7 @@ export interface PlayerStatsSnapshot {
     time_on_ground: number;
     time_low_air: number;
     time_high_air: number;
+    labeled_tracked_time?: LabeledFloatSums;
     [key: string]: unknown;
   };
   powerslide?: {

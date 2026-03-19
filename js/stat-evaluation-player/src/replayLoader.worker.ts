@@ -18,7 +18,6 @@ interface ReplayDoneMessage {
   type: "done";
   rawReplayDataBuffer: ArrayBuffer;
   statsTimelineBuffer: ArrayBuffer;
-  dynamicStatsTimelineBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -106,12 +105,6 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
 
     postMessageToMain({
       type: "progress",
-      progress: { stage: "dynamic-stats-timeline", progress: 0 },
-    });
-    const dynamicStatsTimeline = subtrActor.get_dynamic_stats_timeline_json(bytes);
-
-    postMessageToMain({
-      type: "progress",
       progress: { stage: "normalizing", progress: 0 },
     });
 
@@ -119,11 +112,9 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       type: "done",
       rawReplayDataBuffer: rawReplayData.buffer,
       statsTimelineBuffer: statsTimeline.buffer,
-      dynamicStatsTimelineBuffer: dynamicStatsTimeline.buffer,
     }, [
       rawReplayData.buffer,
       statsTimeline.buffer,
-      dynamicStatsTimeline.buffer,
     ]);
   } catch (error: unknown) {
     postMessageToMain({

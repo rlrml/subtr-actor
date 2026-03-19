@@ -133,53 +133,85 @@ function formatBreakdownLabel(
 }
 
 function renderMovementBreakdownRows(
+  movement: PlayerStatsSnapshot["movement"],
   exportedStats: ExportedStat[] | undefined,
   breakdownClasses: MovementBreakdownClass[],
   trackedTime: number | undefined,
 ): string {
-  if (breakdownClasses.length === 0 || !exportedStats || exportedStats.length === 0) {
+  if (breakdownClasses.length === 0) {
+    return "";
+  }
+  if (!movement?.labeled_tracked_time?.entries?.length && (!exportedStats || exportedStats.length === 0)) {
     return "";
   }
 
   const groups = new Map<string, { values: MovementBreakdownValueMap; total: number }>();
 
-  for (const stat of exportedStats) {
-    const domain = getExportedStatDomain(stat);
-    const name = getExportedStatName(stat);
-    const variant = getExportedStatVariant(stat);
-    const valueType = getExportedStatValueType(stat);
-    const value = getExportedStatValue(stat);
-    if (
-      domain !== "movement" ||
-      name !== "tracked_time" ||
-      variant !== "labeled" ||
-      valueType !== "float" ||
-      value === undefined
-    ) {
-      continue;
-    }
-
-    const labelMap = new Map(getExportedStatLabels(stat).map((label) => [label.key, label.value]));
-    const values = {} as MovementBreakdownValueMap;
-    let complete = true;
-    for (const className of breakdownClasses) {
-      const value = labelMap.get(className);
-      if (value === undefined) {
-        complete = false;
-        break;
+  const snapshotEntries = movement?.labeled_tracked_time?.entries ?? [];
+  if (snapshotEntries.length > 0) {
+    for (const entry of snapshotEntries) {
+      const labelMap = new Map(entry.labels.map((label) => [label.key, label.value]));
+      const values = {} as MovementBreakdownValueMap;
+      let complete = true;
+      for (const className of breakdownClasses) {
+        const value = labelMap.get(className);
+        if (value === undefined) {
+          complete = false;
+          break;
+        }
+        values[className] = value;
       }
-      values[className] = value;
-    }
-    if (!complete) {
-      continue;
-    }
+      if (!complete) {
+        continue;
+      }
 
-    const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
-    const existing = groups.get(key);
-    if (existing) {
-      existing.total += value;
-    } else {
-      groups.set(key, { values, total: value });
+      const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
+      const existing = groups.get(key);
+      if (existing) {
+        existing.total += entry.value;
+      } else {
+        groups.set(key, { values, total: entry.value });
+      }
+    }
+  } else {
+    for (const stat of exportedStats ?? []) {
+      const domain = getExportedStatDomain(stat);
+      const name = getExportedStatName(stat);
+      const variant = getExportedStatVariant(stat);
+      const valueType = getExportedStatValueType(stat);
+      const value = getExportedStatValue(stat);
+      if (
+        domain !== "movement" ||
+        name !== "tracked_time" ||
+        variant !== "labeled" ||
+        valueType !== "float" ||
+        value === undefined
+      ) {
+        continue;
+      }
+
+      const labelMap = new Map(getExportedStatLabels(stat).map((label) => [label.key, label.value]));
+      const values = {} as MovementBreakdownValueMap;
+      let complete = true;
+      for (const className of breakdownClasses) {
+        const value = labelMap.get(className);
+        if (value === undefined) {
+          complete = false;
+          break;
+        }
+        values[className] = value;
+      }
+      if (!complete) {
+        continue;
+      }
+
+      const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
+      const existing = groups.get(key);
+      if (existing) {
+        existing.total += value;
+      } else {
+        groups.set(key, { values, total: value });
+      }
     }
   }
 
@@ -204,6 +236,7 @@ export function renderMovementStats(
       : undefined;
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderMovementBreakdownRows(
+    movement,
     options.exportedStats,
     breakdownClasses,
     trackedTime,
