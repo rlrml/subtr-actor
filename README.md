@@ -4,10 +4,6 @@
 
 `subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
-Mechanics-specific datasets and ML experiments now live in the sibling
-`subtr-actor-mechanics` project so this repository can stay focused on the core
-replay-processing packages.
-
 It supports two main workflows:
 
 - structured replay data for inspection, export, and analysis
@@ -20,8 +16,8 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - Rust: [`subtr-actor`](https://crates.io/crates/subtr-actor)
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM bindings: [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
-- JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
-- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player)
+- JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player)
+- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
 
 ## What You Get
 
