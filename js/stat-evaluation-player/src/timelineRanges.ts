@@ -228,7 +228,7 @@ interface PlayerZoneSpec {
   fieldName: string;
   aliases?: string[];
   label: string;
-  color: string;
+  relativeColor: "own" | "neutral" | "opp";
 }
 
 const PLAYER_ZONE_SPECS: PlayerZoneSpec[] = [
@@ -236,21 +236,33 @@ const PLAYER_ZONE_SPECS: PlayerZoneSpec[] = [
     fieldName: "time_defensive_third",
     aliases: ["time_defensive_zone"],
     label: "Def third",
-    color: "rgba(89, 195, 255, 0.74)",
+    relativeColor: "own",
   },
   {
     fieldName: "time_neutral_third",
     aliases: ["time_neutral_zone"],
     label: "Neutral third",
-    color: "rgba(209, 217, 224, 0.68)",
+    relativeColor: "neutral",
   },
   {
     fieldName: "time_offensive_third",
     aliases: ["time_offensive_zone"],
     label: "Off third",
-    color: "rgba(255, 193, 92, 0.78)",
+    relativeColor: "opp",
   },
 ];
+
+function getPlayerZoneColor(spec: PlayerZoneSpec, isTeamZero: boolean): string {
+  if (spec.relativeColor === "neutral") {
+    return "rgba(209, 217, 224, 0.68)";
+  }
+
+  const isOwnTeamColor = spec.relativeColor === "own";
+  const shouldUseBlue = isOwnTeamColor ? isTeamZero : !isTeamZero;
+  return shouldUseBlue
+    ? "rgba(89, 195, 255, 0.74)"
+    : "rgba(255, 193, 92, 0.78)";
+}
 
 function playerIdToString(playerId: Record<string, string>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
@@ -327,7 +339,7 @@ export function buildTimeInZoneTimelineRanges(
         lane: `time-in-zone:${playerId}`,
         laneLabel: player.name,
         label: winningSpec.label,
-        color: winningSpec.color,
+        color: getPlayerZoneColor(winningSpec, player.is_team_0),
         isTeamZero: player.is_team_0,
       });
     }

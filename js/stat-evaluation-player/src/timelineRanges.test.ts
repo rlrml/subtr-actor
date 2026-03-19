@@ -663,6 +663,90 @@ test("buildTimeInZoneTimelineRanges merges continuous spans independently per pl
       lane: "time-in-zone:Epic:orange-id",
       laneLabel: "Orange",
       label: "Def third",
+      color: "rgba(255, 193, 92, 0.78)",
+      isTeamZero: false,
+    },
+  ]);
+});
+
+test("buildTimeInZoneTimelineRanges uses player-relative colors for orange players", () => {
+  const timeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 1,
+        players: [
+          {
+            player_id: { Epic: "orange-id" },
+            name: "Orange",
+            is_team_0: false,
+            positioning: {
+              active_game_time: 1,
+              time_defensive_zone: 1,
+              time_neutral_zone: 0,
+              time_offensive_zone: 0,
+              time_defensive_half: 1,
+              time_offensive_half: 0,
+              time_demolished: 0,
+              time_no_teammates: 0,
+              time_most_back: 0,
+              time_most_forward: 0,
+              time_mid_role: 0,
+              time_other_role: 0,
+            },
+          },
+        ],
+      },
+      {
+        frame_number: 2,
+        time: 2,
+        dt: 1,
+        players: [
+          {
+            player_id: { Epic: "orange-id" },
+            name: "Orange",
+            is_team_0: false,
+            positioning: {
+              active_game_time: 2,
+              time_defensive_zone: 1,
+              time_neutral_zone: 0,
+              time_offensive_zone: 1,
+              time_defensive_half: 1,
+              time_offensive_half: 1,
+              time_demolished: 0,
+              time_no_teammates: 0,
+              time_most_back: 0,
+              time_most_forward: 0,
+              time_mid_role: 0,
+              time_other_role: 0,
+            },
+          },
+        ],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildTimeInZoneTimelineRanges(timeline), [
+    {
+      id: "time-in-zone:Epic:orange-id:time_defensive_third:0.000",
+      startTime: 0,
+      endTime: 1,
+      lane: "time-in-zone:Epic:orange-id",
+      laneLabel: "Orange",
+      label: "Def third",
+      color: "rgba(255, 193, 92, 0.78)",
+      isTeamZero: false,
+    },
+    {
+      id: "time-in-zone:Epic:orange-id:time_offensive_third:1.000",
+      startTime: 1,
+      endTime: 2,
+      lane: "time-in-zone:Epic:orange-id",
+      laneLabel: "Orange",
+      label: "Off third",
       color: "rgba(89, 195, 255, 0.74)",
       isTeamZero: false,
     },
