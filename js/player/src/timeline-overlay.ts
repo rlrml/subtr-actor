@@ -71,6 +71,9 @@ function ensureStyles(): void {
 
     .sap-tl-shell {
       --sap-tl-thumb-size: 1.35rem;
+      --sap-tl-gutter-width: clamp(4.5rem, 10vw, 6.75rem);
+      --sap-tl-gutter-gap: 0.7rem;
+      --sap-tl-marker-offset: 1.05rem;
       position: absolute;
       left: 0.8rem;
       right: 0.8rem;
@@ -100,6 +103,7 @@ function ensureStyles(): void {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding-left: calc(var(--sap-tl-gutter-width) + var(--sap-tl-gutter-gap));
       margin-bottom: 0.55rem;
       color: #f5fbff;
       font-size: 0.82rem;
@@ -137,6 +141,12 @@ function ensureStyles(): void {
         background 140ms ease;
     }
 
+    .sap-tl-track-toggle {
+      width: 100%;
+      min-width: 0;
+      padding-inline: 0.55rem;
+    }
+
     .sap-tl-toggle:hover {
       border-color: rgba(184, 214, 236, 0.4);
       background: rgba(28, 45, 61, 0.96);
@@ -165,9 +175,15 @@ function ensureStyles(): void {
 
     .sap-tl-track-wrap {
       position: relative;
+      display: grid;
+      grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
+      column-gap: var(--sap-tl-gutter-gap);
+      row-gap: 0.5rem;
+      align-items: center;
     }
 
     .sap-tl-ranges {
+      grid-column: 1 / -1;
       display: flex;
       flex-direction: column;
       gap: 0.34rem;
@@ -176,12 +192,15 @@ function ensureStyles(): void {
     }
 
     .sap-tl-range-lane {
-      position: relative;
-      padding-left: 0.15rem;
+      display: grid;
+      grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
+      column-gap: var(--sap-tl-gutter-gap);
+      align-items: center;
     }
 
     .sap-tl-range-lane-track {
       position: relative;
+      grid-column: 2;
       height: 0.55rem;
       margin: 0 calc(var(--sap-tl-thumb-size) / 2);
       border-radius: 999px;
@@ -191,10 +210,8 @@ function ensureStyles(): void {
     }
 
     .sap-tl-range-lane-label {
-      position: absolute;
-      left: 0.4rem;
-      top: 50%;
-      z-index: 2;
+      display: block;
+      max-width: 100%;
       padding: 0.08rem 0.38rem;
       border: 1px solid rgba(184, 214, 236, 0.18);
       border-radius: 999px;
@@ -203,9 +220,12 @@ function ensureStyles(): void {
       font-size: 0.54rem;
       font-weight: 800;
       letter-spacing: 0.04em;
+      line-height: 1.2;
       text-transform: uppercase;
-      transform: translateY(-50%);
       backdrop-filter: blur(6px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .sap-tl-range-segment {
@@ -229,7 +249,8 @@ function ensureStyles(): void {
 
     .sap-tl-track-rail {
       position: relative;
-      padding-top: 1.05rem;
+      grid-column: 2;
+      min-width: 0;
     }
 
     .sap-tl-range {
@@ -295,7 +316,9 @@ function ensureStyles(): void {
 
     .sap-tl-markers {
       position: absolute;
-      inset: 0 calc(var(--sap-tl-thumb-size) / 2) auto;
+      left: calc(var(--sap-tl-thumb-size) / 2);
+      right: calc(var(--sap-tl-thumb-size) / 2);
+      top: calc(-1 * var(--sap-tl-marker-offset));
       height: 1rem;
       pointer-events: none;
       z-index: 1;
@@ -348,6 +371,8 @@ function ensureStyles(): void {
 
     @media (max-width: 720px) {
       .sap-tl-shell {
+        --sap-tl-gutter-width: 4rem;
+        --sap-tl-gutter-gap: 0.55rem;
         bottom: 0.6rem;
         left: 0.5rem;
         right: 0.5rem;
@@ -794,6 +819,7 @@ export function createTimelineOverlayPlugin(
         const label = document.createElement("span");
         label.className = "sap-tl-range-lane-label";
         label.textContent = lane.label;
+        label.title = lane.label;
         laneEl.append(label);
       }
 
@@ -916,7 +942,7 @@ export function createTimelineOverlayPlugin(
 
       toggleButton = document.createElement("button");
       toggleButton.type = "button";
-      toggleButton.className = "sap-tl-toggle";
+      toggleButton.className = "sap-tl-toggle sap-tl-track-toggle";
       toggleButtonIcon = document.createElement("span");
       toggleButtonIcon.className = "sap-tl-toggle-icon";
       toggleButtonIcon.setAttribute("aria-hidden", "true");
@@ -936,7 +962,7 @@ export function createTimelineOverlayPlugin(
       remainingTimeText.className = "sap-tl-remaining";
       remainingTimeText.textContent = "-0:00.00";
 
-      primary.append(toggleButton, currentTimeText);
+      primary.append(currentTimeText);
       topLine.append(primary, remainingTimeText);
 
       const trackWrap = document.createElement("div");
@@ -990,7 +1016,7 @@ export function createTimelineOverlayPlugin(
       };
 
       trackRail.append(markers, range);
-      trackWrap.append(rangesRoot, trackRail);
+      trackWrap.append(rangesRoot, toggleButton, trackRail);
       shell.append(topLine, trackWrap);
       root.append(shell);
       context.container.append(root);
