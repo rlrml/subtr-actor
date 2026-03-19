@@ -30,7 +30,7 @@
     "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
     "build:player": "npm --prefix ../player run build",
     "check": "tsc --noEmit",
-    "test": "node --test src/*.test.ts",
+    "test": "tsx --tsconfig tsconfig.test.json --test src/*.test.ts",
     "build:types": "tsc --project tsconfig.build.json",
     "build": "npm run build:bindings && npm run build:player && npm run check && vite build && npm run build:types",
     "build:site": "npm run check && vite build --mode site",
@@ -62,6 +62,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/three": "^0.180.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
     "vite-plugin-wasm": "^3.6.0"
