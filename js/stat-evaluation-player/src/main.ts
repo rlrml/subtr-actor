@@ -1529,7 +1529,7 @@ const MODULE_FACTORIES = [
 
 const MODULES = MODULE_FACTORIES.map((factory) => factory());
 let activeModules: StatModule[] = [];
-let activeModuleIds = new Set<string>([RELATIVE_POSITIONING_MODULE_ID]);
+let activeModuleIds = new Set<string>();
 let removeRenderHook: (() => void) | null = null;
 
 let replayPlayer: ReplayPlayer | null = null;
