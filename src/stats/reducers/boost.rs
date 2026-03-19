@@ -631,8 +631,8 @@ impl BoostReducer {
         }
     }
 
-    fn boost_levels_live(sample: &StatsSample, live_play: bool) -> bool {
-        live_play && sample.ball_has_been_hit != Some(false)
+    fn boost_levels_live(_sample: &StatsSample, live_play: bool) -> bool {
+        live_play
     }
 
     fn tracks_boost_levels(boost_levels_live: bool) -> bool {
@@ -1063,7 +1063,14 @@ mod tests {
         reducer.kickoff_respawn_awarded.insert(player_id.clone());
 
         reducer
-            .on_sample(&sample(0, 0.0, BOOST_MAX_AMOUNT, None, Some(false), None))
+            .on_sample(&sample(
+                0,
+                0.0,
+                BOOST_MAX_AMOUNT,
+                Some(GAME_STATE_KICKOFF_COUNTDOWN),
+                Some(false),
+                Some(1),
+            ))
             .unwrap();
         reducer
             .on_sample(&sample(1, 1.0, 0.0, None, Some(true), None))

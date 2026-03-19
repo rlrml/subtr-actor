@@ -3662,7 +3662,7 @@ fn test_boost_reducer_tracks_pre_touch_kickoff_time_and_pickups() {
         .cloned()
         .unwrap_or_default();
     assert!((stats.amount_collected - 55.0).abs() < 0.001);
-    assert_eq!(stats.tracked_time, 10.0);
+    assert_eq!(stats.tracked_time, 11.0);
 }
 
 #[test]
