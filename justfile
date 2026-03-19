@@ -14,7 +14,7 @@ build-python:
 
 # Build JavaScript/WASM package
 build-js:
-    cd js && wasm-pack build --target bundler
+    npm --prefix js exec wasm-pack -- build --target bundler
 
 # Run tests
 test:
