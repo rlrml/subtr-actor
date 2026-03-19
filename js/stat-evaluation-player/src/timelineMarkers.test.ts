@@ -41,6 +41,7 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
 
 test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
   const replay = {
+    frames: Array.from({ length: 41 }, (_, time) => ({ time })),
     players: [
       {
         id: "Steam:blue-id",
@@ -79,7 +80,8 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
   assert.deepEqual(buildFiftyFiftyTimelineEvents(statsTimeline, replay), [
     {
       id: "fifty-fifty:20:Steam:blue-id:Steam:orange-id",
-      time: 2,
+      time: 20,
+      frame: 20,
       kind: "fifty-fifty",
       label: "50/50: Blue vs Orange | blue win | blue poss",
       shortLabel: "50",

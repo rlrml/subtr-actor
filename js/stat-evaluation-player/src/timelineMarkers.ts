@@ -63,6 +63,7 @@ export function buildFiftyFiftyTimelineEvents(
   return buildFiftyFiftyMarkers(statsTimeline, replay).map((marker) => ({
     id: marker.id,
     time: marker.time,
+    frame: marker.frame,
     kind: "fifty-fifty",
     label: marker.label,
     shortLabel: marker.label.startsWith("Kickoff 50/50") ? "KO" : "50",

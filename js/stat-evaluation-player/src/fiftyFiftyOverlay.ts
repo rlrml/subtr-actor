@@ -15,6 +15,7 @@ const DEFAULT_DECAY_SECONDS = 4;
 export interface FiftyFiftyMarker {
   id: string;
   time: number;
+  frame: number;
   label: string;
   labelClassName: string;
   axisStart: THREE.Vector3;
@@ -94,10 +95,12 @@ export function buildFiftyFiftyMarkers(
     const teamZeroPosition = new THREE.Vector3(...event.team_zero_position);
     const teamOnePosition = new THREE.Vector3(...event.team_one_position);
     const midpoint = new THREE.Vector3(...event.midpoint);
+    const markerTime = replay.frames[event.start_frame]?.time ?? event.start_time;
 
     return {
       id: `fifty-fifty:${event.start_frame}:${playerIdToString(event.team_zero_player)}:${playerIdToString(event.team_one_player)}`,
-      time: event.resolve_time,
+      time: markerTime,
+      frame: event.start_frame,
       label: label.text,
       labelClassName: label.className,
       axisStart: teamZeroPosition,
