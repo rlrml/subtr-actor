@@ -350,6 +350,13 @@ input {
   border-color: rgba(243, 154, 55, 0.28);
 }
 
+.player-card.shared {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .player-card-header {
   display: flex;
   justify-content: space-between;

@@ -10,7 +10,14 @@ import {
 
 interface PressureRenderOptions {
   exportedStats?: ExportedStat[];
-  isTeamZero: boolean;
+  labelPerspective:
+    | {
+      kind: "shared";
+    }
+    | {
+      kind: "team";
+      isTeamZero: boolean;
+    };
 }
 
 function formatNumber(
@@ -73,11 +80,19 @@ function renderStatRow(label: string, value: string): string {
   return `<div class="stat-row"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(value)}</span></div>`;
 }
 
-function formatFieldHalfLabel(value: string, isTeamZero: boolean): string {
+function formatFieldHalfLabel(
+  value: string,
+  labelPerspective: PressureRenderOptions["labelPerspective"],
+): string {
   if (value === "neutral") {
     return "Neutral zone";
   }
-  const isOwnHalf = (value === "team_zero_side") === isTeamZero;
+
+  if (labelPerspective.kind === "shared") {
+    return value === "team_zero_side" ? "Blue side" : "Orange side";
+  }
+
+  const isOwnHalf = (value === "team_zero_side") === labelPerspective.isTeamZero;
   return isOwnHalf ? "Own half" : "Opp half";
 }
 
@@ -85,7 +100,7 @@ function renderPressureBreakdownRows(
   pressure: StatsFrame["pressure"],
   exportedStats: ExportedStat[] | undefined,
   trackedTime: number | undefined,
-  isTeamZero: boolean,
+  labelPerspective: PressureRenderOptions["labelPerspective"],
 ): string {
   const totals = new Map<string, number>();
 
@@ -139,7 +154,7 @@ function renderPressureBreakdownRows(
   return orderedHalves
     .filter((half) => totals.has(half))
     .map((half) => renderStatRow(
-      formatFieldHalfLabel(half, isTeamZero),
+      formatFieldHalfLabel(half, labelPerspective),
       formatTimeShare(totals.get(half), trackedTime),
     ))
     .join("");
@@ -162,7 +177,7 @@ export function renderPressureStats(
     pressure,
     options.exportedStats,
     trackedTime,
-    options.isTeamZero,
+    options.labelPerspective,
   );
   const trackedRow = breakdownRows.length === 0
     ? renderStatRow("Tracked", formatNumber(trackedTime, 1, "s"))

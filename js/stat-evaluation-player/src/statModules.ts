@@ -94,19 +94,52 @@ export function getTeamClass(isTeamZero: boolean): string {
   return isTeamZero ? "team-blue" : "team-orange";
 }
 
+type StatCardTone = "blue" | "orange" | "shared";
+
+function renderStatCard(
+  name: string,
+  bodyHtml: string,
+  options: {
+    metaHtml?: string;
+    tone: StatCardTone;
+  },
+): string {
+  const toneClass = options.tone === "shared"
+    ? "shared"
+    : options.tone === "blue"
+      ? "team-blue"
+      : "team-orange";
+
+  return `<div class="player-card ${toneClass}">
+    <div class="player-card-header">
+      <span class="player-name">${name}</span>
+      ${options.metaHtml ?? ""}
+    </div>
+    ${bodyHtml}
+  </div>`;
+}
+
 function renderPlayerCard(
   name: string,
   isTeamZero: boolean,
   bodyHtml: string,
   metaHtml = "",
 ): string {
-  return `<div class="player-card ${getTeamClass(isTeamZero)}">
-    <div class="player-card-header">
-      <span class="player-name">${name}</span>
-      ${metaHtml}
-    </div>
-    ${bodyHtml}
-  </div>`;
+  return renderStatCard(name, bodyHtml, {
+    metaHtml,
+    tone: isTeamZero ? "blue" : "orange",
+  });
+}
+
+function renderSharedCard(
+  name: string,
+  bodyHtml: string,
+  metaHtml = "",
+): string {
+  return renderStatCard(name, bodyHtml, {
+    metaHtml,
+    tone: "shared",
+  });
 }
 
 export function getStatsPlayerSnapshot(
@@ -921,22 +954,14 @@ function createPressureModule(): StatModule {
       );
       if (!statsFrame?.pressure) return "";
 
-      return [
-        renderPlayerCard(
-          "Blue Half",
-          true,
-          renderPressureStats(statsFrame.pressure, {
-            isTeamZero: true,
-          }),
-        ),
-        renderPlayerCard(
-          "Orange Half",
-          false,
-          renderPressureStats(statsFrame.pressure, {
-            isTeamZero: false,
-          }),
-        ),
-      ].join("");
+      return renderSharedCard(
+        "Field State",
+        renderPressureStats(statsFrame.pressure, {
+          labelPerspective: {
+            kind: "shared",
+          },
+        }),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -948,7 +973,10 @@ function createPressureModule(): StatModule {
       if (!statsFrame?.pressure || !player) return "";
 
       return renderPressureStats(statsFrame.pressure, {
-        isTeamZero: player.is_team_0,
+        labelPerspective: {
+          kind: "team",
+          isTeamZero: player.is_team_0,
+        },
       });
     },
   };
