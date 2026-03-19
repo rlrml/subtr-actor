@@ -469,10 +469,6 @@ function createPlayerStatsModule<T>(options: {
 
     onBeforeRender() {},
 
-    getTimelineEvents(ctx) {
-      return buildRushTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
@@ -1128,6 +1124,10 @@ function createRushModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildRushTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
