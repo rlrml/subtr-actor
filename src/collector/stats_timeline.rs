@@ -14,6 +14,7 @@ pub struct ReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
+    pub speed_flip_events: Vec<SpeedFlipEvent>,
     pub frames: Vec<ReplayStatsFrame>,
 }
 
@@ -31,6 +32,7 @@ pub struct DynamicReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
+    pub speed_flip_events: Vec<SpeedFlipEvent>,
     pub frames: Vec<DynamicReplayStatsFrame>,
 }
 
@@ -98,6 +100,7 @@ pub struct PlayerStatsSnapshot {
     pub is_team_0: bool,
     pub core: CorePlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
+    pub speed_flip: SpeedFlipStats,
     pub touch: TouchStats,
     pub musty_flick: MustyFlickStats,
     pub dodge_reset: DodgeResetStats,
@@ -132,6 +135,7 @@ impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
         self.fifty_fifty.visit_stat_fields(visitor);
+        self.speed_flip.visit_stat_fields(visitor);
         self.touch.visit_stat_fields(visitor);
         self.musty_flick.visit_stat_fields(visitor);
         self.dodge_reset.visit_stat_fields(visitor);
@@ -188,6 +192,7 @@ struct StatsTimelineReducers {
     rush: RushReducer,
     match_stats: MatchStatsReducer,
     touch: TouchReducer,
+    speed_flip: SpeedFlipReducer,
     musty_flick: MustyFlickReducer,
     ball_carry: BallCarryReducer,
     boost: BoostReducer,
@@ -222,6 +227,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.on_replay_meta(meta)?;
         self.fifty_fifty.on_replay_meta(meta)?;
         self.touch.on_replay_meta(meta)?;
+        self.speed_flip.on_replay_meta(meta)?;
         self.musty_flick.on_replay_meta(meta)?;
         self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
@@ -244,6 +250,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.on_sample_with_context(sample, ctx)?;
         self.fifty_fifty.on_sample_with_context(sample, ctx)?;
         self.touch.on_sample_with_context(sample, ctx)?;
+        self.speed_flip.on_sample_with_context(sample, ctx)?;
         self.musty_flick.on_sample_with_context(sample, ctx)?;
         self.ball_carry.on_sample_with_context(sample, ctx)?;
         self.boost.on_sample_with_context(sample, ctx)?;
@@ -262,6 +269,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.finish()?;
         self.fifty_fifty.finish()?;
         self.touch.finish()?;
+        self.speed_flip.finish()?;
         self.musty_flick.finish()?;
         self.ball_carry.finish()?;
         self.boost.finish()?;
@@ -361,6 +369,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
+            speed_flip_events: self.reducers.speed_flip.events().to_vec(),
             frames: self.frames,
         }
     }
@@ -389,6 +398,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
+            speed_flip_events: self.reducers.speed_flip.events().to_vec(),
             frames: self
                 .frames
                 .into_iter()
@@ -449,6 +459,13 @@ impl StatsTimelineCollector {
                     fifty_fifty: self
                         .reducers
                         .fifty_fifty
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    speed_flip: self
+                        .reducers
+                        .speed_flip
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()

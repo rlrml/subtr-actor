@@ -767,6 +767,8 @@ pub mod touch;
 pub use touch::*;
 pub mod fifty_fifty;
 pub use fifty_fifty::*;
+pub mod speed_flip;
+pub use speed_flip::*;
 pub mod movement;
 pub use movement::*;
 pub mod positioning;

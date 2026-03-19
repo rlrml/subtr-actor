@@ -13,6 +13,7 @@ mod possession;
 mod powerslide;
 mod pressure;
 mod rush;
+mod speed_flip;
 mod touch;
 
 pub const LEGACY_STAT_VARIANT: &str = "legacy";

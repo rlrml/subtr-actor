@@ -241,6 +241,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         },
         timeline_events: Vec::new(),
         fifty_fifty_events: Vec::new(),
+        speed_flip_events: Vec::new(),
         frames: vec![
             ReplayStatsFrame {
                 frame_number: 10,
