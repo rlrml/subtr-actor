@@ -66,7 +66,9 @@ import {
 } from "./timelineRanges.ts";
 import {
   formatReplayLoadProgress,
+  getReplayLoadCompletion,
   loadReplayBundleInWorker,
+  type ReplayLoadProgress,
 } from "./replayLoader.ts";
 
 interface StatModuleContext {
@@ -108,6 +110,93 @@ const ROLE_LABELS: Record<Role, string> = {
 
 function getTeamClass(isTeamZero: boolean): string {
   return isTeamZero ? "team-blue" : "team-orange";
+}
+
+interface ReplayLoadModalController {
+  show(fileName: string, status?: string): void;
+  update(progress: ReplayLoadProgress): void;
+  hide(): void;
+  destroy(): void;
+}
+
+function createReplayLoadModal(root: HTMLElement): ReplayLoadModalController {
+  const modal = document.createElement("div");
+  modal.className = "replay-load-modal";
+  modal.hidden = true;
+
+  const dialog = document.createElement("div");
+  dialog.className = "replay-load-modal__dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-labelledby", "replay-load-modal-title");
+
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "replay-load-modal__eyebrow";
+  eyebrow.textContent = "Replay loading";
+
+  const percent = document.createElement("h2");
+  percent.id = "replay-load-modal-title";
+  percent.className = "replay-load-modal__percent";
+  percent.textContent = "0%";
+
+  const status = document.createElement("p");
+  status.className = "replay-load-modal__status";
+  status.textContent = "Preparing replay...";
+
+  const bar = document.createElement("div");
+  bar.className = "replay-load-modal__bar";
+
+  const fill = document.createElement("div");
+  fill.className = "replay-load-modal__fill";
+  bar.append(fill);
+
+  const meta = document.createElement("p");
+  meta.className = "replay-load-modal__meta";
+
+  dialog.append(eyebrow, percent, status, bar, meta);
+  modal.append(dialog);
+  root.append(modal);
+
+  let activeFileName = "";
+
+  const setProgress = (fraction: number) => {
+    const bounded = Math.max(0, Math.min(1, fraction));
+    fill.style.width = `${bounded * 100}%`;
+    percent.textContent = `${Math.round(bounded * 100)}%`;
+  };
+
+  const setVisible = (visible: boolean) => {
+    modal.hidden = !visible;
+  };
+
+  return {
+    show(fileName, nextStatus = "Preparing replay...") {
+      activeFileName = fileName;
+      setVisible(true);
+      setProgress(0);
+      status.textContent = nextStatus;
+      meta.textContent = `Loading ${fileName}`;
+    },
+    update(progress) {
+      setVisible(true);
+      setProgress(getReplayLoadCompletion(progress));
+      status.textContent = formatReplayLoadProgress(progress);
+      if (
+        progress.stage === "processing" &&
+        progress.totalFrames !== undefined
+      ) {
+        meta.textContent = `${progress.processedFrames ?? 0}/${progress.totalFrames} frames`;
+        return;
+      }
+      meta.textContent = activeFileName ? `Loading ${activeFileName}` : "";
+    },
+    hide() {
+      setVisible(false);
+    },
+    destroy() {
+      modal.remove();
+    },
+  };
 }
 
 function renderPlayerCard(
@@ -1848,6 +1937,7 @@ let cameraPitchReadout!: HTMLElement;
 let cameraBaseDistanceReadout!: HTMLElement;
 let cameraStiffnessReadout!: HTMLElement;
 let skipPostGoalTransitions!: HTMLInputElement;
+let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
 let currentMountCleanup: (() => void) | null = null;
 
@@ -2078,6 +2168,8 @@ function renderSnapshot(state: ReplayPlayerState): void {
 
 async function loadReplay(file: File): Promise<void> {
   statusReadout.textContent = "Parsing replay...";
+  fileInput.disabled = true;
+  replayLoadModal?.show(file.name, "Parsing replay...");
   setTransportEnabled(false);
   syncCameraControlAvailability();
   emptyState.hidden = false;
@@ -2098,53 +2190,63 @@ async function loadReplay(file: File): Promise<void> {
   renderTimelineEventCount();
   renderModuleSettings();
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const loadedReplay = await loadReplayBundleInWorker(bytes, {
-    reportEveryNFrames: 500,
-    onProgress(progress) {
-      statusReadout.textContent = formatReplayLoadProgress(progress);
-    },
-  });
-  const { replay } = loadedReplay;
-  statsTimeline = loadedReplay.statsTimeline;
-  statsFrameLookup = createStatsFrameLookup(statsTimeline);
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const loadedReplay = await loadReplayBundleInWorker(bytes, {
+      reportEveryNFrames: 500,
+      onProgress(progress) {
+        statusReadout.textContent = formatReplayLoadProgress(progress);
+        replayLoadModal?.update(progress);
+      },
+    });
+    const { replay } = loadedReplay;
+    statsTimeline = loadedReplay.statsTimeline;
+    statsFrameLookup = createStatsFrameLookup(statsTimeline);
 
-  timelineOverlay = createTimelineOverlayPlugin({
-    replayEvents: (context) =>
-      filterReplayTimelineEvents(context.replay, activeModuleIds),
-  });
+    timelineOverlay = createTimelineOverlayPlugin({
+      replayEvents: (context) =>
+        filterReplayTimelineEvents(context.replay, activeModuleIds),
+    });
 
-  replayPlayer = new ReplayPlayer(viewport, replay, {
-    initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
-    initialAttachedPlayerId: null,
-    initialBallCamEnabled: false,
-    initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
-    initialSkipKickoffsEnabled: skipKickoffs.checked,
-    plugins: [
-      createBallchasingOverlayPlugin(),
-      createBoostPadOverlayPlugin(),
-      timelineOverlay,
-    ],
-  });
+    replayPlayer = new ReplayPlayer(viewport, replay, {
+      initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
+      initialAttachedPlayerId: null,
+      initialBallCamEnabled: false,
+      initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
+      initialSkipKickoffsEnabled: skipKickoffs.checked,
+      plugins: [
+        createBallchasingOverlayPlugin(),
+        createBoostPadOverlayPlugin(),
+        timelineOverlay,
+      ],
+    });
 
-  setupActiveModules();
-  unsubscribe = replayPlayer.subscribe(renderSnapshot);
+    setupActiveModules();
+    unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
-  populateAttachedPlayerOptions(replay.players);
-  emptyState.hidden = true;
-  statusReadout.textContent = `Loaded ${file.name}`;
-  playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-  framesReadout.textContent = `${replay.frameCount}`;
-  renderTimelineEventCount();
-  setTransportEnabled(true);
-  syncCameraControlAvailability(replayPlayer.getState());
-  renderSnapshot(replayPlayer.getState());
-  renderModuleSettings();
+    populateAttachedPlayerOptions(replay.players);
+    emptyState.hidden = true;
+    statusReadout.textContent = `Loaded ${file.name}`;
+    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+    framesReadout.textContent = `${replay.frameCount}`;
+    renderTimelineEventCount();
+    setTransportEnabled(true);
+    syncCameraControlAvailability(replayPlayer.getState());
+    renderSnapshot(replayPlayer.getState());
+    renderModuleSettings();
+    replayLoadModal?.hide();
+  } catch (error) {
+    replayLoadModal?.hide();
+    throw error;
+  } finally {
+    fileInput.disabled = false;
+  }
 }
 
 export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
+  replayLoadModal = createReplayLoadModal(root);
   root.innerHTML = APP_TEMPLATE;
   appRoot = root;
 
@@ -2205,6 +2307,8 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
     clearTimelineEventSources();
     clearTimelineRangeSources();
     activeModules = [];
+    replayLoadModal?.destroy();
+    replayLoadModal = null;
     activeModuleIds = new Set<string>();
     removeRenderHook = null;
     if (appRoot === root) {

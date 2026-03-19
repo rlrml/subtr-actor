@@ -1,19 +1,12 @@
 import { normalizeReplayData } from "subtr-actor-player";
 import type { ReplayModel, RawReplayFramesData } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline";
-
-export type ReplayLoadStage =
-  | "validating"
-  | "processing"
-  | "stats-timeline"
-  | "normalizing";
-
-export interface ReplayLoadProgress {
-  stage: ReplayLoadStage;
-  processedFrames?: number;
-  totalFrames?: number;
-  progress?: number;
-}
+export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
+export {
+  formatReplayLoadProgress,
+  getReplayLoadCompletion,
+} from "./replayLoadProgress.ts";
+import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 
 export interface ReplayLoadBundle {
   replay: ReplayModel;
@@ -109,27 +102,4 @@ export async function loadReplayBundleInWorker(
     };
     worker.postMessage(request, [workerBytes.buffer]);
   });
-}
-
-export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
-  if (progress.stage === "processing") {
-    const percent = progress.progress === undefined
-      ? null
-      : Math.round(progress.progress * 100);
-    if (percent === null || progress.totalFrames === undefined) {
-      return "Processing replay frames...";
-    }
-    return `Processing replay frames... ${percent}% (${progress.processedFrames ?? 0}/${progress.totalFrames})`;
-  }
-
-  switch (progress.stage) {
-    case "validating":
-      return "Validating replay...";
-    case "stats-timeline":
-      return "Building stats timeline...";
-    case "normalizing":
-      return "Normalizing replay data...";
-    default:
-      return "Loading replay...";
-  }
 }

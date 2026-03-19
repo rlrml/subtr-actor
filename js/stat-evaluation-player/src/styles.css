@@ -130,6 +130,81 @@ input {
   height: 100%;
 }
 
+.replay-load-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at top, rgba(89, 157, 219, 0.18), transparent 30%),
+    rgba(4, 11, 18, 0.76);
+  backdrop-filter: blur(14px);
+}
+
+.replay-load-modal[hidden] {
+  display: none;
+}
+
+.replay-load-modal__dialog {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.4rem 1.45rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(11, 23, 36, 0.96), rgba(7, 15, 24, 0.94));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+}
+
+.replay-load-modal__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #87afd4;
+}
+
+.replay-load-modal__percent,
+.replay-load-modal__status,
+.replay-load-modal__meta {
+  margin: 0;
+}
+
+.replay-load-modal__percent {
+  font-size: clamp(2.3rem, 7vw, 3.3rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-load-modal__status {
+  color: #e6f0f7;
+  font-size: 1rem;
+}
+
+.replay-load-modal__bar {
+  overflow: hidden;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.replay-load-modal__fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4b94ff 0%, #8ec5ff 55%, #f39a37 100%);
+  transition: width 140ms ease;
+}
+
+.replay-load-modal__meta {
+  color: #9eb4c6;
+  font-size: 0.92rem;
+}
+
 .followed-player-overlay {
   position: absolute;
   top: 1.25rem;
