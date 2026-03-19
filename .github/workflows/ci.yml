@@ -48,5 +48,25 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
+    - name: Install player dependencies
+      working-directory: js/player
+      run: npm ci
+
+    - name: Build player package
+      working-directory: js/player
+      run: npm run build
+
+    - name: Install stats player dependencies
+      working-directory: js/stat-evaluation-player
+      run: npm ci
+
+    - name: Test stats player package
+      working-directory: js/stat-evaluation-player
+      run: npm test
+
+    - name: Build stats player package
+      working-directory: js/stat-evaluation-player
+      run: npm run build
+
     - name: Build release
       run: cargo build --release --verbose

@@ -59,11 +59,15 @@ jobs:
           bindings_version="$(python3 -c 'import json; print(json.load(open("js/package.json"))["version"])')"
           player_name="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["name"])')"
           player_version="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["version"])')"
+          stats_player_name="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["name"])')"
+          stats_player_version="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["version"])')"
 
           echo "bindings_name=${bindings_name}" >> "$GITHUB_OUTPUT"
           echo "bindings_version=${bindings_version}" >> "$GITHUB_OUTPUT"
           echo "player_name=${player_name}" >> "$GITHUB_OUTPUT"
           echo "player_version=${player_version}" >> "$GITHUB_OUTPUT"
+          echo "stats_player_name=${stats_player_name}" >> "$GITHUB_OUTPUT"
+          echo "stats_player_version=${stats_player_version}" >> "$GITHUB_OUTPUT"
 
       - name: Check npm publish state
         id: publish_state
@@ -87,24 +91,40 @@ jobs:
 
           check_already_published "${{ steps.metadata.outputs.bindings_name }}" "${{ steps.metadata.outputs.bindings_version }}" "bindings_already_published"
           check_already_published "${{ steps.metadata.outputs.player_name }}" "${{ steps.metadata.outputs.player_version }}" "player_already_published"
+          check_already_published "${{ steps.metadata.outputs.stats_player_name }}" "${{ steps.metadata.outputs.stats_player_version }}" "stats_player_already_published"
 
       - name: Build WASM package
-        if: steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true'
+        if: steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         run: npm --prefix js run build
 
       - name: Install player dependencies
-        if: steps.publish_state.outputs.player_already_published != 'true'
+        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         working-directory: js/player
         run: npm ci
 
       - name: Build player package
-        if: steps.publish_state.outputs.player_already_published != 'true'
+        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         working-directory: js/player
         run: npm run build
 
       - name: Smoke test packed player package
         if: steps.publish_state.outputs.player_already_published != 'true'
         working-directory: js/player
+        run: npm run smoke:install
+
+      - name: Install stats player dependencies
+        if: steps.publish_state.outputs.stats_player_already_published != 'true'
+        working-directory: js/stat-evaluation-player
+        run: npm ci
+
+      - name: Build stats player package
+        if: steps.publish_state.outputs.stats_player_already_published != 'true'
+        working-directory: js/stat-evaluation-player
+        run: npm run build
+
+      - name: Smoke test packed stats player package
+        if: steps.publish_state.outputs.stats_player_already_published != 'true'
+        working-directory: js/stat-evaluation-player
         run: npm run smoke:install
 
       - name: Publish bindings package to npm
@@ -118,6 +138,20 @@ jobs:
         if: steps.publish_state.outputs.player_already_published != 'true'
         shell: bash
         working-directory: js/player
+        run: |
+          set -euo pipefail
+          package_dir="$(npm run --silent prepare:package)"
+          (
+            cd "$package_dir"
+            npm publish --access public
+          )
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish stats player package to npm
+        if: steps.publish_state.outputs.stats_player_already_published != 'true'
+        shell: bash
+        working-directory: js/stat-evaluation-player
         run: |
           set -euo pipefail
           package_dir="$(npm run --silent prepare:package)"

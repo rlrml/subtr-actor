@@ -4,11 +4,12 @@ This document describes how to release new versions of subtr-actor to GitHub Rel
 
 ## Overview
 
-The project publishes four packages:
+The project publishes five packages:
 - **Rust**: `subtr-actor` on [crates.io](https://crates.io/crates/subtr-actor)
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
 - **JavaScript bindings**: `subtr-actor` on [npm](https://www.npmjs.com/package/subtr-actor)
 - **JavaScript player**: `subtr-actor-player` on [npm](https://www.npmjs.com/package/subtr-actor-player)
+- **JavaScript stats player**: `subtr-actor-stat-evaluation-player` on [npm](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player)
 
 ## Automated Releases (GitHub Actions)
 
@@ -33,8 +34,9 @@ All artifacts are published to PyPI.
 
 ### JavaScript (`release-js.yml`)
 Builds the WebAssembly bindings package, builds the player package, smoke-tests
-the packed player artifact in a fresh consumer app, and publishes both npm
-packages.
+the packed player artifact in a fresh consumer app, builds the stats player
+package, smoke-tests that packed artifact in a fresh consumer app, and publishes
+all three npm packages.
 
 ## Setup Required (One-Time)
 
@@ -79,6 +81,9 @@ sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/package.json
 # js/player/package.json
 sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/player/package.json
 
+# js/stat-evaluation-player/package.json
+sed -i 's/"version": "0.1.8"/"version": "0.1.11"/' js/stat-evaluation-player/package.json
+
 # Cargo.lock
 cargo metadata --format-version 1 >/dev/null
 ```
@@ -91,7 +96,7 @@ just bump 0.1.11
 ### 2. Commit and Tag
 
 ```bash
-git add Cargo.toml Cargo.lock python/pyproject.toml python/Cargo.toml js/package.json js/player/package.json js/Cargo.toml
+git add Cargo.toml Cargo.lock python/pyproject.toml python/Cargo.toml js/package.json js/player/package.json js/stat-evaluation-player/package.json js/Cargo.toml
 git commit -m "Release v0.1.11"
 git tag v0.1.11
 git push origin master --tags
@@ -107,6 +112,7 @@ git push origin master --tags
   - https://pypi.org/project/subtr-actor-py/
   - https://www.npmjs.com/package/subtr-actor
   - https://www.npmjs.com/package/subtr-actor-player
+  - https://www.npmjs.com/package/subtr-actor-stat-evaluation-player
 
 ## Manual Release (Alternative)
 
@@ -124,6 +130,14 @@ twine upload target/wheels/*
 cd js
 wasm-pack build --target bundler --out-dir pkg
 cd pkg && npm publish
+
+cd ../player
+package_dir="$(npm run --silent prepare:package)"
+(cd "$package_dir" && npm publish --access public)
+
+cd ../stat-evaluation-player
+package_dir="$(npm run --silent prepare:package)"
+(cd "$package_dir" && npm publish --access public)
 ```
 
 ## Troubleshooting
