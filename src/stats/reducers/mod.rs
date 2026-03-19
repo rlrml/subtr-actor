@@ -85,6 +85,7 @@ pub struct PlayerSample {
     pub boost_amount: Option<f32>,
     pub last_boost_amount: Option<f32>,
     pub boost_active: bool,
+    pub dodge_active: bool,
     pub powerslide_active: bool,
     pub match_goals: Option<i32>,
     pub match_assists: Option<i32>,
@@ -222,6 +223,7 @@ impl StatsSample {
                 boost_amount: processor.get_player_boost_level(player_id).ok(),
                 last_boost_amount: processor.get_player_last_boost_level(player_id).ok(),
                 boost_active: processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1,
+                dodge_active: processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1,
                 powerslide_active: processor.get_powerslide_active(player_id).unwrap_or(false),
                 match_goals: processor.get_player_match_goals(player_id).ok(),
                 match_assists: processor.get_player_match_assists(player_id).ok(),
@@ -759,6 +761,8 @@ pub mod demo;
 pub use demo::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
+pub mod musty_flick;
+pub use musty_flick::*;
 pub mod touch;
 pub use touch::*;
 pub mod fifty_fifty;

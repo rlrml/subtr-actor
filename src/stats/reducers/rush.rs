@@ -201,6 +201,7 @@ mod tests {
             boost_amount: Some(50.0),
             last_boost_amount: Some(50.0),
             boost_active: false,
+            dodge_active: false,
             powerslide_active: false,
             match_goals: None,
             match_assists: None,

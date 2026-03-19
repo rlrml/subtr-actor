@@ -7,6 +7,7 @@ mod demo;
 mod dodge_reset;
 mod fifty_fifty;
 mod movement;
+mod musty_flick;
 mod positioning;
 mod possession;
 mod powerslide;

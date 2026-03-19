@@ -648,6 +648,7 @@ mod tests {
             boost_amount: None,
             last_boost_amount: None,
             boost_active: false,
+            dodge_active: false,
             powerslide_active: false,
             match_goals: Some(match_goals),
             match_assists: Some(0),

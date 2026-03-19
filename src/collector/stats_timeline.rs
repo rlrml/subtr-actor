@@ -99,6 +99,7 @@ pub struct PlayerStatsSnapshot {
     pub core: CorePlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub touch: TouchStats,
+    pub musty_flick: MustyFlickStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
@@ -132,6 +133,7 @@ impl StatFieldProvider for PlayerStatsSnapshot {
         self.core.visit_stat_fields(visitor);
         self.fifty_fifty.visit_stat_fields(visitor);
         self.touch.visit_stat_fields(visitor);
+        self.musty_flick.visit_stat_fields(visitor);
         self.dodge_reset.visit_stat_fields(visitor);
         self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
@@ -186,6 +188,7 @@ struct StatsTimelineReducers {
     rush: RushReducer,
     match_stats: MatchStatsReducer,
     touch: TouchReducer,
+    musty_flick: MustyFlickReducer,
     ball_carry: BallCarryReducer,
     boost: BoostReducer,
     movement: MovementReducer,
@@ -219,6 +222,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.on_replay_meta(meta)?;
         self.fifty_fifty.on_replay_meta(meta)?;
         self.touch.on_replay_meta(meta)?;
+        self.musty_flick.on_replay_meta(meta)?;
         self.ball_carry.on_replay_meta(meta)?;
         self.boost.on_replay_meta(meta)?;
         self.movement.on_replay_meta(meta)?;
@@ -240,6 +244,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.on_sample_with_context(sample, ctx)?;
         self.fifty_fifty.on_sample_with_context(sample, ctx)?;
         self.touch.on_sample_with_context(sample, ctx)?;
+        self.musty_flick.on_sample_with_context(sample, ctx)?;
         self.ball_carry.on_sample_with_context(sample, ctx)?;
         self.boost.on_sample_with_context(sample, ctx)?;
         self.movement.on_sample_with_context(sample, ctx)?;
@@ -257,6 +262,7 @@ impl StatsReducer for StatsTimelineReducers {
         self.match_stats.finish()?;
         self.fifty_fifty.finish()?;
         self.touch.finish()?;
+        self.musty_flick.finish()?;
         self.ball_carry.finish()?;
         self.boost.finish()?;
         self.movement.finish()?;
@@ -455,6 +461,13 @@ impl StatsTimelineCollector {
                         .cloned()
                         .unwrap_or_default()
                         .with_complete_labeled_touch_counts(),
+                    musty_flick: self
+                        .reducers
+                        .musty_flick
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
                     dodge_reset: self
                         .reducers
                         .dodge_reset
