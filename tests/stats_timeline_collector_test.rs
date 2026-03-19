@@ -153,8 +153,7 @@ fn assert_boost_pickup_nominal_amounts_consistent(timeline: &ReplayStatsTimeline
         let violations = boost_invariant_violations(stats, None);
         assert!(
             violations.is_empty(),
-            "{scope} boost invariant violations at frame {frame_number} (t={time:.3}): {:?}",
-            violations
+            "{scope} boost invariant violations at frame {frame_number} (t={time:.3}): {violations:?}"
         );
     }
 

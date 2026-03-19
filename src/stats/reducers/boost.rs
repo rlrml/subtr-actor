@@ -598,7 +598,7 @@ impl BoostReducer {
         );
         for (player_id, observed_boost_amount, stats) in player_scopes {
             self.warn_for_boost_invariant_violations(
-                &format!("player {:?}", player_id),
+                &format!("player {player_id:?}"),
                 sample.frame_number,
                 sample.time,
                 &stats,

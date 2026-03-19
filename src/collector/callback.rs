@@ -50,7 +50,7 @@ where
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        if frame_number % self.frame_interval == 0 {
+        if frame_number.is_multiple_of(self.frame_interval) {
             (self.callback)(frame, frame_number, current_time)?;
         }
 

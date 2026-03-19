@@ -74,6 +74,11 @@ export default defineConfig(({ command, mode }) => {
         allow: [path.resolve(import.meta.dirname, "..")],
       },
     },
+    worker: {
+      rollupOptions: {
+        external: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+      },
+    },
     optimizeDeps: {
       exclude: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
     },

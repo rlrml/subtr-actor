@@ -22,6 +22,12 @@ edition.workspace = true
 keywords = ["rocket-league"]
 categories = ["parsing"]
 description = "Rocket League replay transformer"
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/src/**",
+]
 
 [dependencies]
 anyhow = "1.0.98"
