@@ -115,6 +115,9 @@ pub enum SubtrActorErrorVariant {
 
     #[error("Derived signal graph error: {0}")]
     DerivedSignalGraphError(String),
+
+    #[error("Callback error: {0}")]
+    CallbackError(String),
 }
 
 /// [`SubtrActorError`] struct provides an error variant

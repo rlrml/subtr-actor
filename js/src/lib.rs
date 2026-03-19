@@ -1,7 +1,10 @@
+use js_sys::Function;
 use subtr_actor::{
     collector::replay_data::{ReplayDataCollector, ReplayDataSupplementalData},
+    collector::CallbackCollector,
     BoostReducer, FlipResetTracker, FrameRateDecorator, NDArrayCollector, ReducerCollector,
-    ReplayProcessor, StatsTimelineCollector,
+    ReplayProcessor, StatsTimelineCollector, SubtrActorError, SubtrActorErrorVariant,
+    SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 
@@ -31,6 +34,47 @@ fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
         .on_error_check_crc()
         .parse()
         .map_err(|e| JsValue::from_str(&format!("Failed to parse replay: {e}")))
+}
+
+fn get_total_frames(replay: &boxcars::Replay) -> Result<usize, JsValue> {
+    replay
+        .network_frames
+        .as_ref()
+        .map(|network_frames| network_frames.frames.len())
+        .ok_or_else(|| JsValue::from_str("Replay has no network frames"))
+}
+
+fn emit_progress(
+    callback: &Function,
+    stage: &str,
+    processed_frames: usize,
+    total_frames: usize,
+) -> SubtrActorResult<()> {
+    let progress = if total_frames == 0 {
+        1.0
+    } else {
+        processed_frames as f64 / total_frames as f64
+    };
+    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "stage": stage,
+        "processedFrames": processed_frames,
+        "totalFrames": total_frames,
+        "progress": progress,
+    }))
+    .map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+            "Failed to serialize progress payload: {error}"
+        )))
+    })?;
+
+    callback.call1(&JsValue::NULL, &payload).map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+            error
+                .as_string()
+                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
+        ))
+    })?;
+    Ok(())
 }
 
 /// Parse a replay file and return the raw replay data as JavaScript object
@@ -138,6 +182,57 @@ pub fn get_replay_frames_data(data: &[u8]) -> Result<JsValue, JsValue> {
             &mut boost_pad_collector,
         ])
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+
+    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+    let replay_data = replay_data_collector
+        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
+
+    serde_wasm_bindgen::to_value(&replay_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn get_replay_frames_data_with_progress(
+    data: &[u8],
+    callback: Function,
+    report_every_n_frames: Option<usize>,
+) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+    let total_frames = get_total_frames(&replay)?;
+    let frame_interval = report_every_n_frames.unwrap_or(1000).max(1);
+
+    emit_progress(&callback, "processing", 0, total_frames)
+        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+
+    let mut processor = ReplayProcessor::new(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
+    let mut replay_data_collector = ReplayDataCollector::new();
+    let mut flip_reset_tracker = FlipResetTracker::new();
+    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut last_reported_frames = 0usize;
+    let mut progress_collector = CallbackCollector::with_frame_interval(
+        |_frame, frame_number, _current_time| {
+            last_reported_frames = frame_number + 1;
+            emit_progress(&callback, "processing", last_reported_frames, total_frames)
+        },
+        frame_interval,
+    );
+
+    processor
+        .process_all(&mut [
+            &mut replay_data_collector,
+            &mut flip_reset_tracker,
+            &mut boost_pad_collector,
+            &mut progress_collector,
+        ])
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+
+    if last_reported_frames < total_frames {
+        emit_progress(&callback, "processing", total_frames, total_frames)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
         .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());

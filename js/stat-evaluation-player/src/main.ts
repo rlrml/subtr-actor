@@ -4,7 +4,6 @@ import {
   createBoostPadOverlayPlugin,
   createTimelineOverlayPlugin,
   ReplayPlayer,
-  loadReplayFromBytes,
 } from "subtr-actor-player";
 import type {
   FrameRenderInfo,
@@ -70,8 +69,10 @@ import {
   buildPressureTimelineRanges,
   buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
-
-import * as subtrActor from "@colonelpanic8/subtr-actor";
+import {
+  formatReplayLoadProgress,
+  loadReplayBundleInWorker,
+} from "./replayLoader.ts";
 
 interface StatModuleContext {
   player: ReplayPlayer;
@@ -2163,17 +2164,16 @@ async function loadReplay(file: File): Promise<void> {
   renderModuleSettings();
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { replay } = await loadReplayFromBytes(bytes);
-  const maybeInit = (subtrActor as typeof subtrActor & {
-    default?: () => Promise<unknown>;
-  }).default;
-  if (typeof maybeInit === "function") {
-    await maybeInit();
-  }
-
-  statsTimeline = subtrActor.get_stats_timeline(bytes) as unknown as StatsTimeline;
+  const loadedReplay = await loadReplayBundleInWorker(bytes, {
+    reportEveryNFrames: 500,
+    onProgress(progress) {
+      statusReadout.textContent = formatReplayLoadProgress(progress);
+    },
+  });
+  const { replay } = loadedReplay;
+  statsTimeline = loadedReplay.statsTimeline;
   statsFrameLookup = createStatsFrameLookup(statsTimeline);
-  dynamicStatsTimeline = subtrActor.get_dynamic_stats_timeline(bytes) as unknown as DynamicStatsTimeline;
+  dynamicStatsTimeline = loadedReplay.dynamicStatsTimeline;
   dynamicStatsFrameLookup = createDynamicStatsFrameLookup(dynamicStatsTimeline);
 
   timelineOverlay = createTimelineOverlayPlugin({
