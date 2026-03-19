@@ -11,10 +11,13 @@ async function main() {
   const sourcePackage = JSON.parse(
     await readFile(path.resolve(packageDir, "package.json"), "utf8")
   );
+  const bindingsPackage = JSON.parse(
+    await readFile(path.resolve(packageDir, "..", "package.json"), "utf8")
+  );
   const publishPackage = {
     ...sourcePackage,
     dependencies: {
-      "subtr-actor": sourcePackage.version,
+      [bindingsPackage.name]: sourcePackage.version,
     },
   };
   delete publishPackage.scripts;

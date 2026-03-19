@@ -5,7 +5,7 @@ declare module "*.wasm?url" {
   export default url;
 }
 
-declare module "subtr-actor" {
+declare module "@colonelpanic8/subtr-actor" {
   export function get_replay_frames_data(data: Uint8Array): unknown;
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;

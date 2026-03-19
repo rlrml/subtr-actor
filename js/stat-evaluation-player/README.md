@@ -10,7 +10,7 @@ npm install subtr-actor-stat-evaluation-player three
 ```
 
 `three` is a peer dependency. The published package pulls in the matching
-`subtr-actor` and `subtr-actor-player` versions automatically.
+`@colonelpanic8/subtr-actor` and `subtr-actor-player` versions automatically.
 
 ## Usage
 

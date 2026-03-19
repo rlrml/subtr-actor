@@ -1,4 +1,4 @@
-import * as subtrActor from "subtr-actor";
+import * as subtrActor from "@colonelpanic8/subtr-actor";
 import type { RawReplayFramesData, ReplayLoadResult } from "./types";
 import { normalizeReplayData } from "./replay-data";
 

@@ -50,40 +50,50 @@ function ensureWasmBindingsPlugin() {
   };
 }
 
-export default defineConfig(({ command }) => ({
-  base: "./",
-  plugins: [wasm(), ensureWasmBindingsPlugin()],
-  resolve: {
-    alias: command === "serve"
+export default defineConfig(({ command, mode }) => {
+  const siteBuild = mode === "site";
+  const useLocalAliases = command === "serve" || siteBuild;
+
+  return {
+    base: "./",
+    plugins: [wasm(), ensureWasmBindingsPlugin()],
+    resolve: {
+      alias: useLocalAliases
+        ? {
+          "@colonelpanic8/subtr-actor": path.resolve(
+            import.meta.dirname,
+            "../pkg/rl_replay_subtr_actor.js",
+          ),
+          "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+          three: path.resolve(import.meta.dirname, "node_modules/three"),
+        }
+        : undefined,
+    },
+    server: {
+      fs: {
+        allow: [path.resolve(import.meta.dirname, "..")],
+      },
+    },
+    optimizeDeps: {
+      exclude: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+    },
+    build: siteBuild
       ? {
-        "subtr-actor": path.resolve(
-          import.meta.dirname,
-          "../pkg/rl_replay_subtr_actor.js",
-        ),
-        "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
-        three: path.resolve(import.meta.dirname, "node_modules/three"),
+        outDir: path.resolve(import.meta.dirname, "dist"),
+        emptyOutDir: true,
       }
-      : undefined,
-  },
-  server: {
-    fs: {
-      allow: [path.resolve(import.meta.dirname, "..")],
-    },
-  },
-  optimizeDeps: {
-    exclude: ["subtr-actor", "subtr-actor-player"],
-  },
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),
-    emptyOutDir: true,
-    lib: {
-      entry: path.resolve(import.meta.dirname, "src/lib.ts"),
-      name: "SubtrActorStatEvaluationPlayer",
-      fileName: "index",
-      formats: ["es"],
-    },
-    rollupOptions: {
-      external: ["subtr-actor", "subtr-actor-player", "three"],
-    },
-  },
-}));
+      : {
+        outDir: path.resolve(import.meta.dirname, "dist"),
+        emptyOutDir: true,
+        lib: {
+          entry: path.resolve(import.meta.dirname, "src/lib.ts"),
+          name: "SubtrActorStatEvaluationPlayer",
+          fileName: "index",
+          formats: ["es"],
+        },
+        rollupOptions: {
+          external: ["@colonelpanic8/subtr-actor", "subtr-actor-player", "three"],
+        },
+      },
+  };
+});

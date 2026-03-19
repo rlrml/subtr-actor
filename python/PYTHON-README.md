@@ -129,7 +129,7 @@ This binding depends on the workspace crate via:
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.1.17"
+version = "0.2.0"
 ```
 
 That keeps local development wired to the workspace crate while still pinning the published dependency version. Use `just bump <version>` to update the workspace and binding versions together.

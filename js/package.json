@@ -1,5 +1,5 @@
 {
-  "name": "subtr-actor",
+  "name": "@colonelpanic8/subtr-actor",
   "version": "0.2.0",
   "description": "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis",
   "main": "pkg/rl_replay_subtr_actor.js",

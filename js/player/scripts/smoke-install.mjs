@@ -72,7 +72,7 @@ async function main() {
             build: "vite build",
           },
           dependencies: {
-            "subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
+            "@colonelpanic8/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
             "subtr-actor-player": `file:${path.relative(consumerDir, playerTarballPath)}`,
             three: "^0.180.0",
           },

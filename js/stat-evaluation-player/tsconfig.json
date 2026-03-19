@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
+      "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
       "subtr-actor-player": ["../player/src/lib.ts"],
       "three": ["./node_modules/@types/three/index.d.ts"],
       "three/examples/jsm/*": ["./node_modules/@types/three/examples/jsm/*"]

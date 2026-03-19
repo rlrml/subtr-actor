@@ -1,6 +1,6 @@
 # subtr-actor
 
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm bindings](https://img.shields.io/npm/v/subtr-actor?style=flat-square)](https://www.npmjs.com/package/subtr-actor) [![npm player](https://img.shields.io/npm/v/subtr-actor-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-player) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square)](https://crates.io/crates/subtr-actor) [![PyPI](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square)](https://pypi.org/project/subtr-actor-py/) [![npm bindings](https://img.shields.io/npm/v/%40colonelpanic8%2Fsubtr-actor?style=flat-square)](https://www.npmjs.com/package/@colonelpanic8/subtr-actor) [![npm player](https://img.shields.io/npm/v/subtr-actor-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-player) [![npm stats player](https://img.shields.io/npm/v/subtr-actor-stat-evaluation-player?style=flat-square)](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
 `subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
@@ -19,8 +19,9 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 - Rust: [`subtr-actor`](https://crates.io/crates/subtr-actor)
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
-- JavaScript / WASM bindings: [`subtr-actor`](https://www.npmjs.com/package/subtr-actor)
+- JavaScript / WASM bindings: [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
 - JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
+- JavaScript stats player: [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player)
 
 ## What You Get
 
@@ -36,7 +37,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 ```toml
 [dependencies]
-subtr-actor = "0.1.17"
+subtr-actor = "0.2.0"
 ```
 
 ### Python
@@ -48,7 +49,7 @@ pip install subtr-actor-py
 ### JavaScript
 
 ```bash
-npm install subtr-actor
+npm install @colonelpanic8/subtr-actor
 ```
 
 ### JavaScript Player
@@ -141,7 +142,7 @@ print(meta["column_headers"]["player_headers"][:5])
 ### JavaScript
 
 ```javascript
-import init, { get_ndarray_with_info, validate_replay } from "subtr-actor";
+import init, { get_ndarray_with_info, validate_replay } from "@colonelpanic8/subtr-actor";
 
 await init();
 
@@ -193,7 +194,7 @@ These are useful when working through the Python or JavaScript bindings:
 - Rust API docs: <https://docs.rs/subtr-actor>
 - Project docs: [docs/README.md](./docs/README.md)
 - Changelog: [docs/CHANGELOG.md](./docs/CHANGELOG.md)
-- Python package README: [python/README.md](./python/README.md)
+- Python package README: [python/PYTHON-README.md](./python/PYTHON-README.md)
 - JavaScript package README: [js/README.md](./js/README.md)
 - JavaScript player README: [js/player/README.md](./js/player/README.md)
 - Example app: [js/example/README.md](./js/example/README.md)

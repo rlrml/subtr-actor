@@ -7,7 +7,7 @@ This document describes how to release new versions of subtr-actor to GitHub Rel
 The project publishes five packages:
 - **Rust**: `subtr-actor` on [crates.io](https://crates.io/crates/subtr-actor)
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
-- **JavaScript bindings**: `subtr-actor` on [npm](https://www.npmjs.com/package/subtr-actor)
+- **JavaScript bindings**: `@colonelpanic8/subtr-actor` on [npm](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
 - **JavaScript player**: `subtr-actor-player` on [npm](https://www.npmjs.com/package/subtr-actor-player)
 - **JavaScript stats player**: `subtr-actor-stat-evaluation-player` on [npm](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player)
 
@@ -110,7 +110,7 @@ git push origin master --tags
   - https://github.com/rlrml/subtr-actor/releases
   - https://crates.io/crates/subtr-actor
   - https://pypi.org/project/subtr-actor-py/
-  - https://www.npmjs.com/package/subtr-actor
+  - https://www.npmjs.com/package/@colonelpanic8/subtr-actor
   - https://www.npmjs.com/package/subtr-actor-player
   - https://www.npmjs.com/package/subtr-actor-stat-evaluation-player
 

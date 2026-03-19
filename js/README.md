@@ -6,14 +6,14 @@ This package mirrors the Python binding at a JavaScript/TypeScript-friendly boun
 
 Related npm packages:
 
-- [`subtr-actor`](https://www.npmjs.com/package/subtr-actor): low-level WebAssembly bindings
+- [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor): low-level WebAssembly bindings
 - [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player): replay player package built on top of these bindings
 - [`subtr-actor-stat-evaluation-player`](https://www.npmjs.com/package/subtr-actor-stat-evaluation-player): stats-focused replay viewer UI built on top of the player package
 
 ## Installation
 
 ```bash
-npm install subtr-actor
+npm install @colonelpanic8/subtr-actor
 ```
 
 ## Runtime Support
@@ -41,7 +41,7 @@ import init, {
   get_replay_info,
   get_replay_meta,
   validate_replay,
-} from "subtr-actor";
+} from "@colonelpanic8/subtr-actor";
 
 await init();
 
@@ -213,7 +213,7 @@ This binding depends on the workspace crate via:
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.1.17"
+version = "0.2.0"
 ```
 
 That keeps local development wired to the workspace crate while still pinning the published crate version. Use `just bump <version>` to update the versions together.

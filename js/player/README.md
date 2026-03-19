@@ -9,7 +9,7 @@ npm install subtr-actor-player three
 ```
 
 `three` is a peer dependency. The player also depends on the low-level
-[`subtr-actor`](https://www.npmjs.com/package/subtr-actor) bindings package.
+[`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor) bindings package.
 
 It provides:
 

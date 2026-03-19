@@ -72,6 +72,22 @@ jobs:
 
       - name: Publish to crates.io
         if: steps.preflight.outputs.already_published != 'true'
+        shell: bash
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p subtr-actor --locked
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            if cargo publish -p subtr-actor --locked; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -eq 3 ]]; then
+              exit 1
+            fi
+
+            sleep_seconds=$((attempt * 20))
+            echo "cargo publish failed on attempt $attempt; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+          done

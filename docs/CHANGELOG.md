@@ -6,6 +6,15 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.2.0 - 2026-03-19
+
+- Package `subtr-actor-stat-evaluation-player` as a publishable npm library
+  with a reusable mount API, package metadata, smoke-install checks, and
+  README/license assets.
+- Wire the new stats player package into CI, npm release automation, and release
+  version checks.
+- Refresh release metadata to `0.2.0`.
+
 ## v0.1.17 - 2026-03-10
 
 - Fix demolition extraction when same-frame replay cleanup clears a car's

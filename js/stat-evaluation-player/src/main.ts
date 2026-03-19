@@ -71,7 +71,7 @@ import {
   buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
 
-import * as subtrActor from "subtr-actor";
+import * as subtrActor from "@colonelpanic8/subtr-actor";
 
 interface StatModuleContext {
   player: ReplayPlayer;

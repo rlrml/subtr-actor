@@ -33,6 +33,7 @@
     "test": "node --test src/*.test.ts",
     "build:types": "tsc --project tsconfig.build.json",
     "build": "npm run build:bindings && npm run build:player && npm run check && vite build && npm run build:types",
+    "build:site": "npm run check && vite build --mode site",
     "prepare:package": "node ./scripts/prepare-package.mjs",
     "smoke:install": "node ./scripts/smoke-install.mjs"
   },

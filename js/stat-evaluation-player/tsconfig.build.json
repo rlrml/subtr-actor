@@ -9,7 +9,7 @@
     "noEmit": false,
     "baseUrl": ".",
     "paths": {
-      "subtr-actor": [
+      "@colonelpanic8/subtr-actor": [
         "../pkg/rl_replay_subtr_actor.d.ts"
       ],
       "subtr-actor-player": [

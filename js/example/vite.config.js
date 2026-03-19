@@ -63,11 +63,11 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["subtr-actor"],
+    exclude: ["@colonelpanic8/subtr-actor"],
   },
   resolve: {
     alias: {
-      "subtr-actor": path.resolve(
+      "@colonelpanic8/subtr-actor": path.resolve(
         exampleDir,
         "../pkg/rl_replay_subtr_actor.js"
       ),

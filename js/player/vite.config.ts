@@ -27,7 +27,7 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["subtr-actor", "three"],
+      external: ["@colonelpanic8/subtr-actor", "three"],
     },
   },
 });
