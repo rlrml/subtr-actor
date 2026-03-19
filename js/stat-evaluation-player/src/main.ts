@@ -56,6 +56,7 @@ import type {
 import type { TouchBreakdownClass } from "./touchFormatting.ts";
 import {
   buildFiftyFiftyTimelineEvents,
+  buildRushTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
 } from "./timelineMarkers.ts";
@@ -467,6 +468,10 @@ function createPlayerStatsModule<T>(options: {
     teardown() {},
 
     onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildRushTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(

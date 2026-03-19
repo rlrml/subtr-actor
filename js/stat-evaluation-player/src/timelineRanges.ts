@@ -282,6 +282,7 @@ export function buildTimeInZoneTimelineRanges(
 ): ReplayTimelineRange[] {
   const previousValues = new Map<string, Map<string, number>>();
   const ranges: ReplayTimelineRange[] = [];
+  const lastRangeByLane = new Map<string, ReplayTimelineRange>();
 
   let previousFrame: StatsTimeline["frames"][number] | null = null;
   for (const frame of timeline.frames) {
@@ -319,7 +320,7 @@ export function buildTimeInZoneTimelineRanges(
         continue;
       }
 
-      mergeRange(ranges, {
+      mergeRangeForLane(ranges, lastRangeByLane, {
         id: `time-in-zone:${playerId}:${winningSpec.fieldName}:${startTime.toFixed(3)}`,
         startTime,
         endTime,
@@ -608,4 +609,28 @@ function mergeRange(
   }
 
   ranges.push(nextRange);
+}
+
+function mergeRangeForLane(
+  ranges: ReplayTimelineRange[],
+  lastRangeByLane: Map<string, ReplayTimelineRange>,
+  nextRange: ReplayTimelineRange | null,
+): void {
+  if (!nextRange) {
+    return;
+  }
+
+  const laneKey = nextRange.lane ?? "";
+  const previousRange = lastRangeByLane.get(laneKey);
+  if (
+    previousRange &&
+    previousRange.label === nextRange.label &&
+    Math.abs(previousRange.endTime - nextRange.startTime) <= RANGE_MERGE_EPSILON_SECONDS
+  ) {
+    previousRange.endTime = nextRange.endTime;
+    return;
+  }
+
+  ranges.push(nextRange);
+  lastRangeByLane.set(laneKey, nextRange);
 }

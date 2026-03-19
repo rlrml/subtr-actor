@@ -5,6 +5,7 @@ import type { ReplayModel } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildFiftyFiftyTimelineEvents,
+  buildRushTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
   getReplayTimelineEventKinds,
@@ -88,11 +89,122 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
   ]);
 });
 
+test("buildRushTimelineEvents maps cumulative rush counts to discrete timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+      { time: 3.5 },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 1,
+        rush: {
+          team_zero_count: 1,
+          team_zero_two_v_one_count: 1,
+          team_zero_two_v_two_count: 0,
+          team_zero_two_v_three_count: 0,
+          team_zero_three_v_one_count: 0,
+          team_zero_three_v_two_count: 0,
+          team_zero_three_v_three_count: 0,
+          team_one_count: 0,
+          team_one_two_v_one_count: 0,
+          team_one_two_v_two_count: 0,
+          team_one_two_v_three_count: 0,
+          team_one_three_v_one_count: 0,
+          team_one_three_v_two_count: 0,
+          team_one_three_v_three_count: 0,
+        },
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 2,
+        dt: 1,
+        rush: {
+          team_zero_count: 1,
+          team_zero_two_v_one_count: 1,
+          team_zero_two_v_two_count: 0,
+          team_zero_two_v_three_count: 0,
+          team_zero_three_v_one_count: 0,
+          team_zero_three_v_two_count: 0,
+          team_zero_three_v_three_count: 0,
+          team_one_count: 1,
+          team_one_two_v_one_count: 0,
+          team_one_two_v_two_count: 0,
+          team_one_two_v_three_count: 0,
+          team_one_three_v_one_count: 0,
+          team_one_three_v_two_count: 1,
+          team_one_three_v_three_count: 0,
+        },
+        players: [],
+      },
+      {
+        frame_number: 3,
+        time: 3,
+        dt: 1,
+        rush: {
+          team_zero_count: 1,
+          team_zero_two_v_one_count: 1,
+          team_zero_two_v_two_count: 0,
+          team_zero_two_v_three_count: 0,
+          team_zero_three_v_one_count: 0,
+          team_zero_three_v_two_count: 0,
+          team_zero_three_v_three_count: 0,
+          team_one_count: 1,
+          team_one_two_v_one_count: 0,
+          team_one_two_v_two_count: 0,
+          team_one_two_v_three_count: 0,
+          team_one_three_v_one_count: 0,
+          team_one_three_v_two_count: 1,
+          team_one_three_v_three_count: 0,
+        },
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildRushTimelineEvents(statsTimeline, replay), [
+    {
+      id: "rush:1:team_zero:0:2v1",
+      time: 1.5,
+      frame: 1,
+      kind: "rush",
+      label: "Blue rush 2v1",
+      shortLabel: "2v1",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+    {
+      id: "rush:2:team_one:0:3v2",
+      time: 2.25,
+      frame: 2,
+      kind: "rush",
+      label: "Orange rush 3v2",
+      shortLabel: "3v2",
+      isTeamZero: false,
+      color: "#f59e0b",
+    },
+  ]);
+});
+
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [
       { kind: "goal", time: 10 },
       { kind: "save", time: 12 },
+    ],
+    frames: [
+      { time: 0 },
+      { time: 1.25 },
     ],
     players: [
       {
@@ -131,6 +243,22 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         frame_number: 1,
         time: 1.25,
         dt: 0.1,
+        rush: {
+          team_zero_count: 1,
+          team_zero_two_v_one_count: 1,
+          team_zero_two_v_two_count: 0,
+          team_zero_two_v_three_count: 0,
+          team_zero_three_v_one_count: 0,
+          team_zero_three_v_two_count: 0,
+          team_zero_three_v_three_count: 0,
+          team_one_count: 0,
+          team_one_two_v_one_count: 0,
+          team_one_two_v_two_count: 0,
+          team_one_two_v_three_count: 0,
+          team_one_three_v_one_count: 0,
+          team_one_three_v_two_count: 0,
+          team_one_three_v_three_count: 0,
+        },
         players: [],
       },
     ],
@@ -140,5 +268,9 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   assert.equal(
     countEnabledTimelineEvents(["core", "fifty-fifty"], replay, statsTimeline),
     3,
+  );
+  assert.equal(
+    countEnabledTimelineEvents(["core", "fifty-fifty", "rush"], replay, statsTimeline),
+    4,
   );
 });
