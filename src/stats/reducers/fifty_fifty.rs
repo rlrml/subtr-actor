@@ -354,12 +354,12 @@ impl FiftyFiftyReducer {
         let displacement = ball.position() - midpoint;
         let signed_distance = displacement.dot(plane_normal);
         if signed_distance.abs() >= FIFTY_FIFTY_MIN_EXIT_DISTANCE {
-            return Some(signed_distance < 0.0);
+            return Some(signed_distance > 0.0);
         }
 
         let signed_speed = ball.velocity().dot(plane_normal);
         if signed_speed.abs() >= FIFTY_FIFTY_MIN_EXIT_SPEED {
-            return Some(signed_speed < 0.0);
+            return Some(signed_speed > 0.0);
         }
 
         None
@@ -575,11 +575,11 @@ mod tests {
 
         assert_eq!(
             FiftyFiftyReducer::winning_team_from_ball(&active, &blue_side),
-            Some(true)
+            Some(false)
         );
         assert_eq!(
             FiftyFiftyReducer::winning_team_from_ball(&active, &orange_side),
-            Some(false)
+            Some(true)
         );
     }
 
