@@ -27,13 +27,13 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build:bindings": "env PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
-    "build:player": "npm --prefix ../player run build",
+    "build:bindings": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
+    "build:player": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm --prefix ../player run build",
     "check": "tsc --noEmit",
     "test": "tsx --tsconfig tsconfig.test.json --test src/*.test.ts",
     "build:types": "tsc --project tsconfig.build.json",
-    "build": "npm run build:bindings && npm run build:player && npm run check && vite build && npm run build:types",
-    "build:site": "npm run check && vite build --mode site",
+    "build": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build:bindings && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build:player && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run check && vite build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build:types",
+    "build:site": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run check && vite build --mode site",
     "prepare:package": "node ./scripts/prepare-package.mjs",
     "smoke:install": "node ./scripts/smoke-install.mjs"
   },

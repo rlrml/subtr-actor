@@ -12,9 +12,9 @@
     "build:nodejs": "wasm-pack build --target nodejs --out-dir pkg-node",
     "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
     "test": "wasm-pack test --headless --firefox",
-    "pack": "npm run build && npm pack pkg/",
-    "publish": "npm run build && npm publish pkg/",
-    "prepublishOnly": "npm run build"
+    "pack": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm pack pkg/",
+    "publish": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm publish pkg/",
+    "prepublishOnly": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build"
   },
   "repository": {
     "type": "git",
