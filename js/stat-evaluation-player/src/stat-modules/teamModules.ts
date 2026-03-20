@@ -27,6 +27,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
   const activeBreakdownClasses = new Set<PossessionBreakdownClass>();
   const orderedBreakdownClasses: PossessionBreakdownClass[] = [
     "possession_state",
+    "field_third",
   ];
 
   return {
@@ -128,6 +129,27 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         optionLabel.append(checkbox, optionText);
         options.append(optionLabel);
 
+        const thirdOptionLabel = document.createElement("label");
+        thirdOptionLabel.className = "toggle";
+
+        const thirdCheckbox = document.createElement("input");
+        thirdCheckbox.type = "checkbox";
+        thirdCheckbox.dataset.breakdownClass = "field_third";
+        thirdCheckbox.addEventListener("change", () => {
+          if (thirdCheckbox.checked) {
+            activeBreakdownClasses.add("field_third");
+          } else {
+            activeBreakdownClasses.delete("field_third");
+          }
+          syncPossessionSettingsUi();
+          runtime.rerenderCurrentState();
+        });
+
+        const thirdOptionText = document.createElement("span");
+        thirdOptionText.textContent = "Third";
+        thirdOptionLabel.append(thirdCheckbox, thirdOptionText);
+        options.append(thirdOptionLabel);
+
         settingsEl.append(header, options);
       }
 
@@ -152,10 +174,14 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
     }
 
     if (breakdownReadoutEl) {
-      breakdownReadoutEl.textContent =
-        activeBreakdownClasses.has("possession_state")
-          ? "Control"
-          : "Total only";
+      const enabled = orderedBreakdownClasses.filter((className) =>
+        activeBreakdownClasses.has(className)
+      );
+      breakdownReadoutEl.textContent = enabled.length === 0
+        ? "Total only"
+        : enabled.map((className) =>
+          className === "possession_state" ? "Control" : "Third"
+        ).join(" x ");
     }
   }
 

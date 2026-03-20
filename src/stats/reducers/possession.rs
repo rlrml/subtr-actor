@@ -21,6 +21,35 @@ impl PossessionStateLabel {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldThirdLabel {
+    TeamZeroThird,
+    NeutralThird,
+    TeamOneThird,
+}
+
+impl FieldThirdLabel {
+    fn from_ball(ball: &BallSample) -> Self {
+        let ball_y = ball.position().y;
+        if ball_y < -FIELD_ZONE_BOUNDARY_Y {
+            Self::TeamZeroThird
+        } else if ball_y > FIELD_ZONE_BOUNDARY_Y {
+            Self::TeamOneThird
+        } else {
+            Self::NeutralThird
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::TeamZeroThird => "team_zero_third",
+            Self::NeutralThird => "neutral_third",
+            Self::TeamOneThird => "team_one_third",
+        };
+        StatLabel::new("field_third", value)
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
@@ -240,13 +269,24 @@ impl PossessionReducer {
         &self.stats
     }
 
-    fn apply_possession_time(stats: &mut PossessionStats, state: PossessionStateLabel, dt: f32) {
+    fn apply_possession_time(
+        stats: &mut PossessionStats,
+        state: PossessionStateLabel,
+        field_third: Option<FieldThirdLabel>,
+        dt: f32,
+    ) {
         match state {
             PossessionStateLabel::TeamZero => stats.team_zero_time += dt,
             PossessionStateLabel::TeamOne => stats.team_one_time += dt,
             PossessionStateLabel::Neutral => stats.neutral_time += dt,
         }
-        stats.labeled_time.add([state.as_label()], dt);
+        if let Some(field_third) = field_third {
+            stats
+                .labeled_time
+                .add([state.as_label(), field_third.as_label()], dt);
+        } else {
+            stats.labeled_time.add([state.as_label()], dt);
+        }
     }
 }
 
@@ -264,17 +304,19 @@ impl StatsReducer for PossessionReducer {
 
         if live_play {
             self.stats.tracked_time += sample.dt;
+            let field_third = sample.ball.as_ref().map(FieldThirdLabel::from_ball);
             if let Some(possession_team_is_team_0) = active_team_before_sample {
                 let state = if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
                 } else {
                     PossessionStateLabel::TeamOne
                 };
-                Self::apply_possession_time(&mut self.stats, state, sample.dt);
+                Self::apply_possession_time(&mut self.stats, state, field_third, sample.dt);
             } else {
                 Self::apply_possession_time(
                     &mut self.stats,
                     PossessionStateLabel::Neutral,
+                    field_third,
                     sample.dt,
                 );
             }
@@ -294,17 +336,19 @@ impl StatsReducer for PossessionReducer {
 
         if live_play {
             self.stats.tracked_time += sample.dt;
+            let field_third = sample.ball.as_ref().map(FieldThirdLabel::from_ball);
             if let Some(possession_team_is_team_0) = active_team_before_sample {
                 let state = if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
                 } else {
                     PossessionStateLabel::TeamOne
                 };
-                Self::apply_possession_time(&mut self.stats, state, sample.dt);
+                Self::apply_possession_time(&mut self.stats, state, field_third, sample.dt);
             } else {
                 Self::apply_possession_time(
                     &mut self.stats,
                     PossessionStateLabel::Neutral,
+                    field_third,
                     sample.dt,
                 );
             }
@@ -315,11 +359,40 @@ impl StatsReducer for PossessionReducer {
 
 #[cfg(test)]
 mod tests {
-    use boxcars::RemoteId;
+    use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
     use super::*;
 
-    fn sample(frame_number: usize, time: f32, touch_teams: &[bool]) -> StatsSample {
+    fn ball(ball_y: f32) -> BallSample {
+        BallSample {
+            rigid_body: RigidBody {
+                sleeping: false,
+                location: Vector3f {
+                    x: 0.0,
+                    y: ball_y,
+                    z: 100.0,
+                },
+                rotation: Quaternion {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    w: 1.0,
+                },
+                linear_velocity: Some(Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                }),
+                angular_velocity: Some(Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                }),
+            },
+        }
+    }
+
+    fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> StatsSample {
         StatsSample {
             frame_number,
             time,
@@ -333,7 +406,7 @@ mod tests {
             possession_team_is_team_0: None,
             scored_on_team_is_team_0: None,
             current_in_game_team_player_counts: Some([1, 1]),
-            ball: None,
+            ball: Some(ball(ball_y)),
             players: Vec::new(),
             active_demos: Vec::new(),
             demo_events: Vec::new(),
@@ -359,12 +432,12 @@ mod tests {
     fn possession_reducer_tracks_labeled_possession_time() {
         let mut reducer = PossessionReducer::new();
 
-        reducer.on_sample(&sample(0, 0.0, &[])).unwrap();
-        reducer.on_sample(&sample(1, 1.0, &[true])).unwrap();
-        reducer.on_sample(&sample(2, 2.0, &[])).unwrap();
-        reducer.on_sample(&sample(3, 3.0, &[false])).unwrap();
-        reducer.on_sample(&sample(4, 4.0, &[false])).unwrap();
-        reducer.on_sample(&sample(5, 5.0, &[])).unwrap();
+        reducer.on_sample(&sample(0, 0.0, 0.0, &[])).unwrap();
+        reducer.on_sample(&sample(1, 1.0, 0.0, &[true])).unwrap();
+        reducer.on_sample(&sample(2, 2.0, 0.0, &[])).unwrap();
+        reducer.on_sample(&sample(3, 3.0, 0.0, &[false])).unwrap();
+        reducer.on_sample(&sample(4, 4.0, 0.0, &[false])).unwrap();
+        reducer.on_sample(&sample(5, 5.0, 0.0, &[])).unwrap();
 
         let stats = reducer.stats();
         assert_eq!(stats.tracked_time, 6.0);
@@ -381,6 +454,77 @@ mod tests {
         );
         assert_eq!(
             stats.time_with_labels(&[StatLabel::new("possession_state", "team_one")]),
+            1.0
+        );
+    }
+
+    #[test]
+    fn possession_reducer_tracks_possession_time_by_field_third() {
+        let mut reducer = PossessionReducer::new();
+
+        reducer.on_sample(&sample(0, 0.0, -3000.0, &[])).unwrap();
+        reducer.on_sample(&sample(1, 1.0, 0.0, &[true])).unwrap();
+        reducer
+            .on_sample(&sample(2, 2.0, -3000.0, &[true]))
+            .unwrap();
+        reducer.on_sample(&sample(3, 3.0, 0.0, &[])).unwrap();
+        reducer.on_sample(&sample(4, 4.0, 3000.0, &[])).unwrap();
+        reducer
+            .on_sample(&sample(5, 5.0, 3000.0, &[false]))
+            .unwrap();
+        reducer
+            .on_sample(&sample(6, 6.0, -3000.0, &[false]))
+            .unwrap();
+
+        let stats = reducer.stats();
+        assert_eq!(stats.tracked_time, 7.0);
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "neutral"),
+                StatLabel::new("field_third", "team_zero_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "neutral"),
+                StatLabel::new("field_third", "neutral_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "neutral"),
+                StatLabel::new("field_third", "team_one_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "team_zero"),
+                StatLabel::new("field_third", "team_zero_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "team_zero"),
+                StatLabel::new("field_third", "neutral_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "team_zero"),
+                StatLabel::new("field_third", "team_one_third"),
+            ]),
+            1.0
+        );
+        assert_eq!(
+            stats.time_with_labels(&[
+                StatLabel::new("possession_state", "team_one"),
+                StatLabel::new("field_third", "team_zero_third"),
+            ]),
             1.0
         );
     }

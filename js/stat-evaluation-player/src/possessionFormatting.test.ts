@@ -23,7 +23,10 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
           name: "time",
           variant: "labeled",
           unit: "seconds",
-          labels: [{ key: "possession_state", value: "team_zero" }],
+          labels: [
+            { key: "possession_state", value: "team_zero" },
+            { key: "field_third", value: "team_zero_third" },
+          ],
           value_type: "float",
           value: 4,
         },
@@ -32,7 +35,10 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
           name: "time",
           variant: "labeled",
           unit: "seconds",
-          labels: [{ key: "possession_state", value: "team_one" }],
+          labels: [
+            { key: "possession_state", value: "team_one" },
+            { key: "field_third", value: "team_one_third" },
+          ],
           value_type: "float",
           value: 3,
         },
@@ -41,7 +47,10 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
           name: "time",
           variant: "labeled",
           unit: "seconds",
-          labels: [{ key: "possession_state", value: "neutral" }],
+          labels: [
+            { key: "possession_state", value: "neutral" },
+            { key: "field_third", value: "neutral_third" },
+          ],
           value_type: "float",
           value: 3,
         },
@@ -76,6 +85,138 @@ test("renderPossessionStats can render a shared control breakdown", () => {
   assert.match(html, /Orange control<\/span><span class="value">3\.0s \(30\.0%\)/);
   assert.doesNotMatch(html, /Team control<\/span>/);
   assert.doesNotMatch(html, /Opp control<\/span>/);
+});
+
+test("renderPossessionStats can render possession by third in team perspective", () => {
+  const html = renderPossessionStats(
+    {
+      tracked_time: 10,
+      team_zero_time: 6,
+      team_one_time: 3,
+      neutral_time: 1,
+    },
+    {
+      labelPerspective: {
+        kind: "team",
+        isTeamZero: true,
+      },
+      breakdownClasses: ["possession_state", "field_third"],
+      exportedStats: [
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "team_zero" },
+            { key: "field_third", value: "team_zero_third" },
+          ],
+          value_type: "float",
+          value: 2,
+        },
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "team_zero" },
+            { key: "field_third", value: "neutral_third" },
+          ],
+          value_type: "float",
+          value: 4,
+        },
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "neutral" },
+            { key: "field_third", value: "team_one_third" },
+          ],
+          value_type: "float",
+          value: 1,
+        },
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "team_one" },
+            { key: "field_third", value: "team_one_third" },
+          ],
+          value_type: "float",
+          value: 3,
+        },
+      ],
+    },
+  );
+
+  assert.match(html, /Team control \/ Own third<\/span><span class="value">2\.0s \(20\.0%\)/);
+  assert.match(html, /Team control \/ Neutral third<\/span><span class="value">4\.0s \(40\.0%\)/);
+  assert.match(html, /Neutral \/ Opp third<\/span><span class="value">1\.0s \(10\.0%\)/);
+  assert.match(html, /Opp control \/ Opp third<\/span><span class="value">3\.0s \(30\.0%\)/);
+});
+
+test("renderPossessionStats can render a field-third breakdown on its own", () => {
+  const html = renderPossessionStats(
+    {
+      tracked_time: 10,
+      team_zero_time: 4,
+      team_one_time: 4,
+      neutral_time: 2,
+    },
+    {
+      labelPerspective: {
+        kind: "shared",
+      },
+      breakdownClasses: ["field_third"],
+      exportedStats: [
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "team_zero" },
+            { key: "field_third", value: "team_zero_third" },
+          ],
+          value_type: "float",
+          value: 3,
+        },
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "neutral" },
+            { key: "field_third", value: "neutral_third" },
+          ],
+          value_type: "float",
+          value: 2,
+        },
+        {
+          domain: "possession",
+          name: "time",
+          variant: "labeled",
+          unit: "seconds",
+          labels: [
+            { key: "possession_state", value: "team_one" },
+            { key: "field_third", value: "team_one_third" },
+          ],
+          value_type: "float",
+          value: 5,
+        },
+      ],
+    },
+  );
+
+  assert.match(html, /Blue third<\/span><span class="value">3\.0s \(30\.0%\)/);
+  assert.match(html, /Neutral third<\/span><span class="value">2\.0s \(20\.0%\)/);
+  assert.match(html, /Orange third<\/span><span class="value">5\.0s \(50\.0%\)/);
 });
 
 test("renderPossessionStats omits breakdown rows when no classes are selected", () => {
