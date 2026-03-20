@@ -68,7 +68,6 @@ struct ActiveSpeedFlipCandidate {
     latest_forward_z: f32,
     latest_time: f32,
     latest_frame: usize,
-    best_local_angular_velocity: glam::Vec3,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -276,7 +275,6 @@ impl SpeedFlipReducer {
                 latest_forward_z: forward_z,
                 latest_time: sample.time,
                 latest_frame: sample.frame_number,
-                best_local_angular_velocity: local_angular_velocity,
             },
         );
     }
@@ -310,11 +308,6 @@ impl SpeedFlipReducer {
         candidate.best_diagonal_score = candidate
             .best_diagonal_score
             .max(Self::diagonal_score(local_angular_velocity));
-        if Self::diagonal_score(local_angular_velocity)
-            >= Self::diagonal_score(candidate.best_local_angular_velocity)
-        {
-            candidate.best_local_angular_velocity = local_angular_velocity;
-        }
 
         let forward_z = (rotation * glam::Vec3::X).z;
         candidate.min_forward_z = candidate.min_forward_z.min(forward_z);
@@ -762,7 +755,7 @@ mod tests {
 
                     let event = SpeedFlipReducer::candidate_event(&player_id, candidate.clone());
                     eprintln!(
-                        "candidate_finalized frame={} time={:.3} player={:?} emitted={} start_time={:.3} start_speed={:.0} max_speed={:.0} align={:.3} diag={:.3} best_local_ang=({:.3},{:.3},{:.3}) min_forward_z={:.3} latest_forward_z={:.3} cancel_recovery={:.3} post_ball_hit={:?}",
+                        "candidate_finalized frame={} time={:.3} player={:?} emitted={} start_time={:.3} start_speed={:.0} max_speed={:.0} align={:.3} diag={:.3} min_forward_z={:.3} latest_forward_z={:.3} cancel_recovery={:.3} post_ball_hit={:?}",
                         frame_number,
                         current_time,
                         player_id,
@@ -772,9 +765,6 @@ mod tests {
                         candidate.max_speed,
                         candidate.best_alignment,
                         candidate.best_diagonal_score,
-                        candidate.best_local_angular_velocity.x,
-                        candidate.best_local_angular_velocity.y,
-                        candidate.best_local_angular_velocity.z,
                         candidate.min_forward_z,
                         candidate.latest_forward_z,
                         candidate.latest_forward_z - candidate.min_forward_z,
