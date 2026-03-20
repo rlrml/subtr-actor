@@ -1,5 +1,0 @@
-[     899ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4173/favicon.ico:0
-[   18313ms] [WARNING] [.WebGL-0x3b2c02984200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4173/:0
-[   18361ms] [WARNING] [.WebGL-0x3b2c02984200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4173/:0
-[   18422ms] [WARNING] [.WebGL-0x3b2c02984200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4173/:0
-[   18470ms] [WARNING] [.WebGL-0x3b2c02984200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://127.0.0.1:4173/:0

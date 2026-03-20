@@ -1,8 +1,0 @@
-[     364ms] [WARNING] using deprecated parameters for the initialization function; pass a single object instead @ http://127.0.0.1:4173/@fs/home/imalison/Projects/subtr-actor/js/pkg/rl_replay_subtr_actor.js:452
-[     424ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4173/favicon.ico:0
-[   19871ms] [ERROR] THREE.WebGLRenderer: Error creating WebGL context. @ https://cdnjs.cloudflare.com/ajax/libs/three.js/r116/three.min.js:201
-[   19871ms] [ERROR] Failed to load ballchasing.com player: Error: Error creating WebGL context.
-    at new mg (https://cdnjs.cloudflare.com/ajax/libs/three.js/r116/three.min.js:202:252)
-    at window.ReplayPlayer (http://127.0.0.1:4173/src/player.js:1753:24)
-    at http://127.0.0.1:4173/src/index.js:282:24 @ http://127.0.0.1:4173/src/index.js:285
-[27855186ms] [WARNING] using deprecated parameters for the initialization function; pass a single object instead @ http://127.0.0.1:4173/@fs/home/imalison/Projects/subtr-actor/js/pkg/rl_replay_subtr_actor.js:452
