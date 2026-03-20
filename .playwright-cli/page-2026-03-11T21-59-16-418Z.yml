@@ -1,0 +1,38 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - paragraph [ref=e4]: subtr-actor
+    - heading "Stats Timeline Viewer" [level=1] [ref=e5]
+    - paragraph [ref=e6]: Watch the replay, scrub freely, and inspect cumulative reducer state at each point in time.
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e18]:
+          - text: Replay
+          - strong [ref=e19]: replay.replay
+        - generic [ref=e20]:
+          - text: Duration
+          - strong [ref=e21]: 05:28
+        - generic [ref=e22]:
+          - text: Players
+          - strong [ref=e23]: "6"
+        - generic [ref=e24]:
+          - text: Version
+          - strong [ref=e25]: "868.32"
+      - generic [ref=e27]:
+        - generic [ref=e29]:
+          - slider [ref=e31]: "0"
+          - generic [ref=e32]:
+            - generic [ref=e33]: 00:00
+            - generic [ref=e34]: /
+            - generic [ref=e35]: 00:00
+            - button "Play" [ref=e36] [cursor=pointer]
+            - button "Camera" [ref=e37] [cursor=pointer]
+            - button "Fullscreen" [ref=e38] [cursor=pointer]
+            - button "Slower" [ref=e39] [cursor=pointer]
+            - generic [ref=e40]: 1x
+            - button "Faster" [ref=e41] [cursor=pointer]
+        - generic [ref=e42]:
+          - generic [ref=e43]: "0"
+          - generic [ref=e44]: 05:00
+          - generic [ref=e45]: "0"
+    - complementary [ref=e16]

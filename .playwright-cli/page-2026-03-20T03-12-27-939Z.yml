@@ -1,0 +1,813 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: subtr-actor / stats replay viewer
+      - heading "Stat Evaluation Player" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Compare stat modules against the in-replay camera view, switch to any player's camera profile, and scrub with the shared timeline plugin.
+    - generic [ref=e9]:
+      - generic [ref=e10]: Choose replay
+      - button "Choose replay" [ref=e11]
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e15]:
+        - generic "Replay player viewport" [ref=e154]
+        - generic:
+          - generic:
+            - button "Follow miztik" [ref=e155] [cursor=pointer]:
+              - generic [ref=e158]: 33 miztik
+            - button "Follow remkoe" [ref=e159] [cursor=pointer]:
+              - generic [ref=e162]: 33 remkoe
+            - button "Follow Maestro." [ref=e163] [cursor=pointer]:
+              - generic [ref=e166]: 33 Maestro.
+            - button "Follow Deevo" [ref=e167] [cursor=pointer]:
+              - generic [ref=e170]: 33 Deevo
+            - button "Follow ViolentPanda" [ref=e171] [cursor=pointer]:
+              - generic [ref=e174]: 33 ViolentPanda
+            - button "Follow Paschy90" [ref=e175] [cursor=pointer]:
+              - generic [ref=e178]: 33 Paschy90
+          - generic:
+            - button "Follow miztik" [ref=e179] [cursor=pointer]:
+              - generic [ref=e182]: 33 miztik
+            - button "Follow remkoe" [ref=e183] [cursor=pointer]:
+              - generic [ref=e186]: 33 remkoe
+            - button "Follow Maestro." [ref=e187] [cursor=pointer]:
+              - generic [ref=e190]: 33 Maestro.
+          - generic:
+            - button "Follow Deevo" [ref=e191] [cursor=pointer]:
+              - generic [ref=e194]: 33 Deevo
+            - button "Follow ViolentPanda" [ref=e195] [cursor=pointer]:
+              - generic [ref=e198]: 33 ViolentPanda
+            - button "Follow Paschy90" [ref=e199] [cursor=pointer]:
+              - generic [ref=e202]: 33 Paschy90
+        - generic [ref=e203]:
+          - generic [ref=e204]:
+            - generic [ref=e206]: 0:00.00
+            - generic [ref=e207]: "-5:47.53"
+          - generic [ref=e208]:
+            - generic:
+              - generic:
+                - generic "miztik"
+                - generic:
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+              - generic:
+                - generic "remkoe"
+                - generic:
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+              - generic:
+                - generic "Maestro."
+                - generic:
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+              - generic:
+                - generic "Deevo"
+                - generic:
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+              - generic:
+                - generic "ViolentPanda"
+                - generic:
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+              - generic:
+                - generic "Paschy90"
+                - generic:
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Def third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Def third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+                  - generic "Neutral third"
+                  - generic "Off third"
+            - button "Play replay" [ref=e209] [cursor=pointer]:
+              - generic [ref=e210]: ">"
+              - generic [ref=e211]: Play
+            - generic [ref=e212]:
+              - generic:
+                - button "G" [ref=e221] [cursor=pointer]
+                - button "G" [ref=e222] [cursor=pointer]
+                - button "G" [ref=e223] [cursor=pointer]
+                - button "G" [ref=e224] [cursor=pointer]
+                - button "G" [ref=e225] [cursor=pointer]
+                - button "G" [ref=e226] [cursor=pointer]
+                - button "G" [ref=e227] [cursor=pointer]
+              - slider [ref=e220] [cursor=pointer]: "0"
+      - generic [ref=e17]:
+        - generic [ref=e19]:
+          - paragraph [ref=e20]: Module output
+          - heading "Per-player stats" [level=2] [ref=e21]
+        - generic [ref=e228]:
+          - generic [ref=e229]: Absolute Positioning
+          - generic [ref=e230]:
+            - generic [ref=e231]:
+              - generic [ref=e233]: miztik
+              - generic [ref=e234]:
+                - generic [ref=e235]: Defensive zone
+                - generic [ref=e236]: "?"
+              - generic [ref=e237]:
+                - generic [ref=e238]: Neutral zone
+                - generic [ref=e239]: "?"
+              - generic [ref=e240]:
+                - generic [ref=e241]: Offensive zone
+                - generic [ref=e242]: "?"
+              - generic [ref=e243]:
+                - generic [ref=e244]: Defensive half
+                - generic [ref=e245]: 0.0s
+              - generic [ref=e246]:
+                - generic [ref=e247]: Offensive half
+                - generic [ref=e248]: 0.0s
+              - generic [ref=e249]:
+                - generic [ref=e250]: To teammates
+                - generic [ref=e251]: "?"
+              - generic [ref=e252]:
+                - generic [ref=e253]: To ball
+                - generic [ref=e254]: "?"
+            - generic [ref=e255]:
+              - generic [ref=e257]: remkoe
+              - generic [ref=e258]:
+                - generic [ref=e259]: Defensive zone
+                - generic [ref=e260]: "?"
+              - generic [ref=e261]:
+                - generic [ref=e262]: Neutral zone
+                - generic [ref=e263]: "?"
+              - generic [ref=e264]:
+                - generic [ref=e265]: Offensive zone
+                - generic [ref=e266]: "?"
+              - generic [ref=e267]:
+                - generic [ref=e268]: Defensive half
+                - generic [ref=e269]: 0.0s
+              - generic [ref=e270]:
+                - generic [ref=e271]: Offensive half
+                - generic [ref=e272]: 0.0s
+              - generic [ref=e273]:
+                - generic [ref=e274]: To teammates
+                - generic [ref=e275]: "?"
+              - generic [ref=e276]:
+                - generic [ref=e277]: To ball
+                - generic [ref=e278]: "?"
+            - generic [ref=e279]:
+              - generic [ref=e281]: Maestro.
+              - generic [ref=e282]:
+                - generic [ref=e283]: Defensive zone
+                - generic [ref=e284]: "?"
+              - generic [ref=e285]:
+                - generic [ref=e286]: Neutral zone
+                - generic [ref=e287]: "?"
+              - generic [ref=e288]:
+                - generic [ref=e289]: Offensive zone
+                - generic [ref=e290]: "?"
+              - generic [ref=e291]:
+                - generic [ref=e292]: Defensive half
+                - generic [ref=e293]: 0.0s
+              - generic [ref=e294]:
+                - generic [ref=e295]: Offensive half
+                - generic [ref=e296]: 0.0s
+              - generic [ref=e297]:
+                - generic [ref=e298]: To teammates
+                - generic [ref=e299]: "?"
+              - generic [ref=e300]:
+                - generic [ref=e301]: To ball
+                - generic [ref=e302]: "?"
+            - generic [ref=e303]:
+              - generic [ref=e305]: Deevo
+              - generic [ref=e306]:
+                - generic [ref=e307]: Defensive zone
+                - generic [ref=e308]: "?"
+              - generic [ref=e309]:
+                - generic [ref=e310]: Neutral zone
+                - generic [ref=e311]: "?"
+              - generic [ref=e312]:
+                - generic [ref=e313]: Offensive zone
+                - generic [ref=e314]: "?"
+              - generic [ref=e315]:
+                - generic [ref=e316]: Defensive half
+                - generic [ref=e317]: 0.0s
+              - generic [ref=e318]:
+                - generic [ref=e319]: Offensive half
+                - generic [ref=e320]: 0.0s
+              - generic [ref=e321]:
+                - generic [ref=e322]: To teammates
+                - generic [ref=e323]: "?"
+              - generic [ref=e324]:
+                - generic [ref=e325]: To ball
+                - generic [ref=e326]: "?"
+            - generic [ref=e327]:
+              - generic [ref=e329]: ViolentPanda
+              - generic [ref=e330]:
+                - generic [ref=e331]: Defensive zone
+                - generic [ref=e332]: "?"
+              - generic [ref=e333]:
+                - generic [ref=e334]: Neutral zone
+                - generic [ref=e335]: "?"
+              - generic [ref=e336]:
+                - generic [ref=e337]: Offensive zone
+                - generic [ref=e338]: "?"
+              - generic [ref=e339]:
+                - generic [ref=e340]: Defensive half
+                - generic [ref=e341]: 0.0s
+              - generic [ref=e342]:
+                - generic [ref=e343]: Offensive half
+                - generic [ref=e344]: 0.0s
+              - generic [ref=e345]:
+                - generic [ref=e346]: To teammates
+                - generic [ref=e347]: "?"
+              - generic [ref=e348]:
+                - generic [ref=e349]: To ball
+                - generic [ref=e350]: "?"
+            - generic [ref=e351]:
+              - generic [ref=e353]: Paschy90
+              - generic [ref=e354]:
+                - generic [ref=e355]: Defensive zone
+                - generic [ref=e356]: "?"
+              - generic [ref=e357]:
+                - generic [ref=e358]: Neutral zone
+                - generic [ref=e359]: "?"
+              - generic [ref=e360]:
+                - generic [ref=e361]: Offensive zone
+                - generic [ref=e362]: "?"
+              - generic [ref=e363]:
+                - generic [ref=e364]: Defensive half
+                - generic [ref=e365]: 0.0s
+              - generic [ref=e366]:
+                - generic [ref=e367]: Offensive half
+                - generic [ref=e368]: 0.0s
+              - generic [ref=e369]:
+                - generic [ref=e370]: To teammates
+                - generic [ref=e371]: "?"
+              - generic [ref=e372]:
+                - generic [ref=e373]: To ball
+                - generic [ref=e374]: "?"
+    - complementary [ref=e23]:
+      - generic [ref=e24]:
+        - paragraph [ref=e25]: Camera
+        - heading "Replay camera" [level=2] [ref=e26]
+        - generic [ref=e27]:
+          - text: Camera profile
+          - combobox "Camera profile" [ref=e28]:
+            - option "Free camera" [selected]
+            - option "miztik (Blue)"
+            - option "remkoe (Blue)"
+            - option "Maestro. (Blue)"
+            - option "Deevo (Orange)"
+            - option "ViolentPanda (Orange)"
+            - option "Paschy90 (Orange)"
+        - generic [ref=e29]:
+          - text: Follow distance
+          - slider "Follow distance" [disabled] [ref=e30]: "2.25"
+        - strong [ref=e31]: 2.25x
+        - generic [ref=e32]:
+          - checkbox "Ball cam" [disabled] [ref=e33]
+          - generic [ref=e34]: Ball cam
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - term [ref=e37]: Profile
+            - definition [ref=e38]: Free camera
+          - generic [ref=e39]:
+            - term [ref=e40]: FOV
+            - definition [ref=e41]: "--"
+          - generic [ref=e42]:
+            - term [ref=e43]: Height
+            - definition [ref=e44]: "--"
+          - generic [ref=e45]:
+            - term [ref=e46]: Pitch
+            - definition [ref=e47]: "--"
+          - generic [ref=e48]:
+            - term [ref=e49]: Distance
+            - definition [ref=e50]: "--"
+          - generic [ref=e51]:
+            - term [ref=e52]: Stiffness
+            - definition [ref=e53]: "--"
+      - generic [ref=e54]:
+        - paragraph [ref=e55]: Modules
+        - heading "Overlay modules" [level=2] [ref=e56]
+        - paragraph [ref=e57]: Toggle stat overlays independently while keeping the timeline and replay camera controls active.
+        - generic [ref=e58]:
+          - checkbox "Show followed player in viewport" [ref=e59]
+          - generic [ref=e60]: Show followed player in viewport
+        - generic [ref=e61]:
+          - button "Core Off" [ref=e375] [cursor=pointer]:
+            - generic [ref=e376]: Core
+            - strong [ref=e377]: "Off"
+          - button "Possession Off" [ref=e378] [cursor=pointer]:
+            - generic [ref=e379]: Possession
+            - strong [ref=e380]: "Off"
+          - button "50/50 Off" [ref=e381] [cursor=pointer]:
+            - generic [ref=e382]: 50/50
+            - strong [ref=e383]: "Off"
+          - button "Half Control Off" [ref=e384] [cursor=pointer]:
+            - generic [ref=e385]: Half Control
+            - strong [ref=e386]: "Off"
+          - button "Rush Off" [ref=e387] [cursor=pointer]:
+            - generic [ref=e388]: Rush
+            - strong [ref=e389]: "Off"
+          - button "Relative Positioning Off" [ref=e390] [cursor=pointer]:
+            - generic [ref=e391]: Relative Positioning
+            - strong [ref=e392]: "Off"
+          - button "Absolute Positioning On" [pressed] [ref=e393] [cursor=pointer]:
+            - generic [ref=e394]: Absolute Positioning
+            - strong [ref=e395]: "On"
+          - button "Time In Zone Off" [ref=e396] [cursor=pointer]:
+            - generic [ref=e397]: Time In Zone
+            - strong [ref=e398]: "Off"
+          - button "Speed Flip Off" [ref=e399] [cursor=pointer]:
+            - generic [ref=e400]: Speed Flip
+            - strong [ref=e401]: "Off"
+          - button "Touch Off" [ref=e402] [cursor=pointer]:
+            - generic [ref=e403]: Touch
+            - strong [ref=e404]: "Off"
+          - button "Musty Flick Off" [ref=e405] [cursor=pointer]:
+            - generic [ref=e406]: Musty Flick
+            - strong [ref=e407]: "Off"
+          - button "Dodge Reset Off" [ref=e408] [cursor=pointer]:
+            - generic [ref=e409]: Dodge Reset
+            - strong [ref=e410]: "Off"
+          - button "Boost Off" [ref=e411] [cursor=pointer]:
+            - generic [ref=e412]: Boost
+            - strong [ref=e413]: "Off"
+          - button "Ball Carry Off" [ref=e414] [cursor=pointer]:
+            - generic [ref=e415]: Ball Carry
+            - strong [ref=e416]: "Off"
+          - button "Movement Off" [ref=e417] [cursor=pointer]:
+            - generic [ref=e418]: Movement
+            - strong [ref=e419]: "Off"
+          - button "Powerslide Off" [ref=e420] [cursor=pointer]:
+            - generic [ref=e421]: Powerslide
+            - strong [ref=e422]: "Off"
+          - button "Demo Off" [ref=e423] [cursor=pointer]:
+            - generic [ref=e424]: Demo
+            - strong [ref=e425]: "Off"
+      - generic [ref=e113]:
+        - paragraph [ref=e114]: Transport
+        - heading "Playback" [level=2] [ref=e115]
+        - generic [ref=e116]:
+          - button "Play" [ref=e117] [cursor=pointer]
+          - combobox [ref=e118]:
+            - option "0.25x"
+            - option "0.5x"
+            - option "1.0x" [selected]
+            - option "1.5x"
+            - option "2.0x"
+        - generic [ref=e119]:
+          - checkbox "Skip post-goal resets" [checked] [ref=e120]
+          - generic [ref=e121]: Skip post-goal resets
+        - generic [ref=e122]:
+          - checkbox "Skip kickoffs" [ref=e123]
+          - generic [ref=e124]: Skip kickoffs
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - term [ref=e127]: Time
+            - definition [ref=e128]: 0.00s
+          - generic [ref=e129]:
+            - term [ref=e130]: Frame
+            - definition [ref=e131]: "0"
+          - generic [ref=e132]:
+            - term [ref=e133]: Duration
+            - definition [ref=e134]: 422.56s
+          - generic [ref=e135]:
+            - term [ref=e136]: Status
+            - definition [ref=e137]: Paused
+      - generic [ref=e138]:
+        - paragraph [ref=e139]: Replay
+        - heading "Loaded file" [level=2] [ref=e140]
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - term [ref=e143]: Status
+            - definition [ref=e144]: Loaded rlcs.replay
+          - generic [ref=e145]:
+            - term [ref=e146]: Players
+            - definition [ref=e147]: miztik, remkoe, Maestro., Deevo, ViolentPanda, Paschy90
+          - generic [ref=e148]:
+            - term [ref=e149]: Frames
+            - definition [ref=e150]: "7651"
+          - generic [ref=e151]:
+            - term [ref=e152]: Timeline events
+            - definition [ref=e153]: "7"

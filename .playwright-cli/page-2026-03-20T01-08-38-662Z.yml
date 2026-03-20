@@ -1,0 +1,167 @@
+- generic [ref=e2]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: subtr-actor / stats replay viewer
+        - heading "Stat Evaluation Player" [level=1] [ref=e7]
+        - paragraph [ref=e8]: Compare stat modules against the in-replay camera view, switch to any player's camera profile, and scrub with the shared timeline plugin.
+      - generic [ref=e9]:
+        - generic [ref=e10]: Choose replay
+        - button "Choose replay" [disabled] [ref=e11]
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e16]: Choose a replay to start the viewer.
+        - generic [ref=e17]:
+          - generic [ref=e19]:
+            - paragraph [ref=e20]: Module output
+            - heading "Per-player stats" [level=2] [ref=e21]
+          - generic [ref=e22]: Load a replay to see stats.
+      - complementary [ref=e23]:
+        - generic [ref=e24]:
+          - paragraph [ref=e25]: Camera
+          - heading "Replay camera" [level=2] [ref=e26]
+          - generic [ref=e27]:
+            - text: Camera profile
+            - combobox "Camera profile" [disabled] [ref=e28]:
+              - option "Free camera" [selected]
+          - generic [ref=e29]:
+            - text: Follow distance
+            - slider "Follow distance" [disabled] [ref=e30]: "2.25"
+          - strong [ref=e31]: 2.25x
+          - generic [ref=e32]:
+            - checkbox "Ball cam" [disabled] [ref=e33]
+            - generic [ref=e34]: Ball cam
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - term [ref=e37]: Profile
+              - definition [ref=e38]: Free camera
+            - generic [ref=e39]:
+              - term [ref=e40]: FOV
+              - definition [ref=e41]: "--"
+            - generic [ref=e42]:
+              - term [ref=e43]: Height
+              - definition [ref=e44]: "--"
+            - generic [ref=e45]:
+              - term [ref=e46]: Pitch
+              - definition [ref=e47]: "--"
+            - generic [ref=e48]:
+              - term [ref=e49]: Distance
+              - definition [ref=e50]: "--"
+            - generic [ref=e51]:
+              - term [ref=e52]: Stiffness
+              - definition [ref=e53]: "--"
+        - generic [ref=e54]:
+          - paragraph [ref=e55]: Modules
+          - heading "Overlay modules" [level=2] [ref=e56]
+          - paragraph [ref=e57]: Toggle stat overlays independently while keeping the timeline and replay camera controls active.
+          - generic [ref=e58]:
+            - checkbox "Show followed player in viewport" [ref=e59]
+            - generic [ref=e60]: Show followed player in viewport
+          - generic [ref=e61]:
+            - button "Core Off" [ref=e62] [cursor=pointer]:
+              - generic [ref=e63]: Core
+              - strong [ref=e64]: "Off"
+            - button "Possession Off" [ref=e65] [cursor=pointer]:
+              - generic [ref=e66]: Possession
+              - strong [ref=e67]: "Off"
+            - button "50/50 Off" [ref=e68] [cursor=pointer]:
+              - generic [ref=e69]: 50/50
+              - strong [ref=e70]: "Off"
+            - button "Half Control Off" [ref=e71] [cursor=pointer]:
+              - generic [ref=e72]: Half Control
+              - strong [ref=e73]: "Off"
+            - button "Rush Off" [ref=e74] [cursor=pointer]:
+              - generic [ref=e75]: Rush
+              - strong [ref=e76]: "Off"
+            - button "Relative Positioning Off" [ref=e77] [cursor=pointer]:
+              - generic [ref=e78]: Relative Positioning
+              - strong [ref=e79]: "Off"
+            - button "Absolute Positioning Off" [ref=e80] [cursor=pointer]:
+              - generic [ref=e81]: Absolute Positioning
+              - strong [ref=e82]: "Off"
+            - button "Time In Zone Off" [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]: Time In Zone
+              - strong [ref=e85]: "Off"
+            - button "Speed Flip Off" [ref=e86] [cursor=pointer]:
+              - generic [ref=e87]: Speed Flip
+              - strong [ref=e88]: "Off"
+            - button "Touch Off" [ref=e89] [cursor=pointer]:
+              - generic [ref=e90]: Touch
+              - strong [ref=e91]: "Off"
+            - button "Musty Flick Off" [ref=e92] [cursor=pointer]:
+              - generic [ref=e93]: Musty Flick
+              - strong [ref=e94]: "Off"
+            - button "Dodge Reset Off" [ref=e95] [cursor=pointer]:
+              - generic [ref=e96]: Dodge Reset
+              - strong [ref=e97]: "Off"
+            - button "Boost Off" [ref=e98] [cursor=pointer]:
+              - generic [ref=e99]: Boost
+              - strong [ref=e100]: "Off"
+            - button "Ball Carry Off" [ref=e101] [cursor=pointer]:
+              - generic [ref=e102]: Ball Carry
+              - strong [ref=e103]: "Off"
+            - button "Movement Off" [ref=e104] [cursor=pointer]:
+              - generic [ref=e105]: Movement
+              - strong [ref=e106]: "Off"
+            - button "Powerslide Off" [ref=e107] [cursor=pointer]:
+              - generic [ref=e108]: Powerslide
+              - strong [ref=e109]: "Off"
+            - button "Demo Off" [ref=e110] [cursor=pointer]:
+              - generic [ref=e111]: Demo
+              - strong [ref=e112]: "Off"
+        - generic [ref=e113]:
+          - paragraph [ref=e114]: Transport
+          - heading "Playback" [level=2] [ref=e115]
+          - generic [ref=e116]:
+            - button "Play" [disabled] [ref=e117]
+            - combobox [disabled] [ref=e118]:
+              - option "0.25x"
+              - option "0.5x"
+              - option "1.0x" [selected]
+              - option "1.5x"
+              - option "2.0x"
+          - generic [ref=e119]:
+            - checkbox "Skip post-goal resets" [checked] [ref=e120]
+            - generic [ref=e121]: Skip post-goal resets
+          - generic [ref=e122]:
+            - checkbox "Skip kickoffs" [ref=e123]
+            - generic [ref=e124]: Skip kickoffs
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - term [ref=e127]: Time
+              - definition [ref=e128]: 0.00s
+            - generic [ref=e129]:
+              - term [ref=e130]: Frame
+              - definition [ref=e131]: "0"
+            - generic [ref=e132]:
+              - term [ref=e133]: Duration
+              - definition [ref=e134]: 0.00s
+            - generic [ref=e135]:
+              - term [ref=e136]: Status
+              - definition [ref=e137]: Stopped
+        - generic [ref=e138]:
+          - paragraph [ref=e139]: Replay
+          - heading "Loaded file" [level=2] [ref=e140]
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - term [ref=e143]: Status
+              - definition [ref=e144]: Processing replay frames and stats... 39% (3001/7651)
+            - generic [ref=e145]:
+              - term [ref=e146]: Players
+              - definition [ref=e147]: "--"
+            - generic [ref=e148]:
+              - term [ref=e149]: Frames
+              - definition [ref=e150]: "--"
+            - generic [ref=e151]:
+              - term [ref=e152]: Timeline events
+              - definition [ref=e153]: "--"
+  - 'dialog "Phase 2 of 4: Process replay frames and stats" [ref=e155]':
+    - paragraph [ref=e156]: Replay loading
+    - 'heading "Phase 2 of 4: Process replay frames and stats" [level=2] [ref=e157]'
+    - paragraph [ref=e158]: Processing replay frames and stats... 39% (3001/7651)
+    - generic [ref=e159]:
+      - paragraph [ref=e161]: 1. Parse replay
+      - paragraph [ref=e165]: 2. Extract replay frames
+      - paragraph [ref=e169]: 3. Build stats timeline
+      - paragraph [ref=e173]: 4. Normalize replay data
+    - paragraph [ref=e175]: 3001/7651 frames

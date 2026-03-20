@@ -1,0 +1,11 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Rocket League Replay Viewer" [level=1] [ref=e4]
+    - paragraph [ref=e5]: Upload a .replay file to view in 3D
+  - generic [ref=e7] [cursor=pointer]:
+    - generic [ref=e8]: 📁
+    - generic [ref=e9]:
+      - strong [ref=e10]: Drop your .replay file here
+      - text: or click to browse
+    - button "Choose File" [ref=e11]
+  - text: 
