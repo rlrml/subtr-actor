@@ -152,6 +152,8 @@ export function renderCoreStats(core: PlayerStatsSnapshot["core"]): string {
     <div class="stat-row"><span class="label">Assists</span><span class="value">${formatInteger(core?.assists)}</span></div>
     <div class="stat-row"><span class="label">Saves</span><span class="value">${formatInteger(core?.saves)}</span></div>
     <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(core?.shots)}</span></div>
+    <div class="stat-row"><span class="label">Backboard hits</span><span class="value">${formatInteger(core?.attacking_backboard_hit_count)}</span></div>
+    <div class="stat-row"><span class="label">Double taps</span><span class="value">${formatInteger(core?.double_tap_count)}</span></div>
     <div class="stat-row"><span class="label">Shooting %</span><span class="value">${formatPercentage(asNumber(core?.shooting_percentage))}</span></div>
   `;
 }

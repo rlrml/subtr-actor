@@ -145,6 +145,8 @@ export interface PlayerStatsSnapshot {
     assists: number;
     saves: number;
     shots: number;
+    attacking_backboard_hit_count?: number;
+    double_tap_count?: number;
     goals_conceded_while_last_defender: number;
     [key: string]: unknown;
   };
