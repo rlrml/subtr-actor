@@ -68,6 +68,7 @@ struct ActiveSpeedFlipCandidate {
     latest_forward_z: f32,
     latest_time: f32,
     latest_frame: usize,
+    best_local_angular_velocity: glam::Vec3,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -133,19 +134,30 @@ impl SpeedFlipReducer {
         pitch_score * ratio_score
     }
 
-    fn horizontal_alignment(player: &PlayerSample, ball: &BallSample) -> Option<f32> {
+    fn horizontal_alignment_to_target(
+        player: &PlayerSample,
+        target_position: glam::Vec3,
+    ) -> Option<f32> {
         let velocity = player.velocity()?;
         let player_position = player.position()?;
-        let to_ball = ball.position() - player_position;
+        let to_target = target_position - player_position;
         let velocity_xy = velocity.truncate().normalize_or_zero();
-        let to_ball_xy = to_ball.truncate().normalize_or_zero();
+        let to_target_xy = to_target.truncate().normalize_or_zero();
         if velocity_xy.length_squared() <= f32::EPSILON
-            || to_ball_xy.length_squared() <= f32::EPSILON
+            || to_target_xy.length_squared() <= f32::EPSILON
         {
             return None;
         }
 
-        Some(velocity_xy.dot(to_ball_xy))
+        Some(velocity_xy.dot(to_target_xy))
+    }
+
+    fn kickoff_alignment_target(sample: &StatsSample) -> glam::Vec3 {
+        sample
+            .ball
+            .as_ref()
+            .map(BallSample::position)
+            .unwrap_or(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))
     }
 
     fn apply_event(&mut self, event: SpeedFlipEvent) {
@@ -216,9 +228,6 @@ impl SpeedFlipReducer {
         let Some(rigid_body) = player.rigid_body.as_ref() else {
             return;
         };
-        let Some(ball) = sample.ball.as_ref() else {
-            return;
-        };
         let Some(player_position) = player.position() else {
             return;
         };
@@ -231,7 +240,9 @@ impl SpeedFlipReducer {
             return;
         }
 
-        let Some(best_alignment) = Self::horizontal_alignment(player, ball) else {
+        let Some(best_alignment) =
+            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
+        else {
             return;
         };
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
@@ -265,6 +276,7 @@ impl SpeedFlipReducer {
                 latest_forward_z: forward_z,
                 latest_time: sample.time,
                 latest_frame: sample.frame_number,
+                best_local_angular_velocity: local_angular_velocity,
             },
         );
     }
@@ -282,10 +294,10 @@ impl SpeedFlipReducer {
             candidate.end_position = player_position.to_array();
         }
         candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
-        if let Some(ball) = sample.ball.as_ref() {
-            if let Some(alignment) = Self::horizontal_alignment(player, ball) {
-                candidate.best_alignment = candidate.best_alignment.max(alignment);
-            }
+        if let Some(alignment) =
+            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
+        {
+            candidate.best_alignment = candidate.best_alignment.max(alignment);
         }
 
         let rotation = quat_to_glam(&rigid_body.rotation);
@@ -298,6 +310,11 @@ impl SpeedFlipReducer {
         candidate.best_diagonal_score = candidate
             .best_diagonal_score
             .max(Self::diagonal_score(local_angular_velocity));
+        if Self::diagonal_score(local_angular_velocity)
+            >= Self::diagonal_score(candidate.best_local_angular_velocity)
+        {
+            candidate.best_local_angular_velocity = local_angular_velocity;
+        }
 
         let forward_z = (rotation * glam::Vec3::X).z;
         candidate.min_forward_z = candidate.min_forward_z.min(forward_z);
@@ -415,6 +432,7 @@ impl StatsReducer for SpeedFlipReducer {
 #[cfg(test)]
 mod tests {
     use boxcars::RemoteId;
+    use std::path::Path;
 
     use super::*;
 
@@ -619,5 +637,240 @@ mod tests {
 
         assert!(reducer.events().is_empty());
         assert!(reducer.player_stats().is_empty());
+    }
+
+    fn parse_replay(path: &str) -> boxcars::Replay {
+        let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+        let data = std::fs::read(&replay_path)
+            .unwrap_or_else(|_| panic!("Failed to read replay file: {}", replay_path.display()));
+        boxcars::ParserBuilder::new(&data[..])
+            .always_check_crc()
+            .must_parse_network_data()
+            .parse()
+            .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
+    }
+
+    #[test]
+    fn debug_speed_flip_counts_on_sample_replays() {
+        for path in [
+            "assets/replays/old_boost_format.replay",
+            "assets/replays/new_boost_format.replay",
+            "assets/replays/tourny.replay",
+            "assets/replays/dodges_refreshed_counter.replay",
+        ] {
+            let replay = parse_replay(path);
+            let reducer = ReducerCollector::new(SpeedFlipReducer::new())
+                .process_replay(&replay)
+                .expect("Expected reducer to process replay")
+                .into_inner();
+
+            eprintln!("speed_flip_events {path}: {}", reducer.events().len());
+            for event in reducer.events().iter().take(8) {
+                eprintln!(
+                    "  frame={} time={:.3} conf={:.3} start_speed={:.0} max_speed={:.0} align={:.3} diag={:.3} cancel={:.3}",
+                    event.frame,
+                    event.time,
+                    event.confidence,
+                    event.start_speed,
+                    event.max_speed,
+                    event.best_alignment,
+                    event.diagonal_score,
+                    event.cancel_score,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn debug_kickoff_dodge_edges_in_tourny_replay() {
+        let replay = parse_replay("assets/replays/tourny.replay");
+        let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
+        let mut previous_dodge_active: HashMap<PlayerId, bool> = HashMap::new();
+
+        processor
+            .process(&mut |processor: &ReplayProcessor,
+                           _frame: &boxcars::Frame,
+                           frame_number: usize,
+                           current_time: f32| {
+                let sample = StatsSample::from_processor(processor, frame_number, current_time, 0.0)
+                    .expect("Expected stats sample");
+                let kickoff_approach_active =
+                    SpeedFlipReducer::kickoff_approach_active(&sample);
+
+                for player in &sample.players {
+                    let was_dodge_active = previous_dodge_active
+                        .insert(player.player_id.clone(), player.dodge_active)
+                        .unwrap_or(false);
+                    if !player.dodge_active || was_dodge_active {
+                        continue;
+                    }
+
+                    let speed = player.speed().unwrap_or(0.0);
+                    let position = player.position().unwrap_or(glam::Vec3::ZERO);
+                    let alignment =
+                        SpeedFlipReducer::horizontal_alignment_to_target(
+                            player,
+                            SpeedFlipReducer::kickoff_alignment_target(&sample),
+                        );
+                    eprintln!(
+                        "dodge_start frame={} time={:.3} player={:?} kickoff={} live={} ball_hit={:?} countdown={:?} speed={:.0} pos=({:.0},{:.0},{:.0}) align={:?}",
+                        frame_number,
+                        current_time,
+                        player.player_id,
+                        kickoff_approach_active,
+                        sample.is_live_play(),
+                        sample.ball_has_been_hit,
+                        sample.kickoff_countdown_time,
+                        speed,
+                        position.x,
+                        position.y,
+                        position.z,
+                        alignment,
+                    );
+                }
+
+                Ok(TimeAdvance::NextFrame)
+            })
+            .expect("Expected replay processing");
+    }
+
+    #[test]
+    fn debug_speed_flip_candidate_scoring_in_tourny_replay() {
+        let replay = parse_replay("assets/replays/tourny.replay");
+        let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
+        let mut reducer = SpeedFlipReducer::new();
+        let mut printed = 0usize;
+
+        processor
+            .process(&mut |processor: &ReplayProcessor,
+                           _frame: &boxcars::Frame,
+                           frame_number: usize,
+                           current_time: f32| {
+                let sample = StatsSample::from_processor(processor, frame_number, current_time, 0.0)
+                    .expect("Expected stats sample");
+                let previous_candidates = reducer.active_candidates.clone();
+                let previous_event_count = reducer.events.len();
+                reducer.on_sample(&sample).expect("Expected reducer update");
+
+                for (player_id, candidate) in previous_candidates {
+                    if reducer.active_candidates.contains_key(&player_id) {
+                        continue;
+                    }
+                    if printed >= 24 {
+                        continue;
+                    }
+
+                    let event = SpeedFlipReducer::candidate_event(&player_id, candidate.clone());
+                    eprintln!(
+                        "candidate_finalized frame={} time={:.3} player={:?} emitted={} start_time={:.3} start_speed={:.0} max_speed={:.0} align={:.3} diag={:.3} best_local_ang=({:.3},{:.3},{:.3}) min_forward_z={:.3} latest_forward_z={:.3} cancel_recovery={:.3} post_ball_hit={:?}",
+                        frame_number,
+                        current_time,
+                        player_id,
+                        event.is_some(),
+                        candidate.start_time,
+                        candidate.start_speed,
+                        candidate.max_speed,
+                        candidate.best_alignment,
+                        candidate.best_diagonal_score,
+                        candidate.best_local_angular_velocity.x,
+                        candidate.best_local_angular_velocity.y,
+                        candidate.best_local_angular_velocity.z,
+                        candidate.min_forward_z,
+                        candidate.latest_forward_z,
+                        candidate.latest_forward_z - candidate.min_forward_z,
+                        sample.ball_has_been_hit,
+                    );
+                    if let Some(event) = event {
+                        eprintln!(
+                            "  event conf={:.3} cancel={:.3} speed={:.3} time_since_kickoff={:.3}",
+                            event.confidence,
+                            event.cancel_score,
+                            event.speed_score,
+                            event.time_since_kickoff_start,
+                        );
+                    }
+                    printed += 1;
+                }
+
+                if reducer.events.len() > previous_event_count && printed < 24 {
+                    let event = reducer.events.last().expect("Expected speed flip event");
+                    eprintln!(
+                        "emitted_event frame={} time={:.3} player={:?} conf={:.3}",
+                        event.frame,
+                        event.time,
+                        event.player,
+                        event.confidence,
+                    );
+                }
+
+                Ok(TimeAdvance::NextFrame)
+            })
+            .expect("Expected replay processing");
+    }
+
+    #[test]
+    fn debug_kickoff_basis_vectors_in_tourny_replay() {
+        let replay = parse_replay("assets/replays/tourny.replay");
+        let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
+        let mut previous_dodge_active: HashMap<PlayerId, bool> = HashMap::new();
+        let mut printed = 0usize;
+
+        processor
+            .process(&mut |processor: &ReplayProcessor,
+                           _frame: &boxcars::Frame,
+                           frame_number: usize,
+                           current_time: f32| {
+                let sample = StatsSample::from_processor(processor, frame_number, current_time, 0.0)
+                    .expect("Expected stats sample");
+                if !SpeedFlipReducer::kickoff_approach_active(&sample) {
+                    return Ok(TimeAdvance::NextFrame);
+                }
+
+                let target = SpeedFlipReducer::kickoff_alignment_target(&sample);
+                for player in &sample.players {
+                    let was_dodge_active = previous_dodge_active
+                        .insert(player.player_id.clone(), player.dodge_active)
+                        .unwrap_or(false);
+                    if !player.dodge_active || was_dodge_active || printed >= 12 {
+                        continue;
+                    }
+
+                    let Some(rigid_body) = player.rigid_body.as_ref() else {
+                        continue;
+                    };
+                    let Some(position) = player.position() else {
+                        continue;
+                    };
+                    let to_target = (target - position).truncate().normalize_or_zero();
+                    let rotation = quat_to_glam(&rigid_body.rotation);
+                    let basis_x = (rotation * glam::Vec3::X).normalize_or_zero();
+                    let basis_y = (rotation * glam::Vec3::Y).normalize_or_zero();
+                    let basis_z = (rotation * glam::Vec3::Z).normalize_or_zero();
+                    eprintln!(
+                        "basis frame={} time={:.3} player={:?} to_target=({:.3},{:.3}) x=({:.3},{:.3},{:.3}) dotx={:.3} y=({:.3},{:.3},{:.3}) doty={:.3} z=({:.3},{:.3},{:.3}) dotz={:.3}",
+                        frame_number,
+                        current_time,
+                        player.player_id,
+                        to_target.x,
+                        to_target.y,
+                        basis_x.x,
+                        basis_x.y,
+                        basis_x.z,
+                        basis_x.truncate().dot(to_target),
+                        basis_y.x,
+                        basis_y.y,
+                        basis_y.z,
+                        basis_y.truncate().dot(to_target),
+                        basis_z.x,
+                        basis_z.y,
+                        basis_z.z,
+                        basis_z.truncate().dot(to_target),
+                    );
+                    printed += 1;
+                }
+
+                Ok(TimeAdvance::NextFrame)
+            })
+            .expect("Expected replay processing");
     }
 }
