@@ -5,11 +5,13 @@ import {
   createRushModule,
 } from "./teamModules.ts";
 import {
+  createBackboardModule,
   createBallCarryModule,
   createBoostModule,
   createCoreModule,
   createDemoModule,
   createDodgeResetModule,
+  createDoubleTapModule,
   createMovementModule,
   createMustyFlickModule,
   createPowerslideModule,
@@ -38,6 +40,8 @@ export type {
 export function createStatModules(runtime: import("./types.ts").StatModuleRuntime) {
   return [
     createCoreModule(),
+    createBackboardModule(),
+    createDoubleTapModule(),
     createPossessionModule(runtime),
     createFiftyFiftyModule(),
     createPressureModule(),

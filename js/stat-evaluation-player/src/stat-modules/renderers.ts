@@ -204,9 +204,25 @@ export function renderCoreStats(core: PlayerStatsSnapshot["core"]): string {
     <div class="stat-row"><span class="label">Assists</span><span class="value">${formatInteger(core?.assists)}</span></div>
     <div class="stat-row"><span class="label">Saves</span><span class="value">${formatInteger(core?.saves)}</span></div>
     <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(core?.shots)}</span></div>
-    <div class="stat-row"><span class="label">Backboard hits</span><span class="value">${formatInteger(core?.attacking_backboard_hit_count)}</span></div>
-    <div class="stat-row"><span class="label">Double taps</span><span class="value">${formatInteger(core?.double_tap_count)}</span></div>
     <div class="stat-row"><span class="label">Shooting %</span><span class="value">${formatPercentage(asNumber(core?.shooting_percentage))}</span></div>
+  `;
+}
+
+export function renderBackboardStats(
+  backboard: PlayerStatsSnapshot["backboard"],
+): string {
+  return `
+    <div class="stat-row"><span class="label">Hits</span><span class="value">${formatInteger(backboard?.count)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(backboard?.time_since_last_backboard), 2, "s")}</span></div>
+  `;
+}
+
+export function renderDoubleTapStats(
+  doubleTap: PlayerStatsSnapshot["double_tap"],
+): string {
+  return `
+    <div class="stat-row"><span class="label">Count</span><span class="value">${formatInteger(doubleTap?.count)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(doubleTap?.time_since_last_double_tap), 2, "s")}</span></div>
   `;
 }
 

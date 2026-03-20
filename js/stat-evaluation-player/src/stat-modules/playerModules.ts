@@ -5,17 +5,25 @@ import type { TouchBreakdownClass } from "../touchFormatting.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import {
+  buildBackboardTimelineEvents,
+  buildBallCarryTimelineEvents,
+  buildDodgeResetTimelineEvents,
+  buildDoubleTapTimelineEvents,
   buildMustyFlickTimelineEvents,
+  buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
+  buildTouchTimelineEvents,
 } from "../timelineMarkers.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
+  renderBackboardStats,
   renderBallCarryStats,
   renderBoostStats,
   renderCoreStats,
   renderDemoStats,
   renderDodgeResetStats,
+  renderDoubleTapStats,
   renderMustyFlickStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
@@ -70,12 +78,27 @@ export function createCoreModule(): StatModule {
   });
 }
 
+export function createBackboardModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "backboard",
+    label: "Backboard",
+    select: (player) => player.backboard,
+    render: (backboard) => renderBackboardStats(backboard),
+    getTimelineEvents(ctx) {
+      return buildBackboardTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+  });
+}
+
 export function createBallCarryModule(): StatModule {
   return createPlayerStatsModule({
     id: "ball-carry",
     label: "Ball Carry",
     select: (player) => player.ball_carry,
     render: (ballCarry) => renderBallCarryStats(ballCarry),
+    getTimelineEvents(ctx) {
+      return buildBallCarryTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }
 
@@ -85,6 +108,21 @@ export function createDodgeResetModule(): StatModule {
     label: "Dodge Reset",
     select: (player) => player.dodge_reset,
     render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
+    getTimelineEvents(ctx) {
+      return buildDodgeResetTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+  });
+}
+
+export function createDoubleTapModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "double-tap",
+    label: "Double Tap",
+    select: (player) => player.double_tap,
+    render: (doubleTap) => renderDoubleTapStats(doubleTap),
+    getTimelineEvents(ctx) {
+      return buildDoubleTapTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }
 
@@ -216,6 +254,10 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
 
     onBeforeRender(info) {
       overlay?.update(info.currentTime);
+    },
+
+    getTimelineEvents(ctx) {
+      return buildTouchTimelineEvents(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
@@ -525,6 +567,9 @@ export function createPowerslideModule(): StatModule {
     label: "Powerslide",
     select: (player) => player.powerslide,
     render: (powerslide) => renderPowerslideStats(powerslide),
+    getTimelineEvents(ctx) {
+      return buildPowerslideTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }
 

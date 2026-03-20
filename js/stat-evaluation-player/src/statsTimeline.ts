@@ -10,10 +10,28 @@ export interface StatsTimeline {
   };
   replay_meta: unknown;
   timeline_events: unknown[];
+  backboard_events?: BackboardEvent[];
+  double_tap_events?: DoubleTapEvent[];
   fifty_fifty_events?: FiftyFiftyEvent[];
   rush_events?: RushEvent[];
   speed_flip_events?: SpeedFlipEvent[];
   frames: StatsFrame[];
+}
+
+export interface BackboardEvent {
+  time: number;
+  frame: number;
+  player: Record<string, string>;
+  is_team_0: boolean;
+}
+
+export interface DoubleTapEvent {
+  time: number;
+  frame: number;
+  player: Record<string, string>;
+  is_team_0: boolean;
+  backboard_time: number;
+  backboard_frame: number;
 }
 
 export interface SpeedFlipEvent {
@@ -145,9 +163,25 @@ export interface PlayerStatsSnapshot {
     assists: number;
     saves: number;
     shots: number;
-    attacking_backboard_hit_count?: number;
-    double_tap_count?: number;
     goals_conceded_while_last_defender: number;
+    [key: string]: unknown;
+  };
+  backboard?: {
+    count: number;
+    is_last_backboard: boolean;
+    last_backboard_time?: number;
+    last_backboard_frame?: number;
+    time_since_last_backboard?: number;
+    frames_since_last_backboard?: number;
+    [key: string]: unknown;
+  };
+  double_tap?: {
+    count: number;
+    is_last_double_tap: boolean;
+    last_double_tap_time?: number;
+    last_double_tap_frame?: number;
+    time_since_last_double_tap?: number;
+    frames_since_last_double_tap?: number;
     [key: string]: unknown;
   };
   fifty_fifty?: {

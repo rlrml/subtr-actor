@@ -1,8 +1,10 @@
+import type { ReplayTimelineEvent } from "subtr-actor-player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot } from "../statsTimeline.ts";
 import {
   getStatsPlayerSnapshot,
   renderPlayerCard,
+  type StatModuleContext,
   type StatModule,
 } from "./types.ts";
 
@@ -11,6 +13,7 @@ export function createPlayerStatsModule<T>(options: {
   label: string;
   select: (player: PlayerStatsSnapshot) => T | undefined;
   render: (stats: T | undefined, player: PlayerStatsSnapshot) => string;
+  getTimelineEvents?: (ctx: StatModuleContext) => ReplayTimelineEvent[];
 }): StatModule {
   return {
     id: options.id,
@@ -21,6 +24,8 @@ export function createPlayerStatsModule<T>(options: {
     teardown() {},
 
     onBeforeRender() {},
+
+    getTimelineEvents: options.getTimelineEvents,
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
