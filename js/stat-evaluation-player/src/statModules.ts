@@ -733,24 +733,15 @@ function createPossessionModule(runtime: StatModuleRuntime): StatModule {
       );
       if (!statsFrame?.possession) return "";
 
-      return [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderPossessionStats(statsFrame.possession, {
-            isTeamZero: true,
-            breakdownClasses: getActiveBreakdownClasses(),
-          }),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderPossessionStats(statsFrame.possession, {
-            isTeamZero: false,
-            breakdownClasses: getActiveBreakdownClasses(),
-          }),
-        ),
-      ].join("");
+      return renderSharedCard(
+        "Control State",
+        renderPossessionStats(statsFrame.possession, {
+          labelPerspective: {
+            kind: "shared",
+          },
+          breakdownClasses: getActiveBreakdownClasses(),
+        }),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -762,7 +753,10 @@ function createPossessionModule(runtime: StatModuleRuntime): StatModule {
       if (!statsFrame?.possession || !player) return "";
 
       return renderPossessionStats(statsFrame.possession, {
-        isTeamZero: player.is_team_0,
+        labelPerspective: {
+          kind: "team",
+          isTeamZero: player.is_team_0,
+        },
         breakdownClasses: getActiveBreakdownClasses(),
       });
     },
@@ -885,18 +879,12 @@ function createFiftyFiftyModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      const summary = [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderFiftyFiftySummary(statsFrame.fifty_fifty, true),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderFiftyFiftySummary(statsFrame.fifty_fifty, false),
-        ),
-      ].join("");
+      const summary = renderSharedCard(
+        "Challenge Summary",
+        renderFiftyFiftySummary(statsFrame.fifty_fifty, {
+          kind: "shared",
+        }),
+      );
 
       const players = statsFrame.players.map((player) => renderPlayerCard(
         player.name,

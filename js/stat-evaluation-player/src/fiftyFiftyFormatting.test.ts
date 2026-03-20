@@ -22,12 +22,42 @@ test("renderFiftyFiftySummary renders team-perspective win and possession counts
     kickoff_team_zero_possession_after_count: 2,
     kickoff_team_one_possession_after_count: 1,
     kickoff_neutral_possession_after_count: 0,
-  }, true);
+  }, {
+    kind: "team",
+    isTeamZero: true,
+  });
 
   assert.match(html, /50s<\/span><span class="value">6<\/span>/);
   assert.match(html, /Wins<\/span><span class="value">4 \(66\.7%\)<\/span>/);
   assert.match(html, /Poss after<\/span><span class="value">5<\/span>/);
   assert.match(html, /Kickoff wins<\/span><span class="value">2<\/span>/);
+});
+
+test("renderFiftyFiftySummary can render a shared challenge summary", () => {
+  const html = renderFiftyFiftySummary({
+    count: 6,
+    team_zero_wins: 4,
+    team_one_wins: 1,
+    neutral_outcomes: 1,
+    kickoff_count: 3,
+    kickoff_team_zero_wins: 2,
+    kickoff_team_one_wins: 1,
+    kickoff_neutral_outcomes: 0,
+    team_zero_possession_after_count: 5,
+    team_one_possession_after_count: 1,
+    neutral_possession_after_count: 0,
+    kickoff_team_zero_possession_after_count: 2,
+    kickoff_team_one_possession_after_count: 1,
+    kickoff_neutral_possession_after_count: 0,
+  }, {
+    kind: "shared",
+  });
+
+  assert.match(html, /Blue wins<\/span><span class="value">4 \(66\.7%\)<\/span>/);
+  assert.match(html, /Orange wins<\/span><span class="value">1 \(16\.7%\)<\/span>/);
+  assert.match(html, /Blue poss after<\/span><span class="value">5<\/span>/);
+  assert.match(html, /Orange kickoff poss<\/span><span class="value">1<\/span>/);
+  assert.doesNotMatch(html, /Losses<\/span>/);
 });
 
 test("renderPlayerFiftyFiftyStats renders player totals and kickoff split", () => {

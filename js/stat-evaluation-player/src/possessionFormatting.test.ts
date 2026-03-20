@@ -12,7 +12,10 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
       neutral_time: 3,
     },
     {
-      isTeamZero: true,
+      labelPerspective: {
+        kind: "team",
+        isTeamZero: true,
+      },
       breakdownClasses: ["possession_state"],
       exportedStats: [
         {
@@ -52,6 +55,29 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
   assert.match(html, /Neutral<\/span><span class="value">3\.0s \(30\.0%\)/);
 });
 
+test("renderPossessionStats can render a shared control breakdown", () => {
+  const html = renderPossessionStats(
+    {
+      tracked_time: 10,
+      team_zero_time: 4,
+      team_one_time: 3,
+      neutral_time: 3,
+    },
+    {
+      labelPerspective: {
+        kind: "shared",
+      },
+      breakdownClasses: ["possession_state"],
+    },
+  );
+
+  assert.match(html, /Blue control<\/span><span class="value">4\.0s \(40\.0%\)/);
+  assert.match(html, /Neutral<\/span><span class="value">3\.0s \(30\.0%\)/);
+  assert.match(html, /Orange control<\/span><span class="value">3\.0s \(30\.0%\)/);
+  assert.doesNotMatch(html, /Team control<\/span>/);
+  assert.doesNotMatch(html, /Opp control<\/span>/);
+});
+
 test("renderPossessionStats omits breakdown rows when no classes are selected", () => {
   const html = renderPossessionStats(
     {
@@ -61,7 +87,10 @@ test("renderPossessionStats omits breakdown rows when no classes are selected", 
       neutral_time: 2,
     },
     {
-      isTeamZero: false,
+      labelPerspective: {
+        kind: "team",
+        isTeamZero: false,
+      },
     },
   );
 

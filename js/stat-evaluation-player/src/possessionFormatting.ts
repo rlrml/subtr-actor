@@ -13,7 +13,14 @@ export type PossessionBreakdownClass = "possession_state";
 interface PossessionRenderOptions {
   breakdownClasses?: PossessionBreakdownClass[];
   exportedStats?: ExportedStat[];
-  isTeamZero: boolean;
+  labelPerspective:
+    | {
+      kind: "shared";
+    }
+    | {
+      kind: "team";
+      isTeamZero: boolean;
+    };
 }
 
 function formatNumber(
@@ -92,13 +99,32 @@ function normalizeBreakdownClasses(
   return result;
 }
 
-function formatPossessionStateLabel(value: string, isTeamZero: boolean): string {
+function formatPossessionStateLabel(
+  value: string,
+  labelPerspective: PossessionRenderOptions["labelPerspective"],
+): string {
   if (value === "neutral") {
     return "Neutral";
   }
 
-  const isOwnTeam = (value === "team_zero") === isTeamZero;
+  if (labelPerspective.kind === "shared") {
+    return value === "team_zero" ? "Blue control" : "Orange control";
+  }
+
+  const isOwnTeam = (value === "team_zero") === labelPerspective.isTeamZero;
   return isOwnTeam ? "Team control" : "Opp control";
+}
+
+function getOrderedPossessionStates(
+  labelPerspective: PossessionRenderOptions["labelPerspective"],
+): string[] {
+  if (labelPerspective.kind === "shared") {
+    return ["team_zero", "neutral", "team_one"];
+  }
+
+  return labelPerspective.isTeamZero
+    ? ["team_zero", "neutral", "team_one"]
+    : ["team_one", "neutral", "team_zero"];
 }
 
 function renderPossessionBreakdownRows(
@@ -106,17 +132,21 @@ function renderPossessionBreakdownRows(
   exportedStats: ExportedStat[] | undefined,
   breakdownClasses: PossessionBreakdownClass[],
   trackedTime: number | undefined,
-  isTeamZero: boolean,
+  labelPerspective: PossessionRenderOptions["labelPerspective"],
 ): string {
   if (breakdownClasses.length === 0 || !breakdownClasses.includes("possession_state")) {
     return "";
   }
-  if (!possession?.labeled_time?.entries?.length && (!exportedStats || exportedStats.length === 0)) {
-    return "";
-  }
 
   const totals = new Map<string, number>();
+  if (possession) {
+    totals.set("team_zero", possession.team_zero_time);
+    totals.set("neutral", possession.neutral_time ?? 0);
+    totals.set("team_one", possession.team_one_time);
+  }
+
   if (possession?.labeled_time?.entries?.length) {
+    totals.clear();
     for (const entry of possession.labeled_time.entries) {
       const state = entry.labels.find((label) => label.key === "possession_state")?.value;
       if (!state) {
@@ -125,7 +155,8 @@ function renderPossessionBreakdownRows(
 
       totals.set(state, (totals.get(state) ?? 0) + entry.value);
     }
-  } else {
+  } else if (exportedStats?.length) {
+    totals.clear();
     for (const stat of exportedStats ?? []) {
       const domain = getExportedStatDomain(stat);
       const name = getExportedStatName(stat);
@@ -151,10 +182,14 @@ function renderPossessionBreakdownRows(
     }
   }
 
-  return ["team_zero", "team_one", "neutral"]
+  if (!getOrderedPossessionStates(labelPerspective).some((state) => (totals.get(state) ?? 0) > 0)) {
+    return "";
+  }
+
+  return getOrderedPossessionStates(labelPerspective)
     .filter((state) => totals.has(state))
     .map((state) => renderStatRow(
-      formatPossessionStateLabel(state, isTeamZero),
+      formatPossessionStateLabel(state, labelPerspective),
       formatTimeShare(totals.get(state), trackedTime),
     ))
     .join("");
@@ -171,7 +206,7 @@ export function renderPossessionStats(
     options.exportedStats,
     breakdownClasses,
     trackedTime,
-    options.isTeamZero,
+    options.labelPerspective,
   );
 
   return `
