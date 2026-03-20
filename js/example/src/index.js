@@ -75,6 +75,12 @@ app.innerHTML = `
               <option value="">Free camera</option>
             </select>
           </div>
+          <div class="camera-presets" role="group" aria-label="Camera views">
+            <button id="camera-view-free" type="button" disabled>Free</button>
+            <button id="camera-view-follow" type="button" disabled>Follow</button>
+            <button id="camera-view-overhead" type="button" disabled>Overhead</button>
+            <button id="camera-view-side" type="button" disabled>Diagonal</button>
+          </div>
           <label>
             <span class="label">Follow Distance</span>
             <input
@@ -162,6 +168,10 @@ const playbackRate = mustElement("#playback-rate");
 const cameraDistance = mustElement("#camera-distance");
 const cameraDistanceReadout = mustElement("#camera-distance-readout");
 const attachedPlayer = mustElement("#attached-player");
+const cameraViewFreeButton = mustElement("#camera-view-free");
+const cameraViewFollowButton = mustElement("#camera-view-follow");
+const cameraViewOverheadButton = mustElement("#camera-view-overhead");
+const cameraViewSideButton = mustElement("#camera-view-side");
 const ballCam = mustElement("#ball-cam");
 const statusReadout = mustElement("#status-readout");
 const teamsReadout = mustElement("#teams-readout");
@@ -189,8 +199,43 @@ function setControlsEnabled(enabled) {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
   attachedPlayer.disabled = !enabled;
-  cameraDistance.disabled = !enabled;
-  ballCam.disabled = !enabled;
+  syncCameraModeButtons(enabled ? replayPlayer?.getSnapshot() : undefined);
+}
+
+function getCameraViewButton(mode) {
+  switch (mode) {
+    case "free":
+      return cameraViewFreeButton;
+    case "follow":
+      return cameraViewFollowButton;
+    case "overhead":
+      return cameraViewOverheadButton;
+    case "side":
+      return cameraViewSideButton;
+    default:
+      throw new Error(`Unknown camera mode: ${mode}`);
+  }
+}
+
+function syncCameraModeButtons(snapshot) {
+  const activeMode = snapshot?.cameraViewMode ?? "free";
+  const hasReplay = replayPlayer !== null && snapshot !== undefined;
+  const canFollow = (snapshot?.attachedPlayerId ?? null) !== null;
+
+  for (const mode of ["free", "follow"]) {
+    const button = getCameraViewButton(mode);
+    button.disabled = !hasReplay || (mode === "follow" && !canFollow);
+    const active = mode === activeMode;
+    button.dataset.active = active ? "true" : "false";
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+
+  cameraViewOverheadButton.disabled = !hasReplay;
+  cameraViewSideButton.disabled = !hasReplay;
+  cameraViewOverheadButton.dataset.active = "false";
+  cameraViewSideButton.dataset.active = "false";
+  cameraViewOverheadButton.setAttribute("aria-pressed", "false");
+  cameraViewSideButton.setAttribute("aria-pressed", "false");
 }
 
 function formatClock(secondsRemaining) {
@@ -250,8 +295,12 @@ function renderSnapshot(snapshot) {
   cameraDistanceReadout.textContent = `${snapshot.cameraDistanceScale.toFixed(2)}x`;
   ballCam.checked = snapshot.ballCamEnabled;
   attachedPlayer.value = snapshot.attachedPlayerId ?? "";
-  cameraDistance.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
-  ballCam.disabled = replayPlayer === null || snapshot.attachedPlayerId === null;
+  syncCameraModeButtons(snapshot);
+  const hasAttachedCamera = replayPlayer === null
+    ? false
+    : snapshot.cameraViewMode === "follow" && snapshot.attachedPlayerId !== null;
+  cameraDistance.disabled = !hasAttachedCamera;
+  ballCam.disabled = !hasAttachedCamera;
   skipPostGoalTransitions.checked = snapshot.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = snapshot.skipKickoffsEnabled;
 
@@ -395,6 +444,22 @@ attachedPlayer.addEventListener("change", () => {
   replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
 });
 
+cameraViewFreeButton.addEventListener("click", () => {
+  replayPlayer?.setCameraViewMode("free");
+});
+
+cameraViewFollowButton.addEventListener("click", () => {
+  replayPlayer?.setCameraViewMode("follow");
+});
+
+cameraViewOverheadButton.addEventListener("click", () => {
+  replayPlayer?.setFreeCameraPreset("overhead");
+});
+
+cameraViewSideButton.addEventListener("click", () => {
+  replayPlayer?.setFreeCameraPreset("side");
+});
+
 ballCam.addEventListener("change", () => {
   replayPlayer?.setBallCamEnabled(ballCam.checked);
 });
@@ -410,3 +475,5 @@ skipPostGoalTransitions.addEventListener("change", () => {
 skipKickoffs.addEventListener("change", () => {
   replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
 });
+
+syncCameraModeButtons();

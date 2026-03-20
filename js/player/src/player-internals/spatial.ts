@@ -1,9 +1,15 @@
 import * as THREE from "three";
 import type { ReplayScene } from "../scene";
-import type { ReplayModel, Vec3 } from "../types";
+import type {
+  ReplayCameraViewMode,
+  ReplayFreeCameraPreset,
+  ReplayModel,
+  Vec3,
+} from "../types";
 
 const CHASE_CAMERA_HEIGHT_MULTIPLIER = 1.4;
 const CAMERA_SMOOTHING = 0.18;
+const FREE_CAMERA_TRANSITION_SMOOTHING = 0.14;
 const GROUND_HEIGHT_THRESHOLD_UU = 120;
 const MIN_CAMERA_HEIGHT_UU = 90;
 const PLAYER_FOCUS_HEIGHT_UU = 40;
@@ -13,6 +19,16 @@ const BALL_CAM_DIRECTION_BLEND = 0.82;
 const BALL_CAM_MAX_FOV = 132;
 const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
 const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
+const OVERHEAD_UP = new THREE.Vector3(-1, 0, 0);
+const OVERHEAD_CAMERA_POSITION_UU = new THREE.Vector3(0, 0, 18800);
+const OVERHEAD_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 700);
+const SIDE_CAMERA_POSITION_UU = new THREE.Vector3(-9600, -12600, 6400);
+const SIDE_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 900);
+const FREE_CAMERA_FOV = 48;
+const CAMERA_POSITION_EPSILON_SQ = 16;
+const CAMERA_TARGET_EPSILON_SQ = 16;
+const CAMERA_UP_EPSILON_RAD = 0.003;
+const CAMERA_FOV_EPSILON = 0.05;
 
 export function interpolatePosition(
   current: Vec3 | null,
@@ -48,6 +64,75 @@ export function worldPosition(position: Vec3, fieldScale: number): THREE.Vector3
 
 function worldDirection(direction: Vec3): THREE.Vector3 {
   return new THREE.Vector3(-direction.x, direction.y, direction.z).normalize();
+}
+
+export function getFreeCameraPreset(
+  preset: ReplayFreeCameraPreset,
+  fieldScale: number,
+): {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+  fov: number;
+} {
+  switch (preset) {
+    case "overhead":
+      return {
+        position: OVERHEAD_CAMERA_POSITION_UU.clone().multiplyScalar(fieldScale),
+        target: OVERHEAD_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale),
+        up: OVERHEAD_UP.clone(),
+        fov: FREE_CAMERA_FOV,
+      };
+    case "side":
+      return {
+        position: SIDE_CAMERA_POSITION_UU.clone().multiplyScalar(fieldScale),
+        target: SIDE_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale),
+        up: DEFAULT_UP.clone(),
+        fov: FREE_CAMERA_FOV,
+      };
+  }
+}
+
+export function updateFreeCameraTransition(options: {
+  sceneState: ReplayScene;
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+  fov: number;
+}): boolean {
+  const { fov, position, sceneState, target, up } = options;
+  const { camera, controls } = sceneState;
+
+  controls.enabled = false;
+  camera.position.lerp(position, FREE_CAMERA_TRANSITION_SMOOTHING);
+  controls.target.lerp(target, FREE_CAMERA_TRANSITION_SMOOTHING);
+  camera.up.lerp(up, FREE_CAMERA_TRANSITION_SMOOTHING).normalize();
+  camera.fov = THREE.MathUtils.lerp(
+    camera.fov,
+    fov,
+    FREE_CAMERA_TRANSITION_SMOOTHING,
+  );
+  camera.updateProjectionMatrix();
+  camera.lookAt(controls.target);
+
+  const reachedPosition =
+    camera.position.distanceToSquared(position) <= CAMERA_POSITION_EPSILON_SQ;
+  const reachedTarget =
+    controls.target.distanceToSquared(target) <= CAMERA_TARGET_EPSILON_SQ;
+  const reachedUp = camera.up.angleTo(up) <= CAMERA_UP_EPSILON_RAD;
+  const reachedFov = Math.abs(camera.fov - fov) <= CAMERA_FOV_EPSILON;
+  if (!reachedPosition || !reachedTarget || !reachedUp || !reachedFov) {
+    return false;
+  }
+
+  camera.position.copy(position);
+  controls.target.copy(target);
+  camera.up.copy(up).normalize();
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+  camera.lookAt(target);
+  controls.enabled = true;
+  return true;
 }
 
 function getOrientationVectors(
@@ -101,6 +186,7 @@ export function updateAttachedCamera(options: {
   sceneState: ReplayScene;
   replay: ReplayModel;
   fieldScale: number;
+  cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   cameraDistanceScale: number;
@@ -110,6 +196,7 @@ export function updateAttachedCamera(options: {
   desiredLookTarget: THREE.Vector3;
 }): void {
   const {
+    cameraViewMode,
     attachedPlayerId,
     ballCamEnabled,
     ballPosition,
@@ -123,9 +210,24 @@ export function updateAttachedCamera(options: {
   } = options;
   const controls = sceneState.controls;
 
+  if (cameraViewMode === "free") {
+    controls.enabled = true;
+    sceneState.camera.fov = THREE.MathUtils.lerp(
+      sceneState.camera.fov,
+      FREE_CAMERA_FOV,
+      CAMERA_SMOOTHING,
+    );
+    sceneState.camera.updateProjectionMatrix();
+    return;
+  }
+
   if (!attachedPlayerId) {
     controls.enabled = true;
-    sceneState.camera.fov = 48;
+    sceneState.camera.fov = THREE.MathUtils.lerp(
+      sceneState.camera.fov,
+      FREE_CAMERA_FOV,
+      CAMERA_SMOOTHING,
+    );
     sceneState.camera.updateProjectionMatrix();
     return;
   }

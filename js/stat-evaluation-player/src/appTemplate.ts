@@ -53,6 +53,14 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <option value="">Free camera</option>
             </select>
           </label>
+          <div class="camera-presets" role="group" aria-label="Camera views">
+            <button id="camera-view-free" type="button" disabled>Free</button>
+            <button id="camera-view-follow" type="button" disabled>Follow</button>
+            <button id="camera-view-overhead" type="button" disabled>
+              Overhead
+            </button>
+            <button id="camera-view-side" type="button" disabled>Diagonal</button>
+          </div>
           <label>
             <span class="label">Follow distance</span>
             <input

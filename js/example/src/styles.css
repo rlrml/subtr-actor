@@ -366,6 +366,31 @@ input {
   margin-bottom: 1rem;
 }
 
+.camera-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.camera-presets button {
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.68rem 0.8rem;
+  background: #173044;
+  color: #eff5f8;
+}
+
+.camera-presets button[data-active="true"] {
+  background:
+    linear-gradient(180deg, rgba(41, 86, 128, 0.96), rgba(15, 42, 65, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(142, 197, 255, 0.18);
+}
+
+.camera-presets button:disabled {
+  opacity: 0.5;
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;

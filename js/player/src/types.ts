@@ -151,6 +151,14 @@ export interface CameraSettings {
   transitionSpeed?: number;
 }
 
+export type ReplayCameraViewMode =
+  | "free"
+  | "follow";
+
+export type ReplayFreeCameraPreset =
+  | "overhead"
+  | "side";
+
 export interface PlaybackFrame {
   time: number;
   secondsRemaining: number;
@@ -448,6 +456,7 @@ export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
   initialCameraDistanceScale?: number;
+  initialCameraViewMode?: ReplayCameraViewMode;
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
   initialBoostMeterEnabled?: boolean;
@@ -474,6 +483,7 @@ export interface ReplayPlayerState {
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
+  cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   boostMeterEnabled: boolean;
@@ -497,6 +507,7 @@ export interface ReplayPlaylistPlayerState {
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
+  cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
@@ -513,6 +524,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "playing"
     | "speed"
     | "cameraDistanceScale"
+    | "cameraViewMode"
     | "attachedPlayerId"
     | "ballCamEnabled"
     | "boostMeterEnabled"

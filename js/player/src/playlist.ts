@@ -5,6 +5,8 @@ import type {
   LoadedReplay,
   PlaybackBound,
   PlaylistItem,
+  ReplayCameraViewMode,
+  ReplayFreeCameraPreset,
   ReplayPreloadContext,
   ReplayPreloadPolicy,
   RawReplayFramesData,
@@ -31,6 +33,7 @@ type ReplayPathLoader = (path: string) => Promise<LoadedReplay>;
 type PlayerPreferences = {
   speed: number;
   cameraDistanceScale: number;
+  cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
@@ -97,6 +100,8 @@ function createInitialPreferences(
       0.25,
       options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
     ),
+    cameraViewMode: options.initialCameraViewMode ??
+      (options.initialAttachedPlayerId ? "follow" : "free"),
     attachedPlayerId: options.initialAttachedPlayerId ?? null,
     ballCamEnabled: options.initialBallCamEnabled ?? false,
     skipPostGoalTransitionsEnabled:
@@ -446,8 +451,21 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setCameraViewMode(mode: ReplayCameraViewMode): void {
+    this.preferences.cameraViewMode = mode;
+    this.player?.setCameraViewMode(mode);
+    this.emitChange();
+  }
+
+  setFreeCameraPreset(preset: ReplayFreeCameraPreset): void {
+    this.preferences.cameraViewMode = "free";
+    this.player?.setFreeCameraPreset(preset);
+    this.emitChange();
+  }
+
   setAttachedPlayer(playerId: string | null): void {
     this.preferences.attachedPlayerId = playerId;
+    this.preferences.cameraViewMode = playerId ? "follow" : "free";
     this.player?.setAttachedPlayer(playerId);
     this.emitChange();
   }
@@ -497,6 +515,8 @@ export class ReplayPlaylistPlayer extends EventTarget {
       speed: playerState?.speed ?? this.preferences.speed,
       cameraDistanceScale:
         playerState?.cameraDistanceScale ?? this.preferences.cameraDistanceScale,
+      cameraViewMode:
+        playerState?.cameraViewMode ?? this.preferences.cameraViewMode,
       attachedPlayerId:
         playerState?.attachedPlayerId ?? this.preferences.attachedPlayerId,
       ballCamEnabled:
@@ -626,11 +646,15 @@ export class ReplayPlaylistPlayer extends EventTarget {
       ? this.preferences.attachedPlayerId
       : null;
     this.preferences.attachedPlayerId = attachedPlayerId;
+    if (attachedPlayerId === null && this.preferences.cameraViewMode === "follow") {
+      this.preferences.cameraViewMode = "free";
+    }
 
     this.player = new ReplayPlayer(this.container, replay, {
       fieldScale: this.options.fieldScale,
       initialPlaybackRate: this.preferences.speed,
       initialCameraDistanceScale: this.preferences.cameraDistanceScale,
+      initialCameraViewMode: this.preferences.cameraViewMode,
       initialAttachedPlayerId: attachedPlayerId,
       initialBallCamEnabled: this.preferences.ballCamEnabled,
       initialSkipPostGoalTransitionsEnabled:

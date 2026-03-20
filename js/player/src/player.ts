@@ -15,14 +15,18 @@ import {
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
 import {
+  getFreeCameraPreset,
   interpolatePosition,
   rootPosition,
+  updateFreeCameraTransition,
   updateAttachedCamera,
   worldPosition,
 } from "./player-internals/spatial";
 import type {
   BeforeRenderCallback,
   FrameRenderInfo,
+  ReplayCameraViewMode,
+  ReplayFreeCameraPreset,
   ReplayPlayerActiveMetadata,
   ReplayModel,
   ReplayPlayerPlugin,
@@ -42,11 +46,18 @@ import type {
 
 const DEFAULT_FIELD_SCALE = 1;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
+const DEFAULT_CAMERA_VIEW_MODE: ReplayCameraViewMode = "free";
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
   definition: ReplayPlayerPluginDefinition;
   plugin: ReplayPlayerPlugin;
+};
+type FreeCameraTransition = {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+  fov: number;
 };
 
 export class ReplayPlayer extends EventTarget {
@@ -75,6 +86,8 @@ export class ReplayPlayer extends EventTarget {
   private playbackStartedAt = 0;
   private playbackStartedTime = 0;
   private cameraDistanceScale: number;
+  private cameraViewMode: ReplayCameraViewMode;
+  private freeCameraTransition: FreeCameraTransition | null = null;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
   private boostMeterEnabled: boolean;
@@ -100,6 +113,8 @@ export class ReplayPlayer extends EventTarget {
       options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
     );
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
+    this.cameraViewMode = options.initialCameraViewMode ??
+      (this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE);
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
     this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
     this.skipPostGoalTransitionsEnabled =
@@ -168,6 +183,31 @@ export class ReplayPlayer extends EventTarget {
 
   setAttachedPlayer(playerId: string | null): void {
     this.attachedPlayerId = playerId;
+    this.cameraViewMode = playerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE;
+    this.freeCameraTransition = null;
+    this.render();
+    this.emitChange();
+  }
+
+  setCameraViewMode(mode: ReplayCameraViewMode): void {
+    this.cameraViewMode = mode;
+    this.freeCameraTransition = null;
+    this.render();
+    this.emitChange();
+  }
+
+  setFreeCameraPreset(preset: ReplayFreeCameraPreset): void {
+    const { fov, position, target, up } = getFreeCameraPreset(
+      preset,
+      this.fieldScale,
+    );
+    this.cameraViewMode = DEFAULT_CAMERA_VIEW_MODE;
+    this.freeCameraTransition = {
+      position,
+      target,
+      up,
+      fov,
+    };
     this.render();
     this.emitChange();
   }
@@ -261,8 +301,16 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.cameraDistanceScale !== undefined) {
       this.cameraDistanceScale = Math.max(0.25, nextState.cameraDistanceScale);
     }
+    if (nextState.cameraViewMode !== undefined) {
+      this.cameraViewMode = nextState.cameraViewMode;
+    }
     if (nextState.attachedPlayerId !== undefined) {
       this.attachedPlayerId = nextState.attachedPlayerId;
+      if (nextState.cameraViewMode === undefined) {
+        this.cameraViewMode = this.attachedPlayerId
+          ? "follow"
+          : DEFAULT_CAMERA_VIEW_MODE;
+      }
     }
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
@@ -319,6 +367,7 @@ export class ReplayPlayer extends EventTarget {
       playing: this.playing,
       speed: this.speed,
       cameraDistanceScale: this.cameraDistanceScale,
+      cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
       boostMeterEnabled: this.boostMeterEnabled,
@@ -661,6 +710,7 @@ export class ReplayPlayer extends EventTarget {
       sceneState: this.sceneState,
       replay: this.replay,
       fieldScale: this.fieldScale,
+      cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
       cameraDistanceScale: this.cameraDistanceScale,
@@ -669,6 +719,15 @@ export class ReplayPlayer extends EventTarget {
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
     });
+    if (this.cameraViewMode === "free" && this.freeCameraTransition) {
+      const completed = updateFreeCameraTransition({
+        sceneState: this.sceneState,
+        ...this.freeCameraTransition,
+      });
+      if (completed) {
+        this.freeCameraTransition = null;
+      }
+    }
     this.sceneState.controls.update();
     this.sceneState.updateWallVisibility();
     const renderInfo: FrameRenderInfo = {

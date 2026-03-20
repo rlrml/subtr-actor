@@ -6,6 +6,7 @@ import {
   ReplayPlayer,
 } from "subtr-actor-player";
 import type {
+  ReplayCameraViewMode,
   ReplayPlayerState,
   ReplayPlayerTrack,
   TimelineOverlayPlugin,
@@ -34,6 +35,10 @@ import {
 } from "./replayLoader.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
+const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
+  "free",
+  "follow",
+];
 
 let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
@@ -73,6 +78,10 @@ let togglePlayback!: HTMLButtonElement;
 let followedPlayerOverlay!: HTMLDivElement;
 let playbackRate!: HTMLSelectElement;
 let attachedPlayer!: HTMLSelectElement;
+let cameraViewFreeButton!: HTMLButtonElement;
+let cameraViewFollowButton!: HTMLButtonElement;
+let cameraViewOverheadButton!: HTMLButtonElement;
+let cameraViewSideButton!: HTMLButtonElement;
 let cameraDistance!: HTMLInputElement;
 let cameraDistanceReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
@@ -314,11 +323,46 @@ function setTransportEnabled(enabled: boolean): void {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
   attachedPlayer.disabled = !enabled;
+  syncCameraModeButtons(enabled ? replayPlayer?.getState() : undefined);
+}
+
+function getCameraViewButton(
+  mode: ReplayCameraViewMode,
+): HTMLButtonElement {
+  switch (mode) {
+    case "free":
+      return cameraViewFreeButton;
+    case "follow":
+      return cameraViewFollowButton;
+  }
+}
+
+function syncCameraModeButtons(state?: ReplayPlayerState): void {
+  const activeMode = state?.cameraViewMode ?? "free";
+  const hasReplay = replayPlayer !== null && state !== undefined;
+  const canFollow = (state?.attachedPlayerId ?? null) !== null;
+
+  for (const mode of CAMERA_VIEW_MODES) {
+    const button = getCameraViewButton(mode);
+    button.disabled = !hasReplay || (mode === "follow" && !canFollow);
+    const isActive = mode === activeMode;
+    button.dataset.active = isActive ? "true" : "false";
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
+
+  cameraViewOverheadButton.disabled = !hasReplay;
+  cameraViewSideButton.disabled = !hasReplay;
+  cameraViewOverheadButton.dataset.active = "false";
+  cameraViewSideButton.dataset.active = "false";
+  cameraViewOverheadButton.setAttribute("aria-pressed", "false");
+  cameraViewSideButton.setAttribute("aria-pressed", "false");
 }
 
 function syncCameraControlAvailability(state?: ReplayPlayerState): void {
-  const attached = state?.attachedPlayerId ?? null;
-  const hasAttachedCamera = replayPlayer !== null && attached !== null;
+  syncCameraModeButtons(state);
+  const hasAttachedCamera = replayPlayer !== null &&
+    state?.cameraViewMode === "follow" &&
+    (state.attachedPlayerId ?? null) !== null;
   cameraDistance.disabled = !hasAttachedCamera;
   ballCam.disabled = !hasAttachedCamera;
 }
@@ -502,7 +546,9 @@ function renderSnapshot(state: ReplayPlayerState): void {
   emptyState.hidden = true;
 
   syncCameraControlAvailability(state);
-  renderCameraProfile(state.attachedPlayerId);
+  renderCameraProfile(
+    state.cameraViewMode === "follow" ? state.attachedPlayerId : null,
+  );
   renderStats(state.frameIndex);
   renderFocusedPlayerOverlay(state);
 }
@@ -605,6 +651,19 @@ export function mountStatEvaluationPlayer(
   );
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
+  cameraViewFreeButton = mustElement<HTMLButtonElement>(
+    root,
+    "#camera-view-free",
+  );
+  cameraViewFollowButton = mustElement<HTMLButtonElement>(
+    root,
+    "#camera-view-follow",
+  );
+  cameraViewOverheadButton = mustElement<HTMLButtonElement>(
+    root,
+    "#camera-view-overhead",
+  );
+  cameraViewSideButton = mustElement<HTMLButtonElement>(root, "#camera-view-side");
   cameraDistance = mustElement<HTMLInputElement>(root, "#camera-distance");
   cameraDistanceReadout = mustElement<HTMLElement>(
     root,
@@ -708,6 +767,22 @@ export function mountStatEvaluationPlayer(
     replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
   }, { signal: listeners.signal });
 
+  cameraViewFreeButton.addEventListener("click", () => {
+    replayPlayer?.setCameraViewMode("free");
+  }, { signal: listeners.signal });
+
+  cameraViewFollowButton.addEventListener("click", () => {
+    replayPlayer?.setCameraViewMode("follow");
+  }, { signal: listeners.signal });
+
+  cameraViewOverheadButton.addEventListener("click", () => {
+    replayPlayer?.setFreeCameraPreset("overhead");
+  }, { signal: listeners.signal });
+
+  cameraViewSideButton.addEventListener("click", () => {
+    replayPlayer?.setFreeCameraPreset("side");
+  }, { signal: listeners.signal });
+
   ballCam.addEventListener("change", () => {
     replayPlayer?.setBallCamEnabled(ballCam.checked);
   }, { signal: listeners.signal });
@@ -729,6 +804,7 @@ export function mountStatEvaluationPlayer(
   renderModuleSummary();
   renderModuleSettings();
   renderCameraProfile(null);
+  syncCameraModeButtons();
   renderTimelineEventCount();
 
   return {

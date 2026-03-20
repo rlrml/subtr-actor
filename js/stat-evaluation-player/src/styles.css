@@ -525,6 +525,25 @@ input {
   flex: 1 1 auto;
 }
 
+.camera-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.camera-presets button {
+  padding: 0.62rem 0.75rem;
+  font-size: 0.84rem;
+}
+
+.camera-presets button[data-active="true"] {
+  border-color: rgba(142, 197, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(33, 71, 107, 0.96), rgba(12, 27, 42, 0.98));
+  color: #f3f8fc;
+  box-shadow: inset 0 0 0 1px rgba(142, 197, 255, 0.12);
+}
+
 button,
 select,
 input[type="file"],

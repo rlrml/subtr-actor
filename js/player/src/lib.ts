@@ -35,6 +35,8 @@ export type {
   BallSample,
   BeforeRenderCallback,
   CameraSettings,
+  ReplayCameraViewMode,
+  ReplayFreeCameraPreset,
   FrameRenderInfo,
   LoadedReplay,
   PlaybackBound,
