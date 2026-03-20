@@ -85,6 +85,30 @@ export function buildRushTimelineEvents(
   statsTimeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineEvent[] {
+  if ((statsTimeline.rush_events?.length ?? 0) > 0) {
+    const teamEventCounts = new Map<RushTeamPrefix, number>();
+
+    return statsTimeline.rush_events!.map((event) => {
+      const eventTime = replay?.frames[event.start_frame]?.time ?? event.start_time;
+      const teamPrefix = event.is_team_0 ? "team_zero" : "team_one";
+      const teamLabel = event.is_team_0 ? "Blue" : "Orange";
+      const matchupLabel = `${event.attackers}v${event.defenders}`;
+      const eventIndex = teamEventCounts.get(teamPrefix) ?? 0;
+      teamEventCounts.set(teamPrefix, eventIndex + 1);
+
+      return {
+        id: `rush:${event.start_frame}:${teamPrefix}:${eventIndex}:${matchupLabel}`,
+        time: eventTime,
+        frame: event.start_frame,
+        kind: "rush",
+        label: `${teamLabel} rush ${matchupLabel}`,
+        shortLabel: matchupLabel,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
+  }
+
   const events: ReplayTimelineEvent[] = [];
   const previousCounts = new Map<string, number>();
 
@@ -179,6 +203,33 @@ export function buildMustyFlickTimelineEvents(
   return events;
 }
 
+export function buildSpeedFlipTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return (statsTimeline.speed_flip_events ?? []).map((event) => {
+    const playerId = event.player ? playerIdToString(event.player) : null;
+    const playerName = playerId
+      ? replay.players.find((player) => player.id === playerId)?.name ?? playerId
+      : "Unknown";
+    const eventTime = replay.frames[event.frame]?.time ?? event.time;
+    const qualityPercent = Math.round(event.confidence * 100);
+
+    return {
+      id: `speed-flip:${event.frame}:${playerId}:${Math.round(event.confidence * 1000)}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "speed-flip",
+      label: `${playerName} speed flip ${qualityPercent}%`,
+      shortLabel: "SF",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 export function countEnabledTimelineEvents(
   activeModuleIds: Iterable<string>,
   replay: ReplayModel,
@@ -197,6 +248,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("musty-flick")) {
     count += buildMustyFlickTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("speed-flip")) {
+    count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
   }
 
   return count;
