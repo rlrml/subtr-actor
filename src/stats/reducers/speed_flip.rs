@@ -80,6 +80,7 @@ pub struct SpeedFlipReducer {
     kickoff_approach_active_last_frame: bool,
     current_kickoff_start_time: Option<f32>,
     current_last_speed_flip_player: Option<PlayerId>,
+    live_play_tracker: LivePlayTracker,
 }
 
 impl SpeedFlipReducer {
@@ -177,7 +178,11 @@ impl SpeedFlipReducer {
         Some(forward_xy.dot(velocity_xy))
     }
 
-    fn candidate_alignment(sample: &StatsSample, player: &PlayerSample, is_kickoff: bool) -> Option<f32> {
+    fn candidate_alignment(
+        sample: &StatsSample,
+        player: &PlayerSample,
+        is_kickoff: bool,
+    ) -> Option<f32> {
         if is_kickoff {
             Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
         } else {
@@ -414,6 +419,13 @@ impl SpeedFlipReducer {
 
 impl StatsReducer for SpeedFlipReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+        if !self.live_play_tracker.is_live_play(sample) {
+            self.active_candidates.clear();
+            self.current_kickoff_start_time = None;
+            self.kickoff_approach_active_last_frame = false;
+            return Ok(());
+        }
+
         self.begin_sample(sample);
 
         let kickoff_approach_active = Self::kickoff_approach_active(sample);
