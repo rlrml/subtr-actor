@@ -20,6 +20,13 @@ const BAND_BASE_Z = 3;
 const STRIPE_Z = 4;
 const ARROW_Z = 5;
 const HALF_FIELD_Z = 2;
+const ZONE_BOUNDARY_Z = 6;
+
+const ZONE_BOUNDARY_COLOR = 0x0d1117;
+const ZONE_BOUNDARY_OPACITY = 0.42;
+const ZONE_BOUNDARY_THICKNESS = 18;
+const ZONE_MIDLINE_OPACITY = 0.24;
+const ZONE_MIDLINE_THICKNESS = 10;
 
 const TEAM_LANE_EDGE_INSET_X = 220;
 const TEAM_LANE_GAP_X = 200;
@@ -519,36 +526,34 @@ export function createZoneBoundaryLines(
   fieldScale: number,
 ): THREE.Group {
   const group = new THREE.Group();
-  const fieldHalfWidth = FIELD_HALF_X * fieldScale;
+  const fieldWidth = FIELD_HALF_X * 2 * fieldScale;
 
-  const material = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.25,
-  });
+  const makeStrip = (
+    y: number,
+    thickness: number,
+    opacity: number,
+  ): THREE.Mesh => {
+    const geometry = new THREE.PlaneGeometry(fieldWidth, thickness * fieldScale);
+    const material = new THREE.MeshBasicMaterial({
+      color: ZONE_BOUNDARY_COLOR,
+      transparent: true,
+      opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(0, y, ZONE_BOUNDARY_Z);
+    mesh.renderOrder = 24;
+    return mesh;
+  };
 
   for (const ySign of [-1, 1]) {
     const y = ySign * FIELD_ZONE_BOUNDARY_Y * fieldScale;
-    const points = [
-      new THREE.Vector3(-fieldHalfWidth, y, 2),
-      new THREE.Vector3(fieldHalfWidth, y, 2),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geometry, material);
-    group.add(line);
+    group.add(makeStrip(y, ZONE_BOUNDARY_THICKNESS, ZONE_BOUNDARY_OPACITY));
   }
 
-  const midPoints = [
-    new THREE.Vector3(-fieldHalfWidth, 0, 2),
-    new THREE.Vector3(fieldHalfWidth, 0, 2),
-  ];
-  const midGeometry = new THREE.BufferGeometry().setFromPoints(midPoints);
-  const midMaterial = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.15,
-  });
-  group.add(new THREE.Line(midGeometry, midMaterial));
+  group.add(makeStrip(0, ZONE_MIDLINE_THICKNESS, ZONE_MIDLINE_OPACITY));
 
   scene.add(group);
   return group;

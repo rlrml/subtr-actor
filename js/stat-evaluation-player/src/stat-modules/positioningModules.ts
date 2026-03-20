@@ -88,6 +88,10 @@ export function createAbsolutePositioningModule(): StatModule {
 
     onBeforeRender() {},
 
+    getTimelineRanges(ctx) {
+      return buildTimeInZoneTimelineRanges(ctx.statsTimeline, ctx.replay);
+    },
+
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
