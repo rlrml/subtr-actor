@@ -1,6 +1,7 @@
-use js_sys::Function;
+use js_sys::{Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector, ReplayDataSupplementalData},
+    collector::stats_timeline::ReplayStatsTimeline,
     collector::CallbackCollector,
     BoostReducer, Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector,
     ReducerCollector, ReplayProcessor, StatsTimelineCollector, SubtrActorError,
@@ -130,6 +131,63 @@ fn collect_replay_data_with_optional_progress(
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))
 }
 
+fn collect_replay_bundle_with_optional_progress(
+    replay: &boxcars::Replay,
+    progress: Option<(&Function, usize)>,
+) -> Result<(ReplayData, ReplayStatsTimeline), JsValue> {
+    let total_frames = get_total_frames(replay)?;
+    let mut processor = ReplayProcessor::new(replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
+    let mut replay_data_collector = ReplayDataCollector::new();
+    let mut stats_timeline_collector = StatsTimelineCollector::new();
+    let mut flip_reset_tracker = FlipResetTracker::new();
+    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut last_reported_frames = 0usize;
+    let mut progress_collector = progress
+        .map(|(callback, frame_interval)| {
+            emit_progress(callback, "processing", 0, total_frames)?;
+            Ok::<_, SubtrActorError>(CallbackCollector::with_frame_interval(
+                |_frame, frame_number, _current_time| {
+                    last_reported_frames = frame_number + 1;
+                    emit_progress(callback, "processing", last_reported_frames, total_frames)
+                },
+                frame_interval.max(1),
+            ))
+        })
+        .transpose()
+        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+
+    let mut collectors: Vec<&mut dyn Collector> = vec![
+        &mut replay_data_collector,
+        &mut stats_timeline_collector,
+        &mut flip_reset_tracker,
+        &mut boost_pad_collector,
+    ];
+    if let Some(progress_collector) = progress_collector.as_mut() {
+        collectors.push(progress_collector);
+    }
+
+    processor
+        .process_all(&mut collectors)
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+
+    if let Some((callback, _)) = progress {
+        if last_reported_frames < total_frames {
+            emit_progress(callback, "processing", total_frames, total_frames).map_err(|error| {
+                JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
+            })?;
+        }
+    }
+
+    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
+        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+    let stats_timeline = stats_timeline_collector.into_timeline();
+    let replay_data = replay_data_collector
+        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
+    Ok((replay_data, stats_timeline))
+}
+
 /// Parse a replay file and return the raw replay data as JavaScript object
 #[wasm_bindgen]
 pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
@@ -253,6 +311,37 @@ pub fn get_replay_frames_data_json_with_progress(
     )?;
     serde_json::to_vec(&replay_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn get_replay_bundle_json_with_progress(
+    data: &[u8],
+    callback: Function,
+    report_every_n_frames: Option<usize>,
+) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+    let (replay_data, stats_timeline) = collect_replay_bundle_with_optional_progress(
+        &replay,
+        Some((&callback, report_every_n_frames.unwrap_or(1000))),
+    )?;
+
+    let replay_data_bytes = serde_json::to_vec(&replay_data)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
+    let stats_timeline_bytes = serde_json::to_vec(&stats_timeline)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))?;
+
+    let result = Object::new();
+    Reflect::set(
+        &result,
+        &JsValue::from_str("rawReplayData"),
+        &Uint8Array::from(replay_data_bytes.as_slice()),
+    )?;
+    Reflect::set(
+        &result,
+        &JsValue::from_str("statsTimeline"),
+        &Uint8Array::from(stats_timeline_bytes.as_slice()),
+    )?;
+    Ok(result.into())
 }
 
 /// Get cumulative stats snapshots for each replay sample.

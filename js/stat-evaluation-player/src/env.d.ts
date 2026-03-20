@@ -17,6 +17,14 @@ declare module "@colonelpanic8/subtr-actor" {
     callback: (progress: unknown) => void,
     reportEveryNFrames?: number,
   ): Uint8Array;
+  export function get_replay_bundle_json_with_progress(
+    data: Uint8Array,
+    callback: (progress: unknown) => void,
+    reportEveryNFrames?: number,
+  ): {
+    rawReplayData: Uint8Array;
+    statsTimeline: Uint8Array;
+  };
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;
   export function get_stats_timeline_json(data: Uint8Array): Uint8Array;

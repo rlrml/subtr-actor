@@ -5,6 +5,9 @@ export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.t
 export {
   formatReplayLoadProgress,
   getReplayLoadCompletion,
+  getReplayLoadPhase,
+  getReplayLoadPhaseStates,
+  listReplayLoadPhases,
 } from "./replayLoadProgress.ts";
 import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 
