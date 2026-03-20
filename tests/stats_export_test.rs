@@ -100,6 +100,8 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
         assists: 1,
         saves: 3,
         shots: 4,
+        attacking_backboard_hit_count: 2,
+        double_tap_count: 1,
         goals_conceded_while_last_defender: 1,
         goal_after_kickoff,
         goal_buildup: GoalBuildupStats::default(),
@@ -127,6 +129,14 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
     );
     assert_eq!(
         find_field(&fields, "core", "kickoff_goal_count").value,
+        StatValue::Unsigned(1)
+    );
+    assert_eq!(
+        find_field(&fields, "core", "attacking_backboard_hit_count").value,
+        StatValue::Unsigned(2)
+    );
+    assert_eq!(
+        find_field(&fields, "core", "double_tap_count").value,
         StatValue::Unsigned(1)
     );
 }
