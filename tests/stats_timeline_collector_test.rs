@@ -233,6 +233,11 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .most_back_forward_threshold_y,
             pressure_neutral_zone_half_width_y: PressureReducerConfig::default()
                 .neutral_zone_half_width_y,
+            rush_max_start_y: RushReducerConfig::default().max_start_y,
+            rush_attack_support_distance_y: RushReducerConfig::default().attack_support_distance_y,
+            rush_defender_distance_y: RushReducerConfig::default().defender_distance_y,
+            rush_min_possession_retained_seconds: RushReducerConfig::default()
+                .min_possession_retained_seconds,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
@@ -241,6 +246,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         },
         timeline_events: Vec::new(),
         fifty_fifty_events: Vec::new(),
+        rush_events: Vec::new(),
         speed_flip_events: Vec::new(),
         frames: vec![
             ReplayStatsFrame {

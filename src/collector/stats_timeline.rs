@@ -6,6 +6,10 @@ use crate::*;
 pub struct StatsTimelineConfig {
     pub most_back_forward_threshold_y: f32,
     pub pressure_neutral_zone_half_width_y: f32,
+    pub rush_max_start_y: f32,
+    pub rush_attack_support_distance_y: f32,
+    pub rush_defender_distance_y: f32,
+    pub rush_min_possession_retained_seconds: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -14,6 +18,7 @@ pub struct ReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
+    pub rush_events: Vec<RushEvent>,
     pub speed_flip_events: Vec<SpeedFlipEvent>,
     pub frames: Vec<ReplayStatsFrame>,
 }
@@ -32,6 +37,7 @@ pub struct DynamicReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
+    pub rush_events: Vec<RushEvent>,
     pub speed_flip_events: Vec<SpeedFlipEvent>,
     pub frames: Vec<DynamicReplayStatsFrame>,
 }
@@ -217,6 +223,13 @@ impl StatsTimelineReducers {
             ..Self::default()
         }
     }
+
+    fn with_rush_config(config: RushReducerConfig) -> Self {
+        Self {
+            rush: RushReducer::with_config(config),
+            ..Self::default()
+        }
+    }
 }
 
 impl StatsReducer for StatsTimelineReducers {
@@ -327,6 +340,13 @@ impl StatsTimelineCollector {
         }
     }
 
+    pub fn with_rush_config(config: RushReducerConfig) -> Self {
+        Self {
+            reducers: StatsTimelineReducers::with_rush_config(config),
+            ..Self::default()
+        }
+    }
+
     pub fn get_replay_data(
         mut self,
         replay: &boxcars::Replay,
@@ -360,6 +380,14 @@ impl StatsTimelineCollector {
                 .pressure
                 .config()
                 .neutral_zone_half_width_y,
+            rush_max_start_y: self.reducers.rush.config().max_start_y,
+            rush_attack_support_distance_y: self.reducers.rush.config().attack_support_distance_y,
+            rush_defender_distance_y: self.reducers.rush.config().defender_distance_y,
+            rush_min_possession_retained_seconds: self
+                .reducers
+                .rush
+                .config()
+                .min_possession_retained_seconds,
         };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
@@ -369,6 +397,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
+            rush_events: self.reducers.rush.events().to_vec(),
             speed_flip_events: self.reducers.speed_flip.events().to_vec(),
             frames: self.frames,
         }
@@ -389,6 +418,14 @@ impl StatsTimelineCollector {
                 .pressure
                 .config()
                 .neutral_zone_half_width_y,
+            rush_max_start_y: self.reducers.rush.config().max_start_y,
+            rush_attack_support_distance_y: self.reducers.rush.config().attack_support_distance_y,
+            rush_defender_distance_y: self.reducers.rush.config().defender_distance_y,
+            rush_min_possession_retained_seconds: self
+                .reducers
+                .rush
+                .config()
+                .min_possession_retained_seconds,
         };
         let mut timeline_events = self.reducers.match_stats.timeline().to_vec();
         timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
@@ -398,6 +435,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
+            rush_events: self.reducers.rush.events().to_vec(),
             speed_flip_events: self.reducers.speed_flip.events().to_vec(),
             frames: self
                 .frames

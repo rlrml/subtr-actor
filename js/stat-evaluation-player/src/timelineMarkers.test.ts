@@ -7,6 +7,7 @@ import {
   buildFiftyFiftyTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildRushTimelineEvents,
+  buildSpeedFlipTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
   getReplayTimelineEventKinds,
@@ -92,7 +93,7 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
   ]);
 });
 
-test("buildRushTimelineEvents maps cumulative rush counts to discrete timeline markers", () => {
+test("buildRushTimelineEvents anchors rush markers to serialized rush event starts", () => {
   const replay = {
     frames: [
       { time: 0 },
@@ -105,6 +106,26 @@ test("buildRushTimelineEvents maps cumulative rush counts to discrete timeline m
   const statsTimeline = {
     replay_meta: {},
     timeline_events: [],
+    rush_events: [
+      {
+        start_time: 1.1,
+        start_frame: 1,
+        end_time: 1.9,
+        end_frame: 2,
+        is_team_0: true,
+        attackers: 2,
+        defenders: 1,
+      },
+      {
+        start_time: 2.1,
+        start_frame: 2,
+        end_time: 2.8,
+        end_frame: 3,
+        is_team_0: false,
+        attackers: 3,
+        defenders: 2,
+      },
+    ],
     frames: [
       {
         frame_number: 1,
@@ -267,6 +288,61 @@ test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline mar
   ]);
 });
 
+test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    speed_flip_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        time_since_kickoff_start: 0.4,
+        start_position: [0, 0, 0],
+        end_position: [100, 0, 0],
+        start_speed: 1200,
+        max_speed: 1600,
+        best_alignment: 0.91,
+        diagonal_score: 0.8,
+        cancel_score: 0.78,
+        speed_score: 0.74,
+        confidence: 0.86,
+      },
+    ],
+    frames: [],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildSpeedFlipTimelineEvents(statsTimeline, replay), [
+    {
+      id: "speed-flip:1:Steam:blue-id:860",
+      time: 1.5,
+      frame: 1,
+      kind: "speed-flip",
+      label: "Blue speed flip 86%",
+      shortLabel: "SF",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [
@@ -307,6 +383,24 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         plane_normal: [1, 0, 0],
         winning_team_is_team_0: true,
         possession_team_is_team_0: true,
+      },
+    ],
+    speed_flip_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        time_since_kickoff_start: 0.35,
+        start_position: [0, 0, 0],
+        end_position: [120, 0, 0],
+        start_speed: 1180,
+        max_speed: 1650,
+        best_alignment: 0.93,
+        diagonal_score: 0.84,
+        cancel_score: 0.82,
+        speed_score: 0.79,
+        confidence: 0.88,
       },
     ],
     frames: [
@@ -363,5 +457,13 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       statsTimeline,
     ),
     5,
+  );
+  assert.equal(
+    countEnabledTimelineEvents(
+      ["core", "fifty-fifty", "rush", "musty-flick", "speed-flip"],
+      replay,
+      statsTimeline,
+    ),
+    6,
   );
 });

@@ -2,11 +2,16 @@ export interface StatsTimeline {
   config?: {
     most_back_forward_threshold_y: number;
     pressure_neutral_zone_half_width_y?: number;
+    rush_max_start_y?: number;
+    rush_attack_support_distance_y?: number;
+    rush_defender_distance_y?: number;
+    rush_min_possession_retained_seconds?: number;
     [key: string]: unknown;
   };
   replay_meta: unknown;
   timeline_events: unknown[];
   fifty_fifty_events?: FiftyFiftyEvent[];
+  rush_events?: RushEvent[];
   speed_flip_events?: SpeedFlipEvent[];
   frames: StatsFrame[];
 }
@@ -42,6 +47,16 @@ export interface FiftyFiftyEvent {
   plane_normal: [number, number, number];
   winning_team_is_team_0?: boolean;
   possession_team_is_team_0?: boolean;
+}
+
+export interface RushEvent {
+  start_time: number;
+  start_frame: number;
+  end_time: number;
+  end_frame: number;
+  is_team_0: boolean;
+  attackers: number;
+  defenders: number;
 }
 
 export interface LabeledCountEntry {
@@ -312,10 +327,15 @@ export interface DynamicStatsTimeline {
   config?: {
     most_back_forward_threshold_y: number;
     pressure_neutral_zone_half_width_y?: number;
+    rush_max_start_y?: number;
+    rush_attack_support_distance_y?: number;
+    rush_defender_distance_y?: number;
+    rush_min_possession_retained_seconds?: number;
     [key: string]: unknown;
   };
   replay_meta: unknown;
   timeline_events: unknown[];
+  rush_events?: RushEvent[];
   frames: DynamicStatsFrame[];
   [key: string]: unknown;
 }

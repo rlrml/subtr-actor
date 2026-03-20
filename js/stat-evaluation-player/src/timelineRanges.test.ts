@@ -6,6 +6,7 @@ import type { DynamicStatsTimeline, StatsTimeline } from "./statsTimeline.ts";
 import {
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
+  buildRushTimelineRanges,
   buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
 
@@ -265,6 +266,65 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
       label: "Neutral half control",
       color: "rgba(209, 217, 224, 0.7)",
       isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildRushTimelineRanges maps serialized rush spans to replay timeline ranges", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+      { time: 3.5 },
+    ],
+  } as ReplayModel;
+  const timeline = {
+    replay_meta: {},
+    timeline_events: [],
+    rush_events: [
+      {
+        start_time: 1.1,
+        start_frame: 1,
+        end_time: 2.0,
+        end_frame: 2,
+        is_team_0: true,
+        attackers: 2,
+        defenders: 1,
+      },
+      {
+        start_time: 2.4,
+        start_frame: 2,
+        end_time: 3.0,
+        end_frame: 3,
+        is_team_0: false,
+        attackers: 3,
+        defenders: 2,
+      },
+    ],
+    frames: [],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildRushTimelineRanges(timeline, replay), [
+    {
+      id: "rush-range:1:2:0",
+      startTime: 1.5,
+      endTime: 2.25,
+      lane: "rush",
+      laneLabel: "Rush",
+      label: "Blue rush 2v1",
+      color: "rgba(59, 130, 246, 0.4)",
+      isTeamZero: true,
+    },
+    {
+      id: "rush-range:2:3:1",
+      startTime: 2.25,
+      endTime: 3.5,
+      lane: "rush",
+      laneLabel: "Rush",
+      label: "Orange rush 3v2",
+      color: "rgba(245, 158, 11, 0.4)",
+      isTeamZero: false,
     },
   ]);
 });
