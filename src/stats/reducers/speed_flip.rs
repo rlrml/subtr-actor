@@ -55,7 +55,8 @@ impl SpeedFlipStats {
 #[derive(Debug, Clone, PartialEq)]
 struct ActiveSpeedFlipCandidate {
     is_team_0: bool,
-    kickoff_start_time: f32,
+    is_kickoff: bool,
+    kickoff_start_time: Option<f32>,
     start_time: f32,
     start_frame: usize,
     start_position: [f32; 3],
@@ -76,7 +77,6 @@ pub struct SpeedFlipReducer {
     events: Vec<SpeedFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
-    kickoff_dodge_started: HashSet<PlayerId>,
     kickoff_approach_active_last_frame: bool,
     current_kickoff_start_time: Option<f32>,
     current_last_speed_flip_player: Option<PlayerId>,
@@ -159,6 +159,32 @@ impl SpeedFlipReducer {
             .unwrap_or(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))
     }
 
+    fn forward_speed_alignment(player: &PlayerSample) -> Option<f32> {
+        let velocity = player.velocity()?;
+        let rigid_body = player.rigid_body.as_ref()?;
+        let velocity_xy = velocity.truncate().normalize_or_zero();
+        if velocity_xy.length_squared() <= f32::EPSILON {
+            return None;
+        }
+
+        let forward_xy = (quat_to_glam(&rigid_body.rotation) * glam::Vec3::X)
+            .truncate()
+            .normalize_or_zero();
+        if forward_xy.length_squared() <= f32::EPSILON {
+            return None;
+        }
+
+        Some(forward_xy.dot(velocity_xy))
+    }
+
+    fn candidate_alignment(sample: &StatsSample, player: &PlayerSample, is_kickoff: bool) -> Option<f32> {
+        if is_kickoff {
+            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
+        } else {
+            Self::forward_speed_alignment(player)
+        }
+    }
+
     fn apply_event(&mut self, event: SpeedFlipEvent) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_speed_flip = false;
@@ -202,7 +228,6 @@ impl SpeedFlipReducer {
 
     fn reset_kickoff_state(&mut self, sample: &StatsSample) {
         self.active_candidates.clear();
-        self.kickoff_dodge_started.clear();
         self.current_kickoff_start_time = Some(sample.time);
     }
 
@@ -215,14 +240,18 @@ impl SpeedFlipReducer {
             return;
         }
 
-        self.kickoff_dodge_started.insert(player.player_id.clone());
-
-        let Some(kickoff_start_time) = self.current_kickoff_start_time else {
-            return;
+        let is_kickoff = Self::kickoff_approach_active(sample);
+        let kickoff_start_time = if is_kickoff {
+            let Some(kickoff_start_time) = self.current_kickoff_start_time else {
+                return;
+            };
+            if sample.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
+                return;
+            }
+            Some(kickoff_start_time)
+        } else {
+            None
         };
-        if sample.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
-            return;
-        }
 
         let Some(rigid_body) = player.rigid_body.as_ref() else {
             return;
@@ -239,9 +268,7 @@ impl SpeedFlipReducer {
             return;
         }
 
-        let Some(best_alignment) =
-            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
-        else {
+        let Some(best_alignment) = Self::candidate_alignment(sample, player, is_kickoff) else {
             return;
         };
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
@@ -262,6 +289,7 @@ impl SpeedFlipReducer {
             player.player_id.clone(),
             ActiveSpeedFlipCandidate {
                 is_team_0: player.is_team_0,
+                is_kickoff,
                 kickoff_start_time,
                 start_time: sample.time,
                 start_frame: sample.frame_number,
@@ -292,9 +320,7 @@ impl SpeedFlipReducer {
             candidate.end_position = player_position.to_array();
         }
         candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
-        if let Some(alignment) =
-            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
-        {
+        if let Some(alignment) = Self::candidate_alignment(sample, player, candidate.is_kickoff) {
             candidate.best_alignment = candidate.best_alignment.max(alignment);
         }
 
@@ -320,9 +346,15 @@ impl SpeedFlipReducer {
         player_id: &PlayerId,
         candidate: ActiveSpeedFlipCandidate,
     ) -> Option<SpeedFlipEvent> {
-        let time_since_kickoff_start =
-            (candidate.start_time - candidate.kickoff_start_time).max(0.0);
-        let timeliness_score = 1.0 - Self::normalize_score(time_since_kickoff_start, 0.55, 1.1);
+        let time_since_kickoff_start = candidate
+            .kickoff_start_time
+            .map(|kickoff_start_time| (candidate.start_time - kickoff_start_time).max(0.0))
+            .unwrap_or(0.0);
+        let timeliness_score = if candidate.is_kickoff {
+            1.0 - Self::normalize_score(time_since_kickoff_start, 0.55, 1.1)
+        } else {
+            1.0
+        };
         let cancel_recovery = candidate.latest_forward_z - candidate.min_forward_z;
         let cancel_score = 0.35 * Self::normalize_score(-candidate.min_forward_z, 0.22, 0.75)
             + 0.40 * Self::normalize_score(cancel_recovery, 0.18, 0.7)
@@ -389,32 +421,25 @@ impl StatsReducer for SpeedFlipReducer {
             self.reset_kickoff_state(sample);
         }
 
+        for player in &sample.players {
+            self.maybe_start_candidate(sample, player);
+        }
+
+        for (player_id, candidate) in &mut self.active_candidates {
+            let Some(player) = Self::player_by_id(sample, player_id) else {
+                continue;
+            };
+            Self::update_candidate(candidate, sample, player);
+        }
+
+        self.finalize_candidates(sample, false);
+
+        self.active_candidates.retain(|_, candidate| {
+            sample.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
+        });
+
         if !kickoff_approach_active {
-            self.finalize_candidates(sample, true);
-            self.kickoff_dodge_started.clear();
-        } else {
-            for player in &sample.players {
-                if self.kickoff_dodge_started.contains(&player.player_id) {
-                    self.previous_dodge_active
-                        .insert(player.player_id.clone(), player.dodge_active);
-                    continue;
-                }
-                self.maybe_start_candidate(sample, player);
-            }
-
-            for (player_id, candidate) in &mut self.active_candidates {
-                let Some(player) = Self::player_by_id(sample, player_id) else {
-                    continue;
-                };
-                Self::update_candidate(candidate, sample, player);
-            }
-
-            let should_force_finalize = sample.ball_has_been_hit == Some(true);
-            self.finalize_candidates(sample, should_force_finalize);
-
-            self.active_candidates.retain(|_, candidate| {
-                sample.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
-            });
+            self.current_kickoff_start_time = None;
         }
 
         self.kickoff_approach_active_last_frame = kickoff_approach_active;
@@ -698,5 +723,78 @@ mod tests {
         assert_eq!(stats.high_confidence_count, 1);
         assert_eq!(reducer.events().len(), 1);
         assert!(reducer.events()[0].confidence >= SPEED_FLIP_HIGH_CONFIDENCE);
+    }
+
+    #[test]
+    fn detects_high_confidence_non_kickoff_speed_flip() {
+        let mut reducer = SpeedFlipReducer::new();
+        let ball_position = Some(glam::Vec3::new(2000.0, 1200.0, 92.75));
+
+        let mut frame0 = sample(
+            0,
+            10.0,
+            rigid_body(
+                glam::Vec3::new(-1500.0, 0.0, 17.0),
+                glam::Quat::IDENTITY,
+                glam::Vec3::new(1280.0, 0.0, 0.0),
+                glam::Vec3::ZERO,
+            ),
+            false,
+            ball_position,
+        );
+        frame0.ball_has_been_hit = Some(true);
+        reducer.on_sample(&frame0).unwrap();
+
+        let mut frame1 = sample(
+            1,
+            10.05,
+            rigid_body(
+                glam::Vec3::new(-1435.0, 0.0, 17.0),
+                glam::Quat::IDENTITY,
+                glam::Vec3::new(1440.0, 0.0, 0.0),
+                glam::Vec3::new(1.1, 7.2, 3.0),
+            ),
+            true,
+            ball_position,
+        );
+        frame1.ball_has_been_hit = Some(true);
+        reducer.on_sample(&frame1).unwrap();
+
+        let mut frame2 = sample(
+            2,
+            10.13,
+            rigid_body(
+                glam::Vec3::new(-1250.0, 12.0, 17.0),
+                glam::Quat::from_rotation_y(0.72),
+                glam::Vec3::new(1775.0, 35.0, 0.0),
+                glam::Vec3::new(0.8, 5.8, 2.2),
+            ),
+            true,
+            ball_position,
+        );
+        frame2.ball_has_been_hit = Some(true);
+        reducer.on_sample(&frame2).unwrap();
+
+        let mut frame3 = sample(
+            3,
+            10.27,
+            rigid_body(
+                glam::Vec3::new(-890.0, 24.0, 17.0),
+                glam::Quat::from_rotation_y(0.26),
+                glam::Vec3::new(1875.0, 45.0, 0.0),
+                glam::Vec3::new(0.3, 1.4, 0.9),
+            ),
+            true,
+            ball_position,
+        );
+        frame3.ball_has_been_hit = Some(true);
+        reducer.on_sample(&frame3).unwrap();
+
+        let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
+        assert_eq!(stats.count, 1);
+        assert_eq!(stats.high_confidence_count, 1);
+        assert_eq!(reducer.events().len(), 1);
+        assert!(reducer.events()[0].confidence >= SPEED_FLIP_HIGH_CONFIDENCE);
+        assert_eq!(reducer.events()[0].time_since_kickoff_start, 0.0);
     }
 }
