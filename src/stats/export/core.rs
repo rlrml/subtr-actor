@@ -36,18 +36,6 @@ impl StatFieldProvider for CorePlayerStats {
         ));
         visitor(ExportedStat::unsigned(
             "core",
-            "attacking_backboard_hit_count",
-            StatUnit::Count,
-            self.attacking_backboard_hit_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "core",
-            "double_tap_count",
-            StatUnit::Count,
-            self.double_tap_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "core",
             "goals_conceded_while_last_defender",
             StatUnit::Count,
             self.goals_conceded_while_last_defender,
@@ -146,18 +134,6 @@ impl StatFieldProvider for CoreTeamStats {
             "shots",
             StatUnit::Count,
             self.shots,
-        ));
-        visitor(ExportedStat::unsigned(
-            "core",
-            "attacking_backboard_hit_count",
-            StatUnit::Count,
-            self.attacking_backboard_hit_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "core",
-            "double_tap_count",
-            StatUnit::Count,
-            self.double_tap_count,
         ));
         visitor(ExportedStat::float(
             "core",

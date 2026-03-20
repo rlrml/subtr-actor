@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 
+use serde::Serialize;
+
 use super::normalized_y;
 use crate::*;
 
@@ -26,7 +28,7 @@ pub struct PossessionState {
     pub current_player: Option<PlayerId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BackboardBounceEvent {
     pub time: f32,
     pub frame: usize,

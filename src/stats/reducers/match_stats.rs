@@ -10,8 +10,6 @@ const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 2.5;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
-const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct GoalAfterKickoffStats {
     pub kickoff_goal_count: u32,
@@ -106,8 +104,6 @@ pub struct CorePlayerStats {
     pub assists: i32,
     pub saves: i32,
     pub shots: i32,
-    pub attacking_backboard_hit_count: u32,
-    pub double_tap_count: u32,
     pub goals_conceded_while_last_defender: u32,
     #[serde(flatten)]
     pub goal_after_kickoff: GoalAfterKickoffStats,
@@ -140,8 +136,6 @@ pub struct CoreTeamStats {
     pub assists: i32,
     pub saves: i32,
     pub shots: i32,
-    pub attacking_backboard_hit_count: u32,
-    pub double_tap_count: u32,
     #[serde(flatten)]
     pub goal_after_kickoff: GoalAfterKickoffStats,
     #[serde(flatten)]
@@ -197,13 +191,6 @@ struct GoalBuildupSample {
     ball_y: f32,
 }
 
-#[derive(Debug, Clone)]
-struct PendingBackboardBounce {
-    player_id: PlayerId,
-    is_team_0: bool,
-    time: f32,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct MatchStatsReducer {
     player_stats: HashMap<PlayerId, CorePlayerStats>,
@@ -215,7 +202,6 @@ pub struct MatchStatsReducer {
     kickoff_waiting_for_first_touch: bool,
     active_kickoff_touch_time: Option<f32>,
     goal_buildup_samples: Vec<GoalBuildupSample>,
-    pending_backboard_bounces: Vec<PendingBackboardBounce>,
     live_play_tracker: LivePlayTracker,
 }
 
@@ -250,8 +236,6 @@ impl MatchStatsReducer {
                 stats.assists += player_stats.assists;
                 stats.saves += player_stats.saves;
                 stats.shots += player_stats.shots;
-                stats.attacking_backboard_hit_count += player_stats.attacking_backboard_hit_count;
-                stats.double_tap_count += player_stats.double_tap_count;
                 stats
                     .goal_after_kickoff
                     .merge(&player_stats.goal_after_kickoff);
@@ -355,110 +339,6 @@ impl MatchStatsReducer {
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
     }
 
-    fn prune_pending_backboard_bounces(&mut self, current_time: f32) {
-        self.pending_backboard_bounces
-            .retain(|entry| current_time - entry.time <= DOUBLE_TAP_TOUCH_WINDOW_SECONDS);
-    }
-
-    fn record_backboard_bounces(&mut self, state: &BackboardBounceState) {
-        for event in &state.bounce_events {
-            self.player_stats
-                .entry(event.player.clone())
-                .or_default()
-                .attacking_backboard_hit_count += 1;
-            if let Some(existing) = self
-                .pending_backboard_bounces
-                .iter_mut()
-                .find(|pending| pending.player_id == event.player)
-            {
-                *existing = PendingBackboardBounce {
-                    player_id: event.player.clone(),
-                    is_team_0: event.is_team_0,
-                    time: event.time,
-                };
-            } else {
-                self.pending_backboard_bounces.push(PendingBackboardBounce {
-                    player_id: event.player.clone(),
-                    is_team_0: event.is_team_0,
-                    time: event.time,
-                });
-            }
-        }
-    }
-
-    fn resolve_double_tap_touches(&mut self, sample: &StatsSample) {
-        if sample.touch_events.is_empty() || self.pending_backboard_bounces.is_empty() {
-            return;
-        }
-
-        let mut completed_players = Vec::new();
-        self.pending_backboard_bounces.retain(|pending| {
-            if sample.time <= pending.time {
-                return true;
-            }
-
-            let matching_touch = sample.touch_events.iter().any(|touch| {
-                touch.team_is_team_0 == pending.is_team_0
-                    && touch.player.as_ref() == Some(&pending.player_id)
-            });
-            let conflicting_touch = sample
-                .touch_events
-                .iter()
-                .any(|touch| touch.player.as_ref() != Some(&pending.player_id));
-
-            if matching_touch
-                && !conflicting_touch
-                && Self::followup_touch_is_goal_directed(sample, pending.is_team_0)
-            {
-                completed_players.push(pending.player_id.clone());
-            }
-            false
-        });
-
-        for player_id in completed_players {
-            self.player_stats
-                .entry(player_id)
-                .or_default()
-                .double_tap_count += 1;
-        }
-    }
-
-    fn followup_touch_is_goal_directed(sample: &StatsSample, is_team_0: bool) -> bool {
-        const GOAL_CENTER_Y: f32 = 5120.0;
-        const MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.6;
-
-        let Some(ball) = sample.ball.as_ref() else {
-            return false;
-        };
-
-        let ball_position = ball.position();
-        let normalized_position_y = if is_team_0 {
-            ball_position.y
-        } else {
-            -ball_position.y
-        };
-        let normalized_velocity = ball.velocity();
-        let normalized_velocity = glam::Vec2::new(
-            normalized_velocity.x,
-            if is_team_0 {
-                normalized_velocity.y
-            } else {
-                -normalized_velocity.y
-            },
-        );
-        let goal_direction =
-            glam::Vec2::new(-ball_position.x, GOAL_CENTER_Y - normalized_position_y);
-
-        let Some(shot_direction) = normalized_velocity.try_normalize() else {
-            return false;
-        };
-        let Some(goal_direction) = goal_direction.try_normalize() else {
-            return false;
-        };
-
-        shot_direction.dot(goal_direction) >= MIN_GOAL_ALIGNMENT_COSINE
-    }
-
     fn record_goal_buildup_sample(&mut self, sample: &StatsSample) {
         let Some(ball) = sample.ball.as_ref() else {
             return;
@@ -542,20 +422,10 @@ impl MatchStatsReducer {
 }
 
 impl MatchStatsReducer {
-    fn on_sample_internal(
-        &mut self,
-        sample: &StatsSample,
-        backboard_bounce_state: &BackboardBounceState,
-    ) -> SubtrActorResult<()> {
+    fn on_sample_internal(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         self.update_kickoff_reference(sample);
         let live_play = self.live_play_tracker.is_live_play(sample);
-        if !sample.is_live_play() {
-            self.pending_backboard_bounces.clear();
-        }
         self.prune_goal_buildup_samples(sample.time);
-        self.prune_pending_backboard_bounces(sample.time);
-        self.record_backboard_bounces(backboard_bounce_state);
-        self.resolve_double_tap_touches(sample);
         if live_play {
             self.record_goal_buildup_sample(sample);
         }
@@ -596,16 +466,6 @@ impl MatchStatsReducer {
                 assists: player.match_assists.unwrap_or(0),
                 saves: player.match_saves.unwrap_or(0),
                 shots: player.match_shots.unwrap_or(0),
-                attacking_backboard_hit_count: self
-                    .player_stats
-                    .get(&player.player_id)
-                    .map(|stats| stats.attacking_backboard_hit_count)
-                    .unwrap_or(0),
-                double_tap_count: self
-                    .player_stats
-                    .get(&player.player_id)
-                    .map(|stats| stats.double_tap_count)
-                    .unwrap_or(0),
                 goals_conceded_while_last_defender: self
                     .player_stats
                     .get(&player.player_id)
@@ -752,19 +612,15 @@ impl MatchStatsReducer {
 
 impl StatsReducer for MatchStatsReducer {
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
-        self.on_sample_internal(sample, &BackboardBounceState::default())
+        self.on_sample_internal(sample)
     }
 
     fn on_sample_with_context(
         &mut self,
         sample: &StatsSample,
-        ctx: &AnalysisContext,
+        _ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
-        let backboard_bounce_state = ctx
-            .get::<BackboardBounceState>(BACKBOARD_BOUNCE_STATE_SIGNAL_ID)
-            .cloned()
-            .unwrap_or_default();
-        self.on_sample_internal(sample, &backboard_bounce_state)
+        self.on_sample_internal(sample)
     }
 }
 
@@ -787,29 +643,6 @@ mod tests {
             linear_velocity: Some(Vector3f {
                 x: 0.0,
                 y: 0.0,
-                z: 0.0,
-            }),
-            angular_velocity: Some(Vector3f {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            }),
-        }
-    }
-
-    fn ball_rigid_body(x: f32, y: f32, z: f32, vx: f32, vy: f32) -> RigidBody {
-        RigidBody {
-            sleeping: false,
-            location: Vector3f { x, y, z },
-            rotation: Quaternion {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 1.0,
-            },
-            linear_velocity: Some(Vector3f {
-                x: vx,
-                y: vy,
                 z: 0.0,
             }),
             angular_velocity: Some(Vector3f {
@@ -872,16 +705,6 @@ mod tests {
             dodge_refreshed_events: Vec::new(),
             player_stat_events: Vec::new(),
             goal_events: goal_event.into_iter().collect(),
-        }
-    }
-
-    fn touch_event(frame: usize, time: f32, player_id: u64, is_team_0: bool) -> TouchEvent {
-        TouchEvent {
-            time,
-            frame,
-            team_is_team_0: is_team_0,
-            player: Some(RemoteId::Steam(player_id)),
-            closest_approach_distance: Some(40.0),
         }
     }
 
@@ -961,138 +784,4 @@ mod tests {
         assert_eq!(stats.goal_buildup.other_buildup_goal_count, 0);
     }
 
-    #[test]
-    fn counts_double_taps_from_backboard_bounces_before_the_followup_touch() {
-        let mut reducer = MatchStatsReducer::new();
-
-        let mut setup_touch = sample(1, 1.0, 1.0, 4300.0, 0, None);
-        setup_touch.ball = Some(BallSample {
-            rigid_body: ball_rigid_body(0.0, 4300.0, 700.0, 0.0, 900.0),
-        });
-        setup_touch.touch_events = vec![touch_event(1, 1.0, 1, true)];
-        reducer.on_sample(&setup_touch).unwrap();
-
-        let bounce_sample = sample(2, 1.2, 0.2, 4800.0, 0, None);
-        reducer
-            .on_sample_internal(
-                &bounce_sample,
-                &BackboardBounceState {
-                    bounce_events: vec![BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }],
-                    last_bounce_event: Some(BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }),
-                },
-            )
-            .unwrap();
-
-        let mut followup_touch = sample(3, 1.6, 0.4, 4400.0, 0, None);
-        followup_touch.ball = Some(BallSample {
-            rigid_body: ball_rigid_body(0.0, 4400.0, 700.0, 0.0, 900.0),
-        });
-        followup_touch.touch_events = vec![touch_event(3, 1.6, 1, true)];
-        reducer.on_sample(&followup_touch).unwrap();
-
-        let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
-        assert_eq!(stats.attacking_backboard_hit_count, 1);
-        assert_eq!(stats.double_tap_count, 1);
-        assert_eq!(reducer.team_zero_stats().attacking_backboard_hit_count, 1);
-        assert_eq!(reducer.team_zero_stats().double_tap_count, 1);
-    }
-
-    #[test]
-    fn does_not_count_double_taps_when_another_player_touches_first() {
-        let mut reducer = MatchStatsReducer::new();
-
-        let mut setup_touch = sample(1, 1.0, 1.0, 4300.0, 0, None);
-        setup_touch.ball = Some(BallSample {
-            rigid_body: ball_rigid_body(0.0, 4300.0, 700.0, 0.0, 900.0),
-        });
-        setup_touch.touch_events = vec![touch_event(1, 1.0, 1, true)];
-        reducer.on_sample(&setup_touch).unwrap();
-
-        let bounce_sample = sample(2, 1.2, 0.2, 4800.0, 0, None);
-        reducer
-            .on_sample_internal(
-                &bounce_sample,
-                &BackboardBounceState {
-                    bounce_events: vec![BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }],
-                    last_bounce_event: Some(BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }),
-                },
-            )
-            .unwrap();
-
-        let mut opponent_touch = sample(3, 1.4, 0.2, 4300.0, 0, None);
-        opponent_touch.touch_events = vec![touch_event(3, 1.4, 2, false)];
-        reducer.on_sample(&opponent_touch).unwrap();
-
-        let mut late_followup = sample(4, 1.8, 0.4, 4200.0, 0, None);
-        late_followup.touch_events = vec![touch_event(4, 1.8, 1, true)];
-        reducer.on_sample(&late_followup).unwrap();
-
-        let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
-        assert_eq!(stats.attacking_backboard_hit_count, 1);
-        assert_eq!(stats.double_tap_count, 0);
-    }
-
-    #[test]
-    fn does_not_count_double_taps_when_followup_touch_is_not_goal_directed() {
-        let mut reducer = MatchStatsReducer::new();
-
-        let mut setup_touch = sample(1, 1.0, 1.0, 4300.0, 0, None);
-        setup_touch.ball = Some(BallSample {
-            rigid_body: ball_rigid_body(0.0, 4300.0, 700.0, 0.0, 900.0),
-        });
-        setup_touch.touch_events = vec![touch_event(1, 1.0, 1, true)];
-        reducer.on_sample(&setup_touch).unwrap();
-
-        let bounce_sample = sample(2, 1.2, 0.2, 4800.0, 0, None);
-        reducer
-            .on_sample_internal(
-                &bounce_sample,
-                &BackboardBounceState {
-                    bounce_events: vec![BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }],
-                    last_bounce_event: Some(BackboardBounceEvent {
-                        time: 1.2,
-                        frame: 2,
-                        player: RemoteId::Steam(1),
-                        is_team_0: true,
-                    }),
-                },
-            )
-            .unwrap();
-
-        let mut wide_followup = sample(3, 1.6, 0.4, 4400.0, 0, None);
-        wide_followup.ball = Some(BallSample {
-            rigid_body: ball_rigid_body(1400.0, 4400.0, 700.0, 1200.0, 150.0),
-        });
-        wide_followup.touch_events = vec![touch_event(3, 1.6, 1, true)];
-        reducer.on_sample(&wide_followup).unwrap();
-
-        let stats = reducer.player_stats().get(&RemoteId::Steam(1)).unwrap();
-        assert_eq!(stats.attacking_backboard_hit_count, 1);
-        assert_eq!(stats.double_tap_count, 0);
-    }
 }

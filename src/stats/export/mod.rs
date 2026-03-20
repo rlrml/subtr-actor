@@ -1,9 +1,11 @@
 use serde::Serialize;
 
 mod ball_carry;
+mod backboard;
 mod boost;
 mod core;
 mod demo;
+mod double_tap;
 mod dodge_reset;
 mod fifty_fifty;
 mod movement;

@@ -17,6 +17,8 @@ pub struct ReplayStatsTimeline {
     pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
+    pub backboard_events: Vec<BackboardBounceEvent>,
+    pub double_tap_events: Vec<DoubleTapEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub rush_events: Vec<RushEvent>,
     pub speed_flip_events: Vec<SpeedFlipEvent>,
@@ -36,6 +38,8 @@ pub struct DynamicReplayStatsTimeline {
     pub config: StatsTimelineConfig,
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
+    pub backboard_events: Vec<BackboardBounceEvent>,
+    pub double_tap_events: Vec<DoubleTapEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub rush_events: Vec<RushEvent>,
     pub speed_flip_events: Vec<SpeedFlipEvent>,
@@ -87,6 +91,8 @@ pub struct DynamicReplayStatsFrame {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TeamStatsSnapshot {
     pub core: CoreTeamStats,
+    pub backboard: BackboardTeamStats,
+    pub double_tap: DoubleTapTeamStats,
     pub ball_carry: BallCarryStats,
     pub boost: BoostStats,
     pub movement: MovementStats,
@@ -105,6 +111,8 @@ pub struct PlayerStatsSnapshot {
     pub name: String,
     pub is_team_0: bool,
     pub core: CorePlayerStats,
+    pub backboard: BackboardPlayerStats,
+    pub double_tap: DoubleTapPlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
     pub touch: TouchStats,
@@ -129,6 +137,8 @@ pub struct DynamicPlayerStatsSnapshot {
 impl StatFieldProvider for TeamStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.backboard.visit_stat_fields(visitor);
+        self.double_tap.visit_stat_fields(visitor);
         self.ball_carry.visit_stat_fields(visitor);
         self.boost.visit_stat_fields(visitor);
         self.movement.visit_stat_fields(visitor);
@@ -140,6 +150,8 @@ impl StatFieldProvider for TeamStatsSnapshot {
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
+        self.backboard.visit_stat_fields(visitor);
+        self.double_tap.visit_stat_fields(visitor);
         self.fifty_fifty.visit_stat_fields(visitor);
         self.speed_flip.visit_stat_fields(visitor);
         self.touch.visit_stat_fields(visitor);
@@ -192,6 +204,8 @@ impl ReplayStatsFrame {
 
 #[derive(Debug, Clone, Default)]
 struct StatsTimelineReducers {
+    backboard: BackboardReducer,
+    double_tap: DoubleTapReducer,
     fifty_fifty: FiftyFiftyReducer,
     possession: PossessionReducer,
     pressure: PressureReducer,
@@ -234,6 +248,8 @@ impl StatsTimelineReducers {
 
 impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
+        self.backboard.on_replay_meta(meta)?;
+        self.double_tap.on_replay_meta(meta)?;
         self.possession.on_replay_meta(meta)?;
         self.pressure.on_replay_meta(meta)?;
         self.rush.on_replay_meta(meta)?;
@@ -257,6 +273,8 @@ impl StatsReducer for StatsTimelineReducers {
         sample: &StatsSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
+        self.backboard.on_sample_with_context(sample, ctx)?;
+        self.double_tap.on_sample_with_context(sample, ctx)?;
         self.possession.on_sample_with_context(sample, ctx)?;
         self.pressure.on_sample_with_context(sample, ctx)?;
         self.rush.on_sample_with_context(sample, ctx)?;
@@ -396,6 +414,8 @@ impl StatsTimelineCollector {
             config,
             replay_meta,
             timeline_events,
+            backboard_events: self.reducers.backboard.events().to_vec(),
+            double_tap_events: self.reducers.double_tap.events().to_vec(),
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             rush_events: self.reducers.rush.events().to_vec(),
             speed_flip_events: self.reducers.speed_flip.events().to_vec(),
@@ -434,6 +454,8 @@ impl StatsTimelineCollector {
             config,
             replay_meta,
             timeline_events,
+            backboard_events: self.reducers.backboard.events().to_vec(),
+            double_tap_events: self.reducers.double_tap.events().to_vec(),
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             rush_events: self.reducers.rush.events().to_vec(),
             speed_flip_events: self.reducers.speed_flip.events().to_vec(),
@@ -464,6 +486,8 @@ impl StatsTimelineCollector {
             rush: self.reducers.rush.stats().clone(),
             team_zero: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_zero_stats(),
+                backboard: self.reducers.backboard.team_zero_stats().clone(),
+                double_tap: self.reducers.double_tap.team_zero_stats().clone(),
                 ball_carry: self.reducers.ball_carry.team_zero_stats().clone(),
                 boost: self.reducers.boost.team_zero_stats().clone(),
                 movement: self.reducers.movement.team_zero_stats().clone(),
@@ -472,6 +496,8 @@ impl StatsTimelineCollector {
             },
             team_one: TeamStatsSnapshot {
                 core: self.reducers.match_stats.team_one_stats(),
+                backboard: self.reducers.backboard.team_one_stats().clone(),
+                double_tap: self.reducers.double_tap.team_one_stats().clone(),
                 ball_carry: self.reducers.ball_carry.team_one_stats().clone(),
                 boost: self.reducers.boost.team_one_stats().clone(),
                 movement: self.reducers.movement.team_one_stats().clone(),
@@ -490,6 +516,20 @@ impl StatsTimelineCollector {
                     core: self
                         .reducers
                         .match_stats
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    backboard: self
+                        .reducers
+                        .backboard
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    double_tap: self
+                        .reducers
+                        .double_tap
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()

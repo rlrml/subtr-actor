@@ -39,6 +39,19 @@ fn normalized_team_stats_for_live_play_comparison(
     normalized
 }
 
+fn default_team_stats_snapshot() -> TeamStatsSnapshot {
+    TeamStatsSnapshot {
+        core: CoreTeamStats::default(),
+        backboard: BackboardTeamStats::default(),
+        double_tap: DoubleTapTeamStats::default(),
+        ball_carry: BallCarryStats::default(),
+        boost: BoostStats::default(),
+        movement: MovementStats::default(),
+        powerslide: PowerslideStats::default(),
+        demo: DemoTeamStats::default(),
+    }
+}
+
 fn normalized_player_stats_for_live_play_comparison(
     snapshot: &PlayerStatsSnapshot,
 ) -> PlayerStatsSnapshot {
@@ -245,6 +258,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             all_headers: Vec::new(),
         },
         timeline_events: Vec::new(),
+        backboard_events: Vec::new(),
+        double_tap_events: Vec::new(),
         fifty_fifty_events: Vec::new(),
         rush_events: Vec::new(),
         speed_flip_events: Vec::new(),
@@ -260,22 +275,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
                 rush: RushStats::default(),
-                team_zero: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
-                team_one: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
+                team_zero: default_team_stats_snapshot(),
+                team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
             },
             ReplayStatsFrame {
@@ -289,22 +290,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
                 rush: RushStats::default(),
-                team_zero: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
-                team_one: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
+                team_zero: default_team_stats_snapshot(),
+                team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
             },
             ReplayStatsFrame {
@@ -318,22 +305,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 possession: PossessionStats::default(),
                 pressure: PressureStats::default(),
                 rush: RushStats::default(),
-                team_zero: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
-                team_one: TeamStatsSnapshot {
-                    core: CoreTeamStats::default(),
-                    ball_carry: BallCarryStats::default(),
-                    boost: BoostStats::default(),
-                    movement: MovementStats::default(),
-                    powerslide: PowerslideStats::default(),
-                    demo: DemoTeamStats::default(),
-                },
+                team_zero: default_team_stats_snapshot(),
+                team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
             },
         ],
@@ -361,6 +334,8 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let mut possession_collector = ReducerCollector::new(PossessionReducer::new());
     let mut pressure_collector = ReducerCollector::new(PressureReducer::new());
     let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
+    let mut backboard_collector = ReducerCollector::new(BackboardReducer::new());
+    let mut double_tap_collector = ReducerCollector::new(DoubleTapReducer::new());
     let mut ball_carry_collector = ReducerCollector::new(BallCarryReducer::new());
     let mut boost_collector = ReducerCollector::new(BoostReducer::new());
     let mut movement_collector = ReducerCollector::new(MovementReducer::new());
@@ -369,10 +344,12 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let mut demo_collector = ReducerCollector::new(DemoReducer::new());
 
     let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
-    let mut collectors: [&mut dyn Collector; 9] = [
+    let mut collectors: [&mut dyn Collector; 11] = [
         &mut possession_collector,
         &mut pressure_collector,
         &mut match_collector,
+        &mut backboard_collector,
+        &mut double_tap_collector,
         &mut ball_carry_collector,
         &mut boost_collector,
         &mut movement_collector,
@@ -387,6 +364,8 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let possession = possession_collector.into_inner();
     let pressure = pressure_collector.into_inner();
     let match_stats = match_collector.into_inner();
+    let backboard = backboard_collector.into_inner();
+    let double_tap = double_tap_collector.into_inner();
     let ball_carry = ball_carry_collector.into_inner();
     let boost = boost_collector.into_inner();
     let movement = movement_collector.into_inner();
@@ -482,6 +461,22 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
         ball_carry.team_zero_stats().clone()
     );
     assert_eq!(
+        final_frame.team_zero.backboard,
+        backboard.team_zero_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.backboard,
+        backboard.team_one_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_zero.double_tap,
+        double_tap.team_zero_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.double_tap,
+        double_tap.team_one_stats().clone()
+    );
+    assert_eq!(
         final_frame.team_one.ball_carry,
         ball_carry.team_one_stats().clone()
     );
@@ -529,6 +524,22 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
                 .unwrap_or_default()
         );
         assert_eq!(
+            player.backboard,
+            backboard
+                .player_stats()
+                .get(&player.player_id)
+                .cloned()
+                .unwrap_or_default()
+        );
+        assert_eq!(
+            player.double_tap,
+            double_tap
+                .player_stats()
+                .get(&player.player_id)
+                .cloned()
+                .unwrap_or_default()
+        );
+        assert_eq!(
             player.boost,
             boost
                 .player_stats()
@@ -569,6 +580,8 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
                 .unwrap_or_default()
         );
     }
+    assert_eq!(timeline.backboard_events, backboard.events());
+    assert_eq!(timeline.double_tap_events, double_tap.events());
 }
 
 #[test]

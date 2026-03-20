@@ -100,8 +100,6 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
         assists: 1,
         saves: 3,
         shots: 4,
-        attacking_backboard_hit_count: 2,
-        double_tap_count: 1,
         goals_conceded_while_last_defender: 1,
         goal_after_kickoff,
         goal_buildup: GoalBuildupStats::default(),
@@ -131,12 +129,34 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
         find_field(&fields, "core", "kickoff_goal_count").value,
         StatValue::Unsigned(1)
     );
+}
+
+#[test]
+fn test_backboard_stats_export_count() {
+    let stats = BackboardPlayerStats {
+        count: 2,
+        ..BackboardPlayerStats::default()
+    };
+
+    let fields = stats.stat_fields();
+
     assert_eq!(
-        find_field(&fields, "core", "attacking_backboard_hit_count").value,
+        find_field(&fields, "backboard", "count").value,
         StatValue::Unsigned(2)
     );
+}
+
+#[test]
+fn test_double_tap_stats_export_count() {
+    let stats = DoubleTapPlayerStats {
+        count: 1,
+        ..DoubleTapPlayerStats::default()
+    };
+
+    let fields = stats.stat_fields();
+
     assert_eq!(
-        find_field(&fields, "core", "double_tap_count").value,
+        find_field(&fields, "double_tap", "count").value,
         StatValue::Unsigned(1)
     );
 }
