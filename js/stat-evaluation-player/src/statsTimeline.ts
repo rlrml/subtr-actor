@@ -229,6 +229,11 @@ export interface PlayerStatsSnapshot {
   };
   positioning?: {
     active_game_time: number;
+    tracked_time?: number;
+    sum_distance_to_teammates?: number;
+    sum_distance_to_ball?: number;
+    average_distance_to_teammates?: number;
+    average_distance_to_ball?: number;
     time_defensive_third?: number;
     time_neutral_third?: number;
     time_offensive_third?: number;
@@ -243,6 +248,18 @@ export interface PlayerStatsSnapshot {
     time_most_forward: number;
     time_mid_role: number;
     time_other_role: number;
+    time_closest_to_ball?: number;
+    time_farthest_from_ball?: number;
+    time_behind_ball?: number;
+    time_in_front_of_ball?: number;
+    percent_most_back?: number;
+    percent_most_forward?: number;
+    percent_mid_role?: number;
+    percent_other_role?: number;
+    percent_closest_to_ball?: number;
+    percent_farthest_from_ball?: number;
+    percent_behind_ball?: number;
+    percent_in_front_of_ball?: number;
     [key: string]: unknown;
   };
   boost?: {
