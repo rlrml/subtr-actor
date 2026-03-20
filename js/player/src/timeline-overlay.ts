@@ -42,6 +42,13 @@ interface TimelineRangeLane {
 interface TimelineRangeRecord {
   range: ReplayTimelineRange;
   element: HTMLDivElement;
+  startTimelineTime: number;
+  endTimelineTime: number;
+}
+
+interface TimelineMarkerRecord {
+  element: HTMLButtonElement;
+  timelineTime: number;
 }
 
 const STYLE_ID = "subtr-actor-timeline-overlay-styles";
@@ -537,9 +544,19 @@ function resolveRangeSources(
   sources: Iterable<ReplayTimelineRangeSource>,
   context: ReplayPlayerPluginContext
 ): ReplayTimelineRange[] {
+  const rangesById = new Set<string>();
   const ranges: ReplayTimelineRange[] = [];
   for (const source of sources) {
-    ranges.push(...resolveCustomRanges(source, context));
+    for (const range of resolveCustomRanges(source, context)) {
+      const rangeId = range.id;
+      if (rangeId !== undefined) {
+        if (rangesById.has(rangeId)) {
+          continue;
+        }
+        rangesById.add(rangeId);
+      }
+      ranges.push(range);
+    }
   }
   return ranges;
 }
@@ -650,7 +667,8 @@ export function createTimelineOverlayPlugin(
   let playerContext: ReplayPlayerPluginContext | null = null;
   let eventBuckets: TimelineEventBucket[] = [];
   let rangeLanes: TimelineRangeLane[] = [];
-  const markerElements = new Map<string, HTMLButtonElement>();
+  let projectionCacheKey: string | null = null;
+  const markerElements = new Map<string, TimelineMarkerRecord>();
   const rangeElements: TimelineRangeRecord[] = [];
 
   function refreshMarkers(): void {
@@ -692,6 +710,16 @@ export function createTimelineOverlayPlugin(
 
     const currentTime = context.player.getTimelineCurrentTime();
     const duration = context.player.getTimelineDuration();
+    const nextProjectionCacheKey = [
+      duration.toFixed(4),
+      context.state.skipKickoffsEnabled ? "1" : "0",
+      context.state.skipPostGoalTransitionsEnabled ? "1" : "0",
+    ].join(":");
+    if (projectionCacheKey !== nextProjectionCacheKey) {
+      buildMarkers(context);
+      buildRanges(context);
+      projectionCacheKey = nextProjectionCacheKey;
+    }
     range.min = "0";
     range.max = `${duration}`;
     range.step = "0.01";
@@ -709,29 +737,21 @@ export function createTimelineOverlayPlugin(
     shell.dataset.scrubbing = scrubbing ? "true" : "false";
 
     for (const bucket of eventBuckets) {
-      const marker = markerElements.get(bucket.key);
-      if (!marker) {
+      const markerRecord = markerElements.get(bucket.key);
+      if (!markerRecord) {
         continue;
       }
-      const projection = context.player.projectReplayTimeToTimeline(bucket.time);
-      marker.style.left = markerLeftPercent(projection.timelineTime, duration);
-      const timeSinceEvent = currentTime - projection.timelineTime;
+      const timeSinceEvent = currentTime - markerRecord.timelineTime;
       const active =
         timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
-      marker.dataset.active = active ? "true" : "false";
-      marker.dataset.passed =
-        projection.timelineTime <= currentTime ? "true" : "false";
+      markerRecord.element.dataset.active = active ? "true" : "false";
+      markerRecord.element.dataset.passed =
+        markerRecord.timelineTime <= currentTime ? "true" : "false";
     }
 
     for (const record of rangeElements) {
-      const startProjection = context.player.projectReplayTimeToTimeline(
-        record.range.startTime
-      );
-      const endProjection = context.player.projectReplayTimeToTimeline(
-        record.range.endTime
-      );
-      const leftTime = Math.max(0, startProjection.timelineTime);
-      const rightTime = Math.min(duration, endProjection.timelineTime);
+      const leftTime = Math.max(0, record.startTimelineTime);
+      const rightTime = Math.min(duration, record.endTimelineTime);
       const widthTime = Math.max(0, rightTime - leftTime);
 
       if (widthTime <= 0.0001) {
@@ -740,8 +760,6 @@ export function createTimelineOverlayPlugin(
       }
 
       record.element.hidden = false;
-      record.element.style.left = markerLeftPercent(leftTime, duration);
-      record.element.style.width = markerLeftPercent(widthTime, duration);
       record.element.dataset.active =
         currentTime >= leftTime && currentTime <= rightTime ? "true" : "false";
     }
@@ -782,7 +800,10 @@ export function createTimelineOverlayPlugin(
       marker.dataset.active = "false";
       marker.dataset.passed = "false";
       markers.append(marker);
-      markerElements.set(bucket.key, marker);
+      markerElements.set(bucket.key, {
+        element: marker,
+        timelineTime: projection.timelineTime,
+      });
     }
   }
 
@@ -800,6 +821,7 @@ export function createTimelineOverlayPlugin(
       range.endTime > range.startTime
     );
     rangeLanes = groupRanges(customRanges);
+    const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
 
     if (rangeLanes.length === 0) {
       rangesRoot.hidden = true;
@@ -824,6 +846,12 @@ export function createTimelineOverlayPlugin(
       }
 
       for (const range of lane.ranges) {
+        const startProjection = context.player.projectReplayTimeToTimeline(
+          range.startTime
+        );
+        const endProjection = context.player.projectReplayTimeToTimeline(
+          range.endTime
+        );
         const segment = document.createElement("div");
         segment.className = "sap-tl-range-segment";
         if (range.className) {
@@ -832,8 +860,18 @@ export function createTimelineOverlayPlugin(
         segment.style.background = rangeAccent(range);
         segment.title = range.label ?? lane.label;
         segment.dataset.active = "false";
+        segment.style.left = markerLeftPercent(startProjection.timelineTime, duration);
+        segment.style.width = markerLeftPercent(
+          Math.max(0, endProjection.timelineTime - startProjection.timelineTime),
+          duration,
+        );
         track.append(segment);
-        rangeElements.push({ range, element: segment });
+        rangeElements.push({
+          range,
+          element: segment,
+          startTimelineTime: startProjection.timelineTime,
+          endTimelineTime: endProjection.timelineTime,
+        });
       }
 
       laneEl.append(track);
@@ -1049,6 +1087,7 @@ export function createTimelineOverlayPlugin(
       playerContext = null;
       eventBuckets = [];
       rangeLanes = [];
+      projectionCacheKey = null;
       markerElements.clear();
       rangeElements.splice(0, rangeElements.length);
       if (changedContainerPosition) {

@@ -98,6 +98,17 @@ let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
 let currentMountCleanup: (() => void) | null = null;
+let statsRenderCacheKey: string | null = null;
+let focusedPlayerOverlayCacheKey: string | null = null;
+
+function getActiveModuleSignature(): string {
+  return activeModules.map((mod) => mod.id).join("|");
+}
+
+function clearRenderCaches(): void {
+  statsRenderCacheKey = null;
+  focusedPlayerOverlayCacheKey = null;
+}
 
 function getModuleContext(): StatModuleContext | null {
   if (!replayPlayer || !statsTimeline || !statsFrameLookup) {
@@ -132,6 +143,7 @@ function setupActiveModules(): void {
 
   syncTimelineEvents();
   syncTimelineRanges();
+  clearRenderCaches();
 }
 
 function teardownActiveModules(): void {
@@ -144,6 +156,7 @@ function teardownActiveModules(): void {
     mod.teardown();
   }
   activeModules = [];
+  clearRenderCaches();
 }
 
 function toggleModule(id: string, enabled: boolean): void {
@@ -369,6 +382,11 @@ function renderStats(frameIndex: number): void {
   const ctx = getModuleContext();
   if (!ctx) return;
 
+  const cacheKey = `${frameIndex}:${getActiveModuleSignature()}`;
+  if (statsRenderCacheKey === cacheKey) {
+    return;
+  }
+
   const sections = activeModules
     .map((mod) => {
       const html = mod.renderStats(frameIndex, ctx);
@@ -383,6 +401,7 @@ function renderStats(frameIndex: number): void {
   playerStatsEl.innerHTML = sections.length > 0
     ? sections.join("")
     : "No stat modules active.";
+  statsRenderCacheKey = cacheKey;
 }
 
 function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
@@ -390,6 +409,7 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   if (!ctx || !state || !showFollowedPlayerOverlay.checked) {
     followedPlayerOverlay.hidden = true;
     followedPlayerOverlay.innerHTML = "";
+    focusedPlayerOverlayCacheKey = "hidden";
     return;
   }
 
@@ -397,6 +417,7 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   if (!attachedPlayerId) {
     followedPlayerOverlay.hidden = true;
     followedPlayerOverlay.innerHTML = "";
+    focusedPlayerOverlayCacheKey = "hidden";
     return;
   }
 
@@ -404,6 +425,22 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   if (!player) {
     followedPlayerOverlay.hidden = true;
     followedPlayerOverlay.innerHTML = "";
+    focusedPlayerOverlayCacheKey = "hidden";
+    return;
+  }
+
+  const showRoleIndicator = activeModuleIds.has(RELATIVE_POSITIONING_MODULE_ID);
+  const role = showRoleIndicator
+    ? getCurrentRole(ctx.replay, attachedPlayerId, state.frameIndex)
+    : null;
+  const cacheKey = [
+    state.frameIndex,
+    attachedPlayerId,
+    getActiveModuleSignature(),
+    showRoleIndicator ? role ?? "none" : "off",
+  ].join(":");
+  if (focusedPlayerOverlayCacheKey === cacheKey) {
+    followedPlayerOverlay.hidden = false;
     return;
   }
 
@@ -424,13 +461,10 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   if (sections.length === 0) {
     followedPlayerOverlay.hidden = true;
     followedPlayerOverlay.innerHTML = "";
+    focusedPlayerOverlayCacheKey = "hidden";
     return;
   }
 
-  const showRoleIndicator = activeModuleIds.has(RELATIVE_POSITIONING_MODULE_ID);
-  const role = showRoleIndicator
-    ? getCurrentRole(ctx.replay, attachedPlayerId, state.frameIndex)
-    : null;
   followedPlayerOverlay.innerHTML = `
     <div class="followed-player-overlay-card ${getTeamClass(player.is_team_0)}">
       <div class="followed-player-overlay-header">
@@ -449,6 +483,7 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
     </div>
   `;
   followedPlayerOverlay.hidden = false;
+  focusedPlayerOverlayCacheKey = cacheKey;
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
@@ -493,6 +528,7 @@ async function loadReplay(file: File): Promise<void> {
   statsFrameLookup = null;
   clearTimelineEventSources();
   clearTimelineRangeSources();
+  clearRenderCaches();
   renderTimelineEventCount();
   renderModuleSettings();
 
@@ -627,6 +663,7 @@ export function mountStatEvaluationPlayer(
     statsFrameLookup = null;
     clearTimelineEventSources();
     clearTimelineRangeSources();
+    clearRenderCaches();
     activeModules = [];
     replayLoadModal?.destroy();
     replayLoadModal = null;
