@@ -23,28 +23,28 @@ impl PossessionStateLabel {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FieldThirdLabel {
-    TeamZeroThird,
-    NeutralThird,
-    TeamOneThird,
+    TeamZero,
+    Neutral,
+    TeamOne,
 }
 
 impl FieldThirdLabel {
     fn from_ball(ball: &BallSample) -> Self {
         let ball_y = ball.position().y;
         if ball_y < -FIELD_ZONE_BOUNDARY_Y {
-            Self::TeamZeroThird
+            Self::TeamZero
         } else if ball_y > FIELD_ZONE_BOUNDARY_Y {
-            Self::TeamOneThird
+            Self::TeamOne
         } else {
-            Self::NeutralThird
+            Self::Neutral
         }
     }
 
     fn as_label(self) -> StatLabel {
         let value = match self {
-            Self::TeamZeroThird => "team_zero_third",
-            Self::NeutralThird => "neutral_third",
-            Self::TeamOneThird => "team_one_third",
+            Self::TeamZero => "team_zero_third",
+            Self::Neutral => "neutral_third",
+            Self::TeamOne => "team_one_third",
         };
         StatLabel::new("field_third", value)
     }

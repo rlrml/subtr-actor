@@ -783,5 +783,4 @@ mod tests {
         assert_eq!(stats.goal_buildup.sustained_pressure_goal_count, 1);
         assert_eq!(stats.goal_buildup.other_buildup_goal_count, 0);
     }
-
 }

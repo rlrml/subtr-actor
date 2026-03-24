@@ -64,7 +64,8 @@ impl BackboardReducer {
             stats.last_backboard_time = Some(event.time);
             stats.last_backboard_frame = Some(event.frame);
             stats.time_since_last_backboard = Some((sample.time - event.time).max(0.0));
-            stats.frames_since_last_backboard = Some(sample.frame_number.saturating_sub(event.frame));
+            stats.frames_since_last_backboard =
+                Some(sample.frame_number.saturating_sub(event.frame));
 
             let team_stats = if event.is_team_0 {
                 &mut self.team_zero_stats
