@@ -366,7 +366,8 @@ impl TeamStatsSnapshot {
                 .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::Boost) {
-            self.boost.visit_stat_fields(&mut |field| fields.push(field));
+            self.boost
+                .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::Movement) {
             self.movement
@@ -430,7 +431,8 @@ impl PlayerStatsSnapshot {
                 .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::Touch) {
-            self.touch.visit_stat_fields(&mut |field| fields.push(field));
+            self.touch
+                .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::MustyFlick) {
             self.musty_flick
@@ -445,7 +447,8 @@ impl PlayerStatsSnapshot {
                 .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::Boost) {
-            self.boost.visit_stat_fields(&mut |field| fields.push(field));
+            self.boost
+                .visit_stat_fields(&mut |field| fields.push(field));
         }
         if modules.contains(StatsTimelineModule::Movement) {
             self.movement

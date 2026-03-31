@@ -963,7 +963,10 @@ fn test_stats_timeline_collector_only_selected_modules_processes_requested_stats
     .get_replay_data(&replay)
     .expect("Expected selective stats timeline data");
 
-    let full_frame = full_timeline.frames.last().expect("Expected full final frame");
+    let full_frame = full_timeline
+        .frames
+        .last()
+        .expect("Expected full final frame");
     let selective_frame = selective_timeline
         .frames
         .last()
@@ -971,15 +974,30 @@ fn test_stats_timeline_collector_only_selected_modules_processes_requested_stats
 
     assert_eq!(selective_frame.team_zero.boost, full_frame.team_zero.boost);
     assert_eq!(selective_frame.team_one.boost, full_frame.team_one.boost);
-    assert_eq!(selective_frame.team_zero.movement, full_frame.team_zero.movement);
-    assert_eq!(selective_frame.team_one.movement, full_frame.team_one.movement);
+    assert_eq!(
+        selective_frame.team_zero.movement,
+        full_frame.team_zero.movement
+    );
+    assert_eq!(
+        selective_frame.team_one.movement,
+        full_frame.team_one.movement
+    );
     assert_eq!(selective_frame.possession, PossessionStats::default());
     assert_eq!(selective_frame.pressure, PressureStats::default());
     assert_eq!(selective_frame.rush, RushStats::default());
     assert_eq!(selective_frame.team_zero.core, CoreTeamStats::default());
-    assert_eq!(selective_frame.team_zero.backboard, BackboardTeamStats::default());
-    assert_eq!(selective_frame.team_zero.double_tap, DoubleTapTeamStats::default());
-    assert_eq!(selective_frame.team_zero.ball_carry, BallCarryStats::default());
+    assert_eq!(
+        selective_frame.team_zero.backboard,
+        BackboardTeamStats::default()
+    );
+    assert_eq!(
+        selective_frame.team_zero.double_tap,
+        DoubleTapTeamStats::default()
+    );
+    assert_eq!(
+        selective_frame.team_zero.ball_carry,
+        BallCarryStats::default()
+    );
     assert_eq!(selective_frame.team_zero.demo, DemoTeamStats::default());
     assert!(selective_timeline.timeline_events.is_empty());
     assert!(selective_timeline.backboard_events.is_empty());

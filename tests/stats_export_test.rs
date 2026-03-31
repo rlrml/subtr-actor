@@ -1,6 +1,5 @@
 use subtr_actor::stats::export::{
-    ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue,
-    LEGACY_STAT_VARIANT,
+    ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue, LEGACY_STAT_VARIANT,
 };
 use subtr_actor::stats::reducers::{
     BackboardPlayerStats, BoostStats, CorePlayerStats, DodgeResetStats, DoubleTapPlayerStats,

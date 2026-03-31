@@ -5,8 +5,7 @@ use subtr_actor::{
     collector::CallbackCollector,
     BoostReducer, Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector,
     ReducerCollector, ReplayProcessor, StatsTimelineCollector, StatsTimelineModule,
-    SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 

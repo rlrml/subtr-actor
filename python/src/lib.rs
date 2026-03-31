@@ -273,11 +273,13 @@ fn build_stats_timeline_collector(
     let parsed_modules = modules
         .into_iter()
         .map(|module| {
-            module.parse::<subtr_actor::StatsTimelineModule>().map_err(|error| {
-                PyErr::new::<exceptions::PyValueError, _>(format!(
-                    "Invalid stats timeline module: {error}"
-                ))
-            })
+            module
+                .parse::<subtr_actor::StatsTimelineModule>()
+                .map_err(|error| {
+                    PyErr::new::<exceptions::PyValueError, _>(format!(
+                        "Invalid stats timeline module: {error}"
+                    ))
+                })
         })
         .collect::<PyResult<Vec<_>>>()?;
 

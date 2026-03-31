@@ -4,8 +4,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use serde::Serialize;
 
 use super::normalized_y;
-use crate::*;
 use crate::stats::reducers::FIFTY_FIFTY_STATE_SIGNAL_ID;
+use crate::*;
 
 pub type DerivedSignalId = &'static str;
 
@@ -818,16 +818,13 @@ fn derived_signal_dependencies(id: DerivedSignalId) -> &'static [DerivedSignalId
     }
 }
 
-fn add_signal_and_dependencies(
-    id: DerivedSignalId,
-    requested: &mut BTreeSet<DerivedSignalId>,
-) {
+fn add_signal_and_dependencies(id: DerivedSignalId, requested: &mut BTreeSet<DerivedSignalId>) {
     if !requested.insert(id) {
         return;
     }
 
     for dependency in derived_signal_dependencies(id) {
-        add_signal_and_dependencies(*dependency, requested);
+        add_signal_and_dependencies(dependency, requested);
     }
 }
 
