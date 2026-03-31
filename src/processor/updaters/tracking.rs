@@ -37,7 +37,10 @@ impl<'a> ReplayProcessor<'a> {
         frame_index: usize,
     ) -> SubtrActorResult<()> {
         self.current_frame_touch_events.clear();
-        let hit_team_num_key = *self.get_object_id_for_key(BALL_HIT_TEAM_NUM_KEY)?;
+        let hit_team_num_key = self.required_cached_object_id(
+            self.cached_object_ids.ball_hit_team_num,
+            BALL_HIT_TEAM_NUM_KEY,
+        )?;
 
         for update in &frame.updated_actors {
             if update.object_id != hit_team_num_key {
@@ -74,10 +77,7 @@ impl<'a> ReplayProcessor<'a> {
         frame_index: usize,
     ) -> SubtrActorResult<()> {
         self.current_frame_dodge_refreshed_events.clear();
-        let dodges_refreshed_counter_key = self
-            .get_object_id_for_key(DODGES_REFRESHED_COUNTER_KEY)
-            .ok()
-            .copied();
+        let dodges_refreshed_counter_key = self.cached_object_ids.dodges_refreshed_counter;
 
         let Some(dodges_refreshed_counter_key) = dodges_refreshed_counter_key else {
             return Ok(());

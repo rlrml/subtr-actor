@@ -112,6 +112,50 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
     id
 }
 
+#[derive(Clone, Copy, Default)]
+struct CachedObjectIds {
+    player_type: Option<boxcars::ObjectId>,
+    car_type: Option<boxcars::ObjectId>,
+    boost_type: Option<boxcars::ObjectId>,
+    dodge_type: Option<boxcars::ObjectId>,
+    jump_type: Option<boxcars::ObjectId>,
+    double_jump_type: Option<boxcars::ObjectId>,
+    unique_id: Option<boxcars::ObjectId>,
+    team: Option<boxcars::ObjectId>,
+    player_replication: Option<boxcars::ObjectId>,
+    vehicle: Option<boxcars::ObjectId>,
+    boost_replicated: Option<boxcars::ObjectId>,
+    boost_amount: Option<boxcars::ObjectId>,
+    component_active: Option<boxcars::ObjectId>,
+    seconds_remaining: Option<boxcars::ObjectId>,
+    ball_hit_team_num: Option<boxcars::ObjectId>,
+    dodges_refreshed_counter: Option<boxcars::ObjectId>,
+}
+
+impl CachedObjectIds {
+    fn from_name_map(name_to_object_id: &HashMap<String, boxcars::ObjectId>) -> Self {
+        let cached = |name| name_to_object_id.get(name).copied();
+        Self {
+            player_type: cached(PLAYER_TYPE),
+            car_type: cached(CAR_TYPE),
+            boost_type: cached(BOOST_TYPE),
+            dodge_type: cached(DODGE_TYPE),
+            jump_type: cached(JUMP_TYPE),
+            double_jump_type: cached(DOUBLE_JUMP_TYPE),
+            unique_id: cached(UNIQUE_ID_KEY),
+            team: cached(TEAM_KEY),
+            player_replication: cached(PLAYER_REPLICATION_KEY),
+            vehicle: cached(VEHICLE_KEY),
+            boost_replicated: cached(BOOST_REPLICATED_KEY),
+            boost_amount: cached(BOOST_AMOUNT_KEY),
+            component_active: cached(COMPONENT_ACTIVE_KEY),
+            seconds_remaining: cached(SECONDS_REMAINING_KEY),
+            ball_hit_team_num: cached(BALL_HIT_TEAM_NUM_KEY),
+            dodges_refreshed_counter: cached(DODGES_REFRESHED_COUNTER_KEY),
+        }
+    }
+}
+
 mod bootstrap;
 mod debug;
 mod queries;
@@ -152,6 +196,7 @@ pub struct ReplayProcessor<'a> {
     /// The replay currently being traversed.
     pub replay: &'a boxcars::Replay,
     spatial_normalization_factor: f32,
+    cached_object_ids: CachedObjectIds,
     /// Modeled actor state for the current replay frame.
     pub actor_state: ActorStateModeler,
     /// Mapping from object ids to their replay object names.
@@ -226,6 +271,7 @@ impl<'a> ReplayProcessor<'a> {
             object_id_to_name.insert(object_id, name.clone());
             name_to_object_id.insert(name.clone(), object_id);
         }
+        let cached_object_ids = CachedObjectIds::from_name_map(&name_to_object_id);
         let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
@@ -234,6 +280,7 @@ impl<'a> ReplayProcessor<'a> {
             } else {
                 1.0
             },
+            cached_object_ids,
             object_id_to_name,
             name_to_object_id,
             team_zero: Vec::new(),
@@ -307,6 +354,15 @@ impl<'a> ReplayProcessor<'a> {
                 angular_velocity: self.normalize_optional_vector(rigid_body.angular_velocity),
             }
         }
+    }
+
+    fn required_cached_object_id(
+        &self,
+        object_id: Option<boxcars::ObjectId>,
+        name: &'static str,
+    ) -> SubtrActorResult<boxcars::ObjectId> {
+        object_id
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
     }
 
     /// [`Self::process`] takes a [`Collector`] as an argument and iterates over

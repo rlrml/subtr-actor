@@ -278,7 +278,10 @@ impl<'a> ReplayProcessor<'a> {
             .map(|object_id| self.get_actor_ids_by_object_id(object_id))
     }
 
-    fn get_actor_ids_by_object_id(&self, object_id: &boxcars::ObjectId) -> &[boxcars::ActorId] {
+    pub(crate) fn get_actor_ids_by_object_id(
+        &self,
+        object_id: &boxcars::ObjectId,
+    ) -> &[boxcars::ActorId] {
         self.actor_state
             .actor_ids_by_type
             .get(object_id)
@@ -554,13 +557,24 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Returns the replicated match clock in whole seconds.
     pub fn get_seconds_remaining(&self) -> SubtrActorResult<i32> {
-        get_actor_attribute_matching!(
-            self,
-            self.get_metadata_actor_id()?,
-            SECONDS_REMAINING_KEY,
-            boxcars::Attribute::Int
-        )
-        .cloned()
+        let seconds_remaining_object_id =
+            self.cached_object_ids.seconds_remaining.ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound {
+                    name: SECONDS_REMAINING_KEY,
+                })
+            })?;
+        let metadata_actor_id = self.get_metadata_actor_id()?;
+        let metadata_state = self.get_actor_state(metadata_actor_id)?;
+        metadata_state
+            .attributes
+            .get(&seconds_remaining_object_id)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: SECONDS_REMAINING_KEY,
+                })
+            })
+            .and_then(|(attribute, _)| attribute_match!(attribute, boxcars::Attribute::Int))
+            .copied()
     }
 
     /// Returns the replicated game-state enum value from the metadata actor.

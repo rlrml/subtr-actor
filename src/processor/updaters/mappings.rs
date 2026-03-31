@@ -44,16 +44,39 @@ impl<'a> ReplayProcessor<'a> {
     /// deleted, the function removes the actor's ID from the `player_to_car`
     /// mapping.
     pub(crate) fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
-        let player_type_actor_ids = self.get_actor_ids_by_type(PLAYER_TYPE)?.to_vec();
-        let car_type_actor_ids = self.get_actor_ids_by_type(CAR_TYPE)?.to_vec();
-        let boost_type_actor_ids = self.get_actor_ids_by_type(BOOST_TYPE)?.to_vec();
-        let dodge_type_actor_ids = self.get_actor_ids_by_type(DODGE_TYPE)?.to_vec();
-        let jump_type_actor_ids = self.get_actor_ids_by_type(JUMP_TYPE)?.to_vec();
-        let double_jump_type_actor_ids = self.get_actor_ids_by_type(DOUBLE_JUMP_TYPE)?.to_vec();
-        let unique_id_object_id = *self.get_object_id_for_key(UNIQUE_ID_KEY)?;
-        let team_object_id = *self.get_object_id_for_key(TEAM_KEY)?;
-        let player_replication_object_id = *self.get_object_id_for_key(PLAYER_REPLICATION_KEY)?;
-        let vehicle_object_id = *self.get_object_id_for_key(VEHICLE_KEY)?;
+        let cached = self.cached_object_ids;
+        let player_type_object_id =
+            self.required_cached_object_id(cached.player_type, PLAYER_TYPE)?;
+        let car_type_object_id = self.required_cached_object_id(cached.car_type, CAR_TYPE)?;
+        let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
+        let dodge_type_object_id = self.required_cached_object_id(cached.dodge_type, DODGE_TYPE)?;
+        let jump_type_object_id = self.required_cached_object_id(cached.jump_type, JUMP_TYPE)?;
+        let double_jump_type_object_id =
+            self.required_cached_object_id(cached.double_jump_type, DOUBLE_JUMP_TYPE)?;
+        let player_type_actor_ids = self
+            .get_actor_ids_by_object_id(&player_type_object_id)
+            .to_vec();
+        let car_type_actor_ids = self
+            .get_actor_ids_by_object_id(&car_type_object_id)
+            .to_vec();
+        let boost_type_actor_ids = self
+            .get_actor_ids_by_object_id(&boost_type_object_id)
+            .to_vec();
+        let dodge_type_actor_ids = self
+            .get_actor_ids_by_object_id(&dodge_type_object_id)
+            .to_vec();
+        let jump_type_actor_ids = self
+            .get_actor_ids_by_object_id(&jump_type_object_id)
+            .to_vec();
+        let double_jump_type_actor_ids = self
+            .get_actor_ids_by_object_id(&double_jump_type_object_id)
+            .to_vec();
+        let unique_id_object_id =
+            self.required_cached_object_id(cached.unique_id, UNIQUE_ID_KEY)?;
+        let team_object_id = self.required_cached_object_id(cached.team, TEAM_KEY)?;
+        let player_replication_object_id =
+            self.required_cached_object_id(cached.player_replication, PLAYER_REPLICATION_KEY)?;
+        let vehicle_object_id = self.required_cached_object_id(cached.vehicle, VEHICLE_KEY)?;
 
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {

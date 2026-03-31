@@ -9,9 +9,10 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<()> {
         let kickoff_phase_active = self.kickoff_phase_active();
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
-        let boost_replicated_object_id = self.name_to_object_id.get(BOOST_REPLICATED_KEY).copied();
-        let boost_amount_object_id = self.name_to_object_id.get(BOOST_AMOUNT_KEY).copied();
-        let component_active_object_id = self.name_to_object_id.get(COMPONENT_ACTIVE_KEY).copied();
+        let cached = self.cached_object_ids;
+        let boost_replicated_object_id = cached.boost_replicated;
+        let boost_amount_object_id = cached.boost_amount;
+        let component_active_object_id = cached.component_active;
         let updates: Vec<_> = self
             .iter_actors_by_type_err(BOOST_TYPE)?
             .map(|(actor_id, actor_state)| {
