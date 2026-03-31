@@ -41,9 +41,7 @@
 //! ## Stats and exports
 //!
 //! The [`stats`] module houses reducer implementations, stat mechanics helpers,
-//! and the exported stat-field model built around [`ExportedStat`]. The same
-//! export layer is re-exported from [`crate::stats_export`] for compatibility
-//! with older import paths.
+//! and the exported stat-field model built around [`ExportedStat`].
 //!
 //! ## Examples
 //!
@@ -122,7 +120,6 @@ pub mod error;
 pub mod mechanics;
 pub mod processor;
 pub mod stats;
-pub mod stats_export;
 pub mod util;
 
 #[cfg(test)]

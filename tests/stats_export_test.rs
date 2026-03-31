@@ -1,4 +1,12 @@
-use subtr_actor::*;
+use subtr_actor::stats::export::{
+    ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue,
+    LEGACY_STAT_VARIANT,
+};
+use subtr_actor::stats::reducers::{
+    BackboardPlayerStats, BoostStats, CorePlayerStats, DodgeResetStats, DoubleTapPlayerStats,
+    GoalAfterKickoffStats, GoalBuildupStats, PositioningStats, PossessionStats, PressureStats,
+    TouchStats,
+};
 
 fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a ExportedStat {
     fields
