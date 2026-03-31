@@ -35,10 +35,19 @@ headers = subtr_actor.get_column_headers(
 
 replay_meta = subtr_actor.get_replay_meta(replay_path)
 frames_data = subtr_actor.get_replay_frames_data(replay_path)
+stats_timeline = subtr_actor.get_stats_timeline(
+    replay_path,
+    modules=["boost", "movement"],
+)
+dynamic_stats_timeline = subtr_actor.get_dynamic_stats_timeline(
+    replay_path,
+    modules=["boost"],
+)
 
 print(ndarray.shape)
 print(headers["player_headers"][:5])
 print(replay_meta["map_name"])
+print(stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
 ```
 
 ## API Surface
@@ -70,6 +79,24 @@ Get header information for the configured ndarray layout.
 ### `get_replay_frames_data(filepath) -> dict`
 
 Get structured frame-by-frame game state data with no FPS resampling.
+
+### `get_stats_timeline(filepath, modules=None) -> dict`
+
+Get cumulative typed stats snapshots for each replay sample.
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `modules`: optional list of stats module names such as `["boost", "movement"]`. Omit this to collect all modules.
+
+### `get_dynamic_stats_timeline(filepath, modules=None) -> dict`
+
+Get cumulative dynamic stats snapshots for each replay sample.
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `modules`: optional list of stats module names such as `["boost"]`. Omit this to collect all modules.
 
 ## Feature Adders
 

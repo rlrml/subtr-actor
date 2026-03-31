@@ -329,6 +329,35 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 }
 
 #[test]
+fn test_stats_timeline_module_names_round_trip() {
+    for module in [
+        StatsTimelineModule::Core,
+        StatsTimelineModule::Backboard,
+        StatsTimelineModule::CeilingShot,
+        StatsTimelineModule::DoubleTap,
+        StatsTimelineModule::FiftyFifty,
+        StatsTimelineModule::Possession,
+        StatsTimelineModule::Pressure,
+        StatsTimelineModule::Rush,
+        StatsTimelineModule::Touch,
+        StatsTimelineModule::SpeedFlip,
+        StatsTimelineModule::MustyFlick,
+        StatsTimelineModule::DodgeReset,
+        StatsTimelineModule::BallCarry,
+        StatsTimelineModule::Boost,
+        StatsTimelineModule::Movement,
+        StatsTimelineModule::Positioning,
+        StatsTimelineModule::Powerslide,
+        StatsTimelineModule::Demo,
+    ] {
+        assert_eq!(
+            module.as_str().parse::<StatsTimelineModule>().unwrap(),
+            module
+        );
+    }
+}
+
+#[test]
 fn test_stats_timeline_collector_final_frame_matches_reducers() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let timeline = StatsTimelineCollector::new()

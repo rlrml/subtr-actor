@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::str::FromStr;
 
 use serde::Serialize;
 
@@ -57,6 +58,87 @@ const ALL_STATS_TIMELINE_MODULES: [StatsTimelineModule; 18] = [
     StatsTimelineModule::Powerslide,
     StatsTimelineModule::Demo,
 ];
+
+const ALL_STATS_TIMELINE_MODULE_NAMES: [&str; 18] = [
+    "core",
+    "backboard",
+    "ceiling_shot",
+    "double_tap",
+    "fifty_fifty",
+    "possession",
+    "pressure",
+    "rush",
+    "touch",
+    "speed_flip",
+    "musty_flick",
+    "dodge_reset",
+    "ball_carry",
+    "boost",
+    "movement",
+    "positioning",
+    "powerslide",
+    "demo",
+];
+
+impl StatsTimelineModule {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            StatsTimelineModule::Core => "core",
+            StatsTimelineModule::Backboard => "backboard",
+            StatsTimelineModule::CeilingShot => "ceiling_shot",
+            StatsTimelineModule::DoubleTap => "double_tap",
+            StatsTimelineModule::FiftyFifty => "fifty_fifty",
+            StatsTimelineModule::Possession => "possession",
+            StatsTimelineModule::Pressure => "pressure",
+            StatsTimelineModule::Rush => "rush",
+            StatsTimelineModule::Touch => "touch",
+            StatsTimelineModule::SpeedFlip => "speed_flip",
+            StatsTimelineModule::MustyFlick => "musty_flick",
+            StatsTimelineModule::DodgeReset => "dodge_reset",
+            StatsTimelineModule::BallCarry => "ball_carry",
+            StatsTimelineModule::Boost => "boost",
+            StatsTimelineModule::Movement => "movement",
+            StatsTimelineModule::Positioning => "positioning",
+            StatsTimelineModule::Powerslide => "powerslide",
+            StatsTimelineModule::Demo => "demo",
+        }
+    }
+
+    pub fn all_names() -> &'static [&'static str] {
+        &ALL_STATS_TIMELINE_MODULE_NAMES
+    }
+}
+
+impl FromStr for StatsTimelineModule {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_ascii_lowercase().as_str() {
+            "core" => Ok(Self::Core),
+            "backboard" => Ok(Self::Backboard),
+            "ceiling_shot" => Ok(Self::CeilingShot),
+            "double_tap" => Ok(Self::DoubleTap),
+            "fifty_fifty" => Ok(Self::FiftyFifty),
+            "possession" => Ok(Self::Possession),
+            "pressure" => Ok(Self::Pressure),
+            "rush" => Ok(Self::Rush),
+            "touch" => Ok(Self::Touch),
+            "speed_flip" => Ok(Self::SpeedFlip),
+            "musty_flick" => Ok(Self::MustyFlick),
+            "dodge_reset" => Ok(Self::DodgeReset),
+            "ball_carry" => Ok(Self::BallCarry),
+            "boost" => Ok(Self::Boost),
+            "movement" => Ok(Self::Movement),
+            "positioning" => Ok(Self::Positioning),
+            "powerslide" => Ok(Self::Powerslide),
+            "demo" => Ok(Self::Demo),
+            invalid => Err(format!(
+                "Unknown stats timeline module '{invalid}'. Expected one of: {}",
+                Self::all_names().join(", ")
+            )),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatsTimelineModules {

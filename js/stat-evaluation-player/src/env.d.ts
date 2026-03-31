@@ -21,15 +21,25 @@ declare module "@colonelpanic8/subtr-actor" {
     data: Uint8Array,
     callback: (progress: unknown) => void,
     reportEveryNFrames?: number,
+    statsModules?: string[],
   ): {
     rawReplayData: Uint8Array;
     statsTimeline: Uint8Array;
   };
   export function validate_replay(data: Uint8Array): unknown;
-  export function get_stats_timeline(data: Uint8Array): unknown;
-  export function get_stats_timeline_json(data: Uint8Array): Uint8Array;
-  export function get_dynamic_stats_timeline(data: Uint8Array): unknown;
-  export function get_dynamic_stats_timeline_json(data: Uint8Array): Uint8Array;
+  export function get_stats_timeline(data: Uint8Array, modules?: string[]): unknown;
+  export function get_stats_timeline_json(
+    data: Uint8Array,
+    modules?: string[],
+  ): Uint8Array;
+  export function get_dynamic_stats_timeline(
+    data: Uint8Array,
+    modules?: string[],
+  ): unknown;
+  export function get_dynamic_stats_timeline_json(
+    data: Uint8Array,
+    modules?: string[],
+  ): Uint8Array;
 }
 
 declare module "../scripts/ensure-wasm-package.mjs" {

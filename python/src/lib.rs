@@ -34,6 +34,8 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_replay_meta, m)?)?;
     m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
     m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stats_timeline, m)?)?;
+    m.add_function(wrap_pyfunction!(get_dynamic_stats_timeline, m)?)?;
     Ok(())
 }
 
@@ -261,6 +263,29 @@ where
     )
 }
 
+fn build_stats_timeline_collector(
+    modules: Option<Vec<String>>,
+) -> PyResult<subtr_actor::StatsTimelineCollector> {
+    let Some(modules) = modules else {
+        return Ok(subtr_actor::StatsTimelineCollector::new());
+    };
+
+    let parsed_modules = modules
+        .into_iter()
+        .map(|module| {
+            module.parse::<subtr_actor::StatsTimelineModule>().map_err(|error| {
+                PyErr::new::<exceptions::PyValueError, _>(format!(
+                    "Invalid stats timeline module: {error}"
+                ))
+            })
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+
+    Ok(subtr_actor::StatsTimelineCollector::only_modules(
+        parsed_modules,
+    ))
+}
+
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 #[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None))]
@@ -333,5 +358,45 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
     Ok(convert_to_py(
         py,
         &serde_json::to_value(replay_data).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, modules=None))]
+fn get_stats_timeline<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    modules: Option<Vec<String>>,
+) -> PyResult<Py<PyAny>> {
+    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
+    let replay = replay_from_data(&data)?;
+    let timeline = build_stats_timeline_collector(modules)?
+        .get_replay_data(&replay)
+        .map_err(handle_frames_exception)?;
+
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(timeline).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, modules=None))]
+fn get_dynamic_stats_timeline<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    modules: Option<Vec<String>>,
+) -> PyResult<Py<PyAny>> {
+    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
+    let replay = replay_from_data(&data)?;
+    let timeline = build_stats_timeline_collector(modules)?
+        .get_dynamic_replay_data(&replay)
+        .map_err(handle_frames_exception)?;
+
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(timeline).map_err(to_py_error)?,
     ))
 }
