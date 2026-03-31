@@ -763,6 +763,8 @@ pub mod double_tap;
 pub use double_tap::*;
 pub mod demo;
 pub use demo::*;
+pub mod ceiling_shot;
+pub use ceiling_shot::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
 pub mod musty_flick;

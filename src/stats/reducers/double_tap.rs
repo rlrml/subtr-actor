@@ -185,7 +185,9 @@ impl DoubleTapReducer {
         }
 
         let goal_direction = glam::Vec3::new(0.0, target_y, ball.position().z) - ball.position();
-        goal_direction.normalize_or_zero().dot(ball_velocity.normalize_or_zero())
+        goal_direction
+            .normalize_or_zero()
+            .dot(ball_velocity.normalize_or_zero())
             >= MIN_GOAL_ALIGNMENT_COSINE
     }
 }

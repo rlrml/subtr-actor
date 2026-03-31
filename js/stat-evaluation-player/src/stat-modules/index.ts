@@ -8,6 +8,7 @@ import {
   createBackboardModule,
   createBallCarryModule,
   createBoostModule,
+  createCeilingShotModule,
   createCoreModule,
   createDemoModule,
   createDodgeResetModule,
@@ -41,6 +42,7 @@ export function createStatModules(runtime: import("./types.ts").StatModuleRuntim
   return [
     createCoreModule(),
     createBackboardModule(),
+    createCeilingShotModule(),
     createDoubleTapModule(),
     createPossessionModule(runtime),
     createFiftyFiftyModule(),

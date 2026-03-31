@@ -2,11 +2,13 @@ import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
+import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
+  buildCeilingShotTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
   buildMustyFlickTimelineEvents,
@@ -20,6 +22,7 @@ import {
   renderBackboardStats,
   renderBallCarryStats,
   renderBoostStats,
+  renderCeilingShotStats,
   renderCoreStats,
   renderDemoStats,
   renderDodgeResetStats,
@@ -88,6 +91,61 @@ export function createBackboardModule(): StatModule {
       return buildBackboardTimelineEvents(ctx.statsTimeline, ctx.replay);
     },
   });
+}
+
+export function createCeilingShotModule(): StatModule {
+  let overlay: CeilingShotOverlay | null = null;
+
+  return {
+    id: "ceiling-shot",
+    label: "Ceiling Shot",
+
+    setup(ctx) {
+      overlay = new CeilingShotOverlay(
+        ctx.player.sceneState,
+        ctx.player.container,
+        ctx.replay,
+        ctx.statsTimeline,
+      );
+    },
+
+    teardown() {
+      overlay?.dispose();
+      overlay = null;
+    },
+
+    onBeforeRender(info) {
+      overlay?.update(info.currentTime);
+    },
+
+    getTimelineEvents(ctx) {
+      return buildCeilingShotTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return statsFrame.players.map((player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderCeilingShotStats(player.ceiling_shot),
+        player.ceiling_shot?.is_last_ceiling_shot
+          ? '<span class="role-indicator role-forward">Last Ceiling Shot</span>'
+          : "",
+      )).join("");
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderCeilingShotStats(player.ceiling_shot);
+    },
+  };
 }
 
 export function createBallCarryModule(): StatModule {

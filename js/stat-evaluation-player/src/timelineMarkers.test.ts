@@ -6,6 +6,7 @@ import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
+  buildCeilingShotTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
   buildFiftyFiftyTimelineEvents,
@@ -222,6 +223,63 @@ test("buildRushTimelineEvents anchors rush markers to serialized rush event star
       shortLabel: "3v2",
       isTeamZero: false,
       color: "#f59e0b",
+    },
+  ]);
+});
+
+test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = {
+    replay_meta: {},
+    timeline_events: [],
+    ceiling_shot_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        ceiling_contact_time: 0.9,
+        ceiling_contact_frame: 0,
+        time_since_ceiling_contact: 0.3,
+        ceiling_contact_position: [0, -800, 1988],
+        touch_position: [120, -690, 1580],
+        local_ball_position: [70, 0, 40],
+        separation_from_ceiling: 240,
+        roof_alignment: 0.88,
+        forward_alignment: 0.72,
+        forward_approach_speed: 580,
+        ball_speed_change: 610,
+        confidence: 0.84,
+      },
+    ],
+    frames: [],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildCeilingShotTimelineEvents(statsTimeline, replay), [
+    {
+      id: "ceiling-shot:1:Steam:blue-id:840",
+      time: 1.5,
+      frame: 1,
+      kind: "ceiling-shot",
+      label: "Blue ceiling shot 84%",
+      shortLabel: "CS",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
     },
   ]);
 });
@@ -724,6 +782,26 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         is_team_0: true,
       },
     ],
+    ceiling_shot_events: [
+      {
+        time: 1.15,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        ceiling_contact_time: 0.9,
+        ceiling_contact_frame: 0,
+        time_since_ceiling_contact: 0.25,
+        ceiling_contact_position: [0, -800, 1988],
+        touch_position: [120, -690, 1580],
+        local_ball_position: [70, 0, 40],
+        separation_from_ceiling: 240,
+        roof_alignment: 0.88,
+        forward_alignment: 0.72,
+        forward_approach_speed: 580,
+        ball_speed_change: 610,
+        confidence: 0.84,
+      },
+    ],
     double_tap_events: [
       {
         time: 1.1,
@@ -784,6 +862,13 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
               last_musty_time: 1.25,
               is_last_musty: true,
             },
+            ceiling_shot: {
+              count: 1,
+              high_confidence_count: 1,
+              last_ceiling_shot_frame: 1,
+              last_ceiling_shot_time: 1.25,
+              is_last_ceiling_shot: true,
+            },
             touch: {
               touch_count: 1,
               last_touch_frame: 1,
@@ -835,12 +920,21 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   );
   assert.equal(
     countEnabledTimelineEvents(
+      ["core", "fifty-fifty", "rush", "musty-flick", "ceiling-shot"],
+      replay,
+      statsTimeline,
+    ),
+    6,
+  );
+  assert.equal(
+    countEnabledTimelineEvents(
       [
         "core",
         "fifty-fifty",
         "rush",
         "musty-flick",
         "backboard",
+        "ceiling-shot",
         "double-tap",
         "touch",
         "dodge-reset",
@@ -851,6 +945,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    12,
+    13,
   );
 });

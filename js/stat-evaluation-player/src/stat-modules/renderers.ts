@@ -226,6 +226,19 @@ export function renderDoubleTapStats(
   `;
 }
 
+export function renderCeilingShotStats(
+  ceilingShot: PlayerStatsSnapshot["ceiling_shot"],
+): string {
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(ceilingShot?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(ceilingShot?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.last_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.average_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.best_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(ceilingShot?.time_since_last_ceiling_shot), 2, "s")}</span></div>
+  `;
+}
+
 export function renderBallCarryStats(
   ballCarry: PlayerStatsSnapshot["ball_carry"],
 ): string {

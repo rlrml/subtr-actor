@@ -7,6 +7,9 @@ import {
   buildFiftyFiftyMarkers,
 } from "./fiftyFiftyOverlay.ts";
 import {
+  buildCeilingShotMarkers,
+} from "./ceilingShotOverlay.ts";
+import {
   buildTouchMarkers,
   playerIdToString,
 } from "./touchOverlay.ts";
@@ -298,6 +301,24 @@ export function buildBackboardTimelineEvents(
   });
 }
 
+export function buildCeilingShotTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return buildCeilingShotMarkers(statsTimeline, replay).map((marker) => ({
+    id: marker.id,
+    time: marker.time,
+    frame: marker.frame,
+    kind: "ceiling-shot",
+    label: `${marker.playerName} ceiling shot ${marker.qualityLabel}`,
+    shortLabel: "CS",
+    playerId: marker.playerId,
+    playerName: marker.playerName,
+    isTeamZero: marker.isTeamZero,
+    color: marker.isTeamZero ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+  }));
+}
+
 export function buildDoubleTapTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -444,6 +465,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("backboard")) {
     count += buildBackboardTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("ceiling-shot")) {
+    count += buildCeilingShotTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("double-tap")) {

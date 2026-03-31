@@ -18,6 +18,7 @@ pub struct ReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub backboard_events: Vec<BackboardBounceEvent>,
+    pub ceiling_shot_events: Vec<CeilingShotEvent>,
     pub double_tap_events: Vec<DoubleTapEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub rush_events: Vec<RushEvent>,
@@ -39,6 +40,7 @@ pub struct DynamicReplayStatsTimeline {
     pub replay_meta: ReplayMeta,
     pub timeline_events: Vec<TimelineEvent>,
     pub backboard_events: Vec<BackboardBounceEvent>,
+    pub ceiling_shot_events: Vec<CeilingShotEvent>,
     pub double_tap_events: Vec<DoubleTapEvent>,
     pub fifty_fifty_events: Vec<FiftyFiftyEvent>,
     pub rush_events: Vec<RushEvent>,
@@ -112,6 +114,7 @@ pub struct PlayerStatsSnapshot {
     pub is_team_0: bool,
     pub core: CorePlayerStats,
     pub backboard: BackboardPlayerStats,
+    pub ceiling_shot: CeilingShotStats,
     pub double_tap: DoubleTapPlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
@@ -151,6 +154,7 @@ impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
         self.backboard.visit_stat_fields(visitor);
+        self.ceiling_shot.visit_stat_fields(visitor);
         self.double_tap.visit_stat_fields(visitor);
         self.fifty_fifty.visit_stat_fields(visitor);
         self.speed_flip.visit_stat_fields(visitor);
@@ -205,6 +209,7 @@ impl ReplayStatsFrame {
 #[derive(Debug, Clone, Default)]
 struct StatsTimelineReducers {
     backboard: BackboardReducer,
+    ceiling_shot: CeilingShotReducer,
     double_tap: DoubleTapReducer,
     fifty_fifty: FiftyFiftyReducer,
     possession: PossessionReducer,
@@ -249,6 +254,7 @@ impl StatsTimelineReducers {
 impl StatsReducer for StatsTimelineReducers {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.backboard.on_replay_meta(meta)?;
+        self.ceiling_shot.on_replay_meta(meta)?;
         self.double_tap.on_replay_meta(meta)?;
         self.possession.on_replay_meta(meta)?;
         self.pressure.on_replay_meta(meta)?;
@@ -274,6 +280,7 @@ impl StatsReducer for StatsTimelineReducers {
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         self.backboard.on_sample_with_context(sample, ctx)?;
+        self.ceiling_shot.on_sample_with_context(sample, ctx)?;
         self.double_tap.on_sample_with_context(sample, ctx)?;
         self.possession.on_sample_with_context(sample, ctx)?;
         self.pressure.on_sample_with_context(sample, ctx)?;
@@ -294,6 +301,7 @@ impl StatsReducer for StatsTimelineReducers {
     }
 
     fn finish(&mut self) -> SubtrActorResult<()> {
+        self.ceiling_shot.finish()?;
         self.possession.finish()?;
         self.pressure.finish()?;
         self.rush.finish()?;
@@ -415,6 +423,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             backboard_events: self.reducers.backboard.events().to_vec(),
+            ceiling_shot_events: self.reducers.ceiling_shot.events().to_vec(),
             double_tap_events: self.reducers.double_tap.events().to_vec(),
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             rush_events: self.reducers.rush.events().to_vec(),
@@ -455,6 +464,7 @@ impl StatsTimelineCollector {
             replay_meta,
             timeline_events,
             backboard_events: self.reducers.backboard.events().to_vec(),
+            ceiling_shot_events: self.reducers.ceiling_shot.events().to_vec(),
             double_tap_events: self.reducers.double_tap.events().to_vec(),
             fifty_fifty_events: self.reducers.fifty_fifty.events().to_vec(),
             rush_events: self.reducers.rush.events().to_vec(),
@@ -523,6 +533,13 @@ impl StatsTimelineCollector {
                     backboard: self
                         .reducers
                         .backboard
+                        .player_stats()
+                        .get(&player.remote_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                    ceiling_shot: self
+                        .reducers
+                        .ceiling_shot
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()

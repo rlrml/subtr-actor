@@ -11,6 +11,7 @@ export interface StatsTimeline {
   replay_meta: unknown;
   timeline_events: unknown[];
   backboard_events?: BackboardEvent[];
+  ceiling_shot_events?: CeilingShotEvent[];
   double_tap_events?: DoubleTapEvent[];
   fifty_fifty_events?: FiftyFiftyEvent[];
   rush_events?: RushEvent[];
@@ -32,6 +33,25 @@ export interface DoubleTapEvent {
   is_team_0: boolean;
   backboard_time: number;
   backboard_frame: number;
+}
+
+export interface CeilingShotEvent {
+  time: number;
+  frame: number;
+  player?: Record<string, string>;
+  is_team_0: boolean;
+  ceiling_contact_time: number;
+  ceiling_contact_frame: number;
+  time_since_ceiling_contact: number;
+  ceiling_contact_position: [number, number, number];
+  touch_position: [number, number, number];
+  local_ball_position: [number, number, number];
+  separation_from_ceiling: number;
+  roof_alignment: number;
+  forward_alignment: number;
+  forward_approach_speed: number;
+  ball_speed_change: number;
+  confidence: number;
 }
 
 export interface SpeedFlipEvent {
@@ -173,6 +193,19 @@ export interface PlayerStatsSnapshot {
     last_backboard_frame?: number;
     time_since_last_backboard?: number;
     frames_since_last_backboard?: number;
+    [key: string]: unknown;
+  };
+  ceiling_shot?: {
+    count: number;
+    high_confidence_count: number;
+    is_last_ceiling_shot: boolean;
+    last_ceiling_shot_time?: number;
+    last_ceiling_shot_frame?: number;
+    time_since_last_ceiling_shot?: number;
+    frames_since_last_ceiling_shot?: number;
+    last_confidence?: number;
+    average_confidence?: number;
+    best_confidence?: number;
     [key: string]: unknown;
   };
   double_tap?: {

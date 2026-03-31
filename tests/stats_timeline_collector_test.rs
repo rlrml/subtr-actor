@@ -259,6 +259,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         },
         timeline_events: Vec::new(),
         backboard_events: Vec::new(),
+        ceiling_shot_events: Vec::new(),
         double_tap_events: Vec::new(),
         fifty_fifty_events: Vec::new(),
         rush_events: Vec::new(),

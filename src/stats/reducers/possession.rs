@@ -22,6 +22,7 @@ impl PossessionStateLabel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 enum FieldThirdLabel {
     TeamZeroThird,
     NeutralThird,
