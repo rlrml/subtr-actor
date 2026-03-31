@@ -259,6 +259,10 @@ impl TouchReducer {
 }
 
 impl StatsReducer for TouchReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![TOUCH_STATE_SIGNAL_ID]
+    }
+
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample) {
             self.current_last_touch_player = None;

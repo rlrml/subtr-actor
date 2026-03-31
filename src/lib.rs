@@ -36,7 +36,9 @@
 //! - [`StatsTimelineCollector`] accumulates reducer-based replay statistics
 //!   frame by frame and can return either typed snapshots
 //!   ([`ReplayStatsTimeline`]) or a dynamic stat-field representation
-//!   ([`DynamicReplayStatsTimeline`]).
+//!   ([`DynamicReplayStatsTimeline`]). Use
+//!   [`StatsTimelineCollector::only_modules`] when you want a la carte stat
+//!   collection instead of the full reducer bundle.
 //!
 //! ## Stats and exports
 //!

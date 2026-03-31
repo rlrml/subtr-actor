@@ -1,10 +1,11 @@
 use std::any::Any;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde::Serialize;
 
 use super::normalized_y;
 use crate::*;
+use crate::stats::reducers::FIFTY_FIFTY_STATE_SIGNAL_ID;
 
 pub type DerivedSignalId = &'static str;
 
@@ -799,11 +800,58 @@ impl DerivedSignal for FiftyFiftyStateSignal {
 }
 
 pub fn default_derived_signal_graph() -> DerivedSignalGraph {
-    DerivedSignalGraph::new()
-        .with_signal(TouchStateSignal::new())
-        .with_signal(PossessionStateSignal::new())
-        .with_signal(BackboardBounceStateSignal::new())
-        .with_signal(FiftyFiftyStateSignal::new())
+    derived_signal_graph_for_ids([
+        TOUCH_STATE_SIGNAL_ID,
+        POSSESSION_STATE_SIGNAL_ID,
+        BACKBOARD_BOUNCE_STATE_SIGNAL_ID,
+        FIFTY_FIFTY_STATE_SIGNAL_ID,
+    ])
+}
+
+fn derived_signal_dependencies(id: DerivedSignalId) -> &'static [DerivedSignalId] {
+    match id {
+        TOUCH_STATE_SIGNAL_ID => &[],
+        POSSESSION_STATE_SIGNAL_ID => &[TOUCH_STATE_SIGNAL_ID],
+        BACKBOARD_BOUNCE_STATE_SIGNAL_ID => &[],
+        FIFTY_FIFTY_STATE_SIGNAL_ID => &[TOUCH_STATE_SIGNAL_ID, POSSESSION_STATE_SIGNAL_ID],
+        _ => &[],
+    }
+}
+
+fn add_signal_and_dependencies(
+    id: DerivedSignalId,
+    requested: &mut BTreeSet<DerivedSignalId>,
+) {
+    if !requested.insert(id) {
+        return;
+    }
+
+    for dependency in derived_signal_dependencies(id) {
+        add_signal_and_dependencies(*dependency, requested);
+    }
+}
+
+pub fn derived_signal_graph_for_ids<I>(ids: I) -> DerivedSignalGraph
+where
+    I: IntoIterator<Item = DerivedSignalId>,
+{
+    let mut requested = BTreeSet::new();
+    for id in ids {
+        add_signal_and_dependencies(id, &mut requested);
+    }
+
+    let mut graph = DerivedSignalGraph::new();
+    for id in requested {
+        match id {
+            TOUCH_STATE_SIGNAL_ID => graph.push(TouchStateSignal::new()),
+            POSSESSION_STATE_SIGNAL_ID => graph.push(PossessionStateSignal::new()),
+            BACKBOARD_BOUNCE_STATE_SIGNAL_ID => graph.push(BackboardBounceStateSignal::new()),
+            FIFTY_FIFTY_STATE_SIGNAL_ID => graph.push(FiftyFiftyStateSignal::new()),
+            _ => {}
+        }
+    }
+
+    graph
 }
 
 #[cfg(test)]

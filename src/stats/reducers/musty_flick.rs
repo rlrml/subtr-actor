@@ -349,6 +349,10 @@ impl MustyFlickReducer {
 }
 
 impl StatsReducer for MustyFlickReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![TOUCH_STATE_SIGNAL_ID]
+    }
+
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         self.on_sample_internal(sample, &sample.touch_events)
     }

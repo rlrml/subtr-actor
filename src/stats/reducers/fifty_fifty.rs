@@ -367,6 +367,10 @@ impl FiftyFiftyReducer {
 }
 
 impl StatsReducer for FiftyFiftyReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![FIFTY_FIFTY_STATE_SIGNAL_ID]
+    }
+
     fn on_sample_with_context(
         &mut self,
         _sample: &StatsSample,

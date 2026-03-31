@@ -474,6 +474,10 @@ impl PositioningReducer {
 }
 
 impl StatsReducer for PositioningReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![POSSESSION_STATE_SIGNAL_ID]
+    }
+
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let possession_player_before_sample = if live_play {

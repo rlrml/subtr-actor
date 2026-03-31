@@ -238,6 +238,10 @@ fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a E
         .unwrap_or_else(|| panic!("Missing field {domain}.{name}"))
 }
 
+fn has_domain(fields: &[ExportedStat], domain: &str) -> bool {
+    fields.iter().any(|field| field.descriptor.domain == domain)
+}
+
 #[test]
 fn test_stats_timeline_frame_lookup_uses_frame_number() {
     let timeline = ReplayStatsTimeline {
@@ -915,4 +919,84 @@ fn test_stats_timeline_collector_can_export_dynamic_stats() {
         find_field(&dynamic_player.stats, "ball_carry", "count").value,
         StatValue::Unsigned(typed_player.ball_carry.carry_count)
     );
+}
+
+#[test]
+fn test_stats_timeline_collector_only_selected_modules_processes_requested_stats() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let full_timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected full stats timeline data");
+    let selective_timeline = StatsTimelineCollector::only_modules([
+        StatsTimelineModule::Boost,
+        StatsTimelineModule::Movement,
+    ])
+    .get_replay_data(&replay)
+    .expect("Expected selective stats timeline data");
+
+    let full_frame = full_timeline.frames.last().expect("Expected full final frame");
+    let selective_frame = selective_timeline
+        .frames
+        .last()
+        .expect("Expected selective final frame");
+
+    assert_eq!(selective_frame.team_zero.boost, full_frame.team_zero.boost);
+    assert_eq!(selective_frame.team_one.boost, full_frame.team_one.boost);
+    assert_eq!(selective_frame.team_zero.movement, full_frame.team_zero.movement);
+    assert_eq!(selective_frame.team_one.movement, full_frame.team_one.movement);
+    assert_eq!(selective_frame.possession, PossessionStats::default());
+    assert_eq!(selective_frame.pressure, PressureStats::default());
+    assert_eq!(selective_frame.rush, RushStats::default());
+    assert_eq!(selective_frame.team_zero.core, CoreTeamStats::default());
+    assert_eq!(selective_frame.team_zero.backboard, BackboardTeamStats::default());
+    assert_eq!(selective_frame.team_zero.double_tap, DoubleTapTeamStats::default());
+    assert_eq!(selective_frame.team_zero.ball_carry, BallCarryStats::default());
+    assert_eq!(selective_frame.team_zero.demo, DemoTeamStats::default());
+    assert!(selective_timeline.timeline_events.is_empty());
+    assert!(selective_timeline.backboard_events.is_empty());
+    assert!(selective_timeline.double_tap_events.is_empty());
+    assert!(selective_timeline.rush_events.is_empty());
+
+    let selective_player = selective_frame
+        .players
+        .first()
+        .expect("Expected at least one player in selective frame");
+    let full_player = full_frame
+        .players
+        .iter()
+        .find(|player| player.player_id == selective_player.player_id)
+        .expect("Expected matching player in full frame");
+
+    assert_eq!(selective_player.boost, full_player.boost);
+    assert_eq!(selective_player.movement, full_player.movement);
+    assert_eq!(selective_player.core, CorePlayerStats::default());
+    assert_eq!(selective_player.positioning, PositioningStats::default());
+    assert_eq!(selective_player.touch, TouchStats::default());
+}
+
+#[test]
+fn test_stats_timeline_collector_dynamic_export_omits_disabled_modules() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let dynamic_timeline = StatsTimelineCollector::only_modules([StatsTimelineModule::Boost])
+        .get_dynamic_replay_data(&replay)
+        .expect("Expected selective dynamic stats timeline data");
+
+    let dynamic_frame = dynamic_timeline
+        .frames
+        .last()
+        .expect("Expected selective dynamic final frame");
+    let dynamic_player = dynamic_frame
+        .players
+        .first()
+        .expect("Expected at least one player");
+
+    assert!(dynamic_frame.possession.is_empty());
+    assert!(dynamic_frame.pressure.is_empty());
+    assert!(dynamic_frame.rush.is_empty());
+    assert!(has_domain(&dynamic_frame.team_zero.stats, "boost"));
+    assert!(!has_domain(&dynamic_frame.team_zero.stats, "core"));
+    assert!(!has_domain(&dynamic_frame.team_zero.stats, "movement"));
+    assert!(has_domain(&dynamic_player.stats, "boost"));
+    assert!(!has_domain(&dynamic_player.stats, "touch"));
+    assert!(!has_domain(&dynamic_player.stats, "positioning"));
 }

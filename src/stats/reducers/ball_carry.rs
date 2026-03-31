@@ -306,6 +306,10 @@ impl BallCarryReducer {
 }
 
 impl StatsReducer for BallCarryReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![TOUCH_STATE_SIGNAL_ID]
+    }
+
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         let controlling_player = sample
             .touch_events

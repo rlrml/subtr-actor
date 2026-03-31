@@ -287,6 +287,10 @@ impl RushReducer {
 }
 
 impl StatsReducer for RushReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![POSSESSION_STATE_SIGNAL_ID]
+    }
+
     fn on_sample_with_context(
         &mut self,
         sample: &StatsSample,

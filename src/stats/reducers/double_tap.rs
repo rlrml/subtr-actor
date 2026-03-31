@@ -193,6 +193,10 @@ impl DoubleTapReducer {
 }
 
 impl StatsReducer for DoubleTapReducer {
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        vec![BACKBOARD_BOUNCE_STATE_SIGNAL_ID]
+    }
+
     fn on_sample_with_context(
         &mut self,
         sample: &StatsSample,

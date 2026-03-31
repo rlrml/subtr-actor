@@ -330,6 +330,10 @@ pub trait StatsReducer {
         Ok(())
     }
 
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        Vec::new()
+    }
+
     fn on_sample(&mut self, _sample: &StatsSample) -> SubtrActorResult<()> {
         Ok(())
     }
@@ -383,6 +387,14 @@ impl StatsReducer for CompositeStatsReducer {
         Ok(())
     }
 
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        let mut signals = HashSet::new();
+        for child in &self.children {
+            signals.extend(child.required_derived_signals());
+        }
+        signals.into_iter().collect()
+    }
+
     fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
         for child in &mut self.children {
             child.on_sample(sample)?;
@@ -421,11 +433,12 @@ pub struct ReducerCollector<R> {
     last_goal_event_count: usize,
 }
 
-impl<R> ReducerCollector<R> {
+impl<R: StatsReducer> ReducerCollector<R> {
     pub fn new(reducer: R) -> Self {
+        let derived_signals = derived_signal_graph_for_ids(reducer.required_derived_signals());
         Self {
             reducer,
-            derived_signals: default_derived_signal_graph(),
+            derived_signals,
             last_sample_time: None,
             replay_meta_initialized: false,
             last_demolish_count: 0,
@@ -435,7 +448,9 @@ impl<R> ReducerCollector<R> {
             last_goal_event_count: 0,
         }
     }
+}
 
+impl<R> ReducerCollector<R> {
     pub fn into_inner(self) -> R {
         self.reducer
     }
@@ -449,7 +464,7 @@ impl<R> ReducerCollector<R> {
     }
 }
 
-impl<R> From<R> for ReducerCollector<R> {
+impl<R: StatsReducer> From<R> for ReducerCollector<R> {
     fn from(reducer: R) -> Self {
         Self::new(reducer)
     }
