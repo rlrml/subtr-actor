@@ -291,7 +291,7 @@ fn comparable_demo_from_team(stats: &DemoTeamStats) -> ComparableDemoStats {
     }
 }
 
-pub(super) struct ComputedBallchasingComparableStats {
+pub(crate) struct ComputedBallchasingComparableStats {
     pub(super) replay_meta: ReplayMeta,
     pub(super) match_stats: MatchStatsReducer,
     pub(super) boost: BoostReducer,
@@ -442,7 +442,7 @@ impl Collector for ComparableStatsCollector {
     }
 }
 
-pub(super) fn compute_ballchasing_comparable_stats(
+pub(crate) fn compute_ballchasing_comparable_stats(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedBallchasingComparableStats> {
     let mut collector = ComparableStatsCollector::new();
@@ -451,7 +451,7 @@ pub(super) fn compute_ballchasing_comparable_stats(
     Ok(collector.into_stats())
 }
 
-pub(super) fn build_actual_comparable_stats(
+pub(crate) fn build_actual_comparable_stats(
     stats: &ComputedBallchasingComparableStats,
 ) -> ComparableReplayStats {
     let mut comparable = ComparableReplayStats::default();
@@ -548,7 +548,7 @@ pub(super) fn build_actual_comparable_stats(
     comparable
 }
 
-pub(super) fn build_expected_comparable_stats(ballchasing: &Value) -> ComparableReplayStats {
+pub(crate) fn build_expected_comparable_stats(ballchasing: &Value) -> ComparableReplayStats {
     let mut comparable = ComparableReplayStats::default();
 
     for team_color in [TeamColor::Blue, TeamColor::Orange] {

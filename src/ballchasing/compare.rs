@@ -3,14 +3,12 @@ use std::path::Path;
 use anyhow::Context;
 use serde_json::Value;
 
-use crate::*;
-
-use super::config::{MatchConfig, StatMatcher};
-use super::conversion::{
-    build_actual_comparable_stats, build_expected_comparable_stats,
-    compute_ballchasing_comparable_stats,
-};
 use super::report::BallchasingComparisonReport;
+use crate::stats::comparison::{
+    build_actual_comparable_stats, build_expected_comparable_stats,
+    compute_ballchasing_comparable_stats, MatchConfig, StatMatcher,
+};
+use crate::*;
 
 pub fn parse_replay_bytes(data: &[u8]) -> anyhow::Result<boxcars::Replay> {
     boxcars::ParserBuilder::new(data)
@@ -39,7 +37,7 @@ pub fn compare_replay_against_ballchasing(
     let mut matcher = StatMatcher::default();
     expected.compare(&actual, &mut matcher, config);
     Ok(BallchasingComparisonReport {
-        mismatches: matcher.mismatches,
+        mismatches: matcher.into_mismatches(),
     })
 }
 

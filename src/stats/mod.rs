@@ -1,4 +1,5 @@
 mod boost_invariants;
+pub(crate) mod comparison;
 pub mod export;
 pub mod mechanics;
 pub mod reducers;

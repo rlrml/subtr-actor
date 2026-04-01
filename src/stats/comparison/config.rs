@@ -173,7 +173,7 @@ pub fn recommended_ballchasing_match_config() -> MatchConfig {
 }
 
 #[derive(Debug, Default)]
-pub(super) struct StatMatcher {
+pub(crate) struct StatMatcher {
     pub(super) mismatches: Vec<String>,
 }
 
@@ -207,12 +207,16 @@ impl StatMatcher {
         self.mismatches
             .push(format!("{scope}: missing actual player"));
     }
+
+    pub(crate) fn into_mismatches(self) -> Vec<String> {
+        self.mismatches
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::model::TeamColor;
     use super::*;
-    use crate::ballchasing::model::TeamColor;
 
     #[test]
     fn test_match_config_defaults_to_exact() {

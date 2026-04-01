@@ -121,7 +121,7 @@ pub(super) struct ComparableTeamStats {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub(super) struct ComparableReplayStats {
+pub(crate) struct ComparableReplayStats {
     pub(super) blue: ComparableTeamStats,
     pub(super) orange: ComparableTeamStats,
 }
@@ -141,7 +141,7 @@ impl ComparableReplayStats {
         }
     }
 
-    pub(super) fn compare(&self, actual: &Self, matcher: &mut StatMatcher, config: &MatchConfig) {
+    pub(crate) fn compare(&self, actual: &Self, matcher: &mut StatMatcher, config: &MatchConfig) {
         for team in [TeamColor::Blue, TeamColor::Orange] {
             self.team(team)
                 .compare(team, actual.team(team), matcher, config);
