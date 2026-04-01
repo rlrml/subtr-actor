@@ -330,30 +330,10 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 
 #[test]
 fn test_stats_timeline_module_names_round_trip() {
-    for module in [
-        StatsTimelineModule::Core,
-        StatsTimelineModule::Backboard,
-        StatsTimelineModule::CeilingShot,
-        StatsTimelineModule::DoubleTap,
-        StatsTimelineModule::FiftyFifty,
-        StatsTimelineModule::Possession,
-        StatsTimelineModule::Pressure,
-        StatsTimelineModule::Rush,
-        StatsTimelineModule::Touch,
-        StatsTimelineModule::SpeedFlip,
-        StatsTimelineModule::MustyFlick,
-        StatsTimelineModule::DodgeReset,
-        StatsTimelineModule::BallCarry,
-        StatsTimelineModule::Boost,
-        StatsTimelineModule::Movement,
-        StatsTimelineModule::Positioning,
-        StatsTimelineModule::Powerslide,
-        StatsTimelineModule::Demo,
-    ] {
-        assert_eq!(
-            module.as_str().parse::<StatsTimelineModule>().unwrap(),
-            module
-        );
+    for module_name in StatsTimelineModules::all_names() {
+        let modules = StatsTimelineModules::from_builtin_names([*module_name])
+            .expect("builtin module name should be accepted");
+        assert!(modules.contains_name(module_name));
     }
 }
 
@@ -956,12 +936,9 @@ fn test_stats_timeline_collector_only_selected_modules_processes_requested_stats
     let full_timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected full stats timeline data");
-    let selective_timeline = StatsTimelineCollector::only_modules([
-        StatsTimelineModule::Boost,
-        StatsTimelineModule::Movement,
-    ])
-    .get_replay_data(&replay)
-    .expect("Expected selective stats timeline data");
+    let selective_timeline = StatsTimelineCollector::only_modules(["boost", "movement"])
+        .get_replay_data(&replay)
+        .expect("Expected selective stats timeline data");
 
     let full_frame = full_timeline
         .frames
@@ -1024,7 +1001,7 @@ fn test_stats_timeline_collector_only_selected_modules_processes_requested_stats
 #[test]
 fn test_stats_timeline_collector_dynamic_export_omits_disabled_modules() {
     let replay = parse_replay("assets/replays/rlcs.replay");
-    let dynamic_timeline = StatsTimelineCollector::only_modules([StatsTimelineModule::Boost])
+    let dynamic_timeline = StatsTimelineCollector::only_modules(["boost"])
         .get_dynamic_replay_data(&replay)
         .expect("Expected selective dynamic stats timeline data");
 

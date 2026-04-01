@@ -213,13 +213,13 @@ impl Scenario {
             Scenario::ComparableBundle => run_comparable_bundle(replay)?,
             Scenario::StatsTimelineEmptyTyped => {
                 black_box(
-                    StatsTimelineCollector::only_modules(std::iter::empty::<StatsTimelineModule>())
+                    StatsTimelineCollector::only_modules(std::iter::empty::<&str>())
                         .get_replay_data(replay)?,
                 );
             }
             Scenario::StatsTimelineEmptyDynamic => {
                 black_box(
-                    StatsTimelineCollector::only_modules(std::iter::empty::<StatsTimelineModule>())
+                    StatsTimelineCollector::only_modules(std::iter::empty::<&str>())
                         .get_dynamic_replay_data(replay)?,
                 );
             }

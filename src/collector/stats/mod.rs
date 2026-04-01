@@ -12,7 +12,6 @@ pub use builtins::{
 pub use collector::StatsCollector;
 pub use types::{CollectedStats, StatsModule, StatsModuleFactory};
 
-#[cfg(test)]
-pub(crate) use resolver::resolve_stats_module_factories;
+pub(crate) use resolver::{resolve_stats_module_factories, ResolvedStatsModuleFactory};
 #[cfg(test)]
 pub(crate) use types::RuntimeStatsModule;

@@ -34,7 +34,7 @@ fn stats_collector_serializes_selected_modules_by_name() {
 
 #[test]
 fn stats_collector_processes_all_builtin_modules() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay = parse_replay("assets/replays/soccar-lan.replay");
     let collected = StatsCollector::new()
         .get_stats(&replay)
         .expect("stats collection should succeed");

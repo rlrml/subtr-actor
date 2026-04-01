@@ -270,22 +270,11 @@ fn build_stats_timeline_collector(
         return Ok(subtr_actor::StatsTimelineCollector::new());
     };
 
-    let parsed_modules = modules
-        .into_iter()
-        .map(|module| {
-            module
-                .parse::<subtr_actor::StatsTimelineModule>()
-                .map_err(|error| {
-                    PyErr::new::<exceptions::PyValueError, _>(format!(
-                        "Invalid stats timeline module: {error}"
-                    ))
-                })
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-
-    Ok(subtr_actor::StatsTimelineCollector::only_modules(
-        parsed_modules,
-    ))
+    subtr_actor::StatsTimelineCollector::try_only_modules(modules).map_err(|error| {
+        PyErr::new::<exceptions::PyValueError, _>(format!(
+            "Invalid stats timeline module selection: {error:?}"
+        ))
+    })
 }
 
 #[allow(clippy::useless_conversion)]

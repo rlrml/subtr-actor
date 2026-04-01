@@ -23,6 +23,10 @@ pub trait StatsModuleFactory: Send + Sync {
         Vec::new()
     }
 
+    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
+        self.build().required_derived_signals()
+    }
+
     fn build(&self) -> Box<dyn StatsModule>;
 }
 

@@ -4,8 +4,8 @@ use subtr_actor::{
     collector::stats_timeline::ReplayStatsTimeline,
     collector::CallbackCollector,
     BoostReducer, Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector,
-    ReducerCollector, ReplayProcessor, StatsTimelineCollector, StatsTimelineModule,
-    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    ReducerCollector, ReplayProcessor, StatsTimelineCollector, SubtrActorError,
+    SubtrActorErrorVariant, SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 
@@ -36,16 +36,8 @@ fn build_stats_timeline_collector(
         return Ok(StatsTimelineCollector::new());
     };
 
-    let parsed_modules = modules
-        .into_iter()
-        .map(|module| {
-            module.parse::<StatsTimelineModule>().map_err(|error| {
-                JsValue::from_str(&format!("Invalid stats timeline module: {error}"))
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(StatsTimelineCollector::only_modules(parsed_modules))
+    StatsTimelineCollector::try_only_modules(modules)
+        .map_err(|error| JsValue::from_str(&format!("Invalid stats timeline module: {error:?}")))
 }
 
 fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
