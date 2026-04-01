@@ -1,6 +1,62 @@
 use super::*;
 
+struct MappingUpdateContext {
+    player_type_actor_ids: Vec<boxcars::ActorId>,
+    car_type_actor_ids: Vec<boxcars::ActorId>,
+    boost_type_actor_ids: Vec<boxcars::ActorId>,
+    dodge_type_actor_ids: Vec<boxcars::ActorId>,
+    jump_type_actor_ids: Vec<boxcars::ActorId>,
+    double_jump_type_actor_ids: Vec<boxcars::ActorId>,
+    unique_id_object_id: boxcars::ObjectId,
+    team_object_id: boxcars::ObjectId,
+    player_replication_object_id: boxcars::ObjectId,
+    vehicle_object_id: boxcars::ObjectId,
+}
+
 impl<'a> ReplayProcessor<'a> {
+    fn mapping_update_context(&self) -> SubtrActorResult<MappingUpdateContext> {
+        let cached = self.cached_object_ids;
+        let player_type_object_id =
+            self.required_cached_object_id(cached.player_type, PLAYER_TYPE)?;
+        let car_type_object_id = self.required_cached_object_id(cached.car_type, CAR_TYPE)?;
+        let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
+        let dodge_type_object_id = self.required_cached_object_id(cached.dodge_type, DODGE_TYPE)?;
+        let jump_type_object_id = self.required_cached_object_id(cached.jump_type, JUMP_TYPE)?;
+        let double_jump_type_object_id =
+            self.required_cached_object_id(cached.double_jump_type, DOUBLE_JUMP_TYPE)?;
+        let unique_id_object_id =
+            self.required_cached_object_id(cached.unique_id, UNIQUE_ID_KEY)?;
+        let team_object_id = self.required_cached_object_id(cached.team, TEAM_KEY)?;
+        let player_replication_object_id =
+            self.required_cached_object_id(cached.player_replication, PLAYER_REPLICATION_KEY)?;
+        let vehicle_object_id = self.required_cached_object_id(cached.vehicle, VEHICLE_KEY)?;
+
+        Ok(MappingUpdateContext {
+            player_type_actor_ids: self
+                .get_actor_ids_by_object_id(&player_type_object_id)
+                .to_vec(),
+            car_type_actor_ids: self
+                .get_actor_ids_by_object_id(&car_type_object_id)
+                .to_vec(),
+            boost_type_actor_ids: self
+                .get_actor_ids_by_object_id(&boost_type_object_id)
+                .to_vec(),
+            dodge_type_actor_ids: self
+                .get_actor_ids_by_object_id(&dodge_type_object_id)
+                .to_vec(),
+            jump_type_actor_ids: self
+                .get_actor_ids_by_object_id(&jump_type_object_id)
+                .to_vec(),
+            double_jump_type_actor_ids: self
+                .get_actor_ids_by_object_id(&double_jump_type_object_id)
+                .to_vec(),
+            unique_id_object_id,
+            team_object_id,
+            player_replication_object_id,
+            vehicle_object_id,
+        })
+    }
+
     /// This method is responsible for updating various mappings that are used
     /// to track and link different actors in the replay.
     ///
@@ -44,44 +100,12 @@ impl<'a> ReplayProcessor<'a> {
     /// deleted, the function removes the actor's ID from the `player_to_car`
     /// mapping.
     pub(crate) fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
-        let cached = self.cached_object_ids;
-        let player_type_object_id =
-            self.required_cached_object_id(cached.player_type, PLAYER_TYPE)?;
-        let car_type_object_id = self.required_cached_object_id(cached.car_type, CAR_TYPE)?;
-        let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
-        let dodge_type_object_id = self.required_cached_object_id(cached.dodge_type, DODGE_TYPE)?;
-        let jump_type_object_id = self.required_cached_object_id(cached.jump_type, JUMP_TYPE)?;
-        let double_jump_type_object_id =
-            self.required_cached_object_id(cached.double_jump_type, DOUBLE_JUMP_TYPE)?;
-        let player_type_actor_ids = self
-            .get_actor_ids_by_object_id(&player_type_object_id)
-            .to_vec();
-        let car_type_actor_ids = self
-            .get_actor_ids_by_object_id(&car_type_object_id)
-            .to_vec();
-        let boost_type_actor_ids = self
-            .get_actor_ids_by_object_id(&boost_type_object_id)
-            .to_vec();
-        let dodge_type_actor_ids = self
-            .get_actor_ids_by_object_id(&dodge_type_object_id)
-            .to_vec();
-        let jump_type_actor_ids = self
-            .get_actor_ids_by_object_id(&jump_type_object_id)
-            .to_vec();
-        let double_jump_type_actor_ids = self
-            .get_actor_ids_by_object_id(&double_jump_type_object_id)
-            .to_vec();
-        let unique_id_object_id =
-            self.required_cached_object_id(cached.unique_id, UNIQUE_ID_KEY)?;
-        let team_object_id = self.required_cached_object_id(cached.team, TEAM_KEY)?;
-        let player_replication_object_id =
-            self.required_cached_object_id(cached.player_replication, PLAYER_REPLICATION_KEY)?;
-        let vehicle_object_id = self.required_cached_object_id(cached.vehicle, VEHICLE_KEY)?;
+        let ctx = self.mapping_update_context()?;
 
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_ids:expr, $object_id:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
-                    if update.object_id == $object_id && $actor_ids.contains(&update.actor_id) {
+                ($map:expr, $actor_ids:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
+                    if $actor_ids.contains(&update.actor_id) {
                         let value = attribute_match!(&update.attribute, $type)?;
                         let _key = $get_key(update.actor_id, value);
                         let _new_value = $get_value(update.actor_id, value);
@@ -92,11 +116,10 @@ impl<'a> ReplayProcessor<'a> {
                 }};
             }
             macro_rules! maintain_actor_link {
-                ($map:expr, $actor_ids:expr, $object_id:expr $(, skip_value $skip:expr)?) => {
+                ($map:expr, $actor_ids:expr $(, skip_value $skip:expr)?) => {
                     maintain_link!(
                         $map,
                         $actor_ids,
-                        $object_id,
                         // This is slightly confusing, but in these cases we are
                         // using the attribute as the key to the current actor.
                         get_actor_id_from_active_actor,
@@ -108,48 +131,52 @@ impl<'a> ReplayProcessor<'a> {
             }
             macro_rules! maintain_vehicle_key_link {
                 ($map:expr, $actor_ids:expr) => {
-                    maintain_actor_link!($map, $actor_ids, vehicle_object_id)
+                    maintain_actor_link!($map, $actor_ids)
                 };
             }
-            maintain_link!(
-                self.player_to_actor_id,
-                player_type_actor_ids,
-                unique_id_object_id,
-                |_, unique_id: &boxcars::UniqueId| unique_id.remote_id.clone(),
-                use_update_actor,
-                boxcars::Attribute::UniqueId
-            );
-            maintain_link!(
-                self.player_to_team,
-                player_type_actor_ids,
-                team_object_id,
-                // In this case we are using the update actor as the key.
-                use_update_actor,
-                get_actor_id_from_active_actor,
-                boxcars::Attribute::ActiveActor,
-                skip_value boxcars::ActorId(-1)
-            );
-            maintain_actor_link!(
-                self.player_to_car,
-                car_type_actor_ids,
-                player_replication_object_id
-            );
-            // `car_to_player` is intentionally the reverse of `player_to_car`:
-            // key = car actor, value = player actor. We still skip `ActorId(-1)`
-            // so same-frame demolition cleanup does not erase the last valid owner.
-            maintain_link!(
-                self.car_to_player,
-                car_type_actor_ids,
-                player_replication_object_id,
-                use_update_actor,
-                get_actor_id_from_active_actor,
-                boxcars::Attribute::ActiveActor,
-                skip_value boxcars::ActorId(-1)
-            );
-            maintain_vehicle_key_link!(self.car_to_boost, boost_type_actor_ids);
-            maintain_vehicle_key_link!(self.car_to_dodge, dodge_type_actor_ids);
-            maintain_vehicle_key_link!(self.car_to_jump, jump_type_actor_ids);
-            maintain_vehicle_key_link!(self.car_to_double_jump, double_jump_type_actor_ids);
+
+            match update.object_id {
+                object_id if object_id == ctx.unique_id_object_id => {
+                    maintain_link!(
+                        self.player_to_actor_id,
+                        ctx.player_type_actor_ids,
+                        |_, unique_id: &boxcars::UniqueId| unique_id.remote_id.clone(),
+                        use_update_actor,
+                        boxcars::Attribute::UniqueId
+                    );
+                }
+                object_id if object_id == ctx.team_object_id => {
+                    maintain_link!(
+                        self.player_to_team,
+                        ctx.player_type_actor_ids,
+                        use_update_actor,
+                        get_actor_id_from_active_actor,
+                        boxcars::Attribute::ActiveActor,
+                        skip_value boxcars::ActorId(-1)
+                    );
+                }
+                object_id if object_id == ctx.player_replication_object_id => {
+                    maintain_actor_link!(self.player_to_car, ctx.car_type_actor_ids);
+                    maintain_link!(
+                        self.car_to_player,
+                        ctx.car_type_actor_ids,
+                        use_update_actor,
+                        get_actor_id_from_active_actor,
+                        boxcars::Attribute::ActiveActor,
+                        skip_value boxcars::ActorId(-1)
+                    );
+                }
+                object_id if object_id == ctx.vehicle_object_id => {
+                    maintain_vehicle_key_link!(self.car_to_boost, ctx.boost_type_actor_ids);
+                    maintain_vehicle_key_link!(self.car_to_dodge, ctx.dodge_type_actor_ids);
+                    maintain_vehicle_key_link!(self.car_to_jump, ctx.jump_type_actor_ids);
+                    maintain_vehicle_key_link!(
+                        self.car_to_double_jump,
+                        ctx.double_jump_type_actor_ids
+                    );
+                }
+                _ => {}
+            }
         }
 
         for actor_id in frame.deleted_actors.iter() {
