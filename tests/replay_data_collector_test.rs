@@ -162,14 +162,17 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
         actual.dodge_refreshed_events,
         expected.dodge_refreshed_events
     );
-    assert_eq!(actual.flip_reset_events, expected.flip_reset_events);
     assert_eq!(
-        actual.post_wall_dodge_events,
-        expected.post_wall_dodge_events
+        actual.heuristic_data.flip_reset_events,
+        expected.heuristic_data.flip_reset_events
     );
     assert_eq!(
-        actual.flip_reset_followup_dodge_events,
-        expected.flip_reset_followup_dodge_events
+        actual.heuristic_data.post_wall_dodge_events,
+        expected.heuristic_data.post_wall_dodge_events
+    );
+    assert_eq!(
+        actual.heuristic_data.flip_reset_followup_dodge_events,
+        expected.heuristic_data.flip_reset_followup_dodge_events
     );
     assert_eq!(actual.player_stat_events, expected.player_stat_events);
     assert_eq!(actual.goal_events, expected.goal_events);

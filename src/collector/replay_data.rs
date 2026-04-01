@@ -41,6 +41,8 @@ use serde::Serialize;
 
 use crate::*;
 
+pub use super::replay_data_heuristics::{ReplayDataHeuristicData, ReplayDataSupplementalData};
+
 /// Represents the ball state for a single frame in a Rocket League replay.
 ///
 /// The ball can either be in an empty state (when ball syncing is disabled or
@@ -499,11 +501,9 @@ pub struct FrameData {
 /// * `boost_pads` - Resolved standard boost pad layout annotated with replay pad ids when known
 /// * `touch_events` - Exact team touch events plus attributed player when available
 /// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
-/// * `flip_reset_events` - Heuristic sparse flip-reset candidates derived from airborne touch geometry
-/// * `post_wall_dodge_events` - Heuristic airborne dodge uses that occur after wall contact
-/// * `flip_reset_followup_dodge_events` - Heuristic airborne dodge uses following a likely reset touch
 /// * `player_stat_events` - Exact shot/save/assist counter increment events
 /// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
+/// * `heuristic_data` - Heuristic or otherwise derived replay enrichments
 ///
 /// # Example
 ///
@@ -541,44 +541,12 @@ pub struct ReplayData {
     pub touch_events: Vec<TouchEvent>,
     /// Exact dodge refresh events observed via the replay's refreshed-dodge counter
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
-    /// Heuristic flip-reset candidates observed during the replay
-    pub flip_reset_events: Vec<FlipResetEvent>,
-    /// Heuristic airborne dodge uses observed after wall contact
-    pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,
-    /// Heuristic airborne dodge uses observed after a likely reset touch
-    pub flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
     /// Exact player stat counter increments observed during the replay
     pub player_stat_events: Vec<PlayerStatEvent>,
     /// Exact goal events observed during the replay
     pub goal_events: Vec<GoalEvent>,
-}
-
-/// Optional replay-data enrichments produced by collectors that run alongside
-/// [`ReplayDataCollector`] in the same processor pass.
-#[derive(Debug, Clone, Default)]
-pub struct ReplayDataSupplementalData {
-    pub boost_pads: Vec<ResolvedBoostPad>,
-    pub flip_reset_events: Vec<FlipResetEvent>,
-    pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,
-    pub flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
-}
-
-impl ReplayDataSupplementalData {
-    pub fn from_flip_reset_tracker(tracker: FlipResetTracker) -> Self {
-        let (flip_reset_events, post_wall_dodge_events, flip_reset_followup_dodge_events) =
-            tracker.into_events();
-        Self {
-            boost_pads: Vec::new(),
-            flip_reset_events,
-            post_wall_dodge_events,
-            flip_reset_followup_dodge_events,
-        }
-    }
-
-    pub fn with_boost_pads(mut self, boost_pads: Vec<ResolvedBoostPad>) -> Self {
-        self.boost_pads = boost_pads;
-        self
-    }
+    /// Heuristic or otherwise derived replay enrichments
+    pub heuristic_data: ReplayDataHeuristicData,
 }
 
 impl ReplayData {
@@ -782,11 +750,9 @@ impl ReplayDataCollector {
             boost_pads: supplemental_data.boost_pads,
             touch_events: processor.touch_events,
             dodge_refreshed_events: processor.dodge_refreshed_events,
-            flip_reset_events: supplemental_data.flip_reset_events,
-            post_wall_dodge_events: supplemental_data.post_wall_dodge_events,
-            flip_reset_followup_dodge_events: supplemental_data.flip_reset_followup_dodge_events,
             player_stat_events: processor.player_stat_events,
             goal_events: processor.goal_events,
+            heuristic_data: supplemental_data.heuristic_data,
             frame_data: self.get_frame_data(),
         })
     }
