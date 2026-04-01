@@ -64,7 +64,7 @@ pub(super) fn approx_abs(abs_tol: f64) -> impl Fn(f64, f64, &ComparisonTarget) -
     move |actual, expected, _| (actual - expected).abs() <= abs_tol
 }
 
-pub fn recommended_ballchasing_match_config() -> MatchConfig {
+pub fn recommended_match_config() -> MatchConfig {
     MatchConfig::exact()
         .with_rule(
             "shooting percentage abs<=0.01",
@@ -135,7 +135,7 @@ pub fn recommended_ballchasing_match_config() -> MatchConfig {
             approx_abs(1.0),
         )
         .with_rule(
-            "movement distance/speed fields tolerate Ballchasing rounding",
+            "movement distance/speed fields tolerate external rounding",
             |target| {
                 matches!(
                     target.key,

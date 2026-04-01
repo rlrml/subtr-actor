@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use super::report::BallchasingComparisonReport;
 use crate::stats::comparison::{
-    build_actual_comparable_stats, build_expected_comparable_stats,
-    compute_ballchasing_comparable_stats, MatchConfig, StatMatcher,
+    build_actual_comparable_stats, build_expected_comparable_stats, compute_comparable_stats,
+    MatchConfig, StatMatcher,
 };
 use crate::*;
 
@@ -30,7 +30,7 @@ pub fn compare_replay_against_ballchasing(
     ballchasing: &Value,
     config: &MatchConfig,
 ) -> SubtrActorResult<BallchasingComparisonReport> {
-    let computed = compute_ballchasing_comparable_stats(replay)?;
+    let computed = compute_comparable_stats(replay)?;
     let actual = build_actual_comparable_stats(&computed);
     let expected = build_expected_comparable_stats(ballchasing);
 

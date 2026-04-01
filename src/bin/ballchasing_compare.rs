@@ -2,7 +2,7 @@ use anyhow::{bail, Context};
 use reqwest::blocking::Client;
 use serde_json::Value;
 use subtr_actor::ballchasing::{
-    compare_replay_against_ballchasing, parse_replay_bytes, recommended_ballchasing_match_config,
+    compare_replay_against_ballchasing, parse_replay_bytes, recommended_match_config,
 };
 
 fn normalize_replay_id(input: &str) -> &str {
@@ -49,13 +49,10 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("Failed to read replay bytes from {replay_file_url}"))?;
 
     let replay = parse_replay_bytes(replay_bytes.as_ref())?;
-    let report = compare_replay_against_ballchasing(
-        &replay,
-        &ballchasing,
-        &recommended_ballchasing_match_config(),
-    )
-    .map_err(|error| anyhow::Error::new(error.variant))
-    .context("Failed to compute comparable stats from replay")?;
+    let report =
+        compare_replay_against_ballchasing(&replay, &ballchasing, &recommended_match_config())
+            .map_err(|error| anyhow::Error::new(error.variant))
+            .context("Failed to compute comparable stats from replay")?;
 
     if report.is_match() {
         println!("Ballchasing comparison matched for replay {replay_id}");

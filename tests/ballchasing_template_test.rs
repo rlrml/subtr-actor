@@ -7,7 +7,7 @@ macro_rules! ballchasing_fixture_test {
         fn $test_name() {
             let report = subtr_actor::ballchasing::compare_fixture_directory(
                 std::path::Path::new(concat!("assets/ballchasing-fixtures/", $fixture_dir)),
-                &subtr_actor::ballchasing::recommended_ballchasing_match_config(),
+                &subtr_actor::ballchasing::recommended_match_config(),
             )
             .expect("Failed to compare Ballchasing fixture");
             report.assert_matches();

@@ -7,7 +7,7 @@ pub(super) enum TeamColor {
 }
 
 impl TeamColor {
-    pub(super) fn ballchasing_key(self) -> &'static str {
+    pub(super) fn team_key(self) -> &'static str {
         match self {
             Self::Blue => "blue",
             Self::Orange => "orange",

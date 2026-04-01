@@ -152,41 +152,39 @@ fn comparable_core_from_team(stats: &CoreTeamStats) -> ComparableCoreStats {
     }
 }
 
-pub(super) fn raw_boost_amount_as_ballchasing_units(value: f32) -> f64 {
+pub(super) fn raw_boost_amount_as_comparable_units(value: f32) -> f64 {
     boost_amount_to_percent(value) as f64
 }
 
 fn comparable_boost_from_stats(stats: &BoostStats) -> ComparableBoostStats {
     ComparableBoostStats {
-        bpm: Some(raw_boost_amount_as_ballchasing_units(stats.bpm())),
-        avg_amount: Some(raw_boost_amount_as_ballchasing_units(
+        bpm: Some(raw_boost_amount_as_comparable_units(stats.bpm())),
+        avg_amount: Some(raw_boost_amount_as_comparable_units(
             stats.average_boost_amount(),
         )),
-        amount_collected: Some(raw_boost_amount_as_ballchasing_units(
-            stats.amount_collected,
-        )),
-        amount_stolen: Some(raw_boost_amount_as_ballchasing_units(stats.amount_stolen)),
-        amount_collected_big: Some(raw_boost_amount_as_ballchasing_units(
+        amount_collected: Some(raw_boost_amount_as_comparable_units(stats.amount_collected)),
+        amount_stolen: Some(raw_boost_amount_as_comparable_units(stats.amount_stolen)),
+        amount_collected_big: Some(raw_boost_amount_as_comparable_units(
             stats.amount_collected_big,
         )),
-        amount_stolen_big: Some(raw_boost_amount_as_ballchasing_units(
+        amount_stolen_big: Some(raw_boost_amount_as_comparable_units(
             stats.amount_stolen_big,
         )),
-        amount_collected_small: Some(raw_boost_amount_as_ballchasing_units(
+        amount_collected_small: Some(raw_boost_amount_as_comparable_units(
             stats.amount_collected_small,
         )),
-        amount_stolen_small: Some(raw_boost_amount_as_ballchasing_units(
+        amount_stolen_small: Some(raw_boost_amount_as_comparable_units(
             stats.amount_stolen_small,
         )),
         count_collected_big: Some(stats.big_pads_collected as f64),
         count_stolen_big: Some(stats.big_pads_stolen as f64),
         count_collected_small: Some(stats.small_pads_collected as f64),
         count_stolen_small: Some(stats.small_pads_stolen as f64),
-        amount_overfill: Some(raw_boost_amount_as_ballchasing_units(stats.overfill_total)),
-        amount_overfill_stolen: Some(raw_boost_amount_as_ballchasing_units(
+        amount_overfill: Some(raw_boost_amount_as_comparable_units(stats.overfill_total)),
+        amount_overfill_stolen: Some(raw_boost_amount_as_comparable_units(
             stats.overfill_from_stolen,
         )),
-        amount_used_while_supersonic: Some(raw_boost_amount_as_ballchasing_units(
+        amount_used_while_supersonic: Some(raw_boost_amount_as_comparable_units(
             stats.amount_used_while_supersonic,
         )),
         time_zero_boost: Some(stats.time_zero_boost as f64),
@@ -291,7 +289,7 @@ fn comparable_demo_from_team(stats: &DemoTeamStats) -> ComparableDemoStats {
     }
 }
 
-pub(crate) struct ComputedBallchasingComparableStats {
+pub(crate) struct ComputedComparableStats {
     pub(super) replay_meta: ReplayMeta,
     pub(super) match_stats: MatchStatsReducer,
     pub(super) boost: BoostReducer,
@@ -357,8 +355,8 @@ impl ComparableStatsCollector {
         }
     }
 
-    fn into_stats(self) -> ComputedBallchasingComparableStats {
-        ComputedBallchasingComparableStats {
+    fn into_stats(self) -> ComputedComparableStats {
+        ComputedComparableStats {
             replay_meta: self
                 .replay_meta
                 .expect("replay metadata should be initialized before building comparable stats"),
@@ -442,9 +440,9 @@ impl Collector for ComparableStatsCollector {
     }
 }
 
-pub(crate) fn compute_ballchasing_comparable_stats(
+pub(crate) fn compute_comparable_stats(
     replay: &boxcars::Replay,
-) -> SubtrActorResult<ComputedBallchasingComparableStats> {
+) -> SubtrActorResult<ComputedComparableStats> {
     let mut collector = ComparableStatsCollector::new();
     let mut processor = ReplayProcessor::new(replay)?;
     processor.process(&mut collector)?;
@@ -452,7 +450,7 @@ pub(crate) fn compute_ballchasing_comparable_stats(
 }
 
 pub(crate) fn build_actual_comparable_stats(
-    stats: &ComputedBallchasingComparableStats,
+    stats: &ComputedComparableStats,
 ) -> ComparableReplayStats {
     let mut comparable = ComparableReplayStats::default();
 
@@ -548,11 +546,11 @@ pub(crate) fn build_actual_comparable_stats(
     comparable
 }
 
-pub(crate) fn build_expected_comparable_stats(ballchasing: &Value) -> ComparableReplayStats {
+pub(crate) fn build_expected_comparable_stats(expected: &Value) -> ComparableReplayStats {
     let mut comparable = ComparableReplayStats::default();
 
     for team_color in [TeamColor::Blue, TeamColor::Orange] {
-        let Some(team) = ballchasing.get(team_color.ballchasing_key()) else {
+        let Some(team) = expected.get(team_color.team_key()) else {
             continue;
         };
 
@@ -599,8 +597,8 @@ pub(crate) fn build_expected_comparable_stats(ballchasing: &Value) -> Comparable
 #[cfg(test)]
 mod tests {
     use super::{
-        build_actual_comparable_stats, compute_ballchasing_comparable_stats,
-        raw_boost_amount_as_ballchasing_units, ComputedBallchasingComparableStats,
+        build_actual_comparable_stats, compute_comparable_stats,
+        raw_boost_amount_as_comparable_units, ComputedComparableStats,
     };
     use crate::*;
 
@@ -614,9 +612,9 @@ mod tests {
             .unwrap_or_else(|_| panic!("Failed to parse replay file: {path}"))
     }
 
-    fn compute_ballchasing_comparable_stats_reference(
+    fn compute_comparable_stats_reference(
         replay: &boxcars::Replay,
-    ) -> SubtrActorResult<ComputedBallchasingComparableStats> {
+    ) -> SubtrActorResult<ComputedComparableStats> {
         let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
         let mut boost_collector = ReducerCollector::new(BoostReducer::new());
         let mut movement_collector = ReducerCollector::new(MovementReducer::new());
@@ -635,7 +633,7 @@ mod tests {
         ];
         processor.process_all(&mut collectors)?;
 
-        Ok(ComputedBallchasingComparableStats {
+        Ok(ComputedComparableStats {
             replay_meta: processor.get_replay_meta()?,
             match_stats: match_collector.into_inner(),
             boost: boost_collector.into_inner(),
@@ -647,21 +645,21 @@ mod tests {
     }
 
     #[test]
-    fn test_raw_boost_amount_conversion_matches_ballchasing_scale() {
-        assert_eq!(raw_boost_amount_as_ballchasing_units(255.0), 100.0);
-        assert!((raw_boost_amount_as_ballchasing_units(30.6) - 12.0).abs() < 0.1);
-        assert!((raw_boost_amount_as_ballchasing_units(510.0) - 200.0).abs() < 0.1);
+    fn test_raw_boost_amount_conversion_matches_percent_scale() {
+        assert_eq!(raw_boost_amount_as_comparable_units(255.0), 100.0);
+        assert!((raw_boost_amount_as_comparable_units(30.6) - 12.0).abs() < 0.1);
+        assert!((raw_boost_amount_as_comparable_units(510.0) - 200.0).abs() < 0.1);
     }
 
     #[test]
     fn comparable_stats_collector_matches_reference_bundle() {
         let replay = parse_replay("assets/replays/new_boost_format.replay");
         let combined_start = std::time::Instant::now();
-        let combined = compute_ballchasing_comparable_stats(&replay)
-            .expect("combined comparable stats should succeed");
+        let combined =
+            compute_comparable_stats(&replay).expect("combined comparable stats should succeed");
         let combined_duration = combined_start.elapsed();
         let reference_start = std::time::Instant::now();
-        let reference = compute_ballchasing_comparable_stats_reference(&replay)
+        let reference = compute_comparable_stats_reference(&replay)
             .expect("reference comparable stats should succeed");
         let reference_duration = reference_start.elapsed();
 
