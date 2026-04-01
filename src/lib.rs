@@ -33,6 +33,8 @@
 //!   metadata and headers. It supports both explicit feature adders and the
 //!   string-based registry exposed through [`NDArrayCollector::from_strings`]
 //!   and [`NDArrayCollector::from_strings_typed`].
+//! - [`StatsCollector`] accumulates reducer-based replay statistics as a
+//!   module-keyed dynamic payload suitable for extensible module registries.
 //! - [`StatsTimelineCollector`] accumulates reducer-based replay statistics
 //!   frame by frame and can return either typed snapshots
 //!   ([`ReplayStatsTimeline`]) or a dynamic stat-field representation

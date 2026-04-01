@@ -118,6 +118,15 @@ pub enum SubtrActorErrorVariant {
 
     #[error("Callback error: {0}")]
     CallbackError(String),
+
+    #[error("Stats module dependency cycle detected: {cycle:?}")]
+    StatsModuleDependencyCycle { cycle: Vec<String> },
+
+    #[error("Unknown builtin stats module '{0}'")]
+    UnknownStatsModuleName(String),
+
+    #[error("Duplicate emitted stats module name '{name}' for dependency keys {keys:?}")]
+    DuplicateStatsModuleName { name: String, keys: Vec<String> },
 }
 
 /// [`SubtrActorError`] struct provides an error variant

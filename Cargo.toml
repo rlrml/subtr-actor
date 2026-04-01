@@ -37,6 +37,7 @@ ballchasing-cli = ["dep:reqwest"]
 anyhow = "1.0.98"
 boxcars.workspace = true
 derive-new = "0.7.0"
+erased-serde = "0.4.6"
 float-ord = "0.3.2"
 glam = "0.31.0"
 log = "0.4.27"
