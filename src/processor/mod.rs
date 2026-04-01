@@ -128,6 +128,9 @@ struct CachedObjectIds {
     boost_amount: Option<boxcars::ObjectId>,
     component_active: Option<boxcars::ObjectId>,
     seconds_remaining: Option<boxcars::ObjectId>,
+    replicated_state_name: Option<boxcars::ObjectId>,
+    replicated_game_state_time_remaining: Option<boxcars::ObjectId>,
+    ball_has_been_hit: Option<boxcars::ObjectId>,
     ball_hit_team_num: Option<boxcars::ObjectId>,
     dodges_refreshed_counter: Option<boxcars::ObjectId>,
 }
@@ -150,6 +153,9 @@ impl CachedObjectIds {
             boost_amount: cached(BOOST_AMOUNT_KEY),
             component_active: cached(COMPONENT_ACTIVE_KEY),
             seconds_remaining: cached(SECONDS_REMAINING_KEY),
+            replicated_state_name: cached(REPLICATED_STATE_NAME_KEY),
+            replicated_game_state_time_remaining: cached(REPLICATED_GAME_STATE_TIME_REMAINING_KEY),
+            ball_has_been_hit: cached(BALL_HAS_BEEN_HIT_KEY),
             ball_hit_team_num: cached(BALL_HIT_TEAM_NUM_KEY),
             dodges_refreshed_counter: cached(DODGES_REFRESHED_COUNTER_KEY),
         }
@@ -197,6 +203,7 @@ pub struct ReplayProcessor<'a> {
     pub replay: &'a boxcars::Replay,
     spatial_normalization_factor: f32,
     cached_object_ids: CachedObjectIds,
+    is_boost_pad_object: Vec<bool>,
     /// Modeled actor state for the current replay frame.
     pub actor_state: ActorStateModeler,
     /// Mapping from object ids to their replay object names.
@@ -281,6 +288,11 @@ impl<'a> ReplayProcessor<'a> {
                 1.0
             },
             cached_object_ids,
+            is_boost_pad_object: replay
+                .objects
+                .iter()
+                .map(|name| name.contains("VehiclePickup_Boost_TA"))
+                .collect(),
             object_id_to_name,
             name_to_object_id,
             team_zero: Vec::new(),

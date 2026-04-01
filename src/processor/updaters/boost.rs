@@ -10,12 +10,20 @@ impl<'a> ReplayProcessor<'a> {
         let kickoff_phase_active = self.kickoff_phase_active();
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
         let cached = self.cached_object_ids;
+        let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
         let boost_replicated_object_id = cached.boost_replicated;
         let boost_amount_object_id = cached.boost_amount;
         let component_active_object_id = cached.component_active;
-        let updates: Vec<_> = self
-            .iter_actors_by_type_err(BOOST_TYPE)?
-            .map(|(actor_id, actor_state)| {
+        let boost_actor_ids = self
+            .actor_state
+            .actor_ids_by_type
+            .get(&boost_type_object_id)
+            .cloned()
+            .unwrap_or_default();
+        let updates: Vec<_> = boost_actor_ids
+            .into_iter()
+            .map(|actor_id| {
+                let actor_state = self.actor_state.actor_states.get(&actor_id).unwrap();
                 let (
                     actor_amount_value,
                     last_value,
@@ -43,25 +51,21 @@ impl<'a> ReplayProcessor<'a> {
                 if is_active {
                     current_value -= frame.delta * BOOST_USED_RAW_UNITS_PER_SECOND;
                 }
-                (*actor_id, current_value.max(0.0), actor_amount_value)
+                (actor_id, current_value.max(0.0), actor_amount_value)
             })
             .collect();
 
         for (actor_id, current_value, new_last_value) in updates {
-            let derived_attributes = &mut self
-                .actor_state
-                .actor_states
-                .get_mut(&actor_id)
-                .unwrap()
-                .derived_attributes;
-
-            derived_attributes.insert(
-                LAST_BOOST_AMOUNT_KEY.to_string(),
-                (boxcars::Attribute::Byte(new_last_value), frame_index),
+            let actor_state = self.actor_state.actor_states.get_mut(&actor_id).unwrap();
+            actor_state.set_derived_attribute(
+                LAST_BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Byte(new_last_value),
+                frame_index,
             );
-            derived_attributes.insert(
-                BOOST_AMOUNT_KEY.to_string(),
-                (boxcars::Attribute::Float(current_value), frame_index),
+            actor_state.set_derived_attribute(
+                BOOST_AMOUNT_KEY,
+                boxcars::Attribute::Float(current_value),
+                frame_index,
             );
         }
         self.kickoff_phase_active_last_frame = kickoff_phase_active;
@@ -69,12 +73,42 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     fn kickoff_phase_active(&self) -> bool {
-        self.get_replicated_state_name().ok() == Some(55)
-            || self
-                .get_replicated_game_state_time_remaining()
-                .ok()
-                .is_some_and(|countdown| countdown > 0)
-            || self.get_ball_has_been_hit().ok() == Some(false)
+        let Ok(metadata_actor_id) = self.get_metadata_actor_id() else {
+            return false;
+        };
+        let Ok(metadata_state) = self.get_actor_state(metadata_actor_id) else {
+            return false;
+        };
+        let metadata_attributes = &metadata_state.attributes;
+
+        let replicated_state_name = self
+            .cached_object_ids
+            .replicated_state_name
+            .and_then(|object_id| metadata_attributes.get(&object_id))
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Int(value) => Some(*value),
+                _ => None,
+            });
+        let replicated_game_state_time_remaining = self
+            .cached_object_ids
+            .replicated_game_state_time_remaining
+            .and_then(|object_id| metadata_attributes.get(&object_id))
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Int(value) => Some(*value),
+                _ => None,
+            });
+        let ball_has_been_hit = self
+            .cached_object_ids
+            .ball_has_been_hit
+            .and_then(|object_id| metadata_attributes.get(&object_id))
+            .and_then(|(attribute, _)| match attribute {
+                boxcars::Attribute::Boolean(value) => Some(*value),
+                _ => None,
+            });
+
+        replicated_state_name == Some(55)
+            || replicated_game_state_time_remaining.is_some_and(|countdown| countdown > 0)
+            || ball_has_been_hit == Some(false)
     }
 
     fn get_current_boost_values(
@@ -136,8 +170,9 @@ impl<'a> ReplayProcessor<'a> {
     fn actor_is_boost_pad(&self, actor_id: &boxcars::ActorId) -> bool {
         self.get_actor_state_or_recently_deleted(actor_id)
             .ok()
-            .and_then(|state| self.object_id_to_name.get(&state.object_id))
-            .map(|name: &String| name.contains("VehiclePickup_Boost_TA"))
+            .and_then(|state| usize::try_from(state.object_id.0).ok())
+            .and_then(|index| self.is_boost_pad_object.get(index))
+            .copied()
             .unwrap_or(false)
     }
 

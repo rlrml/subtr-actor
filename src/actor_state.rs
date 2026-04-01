@@ -57,6 +57,20 @@ impl ActorState {
         self.attributes
             .insert(update.object_id, (update.attribute.clone(), frame_index))
     }
+
+    pub(crate) fn set_derived_attribute(
+        &mut self,
+        key: &'static str,
+        attribute: boxcars::Attribute,
+        frame_index: usize,
+    ) {
+        if let Some(entry) = self.derived_attributes.get_mut(key) {
+            *entry = (attribute, frame_index);
+        } else {
+            self.derived_attributes
+                .insert(key.to_owned(), (attribute, frame_index));
+        }
+    }
 }
 
 /// A struct modeling the states of multiple actors at a given point in time.
