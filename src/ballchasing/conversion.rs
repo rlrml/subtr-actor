@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use serde_json::Value;
 
 use crate::*;
@@ -299,36 +301,154 @@ pub(super) struct ComputedBallchasingComparableStats {
     pub(super) powerslide: PowerslideReducer,
 }
 
+struct ComparableStatsCollector {
+    match_stats: MatchStatsReducer,
+    boost: BoostReducer,
+    movement: MovementReducer,
+    positioning: PositioningReducer,
+    demo: DemoReducer,
+    powerslide: PowerslideReducer,
+    derived_signals: DerivedSignalGraph,
+    replay_meta: Option<ReplayMeta>,
+    last_sample_time: Option<f32>,
+    last_demolish_count: usize,
+    last_boost_pad_event_count: usize,
+    last_touch_event_count: usize,
+    last_player_stat_event_count: usize,
+    last_goal_event_count: usize,
+}
+
+impl ComparableStatsCollector {
+    fn new() -> Self {
+        let match_stats = MatchStatsReducer::new();
+        let boost = BoostReducer::new();
+        let movement = MovementReducer::new();
+        let positioning = PositioningReducer::new();
+        let demo = DemoReducer::new();
+        let powerslide = PowerslideReducer::new();
+
+        let mut required_signals = BTreeSet::new();
+        for signals in [
+            match_stats.required_derived_signals(),
+            boost.required_derived_signals(),
+            movement.required_derived_signals(),
+            positioning.required_derived_signals(),
+            demo.required_derived_signals(),
+            powerslide.required_derived_signals(),
+        ] {
+            required_signals.extend(signals);
+        }
+
+        Self {
+            match_stats,
+            boost,
+            movement,
+            positioning,
+            demo,
+            powerslide,
+            derived_signals: derived_signal_graph_for_ids(required_signals.into_iter()),
+            replay_meta: None,
+            last_sample_time: None,
+            last_demolish_count: 0,
+            last_boost_pad_event_count: 0,
+            last_touch_event_count: 0,
+            last_player_stat_event_count: 0,
+            last_goal_event_count: 0,
+        }
+    }
+
+    fn into_stats(self) -> ComputedBallchasingComparableStats {
+        ComputedBallchasingComparableStats {
+            replay_meta: self
+                .replay_meta
+                .expect("replay metadata should be initialized before building comparable stats"),
+            match_stats: self.match_stats,
+            boost: self.boost,
+            movement: self.movement,
+            positioning: self.positioning,
+            demo: self.demo,
+            powerslide: self.powerslide,
+        }
+    }
+}
+
+impl Collector for ComparableStatsCollector {
+    fn process_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        _frame: &boxcars::Frame,
+        frame_number: usize,
+        current_time: f32,
+    ) -> SubtrActorResult<TimeAdvance> {
+        if self.replay_meta.is_none() {
+            let replay_meta = processor.get_replay_meta()?;
+            self.derived_signals.on_replay_meta(&replay_meta)?;
+            self.match_stats.on_replay_meta(&replay_meta)?;
+            self.boost.on_replay_meta(&replay_meta)?;
+            self.movement.on_replay_meta(&replay_meta)?;
+            self.positioning.on_replay_meta(&replay_meta)?;
+            self.demo.on_replay_meta(&replay_meta)?;
+            self.powerslide.on_replay_meta(&replay_meta)?;
+            self.replay_meta = Some(replay_meta);
+        }
+
+        let dt = self
+            .last_sample_time
+            .map(|last_time| (current_time - last_time).max(0.0))
+            .unwrap_or(0.0);
+        let mut sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        sample.active_demos.clear();
+        sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
+        sample.boost_pad_events =
+            processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
+        sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
+        sample.player_stat_events =
+            processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
+        sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
+        let analysis_context = self.derived_signals.evaluate(&sample)?;
+
+        self.match_stats
+            .on_sample_with_context(&sample, analysis_context)?;
+        self.boost
+            .on_sample_with_context(&sample, analysis_context)?;
+        self.movement
+            .on_sample_with_context(&sample, analysis_context)?;
+        self.positioning
+            .on_sample_with_context(&sample, analysis_context)?;
+        self.demo
+            .on_sample_with_context(&sample, analysis_context)?;
+        self.powerslide
+            .on_sample_with_context(&sample, analysis_context)?;
+
+        self.last_sample_time = Some(current_time);
+        self.last_demolish_count = processor.demolishes.len();
+        self.last_boost_pad_event_count = processor.boost_pad_events.len();
+        self.last_touch_event_count = processor.touch_events.len();
+        self.last_player_stat_event_count = processor.player_stat_events.len();
+        self.last_goal_event_count = processor.goal_events.len();
+
+        Ok(TimeAdvance::NextFrame)
+    }
+
+    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.derived_signals.finish()?;
+        self.match_stats.finish()?;
+        self.boost.finish()?;
+        self.movement.finish()?;
+        self.positioning.finish()?;
+        self.demo.finish()?;
+        self.powerslide.finish()?;
+        Ok(())
+    }
+}
+
 pub(super) fn compute_ballchasing_comparable_stats(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedBallchasingComparableStats> {
-    let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
-    let mut boost_collector = ReducerCollector::new(BoostReducer::new());
-    let mut movement_collector = ReducerCollector::new(MovementReducer::new());
-    let mut positioning_collector = ReducerCollector::new(PositioningReducer::new());
-    let mut demo_collector = ReducerCollector::new(DemoReducer::new());
-    let mut powerslide_collector = ReducerCollector::new(PowerslideReducer::new());
-
+    let mut collector = ComparableStatsCollector::new();
     let mut processor = ReplayProcessor::new(replay)?;
-    let mut collectors: [&mut dyn Collector; 6] = [
-        &mut match_collector,
-        &mut boost_collector,
-        &mut movement_collector,
-        &mut positioning_collector,
-        &mut demo_collector,
-        &mut powerslide_collector,
-    ];
-    processor.process_all(&mut collectors)?;
-
-    Ok(ComputedBallchasingComparableStats {
-        replay_meta: processor.get_replay_meta()?,
-        match_stats: match_collector.into_inner(),
-        boost: boost_collector.into_inner(),
-        movement: movement_collector.into_inner(),
-        positioning: positioning_collector.into_inner(),
-        demo: demo_collector.into_inner(),
-        powerslide: powerslide_collector.into_inner(),
-    })
+    processor.process(&mut collector)?;
+    Ok(collector.into_stats())
 }
 
 pub(super) fn build_actual_comparable_stats(
@@ -478,12 +598,78 @@ pub(super) fn build_expected_comparable_stats(ballchasing: &Value) -> Comparable
 
 #[cfg(test)]
 mod tests {
-    use super::raw_boost_amount_as_ballchasing_units;
+    use super::{
+        build_actual_comparable_stats, compute_ballchasing_comparable_stats,
+        raw_boost_amount_as_ballchasing_units, ComputedBallchasingComparableStats,
+    };
+    use crate::*;
+
+    fn parse_replay(path: &str) -> boxcars::Replay {
+        let data =
+            std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
+        boxcars::ParserBuilder::new(&data)
+            .must_parse_network_data()
+            .always_check_crc()
+            .parse()
+            .unwrap_or_else(|_| panic!("Failed to parse replay file: {path}"))
+    }
+
+    fn compute_ballchasing_comparable_stats_reference(
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<ComputedBallchasingComparableStats> {
+        let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
+        let mut boost_collector = ReducerCollector::new(BoostReducer::new());
+        let mut movement_collector = ReducerCollector::new(MovementReducer::new());
+        let mut positioning_collector = ReducerCollector::new(PositioningReducer::new());
+        let mut demo_collector = ReducerCollector::new(DemoReducer::new());
+        let mut powerslide_collector = ReducerCollector::new(PowerslideReducer::new());
+
+        let mut processor = ReplayProcessor::new(replay)?;
+        let mut collectors: [&mut dyn Collector; 6] = [
+            &mut match_collector,
+            &mut boost_collector,
+            &mut movement_collector,
+            &mut positioning_collector,
+            &mut demo_collector,
+            &mut powerslide_collector,
+        ];
+        processor.process_all(&mut collectors)?;
+
+        Ok(ComputedBallchasingComparableStats {
+            replay_meta: processor.get_replay_meta()?,
+            match_stats: match_collector.into_inner(),
+            boost: boost_collector.into_inner(),
+            movement: movement_collector.into_inner(),
+            positioning: positioning_collector.into_inner(),
+            demo: demo_collector.into_inner(),
+            powerslide: powerslide_collector.into_inner(),
+        })
+    }
 
     #[test]
     fn test_raw_boost_amount_conversion_matches_ballchasing_scale() {
         assert_eq!(raw_boost_amount_as_ballchasing_units(255.0), 100.0);
         assert!((raw_boost_amount_as_ballchasing_units(30.6) - 12.0).abs() < 0.1);
         assert!((raw_boost_amount_as_ballchasing_units(510.0) - 200.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn comparable_stats_collector_matches_reference_bundle() {
+        let replay = parse_replay("assets/replays/new_boost_format.replay");
+        let combined_start = std::time::Instant::now();
+        let combined = compute_ballchasing_comparable_stats(&replay)
+            .expect("combined comparable stats should succeed");
+        let combined_duration = combined_start.elapsed();
+        let reference_start = std::time::Instant::now();
+        let reference = compute_ballchasing_comparable_stats_reference(&replay)
+            .expect("reference comparable stats should succeed");
+        let reference_duration = reference_start.elapsed();
+
+        eprintln!("combined={combined_duration:?} reference={reference_duration:?}");
+
+        let actual = build_actual_comparable_stats(&combined);
+        let expected = build_actual_comparable_stats(&reference);
+
+        assert_eq!(actual, expected);
     }
 }
