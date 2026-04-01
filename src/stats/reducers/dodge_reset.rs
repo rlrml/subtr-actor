@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DodgeResetStats {
     pub count: u32,
     pub on_ball_count: u32,

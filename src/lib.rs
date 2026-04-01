@@ -116,7 +116,6 @@
 //! println!("rush events: {}", timeline.rush_events.len());
 //! ```
 
-pub mod actor_state;
 pub mod ballchasing;
 pub mod collector;
 pub mod constants;
@@ -128,6 +127,11 @@ pub mod util;
 
 #[cfg(test)]
 mod util_test;
+
+pub mod actor_state {
+    //! Compatibility re-export for processor actor-state types.
+    pub use crate::processor::actor_state::*;
+}
 
 pub use crate::actor_state::*;
 pub use crate::collector::*;

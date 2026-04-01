@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BoostStats {
     pub tracked_time: f32,
     pub boost_integral: f32,

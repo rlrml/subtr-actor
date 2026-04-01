@@ -4,7 +4,7 @@ const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
 const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
 const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PositioningStats {
     pub active_game_time: f32,
     pub tracked_time: f32,

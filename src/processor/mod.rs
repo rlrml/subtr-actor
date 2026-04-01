@@ -2,6 +2,9 @@ use crate::*;
 use boxcars;
 use std::collections::HashMap;
 
+pub mod actor_state;
+pub use actor_state::*;
+
 /// Attempts to match an attribute value with the given type.
 ///
 /// # Arguments
@@ -21,8 +24,8 @@ macro_rules! attribute_match {
             Ok(value)
         } else {
             SubtrActorError::new_result(SubtrActorErrorVariant::UnexpectedAttributeType {
-                expected_type: stringify!(path).to_string(),
-                actual_type: attribute_to_tag(&attribute).to_string(),
+                expected_type: stringify!($type),
+                actual_type: attribute.tag(),
             })
         }
     }};

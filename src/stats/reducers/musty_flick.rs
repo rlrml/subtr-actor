@@ -34,7 +34,7 @@ pub struct MustyFlickEvent {
     pub ball_speed_change: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct MustyFlickStats {
     pub count: u32,
     pub aerial_count: u32,

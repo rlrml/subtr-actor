@@ -2,13 +2,13 @@ use super::*;
 
 const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DemoPlayerStats {
     pub demos_inflicted: u32,
     pub demos_taken: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DemoTeamStats {
     pub demos_inflicted: u32,
 }

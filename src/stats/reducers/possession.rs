@@ -51,13 +51,13 @@ impl FieldThirdLabel {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
     pub team_zero_time: f32,
     pub team_one_time: f32,
     pub neutral_time: f32,
-    #[serde(skip_serializing_if = "LabeledFloatSums::is_empty")]
+    #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
     pub labeled_time: LabeledFloatSums,
 }
 

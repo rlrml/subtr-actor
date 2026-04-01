@@ -60,10 +60,15 @@ enum Scenario {
     StatsTimelineEmptyDynamic,
     StatsTimelineFullTyped,
     StatsTimelineFullDynamic,
+    StatsTimelineFullDynamicValue,
+    StatsCollectorPlayback,
+    StatsCollectorFullTyped,
+    StatsCollectorFullDynamic,
+    StatsCollectorFullDynamicValue,
 }
 
 impl Scenario {
-    const ALL: [Scenario; 28] = [
+    const ALL: [Scenario; 33] = [
         Scenario::ReducerNoop,
         Scenario::SignalTouch,
         Scenario::SignalPossession,
@@ -92,6 +97,11 @@ impl Scenario {
         Scenario::StatsTimelineEmptyDynamic,
         Scenario::StatsTimelineFullTyped,
         Scenario::StatsTimelineFullDynamic,
+        Scenario::StatsTimelineFullDynamicValue,
+        Scenario::StatsCollectorPlayback,
+        Scenario::StatsCollectorFullTyped,
+        Scenario::StatsCollectorFullDynamic,
+        Scenario::StatsCollectorFullDynamicValue,
     ];
 
     fn name(self) -> &'static str {
@@ -124,6 +134,11 @@ impl Scenario {
             Scenario::StatsTimelineEmptyDynamic => "stats_timeline_empty_dynamic",
             Scenario::StatsTimelineFullTyped => "stats_timeline_full_typed",
             Scenario::StatsTimelineFullDynamic => "stats_timeline_full_dynamic",
+            Scenario::StatsTimelineFullDynamicValue => "stats_timeline_full_dynamic_value",
+            Scenario::StatsCollectorPlayback => "stats_collector_playback",
+            Scenario::StatsCollectorFullTyped => "stats_collector_full_typed",
+            Scenario::StatsCollectorFullDynamic => "stats_collector_full_dynamic",
+            Scenario::StatsCollectorFullDynamicValue => "stats_collector_full_dynamic_value",
         }
     }
 
@@ -228,6 +243,30 @@ impl Scenario {
             }
             Scenario::StatsTimelineFullDynamic => {
                 black_box(StatsTimelineCollector::new().get_dynamic_replay_data(replay)?);
+            }
+            Scenario::StatsTimelineFullDynamicValue => {
+                black_box(
+                    serde_json::to_value(
+                        &StatsTimelineCollector::new().get_dynamic_replay_data(replay)?,
+                    )
+                    .map_err(|error| {
+                        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+                            "failed to serialize dynamic stats timeline: {error}",
+                        )))
+                    })?,
+                );
+            }
+            Scenario::StatsCollectorPlayback => {
+                black_box(StatsCollector::new().get_playback_data(replay)?);
+            }
+            Scenario::StatsCollectorFullTyped => {
+                black_box(StatsCollector::new().get_replay_stats_timeline(replay)?);
+            }
+            Scenario::StatsCollectorFullDynamic => {
+                black_box(StatsCollector::new().get_dynamic_replay_stats_timeline(replay)?);
+            }
+            Scenario::StatsCollectorFullDynamicValue => {
+                black_box(StatsCollector::new().get_dynamic_stats_timeline_value(replay)?);
             }
         }
 

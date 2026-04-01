@@ -1,5 +1,4 @@
 use crate::*;
-use boxcars::Attribute;
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
@@ -34,10 +33,10 @@ pub enum SubtrActorErrorVariant {
     #[error("No boost amount value.")]
     NoBoostAmountValue,
 
-    #[error("The attribute value that was found was not of the expected type {expected_type:?} {actual_type:?}")]
+    #[error("The attribute value that was found was not of the expected type {expected_type} {actual_type:?}")]
     UnexpectedAttributeType {
-        expected_type: String,
-        actual_type: String,
+        expected_type: &'static str,
+        actual_type: boxcars::AttributeTag,
     },
 
     #[error("ActorId {actor_id:?} has no matching player id")]
@@ -127,6 +126,9 @@ pub enum SubtrActorErrorVariant {
 
     #[error("Duplicate emitted stats module name '{name}' for dependency keys {keys:?}")]
     DuplicateStatsModuleName { name: String, keys: Vec<String> },
+
+    #[error("Stats serialization error: {0}")]
+    StatsSerializationError(String),
 }
 
 /// [`SubtrActorError`] struct provides an error variant
@@ -152,52 +154,3 @@ impl SubtrActorError {
 
 #[allow(clippy::result_large_err)]
 pub type SubtrActorResult<T> = Result<T, SubtrActorError>;
-
-pub fn attribute_to_tag(attribute: &Attribute) -> &str {
-    match attribute {
-        Attribute::Boolean(_) => "AttributeTag::Boolean",
-        Attribute::Byte(_) => "AttributeTag::Byte",
-        Attribute::AppliedDamage(_) => "AttributeTag::AppliedDamage",
-        Attribute::DamageState(_) => "AttributeTag::DamageState",
-        Attribute::CamSettings(_) => "AttributeTag::CamSettings",
-        Attribute::ClubColors(_) => "AttributeTag::ClubColors",
-        Attribute::Demolish(_) => "AttributeTag::Demolish",
-        Attribute::DemolishFx(_) => "AttributeTag::DemolishFx",
-        Attribute::Enum(_) => "AttributeTag::Enum",
-        Attribute::Explosion(_) => "AttributeTag::Explosion",
-        Attribute::ExtendedExplosion(_) => "AttributeTag::ExtendedExplosion",
-        Attribute::FlaggedByte(_, _) => "AttributeTag::FlaggedByte",
-        Attribute::ActiveActor(_) => "AttributeTag::ActiveActor",
-        Attribute::Float(_) => "AttributeTag::Float",
-        Attribute::GameMode(_, _) => "AttributeTag::GameMode",
-        Attribute::Int(_) => "AttributeTag::Int",
-        Attribute::Int64(_) => "AttributeTag::Int64",
-        Attribute::Loadout(_) => "AttributeTag::Loadout",
-        Attribute::TeamLoadout(_) => "AttributeTag::TeamLoadout",
-        Attribute::Location(_) => "AttributeTag::Location",
-        Attribute::MusicStinger(_) => "AttributeTag::MusicStinger",
-        Attribute::Pickup(_) => "AttributeTag::Pickup",
-        Attribute::PickupNew(_) => "AttributeTag::PickupNew",
-        Attribute::PlayerHistoryKey(_) => "AttributeTag::PlayerHistoryKey",
-        Attribute::Welded(_) => "AttributeTag::Welded",
-        Attribute::RigidBody(_) => "AttributeTag::RigidBody",
-        Attribute::Title(_, _, _, _, _, _, _, _) => "AttributeTag::Title",
-        Attribute::TeamPaint(_) => "AttributeTag::TeamPaint",
-        Attribute::String(_) => "AttributeTag::String",
-        Attribute::UniqueId(_) => "AttributeTag::UniqueId",
-        Attribute::Reservation(_) => "AttributeTag::Reservation",
-        Attribute::PartyLeader(_) => "AttributeTag::PartyLeader",
-        Attribute::LoadoutOnline(_) => "AttributeTag::LoadoutOnline",
-        Attribute::LoadoutsOnline(_) => "AttributeTag::LoadoutsOnline",
-        Attribute::StatEvent(_) => "AttributeTag::StatEvent",
-        Attribute::RepStatTitle(_) => "AttributeTag::RepStatTitle",
-        Attribute::PickupInfo(_) => "AttributeTag::PickupInfo",
-        Attribute::Impulse(_) => "AttributeTag::Impulse",
-        Attribute::QWord(_) => "AttributeTag::QWordString",
-        Attribute::PrivateMatch(_) => "AttributeTag::PrivateMatchSettings",
-        Attribute::Rotation(_) => "AttributeTag::RotationTag",
-        Attribute::DemolishExtended(_) => "AttributeTag::DemolishExtended",
-        Attribute::ReplicatedBoost(_) => "AttributeTag::ReplicatedBoost",
-        Attribute::LogoData(_) => "AttributeTag::LogoData",
-    }
-}

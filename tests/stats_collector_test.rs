@@ -1,21 +1,10 @@
-use std::path::Path;
+mod common;
 
 use subtr_actor::{builtin_stats_module_names, StatsCollector};
 
-fn parse_replay(path: &str) -> boxcars::Replay {
-    let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
-    let data = std::fs::read(&replay_path)
-        .unwrap_or_else(|_| panic!("Failed to read replay file: {}", replay_path.display()));
-    boxcars::ParserBuilder::new(&data[..])
-        .always_check_crc()
-        .must_parse_network_data()
-        .parse()
-        .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
-}
-
 #[test]
 fn stats_collector_serializes_selected_modules_by_name() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay = common::parse_replay("assets/replays/rlcs.replay");
     let collected = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
         .get_stats(&replay)
@@ -34,7 +23,7 @@ fn stats_collector_serializes_selected_modules_by_name() {
 
 #[test]
 fn stats_collector_processes_all_builtin_modules() {
-    let replay = parse_replay("assets/replays/soccar-lan.replay");
+    let replay = common::parse_replay("assets/replays/soccar-lan.replay");
     let collected = StatsCollector::new()
         .get_stats(&replay)
         .expect("stats collection should succeed");
@@ -52,4 +41,56 @@ fn stats_collector_processes_all_builtin_modules() {
             "expected serialized modules to include {module_name}"
         );
     }
+}
+
+#[test]
+fn stats_collector_captures_module_keyed_playback_frames() {
+    let replay = common::parse_replay("assets/replays/soccar-lan.replay");
+    let playback = StatsCollector::with_builtin_module_names(["boost", "movement"])
+        .expect("builtin module selection should be valid")
+        .get_playback_data(&replay)
+        .expect("playback collection should succeed");
+
+    assert!(
+        !playback.frames.is_empty(),
+        "expected playback frames to be captured"
+    );
+    let final_frame = playback
+        .frames
+        .last()
+        .expect("expected a final playback frame");
+    assert!(final_frame.modules.contains_key("boost"));
+    assert!(final_frame.modules.contains_key("movement"));
+    assert!(!final_frame.modules.contains_key("core"));
+}
+
+#[test]
+fn stats_collector_transforms_captured_frame_modules() {
+    let replay = common::parse_replay("assets/replays/soccar-lan.replay");
+    let transformed = StatsCollector::with_builtin_module_names(["boost", "movement"])
+        .expect("builtin module selection should be valid")
+        .with_module_transform(|modules| {
+            let mut names = modules
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>();
+            names.sort();
+            Ok(names)
+        })
+        .capture_frames()
+        .get_captured_data(&replay)
+        .expect("transformed frame capture should succeed");
+
+    assert!(
+        !transformed.frames.is_empty(),
+        "expected transformed frames to be captured"
+    );
+    let final_frame = transformed
+        .frames
+        .last()
+        .expect("expected a final transformed frame");
+    assert_eq!(
+        final_frame.modules,
+        vec!["boost".to_owned(), "movement".to_owned()]
+    );
 }

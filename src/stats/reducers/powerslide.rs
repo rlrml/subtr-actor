@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PowerslideStats {
     pub total_duration: f32,
     pub press_count: u32,

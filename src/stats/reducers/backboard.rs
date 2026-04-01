@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BackboardPlayerStats {
     pub count: u32,
     pub is_last_backboard: bool,
@@ -10,7 +10,7 @@ pub struct BackboardPlayerStats {
     pub frames_since_last_backboard: Option<usize>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BackboardTeamStats {
     pub count: u32,
 }

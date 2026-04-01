@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 
 mod backboard;
 mod ball_carry;
@@ -22,7 +22,7 @@ mod touch;
 pub const LEGACY_STAT_VARIANT: &str = "legacy";
 pub const LABELED_STAT_VARIANT: &str = "labeled";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatUnit {
     Seconds,
@@ -46,17 +46,62 @@ impl StatLabel {
     }
 }
 
+impl<'de> Deserialize<'de> for StatLabel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct OwnedStatLabel {
+            key: String,
+            value: String,
+        }
+
+        let owned = OwnedStatLabel::deserialize(deserializer)?;
+        Ok(Self {
+            key: leak_string(owned.key),
+            value: leak_string(owned.value),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StatDescriptor {
     pub domain: &'static str,
     pub name: &'static str,
     pub variant: &'static str,
     pub unit: StatUnit,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<StatLabel>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+impl<'de> Deserialize<'de> for StatDescriptor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct OwnedStatDescriptor {
+            domain: String,
+            name: String,
+            variant: String,
+            unit: StatUnit,
+            #[serde(default)]
+            labels: Vec<StatLabel>,
+        }
+
+        let owned = OwnedStatDescriptor::deserialize(deserializer)?;
+        Ok(Self {
+            domain: leak_string(owned.domain),
+            name: leak_string(owned.name),
+            variant: leak_string(owned.variant),
+            unit: owned.unit,
+            labels: owned.labels,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "value_type", content = "value", rename_all = "snake_case")]
 pub enum StatValue {
     Float(f32),
@@ -64,13 +109,13 @@ pub enum StatValue {
     Signed(i32),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LabeledCountEntry {
     pub labels: Vec<StatLabel>,
     pub count: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LabeledCounts {
     pub entries: Vec<LabeledCountEntry>,
 }
@@ -121,13 +166,13 @@ impl LabeledCounts {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LabeledFloatSumEntry {
     pub labels: Vec<StatLabel>,
     pub value: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LabeledFloatSums {
     pub entries: Vec<LabeledFloatSumEntry>,
 }
@@ -178,7 +223,7 @@ impl LabeledFloatSums {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExportedStat {
     #[serde(flatten)]
     pub descriptor: StatDescriptor,
@@ -272,4 +317,8 @@ pub trait StatFieldProvider {
         self.visit_stat_fields(&mut |field| fields.push(field));
         fields
     }
+}
+
+fn leak_string(value: String) -> &'static str {
+    Box::leak(value.into_boxed_str())
 }

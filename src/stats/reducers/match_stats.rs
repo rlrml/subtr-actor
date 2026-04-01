@@ -10,17 +10,21 @@ const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 2.5;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct GoalAfterKickoffStats {
     pub kickoff_goal_count: u32,
     pub short_goal_count: u32,
     pub medium_goal_count: u32,
     pub long_goal_count: u32,
-    #[serde(skip)]
+    #[serde(default, skip_serializing)]
     goal_times: Vec<f32>,
 }
 
 impl GoalAfterKickoffStats {
+    pub fn goal_times(&self) -> &[f32] {
+        &self.goal_times
+    }
+
     pub fn record_goal(&mut self, time_after_kickoff: f32) {
         let clamped_time = time_after_kickoff.max(0.0);
         self.goal_times.push(clamped_time);
@@ -74,7 +78,7 @@ enum GoalBuildupKind {
     Other,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct GoalBuildupStats {
     pub counter_attack_goal_count: u32,
     pub sustained_pressure_goal_count: u32,
@@ -97,7 +101,7 @@ impl GoalBuildupStats {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CorePlayerStats {
     pub score: i32,
     pub goals: i32,
@@ -129,7 +133,7 @@ impl CorePlayerStats {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CoreTeamStats {
     pub score: i32,
     pub goals: i32,
@@ -160,7 +164,7 @@ impl CoreTeamStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TimelineEventKind {
     Goal,
     Shot,
@@ -227,7 +231,8 @@ impl MatchStatsReducer {
     }
 
     fn team_stats_for_side(&self, is_team_0: bool) -> CoreTeamStats {
-        self.player_stats
+        let mut stats = self
+            .player_stats
             .iter()
             .filter(|(player_id, _)| self.player_teams.get(*player_id) == Some(&is_team_0))
             .fold(CoreTeamStats::default(), |mut stats, (_, player_stats)| {
@@ -241,7 +246,12 @@ impl MatchStatsReducer {
                     .merge(&player_stats.goal_after_kickoff);
                 stats.goal_buildup.merge(&player_stats.goal_buildup);
                 stats
-            })
+            });
+        stats
+            .goal_after_kickoff
+            .goal_times
+            .sort_by(|left, right| left.total_cmp(right));
+        stats
     }
 
     fn emit_timeline_events(

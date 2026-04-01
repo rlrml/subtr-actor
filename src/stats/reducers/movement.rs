@@ -60,7 +60,7 @@ impl MovementClassification {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct MovementStats {
     pub tracked_time: f32,
     pub total_distance: f32,
@@ -71,7 +71,7 @@ pub struct MovementStats {
     pub time_on_ground: f32,
     pub time_low_air: f32,
     pub time_high_air: f32,
-    #[serde(skip_serializing_if = "LabeledFloatSums::is_empty")]
+    #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
     pub labeled_tracked_time: LabeledFloatSums,
 }
 

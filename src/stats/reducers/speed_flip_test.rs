@@ -274,6 +274,91 @@ fn detects_high_confidence_kickoff_speed_flip_with_sleeping_ball() {
     assert!(reducer.events()[0].confidence >= SPEED_FLIP_HIGH_CONFIDENCE);
 }
 
+fn active_candidate(
+    player_id: u64,
+    start_time: f32,
+    start_frame: usize,
+) -> (PlayerId, ActiveSpeedFlipCandidate) {
+    (
+        RemoteId::Steam(player_id),
+        ActiveSpeedFlipCandidate {
+            is_team_0: player_id == 1,
+            is_kickoff: false,
+            kickoff_start_time: None,
+            start_time,
+            start_frame,
+            start_position: [0.0, 0.0, 17.0],
+            end_position: [100.0, 0.0, 17.0],
+            start_speed: 1200.0,
+            max_speed: 1700.0,
+            best_alignment: 0.95,
+            best_diagonal_score: 0.95,
+            min_forward_z: -0.6,
+            latest_forward_z: -0.1,
+            latest_time: start_time + SPEED_FLIP_EVALUATION_SECONDS,
+            latest_frame: start_frame + 1,
+        },
+    )
+}
+
+#[test]
+fn finalize_candidates_orders_simultaneous_events_deterministically() {
+    let mut reducer = SpeedFlipReducer::new();
+    let (player_one, candidate_one) = active_candidate(1, 0.5, 10);
+    let (player_two, candidate_two) = active_candidate(2, 0.5, 10);
+    reducer
+        .active_candidates
+        .insert(player_two.clone(), candidate_two);
+    reducer
+        .active_candidates
+        .insert(player_one.clone(), candidate_one);
+
+    reducer.finalize_candidates(
+        &sample(
+            100,
+            1.0,
+            rigid_body(
+                glam::Vec3::ZERO,
+                glam::Quat::IDENTITY,
+                glam::Vec3::ZERO,
+                glam::Vec3::ZERO,
+            ),
+            false,
+            None,
+        ),
+        true,
+    );
+
+    assert_eq!(
+        reducer
+            .events()
+            .iter()
+            .map(|event| &event.player)
+            .collect::<Vec<_>>(),
+        vec![&player_one, &player_two]
+    );
+    assert_eq!(
+        reducer.current_last_speed_flip_player.as_ref(),
+        Some(&player_two)
+    );
+    assert_eq!(
+        reducer
+            .player_stats()
+            .get(&player_one)
+            .unwrap()
+            .is_last_speed_flip,
+        false
+    );
+    assert_eq!(
+        reducer
+            .player_stats()
+            .get(&player_two)
+            .unwrap()
+            .is_last_speed_flip,
+        true
+    );
+}
+
 #[test]
 fn detects_high_confidence_non_kickoff_speed_flip() {
     let mut reducer = SpeedFlipReducer::new();

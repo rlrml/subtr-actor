@@ -220,6 +220,47 @@ impl ReplayStatsTimeline {
             .iter()
             .find(|frame| frame.frame_number == frame_number)
     }
+
+    pub fn into_dynamic(self) -> DynamicReplayStatsTimeline {
+        self.into_dynamic_with_modules(&StatsTimelineModules::all())
+    }
+
+    pub fn into_dynamic_with_module_names<I, S>(
+        self,
+        module_names: I,
+    ) -> SubtrActorResult<DynamicReplayStatsTimeline>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        Ok(
+            self.into_dynamic_with_modules(&StatsTimelineModules::from_builtin_names(
+                module_names,
+            )?),
+        )
+    }
+
+    pub fn into_dynamic_with_modules(
+        self,
+        modules: &StatsTimelineModules,
+    ) -> DynamicReplayStatsTimeline {
+        DynamicReplayStatsTimeline {
+            config: self.config,
+            replay_meta: self.replay_meta,
+            timeline_events: self.timeline_events,
+            backboard_events: self.backboard_events,
+            ceiling_shot_events: self.ceiling_shot_events,
+            double_tap_events: self.double_tap_events,
+            fifty_fifty_events: self.fifty_fifty_events,
+            rush_events: self.rush_events,
+            speed_flip_events: self.speed_flip_events,
+            frames: self
+                .frames
+                .into_iter()
+                .map(|frame| frame.into_dynamic_with_modules(modules))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -465,7 +506,10 @@ impl ReplayStatsFrame {
         self.into_dynamic_with_modules(&StatsTimelineModules::all())
     }
 
-    fn into_dynamic_with_modules(self, modules: &StatsTimelineModules) -> DynamicReplayStatsFrame {
+    pub(crate) fn into_dynamic_with_modules(
+        self,
+        modules: &StatsTimelineModules,
+    ) -> DynamicReplayStatsFrame {
         DynamicReplayStatsFrame {
             frame_number: self.frame_number,
             time: self.time,

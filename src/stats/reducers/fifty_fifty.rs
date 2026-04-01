@@ -64,7 +64,7 @@ pub struct FiftyFiftyEvent {
     pub possession_team_is_team_0: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FiftyFiftyStats {
     pub count: u32,
     pub team_zero_wins: u32,
@@ -82,7 +82,7 @@ pub struct FiftyFiftyStats {
     pub kickoff_neutral_possession_after_count: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FiftyFiftyPlayerStats {
     pub count: u32,
     pub wins: u32,

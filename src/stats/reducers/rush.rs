@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::*;
 
@@ -11,7 +11,7 @@ const DEFAULT_RUSH_ATTACK_SUPPORT_DISTANCE_Y: f32 = 900.0;
 const DEFAULT_RUSH_DEFENDER_DISTANCE_Y: f32 = 150.0;
 const DEFAULT_RUSH_MIN_POSSESSION_RETAINED_SECONDS: f32 = 0.75;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RushEvent {
     pub start_time: f32,
     pub start_frame: usize,
@@ -59,7 +59,7 @@ impl Default for RushReducerConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RushStats {
     pub team_zero_count: u32,
     pub team_zero_two_v_one_count: u32,

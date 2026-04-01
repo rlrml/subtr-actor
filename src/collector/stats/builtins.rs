@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 
 use crate::*;
 
-use super::types::{StatsModule, StatsModuleFactory};
+use super::types::{serialize_to_json_value, StatsModule, StatsModuleFactory};
 
 fn player_stats_entries<'a, T>(
     player_stats: &'a HashMap<PlayerId, T>,
@@ -30,8 +30,19 @@ struct PlayerStatsEntry<'a, T> {
 }
 
 #[derive(Serialize)]
+struct OwnedPlayerStatsEntry<T> {
+    player_id: PlayerId,
+    stats: T,
+}
+
+#[derive(Serialize)]
 struct PlayerStatsExport<'a, T> {
     player_stats: Vec<PlayerStatsEntry<'a, T>>,
+}
+
+#[derive(Serialize)]
+struct OwnedPlayerStatsExport<T> {
+    player_stats: Vec<OwnedPlayerStatsEntry<T>>,
 }
 
 #[derive(Serialize)]
@@ -45,6 +56,13 @@ struct TeamPlayerStatsExport<'a, Team, Player> {
     team_zero: &'a Team,
     team_one: &'a Team,
     player_stats: Vec<PlayerStatsEntry<'a, Player>>,
+}
+
+#[derive(Serialize)]
+struct TeamOwnedPlayerStatsExport<'a, Team, Player> {
+    team_zero: &'a Team,
+    team_one: &'a Team,
+    player_stats: Vec<OwnedPlayerStatsEntry<Player>>,
 }
 
 #[derive(Serialize)]
@@ -74,11 +92,100 @@ struct StatsWithPlayerEventsExport<'a, T, Player, E> {
 }
 
 #[derive(Serialize)]
+struct StatsWithPlayerStatsExport<'a, T, Player> {
+    stats: &'a T,
+    player_stats: Vec<PlayerStatsEntry<'a, Player>>,
+}
+
+#[derive(Serialize)]
 struct CoreStatsExport<'a> {
     team_zero: CoreTeamStats,
     team_one: CoreTeamStats,
     player_stats: Vec<PlayerStatsEntry<'a, CorePlayerStats>>,
     timeline: &'a [TimelineEvent],
+}
+
+#[derive(Serialize)]
+struct CoreStatsSnapshotExport {
+    team_zero: CoreTeamStatsPlayback,
+    team_one: CoreTeamStatsPlayback,
+    player_stats: Vec<OwnedPlayerStatsEntry<CorePlayerStatsPlayback>>,
+}
+
+#[derive(Serialize)]
+struct CoreTeamStatsPlayback {
+    score: i32,
+    goals: i32,
+    assists: i32,
+    saves: i32,
+    shots: i32,
+    kickoff_goal_count: u32,
+    short_goal_count: u32,
+    medium_goal_count: u32,
+    long_goal_count: u32,
+    goal_times: Vec<f32>,
+    counter_attack_goal_count: u32,
+    sustained_pressure_goal_count: u32,
+    other_buildup_goal_count: u32,
+}
+
+impl From<CoreTeamStats> for CoreTeamStatsPlayback {
+    fn from(stats: CoreTeamStats) -> Self {
+        Self {
+            score: stats.score,
+            goals: stats.goals,
+            assists: stats.assists,
+            saves: stats.saves,
+            shots: stats.shots,
+            kickoff_goal_count: stats.goal_after_kickoff.kickoff_goal_count,
+            short_goal_count: stats.goal_after_kickoff.short_goal_count,
+            medium_goal_count: stats.goal_after_kickoff.medium_goal_count,
+            long_goal_count: stats.goal_after_kickoff.long_goal_count,
+            goal_times: stats.goal_after_kickoff.goal_times().to_vec(),
+            counter_attack_goal_count: stats.goal_buildup.counter_attack_goal_count,
+            sustained_pressure_goal_count: stats.goal_buildup.sustained_pressure_goal_count,
+            other_buildup_goal_count: stats.goal_buildup.other_buildup_goal_count,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CorePlayerStatsPlayback {
+    score: i32,
+    goals: i32,
+    assists: i32,
+    saves: i32,
+    shots: i32,
+    goals_conceded_while_last_defender: u32,
+    kickoff_goal_count: u32,
+    short_goal_count: u32,
+    medium_goal_count: u32,
+    long_goal_count: u32,
+    goal_times: Vec<f32>,
+    counter_attack_goal_count: u32,
+    sustained_pressure_goal_count: u32,
+    other_buildup_goal_count: u32,
+}
+
+impl From<&CorePlayerStats> for CorePlayerStatsPlayback {
+    fn from(stats: &CorePlayerStats) -> Self {
+        Self {
+            score: stats.score,
+            goals: stats.goals,
+            assists: stats.assists,
+            saves: stats.saves,
+            shots: stats.shots,
+            goals_conceded_while_last_defender: stats.goals_conceded_while_last_defender,
+            kickoff_goal_count: stats.goal_after_kickoff.kickoff_goal_count,
+            short_goal_count: stats.goal_after_kickoff.short_goal_count,
+            medium_goal_count: stats.goal_after_kickoff.medium_goal_count,
+            long_goal_count: stats.goal_after_kickoff.long_goal_count,
+            goal_times: stats.goal_after_kickoff.goal_times().to_vec(),
+            counter_attack_goal_count: stats.goal_buildup.counter_attack_goal_count,
+            sustained_pressure_goal_count: stats.goal_buildup.sustained_pressure_goal_count,
+            other_buildup_goal_count: stats.goal_buildup.other_buildup_goal_count,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -129,6 +236,15 @@ macro_rules! player_stats_module {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            fn playback_frame_json(
+                &self,
+                _replay_meta: &ReplayMeta,
+            ) -> SubtrActorResult<Option<serde_json::Value>> {
+                Ok(Some(serialize_to_json_value(&PlayerStatsExport {
+                    player_stats: player_stats_entries(self.reducer.player_stats()),
+                })?))
+            }
         }
 
         delegate_stats_reducer!($runtime, reducer);
@@ -156,6 +272,15 @@ macro_rules! player_stats_events_module {
         impl StatsModule for $runtime {
             fn name(&self) -> &'static str {
                 $name
+            }
+
+            fn playback_frame_json(
+                &self,
+                _replay_meta: &ReplayMeta,
+            ) -> SubtrActorResult<Option<serde_json::Value>> {
+                Ok(Some(serialize_to_json_value(&PlayerStatsExport {
+                    player_stats: player_stats_entries(self.reducer.player_stats()),
+                })?))
             }
         }
 
@@ -186,6 +311,17 @@ macro_rules! team_player_stats_module {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            fn playback_frame_json(
+                &self,
+                _replay_meta: &ReplayMeta,
+            ) -> SubtrActorResult<Option<serde_json::Value>> {
+                Ok(Some(serialize_to_json_value(&TeamPlayerStatsExport {
+                    team_zero: self.reducer.team_zero_stats(),
+                    team_one: self.reducer.team_one_stats(),
+                    player_stats: player_stats_entries(self.reducer.player_stats()),
+                })?))
+            }
         }
 
         delegate_stats_reducer!($runtime, reducer);
@@ -215,6 +351,17 @@ macro_rules! team_player_events_module {
         impl StatsModule for $runtime {
             fn name(&self) -> &'static str {
                 $name
+            }
+
+            fn playback_frame_json(
+                &self,
+                _replay_meta: &ReplayMeta,
+            ) -> SubtrActorResult<Option<serde_json::Value>> {
+                Ok(Some(serialize_to_json_value(&TeamPlayerStatsExport {
+                    team_zero: self.reducer.team_zero_stats(),
+                    team_one: self.reducer.team_one_stats(),
+                    player_stats: player_stats_entries(self.reducer.player_stats()),
+                })?))
             }
         }
 
@@ -247,6 +394,15 @@ macro_rules! stats_only_module {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            fn playback_frame_json(
+                &self,
+                _replay_meta: &ReplayMeta,
+            ) -> SubtrActorResult<Option<serde_json::Value>> {
+                Ok(Some(serialize_to_json_value(&StatsExport {
+                    stats: self.reducer.stats(),
+                })?))
+            }
         }
 
         delegate_stats_reducer!($runtime, reducer);
@@ -265,37 +421,6 @@ macro_rules! stats_only_module {
     };
 }
 
-macro_rules! stats_events_module {
-    ($runtime:ident, $name:literal, $reducer:ty) => {
-        struct $runtime {
-            reducer: $reducer,
-        }
-
-        impl StatsModule for $runtime {
-            fn name(&self) -> &'static str {
-                $name
-            }
-        }
-
-        delegate_stats_reducer!($runtime, reducer);
-
-        impl Serialize for $runtime {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                StatsWithEventsExport {
-                    stats: self.reducer.stats(),
-                    events: self.reducer.events(),
-                }
-                .serialize(serializer)
-            }
-        }
-    };
-}
-
-player_stats_module!(TouchStatsModule, "touch", TouchReducer);
-player_stats_module!(PositioningStatsModule, "positioning", PositioningReducer);
 player_stats_module!(DodgeResetStatsModule, "dodge_reset", DodgeResetReducer);
 
 player_stats_events_module!(CeilingShotStatsModule, "ceiling_shot", CeilingShotReducer);
@@ -303,16 +428,223 @@ player_stats_events_module!(SpeedFlipStatsModule, "speed_flip", SpeedFlipReducer
 player_stats_events_module!(MustyFlickStatsModule, "musty_flick", MustyFlickReducer);
 
 team_player_stats_module!(BoostStatsModule, "boost", BoostReducer);
-team_player_stats_module!(MovementStatsModule, "movement", MovementReducer);
 team_player_stats_module!(PowerslideStatsModule, "powerslide", PowerslideReducer);
 
 team_player_events_module!(BackboardStatsModule, "backboard", BackboardReducer);
 team_player_events_module!(DoubleTapStatsModule, "double_tap", DoubleTapReducer);
 
 stats_only_module!(PossessionStatsModule, "possession", PossessionReducer);
-stats_only_module!(PressureStatsModule, "pressure", PressureReducer);
 
-stats_events_module!(RushStatsModule, "rush", RushReducer);
+struct TouchStatsModule {
+    reducer: TouchReducer,
+}
+
+impl StatsModule for TouchStatsModule {
+    fn name(&self) -> &'static str {
+        "touch"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        let player_stats = self
+            .reducer
+            .player_stats()
+            .iter()
+            .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                player_id: player_id.clone(),
+                stats: stats.clone().with_complete_labeled_touch_counts(),
+            })
+            .collect();
+        Ok(Some(serialize_to_json_value(&OwnedPlayerStatsExport {
+            player_stats,
+        })?))
+    }
+}
+
+delegate_stats_reducer!(TouchStatsModule, reducer);
+
+impl Serialize for TouchStatsModule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        PlayerStatsExport {
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        }
+        .serialize(serializer)
+    }
+}
+
+struct MovementStatsModule {
+    reducer: MovementReducer,
+}
+
+impl StatsModule for MovementStatsModule {
+    fn name(&self) -> &'static str {
+        "movement"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        let player_stats = self
+            .reducer
+            .player_stats()
+            .iter()
+            .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                player_id: player_id.clone(),
+                stats: stats.clone().with_complete_labeled_tracked_time(),
+            })
+            .collect();
+        Ok(Some(serialize_to_json_value(
+            &TeamOwnedPlayerStatsExport {
+                team_zero: self.reducer.team_zero_stats(),
+                team_one: self.reducer.team_one_stats(),
+                player_stats,
+            },
+        )?))
+    }
+}
+
+delegate_stats_reducer!(MovementStatsModule, reducer);
+
+impl Serialize for MovementStatsModule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        TeamPlayerStatsExport {
+            team_zero: self.reducer.team_zero_stats(),
+            team_one: self.reducer.team_one_stats(),
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        }
+        .serialize(serializer)
+    }
+}
+
+struct PositioningStatsModule {
+    reducer: PositioningReducer,
+}
+
+impl StatsModule for PositioningStatsModule {
+    fn name(&self) -> &'static str {
+        "positioning"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&PlayerStatsExport {
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        })?))
+    }
+
+    fn playback_config_json(&self) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&serde_json::json!({
+            "most_back_forward_threshold_y": self.reducer.config().most_back_forward_threshold_y,
+        }))?))
+    }
+}
+
+delegate_stats_reducer!(PositioningStatsModule, reducer);
+
+impl Serialize for PositioningStatsModule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        PlayerStatsExport {
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        }
+        .serialize(serializer)
+    }
+}
+
+struct PressureStatsModule {
+    reducer: PressureReducer,
+}
+
+impl StatsModule for PressureStatsModule {
+    fn name(&self) -> &'static str {
+        "pressure"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&StatsExport {
+            stats: self.reducer.stats(),
+        })?))
+    }
+
+    fn playback_config_json(&self) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&serde_json::json!({
+            "pressure_neutral_zone_half_width_y": self.reducer.config().neutral_zone_half_width_y,
+        }))?))
+    }
+}
+
+delegate_stats_reducer!(PressureStatsModule, reducer);
+
+impl Serialize for PressureStatsModule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        StatsExport {
+            stats: self.reducer.stats(),
+        }
+        .serialize(serializer)
+    }
+}
+
+struct RushStatsModule {
+    reducer: RushReducer,
+}
+
+impl StatsModule for RushStatsModule {
+    fn name(&self) -> &'static str {
+        "rush"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&StatsExport {
+            stats: self.reducer.stats(),
+        })?))
+    }
+
+    fn playback_config_json(&self) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&serde_json::json!({
+            "rush_max_start_y": self.reducer.config().max_start_y,
+            "rush_attack_support_distance_y": self.reducer.config().attack_support_distance_y,
+            "rush_defender_distance_y": self.reducer.config().defender_distance_y,
+            "rush_min_possession_retained_seconds": self.reducer.config().min_possession_retained_seconds,
+        }))?))
+    }
+}
+
+delegate_stats_reducer!(RushStatsModule, reducer);
+
+impl Serialize for RushStatsModule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        StatsWithEventsExport {
+            stats: self.reducer.stats(),
+            events: self.reducer.events(),
+        }
+        .serialize(serializer)
+    }
+}
 
 struct BallCarryStatsModule {
     reducer: BallCarryReducer,
@@ -321,6 +653,17 @@ struct BallCarryStatsModule {
 impl StatsModule for BallCarryStatsModule {
     fn name(&self) -> &'static str {
         "ball_carry"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&TeamPlayerStatsExport {
+            team_zero: self.reducer.team_zero_stats(),
+            team_one: self.reducer.team_one_stats(),
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        })?))
     }
 }
 
@@ -349,6 +692,18 @@ impl StatsModule for FiftyFiftyStatsModule {
     fn name(&self) -> &'static str {
         "fifty_fifty"
     }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(
+            &StatsWithPlayerStatsExport {
+                stats: self.reducer.stats(),
+                player_stats: player_stats_entries(self.reducer.player_stats()),
+            },
+        )?))
+    }
 }
 
 delegate_stats_reducer!(FiftyFiftyStatsModule, reducer);
@@ -374,6 +729,29 @@ struct CoreStatsModule {
 impl StatsModule for CoreStatsModule {
     fn name(&self) -> &'static str {
         "core"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        let mut player_stats: Vec<_> = self
+            .reducer
+            .player_stats()
+            .iter()
+            .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                player_id: player_id.clone(),
+                stats: CorePlayerStatsPlayback::from(stats),
+            })
+            .collect();
+        player_stats.sort_by(|left, right| {
+            format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+        });
+        Ok(Some(serialize_to_json_value(&CoreStatsSnapshotExport {
+            team_zero: self.reducer.team_zero_stats().into(),
+            team_one: self.reducer.team_one_stats().into(),
+            player_stats,
+        })?))
     }
 }
 
@@ -401,6 +779,17 @@ struct DemoStatsModule {
 impl StatsModule for DemoStatsModule {
     fn name(&self) -> &'static str {
         "demo"
+    }
+
+    fn playback_frame_json(
+        &self,
+        _replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Option<serde_json::Value>> {
+        Ok(Some(serialize_to_json_value(&TeamPlayerStatsExport {
+            team_zero: self.reducer.team_zero_stats(),
+            team_one: self.reducer.team_one_stats(),
+            player_stats: player_stats_entries(self.reducer.player_stats()),
+        })?))
     }
 }
 

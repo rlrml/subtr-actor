@@ -12,7 +12,7 @@ pub struct DoubleTapEvent {
     pub backboard_frame: usize,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DoubleTapPlayerStats {
     pub count: u32,
     pub is_last_double_tap: bool,
@@ -22,7 +22,7 @@ pub struct DoubleTapPlayerStats {
     pub frames_since_last_double_tap: Option<usize>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DoubleTapTeamStats {
     pub count: u32,
 }

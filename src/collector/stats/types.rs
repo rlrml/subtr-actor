@@ -3,11 +3,20 @@ use std::sync::Arc;
 use erased_serde::serialize_trait_object;
 use serde::ser::{SerializeMap, SerializeStruct};
 use serde::{Serialize, Serializer};
+use serde_json::Value;
 
 use crate::*;
 
 pub trait StatsModule: StatsReducer + erased_serde::Serialize {
     fn name(&self) -> &'static str;
+
+    fn playback_frame_json(&self, _replay_meta: &ReplayMeta) -> SubtrActorResult<Option<Value>> {
+        Ok(None)
+    }
+
+    fn playback_config_json(&self) -> SubtrActorResult<Option<Value>> {
+        Ok(None)
+    }
 }
 
 serialize_trait_object!(StatsModule);
@@ -39,6 +48,18 @@ impl Serialize for DynStatsModule<'_> {
     {
         erased_serde::serialize(self.0, serializer).map_err(serde::ser::Error::custom)
     }
+}
+
+pub(crate) fn stats_module_to_json_value(module: &dyn StatsModule) -> SubtrActorResult<Value> {
+    serialize_to_json_value(&DynStatsModule(module))
+}
+
+pub(crate) fn serialize_to_json_value<T: Serialize + ?Sized>(value: &T) -> SubtrActorResult<Value> {
+    serde_json::to_value(value).map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+            error.to_string(),
+        ))
+    })
 }
 
 pub(crate) struct RuntimeStatsModule {

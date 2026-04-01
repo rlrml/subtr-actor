@@ -33,7 +33,7 @@ pub struct CeilingShotEvent {
     pub confidence: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CeilingShotStats {
     pub count: u32,
     pub high_confidence_count: u32,

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use boxcars;
 use boxcars::HeaderProp;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::boost_invariants::{boost_invariant_violations, BoostInvariantKind};
 use crate::*;

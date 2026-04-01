@@ -67,7 +67,7 @@ impl TouchClassification {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct TouchStats {
     pub touch_count: u32,
     pub dribble_touch_count: u32,
@@ -84,7 +84,7 @@ pub struct TouchStats {
     pub last_ball_speed_change: Option<f32>,
     pub max_ball_speed_change: f32,
     pub cumulative_ball_speed_change: f32,
-    #[serde(skip_serializing_if = "LabeledCounts::is_empty")]
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_touch_counts: LabeledCounts,
 }
 
