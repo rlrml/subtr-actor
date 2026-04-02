@@ -27,6 +27,11 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: |
+          js/player/package-lock.json
+          js/stat-evaluation-player/package-lock.json
+          js/example/package-lock.json
 
     - name: Install wasm-pack
       run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -61,6 +66,10 @@ jobs:
       working-directory: js/player
       run: npm ci
 
+    - name: Typecheck player package
+      working-directory: js/player
+      run: npm run check
+
     - name: Build player package
       working-directory: js/player
       run: npm run build
@@ -69,12 +78,24 @@ jobs:
       working-directory: js/stat-evaluation-player
       run: npm ci
 
+    - name: Typecheck stats player package
+      working-directory: js/stat-evaluation-player
+      run: npm run check
+
     - name: Test stats player package
       working-directory: js/stat-evaluation-player
       run: npm test
 
     - name: Build stats player package
       working-directory: js/stat-evaluation-player
+      run: npm run build
+
+    - name: Install example dependencies
+      working-directory: js/example
+      run: npm ci
+
+    - name: Build example package
+      working-directory: js/example
       run: npm run build
 
     - name: Build release
