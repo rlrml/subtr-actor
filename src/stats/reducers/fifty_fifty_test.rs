@@ -36,8 +36,8 @@ fn sample(
     touch_events: Vec<TouchEvent>,
     kickoff_countdown_time: Option<i32>,
     ball_has_been_hit: Option<bool>,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0 / 120.0,
@@ -124,7 +124,7 @@ fn contested_touch_builds_horizontal_plane() {
         Some(0),
         Some(false),
     );
-    let active = FiftyFiftyReducer::contested_touch(&sample, &touch_events, true).unwrap();
+    let active = FiftyFiftyCalculator::contested_touch(&sample, &touch_events, true).unwrap();
 
     assert!(active.is_kickoff);
     assert_eq!(active.team_zero_player, Some(RemoteId::Steam(1)));
@@ -162,7 +162,7 @@ fn winning_team_uses_ball_side_and_velocity() {
         None,
         Some(true),
     );
-    let active = FiftyFiftyReducer::contested_touch(&start, &touch_events, false).unwrap();
+    let active = FiftyFiftyCalculator::contested_touch(&start, &touch_events, false).unwrap();
 
     let blue_side = sample(
         11,
@@ -188,18 +188,18 @@ fn winning_team_uses_ball_side_and_velocity() {
     );
 
     assert_eq!(
-        FiftyFiftyReducer::winning_team_from_ball(&active, &blue_side),
+        FiftyFiftyCalculator::winning_team_from_ball(&active, &blue_side),
         Some(false)
     );
     assert_eq!(
-        FiftyFiftyReducer::winning_team_from_ball(&active, &orange_side),
+        FiftyFiftyCalculator::winning_team_from_ball(&active, &orange_side),
         Some(true)
     );
 }
 
 #[test]
 fn reducer_tracks_kickoff_wins_and_possession_after() {
-    let mut reducer = FiftyFiftyReducer::new();
+    let mut reducer = FiftyFiftyCalculator::new();
     reducer.apply_event(&FiftyFiftyEvent {
         start_time: 0.1,
         start_frame: 10,

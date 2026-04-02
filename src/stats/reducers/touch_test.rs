@@ -1,6 +1,7 @@
 use boxcars::RemoteId;
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(x: f32, y: f32, z: f32, vx: f32, vy: f32, vz: f32) -> boxcars::RigidBody {
     boxcars::RigidBody {
@@ -31,8 +32,8 @@ fn sample(
     player_z: f32,
     ball_velocity_x: f32,
     touch: bool,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0 / 120.0,
@@ -102,7 +103,7 @@ fn sample(
 
 #[test]
 fn touch_reducer_classifies_touch_strength_and_height_bands() {
-    let mut reducer = TouchReducer::new();
+    let mut reducer = TouchCalculator::new();
 
     let baseline = sample(0, 0.0, 0.0, 0.0, false);
     reducer.on_sample(&baseline).unwrap();

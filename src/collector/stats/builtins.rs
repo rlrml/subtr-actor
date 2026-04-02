@@ -207,13 +207,13 @@ macro_rules! delegate_stats_reducer {
                 self.$field.required_derived_signals()
             }
 
-            fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+            fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
                 self.$field.on_sample(sample)
             }
 
             fn on_sample_with_context(
                 &mut self,
-                sample: &StatsSample,
+                sample: &CoreSample,
                 ctx: &AnalysisContext,
             ) -> SubtrActorResult<()> {
                 self.$field.on_sample_with_context(sample, ctx)

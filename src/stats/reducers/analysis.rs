@@ -1,10 +1,11 @@
 use std::any::Any;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use serde::Serialize;
-
-use super::normalized_y;
-use crate::stats::reducers::FIFTY_FIFTY_STATE_SIGNAL_ID;
+pub use crate::stats::calculators::{
+    BackboardBounceCalculator, BackboardBounceEvent, BackboardBounceState, FiftyFiftyState,
+    FiftyFiftyStateCalculator, PossessionState, PossessionStateCalculator, TouchState,
+    TouchStateCalculator,
+};
 use crate::*;
 
 pub type DerivedSignalId = &'static str;
@@ -12,36 +13,6 @@ pub type DerivedSignalId = &'static str;
 pub const TOUCH_STATE_SIGNAL_ID: DerivedSignalId = "touch_state";
 pub const POSSESSION_STATE_SIGNAL_ID: DerivedSignalId = "possession_state";
 pub const BACKBOARD_BOUNCE_STATE_SIGNAL_ID: DerivedSignalId = "backboard_bounce_state";
-
-#[derive(Debug, Clone, Default)]
-pub struct TouchState {
-    pub touch_events: Vec<TouchEvent>,
-    pub last_touch: Option<TouchEvent>,
-    pub last_touch_player: Option<PlayerId>,
-    pub last_touch_team_is_team_0: Option<bool>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PossessionState {
-    pub active_team_before_sample: Option<bool>,
-    pub current_team_is_team_0: Option<bool>,
-    pub active_player_before_sample: Option<PlayerId>,
-    pub current_player: Option<PlayerId>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct BackboardBounceEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub player: PlayerId,
-    pub is_team_0: bool,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct BackboardBounceState {
-    pub bounce_events: Vec<BackboardBounceEvent>,
-    pub last_bounce_event: Option<BackboardBounceEvent>,
-}
 
 #[derive(Default)]
 pub struct AnalysisContext {
@@ -51,6 +22,10 @@ pub struct AnalysisContext {
 impl AnalysisContext {
     pub fn get<T: 'static>(&self, id: DerivedSignalId) -> Option<&T> {
         self.values.get(id)?.downcast_ref::<T>()
+    }
+
+    pub fn insert<T: 'static>(&mut self, id: DerivedSignalId, value: T) {
+        self.insert_box(id, Box::new(value));
     }
 
     fn insert_box(&mut self, id: DerivedSignalId, value: Box<dyn Any>) {
@@ -75,8 +50,8 @@ pub trait DerivedSignal {
 
     fn evaluate(
         &mut self,
-        sample: &StatsSample,
-        _ctx: &AnalysisContext,
+        sample: &CoreSample,
+        ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>>;
 
     fn finish(&mut self) -> SubtrActorResult<()> {
@@ -115,7 +90,7 @@ impl DerivedSignalGraph {
         Ok(())
     }
 
-    pub fn evaluate(&mut self, sample: &StatsSample) -> SubtrActorResult<&AnalysisContext> {
+    pub fn evaluate(&mut self, sample: &CoreSample) -> SubtrActorResult<&AnalysisContext> {
         self.rebuild_order_if_needed()?;
         self.context.clear();
 
@@ -205,246 +180,12 @@ impl DerivedSignalGraph {
 
 #[derive(Default)]
 pub struct TouchStateSignal {
-    previous_ball_linear_velocity: Option<glam::Vec3>,
-    previous_ball_angular_velocity: Option<glam::Vec3>,
-    current_last_touch: Option<TouchEvent>,
-    recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
-    live_play_tracker: LivePlayTracker,
+    calculator: TouchStateCalculator,
 }
 
 impl TouchStateSignal {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn should_emit_candidate(&self, candidate: &TouchEvent) -> bool {
-        const SAME_PLAYER_TOUCH_COOLDOWN_FRAMES: usize = 7;
-
-        let Some(previous_touch) = self.current_last_touch.as_ref() else {
-            return true;
-        };
-
-        let same_player =
-            previous_touch.player.is_some() && previous_touch.player == candidate.player;
-        if !same_player {
-            return true;
-        }
-
-        candidate.frame.saturating_sub(previous_touch.frame) >= SAME_PLAYER_TOUCH_COOLDOWN_FRAMES
-    }
-
-    fn prune_recent_touch_candidates(&mut self, current_frame: usize) {
-        const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
-
-        self.recent_touch_candidates.retain(|_, candidate| {
-            current_frame.saturating_sub(candidate.frame) <= TOUCH_CANDIDATE_WINDOW_FRAMES
-        });
-    }
-
-    fn current_ball_angular_velocity(sample: &StatsSample) -> Option<glam::Vec3> {
-        sample
-            .ball
-            .as_ref()
-            .map(|ball| {
-                ball.rigid_body
-                    .angular_velocity
-                    .unwrap_or(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    })
-            })
-            .map(|velocity| vec_to_glam(&velocity))
-    }
-
-    fn current_ball_linear_velocity(sample: &StatsSample) -> Option<glam::Vec3> {
-        sample.ball.as_ref().map(BallSample::velocity)
-    }
-
-    fn is_touch_candidate(&self, sample: &StatsSample) -> bool {
-        const BALL_GRAVITY_Z: f32 = -650.0;
-        const TOUCH_LINEAR_IMPULSE_THRESHOLD: f32 = 120.0;
-        const TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD: f32 = 0.5;
-
-        let Some(current_linear_velocity) = Self::current_ball_linear_velocity(sample) else {
-            return false;
-        };
-        let Some(previous_linear_velocity) = self.previous_ball_linear_velocity else {
-            return false;
-        };
-        let Some(current_angular_velocity) = Self::current_ball_angular_velocity(sample) else {
-            return false;
-        };
-        let Some(previous_angular_velocity) = self.previous_ball_angular_velocity else {
-            return false;
-        };
-
-        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * sample.dt.max(0.0));
-        let residual_linear_impulse =
-            current_linear_velocity - previous_linear_velocity - expected_linear_delta;
-        let angular_velocity_delta = current_angular_velocity - previous_angular_velocity;
-
-        residual_linear_impulse.length() > TOUCH_LINEAR_IMPULSE_THRESHOLD
-            || angular_velocity_delta.length() > TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD
-    }
-
-    fn proximity_touch_candidates(
-        &self,
-        sample: &StatsSample,
-        max_collision_distance: f32,
-    ) -> Vec<TouchEvent> {
-        const OCTANE_HITBOX_LENGTH: f32 = 118.01;
-        const OCTANE_HITBOX_WIDTH: f32 = 84.2;
-        const OCTANE_HITBOX_HEIGHT: f32 = 36.16;
-        const OCTANE_HITBOX_OFFSET: f32 = 13.88;
-        const OCTANE_HITBOX_ELEVATION: f32 = 17.05;
-
-        let Some(ball) = sample.ball.as_ref() else {
-            return Vec::new();
-        };
-        let ball_position = vec_to_glam(&ball.rigid_body.location);
-
-        let mut candidates = sample
-            .players
-            .iter()
-            .filter_map(|player| {
-                let rigid_body = player.rigid_body.as_ref()?;
-                let player_position = vec_to_glam(&rigid_body.location);
-                let local_ball_position = quat_to_glam(&rigid_body.rotation).inverse()
-                    * (ball_position - player_position);
-
-                let x_distance = if local_ball_position.x
-                    < -OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
-                {
-                    (-OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET) - local_ball_position.x
-                } else if local_ball_position.x > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
-                {
-                    local_ball_position.x - (OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET)
-                } else {
-                    0.0
-                };
-                let y_distance = if local_ball_position.y < -OCTANE_HITBOX_WIDTH / 2.0 {
-                    (-OCTANE_HITBOX_WIDTH / 2.0) - local_ball_position.y
-                } else if local_ball_position.y > OCTANE_HITBOX_WIDTH / 2.0 {
-                    local_ball_position.y - OCTANE_HITBOX_WIDTH / 2.0
-                } else {
-                    0.0
-                };
-                let z_distance = if local_ball_position.z
-                    < -OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
-                {
-                    (-OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION) - local_ball_position.z
-                } else if local_ball_position.z
-                    > OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
-                {
-                    local_ball_position.z - (OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION)
-                } else {
-                    0.0
-                };
-
-                let collision_distance =
-                    glam::Vec3::new(x_distance, y_distance, z_distance).length();
-                if collision_distance > max_collision_distance {
-                    return None;
-                }
-
-                Some(TouchEvent {
-                    time: sample.time,
-                    frame: sample.frame_number,
-                    team_is_team_0: player.is_team_0,
-                    player: Some(player.player_id.clone()),
-                    closest_approach_distance: Some(collision_distance),
-                })
-            })
-            .collect::<Vec<_>>();
-
-        candidates.sort_by(|left, right| {
-            let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
-            let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
-            left_distance.total_cmp(&right_distance)
-        });
-        candidates
-    }
-
-    fn candidate_touch_event(&self, sample: &StatsSample) -> Option<TouchEvent> {
-        const TOUCH_COLLISION_DISTANCE_THRESHOLD: f32 = 300.0;
-
-        self.proximity_touch_candidates(sample, TOUCH_COLLISION_DISTANCE_THRESHOLD)
-            .into_iter()
-            .next()
-    }
-
-    fn update_recent_touch_candidates(&mut self, sample: &StatsSample) {
-        const PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD: f32 = 220.0;
-
-        for candidate in
-            self.proximity_touch_candidates(sample, PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD)
-        {
-            let Some(player_id) = candidate.player.clone() else {
-                continue;
-            };
-
-            self.recent_touch_candidates.insert(player_id, candidate);
-        }
-    }
-
-    fn candidate_for_player(&self, player_id: &PlayerId) -> Option<TouchEvent> {
-        self.recent_touch_candidates.get(player_id).cloned()
-    }
-
-    fn contested_touch_candidates(&self, primary: &TouchEvent) -> Vec<TouchEvent> {
-        const CONTESTED_TOUCH_DISTANCE_MARGIN: f32 = 80.0;
-
-        let primary_distance = primary.closest_approach_distance.unwrap_or(f32::INFINITY);
-
-        let best_opposing_candidate = self
-            .recent_touch_candidates
-            .values()
-            .filter(|candidate| candidate.team_is_team_0 != primary.team_is_team_0)
-            .filter(|candidate| {
-                candidate.closest_approach_distance.unwrap_or(f32::INFINITY)
-                    <= primary_distance + CONTESTED_TOUCH_DISTANCE_MARGIN
-            })
-            .min_by(|left, right| {
-                let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
-                let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
-                left_distance.total_cmp(&right_distance)
-            })
-            .cloned();
-
-        best_opposing_candidate.into_iter().collect()
-    }
-
-    fn confirmed_touch_events(&self, sample: &StatsSample) -> Vec<TouchEvent> {
-        let mut touch_events = Vec::new();
-        let mut confirmed_players = HashSet::new();
-
-        if self.is_touch_candidate(sample) {
-            if let Some(candidate) = self.candidate_touch_event(sample) {
-                for contested_candidate in self.contested_touch_candidates(&candidate) {
-                    if let Some(player_id) = contested_candidate.player.clone() {
-                        confirmed_players.insert(player_id);
-                    }
-                    touch_events.push(contested_candidate);
-                }
-                if let Some(player_id) = candidate.player.clone() {
-                    confirmed_players.insert(player_id);
-                }
-                touch_events.push(candidate);
-            }
-        }
-
-        for dodge_refresh in &sample.dodge_refreshed_events {
-            if !confirmed_players.insert(dodge_refresh.player.clone()) {
-                continue;
-            }
-            let Some(candidate) = self.candidate_for_player(&dodge_refresh.player) else {
-                continue;
-            };
-            touch_events.push(candidate);
-        }
-
-        touch_events
     }
 }
 
@@ -455,49 +196,16 @@ impl DerivedSignal for TouchStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        let touch_events = if live_play {
-            self.prune_recent_touch_candidates(sample.frame_number);
-            self.update_recent_touch_candidates(sample);
-            self.confirmed_touch_events(sample)
-                .into_iter()
-                .filter(|candidate| self.should_emit_candidate(candidate))
-                .collect()
-        } else {
-            self.current_last_touch = None;
-            self.recent_touch_candidates.clear();
-            Vec::new()
-        };
-
-        if let Some(last_touch) = touch_events.last() {
-            self.current_last_touch = Some(last_touch.clone());
-        }
-        self.previous_ball_linear_velocity = Self::current_ball_linear_velocity(sample);
-        self.previous_ball_angular_velocity = Self::current_ball_angular_velocity(sample);
-
-        let output = TouchState {
-            touch_events,
-            last_touch: self.current_last_touch.clone(),
-            last_touch_player: self
-                .current_last_touch
-                .as_ref()
-                .and_then(|touch| touch.player.clone()),
-            last_touch_team_is_team_0: self
-                .current_last_touch
-                .as_ref()
-                .map(|touch| touch.team_is_team_0),
-        };
-        Ok(Some(Box::new(output)))
+        Ok(Some(Box::new(self.calculator.update(sample))))
     }
 }
 
 #[derive(Default)]
 pub struct PossessionStateSignal {
-    tracker: PossessionTracker,
-    live_play_tracker: LivePlayTracker,
+    calculator: PossessionStateCalculator,
 }
 
 impl PossessionStateSignal {
@@ -517,98 +225,25 @@ impl DerivedSignal for PossessionStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        if !live_play {
-            self.tracker.reset();
-            return Ok(Some(Box::new(PossessionState {
-                active_team_before_sample: None,
-                current_team_is_team_0: None,
-                active_player_before_sample: None,
-                current_player: None,
-            })));
-        }
-
         let touch_state = ctx
             .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
             .cloned()
             .unwrap_or_default();
-        Ok(Some(Box::new(
-            self.tracker.update(sample, &touch_state.touch_events),
-        )))
+        Ok(Some(Box::new(self.calculator.update(sample, &touch_state))))
     }
 }
 
 #[derive(Default)]
 pub struct BackboardBounceStateSignal {
-    previous_ball_velocity: Option<glam::Vec3>,
-    last_touch: Option<TouchEvent>,
-    last_bounce_event: Option<BackboardBounceEvent>,
-    live_play_tracker: LivePlayTracker,
+    calculator: BackboardBounceCalculator,
 }
 
 impl BackboardBounceStateSignal {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn detect_bounce(&self, sample: &StatsSample) -> Option<BackboardBounceEvent> {
-        const BACKBOARD_MIN_BALL_Z: f32 = 500.0;
-        const BACKBOARD_MIN_NORMALIZED_Y: f32 = 4700.0;
-        const BACKBOARD_MAX_ABS_X: f32 = 1600.0;
-        const BACKBOARD_MIN_APPROACH_SPEED_Y: f32 = 350.0;
-        const BACKBOARD_MIN_REBOUND_SPEED_Y: f32 = 250.0;
-        const BACKBOARD_TOUCH_ATTRIBUTION_MAX_SECONDS: f32 = 2.5;
-
-        if !sample.touch_events.is_empty() {
-            return None;
-        }
-
-        let last_touch = self.last_touch.as_ref()?;
-        let player = last_touch.player.clone()?;
-        let current_ball = sample.ball.as_ref()?;
-        let previous_ball_velocity = self.previous_ball_velocity?;
-
-        if (sample.time - last_touch.time).max(0.0) > BACKBOARD_TOUCH_ATTRIBUTION_MAX_SECONDS {
-            return None;
-        }
-
-        let ball_position = current_ball.position();
-        if ball_position.x.abs() > BACKBOARD_MAX_ABS_X || ball_position.z < BACKBOARD_MIN_BALL_Z {
-            return None;
-        }
-
-        let normalized_position_y = normalized_y(last_touch.team_is_team_0, ball_position);
-        if normalized_position_y < BACKBOARD_MIN_NORMALIZED_Y {
-            return None;
-        }
-
-        let previous_normalized_velocity_y = if last_touch.team_is_team_0 {
-            previous_ball_velocity.y
-        } else {
-            -previous_ball_velocity.y
-        };
-        let current_normalized_velocity_y = if last_touch.team_is_team_0 {
-            current_ball.velocity().y
-        } else {
-            -current_ball.velocity().y
-        };
-
-        if previous_normalized_velocity_y < BACKBOARD_MIN_APPROACH_SPEED_Y {
-            return None;
-        }
-        if current_normalized_velocity_y > -BACKBOARD_MIN_REBOUND_SPEED_Y {
-            return None;
-        }
-
-        Some(BackboardBounceEvent {
-            time: sample.time,
-            frame: sample.frame_number,
-            player,
-            is_team_0: last_touch.team_is_team_0,
-        })
     }
 }
 
@@ -619,89 +254,21 @@ impl DerivedSignal for BackboardBounceStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        if !live_play {
-            self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
-            self.last_touch = None;
-            self.last_bounce_event = None;
-            return Ok(Some(Box::new(BackboardBounceState::default())));
-        }
-
-        let bounce_events: Vec<_> = self.detect_bounce(sample).into_iter().collect();
-        if let Some(last_bounce_event) = bounce_events.last() {
-            self.last_bounce_event = Some(last_bounce_event.clone());
-        }
-
-        if let Some(last_touch) = sample.touch_events.last() {
-            self.last_touch = Some(last_touch.clone());
-        }
-        self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
-
-        Ok(Some(Box::new(BackboardBounceState {
-            bounce_events,
-            last_bounce_event: self.last_bounce_event.clone(),
-        })))
+        Ok(Some(Box::new(self.calculator.update(sample))))
     }
 }
 
 #[derive(Default)]
 pub struct FiftyFiftyStateSignal {
-    active_event: Option<ActiveFiftyFifty>,
-    last_resolved_event: Option<FiftyFiftyEvent>,
-    kickoff_touch_window_open: bool,
-    live_play_tracker: LivePlayTracker,
+    calculator: FiftyFiftyStateCalculator,
 }
 
 impl FiftyFiftyStateSignal {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn reset(&mut self) {
-        self.active_event = None;
-    }
-
-    fn maybe_resolve_active_event(
-        &mut self,
-        sample: &StatsSample,
-        possession_state: &PossessionState,
-    ) -> Option<FiftyFiftyEvent> {
-        let active = self.active_event.as_ref()?;
-        let age = (sample.time - active.last_touch_time).max(0.0);
-        if age < FIFTY_FIFTY_RESOLUTION_DELAY_SECONDS {
-            return None;
-        }
-
-        let winning_team_is_team_0 = FiftyFiftyReducer::winning_team_from_ball(active, sample);
-        let possession_team_is_team_0 = possession_state.current_team_is_team_0;
-        let should_resolve = winning_team_is_team_0.is_some()
-            || possession_team_is_team_0.is_some()
-            || age >= FIFTY_FIFTY_MAX_DURATION_SECONDS;
-        if !should_resolve {
-            return None;
-        }
-
-        let active = self.active_event.take()?;
-        let event = FiftyFiftyEvent {
-            start_time: active.start_time,
-            start_frame: active.start_frame,
-            resolve_time: sample.time,
-            resolve_frame: sample.frame_number,
-            is_kickoff: active.is_kickoff,
-            team_zero_player: active.team_zero_player,
-            team_one_player: active.team_one_player,
-            team_zero_position: active.team_zero_position,
-            team_one_position: active.team_one_position,
-            midpoint: active.midpoint,
-            plane_normal: active.plane_normal,
-            winning_team_is_team_0,
-            possession_team_is_team_0,
-        };
-        self.last_resolved_event = Some(event.clone());
-        Some(event)
     }
 }
 
@@ -716,10 +283,9 @@ impl DerivedSignal for FiftyFiftyStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
         let touch_state = ctx
             .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
             .cloned()
@@ -729,73 +295,11 @@ impl DerivedSignal for FiftyFiftyStateSignal {
             .cloned()
             .unwrap_or_default();
 
-        if FiftyFiftyReducer::kickoff_phase_active(sample) {
-            self.kickoff_touch_window_open = true;
-        }
-
-        if !live_play {
-            self.reset();
-            return Ok(Some(Box::new(FiftyFiftyState {
-                active_event: None,
-                resolved_events: Vec::new(),
-                last_resolved_event: self.last_resolved_event.clone(),
-            })));
-        }
-
-        let has_touch = !touch_state.touch_events.is_empty();
-        let has_contested_touch = touch_state
-            .touch_events
-            .iter()
-            .any(|touch| touch.team_is_team_0)
-            && touch_state
-                .touch_events
-                .iter()
-                .any(|touch| !touch.team_is_team_0);
-
-        if let Some(active_event) = self.active_event.as_mut() {
-            let age = (sample.time - active_event.last_touch_time).max(0.0);
-            if age <= FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS
-                && active_event.contains_team_touch(&touch_state.touch_events)
-            {
-                active_event.last_touch_time = sample.time;
-                active_event.last_touch_frame = sample.frame_number;
-            }
-        }
-
-        let mut resolved_events = Vec::new();
-        if let Some(event) = self.maybe_resolve_active_event(sample, &possession_state) {
-            resolved_events.push(event);
-        }
-
-        if has_contested_touch {
-            if self.active_event.is_none() {
-                self.active_event = FiftyFiftyReducer::contested_touch(
-                    sample,
-                    &touch_state.touch_events,
-                    self.kickoff_touch_window_open,
-                );
-            }
-        } else if has_touch {
-            if let Some(active_event) = self.active_event.as_mut() {
-                let age = (sample.time - active_event.last_touch_time).max(0.0);
-                if age <= FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS
-                    && active_event.contains_team_touch(&touch_state.touch_events)
-                {
-                    active_event.last_touch_time = sample.time;
-                    active_event.last_touch_frame = sample.frame_number;
-                }
-            }
-        }
-
-        if has_touch {
-            self.kickoff_touch_window_open = false;
-        }
-
-        Ok(Some(Box::new(FiftyFiftyState {
-            active_event: self.active_event.clone(),
-            resolved_events,
-            last_resolved_event: self.last_resolved_event.clone(),
-        })))
+        Ok(Some(Box::new(self.calculator.update(
+            sample,
+            &touch_state,
+            &possession_state,
+        ))))
     }
 }
 

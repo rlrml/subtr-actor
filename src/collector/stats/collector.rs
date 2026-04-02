@@ -181,7 +181,7 @@ impl CompositeStatsModules {
     fn snapshot_frame(
         &self,
         replay_meta: &ReplayMeta,
-        sample: &StatsSample,
+        sample: &CoreSample,
         is_live_play: bool,
     ) -> SubtrActorResult<StatsPlaybackFrame> {
         let mut modules = Map::new();
@@ -219,7 +219,7 @@ impl StatsReducer for CompositeStatsModules {
         signals.into_iter().collect()
     }
 
-    fn on_sample(&mut self, sample: &StatsSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
         for module in &mut self.modules {
             module.module.on_sample(sample)?;
         }
@@ -228,7 +228,7 @@ impl StatsReducer for CompositeStatsModules {
 
     fn on_sample_with_context(
         &mut self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         for module in &mut self.modules {
@@ -253,7 +253,7 @@ pub struct StatsCollector<T = StatsPlaybackFrame, F = IdentityFrameTransform> {
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
     last_sample_time: Option<f32>,
-    last_sample: Option<StatsSample>,
+    last_sample: Option<CoreSample>,
     last_live_play: Option<bool>,
     live_play_tracker: LivePlayTracker,
     last_demolish_count: usize,
@@ -597,7 +597,7 @@ where
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        let mut sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
         if matches!(self.sample_mode, SampleMode::Aggregate) {
             sample.active_demos.clear();
             sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();

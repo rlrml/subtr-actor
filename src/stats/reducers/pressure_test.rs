@@ -1,6 +1,7 @@
 use boxcars::{Quaternion, RigidBody, Vector3f};
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn ball(y: f32) -> BallSample {
     BallSample {
@@ -31,8 +32,8 @@ fn ball(y: f32) -> BallSample {
     }
 }
 
-fn sample(frame_number: usize, time: f32, ball_y: f32) -> StatsSample {
-    StatsSample {
+fn sample(frame_number: usize, time: f32, ball_y: f32) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0,
@@ -59,7 +60,7 @@ fn sample(frame_number: usize, time: f32, ball_y: f32) -> StatsSample {
 
 #[test]
 fn pressure_reducer_tracks_labeled_half_time_with_neutral_zone() {
-    let mut reducer = PressureReducer::new();
+    let mut reducer = PressureCalculator::new();
 
     reducer.on_sample(&sample(0, 0.0, -250.0)).unwrap();
     reducer.on_sample(&sample(1, 1.0, 0.0)).unwrap();

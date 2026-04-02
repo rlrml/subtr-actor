@@ -1,6 +1,7 @@
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(
     location: glam::Vec3,
@@ -40,8 +41,8 @@ fn sample(
     player_body: RigidBody,
     ball_body: RigidBody,
     touch: bool,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: if frame_number == 0 { 0.0 } else { 1.0 / 120.0 },
@@ -116,7 +117,7 @@ fn sample(
 
 #[test]
 fn counts_touch_shortly_after_ceiling_contact_as_ceiling_shot() {
-    let mut reducer = CeilingShotReducer::new();
+    let mut reducer = CeilingShotCalculator::new();
 
     let on_ceiling = sample(
         0,
@@ -167,7 +168,7 @@ fn counts_touch_shortly_after_ceiling_contact_as_ceiling_shot() {
 
 #[test]
 fn rejects_touch_without_prior_ceiling_contact() {
-    let mut reducer = CeilingShotReducer::new();
+    let mut reducer = CeilingShotCalculator::new();
 
     let ordinary_touch = sample(
         0,

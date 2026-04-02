@@ -669,7 +669,7 @@ impl StatsTimelineReducers {
     fn on_sample_with_context(
         &mut self,
         modules: &StatsTimelineModules,
-        sample: &StatsSample,
+        sample: &CoreSample,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         if modules.contains(StatsTimelineModule::Backboard) {
@@ -789,7 +789,7 @@ pub struct StatsTimelineCollector {
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
-    last_sample: Option<StatsSample>,
+    last_sample: Option<CoreSample>,
     last_live_play: Option<bool>,
     live_play_tracker: LivePlayTracker,
 }
@@ -1026,7 +1026,7 @@ impl StatsTimelineCollector {
 
     fn snapshot_frame(
         &self,
-        sample: &StatsSample,
+        sample: &CoreSample,
         replay_meta: &ReplayMeta,
         live_play: bool,
     ) -> ReplayStatsFrame {
@@ -1327,7 +1327,7 @@ impl Collector for StatsTimelineCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        let sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
         let live_play = self.live_play_tracker.is_live_play(&sample);
         let analysis_context = self.derived_signals.evaluate(&sample)?;
         self.reducers

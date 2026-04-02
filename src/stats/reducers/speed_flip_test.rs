@@ -1,6 +1,7 @@
 use boxcars::RemoteId;
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(
     position: glam::Vec3,
@@ -23,8 +24,8 @@ fn sample(
     player_rigid_body: boxcars::RigidBody,
     dodge_active: bool,
     ball_position: Option<glam::Vec3>,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: if frame_number == 0 { 0.0 } else { 1.0 / 120.0 },
@@ -72,7 +73,7 @@ fn sample(
 
 #[test]
 fn detects_high_confidence_kickoff_speed_flip() {
-    let mut reducer = SpeedFlipReducer::new();
+    let mut reducer = SpeedFlipCalculator::new();
     let ball_position = Some(glam::Vec3::new(4000.0, 420.0, 92.75));
 
     reducer
@@ -141,7 +142,7 @@ fn detects_high_confidence_kickoff_speed_flip() {
 
 #[test]
 fn rejects_diagonal_kickoff_flip_without_cancel_recovery() {
-    let mut reducer = SpeedFlipReducer::new();
+    let mut reducer = SpeedFlipCalculator::new();
     let ball_position = Some(glam::Vec3::new(4000.0, 420.0, 92.75));
 
     reducer
@@ -207,7 +208,7 @@ fn rejects_diagonal_kickoff_flip_without_cancel_recovery() {
 
 #[test]
 fn detects_high_confidence_kickoff_speed_flip_with_sleeping_ball() {
-    let mut reducer = SpeedFlipReducer::new();
+    let mut reducer = SpeedFlipCalculator::new();
     let ball_position = None;
 
     reducer
@@ -303,7 +304,7 @@ fn active_candidate(
 
 #[test]
 fn finalize_candidates_orders_simultaneous_events_deterministically() {
-    let mut reducer = SpeedFlipReducer::new();
+    let mut reducer = SpeedFlipCalculator::new();
     let (player_one, candidate_one) = active_candidate(1, 0.5, 10);
     let (player_two, candidate_two) = active_candidate(2, 0.5, 10);
     reducer
@@ -361,7 +362,7 @@ fn finalize_candidates_orders_simultaneous_events_deterministically() {
 
 #[test]
 fn detects_high_confidence_non_kickoff_speed_flip() {
-    let mut reducer = SpeedFlipReducer::new();
+    let mut reducer = SpeedFlipCalculator::new();
     let ball_position = Some(glam::Vec3::new(2000.0, 1200.0, 92.75));
 
     let mut frame0 = sample(

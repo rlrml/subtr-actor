@@ -394,7 +394,7 @@ impl Collector for ComparableStatsCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = StatsSample::from_processor(processor, frame_number, current_time, dt)?;
+        let mut sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
         sample.active_demos.clear();
         sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
         sample.boost_pad_events =

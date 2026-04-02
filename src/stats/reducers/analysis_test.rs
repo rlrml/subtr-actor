@@ -1,4 +1,5 @@
 use super::*;
+use crate::stats::reducers::StatsReducer;
 use crate::stats::reducers::TouchReducer;
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
@@ -19,7 +20,7 @@ impl DerivedSignal for TestSignal {
 
     fn evaluate(
         &mut self,
-        _sample: &StatsSample,
+        _sample: &CoreSample,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         Ok(None)
@@ -71,8 +72,8 @@ fn rigid_body(x: f32, y: f32, z: f32, ang_vel_z: f32) -> RigidBody {
     }
 }
 
-fn sample(frame_number: usize, time: f32, ball_ang_vel_z: f32) -> StatsSample {
-    StatsSample {
+fn sample(frame_number: usize, time: f32, ball_ang_vel_z: f32) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0 / 120.0,

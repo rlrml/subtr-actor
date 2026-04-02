@@ -1,6 +1,7 @@
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn ball(ball_y: f32) -> BallSample {
     BallSample {
@@ -31,8 +32,8 @@ fn ball(ball_y: f32) -> BallSample {
     }
 }
 
-fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> StatsSample {
-    StatsSample {
+fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0,
@@ -69,7 +70,7 @@ fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> 
 
 #[test]
 fn possession_reducer_tracks_labeled_possession_time() {
-    let mut reducer = PossessionReducer::new();
+    let mut reducer = PossessionCalculator::new();
 
     reducer.on_sample(&sample(0, 0.0, 0.0, &[])).unwrap();
     reducer.on_sample(&sample(1, 1.0, 0.0, &[true])).unwrap();
@@ -99,7 +100,7 @@ fn possession_reducer_tracks_labeled_possession_time() {
 
 #[test]
 fn possession_reducer_tracks_possession_time_by_field_third() {
-    let mut reducer = PossessionReducer::new();
+    let mut reducer = PossessionCalculator::new();
 
     reducer.on_sample(&sample(0, 0.0, -3000.0, &[])).unwrap();
     reducer.on_sample(&sample(1, 1.0, 0.0, &[true])).unwrap();

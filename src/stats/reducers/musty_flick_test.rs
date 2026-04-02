@@ -1,6 +1,7 @@
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(
     location: glam::Vec3,
@@ -41,8 +42,8 @@ fn sample(
     player_dodge_active: bool,
     ball_body: RigidBody,
     touch: bool,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0 / 120.0,
@@ -117,7 +118,7 @@ fn sample(
 
 #[test]
 fn counts_recent_backflip_style_touch_as_musty_flick() {
-    let mut reducer = MustyFlickReducer::new();
+    let mut reducer = MustyFlickCalculator::new();
 
     let baseline = sample(
         0,
@@ -188,7 +189,7 @@ fn counts_recent_backflip_style_touch_as_musty_flick() {
 
 #[test]
 fn rejects_backside_touch_without_recent_dodge_start() {
-    let mut reducer = MustyFlickReducer::new();
+    let mut reducer = MustyFlickCalculator::new();
 
     let baseline = sample(
         0,

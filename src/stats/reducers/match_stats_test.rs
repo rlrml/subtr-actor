@@ -1,6 +1,7 @@
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(y: f32) -> RigidBody {
     RigidBody {
@@ -50,8 +51,8 @@ fn sample(
     ball_y: f32,
     team_zero_goals: i32,
     goal_event: Option<GoalEvent>,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt,
@@ -82,7 +83,7 @@ fn sample(
 
 #[test]
 fn classifies_counter_attack_goals_from_recent_defensive_pressure() {
-    let mut reducer = MatchStatsReducer::new();
+    let mut reducer = MatchStatsCalculator::new();
 
     for (index, ball_y) in [-4200.0, -4000.0, -3600.0, -3200.0, -2600.0, -1800.0, 1200.0]
         .into_iter()
@@ -119,7 +120,7 @@ fn classifies_counter_attack_goals_from_recent_defensive_pressure() {
 
 #[test]
 fn classifies_sustained_pressure_goals_after_long_attacking_spell() {
-    let mut reducer = MatchStatsReducer::new();
+    let mut reducer = MatchStatsCalculator::new();
 
     for (index, ball_y) in [
         800.0, 1400.0, 2200.0, 2800.0, 3200.0, 3600.0, 4100.0, 4600.0,

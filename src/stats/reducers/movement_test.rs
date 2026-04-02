@@ -1,6 +1,7 @@
 use boxcars::RemoteId;
 
 use super::*;
+use crate::stats::reducers::StatsReducer;
 
 fn rigid_body(x: f32, y: f32, z: f32, vx: f32) -> boxcars::RigidBody {
     boxcars::RigidBody {
@@ -25,8 +26,8 @@ fn rigid_body(x: f32, y: f32, z: f32, vx: f32) -> boxcars::RigidBody {
     }
 }
 
-fn sample(frame_number: usize, time: f32, z: f32, vx: f32) -> StatsSample {
-    StatsSample {
+fn sample(frame_number: usize, time: f32, z: f32, vx: f32) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0,
@@ -67,7 +68,7 @@ fn sample(frame_number: usize, time: f32, z: f32, vx: f32) -> StatsSample {
 
 #[test]
 fn movement_reducer_tracks_labeled_time_bands() {
-    let mut reducer = MovementReducer::new();
+    let mut reducer = MovementCalculator::new();
 
     reducer.on_sample(&sample(0, 0.0, 0.0, 200.0)).unwrap();
     reducer.on_sample(&sample(1, 1.0, 0.0, 200.0)).unwrap();

@@ -1,4 +1,5 @@
 use super::*;
+use crate::stats::reducers::StatsReducer;
 use boxcars::RemoteId;
 
 fn player(player_id: u64, boost_amount: f32) -> PlayerSample {
@@ -26,8 +27,8 @@ fn sample(
     game_state: Option<i32>,
     ball_has_been_hit: Option<bool>,
     kickoff_countdown_time: Option<i32>,
-) -> StatsSample {
-    StatsSample {
+) -> CoreSample {
+    CoreSample {
         frame_number,
         time,
         dt: 1.0,
@@ -54,7 +55,7 @@ fn sample(
 
 #[test]
 fn boost_levels_skip_pre_kickoff_dead_time() {
-    let mut reducer = BoostReducer::new();
+    let mut reducer = BoostCalculator::new();
     let player_id = RemoteId::Steam(1);
     reducer.initial_respawn_awarded.insert(player_id.clone());
     reducer.kickoff_respawn_awarded.insert(player_id.clone());
@@ -83,7 +84,7 @@ fn boost_levels_skip_pre_kickoff_dead_time() {
 
 #[test]
 fn boost_levels_still_track_when_replay_starts_live() {
-    let mut reducer = BoostReducer::new();
+    let mut reducer = BoostCalculator::new();
     let player_id = RemoteId::Steam(1);
     reducer.initial_respawn_awarded.insert(player_id.clone());
 
