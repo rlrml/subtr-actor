@@ -347,7 +347,7 @@ pub struct PlayerStatsSnapshot {
     pub demo: DemoPlayerStats,
 }
 
-fn build_timeline_graph() -> AnalysisGraph {
+pub fn build_timeline_graph() -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
     graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
     graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
