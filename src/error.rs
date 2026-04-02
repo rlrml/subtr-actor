@@ -36,7 +36,7 @@ pub enum SubtrActorErrorVariant {
     #[error("The attribute value that was found was not of the expected type {expected_type} {actual_type:?}")]
     UnexpectedAttributeType {
         expected_type: &'static str,
-        actual_type: boxcars::AttributeTag,
+        actual_type: &'static str,
     },
 
     #[error("ActorId {actor_id:?} has no matching player id")]

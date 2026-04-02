@@ -12,9 +12,6 @@ edition = "2021"
 [workspace.dependencies]
 boxcars = "0.10.11"
 
-[patch.crates-io]
-boxcars = { path = "../boxcars" }
-
 [package]
 name = "subtr-actor"
 version.workspace = true

@@ -5,6 +5,55 @@ use std::collections::HashMap;
 pub mod actor_state;
 pub use actor_state::*;
 
+pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static str {
+    match attribute {
+        boxcars::Attribute::Boolean(_) => "Boolean",
+        boxcars::Attribute::Byte(_) => "Byte",
+        boxcars::Attribute::AppliedDamage(_) => "AppliedDamage",
+        boxcars::Attribute::DamageState(_) => "DamageState",
+        boxcars::Attribute::CamSettings(_) => "CamSettings",
+        boxcars::Attribute::ClubColors(_) => "ClubColors",
+        boxcars::Attribute::Demolish(_) => "Demolish",
+        boxcars::Attribute::DemolishExtended(_) => "DemolishExtended",
+        boxcars::Attribute::DemolishFx(_) => "DemolishFx",
+        boxcars::Attribute::Enum(_) => "Enum",
+        boxcars::Attribute::Explosion(_) => "Explosion",
+        boxcars::Attribute::ExtendedExplosion(_) => "ExtendedExplosion",
+        boxcars::Attribute::FlaggedByte(_, _) => "FlaggedByte",
+        boxcars::Attribute::ActiveActor(_) => "ActiveActor",
+        boxcars::Attribute::Float(_) => "Float",
+        boxcars::Attribute::GameMode(_, _) => "GameMode",
+        boxcars::Attribute::Int(_) => "Int",
+        boxcars::Attribute::Int64(_) => "Int64",
+        boxcars::Attribute::Loadout(_) => "Loadout",
+        boxcars::Attribute::TeamLoadout(_) => "TeamLoadout",
+        boxcars::Attribute::Location(_) => "Location",
+        boxcars::Attribute::MusicStinger(_) => "MusicStinger",
+        boxcars::Attribute::PlayerHistoryKey(_) => "PlayerHistoryKey",
+        boxcars::Attribute::Pickup(_) => "Pickup",
+        boxcars::Attribute::PickupNew(_) => "PickupNew",
+        boxcars::Attribute::QWord(_) => "QWord",
+        boxcars::Attribute::Welded(_) => "Welded",
+        boxcars::Attribute::Title(_, _, _, _, _, _, _, _) => "Title",
+        boxcars::Attribute::TeamPaint(_) => "TeamPaint",
+        boxcars::Attribute::RigidBody(_) => "RigidBody",
+        boxcars::Attribute::String(_) => "String",
+        boxcars::Attribute::UniqueId(_) => "UniqueId",
+        boxcars::Attribute::Reservation(_) => "Reservation",
+        boxcars::Attribute::PartyLeader(_) => "PartyLeader",
+        boxcars::Attribute::PrivateMatch(_) => "PrivateMatch",
+        boxcars::Attribute::LoadoutOnline(_) => "LoadoutOnline",
+        boxcars::Attribute::LoadoutsOnline(_) => "LoadoutsOnline",
+        boxcars::Attribute::StatEvent(_) => "StatEvent",
+        boxcars::Attribute::Rotation(_) => "Rotation",
+        boxcars::Attribute::RepStatTitle(_) => "RepStatTitle",
+        boxcars::Attribute::PickupInfo(_) => "PickupInfo",
+        boxcars::Attribute::Impulse(_) => "Impulse",
+        boxcars::Attribute::ReplicatedBoost(_) => "ReplicatedBoost",
+        boxcars::Attribute::LogoData(_) => "LogoData",
+    }
+}
+
 /// Attempts to match an attribute value with the given type.
 ///
 /// # Arguments
@@ -25,7 +74,7 @@ macro_rules! attribute_match {
         } else {
             SubtrActorError::new_result(SubtrActorErrorVariant::UnexpectedAttributeType {
                 expected_type: stringify!($type),
-                actual_type: attribute.tag(),
+                actual_type: attribute_type_name(&attribute),
             })
         }
     }};
