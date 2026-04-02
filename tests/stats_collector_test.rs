@@ -66,6 +66,7 @@ fn stats_collector_captures_module_keyed_snapshot_frames() {
 }
 
 #[test]
+#[allow(clippy::result_large_err)]
 fn stats_collector_transforms_captured_frame_modules() {
     let replay = common::parse_replay("assets/replays/soccar-lan.replay");
     let transformed = StatsCollector::with_builtin_module_names(["boost", "movement"])
