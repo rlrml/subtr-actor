@@ -326,6 +326,14 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
             .into_replay_stats_timeline()
     }
 
+    pub fn get_dynamic_replay_stats_timeline(
+        self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
+        self.get_replay_stats_timeline(replay)
+            .map(ReplayStatsTimeline::into_dynamic)
+    }
+
     pub fn get_legacy_stats_timeline_value(
         self,
         replay: &boxcars::Replay,
@@ -343,6 +351,13 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
 
     pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         self.into_playback_data()?.into_stats_timeline()
+    }
+
+    pub fn into_dynamic_replay_stats_timeline(
+        self,
+    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
+        self.into_replay_stats_timeline()
+            .map(ReplayStatsTimeline::into_dynamic)
     }
 }
 

@@ -863,8 +863,8 @@ fn test_stats_timeline_collector_can_export_dynamic_stats() {
     let typed_timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected typed stats timeline data");
-    let dynamic_timeline = StatsTimelineCollector::new()
-        .get_dynamic_replay_data(&replay)
+    let dynamic_timeline = StatsCollector::new()
+        .get_dynamic_replay_stats_timeline(&replay)
         .expect("Expected dynamic stats timeline data");
 
     let typed_frame = typed_timeline

@@ -690,22 +690,9 @@ impl StatsTimelineCollector {
         self.into_timeline_result()
     }
 
-    pub fn get_dynamic_replay_data(
-        mut self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        let mut processor = ReplayProcessor::new(replay)?;
-        processor.process(&mut self)?;
-        Ok(self.into_dynamic_timeline())
-    }
-
     pub fn into_timeline(self) -> ReplayStatsTimeline {
         self.into_timeline_result()
             .expect("analysis-node timeline collector should build typed stats frames")
-    }
-
-    pub fn into_dynamic_timeline(self) -> DynamicReplayStatsTimeline {
-        self.into_timeline().into_dynamic()
     }
 }
 

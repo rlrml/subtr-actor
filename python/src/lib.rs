@@ -357,8 +357,8 @@ fn get_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAn
 fn get_dynamic_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
-    let timeline = subtr_actor::StatsTimelineCollector::new()
-        .get_dynamic_replay_data(&replay)
+    let timeline = subtr_actor::StatsCollector::new()
+        .get_dynamic_replay_stats_timeline(&replay)
         .map_err(handle_frames_exception)?;
 
     Ok(convert_to_py(

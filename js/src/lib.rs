@@ -375,8 +375,8 @@ pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 pub fn get_dynamic_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = subtr_actor::StatsTimelineCollector::new()
-        .get_dynamic_replay_data(&replay)
+    let stats_timeline = StatsCollector::new()
+        .get_dynamic_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
@@ -387,8 +387,8 @@ pub fn get_dynamic_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
 pub fn get_dynamic_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = subtr_actor::StatsTimelineCollector::new()
-        .get_dynamic_replay_data(&replay)
+    let stats_timeline = StatsCollector::new()
+        .get_dynamic_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)
