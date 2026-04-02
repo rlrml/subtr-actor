@@ -29,12 +29,19 @@ impl AnalysisNode for DemoNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
+        vec![
+            frame_info_dependency(),
+            player_frame_state_dependency(),
+            frame_events_state_dependency(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
-        self.calculator.update(sample)
+        self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<PlayerFrameState>()?,
+            ctx.get::<FrameEventsState>()?,
+        )
     }
 
     fn state(&self) -> &Self::State {

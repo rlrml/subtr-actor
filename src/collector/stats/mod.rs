@@ -14,6 +14,6 @@ pub use collector::{FrameTransform, IdentityFrameTransform, ModuleFrameTransform
 pub use playback::{CapturedStatsData, CapturedStatsFrame, StatsPlaybackData, StatsPlaybackFrame};
 pub use types::{CollectedStats, StatsModule, StatsModuleFactory};
 
-pub(crate) use resolver::{resolve_stats_module_factories, ResolvedStatsModuleFactory};
+pub(crate) use builtins::{builtin_module_json, builtin_playback_frame_json};
 #[cfg(test)]
-pub(crate) use types::RuntimeStatsModule;
+pub(crate) use resolver::resolve_stats_module_factories;

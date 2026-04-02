@@ -36,11 +36,8 @@
 //! - [`StatsCollector`] accumulates reducer-based replay statistics as a
 //!   module-keyed dynamic payload suitable for extensible module registries.
 //! - [`StatsTimelineCollector`] accumulates reducer-based replay statistics
-//!   frame by frame and can return either typed snapshots
-//!   ([`ReplayStatsTimeline`]) or a dynamic stat-field representation
-//!   ([`DynamicReplayStatsTimeline`]). Use
-//!   [`StatsTimelineCollector::only_modules`] when you want a la carte stat
-//!   collection instead of the full reducer bundle.
+//!   frame by frame and returns typed snapshots
+//!   ([`ReplayStatsTimeline`]) for the full builtin reducer bundle.
 //!
 //! ## Stats and exports
 //!
@@ -95,7 +92,7 @@
 //! println!("shape: {:?}", features.raw_dim());
 //! ```
 //!
-//! ### Export dynamic stats timeline snapshots
+//! ### Export typed stats timeline snapshots
 //!
 //! ```no_run
 //! use boxcars::ParserBuilder;
@@ -108,9 +105,7 @@
 //!     .parse()
 //!     .unwrap();
 //!
-//! let timeline = StatsTimelineCollector::new()
-//!     .get_dynamic_replay_data(&replay)
-//!     .unwrap();
+//! let timeline = StatsTimelineCollector::new().get_replay_data(&replay).unwrap();
 //!
 //! println!("timeline frames: {}", timeline.frames.len());
 //! println!("rush events: {}", timeline.rush_events.len());

@@ -11,7 +11,7 @@ impl StatsReducer for RushReducer {
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let default_state = PossessionState::default();

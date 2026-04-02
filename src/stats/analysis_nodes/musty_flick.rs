@@ -29,11 +29,13 @@ impl AnalysisNode for MustyFlickNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency(), touch_state_dependency()]
+        let mut dependencies = vec![frame_state_dependency()];
+        dependencies.push(touch_state_dependency());
+        dependencies
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
+        let sample = ctx.get::<FrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
         self.calculator.update(sample, &touch_state.touch_events)
     }

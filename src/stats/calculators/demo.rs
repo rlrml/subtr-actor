@@ -62,26 +62,26 @@ impl DemoCalculator {
         !already_counted
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        for player in &sample.players {
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+    ) -> SubtrActorResult<()> {
+        for player in &players.players {
             self.player_teams
                 .insert(player.player_id.clone(), player.is_team_0);
         }
 
-        if !sample.demo_events.is_empty() {
-            for demo in &sample.demo_events {
+        if !events.demo_events.is_empty() {
+            for demo in &events.demo_events {
                 self.record_demo(&demo.attacker, &demo.victim, demo.time, demo.frame);
             }
             return Ok(());
         }
 
-        for demo in &sample.active_demos {
-            self.record_demo(
-                &demo.attacker,
-                &demo.victim,
-                sample.time,
-                sample.frame_number,
-            );
+        for demo in &events.active_demos {
+            self.record_demo(&demo.attacker, &demo.victim, frame.time, frame.frame_number);
         }
 
         Ok(())

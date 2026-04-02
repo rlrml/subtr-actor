@@ -90,7 +90,7 @@ impl MustyFlickCalculator {
         &self.events
     }
 
-    fn begin_sample(&mut self, sample: &CoreSample) {
+    fn begin_sample(&mut self, sample: &FrameState) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_musty = false;
             stats.time_since_last_musty = stats
@@ -102,7 +102,7 @@ impl MustyFlickCalculator {
         }
     }
 
-    fn ball_speed_change(sample: &CoreSample, previous_ball_velocity: Option<glam::Vec3>) -> f32 {
+    fn ball_speed_change(sample: &FrameState, previous_ball_velocity: Option<glam::Vec3>) -> f32 {
         const BALL_GRAVITY_Z: f32 = -650.0;
 
         let Some(ball) = sample.ball.as_ref() else {
@@ -118,7 +118,7 @@ impl MustyFlickCalculator {
         residual_linear_impulse.length()
     }
 
-    fn track_dodge_starts(&mut self, sample: &CoreSample) {
+    fn track_dodge_starts(&mut self, sample: &FrameState) {
         for player in &sample.players {
             let was_dodge_active = self
                 .previous_dodge_active
@@ -150,7 +150,7 @@ impl MustyFlickCalculator {
 
     fn musty_candidate(
         &self,
-        sample: &CoreSample,
+        sample: &FrameState,
         player: &PlayerSample,
         touch_event: &TouchEvent,
         dodge_start: RecentDodgeStart,
@@ -268,7 +268,7 @@ impl MustyFlickCalculator {
         })
     }
 
-    fn apply_touch_events(&mut self, sample: &CoreSample, touch_events: &[TouchEvent]) {
+    fn apply_touch_events(&mut self, sample: &FrameState, touch_events: &[TouchEvent]) {
         let ball_speed_change = Self::ball_speed_change(sample, self.previous_ball_velocity);
 
         for touch_event in touch_events {
@@ -322,7 +322,7 @@ impl MustyFlickCalculator {
         }
     }
 
-    fn reset_live_play_state(&mut self, sample: &CoreSample) {
+    fn reset_live_play_state(&mut self, sample: &FrameState) {
         self.current_last_musty_player = None;
         self.recent_dodge_starts.clear();
         self.previous_dodge_active.clear();
@@ -331,7 +331,7 @@ impl MustyFlickCalculator {
 
     fn on_sample_internal(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_events: &[TouchEvent],
     ) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample) {
@@ -349,7 +349,7 @@ impl MustyFlickCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_events: &[TouchEvent],
     ) -> SubtrActorResult<()> {
         self.on_sample_internal(sample, touch_events)

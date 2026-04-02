@@ -20,16 +20,20 @@ impl DodgeResetCalculator {
         &self.player_stats
     }
 
-    fn on_ball_dodge_reset(sample: &CoreSample, player_id: &PlayerId) -> bool {
+    fn on_ball_dodge_reset(
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        player_id: &PlayerId,
+    ) -> bool {
         const MIN_PLAYER_HEIGHT: f32 = 95.0;
         const MIN_BALL_HEIGHT: f32 = 80.0;
         const MAX_CENTER_DISTANCE: f32 = 180.0;
         const MAX_LOCAL_VERTICAL_OFFSET: f32 = 140.0;
 
-        let Some(ball) = &sample.ball else {
+        let Some(ball) = &ball.ball else {
             return false;
         };
-        let Some(player) = sample
+        let Some(player) = players
             .players
             .iter()
             .find(|player| &player.player_id == player_id)
@@ -57,9 +61,14 @@ impl DodgeResetCalculator {
         local_ball_position.z <= MAX_LOCAL_VERTICAL_OFFSET
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        for event in &sample.dodge_refreshed_events {
-            let on_ball = Self::on_ball_dodge_reset(sample, &event.player);
+    pub fn update(
+        &mut self,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+    ) -> SubtrActorResult<()> {
+        for event in &events.dodge_refreshed_events {
+            let on_ball = Self::on_ball_dodge_reset(ball, players, &event.player);
             let stats = self.player_stats.entry(event.player.clone()).or_default();
             stats.count += 1;
             if on_ball {

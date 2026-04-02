@@ -50,7 +50,7 @@ pub trait DerivedSignal {
 
     fn evaluate(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>>;
 
@@ -90,7 +90,7 @@ impl DerivedSignalGraph {
         Ok(())
     }
 
-    pub fn evaluate(&mut self, sample: &CoreSample) -> SubtrActorResult<&AnalysisContext> {
+    pub fn evaluate(&mut self, sample: &FrameState) -> SubtrActorResult<&AnalysisContext> {
         self.rebuild_order_if_needed()?;
         self.context.clear();
 
@@ -196,10 +196,33 @@ impl DerivedSignal for TouchStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        Ok(Some(Box::new(self.calculator.update(sample))))
+        Ok(Some(Box::new(self.calculator.update(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            &BallFrameState {
+                ball: sample.ball.clone(),
+            },
+            &PlayerFrameState {
+                players: sample.players.clone(),
+            },
+            &FrameEventsState {
+                active_demos: sample.active_demos.clone(),
+                demo_events: sample.demo_events.clone(),
+                boost_pad_events: sample.boost_pad_events.clone(),
+                touch_events: sample.touch_events.clone(),
+                dodge_refreshed_events: sample.dodge_refreshed_events.clone(),
+                player_stat_events: sample.player_stat_events.clone(),
+                goal_events: sample.goal_events.clone(),
+            },
+            sample.is_live_play(),
+        ))))
     }
 }
 
@@ -225,14 +248,23 @@ impl DerivedSignal for PossessionStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         let touch_state = ctx
             .get::<TouchState>(TOUCH_STATE_SIGNAL_ID)
             .cloned()
             .unwrap_or_default();
-        Ok(Some(Box::new(self.calculator.update(sample, &touch_state))))
+        Ok(Some(Box::new(self.calculator.update(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            &touch_state,
+            sample.is_live_play(),
+        ))))
     }
 }
 
@@ -254,10 +286,30 @@ impl DerivedSignal for BackboardBounceStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
-        Ok(Some(Box::new(self.calculator.update(sample))))
+        Ok(Some(Box::new(self.calculator.update(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            &BallFrameState {
+                ball: sample.ball.clone(),
+            },
+            &FrameEventsState {
+                active_demos: sample.active_demos.clone(),
+                demo_events: sample.demo_events.clone(),
+                boost_pad_events: sample.boost_pad_events.clone(),
+                touch_events: sample.touch_events.clone(),
+                dodge_refreshed_events: sample.dodge_refreshed_events.clone(),
+                player_stat_events: sample.player_stat_events.clone(),
+                goal_events: sample.goal_events.clone(),
+            },
+            sample.is_live_play(),
+        ))))
     }
 }
 
@@ -283,7 +335,7 @@ impl DerivedSignal for FiftyFiftyStateSignal {
 
     fn evaluate(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         let touch_state = ctx

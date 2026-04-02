@@ -1,9 +1,9 @@
-use std::collections::BTreeSet;
-use std::str::FromStr;
-
-use serde::Serialize;
-
+use crate::stats::analysis_nodes::analysis_graph::{AnalysisGraph, AnalysisNodeDyn};
+use crate::stats::analysis_nodes::{
+    boxed_analysis_node_by_name, LivePlayNode, PositioningNode, PressureNode, RushNode,
+};
 use crate::*;
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StatsTimelineConfig {
@@ -15,190 +15,9 @@ pub struct StatsTimelineConfig {
     pub rush_min_possession_retained_seconds: f32,
 }
 
-const CORE_MODULE: &str = "core";
-const BACKBOARD_MODULE: &str = "backboard";
-const CEILING_SHOT_MODULE: &str = "ceiling_shot";
-const DOUBLE_TAP_MODULE: &str = "double_tap";
-const FIFTY_FIFTY_MODULE: &str = "fifty_fifty";
-const POSSESSION_MODULE: &str = "possession";
 const PRESSURE_MODULE: &str = "pressure";
 const RUSH_MODULE: &str = "rush";
-const TOUCH_MODULE: &str = "touch";
-const SPEED_FLIP_MODULE: &str = "speed_flip";
-const MUSTY_FLICK_MODULE: &str = "musty_flick";
-const DODGE_RESET_MODULE: &str = "dodge_reset";
-const BALL_CARRY_MODULE: &str = "ball_carry";
-const BOOST_MODULE: &str = "boost";
-const MOVEMENT_MODULE: &str = "movement";
 const POSITIONING_MODULE: &str = "positioning";
-const POWERSLIDE_MODULE: &str = "powerslide";
-const DEMO_MODULE: &str = "demo";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StatsTimelineModule {
-    Core,
-    Backboard,
-    CeilingShot,
-    DoubleTap,
-    FiftyFifty,
-    Possession,
-    Pressure,
-    Rush,
-    Touch,
-    SpeedFlip,
-    MustyFlick,
-    DodgeReset,
-    BallCarry,
-    Boost,
-    Movement,
-    Positioning,
-    Powerslide,
-    Demo,
-}
-
-impl StatsTimelineModule {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            StatsTimelineModule::Core => CORE_MODULE,
-            StatsTimelineModule::Backboard => BACKBOARD_MODULE,
-            StatsTimelineModule::CeilingShot => CEILING_SHOT_MODULE,
-            StatsTimelineModule::DoubleTap => DOUBLE_TAP_MODULE,
-            StatsTimelineModule::FiftyFifty => FIFTY_FIFTY_MODULE,
-            StatsTimelineModule::Possession => POSSESSION_MODULE,
-            StatsTimelineModule::Pressure => PRESSURE_MODULE,
-            StatsTimelineModule::Rush => RUSH_MODULE,
-            StatsTimelineModule::Touch => TOUCH_MODULE,
-            StatsTimelineModule::SpeedFlip => SPEED_FLIP_MODULE,
-            StatsTimelineModule::MustyFlick => MUSTY_FLICK_MODULE,
-            StatsTimelineModule::DodgeReset => DODGE_RESET_MODULE,
-            StatsTimelineModule::BallCarry => BALL_CARRY_MODULE,
-            StatsTimelineModule::Boost => BOOST_MODULE,
-            StatsTimelineModule::Movement => MOVEMENT_MODULE,
-            StatsTimelineModule::Positioning => POSITIONING_MODULE,
-            StatsTimelineModule::Powerslide => POWERSLIDE_MODULE,
-            StatsTimelineModule::Demo => DEMO_MODULE,
-        }
-    }
-
-    pub fn all_names() -> &'static [&'static str] {
-        builtin_stats_module_names()
-    }
-}
-
-impl FromStr for StatsTimelineModule {
-    type Err = String;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        match input.trim().to_ascii_lowercase().as_str() {
-            CORE_MODULE => Ok(Self::Core),
-            BACKBOARD_MODULE => Ok(Self::Backboard),
-            CEILING_SHOT_MODULE => Ok(Self::CeilingShot),
-            DOUBLE_TAP_MODULE => Ok(Self::DoubleTap),
-            FIFTY_FIFTY_MODULE => Ok(Self::FiftyFifty),
-            POSSESSION_MODULE => Ok(Self::Possession),
-            PRESSURE_MODULE => Ok(Self::Pressure),
-            RUSH_MODULE => Ok(Self::Rush),
-            TOUCH_MODULE => Ok(Self::Touch),
-            SPEED_FLIP_MODULE => Ok(Self::SpeedFlip),
-            MUSTY_FLICK_MODULE => Ok(Self::MustyFlick),
-            DODGE_RESET_MODULE => Ok(Self::DodgeReset),
-            BALL_CARRY_MODULE => Ok(Self::BallCarry),
-            BOOST_MODULE => Ok(Self::Boost),
-            MOVEMENT_MODULE => Ok(Self::Movement),
-            POSITIONING_MODULE => Ok(Self::Positioning),
-            POWERSLIDE_MODULE => Ok(Self::Powerslide),
-            DEMO_MODULE => Ok(Self::Demo),
-            invalid => Err(format!(
-                "Unknown stats timeline module '{invalid}'. Expected one of: {}",
-                Self::all_names().join(", ")
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StatsTimelineModules {
-    processed: BTreeSet<String>,
-    emitted: BTreeSet<String>,
-    required_derived_signals: Vec<DerivedSignalId>,
-}
-
-impl Default for StatsTimelineModules {
-    fn default() -> Self {
-        Self::all()
-    }
-}
-
-impl StatsTimelineModules {
-    pub fn all_names() -> &'static [&'static str] {
-        builtin_stats_module_names()
-    }
-
-    pub fn all() -> Self {
-        Self::from_builtin_names(builtin_stats_module_names())
-            .expect("builtin stats timeline modules should resolve without conflicts")
-    }
-
-    pub fn from_builtin_names<I, S>(modules: I) -> SubtrActorResult<Self>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<str>,
-    {
-        let mut factories = Vec::new();
-        for module in modules {
-            let module = module.as_ref();
-            factories.push(builtin_stats_module_factory_by_name(module).ok_or_else(|| {
-                SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
-                    module.to_owned(),
-                ))
-            })?);
-        }
-        Ok(Self::from_resolved(
-            crate::collector::stats::resolve_stats_module_factories(factories)?,
-        ))
-    }
-
-    fn from_resolved(resolved: Vec<crate::collector::stats::ResolvedStatsModuleFactory>) -> Self {
-        let mut processed = BTreeSet::new();
-        let mut emitted = BTreeSet::new();
-        let mut required_derived_signals = BTreeSet::new();
-
-        for resolved_module in resolved {
-            processed.insert(resolved_module.name.to_owned());
-            if resolved_module.emit {
-                emitted.insert(resolved_module.name.to_owned());
-            }
-            required_derived_signals.extend(resolved_module.factory.required_derived_signals());
-        }
-
-        Self {
-            processed,
-            emitted,
-            required_derived_signals: required_derived_signals.into_iter().collect(),
-        }
-    }
-
-    pub fn contains_name(&self, module_name: &str) -> bool {
-        self.processed.contains(module_name)
-    }
-
-    pub fn contains(&self, module: StatsTimelineModule) -> bool {
-        self.contains_name(module.as_str())
-    }
-
-    pub fn emits_name(&self, module_name: &str) -> bool {
-        self.emitted.contains(module_name)
-    }
-
-    pub fn emits(&self, module: StatsTimelineModule) -> bool {
-        self.emits_name(module.as_str())
-    }
-
-    pub fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
-        self.required_derived_signals.clone()
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReplayStatsTimeline {
@@ -222,28 +41,6 @@ impl ReplayStatsTimeline {
     }
 
     pub fn into_dynamic(self) -> DynamicReplayStatsTimeline {
-        self.into_dynamic_with_modules(&StatsTimelineModules::all())
-    }
-
-    pub fn into_dynamic_with_module_names<I, S>(
-        self,
-        module_names: I,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<str>,
-    {
-        Ok(
-            self.into_dynamic_with_modules(&StatsTimelineModules::from_builtin_names(
-                module_names,
-            )?),
-        )
-    }
-
-    pub fn into_dynamic_with_modules(
-        self,
-        modules: &StatsTimelineModules,
-    ) -> DynamicReplayStatsTimeline {
         DynamicReplayStatsTimeline {
             config: self.config,
             replay_meta: self.replay_meta,
@@ -257,7 +54,7 @@ impl ReplayStatsTimeline {
             frames: self
                 .frames
                 .into_iter()
-                .map(|frame| frame.into_dynamic_with_modules(modules))
+                .map(ReplayStatsFrame::into_dynamic)
                 .collect(),
         }
     }
@@ -379,43 +176,6 @@ impl StatFieldProvider for TeamStatsSnapshot {
     }
 }
 
-impl TeamStatsSnapshot {
-    fn stat_fields_for_modules(&self, modules: &StatsTimelineModules) -> Vec<ExportedStat> {
-        let mut fields = Vec::new();
-        if modules.emits(StatsTimelineModule::Core) {
-            self.core.visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Backboard) {
-            self.backboard
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::DoubleTap) {
-            self.double_tap
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::BallCarry) {
-            self.ball_carry
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Boost) {
-            self.boost
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Movement) {
-            self.movement
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Powerslide) {
-            self.powerslide
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Demo) {
-            self.demo.visit_stat_fields(&mut |field| fields.push(field));
-        }
-        fields
-    }
-}
-
 impl StatFieldProvider for PlayerStatsSnapshot {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
         self.core.visit_stat_fields(visitor);
@@ -436,80 +196,8 @@ impl StatFieldProvider for PlayerStatsSnapshot {
     }
 }
 
-impl PlayerStatsSnapshot {
-    fn stat_fields_for_modules(&self, modules: &StatsTimelineModules) -> Vec<ExportedStat> {
-        let mut fields = Vec::new();
-        if modules.emits(StatsTimelineModule::Core) {
-            self.core.visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Backboard) {
-            self.backboard
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::CeilingShot) {
-            self.ceiling_shot
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::DoubleTap) {
-            self.double_tap
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::FiftyFifty) {
-            self.fifty_fifty
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::SpeedFlip) {
-            self.speed_flip
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Touch) {
-            self.touch
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::MustyFlick) {
-            self.musty_flick
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::DodgeReset) {
-            self.dodge_reset
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::BallCarry) {
-            self.ball_carry
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Boost) {
-            self.boost
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Movement) {
-            self.movement
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Positioning) {
-            self.positioning
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Powerslide) {
-            self.powerslide
-                .visit_stat_fields(&mut |field| fields.push(field));
-        }
-        if modules.emits(StatsTimelineModule::Demo) {
-            self.demo.visit_stat_fields(&mut |field| fields.push(field));
-        }
-        fields
-    }
-}
-
 impl ReplayStatsFrame {
     pub fn into_dynamic(self) -> DynamicReplayStatsFrame {
-        self.into_dynamic_with_modules(&StatsTimelineModules::all())
-    }
-
-    pub(crate) fn into_dynamic_with_modules(
-        self,
-        modules: &StatsTimelineModules,
-    ) -> DynamicReplayStatsFrame {
         DynamicReplayStatsFrame {
             frame_number: self.frame_number,
             time: self.time,
@@ -517,40 +205,24 @@ impl ReplayStatsFrame {
             seconds_remaining: self.seconds_remaining,
             game_state: self.game_state,
             is_live_play: self.is_live_play,
-            fifty_fifty: if modules.emits(StatsTimelineModule::FiftyFifty) {
-                self.fifty_fifty.stat_fields()
-            } else {
-                Vec::new()
-            },
-            possession: if modules.emits(StatsTimelineModule::Possession) {
-                self.possession.stat_fields()
-            } else {
-                Vec::new()
-            },
-            pressure: if modules.emits(StatsTimelineModule::Pressure) {
-                self.pressure.stat_fields()
-            } else {
-                Vec::new()
-            },
-            rush: if modules.emits(StatsTimelineModule::Rush) {
-                self.rush.stat_fields()
-            } else {
-                Vec::new()
-            },
+            fifty_fifty: self.fifty_fifty.stat_fields(),
+            possession: self.possession.stat_fields(),
+            pressure: self.pressure.stat_fields(),
+            rush: self.rush.stat_fields(),
             team_zero: DynamicTeamStatsSnapshot {
-                stats: self.team_zero.stat_fields_for_modules(modules),
+                stats: self.team_zero.stat_fields(),
             },
             team_one: DynamicTeamStatsSnapshot {
-                stats: self.team_one.stat_fields_for_modules(modules),
+                stats: self.team_one.stat_fields(),
             },
             players: self
                 .players
                 .into_iter()
                 .map(|player| {
-                    let stats = player.stat_fields_for_modules(modules);
+                    let stats = player.stat_fields();
                     DynamicPlayerStatsSnapshot {
                         player_id: player.player_id,
-                        name: player.name,
+                        name: player.name.clone(),
                         is_team_0: player.is_team_0,
                         stats,
                     }
@@ -559,306 +231,454 @@ impl ReplayStatsFrame {
         }
     }
 }
-
-#[derive(Debug, Clone, Default)]
-struct StatsTimelineReducers {
-    backboard: BackboardReducer,
-    ceiling_shot: CeilingShotReducer,
-    double_tap: DoubleTapReducer,
-    fifty_fifty: FiftyFiftyReducer,
-    possession: PossessionReducer,
-    pressure: PressureReducer,
-    rush: RushReducer,
-    match_stats: MatchStatsReducer,
-    touch: TouchReducer,
-    speed_flip: SpeedFlipReducer,
-    musty_flick: MustyFlickReducer,
-    ball_carry: BallCarryReducer,
-    boost: BoostReducer,
-    movement: MovementReducer,
-    positioning: PositioningReducer,
-    powerslide: PowerslideReducer,
-    demo: DemoReducer,
-    dodge_reset: DodgeResetReducer,
+fn timeline_node_for_module(
+    module_name: &str,
+    positioning_config: &PositioningReducerConfig,
+    pressure_config: &PressureReducerConfig,
+    rush_config: &RushReducerConfig,
+) -> SubtrActorResult<Box<dyn AnalysisNodeDyn>> {
+    match module_name {
+        POSITIONING_MODULE => Ok(Box::new(PositioningNode::with_config(
+            positioning_config.clone(),
+        ))),
+        PRESSURE_MODULE => Ok(Box::new(PressureNode::with_config(pressure_config.clone()))),
+        RUSH_MODULE => Ok(Box::new(RushNode::with_config(rush_config.clone()))),
+        _ => boxed_analysis_node_by_name(module_name).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
+                module_name.to_owned(),
+            ))
+        }),
+    }
 }
 
-impl StatsTimelineReducers {
-    fn with_positioning_config(config: PositioningReducerConfig) -> Self {
-        Self {
-            positioning: PositioningReducer::with_config(config),
-            ..Self::default()
-        }
+fn build_timeline_graph(
+    positioning_config: &PositioningReducerConfig,
+    pressure_config: &PressureReducerConfig,
+    rush_config: &RushReducerConfig,
+) -> SubtrActorResult<AnalysisGraph> {
+    let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
+    graph.push_boxed_node(Box::new(LivePlayNode::new()));
+    for module_name in builtin_stats_module_names() {
+        graph.push_boxed_node(timeline_node_for_module(
+            module_name,
+            positioning_config,
+            pressure_config,
+            rush_config,
+        )?);
     }
-
-    fn with_pressure_config(config: PressureReducerConfig) -> Self {
-        Self {
-            pressure: PressureReducer::with_config(config),
-            ..Self::default()
-        }
-    }
-
-    fn with_rush_config(config: RushReducerConfig) -> Self {
-        Self {
-            rush: RushReducer::with_config(config),
-            ..Self::default()
-        }
-    }
-
-    fn on_replay_meta(
-        &mut self,
-        modules: &StatsTimelineModules,
-        meta: &ReplayMeta,
-    ) -> SubtrActorResult<()> {
-        if modules.contains(StatsTimelineModule::Backboard) {
-            self.backboard.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::CeilingShot) {
-            self.ceiling_shot.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::DoubleTap) {
-            self.double_tap.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Possession) {
-            self.possession.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Pressure) {
-            self.pressure.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Rush) {
-            self.rush.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Core) {
-            self.match_stats.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::FiftyFifty) {
-            self.fifty_fifty.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Touch) {
-            self.touch.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::SpeedFlip) {
-            self.speed_flip.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::MustyFlick) {
-            self.musty_flick.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::BallCarry) {
-            self.ball_carry.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Boost) {
-            self.boost.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Movement) {
-            self.movement.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Positioning) {
-            self.positioning.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Powerslide) {
-            self.powerslide.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::Demo) {
-            self.demo.on_replay_meta(meta)?;
-        }
-        if modules.contains(StatsTimelineModule::DodgeReset) {
-            self.dodge_reset.on_replay_meta(meta)?;
-        }
-        Ok(())
-    }
-
-    fn on_sample_with_context(
-        &mut self,
-        modules: &StatsTimelineModules,
-        sample: &CoreSample,
-        ctx: &AnalysisContext,
-    ) -> SubtrActorResult<()> {
-        if modules.contains(StatsTimelineModule::Backboard) {
-            self.backboard.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::CeilingShot) {
-            self.ceiling_shot.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::DoubleTap) {
-            self.double_tap.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Possession) {
-            self.possession.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Pressure) {
-            self.pressure.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Rush) {
-            self.rush.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Core) {
-            self.match_stats.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::FiftyFifty) {
-            self.fifty_fifty.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Touch) {
-            self.touch.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::SpeedFlip) {
-            self.speed_flip.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::MustyFlick) {
-            self.musty_flick.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::BallCarry) {
-            self.ball_carry.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Boost) {
-            self.boost.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Movement) {
-            self.movement.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Positioning) {
-            self.positioning.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Powerslide) {
-            self.powerslide.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::Demo) {
-            self.demo.on_sample_with_context(sample, ctx)?;
-        }
-        if modules.contains(StatsTimelineModule::DodgeReset) {
-            self.dodge_reset.on_sample_with_context(sample, ctx)?;
-        }
-        Ok(())
-    }
-
-    fn finish(&mut self, modules: &StatsTimelineModules) -> SubtrActorResult<()> {
-        if modules.contains(StatsTimelineModule::CeilingShot) {
-            self.ceiling_shot.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Possession) {
-            self.possession.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Pressure) {
-            self.pressure.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Rush) {
-            self.rush.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Core) {
-            self.match_stats.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::FiftyFifty) {
-            self.fifty_fifty.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Touch) {
-            self.touch.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::SpeedFlip) {
-            self.speed_flip.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::MustyFlick) {
-            self.musty_flick.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::BallCarry) {
-            self.ball_carry.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Boost) {
-            self.boost.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Movement) {
-            self.movement.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Positioning) {
-            self.positioning.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Powerslide) {
-            self.powerslide.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::Demo) {
-            self.demo.finish()?;
-        }
-        if modules.contains(StatsTimelineModule::DodgeReset) {
-            self.dodge_reset.finish()?;
-        }
-        Ok(())
-    }
+    Ok(graph)
 }
 
 pub struct StatsTimelineCollector {
-    modules: StatsTimelineModules,
-    reducers: StatsTimelineReducers,
-    derived_signals: DerivedSignalGraph,
+    graph: AnalysisGraph,
+    positioning_config: PositioningReducerConfig,
+    pressure_config: PressureReducerConfig,
+    rush_config: RushReducerConfig,
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
-    last_sample: Option<CoreSample>,
-    last_live_play: Option<bool>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl Default for StatsTimelineCollector {
     fn default() -> Self {
-        let modules = StatsTimelineModules::default();
-        Self {
-            derived_signals: derived_signal_graph_for_ids(modules.required_derived_signals()),
-            modules,
-            reducers: StatsTimelineReducers::default(),
-            replay_meta: None,
-            frames: Vec::new(),
-            last_sample_time: None,
-            last_sample: None,
-            last_live_play: None,
-            live_play_tracker: LivePlayTracker::default(),
-        }
+        Self::with_configs(
+            PositioningReducerConfig::default(),
+            PressureReducerConfig::default(),
+            RushReducerConfig::default(),
+        )
     }
 }
 
 impl StatsTimelineCollector {
+    fn with_configs(
+        positioning_config: PositioningReducerConfig,
+        pressure_config: PressureReducerConfig,
+        rush_config: RushReducerConfig,
+    ) -> Self {
+        let graph = build_timeline_graph(&positioning_config, &pressure_config, &rush_config)
+            .expect("builtin stats timeline modules should resolve without conflicts");
+        Self {
+            graph,
+            positioning_config,
+            pressure_config,
+            rush_config,
+            replay_meta: None,
+            frames: Vec::new(),
+            last_sample_time: None,
+        }
+    }
+
+    fn timeline_config(&self) -> StatsTimelineConfig {
+        StatsTimelineConfig {
+            most_back_forward_threshold_y: self.positioning_config.most_back_forward_threshold_y,
+            pressure_neutral_zone_half_width_y: self.pressure_config.neutral_zone_half_width_y,
+            rush_max_start_y: self.rush_config.max_start_y,
+            rush_attack_support_distance_y: self.rush_config.attack_support_distance_y,
+            rush_defender_distance_y: self.rush_config.defender_distance_y,
+            rush_min_possession_retained_seconds: self.rush_config.min_possession_retained_seconds,
+        }
+    }
+
+    fn graph_value_or_default<T, S, F>(&self, project: F) -> T
+    where
+        T: Default,
+        S: 'static,
+        F: FnOnce(&S) -> T,
+    {
+        self.graph.state::<S>().map(project).unwrap_or_default()
+    }
+
+    fn is_team_zero_player(replay_meta: &ReplayMeta, player: &PlayerInfo) -> bool {
+        replay_meta
+            .team_zero
+            .iter()
+            .any(|team_player| team_player.remote_id == player.remote_id)
+    }
+
+    fn team_snapshot(&self, is_team_zero: bool) -> TeamStatsSnapshot {
+        TeamStatsSnapshot {
+            core: if is_team_zero {
+                self.graph_value_or_default::<CoreTeamStats, MatchStatsCalculator, _>(
+                    |calculator| calculator.team_zero_stats(),
+                )
+            } else {
+                self.graph_value_or_default::<CoreTeamStats, MatchStatsCalculator, _>(
+                    |calculator| calculator.team_one_stats(),
+                )
+            },
+            backboard: if is_team_zero {
+                self.graph_value_or_default::<BackboardTeamStats, BackboardCalculator, _>(
+                    |calculator| calculator.team_zero_stats().clone(),
+                )
+            } else {
+                self.graph_value_or_default::<BackboardTeamStats, BackboardCalculator, _>(
+                    |calculator| calculator.team_one_stats().clone(),
+                )
+            },
+            double_tap: if is_team_zero {
+                self.graph_value_or_default::<DoubleTapTeamStats, DoubleTapCalculator, _>(
+                    |calculator| calculator.team_zero_stats().clone(),
+                )
+            } else {
+                self.graph_value_or_default::<DoubleTapTeamStats, DoubleTapCalculator, _>(
+                    |calculator| calculator.team_one_stats().clone(),
+                )
+            },
+            ball_carry: if is_team_zero {
+                self.graph_value_or_default::<BallCarryStats, BallCarryCalculator, _>(
+                    |calculator| calculator.team_zero_stats().clone(),
+                )
+            } else {
+                self.graph_value_or_default::<BallCarryStats, BallCarryCalculator, _>(
+                    |calculator| calculator.team_one_stats().clone(),
+                )
+            },
+            boost: if is_team_zero {
+                self.graph_value_or_default::<BoostStats, BoostCalculator, _>(|calculator| {
+                    calculator.team_zero_stats().clone()
+                })
+            } else {
+                self.graph_value_or_default::<BoostStats, BoostCalculator, _>(|calculator| {
+                    calculator.team_one_stats().clone()
+                })
+            },
+            movement: if is_team_zero {
+                self.graph_value_or_default::<MovementStats, MovementCalculator, _>(|calculator| {
+                    calculator.team_zero_stats().clone()
+                })
+            } else {
+                self.graph_value_or_default::<MovementStats, MovementCalculator, _>(|calculator| {
+                    calculator.team_one_stats().clone()
+                })
+            },
+            powerslide: if is_team_zero {
+                self.graph_value_or_default::<PowerslideStats, PowerslideCalculator, _>(
+                    |calculator| calculator.team_zero_stats().clone(),
+                )
+            } else {
+                self.graph_value_or_default::<PowerslideStats, PowerslideCalculator, _>(
+                    |calculator| calculator.team_one_stats().clone(),
+                )
+            },
+            demo: if is_team_zero {
+                self.graph_value_or_default::<DemoTeamStats, DemoCalculator, _>(|calculator| {
+                    calculator.team_zero_stats().clone()
+                })
+            } else {
+                self.graph_value_or_default::<DemoTeamStats, DemoCalculator, _>(|calculator| {
+                    calculator.team_one_stats().clone()
+                })
+            },
+        }
+    }
+
+    fn player_snapshot(
+        &self,
+        replay_meta: &ReplayMeta,
+        player: &PlayerInfo,
+    ) -> PlayerStatsSnapshot {
+        let player_id = &player.remote_id;
+        PlayerStatsSnapshot {
+            player_id: player.remote_id.clone(),
+            name: player.name.clone(),
+            is_team_0: Self::is_team_zero_player(replay_meta, player),
+            core: self.graph_value_or_default::<CorePlayerStats, MatchStatsCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            backboard: self.graph_value_or_default::<BackboardPlayerStats, BackboardCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            ceiling_shot: self
+                .graph_value_or_default::<CeilingShotStats, CeilingShotCalculator, _>(
+                    |calculator| {
+                        calculator
+                            .player_stats()
+                            .get(player_id)
+                            .cloned()
+                            .unwrap_or_default()
+                    },
+                ),
+            double_tap: self
+                .graph_value_or_default::<DoubleTapPlayerStats, DoubleTapCalculator, _>(
+                    |calculator| {
+                        calculator
+                            .player_stats()
+                            .get(player_id)
+                            .cloned()
+                            .unwrap_or_default()
+                    },
+                ),
+            fifty_fifty: self
+                .graph_value_or_default::<FiftyFiftyPlayerStats, FiftyFiftyCalculator, _>(
+                    |calculator| {
+                        calculator
+                            .player_stats()
+                            .get(player_id)
+                            .cloned()
+                            .unwrap_or_default()
+                    },
+                ),
+            speed_flip: self.graph_value_or_default::<SpeedFlipStats, SpeedFlipCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            touch: self.graph_value_or_default::<TouchStats, TouchCalculator, _>(|calculator| {
+                calculator
+                    .player_stats()
+                    .get(player_id)
+                    .cloned()
+                    .unwrap_or_default()
+                    .with_complete_labeled_touch_counts()
+            }),
+            musty_flick: self.graph_value_or_default::<MustyFlickStats, MustyFlickCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            dodge_reset: self.graph_value_or_default::<DodgeResetStats, DodgeResetCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            ball_carry: self.graph_value_or_default::<BallCarryStats, BallCarryCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            boost: self.graph_value_or_default::<BoostStats, BoostCalculator, _>(|calculator| {
+                calculator
+                    .player_stats()
+                    .get(player_id)
+                    .cloned()
+                    .unwrap_or_default()
+            }),
+            movement: self.graph_value_or_default::<MovementStats, MovementCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                        .with_complete_labeled_tracked_time()
+                },
+            ),
+            positioning: self.graph_value_or_default::<PositioningStats, PositioningCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            powerslide: self.graph_value_or_default::<PowerslideStats, PowerslideCalculator, _>(
+                |calculator| {
+                    calculator
+                        .player_stats()
+                        .get(player_id)
+                        .cloned()
+                        .unwrap_or_default()
+                },
+            ),
+            demo: self.graph_value_or_default::<DemoPlayerStats, DemoCalculator, _>(|calculator| {
+                calculator
+                    .player_stats()
+                    .get(player_id)
+                    .cloned()
+                    .unwrap_or_default()
+            }),
+        }
+    }
+
+    fn timeline_events(&self) -> Vec<TimelineEvent> {
+        let mut events = self
+            .graph_value_or_default::<Vec<TimelineEvent>, MatchStatsCalculator, _>(|calculator| {
+                calculator.timeline().to_vec()
+            });
+        events.extend(
+            self.graph_value_or_default::<Vec<TimelineEvent>, DemoCalculator, _>(|calculator| {
+                calculator.timeline().to_vec()
+            }),
+        );
+        events.sort_by(|left, right| left.time.total_cmp(&right.time));
+        events
+    }
+
+    fn snapshot_frame(&self, replay_meta: &ReplayMeta) -> SubtrActorResult<ReplayStatsFrame> {
+        let frame = self.graph.state::<FrameInfo>().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                "missing FrameInfo state while building timeline frame".to_owned(),
+            ))
+        })?;
+        let gameplay = self.graph.state::<GameplayState>().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                "missing GameplayState state while building timeline frame".to_owned(),
+            ))
+        })?;
+        let live_play = self
+            .graph
+            .state::<LivePlayState>()
+            .map(|state| state.is_live_play)
+            .unwrap_or(false);
+        Ok(ReplayStatsFrame {
+            frame_number: frame.frame_number,
+            time: frame.time,
+            dt: frame.dt,
+            seconds_remaining: frame.seconds_remaining,
+            game_state: gameplay.game_state,
+            is_live_play: live_play,
+            fifty_fifty: self.graph_value_or_default::<FiftyFiftyStats, FiftyFiftyCalculator, _>(
+                |calculator| calculator.stats().clone(),
+            ),
+            possession: self.graph_value_or_default::<PossessionStats, PossessionCalculator, _>(
+                |calculator| calculator.stats().clone(),
+            ),
+            pressure: self.graph_value_or_default::<PressureStats, PressureCalculator, _>(
+                |calculator| calculator.stats().clone(),
+            ),
+            rush: self.graph_value_or_default::<RushStats, RushCalculator, _>(|calculator| {
+                calculator.stats().clone()
+            }),
+            team_zero: self.team_snapshot(true),
+            team_one: self.team_snapshot(false),
+            players: replay_meta
+                .player_order()
+                .map(|player| self.player_snapshot(replay_meta, player))
+                .collect(),
+        })
+    }
+
+    fn into_timeline_result(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        let replay_meta = self
+            .replay_meta
+            .clone()
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
+        Ok(ReplayStatsTimeline {
+            config: self.timeline_config(),
+            replay_meta,
+            timeline_events: self.timeline_events(),
+            backboard_events: self
+                .graph_value_or_default::<Vec<BackboardBounceEvent>, BackboardCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
+            ceiling_shot_events: self
+                .graph_value_or_default::<Vec<CeilingShotEvent>, CeilingShotCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
+            double_tap_events: self
+                .graph_value_or_default::<Vec<DoubleTapEvent>, DoubleTapCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
+            fifty_fifty_events: self
+                .graph_value_or_default::<Vec<FiftyFiftyEvent>, FiftyFiftyCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
+            rush_events: self.graph_value_or_default::<Vec<RushEvent>, RushCalculator, _>(
+                |calculator| calculator.events().to_vec(),
+            ),
+            speed_flip_events: self
+                .graph_value_or_default::<Vec<SpeedFlipEvent>, SpeedFlipCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
+            frames: self.frames,
+        })
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn only_modules<I>(modules: I) -> Self
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        Self::try_only_modules(modules)
-            .expect("builtin stats timeline module names should be valid")
-    }
-
-    pub fn try_only_modules<I>(modules: I) -> SubtrActorResult<Self>
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        Ok(Self::default()
-            .with_module_selection(StatsTimelineModules::from_builtin_names(modules)?))
-    }
-
-    pub fn with_module_selection(mut self, modules: StatsTimelineModules) -> Self {
-        self.derived_signals = derived_signal_graph_for_ids(modules.required_derived_signals());
-        self.modules = modules;
-        self
-    }
-
     pub fn with_positioning_config(config: PositioningReducerConfig) -> Self {
-        Self {
-            reducers: StatsTimelineReducers::with_positioning_config(config),
-            ..Self::default()
-        }
+        Self::with_configs(
+            config,
+            PressureReducerConfig::default(),
+            RushReducerConfig::default(),
+        )
     }
 
     pub fn with_pressure_config(config: PressureReducerConfig) -> Self {
-        Self {
-            reducers: StatsTimelineReducers::with_pressure_config(config),
-            ..Self::default()
-        }
+        Self::with_configs(
+            PositioningReducerConfig::default(),
+            config,
+            RushReducerConfig::default(),
+        )
     }
 
     pub fn with_rush_config(config: RushReducerConfig) -> Self {
-        Self {
-            reducers: StatsTimelineReducers::with_rush_config(config),
-            ..Self::default()
-        }
+        Self::with_configs(
+            PositioningReducerConfig::default(),
+            PressureReducerConfig::default(),
+            config,
+        )
     }
 
     pub fn get_replay_data(
@@ -867,7 +687,7 @@ impl StatsTimelineCollector {
     ) -> SubtrActorResult<ReplayStatsTimeline> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
-        Ok(self.into_timeline())
+        self.into_timeline_result()
     }
 
     pub fn get_dynamic_replay_data(
@@ -880,431 +700,12 @@ impl StatsTimelineCollector {
     }
 
     pub fn into_timeline(self) -> ReplayStatsTimeline {
-        let replay_meta = self
-            .replay_meta
-            .expect("replay metadata should be initialized before building a stats timeline");
-        let config = StatsTimelineConfig {
-            most_back_forward_threshold_y: self
-                .reducers
-                .positioning
-                .config()
-                .most_back_forward_threshold_y,
-            pressure_neutral_zone_half_width_y: self
-                .reducers
-                .pressure
-                .config()
-                .neutral_zone_half_width_y,
-            rush_max_start_y: self.reducers.rush.config().max_start_y,
-            rush_attack_support_distance_y: self.reducers.rush.config().attack_support_distance_y,
-            rush_defender_distance_y: self.reducers.rush.config().defender_distance_y,
-            rush_min_possession_retained_seconds: self
-                .reducers
-                .rush
-                .config()
-                .min_possession_retained_seconds,
-        };
-        let mut timeline_events = Vec::new();
-        if self.modules.emits(StatsTimelineModule::Core) {
-            timeline_events.extend(self.reducers.match_stats.timeline().iter().cloned());
-        }
-        if self.modules.emits(StatsTimelineModule::Demo) {
-            timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
-        }
-        timeline_events.sort_by(|left, right| left.time.total_cmp(&right.time));
-        ReplayStatsTimeline {
-            config,
-            replay_meta,
-            timeline_events,
-            backboard_events: if self.modules.emits(StatsTimelineModule::Backboard) {
-                self.reducers.backboard.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            ceiling_shot_events: if self.modules.emits(StatsTimelineModule::CeilingShot) {
-                self.reducers.ceiling_shot.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            double_tap_events: if self.modules.emits(StatsTimelineModule::DoubleTap) {
-                self.reducers.double_tap.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            fifty_fifty_events: if self.modules.emits(StatsTimelineModule::FiftyFifty) {
-                self.reducers.fifty_fifty.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            rush_events: if self.modules.emits(StatsTimelineModule::Rush) {
-                self.reducers.rush.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            speed_flip_events: if self.modules.emits(StatsTimelineModule::SpeedFlip) {
-                self.reducers.speed_flip.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            frames: self.frames,
-        }
+        self.into_timeline_result()
+            .expect("analysis-node timeline collector should build typed stats frames")
     }
 
     pub fn into_dynamic_timeline(self) -> DynamicReplayStatsTimeline {
-        let replay_meta = self
-            .replay_meta
-            .expect("replay metadata should be initialized before building a stats timeline");
-        let config = StatsTimelineConfig {
-            most_back_forward_threshold_y: self
-                .reducers
-                .positioning
-                .config()
-                .most_back_forward_threshold_y,
-            pressure_neutral_zone_half_width_y: self
-                .reducers
-                .pressure
-                .config()
-                .neutral_zone_half_width_y,
-            rush_max_start_y: self.reducers.rush.config().max_start_y,
-            rush_attack_support_distance_y: self.reducers.rush.config().attack_support_distance_y,
-            rush_defender_distance_y: self.reducers.rush.config().defender_distance_y,
-            rush_min_possession_retained_seconds: self
-                .reducers
-                .rush
-                .config()
-                .min_possession_retained_seconds,
-        };
-        let mut timeline_events = Vec::new();
-        if self.modules.emits(StatsTimelineModule::Core) {
-            timeline_events.extend(self.reducers.match_stats.timeline().iter().cloned());
-        }
-        if self.modules.emits(StatsTimelineModule::Demo) {
-            timeline_events.extend(self.reducers.demo.timeline().iter().cloned());
-        }
-        timeline_events.sort_by(|left, right| left.time.total_cmp(&right.time));
-        let modules = self.modules.clone();
-        DynamicReplayStatsTimeline {
-            config,
-            replay_meta,
-            timeline_events,
-            backboard_events: if modules.emits(StatsTimelineModule::Backboard) {
-                self.reducers.backboard.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            ceiling_shot_events: if modules.emits(StatsTimelineModule::CeilingShot) {
-                self.reducers.ceiling_shot.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            double_tap_events: if modules.emits(StatsTimelineModule::DoubleTap) {
-                self.reducers.double_tap.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            fifty_fifty_events: if modules.emits(StatsTimelineModule::FiftyFifty) {
-                self.reducers.fifty_fifty.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            rush_events: if modules.emits(StatsTimelineModule::Rush) {
-                self.reducers.rush.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            speed_flip_events: if modules.emits(StatsTimelineModule::SpeedFlip) {
-                self.reducers.speed_flip.events().to_vec()
-            } else {
-                Vec::new()
-            },
-            frames: self
-                .frames
-                .into_iter()
-                .map(|frame| frame.into_dynamic_with_modules(&modules))
-                .collect(),
-        }
-    }
-
-    fn snapshot_frame(
-        &self,
-        sample: &CoreSample,
-        replay_meta: &ReplayMeta,
-        live_play: bool,
-    ) -> ReplayStatsFrame {
-        ReplayStatsFrame {
-            frame_number: sample.frame_number,
-            time: sample.time,
-            dt: sample.dt,
-            seconds_remaining: sample.seconds_remaining,
-            game_state: sample.game_state,
-            is_live_play: live_play,
-            fifty_fifty: if self.modules.emits(StatsTimelineModule::FiftyFifty) {
-                self.reducers.fifty_fifty.stats().clone()
-            } else {
-                FiftyFiftyStats::default()
-            },
-            possession: if self.modules.emits(StatsTimelineModule::Possession) {
-                self.reducers.possession.stats().clone()
-            } else {
-                PossessionStats::default()
-            },
-            pressure: if self.modules.emits(StatsTimelineModule::Pressure) {
-                self.reducers.pressure.stats().clone()
-            } else {
-                PressureStats::default()
-            },
-            rush: if self.modules.emits(StatsTimelineModule::Rush) {
-                self.reducers.rush.stats().clone()
-            } else {
-                RushStats::default()
-            },
-            team_zero: TeamStatsSnapshot {
-                core: if self.modules.emits(StatsTimelineModule::Core) {
-                    self.reducers.match_stats.team_zero_stats()
-                } else {
-                    CoreTeamStats::default()
-                },
-                backboard: if self.modules.emits(StatsTimelineModule::Backboard) {
-                    self.reducers.backboard.team_zero_stats().clone()
-                } else {
-                    BackboardTeamStats::default()
-                },
-                double_tap: if self.modules.emits(StatsTimelineModule::DoubleTap) {
-                    self.reducers.double_tap.team_zero_stats().clone()
-                } else {
-                    DoubleTapTeamStats::default()
-                },
-                ball_carry: if self.modules.emits(StatsTimelineModule::BallCarry) {
-                    self.reducers.ball_carry.team_zero_stats().clone()
-                } else {
-                    BallCarryStats::default()
-                },
-                boost: if self.modules.emits(StatsTimelineModule::Boost) {
-                    self.reducers.boost.team_zero_stats().clone()
-                } else {
-                    BoostStats::default()
-                },
-                movement: if self.modules.emits(StatsTimelineModule::Movement) {
-                    self.reducers.movement.team_zero_stats().clone()
-                } else {
-                    MovementStats::default()
-                },
-                powerslide: if self.modules.emits(StatsTimelineModule::Powerslide) {
-                    self.reducers.powerslide.team_zero_stats().clone()
-                } else {
-                    PowerslideStats::default()
-                },
-                demo: if self.modules.emits(StatsTimelineModule::Demo) {
-                    self.reducers.demo.team_zero_stats().clone()
-                } else {
-                    DemoTeamStats::default()
-                },
-            },
-            team_one: TeamStatsSnapshot {
-                core: if self.modules.emits(StatsTimelineModule::Core) {
-                    self.reducers.match_stats.team_one_stats()
-                } else {
-                    CoreTeamStats::default()
-                },
-                backboard: if self.modules.emits(StatsTimelineModule::Backboard) {
-                    self.reducers.backboard.team_one_stats().clone()
-                } else {
-                    BackboardTeamStats::default()
-                },
-                double_tap: if self.modules.emits(StatsTimelineModule::DoubleTap) {
-                    self.reducers.double_tap.team_one_stats().clone()
-                } else {
-                    DoubleTapTeamStats::default()
-                },
-                ball_carry: if self.modules.emits(StatsTimelineModule::BallCarry) {
-                    self.reducers.ball_carry.team_one_stats().clone()
-                } else {
-                    BallCarryStats::default()
-                },
-                boost: if self.modules.emits(StatsTimelineModule::Boost) {
-                    self.reducers.boost.team_one_stats().clone()
-                } else {
-                    BoostStats::default()
-                },
-                movement: if self.modules.emits(StatsTimelineModule::Movement) {
-                    self.reducers.movement.team_one_stats().clone()
-                } else {
-                    MovementStats::default()
-                },
-                powerslide: if self.modules.emits(StatsTimelineModule::Powerslide) {
-                    self.reducers.powerslide.team_one_stats().clone()
-                } else {
-                    PowerslideStats::default()
-                },
-                demo: if self.modules.emits(StatsTimelineModule::Demo) {
-                    self.reducers.demo.team_one_stats().clone()
-                } else {
-                    DemoTeamStats::default()
-                },
-            },
-            players: replay_meta
-                .player_order()
-                .map(|player| PlayerStatsSnapshot {
-                    player_id: player.remote_id.clone(),
-                    name: player.name.clone(),
-                    is_team_0: replay_meta
-                        .team_zero
-                        .iter()
-                        .any(|team_player| team_player.remote_id == player.remote_id),
-                    core: if self.modules.emits(StatsTimelineModule::Core) {
-                        self.reducers
-                            .match_stats
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        CorePlayerStats::default()
-                    },
-                    backboard: if self.modules.emits(StatsTimelineModule::Backboard) {
-                        self.reducers
-                            .backboard
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        BackboardPlayerStats::default()
-                    },
-                    ceiling_shot: if self.modules.emits(StatsTimelineModule::CeilingShot) {
-                        self.reducers
-                            .ceiling_shot
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        CeilingShotStats::default()
-                    },
-                    double_tap: if self.modules.emits(StatsTimelineModule::DoubleTap) {
-                        self.reducers
-                            .double_tap
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        DoubleTapPlayerStats::default()
-                    },
-                    fifty_fifty: if self.modules.emits(StatsTimelineModule::FiftyFifty) {
-                        self.reducers
-                            .fifty_fifty
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        FiftyFiftyPlayerStats::default()
-                    },
-                    speed_flip: if self.modules.emits(StatsTimelineModule::SpeedFlip) {
-                        self.reducers
-                            .speed_flip
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        SpeedFlipStats::default()
-                    },
-                    touch: if self.modules.emits(StatsTimelineModule::Touch) {
-                        self.reducers
-                            .touch
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                            .with_complete_labeled_touch_counts()
-                    } else {
-                        TouchStats::default()
-                    },
-                    musty_flick: if self.modules.emits(StatsTimelineModule::MustyFlick) {
-                        self.reducers
-                            .musty_flick
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        MustyFlickStats::default()
-                    },
-                    dodge_reset: if self.modules.emits(StatsTimelineModule::DodgeReset) {
-                        self.reducers
-                            .dodge_reset
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        DodgeResetStats::default()
-                    },
-                    ball_carry: if self.modules.emits(StatsTimelineModule::BallCarry) {
-                        self.reducers
-                            .ball_carry
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        BallCarryStats::default()
-                    },
-                    boost: if self.modules.emits(StatsTimelineModule::Boost) {
-                        self.reducers
-                            .boost
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        BoostStats::default()
-                    },
-                    movement: if self.modules.emits(StatsTimelineModule::Movement) {
-                        self.reducers
-                            .movement
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                            .with_complete_labeled_tracked_time()
-                    } else {
-                        MovementStats::default()
-                    },
-                    positioning: if self.modules.emits(StatsTimelineModule::Positioning) {
-                        self.reducers
-                            .positioning
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        PositioningStats::default()
-                    },
-                    powerslide: if self.modules.emits(StatsTimelineModule::Powerslide) {
-                        self.reducers
-                            .powerslide
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        PowerslideStats::default()
-                    },
-                    demo: if self.modules.emits(StatsTimelineModule::Demo) {
-                        self.reducers
-                            .demo
-                            .player_stats()
-                            .get(&player.remote_id)
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        DemoPlayerStats::default()
-                    },
-                })
-                .collect(),
-        }
+        self.into_timeline().into_dynamic()
     }
 }
 
@@ -1318,8 +719,7 @@ impl Collector for StatsTimelineCollector {
     ) -> SubtrActorResult<TimeAdvance> {
         if self.replay_meta.is_none() {
             let replay_meta = processor.get_replay_meta()?;
-            self.derived_signals.on_replay_meta(&replay_meta)?;
-            self.reducers.on_replay_meta(&self.modules, &replay_meta)?;
+            self.graph.on_replay_meta(&replay_meta)?;
             self.replay_meta = Some(replay_meta);
         }
 
@@ -1327,39 +727,28 @@ impl Collector for StatsTimelineCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
-        let live_play = self.live_play_tracker.is_live_play(&sample);
-        let analysis_context = self.derived_signals.evaluate(&sample)?;
-        self.reducers
-            .on_sample_with_context(&self.modules, &sample, analysis_context)?;
+        let frame_input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
-        self.last_live_play = Some(live_play);
 
         let replay_meta = self
             .replay_meta
             .as_ref()
             .expect("replay metadata should be initialized before snapshotting");
-        self.frames
-            .push(self.snapshot_frame(&sample, replay_meta, live_play));
-        self.last_sample = Some(sample);
+        self.frames.push(self.snapshot_frame(replay_meta)?);
 
         Ok(TimeAdvance::NextFrame)
     }
 
     fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
-        self.derived_signals.finish()?;
-        self.reducers.finish(&self.modules)?;
-        let Some(last_sample) = self.last_sample.as_ref() else {
-            return Ok(());
-        };
+        self.graph.finish()?;
         let Some(replay_meta) = self.replay_meta.as_ref() else {
             return Ok(());
         };
-        let final_snapshot = self.snapshot_frame(
-            last_sample,
-            replay_meta,
-            self.last_live_play.unwrap_or(false),
-        );
+        let Some(_) = self.graph.state::<FrameInfo>() else {
+            return Ok(());
+        };
+        let final_snapshot = self.snapshot_frame(replay_meta)?;
         if let Some(last_frame) = self.frames.last_mut() {
             *last_frame = final_snapshot;
         }

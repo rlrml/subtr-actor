@@ -210,13 +210,9 @@ impl PossessionTracker {
         }
     }
 
-    pub(crate) fn update(
-        &mut self,
-        sample: &CoreSample,
-        touch_events: &[TouchEvent],
-    ) -> PossessionState {
-        self.expire_pending_turnover(sample.time);
-        self.expire_loose_ball(sample.time);
+    pub(crate) fn update(&mut self, time: f32, touch_events: &[TouchEvent]) -> PossessionState {
+        self.expire_pending_turnover(time);
+        self.expire_loose_ball(time);
 
         let active_team_before_sample = self.current_team_is_team_0;
         let active_player_before_sample = self.current_player.clone();
@@ -234,9 +230,9 @@ impl PossessionTracker {
             .and_then(|touch| touch.player.clone());
 
         match (touched_team_zero, touched_team_one) {
-            (true, true) => self.register_contested_touch(sample.time),
-            (true, false) => self.register_single_team_touch(true, sample.time),
-            (false, true) => self.register_single_team_touch(false, sample.time),
+            (true, true) => self.register_contested_touch(time),
+            (true, false) => self.register_single_team_touch(true, time),
+            (false, true) => self.register_single_team_touch(false, time),
             (false, false) => {}
         }
         self.update_player_control(
@@ -258,7 +254,6 @@ impl PossessionTracker {
 pub struct PossessionCalculator {
     stats: PossessionStats,
     tracker: PossessionTracker,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl PossessionCalculator {
@@ -292,43 +287,56 @@ impl PossessionCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        live_play: bool,
         active_team_before_sample: Option<bool>,
     ) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
         if live_play {
-            self.stats.tracked_time += sample.dt;
-            let field_third = sample.ball.as_ref().map(FieldThirdLabel::from_ball);
+            self.stats.tracked_time += frame.dt;
+            let field_third = ball.ball.as_ref().map(FieldThirdLabel::from_ball);
             if let Some(possession_team_is_team_0) = active_team_before_sample {
                 let state = if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
                 } else {
                     PossessionStateLabel::TeamOne
                 };
-                Self::apply_possession_time(&mut self.stats, state, field_third, sample.dt);
+                Self::apply_possession_time(&mut self.stats, state, field_third, frame.dt);
             } else {
                 Self::apply_possession_time(
                     &mut self.stats,
                     PossessionStateLabel::Neutral,
                     field_third,
-                    sample.dt,
+                    frame.dt,
                 );
             }
         }
         Ok(())
     }
 
-    pub fn update_from_sample_touch_events(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
+    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
+        let live_play = sample.is_live_play();
         let active_team_before_sample = if live_play {
             self.tracker
-                .update(sample, &sample.touch_events)
+                .update(sample.time, &sample.touch_events)
                 .active_team_before_sample
         } else {
             self.tracker.reset();
             None
         };
-        self.update(sample, active_team_before_sample)
+        self.update(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            &BallFrameState {
+                ball: sample.ball.clone(),
+            },
+            live_play,
+            active_team_before_sample,
+        )
     }
 }
 

@@ -24,8 +24,8 @@ fn sample(
     player_rigid_body: boxcars::RigidBody,
     dodge_active: bool,
     ball_position: Option<glam::Vec3>,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: if frame_number == 0 { 0.0 } else { 1.0 / 120.0 },

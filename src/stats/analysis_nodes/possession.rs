@@ -29,14 +29,23 @@ impl AnalysisNode for PossessionNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency(), possession_state_dependency()]
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            possession_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
         let possession_state = ctx.get::<PossessionState>()?;
         self.calculator
-            .update(sample, possession_state.active_team_before_sample)
+            .update(
+                ctx.get::<FrameInfo>()?,
+                ctx.get::<BallFrameState>()?,
+                ctx.get::<LivePlayState>()?.is_live_play,
+                possession_state.active_team_before_sample,
+            )
     }
 
     fn state(&self) -> &Self::State {

@@ -96,12 +96,15 @@ impl SpeedFlipCalculator {
         &self.events
     }
 
-    fn kickoff_approach_active(sample: &CoreSample) -> bool {
-        sample.is_live_play() && sample.ball_has_been_hit == Some(false)
+    fn kickoff_approach_active(gameplay: &GameplayState, live_play: bool) -> bool {
+        live_play && gameplay.ball_has_been_hit == Some(false)
     }
 
-    fn player_by_id<'a>(sample: &'a CoreSample, player_id: &PlayerId) -> Option<&'a PlayerSample> {
-        sample
+    fn player_by_id<'a>(
+        players: &'a PlayerFrameState,
+        player_id: &PlayerId,
+    ) -> Option<&'a PlayerSample> {
+        players
             .players
             .iter()
             .find(|player| &player.player_id == player_id)
@@ -152,8 +155,8 @@ impl SpeedFlipCalculator {
         Some(velocity_xy.dot(to_target_xy))
     }
 
-    fn kickoff_alignment_target(sample: &CoreSample) -> glam::Vec3 {
-        sample
+    fn kickoff_alignment_target(ball: &BallFrameState) -> glam::Vec3 {
+        ball
             .ball
             .as_ref()
             .map(BallSample::position)
@@ -179,12 +182,12 @@ impl SpeedFlipCalculator {
     }
 
     fn candidate_alignment(
-        sample: &CoreSample,
+        ball: &BallFrameState,
         player: &PlayerSample,
         is_kickoff: bool,
     ) -> Option<f32> {
         if is_kickoff {
-            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(sample))
+            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(ball))
         } else {
             Self::forward_speed_alignment(player)
         }
@@ -213,15 +216,15 @@ impl SpeedFlipCalculator {
         self.events.push(event);
     }
 
-    fn begin_sample(&mut self, sample: &CoreSample) {
+    fn begin_sample(&mut self, frame: &FrameInfo) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_speed_flip = false;
             stats.time_since_last_speed_flip = stats
                 .last_speed_flip_time
-                .map(|time| (sample.time - time).max(0.0));
+                .map(|time| (frame.time - time).max(0.0));
             stats.frames_since_last_speed_flip = stats
                 .last_speed_flip_frame
-                .map(|frame| sample.frame_number.saturating_sub(frame));
+                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
         }
 
         if let Some(player_id) = self.current_last_speed_flip_player.as_ref() {
@@ -231,12 +234,19 @@ impl SpeedFlipCalculator {
         }
     }
 
-    fn reset_kickoff_state(&mut self, sample: &CoreSample) {
+    fn reset_kickoff_state(&mut self, frame: &FrameInfo) {
         self.active_candidates.clear();
-        self.current_kickoff_start_time = Some(sample.time);
+        self.current_kickoff_start_time = Some(frame.time);
     }
 
-    fn maybe_start_candidate(&mut self, sample: &CoreSample, player: &PlayerSample) {
+    fn maybe_start_candidate(
+        &mut self,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        player: &PlayerSample,
+        live_play: bool,
+    ) {
         let was_dodge_active = self
             .previous_dodge_active
             .insert(player.player_id.clone(), player.dodge_active)
@@ -245,12 +255,12 @@ impl SpeedFlipCalculator {
             return;
         }
 
-        let is_kickoff = Self::kickoff_approach_active(sample);
+        let is_kickoff = Self::kickoff_approach_active(gameplay, live_play);
         let kickoff_start_time = if is_kickoff {
             let Some(kickoff_start_time) = self.current_kickoff_start_time else {
                 return;
             };
-            if sample.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
+            if frame.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
                 return;
             }
             Some(kickoff_start_time)
@@ -273,7 +283,7 @@ impl SpeedFlipCalculator {
             return;
         }
 
-        let Some(best_alignment) = Self::candidate_alignment(sample, player, is_kickoff) else {
+        let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
             return;
         };
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
@@ -296,8 +306,8 @@ impl SpeedFlipCalculator {
                 is_team_0: player.is_team_0,
                 is_kickoff,
                 kickoff_start_time,
-                start_time: sample.time,
-                start_frame: sample.frame_number,
+                start_time: frame.time,
+                start_frame: frame.frame_number,
                 start_position: player_position.to_array(),
                 end_position: player_position.to_array(),
                 start_speed,
@@ -306,15 +316,16 @@ impl SpeedFlipCalculator {
                 best_diagonal_score,
                 min_forward_z: forward_z,
                 latest_forward_z: forward_z,
-                latest_time: sample.time,
-                latest_frame: sample.frame_number,
+                latest_time: frame.time,
+                latest_frame: frame.frame_number,
             },
         );
     }
 
     fn update_candidate(
         candidate: &mut ActiveSpeedFlipCandidate,
-        sample: &CoreSample,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
         player: &PlayerSample,
     ) {
         let Some(rigid_body) = player.rigid_body.as_ref() else {
@@ -325,7 +336,7 @@ impl SpeedFlipCalculator {
             candidate.end_position = player_position.to_array();
         }
         candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
-        if let Some(alignment) = Self::candidate_alignment(sample, player, candidate.is_kickoff) {
+        if let Some(alignment) = Self::candidate_alignment(ball, player, candidate.is_kickoff) {
             candidate.best_alignment = candidate.best_alignment.max(alignment);
         }
 
@@ -343,8 +354,8 @@ impl SpeedFlipCalculator {
         let forward_z = (rotation * glam::Vec3::X).z;
         candidate.min_forward_z = candidate.min_forward_z.min(forward_z);
         candidate.latest_forward_z = forward_z;
-        candidate.latest_time = sample.time;
-        candidate.latest_frame = sample.frame_number;
+        candidate.latest_time = frame.time;
+        candidate.latest_frame = frame.frame_number;
     }
 
     fn candidate_event(
@@ -396,11 +407,11 @@ impl SpeedFlipCalculator {
         })
     }
 
-    fn finalize_candidates(&mut self, sample: &CoreSample, force_all: bool) {
+    fn finalize_candidates(&mut self, frame: &FrameInfo, force_all: bool) {
         let mut finished_candidates = Vec::new();
 
         for (player_id, candidate) in &self.active_candidates {
-            let duration = sample.time - candidate.start_time;
+            let duration = frame.time - candidate.start_time;
             if force_all || duration >= SPEED_FLIP_EVALUATION_SECONDS {
                 finished_candidates.push((
                     candidate.start_time,
@@ -428,36 +439,43 @@ impl SpeedFlipCalculator {
         }
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        if !self.live_play_tracker.is_live_play(sample) {
+    pub fn update_parts(
+        &mut self,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        if !live_play {
             self.active_candidates.clear();
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
             return Ok(());
         }
 
-        self.begin_sample(sample);
+        self.begin_sample(frame);
 
-        let kickoff_approach_active = Self::kickoff_approach_active(sample);
+        let kickoff_approach_active = Self::kickoff_approach_active(gameplay, live_play);
         if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
-            self.reset_kickoff_state(sample);
+            self.reset_kickoff_state(frame);
         }
 
-        for player in &sample.players {
-            self.maybe_start_candidate(sample, player);
+        for player in &players.players {
+            self.maybe_start_candidate(frame, gameplay, ball, player, live_play);
         }
 
         for (player_id, candidate) in &mut self.active_candidates {
-            let Some(player) = Self::player_by_id(sample, player_id) else {
+            let Some(player) = Self::player_by_id(players, player_id) else {
                 continue;
             };
-            Self::update_candidate(candidate, sample, player);
+            Self::update_candidate(candidate, frame, ball, player);
         }
 
-        self.finalize_candidates(sample, false);
+        self.finalize_candidates(frame, false);
 
         self.active_candidates.retain(|_, candidate| {
-            sample.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
+            frame.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
         });
 
         if !kickoff_approach_active {
@@ -468,8 +486,48 @@ impl SpeedFlipCalculator {
         Ok(())
     }
 
-    pub fn finalize(&mut self, sample: &CoreSample) {
-        self.finalize_candidates(sample, true);
+    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
+        let live_play = self.live_play_tracker.is_live_play(sample);
+        self.update_parts(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            &GameplayState {
+                game_state: sample.game_state,
+                ball_has_been_hit: sample.ball_has_been_hit,
+                kickoff_countdown_time: sample.kickoff_countdown_time,
+                team_zero_score: sample.team_zero_score,
+                team_one_score: sample.team_one_score,
+                possession_team_is_team_0: sample.possession_team_is_team_0,
+                scored_on_team_is_team_0: sample.scored_on_team_is_team_0,
+                current_in_game_team_player_counts: sample
+                    .current_in_game_team_player_counts
+                    .unwrap_or_default(),
+            },
+            &BallFrameState {
+                ball: sample.ball.clone(),
+            },
+            &PlayerFrameState {
+                players: sample.players.clone(),
+            },
+            live_play,
+        )
+    }
+
+    pub fn finalize_parts(&mut self, frame: &FrameInfo) {
+        self.finalize_candidates(frame, true);
+    }
+
+    pub fn finalize(&mut self, sample: &FrameState) {
+        self.finalize_parts(&FrameInfo {
+            frame_number: sample.frame_number,
+            time: sample.time,
+            dt: sample.dt,
+            seconds_remaining: sample.seconds_remaining,
+        });
     }
 }
 

@@ -14,7 +14,6 @@ pub struct TouchStateCalculator {
     previous_ball_angular_velocity: Option<glam::Vec3>,
     current_last_touch: Option<TouchEvent>,
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl TouchStateCalculator {
@@ -46,9 +45,8 @@ impl TouchStateCalculator {
         });
     }
 
-    fn current_ball_angular_velocity(sample: &CoreSample) -> Option<glam::Vec3> {
-        sample
-            .ball
+    fn current_ball_angular_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
+        ball.ball
             .as_ref()
             .map(|ball| {
                 ball.rigid_body
@@ -62,29 +60,29 @@ impl TouchStateCalculator {
             .map(|velocity| vec_to_glam(&velocity))
     }
 
-    fn current_ball_linear_velocity(sample: &CoreSample) -> Option<glam::Vec3> {
-        sample.ball.as_ref().map(BallSample::velocity)
+    fn current_ball_linear_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
+        ball.ball.as_ref().map(BallSample::velocity)
     }
 
-    fn is_touch_candidate(&self, sample: &CoreSample) -> bool {
+    fn is_touch_candidate(&self, frame: &FrameInfo, ball: &BallFrameState) -> bool {
         const BALL_GRAVITY_Z: f32 = -650.0;
         const TOUCH_LINEAR_IMPULSE_THRESHOLD: f32 = 120.0;
         const TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD: f32 = 0.5;
 
-        let Some(current_linear_velocity) = Self::current_ball_linear_velocity(sample) else {
+        let Some(current_linear_velocity) = Self::current_ball_linear_velocity(ball) else {
             return false;
         };
         let Some(previous_linear_velocity) = self.previous_ball_linear_velocity else {
             return false;
         };
-        let Some(current_angular_velocity) = Self::current_ball_angular_velocity(sample) else {
+        let Some(current_angular_velocity) = Self::current_ball_angular_velocity(ball) else {
             return false;
         };
         let Some(previous_angular_velocity) = self.previous_ball_angular_velocity else {
             return false;
         };
 
-        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * sample.dt.max(0.0));
+        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * frame.dt.max(0.0));
         let residual_linear_impulse =
             current_linear_velocity - previous_linear_velocity - expected_linear_delta;
         let angular_velocity_delta = current_angular_velocity - previous_angular_velocity;
@@ -95,7 +93,9 @@ impl TouchStateCalculator {
 
     fn proximity_touch_candidates(
         &self,
-        sample: &CoreSample,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
         max_collision_distance: f32,
     ) -> Vec<TouchEvent> {
         const OCTANE_HITBOX_LENGTH: f32 = 118.01;
@@ -104,12 +104,12 @@ impl TouchStateCalculator {
         const OCTANE_HITBOX_OFFSET: f32 = 13.88;
         const OCTANE_HITBOX_ELEVATION: f32 = 17.05;
 
-        let Some(ball) = sample.ball.as_ref() else {
+        let Some(ball) = ball.ball.as_ref() else {
             return Vec::new();
         };
         let ball_position = vec_to_glam(&ball.rigid_body.location);
 
-        let mut candidates = sample
+        let mut candidates = players
             .players
             .iter()
             .filter_map(|player| {
@@ -154,8 +154,8 @@ impl TouchStateCalculator {
                 }
 
                 Some(TouchEvent {
-                    time: sample.time,
-                    frame: sample.frame_number,
+                    time: frame.time,
+                    frame: frame.frame_number,
                     team_is_team_0: player.is_team_0,
                     player: Some(player.player_id.clone()),
                     closest_approach_distance: Some(collision_distance),
@@ -171,20 +171,33 @@ impl TouchStateCalculator {
         candidates
     }
 
-    fn candidate_touch_event(&self, sample: &CoreSample) -> Option<TouchEvent> {
+    fn candidate_touch_event(
+        &self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) -> Option<TouchEvent> {
         const TOUCH_COLLISION_DISTANCE_THRESHOLD: f32 = 300.0;
 
-        self.proximity_touch_candidates(sample, TOUCH_COLLISION_DISTANCE_THRESHOLD)
+        self.proximity_touch_candidates(frame, ball, players, TOUCH_COLLISION_DISTANCE_THRESHOLD)
             .into_iter()
             .next()
     }
 
-    fn update_recent_touch_candidates(&mut self, sample: &CoreSample) {
+    fn update_recent_touch_candidates(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) {
         const PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD: f32 = 220.0;
 
-        for candidate in
-            self.proximity_touch_candidates(sample, PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD)
-        {
+        for candidate in self.proximity_touch_candidates(
+            frame,
+            ball,
+            players,
+            PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD,
+        ) {
             let Some(player_id) = candidate.player.clone() else {
                 continue;
             };
@@ -220,12 +233,18 @@ impl TouchStateCalculator {
         best_opposing_candidate.into_iter().collect()
     }
 
-    fn confirmed_touch_events(&self, sample: &CoreSample) -> Vec<TouchEvent> {
+    fn confirmed_touch_events(
+        &self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+    ) -> Vec<TouchEvent> {
         let mut touch_events = Vec::new();
         let mut confirmed_players = HashSet::new();
 
-        if self.is_touch_candidate(sample) {
-            if let Some(candidate) = self.candidate_touch_event(sample) {
+        if self.is_touch_candidate(frame, ball) {
+            if let Some(candidate) = self.candidate_touch_event(frame, ball, players) {
                 for contested_candidate in self.contested_touch_candidates(&candidate) {
                     if let Some(player_id) = contested_candidate.player.clone() {
                         confirmed_players.insert(player_id);
@@ -239,7 +258,7 @@ impl TouchStateCalculator {
             }
         }
 
-        for dodge_refresh in &sample.dodge_refreshed_events {
+        for dodge_refresh in &events.dodge_refreshed_events {
             if !confirmed_players.insert(dodge_refresh.player.clone()) {
                 continue;
             }
@@ -252,12 +271,18 @@ impl TouchStateCalculator {
         touch_events
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> TouchState {
-        let live_play = self.live_play_tracker.is_live_play(sample);
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        live_play: bool,
+    ) -> TouchState {
         let touch_events = if live_play {
-            self.prune_recent_touch_candidates(sample.frame_number);
-            self.update_recent_touch_candidates(sample);
-            self.confirmed_touch_events(sample)
+            self.prune_recent_touch_candidates(frame.frame_number);
+            self.update_recent_touch_candidates(frame, ball, players);
+            self.confirmed_touch_events(frame, ball, players, events)
                 .into_iter()
                 .filter(|candidate| self.should_emit_candidate(candidate))
                 .collect()
@@ -270,8 +295,8 @@ impl TouchStateCalculator {
         if let Some(last_touch) = touch_events.last() {
             self.current_last_touch = Some(last_touch.clone());
         }
-        self.previous_ball_linear_velocity = Self::current_ball_linear_velocity(sample);
-        self.previous_ball_angular_velocity = Self::current_ball_angular_velocity(sample);
+        self.previous_ball_linear_velocity = Self::current_ball_linear_velocity(ball);
+        self.previous_ball_angular_velocity = Self::current_ball_angular_velocity(ball);
 
         TouchState {
             touch_events,

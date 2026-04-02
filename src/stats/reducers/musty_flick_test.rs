@@ -42,8 +42,8 @@ fn sample(
     player_dodge_active: bool,
     ball_body: RigidBody,
     touch: bool,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0 / 120.0,

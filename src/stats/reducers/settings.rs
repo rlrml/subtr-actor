@@ -8,7 +8,8 @@ impl StatsReducer for SettingsReducer {
         self.apply_replay_meta(meta)
     }
 
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        self.update(sample)
+    fn on_sample(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
+        let _ = sample;
+        self.update()
     }
 }

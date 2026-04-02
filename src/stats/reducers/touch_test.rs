@@ -32,8 +32,8 @@ fn sample(
     player_z: f32,
     ball_velocity_x: f32,
     touch: bool,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0 / 120.0,

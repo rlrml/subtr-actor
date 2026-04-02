@@ -49,8 +49,8 @@ fn sample(
     time: f32,
     touch_players: &[(u64, bool)],
     kickoff_phase_active: bool,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0,
@@ -93,7 +93,7 @@ fn sample(
 #[test]
 fn counts_defenders_caught_ahead_of_play_on_goal_frames() {
     let mut reducer = PositioningCalculator::new();
-    let sample = CoreSample {
+    let sample = FrameState {
         frame_number: 10,
         time: 10.0,
         dt: 1.0,

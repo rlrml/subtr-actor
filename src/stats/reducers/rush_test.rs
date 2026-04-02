@@ -43,8 +43,8 @@ fn player(player_id: u64, is_team_0: bool, x: f32, y: f32) -> PlayerSample {
     }
 }
 
-fn sample_with_ball_y(players: Vec<PlayerSample>, ball_y: f32) -> CoreSample {
-    CoreSample {
+fn sample_with_ball_y(players: Vec<PlayerSample>, ball_y: f32) -> FrameState {
+    FrameState {
         frame_number: 10,
         time: 5.0,
         dt: 1.0 / 120.0,
@@ -71,7 +71,7 @@ fn sample_with_ball_y(players: Vec<PlayerSample>, ball_y: f32) -> CoreSample {
     }
 }
 
-fn sample(players: Vec<PlayerSample>) -> CoreSample {
+fn sample(players: Vec<PlayerSample>) -> FrameState {
     sample_with_ball_y(players, -200.0)
 }
 
@@ -100,7 +100,7 @@ fn counts_rush_once_when_possession_changes() {
         player(5, false, 800.0, -150.0),
         player(6, false, -900.0, -1800.0),
     ]);
-    let continue_sample = CoreSample {
+    let continue_sample = FrameState {
         frame_number: 11,
         time: 5.1,
         ..sample(vec![
@@ -164,7 +164,7 @@ fn records_rush_event_with_start_and_end_frames() {
         player(5, false, 800.0, -150.0),
         player(6, false, -900.0, -1800.0),
     ]);
-    let continue_sample = CoreSample {
+    let continue_sample = FrameState {
         frame_number: 11,
         time: 5.1,
         ..sample(vec![
@@ -176,7 +176,7 @@ fn records_rush_event_with_start_and_end_frames() {
             player(6, false, -900.0, -1700.0),
         ])
     };
-    let end_sample = CoreSample {
+    let end_sample = FrameState {
         frame_number: 12,
         time: 5.2,
         ..sample_with_ball_y(
@@ -225,7 +225,7 @@ fn does_not_count_short_lived_rush_before_retention_threshold() {
         player(5, false, 800.0, -150.0),
         player(6, false, -900.0, -1800.0),
     ]);
-    let brief_continue_sample = CoreSample {
+    let brief_continue_sample = FrameState {
         frame_number: 11,
         time: 5.05,
         ..sample(vec![
@@ -237,7 +237,7 @@ fn does_not_count_short_lived_rush_before_retention_threshold() {
             player(6, false, -900.0, -1700.0),
         ])
     };
-    let end_sample = CoreSample {
+    let end_sample = FrameState {
         frame_number: 12,
         time: 5.1,
         ..sample_with_ball_y(

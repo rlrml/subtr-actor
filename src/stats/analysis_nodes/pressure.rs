@@ -33,12 +33,19 @@ impl AnalysisNode for PressureNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
-        self.calculator.update(sample)
+        self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        )
     }
 
     fn state(&self) -> &Self::State {

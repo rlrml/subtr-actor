@@ -46,14 +46,47 @@ pub struct AnalysisStateContext<'a> {
     states: HashMap<TypeId, &'a dyn Any>,
 }
 
+pub struct AnalysisStateRef<'a> {
+    type_id: TypeId,
+    type_name: &'static str,
+    state: &'a dyn Any,
+}
+
+impl<'a> AnalysisStateRef<'a> {
+    pub fn of<T: 'static>(state: &'a T) -> Self {
+        Self {
+            type_id: TypeId::of::<T>(),
+            type_name: type_name::<T>(),
+            state,
+        }
+    }
+
+    fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+
+    fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+
+    fn state(&self) -> &'a dyn Any {
+        self.state
+    }
+}
+
 impl<'a> AnalysisStateContext<'a> {
     fn from_parts(
         root_states: &'a HashMap<TypeId, Box<dyn Any>>,
+        input_states: &'a [AnalysisStateRef<'a>],
         before: &'a [Box<dyn AnalysisNodeDyn>],
     ) -> Self {
-        let mut states = HashMap::with_capacity(root_states.len() + before.len());
+        let mut states =
+            HashMap::with_capacity(root_states.len() + input_states.len() + before.len());
         for (type_id, state) in root_states {
             states.insert(*type_id, state.as_ref());
+        }
+        for input_state in input_states {
+            states.insert(input_state.type_id(), input_state.state());
         }
         for node in before {
             states.insert(node.provides_state_type_id(), node.state_any());
@@ -158,6 +191,7 @@ pub struct AnalysisGraph {
     nodes: Vec<Box<dyn AnalysisNodeDyn>>,
     evaluation_order: Vec<usize>,
     declared_root_states: HashMap<TypeId, &'static str>,
+    declared_input_states: HashMap<TypeId, &'static str>,
     root_states: HashMap<TypeId, Box<dyn Any>>,
     resolved: bool,
 }
@@ -168,6 +202,7 @@ impl Default for AnalysisGraph {
             nodes: Vec::new(),
             evaluation_order: Vec::new(),
             declared_root_states: HashMap::new(),
+            declared_input_states: HashMap::new(),
             root_states: HashMap::new(),
             resolved: false,
         }
@@ -186,6 +221,16 @@ impl AnalysisGraph {
 
     pub fn register_root_state<T: 'static>(&mut self) {
         self.declared_root_states
+            .insert(TypeId::of::<T>(), type_name::<T>());
+    }
+
+    pub fn with_input_state_type<T: 'static>(mut self) -> Self {
+        self.register_input_state::<T>();
+        self
+    }
+
+    pub fn register_input_state<T: 'static>(&mut self) {
+        self.declared_input_states
             .insert(TypeId::of::<T>(), type_name::<T>());
     }
 
@@ -234,6 +279,9 @@ impl AnalysisGraph {
                     if providers.contains_key(&dependency.state_type_id())
                         || self
                             .declared_root_states
+                            .contains_key(&dependency.state_type_id())
+                        || self
+                            .declared_input_states
                             .contains_key(&dependency.state_type_id())
                     {
                         continue;
@@ -303,6 +351,17 @@ impl AnalysisGraph {
     }
 
     pub fn evaluate(&mut self) -> SubtrActorResult<()> {
+        self.evaluate_with_states(&[])
+    }
+
+    pub fn evaluate_with_state<T: 'static>(&mut self, value: &T) -> SubtrActorResult<()> {
+        self.evaluate_with_states(&[AnalysisStateRef::of(value)])
+    }
+
+    pub fn evaluate_with_states<'a>(
+        &mut self,
+        input_states: &'a [AnalysisStateRef<'a>],
+    ) -> SubtrActorResult<()> {
         self.resolve()?;
 
         for (type_id, type_name) in &self.declared_root_states {
@@ -313,12 +372,33 @@ impl AnalysisGraph {
             }
         }
 
+        let mut provided_input_types = HashMap::with_capacity(input_states.len());
+        for input_state in input_states {
+            if let Some(existing) =
+                provided_input_types.insert(input_state.type_id(), input_state.type_name())
+            {
+                return Err(analysis_node_graph_error(format!(
+                    "Duplicate input states for {}: {} and {}",
+                    input_state.type_name(),
+                    existing,
+                    input_state.type_name(),
+                )));
+            }
+        }
+        for (type_id, type_name) in self.required_input_states() {
+            if !provided_input_types.contains_key(&type_id) {
+                return Err(analysis_node_graph_error(format!(
+                    "Missing input state {type_name} for evaluation"
+                )));
+            }
+        }
+
         for node_index in self.evaluation_order.clone() {
             let (before, current_and_after) = self.nodes.split_at_mut(node_index);
             let (current, _) = current_and_after
                 .split_first_mut()
                 .expect("evaluation order should contain valid indexes");
-            let ctx = AnalysisStateContext::from_parts(&self.root_states, before);
+            let ctx = AnalysisStateContext::from_parts(&self.root_states, input_states, before);
             current.evaluate(&ctx)?;
         }
 
@@ -364,6 +444,18 @@ impl AnalysisGraph {
                     )),
                 );
             }
+            if self
+                .declared_input_states
+                .contains_key(&node.provides_state_type_id())
+            {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::CallbackError(format!(
+                        "analysis node graph error: Duplicate providers for input state {}: input and '{}'",
+                        node.provides_state_type_name(),
+                        node.name(),
+                    )),
+                );
+            }
             if let Some(existing) = providers.insert(node.provides_state_type_id(), index) {
                 return SubtrActorError::new_result(
                     SubtrActorErrorVariant::CallbackError(format!(
@@ -376,6 +468,21 @@ impl AnalysisGraph {
             }
         }
         Ok(providers)
+    }
+
+    fn required_input_states(&self) -> HashMap<TypeId, &'static str> {
+        let mut required = HashMap::new();
+        for node in &self.nodes {
+            for dependency in node.dependencies() {
+                let type_id = dependency.state_type_id();
+                if self.declared_input_states.contains_key(&type_id)
+                    && !self.root_states.contains_key(&type_id)
+                {
+                    required.insert(type_id, dependency.state_type_name());
+                }
+            }
+        }
+        required
     }
 
     fn visit_node(
@@ -404,6 +511,9 @@ impl AnalysisGraph {
             if self
                 .declared_root_states
                 .contains_key(&dependency.state_type_id())
+                || self
+                    .declared_input_states
+                    .contains_key(&dependency.state_type_id())
             {
                 continue;
             }

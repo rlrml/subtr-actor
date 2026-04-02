@@ -51,7 +51,7 @@ impl SettingsCalculator {
         Ok(())
     }
 
-    pub fn update(&mut self, _sample: &CoreSample) -> SubtrActorResult<()> {
+    pub fn update(&mut self) -> SubtrActorResult<()> {
         Ok(())
     }
 }

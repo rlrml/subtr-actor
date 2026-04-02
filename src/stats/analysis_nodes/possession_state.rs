@@ -31,13 +31,20 @@ impl AnalysisNode for PossessionStateNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency(), touch_state_dependency()]
+        vec![
+            frame_info_dependency(),
+            touch_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
         let touch_state = ctx.get::<TouchState>()?;
-        self.state = self.calculator.update(sample, touch_state);
+        self.state = self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            touch_state,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        );
         Ok(())
     }
 

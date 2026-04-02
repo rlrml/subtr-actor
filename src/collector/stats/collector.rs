@@ -1,20 +1,19 @@
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
+use crate::stats::analysis_nodes::graph_with_builtin_analysis_nodes;
 use crate::*;
 
-use super::builtins::{builtin_stats_module_factories, builtin_stats_module_factory_by_name};
+use super::builtins::{
+    builtin_module_json, builtin_playback_config_json, builtin_playback_frame_json,
+    builtin_stats_module_names,
+};
 use super::playback::{
     CapturedStatsData, CapturedStatsFrame, StatsPlaybackData, StatsPlaybackFrame,
 };
-use super::resolver::resolve_stats_module_factories;
-use super::types::{
-    serialize_to_json_value, stats_module_to_json_value, CollectedStats, RuntimeStatsModule,
-    StatsModuleFactory,
-};
+use super::types::{serialize_to_json_value, CollectedStats, CollectedStatsModule};
 
 enum SampleMode {
     Aggregate,
@@ -24,6 +23,142 @@ enum SampleMode {
 impl Default for SampleMode {
     fn default() -> Self {
         Self::Aggregate
+    }
+}
+
+struct BuiltinModuleSelection {
+    module_names: Vec<&'static str>,
+}
+
+impl BuiltinModuleSelection {
+    fn all() -> Self {
+        Self {
+            module_names: builtin_stats_module_names().to_vec(),
+        }
+    }
+
+    fn from_names<I, S>(module_names: I) -> SubtrActorResult<Self>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut selected = Vec::new();
+        let mut seen = HashSet::new();
+        for module_name in module_names {
+            let module_name = module_name.as_ref();
+            let resolved_name = builtin_stats_module_names()
+                .iter()
+                .copied()
+                .find(|candidate| *candidate == module_name)
+                .ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
+                        module_name.to_owned(),
+                    ))
+                })?;
+            if seen.insert(resolved_name) {
+                selected.push(resolved_name);
+            }
+        }
+        Ok(Self {
+            module_names: selected,
+        })
+    }
+
+    fn graph(
+        &self,
+    ) -> SubtrActorResult<crate::stats::analysis_nodes::analysis_graph::AnalysisGraph> {
+        graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
+    }
+
+    fn emitted_module_names(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.module_names.iter().copied()
+    }
+
+    fn collected_modules(
+        &self,
+        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+    ) -> SubtrActorResult<Vec<CollectedStatsModule>> {
+        self.module_names
+            .iter()
+            .copied()
+            .map(|module_name| {
+                Ok(CollectedStatsModule {
+                    name: module_name,
+                    value: builtin_module_json(module_name, graph)?,
+                })
+            })
+            .collect()
+    }
+
+    fn modules_json(
+        &self,
+        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+    ) -> SubtrActorResult<Map<String, Value>> {
+        let mut modules = Map::new();
+        for module_name in self.module_names.iter().copied() {
+            modules.insert(
+                module_name.to_owned(),
+                builtin_module_json(module_name, graph)?,
+            );
+        }
+        Ok(modules)
+    }
+
+    fn frame_modules_json(
+        &self,
+        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<Map<String, Value>> {
+        let mut modules = Map::new();
+        for module_name in self.module_names.iter().copied() {
+            if let Some(snapshot) = builtin_playback_frame_json(module_name, graph, replay_meta)? {
+                modules.insert(module_name.to_owned(), snapshot);
+            }
+        }
+        Ok(modules)
+    }
+
+    fn playback_config_json(
+        &self,
+        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+    ) -> SubtrActorResult<Map<String, Value>> {
+        let mut config = Map::new();
+        for module_name in self.module_names.iter().copied() {
+            if let Some(module_config) = builtin_playback_config_json(module_name, graph)? {
+                config.insert(module_name.to_owned(), module_config);
+            }
+        }
+        Ok(config)
+    }
+
+    fn snapshot_frame(
+        &self,
+        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        replay_meta: &ReplayMeta,
+    ) -> SubtrActorResult<StatsPlaybackFrame> {
+        let frame = graph.state::<FrameInfo>().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                "missing FrameInfo state while snapshotting playback frame".to_owned(),
+            ))
+        })?;
+        let gameplay = graph.state::<GameplayState>().ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                "missing GameplayState state while snapshotting playback frame".to_owned(),
+            ))
+        })?;
+        let is_live_play = graph
+            .state::<LivePlayState>()
+            .map(|state| state.is_live_play)
+            .unwrap_or(false);
+        Ok(StatsPlaybackFrame {
+            frame_number: frame.frame_number,
+            time: frame.time,
+            dt: frame.dt,
+            seconds_remaining: frame.seconds_remaining,
+            game_state: gameplay.game_state,
+            is_live_play,
+            modules: self.frame_modules_json(graph, replay_meta)?,
+        })
     }
 }
 
@@ -112,150 +247,14 @@ impl FrameTransform for ReplayStatsFrameTransform {
     }
 }
 
-struct DynamicReplayStatsFrameTransform {
-    modules: StatsTimelineModules,
-}
-
-impl DynamicReplayStatsFrameTransform {
-    fn new(modules: StatsTimelineModules) -> Self {
-        Self { modules }
-    }
-}
-
-impl FrameTransform for DynamicReplayStatsFrameTransform {
-    type Output = DynamicReplayStatsFrame;
-
-    fn transform(
-        &mut self,
-        replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
-    ) -> SubtrActorResult<Self::Output> {
-        CapturedStatsData::<StatsPlaybackFrame> {
-            replay_meta: replay_meta.clone(),
-            config: Map::new(),
-            modules: Map::new(),
-            frames: Vec::new(),
-        }
-        .dynamic_replay_stats_frame(&frame, &self.modules)
-    }
-}
-
-#[derive(Default)]
-struct CompositeStatsModules {
-    modules: Vec<RuntimeStatsModule>,
-}
-
-impl CompositeStatsModules {
-    fn into_modules(self) -> Vec<RuntimeStatsModule> {
-        self.modules
-    }
-
-    fn emitted_module_names(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.modules
-            .iter()
-            .filter(|module| module.emit)
-            .map(|module| module.module.name())
-    }
-
-    fn playback_modules_json(&self) -> SubtrActorResult<Map<String, Value>> {
-        let mut modules = Map::new();
-        for module in self.modules.iter().filter(|module| module.emit) {
-            modules.insert(
-                module.module.name().to_owned(),
-                stats_module_to_json_value(module.module.as_ref())?,
-            );
-        }
-        Ok(modules)
-    }
-
-    fn playback_config_json(&self) -> SubtrActorResult<Map<String, Value>> {
-        let mut config = Map::new();
-        for module in self.modules.iter().filter(|module| module.emit) {
-            if let Some(module_config) = module.module.playback_config_json()? {
-                config.insert(module.module.name().to_owned(), module_config);
-            }
-        }
-        Ok(config)
-    }
-
-    fn snapshot_frame(
-        &self,
-        replay_meta: &ReplayMeta,
-        sample: &CoreSample,
-        is_live_play: bool,
-    ) -> SubtrActorResult<StatsPlaybackFrame> {
-        let mut modules = Map::new();
-        for module in self.modules.iter().filter(|module| module.emit) {
-            if let Some(snapshot) = module.module.playback_frame_json(replay_meta)? {
-                modules.insert(module.module.name().to_owned(), snapshot);
-            }
-        }
-
-        Ok(StatsPlaybackFrame {
-            frame_number: sample.frame_number,
-            time: sample.time,
-            dt: sample.dt,
-            seconds_remaining: sample.seconds_remaining,
-            game_state: sample.game_state,
-            is_live_play,
-            modules,
-        })
-    }
-}
-
-impl StatsReducer for CompositeStatsModules {
-    fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
-        for module in &mut self.modules {
-            module.module.on_replay_meta(meta)?;
-        }
-        Ok(())
-    }
-
-    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
-        let mut signals = HashSet::new();
-        for module in &self.modules {
-            signals.extend(module.module.required_derived_signals());
-        }
-        signals.into_iter().collect()
-    }
-
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        for module in &mut self.modules {
-            module.module.on_sample(sample)?;
-        }
-        Ok(())
-    }
-
-    fn on_sample_with_context(
-        &mut self,
-        sample: &CoreSample,
-        ctx: &AnalysisContext,
-    ) -> SubtrActorResult<()> {
-        for module in &mut self.modules {
-            module.module.on_sample_with_context(sample, ctx)?;
-        }
-        Ok(())
-    }
-
-    fn finish(&mut self) -> SubtrActorResult<()> {
-        for module in &mut self.modules {
-            module.module.finish()?;
-        }
-        Ok(())
-    }
-}
-
 pub struct StatsCollector<T = StatsPlaybackFrame, F = IdentityFrameTransform> {
-    modules: CompositeStatsModules,
-    derived_signals: DerivedSignalGraph,
+    modules: BuiltinModuleSelection,
+    graph: crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
     frame_transform: F,
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
     last_sample_time: Option<f32>,
-    last_sample: Option<CoreSample>,
-    last_live_play: Option<bool>,
-    live_play_tracker: LivePlayTracker,
     last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
@@ -272,8 +271,11 @@ impl Default for StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
 
 impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
     pub fn new() -> Self {
-        Self::with_modules(builtin_stats_module_factories())
-            .expect("builtin stats modules should resolve without conflicts")
+        Self::with_selection_and_frame_transform(
+            BuiltinModuleSelection::all(),
+            IdentityFrameTransform,
+        )
+        .expect("builtin stats modules should resolve without conflicts")
     }
 
     pub fn only_modules<I>(modules: I) -> Self
@@ -292,47 +294,22 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
         Self::with_builtin_module_names(modules)
     }
 
-    pub fn with_modules<I>(modules: I) -> SubtrActorResult<Self>
-    where
-        I: IntoIterator<Item = Arc<dyn StatsModuleFactory>>,
-    {
-        Self::with_modules_and_frame_transform(modules, IdentityFrameTransform)
-    }
-
     pub fn with_builtin_module_names<I, S>(module_names: I) -> SubtrActorResult<Self>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut modules = Vec::new();
-        for module_name in module_names {
-            let module_name = module_name.as_ref();
-            modules.push(
-                builtin_stats_module_factory_by_name(module_name).ok_or_else(|| {
-                    SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
-                        module_name.to_owned(),
-                    ))
-                })?,
-            );
-        }
-        Self::with_modules(modules)
+        Self::with_selection_and_frame_transform(
+            BuiltinModuleSelection::from_names(module_names)?,
+            IdentityFrameTransform,
+        )
     }
 
-    pub fn get_playback_data(
-        mut self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<StatsPlaybackData>
+    pub fn get_playback_data(self, replay: &boxcars::Replay) -> SubtrActorResult<StatsPlaybackData>
     where
         IdentityFrameTransform: FrameTransform<Output = StatsPlaybackFrame>,
     {
-        self.captured_frames = Some(Vec::new());
-        self.sample_mode = SampleMode::Timeline;
-        let mut processor = ReplayProcessor::new(replay)?;
-        processor.process(&mut self)?;
-        if self.replay_meta.is_none() {
-            self.replay_meta = Some(processor.get_replay_meta()?);
-        }
-        self.into_playback_data()
+        self.capture_frames().get_captured_data(replay)
     }
 
     pub fn get_stats_timeline_value(self, replay: &boxcars::Replay) -> SubtrActorResult<Value> {
@@ -347,24 +324,6 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
             .capture_frames()
             .get_captured_data(replay)?
             .into_replay_stats_timeline()
-    }
-
-    pub fn get_dynamic_replay_stats_timeline(
-        self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        let modules = self.stats_timeline_modules()?;
-        self.with_frame_transform(DynamicReplayStatsFrameTransform::new(modules))
-            .capture_frames()
-            .get_captured_data(replay)?
-            .into_dynamic_replay_stats_timeline()
-    }
-
-    pub fn get_dynamic_stats_timeline_value(
-        self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<Value> {
-        serialize_to_json_value(&self.get_dynamic_replay_stats_timeline(replay)?)
     }
 
     pub fn get_legacy_stats_timeline_value(
@@ -385,48 +344,21 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
     pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         self.into_playback_data()?.into_stats_timeline()
     }
-
-    pub fn into_dynamic_replay_stats_timeline(
-        self,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        self.into_playback_data()?.into_dynamic_stats_timeline()
-    }
-
-    pub fn into_dynamic_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.into_playback_data()?.to_dynamic_stats_timeline_value()
-    }
 }
 
 impl<T, F> StatsCollector<T, F> {
-    pub fn with_modules_and_frame_transform<I>(
-        modules: I,
+    fn with_selection_and_frame_transform(
+        modules: BuiltinModuleSelection,
         frame_transform: F,
-    ) -> SubtrActorResult<Self>
-    where
-        I: IntoIterator<Item = Arc<dyn StatsModuleFactory>>,
-    {
-        let resolved = resolve_stats_module_factories(modules)?;
-        let composite = CompositeStatsModules {
-            modules: resolved
-                .into_iter()
-                .map(|resolved_module| RuntimeStatsModule {
-                    emit: resolved_module.emit,
-                    module: resolved_module.factory.build(),
-                })
-                .collect(),
-        };
-        let derived_signals = derived_signal_graph_for_ids(composite.required_derived_signals());
+    ) -> SubtrActorResult<Self> {
         Ok(Self {
-            modules: composite,
-            derived_signals,
+            graph: modules.graph()?,
+            modules,
             replay_meta: None,
             frame_transform,
             captured_frames: None,
             sample_mode: SampleMode::Aggregate,
             last_sample_time: None,
-            last_sample: None,
-            last_live_play: None,
-            live_play_tracker: LivePlayTracker::default(),
             last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
@@ -445,14 +377,11 @@ impl<T, F> StatsCollector<T, F> {
     pub fn with_frame_transform<U, G>(self, frame_transform: G) -> StatsCollector<U, G> {
         let StatsCollector {
             modules,
-            derived_signals,
+            graph,
             replay_meta,
             captured_frames,
             sample_mode,
             last_sample_time,
-            last_sample,
-            last_live_play,
-            live_play_tracker,
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
@@ -462,15 +391,12 @@ impl<T, F> StatsCollector<T, F> {
         } = self;
         StatsCollector {
             modules,
-            derived_signals,
+            graph,
             replay_meta,
             frame_transform,
             captured_frames: captured_frames.map(|_| Vec::new()),
             sample_mode,
             last_sample_time,
-            last_sample,
-            last_live_play,
-            live_play_tracker,
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
@@ -524,7 +450,7 @@ impl<T, F> StatsCollector<T, F> {
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
         Ok(CollectedStats {
             replay_meta,
-            modules: self.modules.into_modules(),
+            modules: self.modules.collected_modules(&self.graph)?,
         })
     }
 
@@ -533,15 +459,11 @@ impl<T, F> StatsCollector<T, F> {
             .replay_meta
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
         Ok(CapturedStatsData {
-            replay_meta,
-            config: self.modules.playback_config_json()?,
-            modules: self.modules.playback_modules_json()?,
+            replay_meta: replay_meta.clone(),
+            config: self.modules.playback_config_json(&self.graph)?,
+            modules: self.modules.modules_json(&self.graph)?,
             frames: self.captured_frames.unwrap_or_default(),
         })
-    }
-
-    fn stats_timeline_modules(&self) -> SubtrActorResult<StatsTimelineModules> {
-        StatsTimelineModules::from_builtin_names(self.modules.emitted_module_names())
     }
 
     fn capture_frame_snapshot(
@@ -588,8 +510,7 @@ where
     ) -> SubtrActorResult<TimeAdvance> {
         if self.replay_meta.is_none() {
             let replay_meta = processor.get_replay_meta()?;
-            self.derived_signals.on_replay_meta(&replay_meta)?;
-            self.modules.on_replay_meta(&replay_meta)?;
+            self.graph.on_replay_meta(&replay_meta)?;
             self.replay_meta = Some(replay_meta);
         }
 
@@ -597,21 +518,21 @@ where
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
-        if matches!(self.sample_mode, SampleMode::Aggregate) {
-            sample.active_demos.clear();
-            sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
-            sample.boost_pad_events =
-                processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
-            sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
-            sample.player_stat_events =
-                processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
-            sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
-        }
-        let is_live_play = self.live_play_tracker.is_live_play(&sample);
-        let analysis_context = self.derived_signals.evaluate(&sample)?;
-        self.modules
-            .on_sample_with_context(&sample, analysis_context)?;
+        let frame_input = match self.sample_mode {
+            SampleMode::Aggregate => FrameInput::aggregate(
+                processor,
+                frame_number,
+                current_time,
+                dt,
+                self.last_demolish_count,
+                self.last_boost_pad_event_count,
+                self.last_touch_event_count,
+                self.last_player_stat_event_count,
+                self.last_goal_event_count,
+            ),
+            SampleMode::Timeline => FrameInput::timeline(processor, frame_number, current_time, dt),
+        };
+        self.graph.evaluate_with_state(&frame_input)?;
 
         if self.captured_frames.is_some() {
             let replay_meta = self
@@ -621,14 +542,11 @@ where
                 .clone();
             self.capture_frame_snapshot(
                 &replay_meta,
-                self.modules
-                    .snapshot_frame(&replay_meta, &sample, is_live_play)?,
+                self.modules.snapshot_frame(&self.graph, &replay_meta)?,
             )?;
         }
 
         self.last_sample_time = Some(current_time);
-        self.last_live_play = Some(is_live_play);
-        self.last_sample = Some(sample);
         if matches!(self.sample_mode, SampleMode::Aggregate) {
             self.last_demolish_count = processor.demolishes.len();
             self.last_boost_pad_event_count = processor.boost_pad_events.len();
@@ -641,19 +559,14 @@ where
     }
 
     fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
-        self.derived_signals.finish()?;
-        self.modules.finish()?;
-        let Some(last_sample) = self.last_sample.as_ref() else {
-            return Ok(());
-        };
+        self.graph.finish()?;
         let Some(replay_meta) = self.replay_meta.as_ref().cloned() else {
             return Ok(());
         };
-        let final_snapshot = self.modules.snapshot_frame(
-            &replay_meta,
-            last_sample,
-            self.last_live_play.unwrap_or(false),
-        )?;
+        let Some(_) = self.graph.state::<FrameInfo>() else {
+            return Ok(());
+        };
+        let final_snapshot = self.modules.snapshot_frame(&self.graph, &replay_meta)?;
         if self.captured_frames.is_some() {
             self.replace_last_frame_snapshot(&replay_meta, final_snapshot)?;
         }

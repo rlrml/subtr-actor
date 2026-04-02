@@ -168,74 +168,6 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         self.to_stats_timeline_value()
     }
 
-    pub fn into_dynamic_stats_timeline(self) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        self.to_dynamic_stats_timeline()
-    }
-
-    pub fn to_dynamic_stats_timeline(&self) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        let module_names = self.modules.keys().map(String::as_str);
-        self.to_replay_stats_timeline_with_frames(
-            self.frames
-                .iter()
-                .map(|frame| self.replay_stats_frame(frame))
-                .collect::<SubtrActorResult<Vec<_>>>()?,
-        )?
-        .into_dynamic_with_module_names(module_names)
-    }
-
-    pub(crate) fn into_dynamic_replay_stats_timeline_with_frames(
-        self,
-        frames: Vec<DynamicReplayStatsFrame>,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        self.to_dynamic_replay_stats_timeline_with_frames(frames)
-    }
-
-    fn to_dynamic_replay_stats_timeline_with_frames(
-        &self,
-        frames: Vec<DynamicReplayStatsFrame>,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        Ok(DynamicReplayStatsTimeline {
-            config: self.legacy_config(),
-            replay_meta: self.replay_meta.clone(),
-            timeline_events: self.timeline_events_typed()?,
-            backboard_events: self.module_player_events(
-                "backboard",
-                "events",
-                parse_backboard_event,
-            )?,
-            ceiling_shot_events: self.module_player_events(
-                "ceiling_shot",
-                "events",
-                parse_ceiling_shot_event,
-            )?,
-            double_tap_events: self.module_player_events(
-                "double_tap",
-                "events",
-                parse_double_tap_event,
-            )?,
-            fifty_fifty_events: self.module_player_events(
-                "fifty_fifty",
-                "events",
-                parse_fifty_fifty_event,
-            )?,
-            rush_events: self.module_typed_array("rush", "events")?,
-            speed_flip_events: self.module_player_events(
-                "speed_flip",
-                "events",
-                parse_speed_flip_event,
-            )?,
-            frames,
-        })
-    }
-
-    pub fn into_dynamic_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.to_dynamic_stats_timeline_value()
-    }
-
-    pub fn to_dynamic_stats_timeline_value(&self) -> SubtrActorResult<Value> {
-        serialize_to_json_value(&self.to_dynamic_stats_timeline()?)
-    }
-
     fn timeline_events(&self) -> Vec<Value> {
         let mut events = self.module_array("core", "timeline");
         events.extend(self.module_array("demo", "timeline"));
@@ -433,16 +365,6 @@ impl CapturedStatsData<StatsPlaybackFrame> {
                 .map(|player| self.replay_player_stats(frame, player))
                 .collect::<SubtrActorResult<Vec<_>>>()?,
         })
-    }
-
-    pub(crate) fn dynamic_replay_stats_frame(
-        &self,
-        frame: &StatsPlaybackFrame,
-        modules: &StatsTimelineModules,
-    ) -> SubtrActorResult<DynamicReplayStatsFrame> {
-        Ok(self
-            .replay_stats_frame(frame)?
-            .into_dynamic_with_modules(modules))
     }
 
     fn replay_team_stats(
@@ -908,26 +830,6 @@ impl CapturedStatsData<ReplayStatsFrame> {
             frames: Vec::new(),
         }
         .into_replay_stats_timeline_with_frames(frames)
-    }
-}
-
-impl CapturedStatsData<DynamicReplayStatsFrame> {
-    pub fn into_dynamic_replay_stats_timeline(
-        self,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        let CapturedStatsData {
-            replay_meta,
-            config,
-            modules,
-            frames,
-        } = self;
-        CapturedStatsData::<StatsPlaybackFrame> {
-            replay_meta,
-            config,
-            modules,
-            frames: Vec::new(),
-        }
-        .into_dynamic_replay_stats_timeline_with_frames(frames)
     }
 }
 

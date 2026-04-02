@@ -29,13 +29,24 @@ impl AnalysisNode for TouchNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency(), touch_state_dependency()]
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            touch_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
         let touch_state = ctx.get::<TouchState>()?;
-        self.calculator.update(sample, touch_state)
+        self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
+            touch_state,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        )
     }
 
     fn state(&self) -> &Self::State {

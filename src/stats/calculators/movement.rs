@@ -173,7 +173,6 @@ pub struct MovementCalculator {
     previous_positions: HashMap<PlayerId, glam::Vec3>,
     team_zero_stats: MovementStats,
     team_one_stats: MovementStats,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl MovementCalculator {
@@ -236,10 +235,14 @@ impl MovementCalculator {
         stats.labeled_tracked_time.add(classification.labels(), dt);
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        if sample.dt == 0.0 {
-            for player in &sample.players {
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        if frame.dt == 0.0 {
+            for player in &players.players {
                 if let Some(position) = player.position() {
                     self.previous_positions
                         .insert(player.player_id.clone(), position);
@@ -248,7 +251,7 @@ impl MovementCalculator {
             return Ok(());
         }
 
-        for player in &sample.players {
+        for player in &players.players {
             self.player_teams
                 .insert(player.player_id.clone(), player.is_team_0);
             let Some(position) = player.position() else {
@@ -266,10 +269,10 @@ impl MovementCalculator {
             };
 
             if live_play {
-                stats.tracked_time += sample.dt;
-                stats.speed_integral += speed * sample.dt;
-                team_stats.tracked_time += sample.dt;
-                team_stats.speed_integral += speed * sample.dt;
+                stats.tracked_time += frame.dt;
+                stats.speed_integral += speed * frame.dt;
+                team_stats.tracked_time += frame.dt;
+                team_stats.speed_integral += speed * frame.dt;
 
                 if let Some(previous_position) = self.previous_positions.get(&player.player_id) {
                     let distance = position.distance(*previous_position);
@@ -278,8 +281,8 @@ impl MovementCalculator {
                 }
 
                 let classification = Self::classify_movement(speed, position.z);
-                Self::apply_classification(stats, classification, sample.dt);
-                Self::apply_classification(team_stats, classification, sample.dt);
+                Self::apply_classification(stats, classification, frame.dt);
+                Self::apply_classification(team_stats, classification, frame.dt);
             }
 
             self.previous_positions

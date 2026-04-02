@@ -137,12 +137,17 @@ impl PressureCalculator {
         stats.labeled_time.add([half.as_label()], dt);
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        if !self.live_play_tracker.is_live_play(sample) {
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        if !live_play {
             return Ok(());
         }
-        if let Some(ball) = &sample.ball {
-            self.stats.tracked_time += sample.dt;
+        if let Some(ball) = &ball.ball {
+            self.stats.tracked_time += frame.dt;
             let ball_y = ball.position().y;
             let half = if ball_y.abs() <= self.config.neutral_zone_half_width_y {
                 PressureHalfLabel::Neutral
@@ -151,7 +156,7 @@ impl PressureCalculator {
             } else {
                 PressureHalfLabel::TeamOneSide
             };
-            Self::apply_pressure_time(&mut self.stats, half, sample.dt);
+            Self::apply_pressure_time(&mut self.stats, half, frame.dt);
         }
         Ok(())
     }

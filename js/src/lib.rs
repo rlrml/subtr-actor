@@ -1,11 +1,10 @@
 use js_sys::{Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector, ReplayDataSupplementalData},
-    collector::stats_timeline::ReplayStatsTimeline,
     collector::CallbackCollector,
     BoostReducer, Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector,
-    ReducerCollector, ReplayProcessor, StatsTimelineCollector, SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult,
+    ReducerCollector, ReplayProcessor, StatsCollector, SubtrActorError, SubtrActorErrorVariant,
+    SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 
@@ -28,17 +27,6 @@ pub fn main() {
 // Default feature adders (same as Python bindings)
 const DEFAULT_GLOBAL_FEATURE_ADDERS: &[&str] = &["BallRigidBody"];
 const DEFAULT_PLAYER_FEATURE_ADDERS: &[&str] = &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
-
-fn build_stats_timeline_collector(
-    modules: Option<Vec<String>>,
-) -> Result<StatsTimelineCollector, JsValue> {
-    let Some(modules) = modules else {
-        return Ok(StatsTimelineCollector::new());
-    };
-
-    StatsTimelineCollector::try_only_modules(modules)
-        .map_err(|error| JsValue::from_str(&format!("Invalid stats timeline module: {error:?}")))
-}
 
 fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
     boxcars::ParserBuilder::new(data)
@@ -145,13 +133,12 @@ fn collect_replay_data_with_optional_progress(
 fn collect_replay_bundle_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
-    stats_modules: Option<Vec<String>>,
-) -> Result<(ReplayData, ReplayStatsTimeline), JsValue> {
+) -> Result<(ReplayData, serde_json::Value), JsValue> {
     let total_frames = get_total_frames(replay)?;
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut stats_timeline_collector = build_stats_timeline_collector(stats_modules)?;
+    let mut stats_collector = StatsCollector::new().capture_frames();
     let mut flip_reset_tracker = FlipResetTracker::new();
     let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
     let mut last_reported_frames = 0usize;
@@ -171,7 +158,7 @@ fn collect_replay_bundle_with_optional_progress(
 
     let mut collectors: Vec<&mut dyn Collector> = vec![
         &mut replay_data_collector,
-        &mut stats_timeline_collector,
+        &mut stats_collector,
         &mut flip_reset_tracker,
         &mut boost_pad_collector,
     ];
@@ -193,7 +180,9 @@ fn collect_replay_bundle_with_optional_progress(
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
         .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
-    let stats_timeline = stats_timeline_collector.into_timeline();
+    let stats_timeline = stats_collector
+        .into_stats_timeline_value()
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
     let replay_data = replay_data_collector
         .into_replay_data_with_supplemental_data(processor, supplemental_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
@@ -330,13 +319,11 @@ pub fn get_replay_bundle_json_with_progress(
     data: &[u8],
     callback: Function,
     report_every_n_frames: Option<usize>,
-    stats_modules: Option<Vec<String>>,
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
     let (replay_data, stats_timeline) = collect_replay_bundle_with_optional_progress(
         &replay,
         Some((&callback, report_every_n_frames.unwrap_or(1000))),
-        stats_modules,
     )?;
 
     let replay_data_bytes = serde_json::to_vec(&replay_data)
@@ -360,11 +347,11 @@ pub fn get_replay_bundle_json_with_progress(
 
 /// Get cumulative stats snapshots for each replay sample.
 #[wasm_bindgen]
-pub fn get_stats_timeline(data: &[u8], modules: Option<Vec<String>>) -> Result<JsValue, JsValue> {
+pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = build_stats_timeline_collector(modules)?
-        .get_replay_data(&replay)
+    let stats_timeline = StatsCollector::new()
+        .get_stats_timeline_value(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
@@ -372,14 +359,11 @@ pub fn get_stats_timeline(data: &[u8], modules: Option<Vec<String>>) -> Result<J
 }
 
 #[wasm_bindgen]
-pub fn get_stats_timeline_json(
-    data: &[u8],
-    modules: Option<Vec<String>>,
-) -> Result<Vec<u8>, JsValue> {
+pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = build_stats_timeline_collector(modules)?
-        .get_replay_data(&replay)
+    let stats_timeline = StatsCollector::new()
+        .get_stats_timeline_value(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)
@@ -388,13 +372,10 @@ pub fn get_stats_timeline_json(
 
 /// Get dynamically-described cumulative stats snapshots for each replay sample.
 #[wasm_bindgen]
-pub fn get_dynamic_stats_timeline(
-    data: &[u8],
-    modules: Option<Vec<String>>,
-) -> Result<JsValue, JsValue> {
+pub fn get_dynamic_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = build_stats_timeline_collector(modules)?
+    let stats_timeline = subtr_actor::StatsTimelineCollector::new()
         .get_dynamic_replay_data(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
@@ -403,13 +384,10 @@ pub fn get_dynamic_stats_timeline(
 }
 
 #[wasm_bindgen]
-pub fn get_dynamic_stats_timeline_json(
-    data: &[u8],
-    modules: Option<Vec<String>>,
-) -> Result<Vec<u8>, JsValue> {
+pub fn get_dynamic_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = build_stats_timeline_collector(modules)?
+    let stats_timeline = subtr_actor::StatsTimelineCollector::new()
         .get_dynamic_replay_data(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 

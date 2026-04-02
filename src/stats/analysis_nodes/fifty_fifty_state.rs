@@ -31,15 +31,14 @@ impl AnalysisNode for FiftyFiftyStateNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![
-            core_sample_dependency(),
-            touch_state_dependency(),
-            possession_state_dependency(),
-        ]
+        let mut dependencies = vec![frame_state_dependency()];
+        dependencies.push(touch_state_dependency());
+        dependencies.push(possession_state_dependency());
+        dependencies
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
+        let sample = ctx.get::<FrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
         let possession_state = ctx.get::<PossessionState>()?;
         self.state = self

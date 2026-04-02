@@ -2,10 +2,7 @@ use std::path::Path;
 
 use serde::Serialize;
 use serde_json::Value;
-use subtr_actor::{
-    CoreTeamStats, DynamicReplayStatsFrame, DynamicReplayStatsTimeline, ReplayStatsFrame,
-    ReplayStatsTimeline, TeamStatsSnapshot,
-};
+use subtr_actor::{CoreTeamStats, ReplayStatsFrame, ReplayStatsTimeline, TeamStatsSnapshot};
 
 pub fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -68,62 +65,6 @@ pub fn assert_replay_stats_timeline_eq(left: &ReplayStatsTimeline, right: &Repla
         .or_else(|| compare_replay_frame_slice("frames", &left.frames, &right.frames))
     {
         panic!("replay stats timelines differ at {diff}");
-    }
-}
-
-#[allow(dead_code)]
-pub fn assert_dynamic_replay_stats_timeline_eq(
-    left: &DynamicReplayStatsTimeline,
-    right: &DynamicReplayStatsTimeline,
-) {
-    if let Some(diff) = compare_field("config", &left.config, &right.config)
-        .or_else(|| compare_field("replay_meta", &left.replay_meta, &right.replay_meta))
-        .or_else(|| {
-            compare_slice(
-                "timeline_events",
-                &left.timeline_events,
-                &right.timeline_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "backboard_events",
-                &left.backboard_events,
-                &right.backboard_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "ceiling_shot_events",
-                &left.ceiling_shot_events,
-                &right.ceiling_shot_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "double_tap_events",
-                &left.double_tap_events,
-                &right.double_tap_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "fifty_fifty_events",
-                &left.fifty_fifty_events,
-                &right.fifty_fifty_events,
-            )
-        })
-        .or_else(|| compare_slice("rush_events", &left.rush_events, &right.rush_events))
-        .or_else(|| {
-            compare_slice(
-                "speed_flip_events",
-                &left.speed_flip_events,
-                &right.speed_flip_events,
-            )
-        })
-        .or_else(|| compare_dynamic_frame_slice("frames", &left.frames, &right.frames))
-    {
-        panic!("dynamic replay stats timelines differ at {diff}");
     }
 }
 
@@ -311,99 +252,6 @@ fn compare_core_team_stats(
                 &right.goal_buildup,
             )
         })
-}
-
-fn compare_dynamic_frame_slice(
-    label: &str,
-    left: &[DynamicReplayStatsFrame],
-    right: &[DynamicReplayStatsFrame],
-) -> Option<String> {
-    if left.len() != right.len() {
-        return Some(format!(
-            "{label}.len: left={}, right={}",
-            left.len(),
-            right.len()
-        ));
-    }
-
-    left.iter()
-        .zip(right.iter())
-        .enumerate()
-        .find_map(|(index, (left_frame, right_frame))| {
-            compare_dynamic_frame(&format!("{label}[{index}]"), left_frame, right_frame)
-        })
-}
-
-fn compare_dynamic_frame(
-    label: &str,
-    left: &DynamicReplayStatsFrame,
-    right: &DynamicReplayStatsFrame,
-) -> Option<String> {
-    compare_field(
-        &format!("{label}.frame_number"),
-        &left.frame_number,
-        &right.frame_number,
-    )
-    .or_else(|| compare_field(&format!("{label}.time"), &left.time, &right.time))
-    .or_else(|| compare_field(&format!("{label}.dt"), &left.dt, &right.dt))
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.seconds_remaining"),
-            &left.seconds_remaining,
-            &right.seconds_remaining,
-        )
-    })
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.game_state"),
-            &left.game_state,
-            &right.game_state,
-        )
-    })
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.is_live_play"),
-            &left.is_live_play,
-            &right.is_live_play,
-        )
-    })
-    .or_else(|| {
-        compare_slice(
-            &format!("{label}.fifty_fifty"),
-            &left.fifty_fifty,
-            &right.fifty_fifty,
-        )
-    })
-    .or_else(|| {
-        compare_slice(
-            &format!("{label}.possession"),
-            &left.possession,
-            &right.possession,
-        )
-    })
-    .or_else(|| {
-        compare_slice(
-            &format!("{label}.pressure"),
-            &left.pressure,
-            &right.pressure,
-        )
-    })
-    .or_else(|| compare_slice(&format!("{label}.rush"), &left.rush, &right.rush))
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.team_zero"),
-            &left.team_zero,
-            &right.team_zero,
-        )
-    })
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.team_one"),
-            &left.team_one,
-            &right.team_one,
-        )
-    })
-    .or_else(|| compare_slice(&format!("{label}.players"), &left.players, &right.players))
 }
 
 fn serialized_diff_path<T: Serialize>(label: &str, left: &T, right: &T) -> String {

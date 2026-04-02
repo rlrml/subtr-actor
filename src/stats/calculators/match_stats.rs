@@ -272,13 +272,13 @@ impl MatchStatsCalculator {
         }
     }
 
-    fn kickoff_phase_active(sample: &CoreSample) -> bool {
+    fn kickoff_phase_active(sample: &FrameState) -> bool {
         sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
             || sample.ball_has_been_hit == Some(false)
     }
 
-    fn update_kickoff_reference(&mut self, sample: &CoreSample) {
+    fn update_kickoff_reference(&mut self, sample: &FrameState) {
         if let Some(first_touch_time) = sample
             .touch_events
             .iter()
@@ -316,7 +316,7 @@ impl MatchStatsCalculator {
 
     fn last_defender(
         &self,
-        sample: &CoreSample,
+        sample: &FrameState,
         defending_team_is_team_0: bool,
     ) -> Option<PlayerId> {
         sample
@@ -349,7 +349,7 @@ impl MatchStatsCalculator {
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
     }
 
-    fn record_goal_buildup_sample(&mut self, sample: &CoreSample) {
+    fn record_goal_buildup_sample(&mut self, sample: &FrameState) {
         let Some(ball) = sample.ball.as_ref() else {
             return;
         };
@@ -432,7 +432,7 @@ impl MatchStatsCalculator {
 }
 
 impl MatchStatsCalculator {
-    fn on_sample_internal(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample_internal(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         self.update_kickoff_reference(sample);
         let live_play = self.live_play_tracker.is_live_play(sample);
         self.prune_goal_buildup_samples(sample.time);
@@ -619,7 +619,7 @@ impl MatchStatsCalculator {
         Ok(())
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         self.on_sample_internal(sample)
     }
 }

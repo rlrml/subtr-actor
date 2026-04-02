@@ -66,7 +66,7 @@ impl DoubleTapCalculator {
         &self.events
     }
 
-    fn begin_sample(&mut self, sample: &CoreSample) {
+    fn begin_sample(&mut self, sample: &FrameState) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_double_tap = false;
             stats.time_since_last_double_tap = stats
@@ -107,7 +107,7 @@ impl DoubleTapCalculator {
         }
     }
 
-    fn resolve_double_tap_touches(&mut self, sample: &CoreSample) {
+    fn resolve_double_tap_touches(&mut self, sample: &FrameState) {
         if sample.touch_events.is_empty() || self.pending_backboard_bounces.is_empty() {
             return;
         }
@@ -148,7 +148,7 @@ impl DoubleTapCalculator {
         }
     }
 
-    fn record_double_tap(&mut self, sample: &CoreSample, event: DoubleTapEvent) {
+    fn record_double_tap(&mut self, sample: &FrameState, event: DoubleTapEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.count += 1;
         stats.last_double_tap_time = Some(event.time);
@@ -166,7 +166,7 @@ impl DoubleTapCalculator {
         self.events.push(event);
     }
 
-    fn followup_touch_is_goal_directed(sample: &CoreSample, is_team_0: bool) -> bool {
+    fn followup_touch_is_goal_directed(sample: &FrameState, is_team_0: bool) -> bool {
         const GOAL_CENTER_Y: f32 = 5120.0;
         const MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.6;
 
@@ -193,7 +193,7 @@ impl DoubleTapCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         backboard_bounce_state: &BackboardBounceState,
     ) -> SubtrActorResult<()> {
         self.begin_sample(sample);

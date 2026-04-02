@@ -45,27 +45,27 @@ impl BackboardCalculator {
         &self.events
     }
 
-    fn begin_sample(&mut self, sample: &CoreSample) {
+    fn begin_sample(&mut self, frame: &FrameInfo) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_backboard = false;
             stats.time_since_last_backboard = stats
                 .last_backboard_time
-                .map(|time| (sample.time - time).max(0.0));
+                .map(|time| (frame.time - time).max(0.0));
             stats.frames_since_last_backboard = stats
                 .last_backboard_frame
-                .map(|frame| sample.frame_number.saturating_sub(frame));
+                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
         }
     }
 
-    fn apply_events(&mut self, sample: &CoreSample, events: &[BackboardBounceEvent]) {
+    fn apply_events(&mut self, frame: &FrameInfo, events: &[BackboardBounceEvent]) {
         for event in events {
             let stats = self.player_stats.entry(event.player.clone()).or_default();
             stats.count += 1;
             stats.last_backboard_time = Some(event.time);
             stats.last_backboard_frame = Some(event.frame);
-            stats.time_since_last_backboard = Some((sample.time - event.time).max(0.0));
+            stats.time_since_last_backboard = Some((frame.time - event.time).max(0.0));
             stats.frames_since_last_backboard =
-                Some(sample.frame_number.saturating_sub(event.frame));
+                Some(frame.frame_number.saturating_sub(event.frame));
 
             let team_stats = if event.is_team_0 {
                 &mut self.team_zero_stats
@@ -89,11 +89,11 @@ impl BackboardCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        frame: &FrameInfo,
         backboard_bounce_state: &BackboardBounceState,
     ) -> SubtrActorResult<()> {
-        self.begin_sample(sample);
-        self.apply_events(sample, &backboard_bounce_state.bounce_events);
+        self.begin_sample(frame);
+        self.apply_events(frame, &backboard_bounce_state.bounce_events);
         Ok(())
     }
 }

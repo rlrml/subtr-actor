@@ -8,13 +8,13 @@ impl StatsReducer for BallCarryReducer {
         vec![TOUCH_STATE_SIGNAL_ID]
     }
 
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         self.update_from_sample_touch_events(sample)
     }
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let controlling_player = ctx

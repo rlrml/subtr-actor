@@ -41,8 +41,8 @@ fn sample(
     player_body: RigidBody,
     ball_body: RigidBody,
     touch: bool,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: if frame_number == 0 { 0.0 } else { 1.0 / 120.0 },

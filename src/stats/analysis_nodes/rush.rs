@@ -33,11 +33,13 @@ impl AnalysisNode for RushNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency(), possession_state_dependency()]
+        let mut dependencies = vec![frame_state_dependency()];
+        dependencies.push(possession_state_dependency());
+        dependencies
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
+        let sample = ctx.get::<FrameState>()?;
         let possession_state = ctx.get::<PossessionState>()?;
         self.calculator.update(sample, possession_state)
     }

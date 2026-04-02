@@ -26,8 +26,8 @@ fn rigid_body(x: f32, y: f32, z: f32, vx: f32) -> boxcars::RigidBody {
     }
 }
 
-fn sample(frame_number: usize, time: f32, z: f32, vx: f32) -> CoreSample {
-    CoreSample {
+fn sample(frame_number: usize, time: f32, z: f32, vx: f32) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0,

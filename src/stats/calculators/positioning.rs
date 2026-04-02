@@ -184,7 +184,7 @@ impl PositioningCalculator {
         &self.player_stats
     }
 
-    fn record_goal_positioning_events(&mut self, sample: &CoreSample, ball_position: glam::Vec3) {
+    fn record_goal_positioning_events(&mut self, sample: &FrameState, ball_position: glam::Vec3) {
         for goal_event in &sample.goal_events {
             let defending_team_is_team_0 = !goal_event.scoring_team_is_team_0;
             let normalized_ball_y = normalized_y(defending_team_is_team_0, ball_position);
@@ -218,7 +218,7 @@ impl PositioningCalculator {
 
     fn process_sample(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         live_play: bool,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
@@ -474,17 +474,19 @@ impl PositioningCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         self.process_sample(sample, live_play, possession_player_before_sample)
     }
 
-    pub fn update_from_sample_touch_events(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let possession_player_before_sample = if live_play {
-            let possession_state = self.possession_tracker.update(sample, &sample.touch_events);
+            let possession_state = self
+                .possession_tracker
+                .update(sample.time, &sample.touch_events);
             possession_state.active_player_before_sample
         } else {
             self.possession_tracker.reset();

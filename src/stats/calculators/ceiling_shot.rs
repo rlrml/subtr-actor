@@ -102,7 +102,7 @@ impl CeilingShotCalculator {
         ((value - min_value) / (max_value - min_value)).clamp(0.0, 1.0)
     }
 
-    fn ball_speed_change(sample: &CoreSample, previous_ball_velocity: Option<glam::Vec3>) -> f32 {
+    fn ball_speed_change(sample: &FrameState, previous_ball_velocity: Option<glam::Vec3>) -> f32 {
         const BALL_GRAVITY_Z: f32 = -650.0;
 
         let Some(ball) = sample.ball.as_ref() else {
@@ -118,7 +118,7 @@ impl CeilingShotCalculator {
         residual_linear_impulse.length()
     }
 
-    fn begin_sample(&mut self, sample: &CoreSample) {
+    fn begin_sample(&mut self, sample: &FrameState) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_ceiling_shot = false;
             stats.time_since_last_ceiling_shot = stats
@@ -156,7 +156,7 @@ impl CeilingShotCalculator {
         })
     }
 
-    fn update_recent_ceiling_contacts(&mut self, sample: &CoreSample) {
+    fn update_recent_ceiling_contacts(&mut self, sample: &FrameState) {
         for player in &sample.players {
             let observation = Self::ceiling_contact_observation(player);
             let Some(observation) = observation else {
@@ -183,7 +183,7 @@ impl CeilingShotCalculator {
 
     fn candidate_event(
         &self,
-        sample: &CoreSample,
+        sample: &FrameState,
         player: &PlayerSample,
         touch_event: &TouchEvent,
         recent_contact: RecentCeilingContact,
@@ -299,7 +299,7 @@ impl CeilingShotCalculator {
         })
     }
 
-    fn apply_touch_events(&mut self, sample: &CoreSample, touch_events: &[TouchEvent]) {
+    fn apply_touch_events(&mut self, sample: &FrameState, touch_events: &[TouchEvent]) {
         let ball_speed_change = Self::ball_speed_change(sample, self.previous_ball_velocity);
 
         for touch_event in touch_events {
@@ -352,7 +352,7 @@ impl CeilingShotCalculator {
         }
     }
 
-    fn reset_live_play_state(&mut self, sample: &CoreSample) {
+    fn reset_live_play_state(&mut self, sample: &FrameState) {
         self.current_last_ceiling_shot_player = None;
         self.recent_ceiling_contacts.clear();
         self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
@@ -360,7 +360,7 @@ impl CeilingShotCalculator {
 
     fn on_sample_internal(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_events: &[TouchEvent],
     ) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample) {
@@ -378,7 +378,7 @@ impl CeilingShotCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_events: &[TouchEvent],
     ) -> SubtrActorResult<()> {
         self.on_sample_internal(sample, touch_events)

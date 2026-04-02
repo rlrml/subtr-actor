@@ -32,8 +32,8 @@ fn ball(ball_y: f32) -> BallSample {
     }
 }
 
-fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> CoreSample {
-    CoreSample {
+fn sample(frame_number: usize, time: f32, ball_y: f32, touch_teams: &[bool]) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0,

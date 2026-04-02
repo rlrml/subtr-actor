@@ -10,13 +10,21 @@ impl StatsReducer for BackboardReducer {
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let default_state = BackboardBounceState::default();
         let backboard_bounce_state = ctx
             .get::<BackboardBounceState>(BACKBOARD_BOUNCE_STATE_SIGNAL_ID)
             .unwrap_or(&default_state);
-        self.update(sample, backboard_bounce_state)
+        self.update(
+            &FrameInfo {
+                frame_number: sample.frame_number,
+                time: sample.time,
+                dt: sample.dt,
+                seconds_remaining: sample.seconds_remaining,
+            },
+            backboard_bounce_state,
+        )
     }
 }

@@ -29,12 +29,23 @@ impl AnalysisNode for SpeedFlipNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
+        vec![
+            frame_info_dependency(),
+            gameplay_state_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
-        self.calculator.update(sample)
+        self.calculator.update_parts(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<GameplayState>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        )
     }
 
     fn state(&self) -> &Self::State {

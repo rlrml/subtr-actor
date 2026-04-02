@@ -29,11 +29,11 @@ impl AnalysisNode for MatchStatsNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
+        vec![frame_state_dependency()]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
+        let sample = ctx.get::<FrameState>()?;
         self.calculator.update(sample)
     }
 

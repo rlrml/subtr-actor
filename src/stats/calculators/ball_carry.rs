@@ -153,7 +153,7 @@ impl BallCarryCalculator {
 
     fn begin_carry(
         &self,
-        sample: &CoreSample,
+        sample: &FrameState,
         player: &PlayerSample,
         frame_sample: BallCarryFrameSample,
     ) -> ActiveBallCarry {
@@ -178,7 +178,7 @@ impl BallCarryCalculator {
 
     fn extend_carry(
         active_carry: &mut ActiveBallCarry,
-        sample: &CoreSample,
+        sample: &FrameState,
         frame_sample: BallCarryFrameSample,
     ) {
         active_carry.duration += sample.dt;
@@ -254,7 +254,7 @@ impl BallCarryCalculator {
 
     fn process_sample(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         controlling_player: Option<PlayerId>,
     ) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
@@ -306,13 +306,13 @@ impl BallCarryCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         controlling_player: Option<PlayerId>,
     ) -> SubtrActorResult<()> {
         self.process_sample(sample, controlling_player)
     }
 
-    pub fn update_from_sample_touch_events(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         let controlling_player = sample
             .touch_events
             .last()

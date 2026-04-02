@@ -82,8 +82,8 @@ fn sample_stats(
     dt: f32,
     ball: Option<boxcars::RigidBody>,
     players: Vec<PlayerSample>,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt,
@@ -151,7 +151,7 @@ impl StatsReducer for RecordingReducer {
         Ok(())
     }
 
-    fn on_sample(&mut self, _sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, _sample: &FrameState) -> SubtrActorResult<()> {
         *self.sample_calls.borrow_mut() += 1;
         Ok(())
     }
@@ -440,7 +440,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
     let mut reducer = PowerslideReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -466,7 +466,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -496,7 +496,7 @@ fn test_powerslide_reducer_ignores_non_live_rising_edges() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -539,7 +539,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
     airborne_player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 200.0));
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.5,
@@ -569,7 +569,7 @@ fn test_powerslide_reducer_requires_ground_contact() {
     grounded_player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 17.0));
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.5,
             dt: 0.5,
@@ -617,7 +617,7 @@ fn test_powerslide_reducer_allows_small_suspension_height() {
     player.rigid_body = Some(sample_rigid_body(0.0, 0.0, 30.0));
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.5,
@@ -817,7 +817,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
     let mut reducer = MatchStatsReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -843,7 +843,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -869,7 +869,7 @@ fn test_match_stats_reducer_prefers_exact_goal_event_times() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -922,7 +922,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
     let mut reducer = MatchStatsReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -951,7 +951,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -980,7 +980,7 @@ fn test_match_stats_reducer_matches_goal_events_by_exact_scorer() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -1034,7 +1034,7 @@ fn test_match_stats_reducer_tracks_goal_time_after_kickoff_buckets() {
     let mut reducer = MatchStatsReducer::new();
 
     let kickoff_sample =
-        |frame_number: usize, time: f32, team_zero_score: i32, goals: i32| CoreSample {
+        |frame_number: usize, time: f32, team_zero_score: i32, goals: i32| FrameState {
             frame_number,
             time,
             dt: 1.0,
@@ -1064,7 +1064,7 @@ fn test_match_stats_reducer_tracks_goal_time_after_kickoff_buckets() {
 
     let first_touch_sample =
         |frame_number: usize, time: f32, team_zero_score: i32, goals: i32, touch_time: f32| {
-            CoreSample {
+            FrameState {
                 frame_number,
                 time,
                 dt: 1.0,
@@ -1101,7 +1101,7 @@ fn test_match_stats_reducer_tracks_goal_time_after_kickoff_buckets() {
 
     let goal_sample =
         |frame_number: usize, time: f32, team_zero_score: i32, goals: i32, goal_time: f32| {
-            CoreSample {
+            FrameState {
                 frame_number,
                 time,
                 dt: 1.0,
@@ -1180,7 +1180,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
     let mut reducer = MatchStatsReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -1206,7 +1206,7 @@ fn test_match_stats_reducer_prefers_processor_stat_events_without_double_countin
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -1306,7 +1306,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
     let mut reducer = MovementReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -1335,7 +1335,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -1364,7 +1364,7 @@ fn test_movement_reducer_updates_position_baseline_through_non_live_time() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -1403,7 +1403,7 @@ fn test_movement_reducer_tracks_pre_touch_kickoff_time() {
     let mut reducer = MovementReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -1432,7 +1432,7 @@ fn test_movement_reducer_tracks_pre_touch_kickoff_time() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -1471,7 +1471,7 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
     let mut reducer = MovementReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 1.0,
@@ -1500,7 +1500,7 @@ fn test_movement_reducer_uses_crossbar_plus_ball_radius_for_high_air_bucket() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -1575,7 +1575,7 @@ fn test_positioning_reducer_uses_field_marking_zone_boundary() {
         (6, 1.0, -3000.0),
     ] {
         reducer
-            .on_sample(&CoreSample {
+            .on_sample(&FrameState {
                 frame_number,
                 time: frame_number as f32,
                 dt,
@@ -1616,7 +1616,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
     let mut reducer = PositioningReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -1647,7 +1647,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -1678,7 +1678,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 0.0,
@@ -1709,7 +1709,7 @@ fn test_positioning_reducer_interpolates_zone_half_and_ball_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 4.0,
             dt: 1.0,
@@ -1827,7 +1827,7 @@ fn test_positioning_reducer_uses_current_in_game_roster_for_role_bucket_gating()
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -1977,7 +1977,7 @@ fn test_positioning_reducer_allows_role_buckets_after_player_leaves_match() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -2186,7 +2186,7 @@ fn test_positioning_reducer_tracks_demo_and_no_teammate_role_gaps() {
     victim_sample.rigid_body = None;
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -2576,7 +2576,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
     };
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -2608,7 +2608,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -2634,7 +2634,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -2666,7 +2666,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 4.0,
             dt: 1.0,
@@ -2698,7 +2698,7 @@ fn test_positioning_reducer_uses_touch_event_boundaries_for_possession_buckets()
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 5,
             time: 5.0,
             dt: 1.0,
@@ -2765,7 +2765,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -2794,7 +2794,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -2823,7 +2823,7 @@ fn test_boost_reducer_ignores_non_live_time_for_average_amount() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -2862,7 +2862,7 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -2895,7 +2895,7 @@ fn test_boost_reducer_uses_actual_depletion_for_supersonic_usage() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -2937,7 +2937,7 @@ fn test_boost_reducer_splits_observed_usage_between_ground_and_air() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -2968,7 +2968,7 @@ fn test_boost_reducer_splits_observed_usage_between_ground_and_air() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -2999,7 +2999,7 @@ fn test_boost_reducer_splits_observed_usage_between_ground_and_air() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 2.0,
             dt: 1.0,
@@ -3045,7 +3045,7 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3078,7 +3078,7 @@ fn test_boost_reducer_does_not_infer_supersonic_usage_without_depletion() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -3120,7 +3120,7 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3153,7 +3153,7 @@ fn test_boost_reducer_requires_supersonic_speed_across_interval() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -3195,7 +3195,7 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3224,7 +3224,7 @@ fn test_boost_reducer_interpolates_average_and_bucket_times() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -3268,7 +3268,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3298,7 +3298,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -3334,7 +3334,7 @@ fn test_boost_reducer_uses_exact_pad_events_for_size_and_overfill() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 11.0,
             dt: 10.0,
@@ -3383,7 +3383,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3413,7 +3413,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -3450,7 +3450,7 @@ fn test_boost_reducer_prefers_frame_last_boost_amount_for_pickups() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 11.0,
             dt: 10.0,
@@ -3497,7 +3497,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -3533,7 +3533,7 @@ fn test_boost_reducer_ignores_non_live_pickups_by_default() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 10.0,
             dt: 10.0,
@@ -3584,7 +3584,7 @@ fn test_boost_reducer_tracks_pre_touch_kickoff_time_and_pickups() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 1.0,
@@ -3621,7 +3621,7 @@ fn test_boost_reducer_tracks_pre_touch_kickoff_time_and_pickups() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 10.0,
             dt: 10.0,
@@ -3671,7 +3671,7 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -3716,7 +3716,7 @@ fn test_boost_reducer_dedupes_same_frame_pickup_payloads() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 11.0,
             dt: 10.0,
@@ -3763,7 +3763,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 1.0,
@@ -3799,7 +3799,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 11.0,
             dt: 10.0,
@@ -3835,7 +3835,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 12.0,
             dt: 1.0,
@@ -3884,7 +3884,7 @@ fn test_boost_reducer_requires_respawn_before_recounting_known_pad_pickups() {
     assert_eq!(stats.amount_collected, 110.0);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 22.0,
             dt: 10.0,
@@ -3931,7 +3931,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 1.0,
@@ -3967,7 +3967,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 6.0,
             dt: 5.0,
@@ -4003,7 +4003,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 7.0,
             dt: 1.0,
@@ -4042,7 +4042,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
     assert_eq!(stats.small_pads_collected, 2);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 10.0,
             dt: 3.0,
@@ -4078,7 +4078,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 5,
             time: 10.5,
             dt: 0.5,
@@ -4117,7 +4117,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
     assert_eq!(stats.small_pads_collected, 2);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 6,
             time: 11.0,
             dt: 0.5,
@@ -4153,7 +4153,7 @@ fn test_boost_reducer_ignores_early_available_for_known_small_pad() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 7,
             time: 11.5,
             dt: 0.5,
@@ -4200,7 +4200,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
     });
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -4236,7 +4236,7 @@ fn test_boost_reducer_can_include_non_live_pickups_when_enabled() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 10.0,
             dt: 10.0,
@@ -4282,7 +4282,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -4335,7 +4335,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -4394,7 +4394,7 @@ fn test_boost_reducer_uses_canonical_pad_layout_for_stolen_classification() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 11.0,
             dt: 10.0,
@@ -4630,7 +4630,7 @@ fn test_boost_reducer_aligns_canonical_pickups_with_boost_jump_frame() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -4660,7 +4660,7 @@ fn test_boost_reducer_aligns_canonical_pickups_with_boost_jump_frame() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -4713,7 +4713,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -4743,7 +4743,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -4773,7 +4773,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 2.0,
             dt: 1.0,
@@ -4824,7 +4824,7 @@ fn test_boost_reducer_tracks_respawn_grants_and_used_amount() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 3.0,
             dt: 1.0,
@@ -5032,7 +5032,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
     let mut reducer = BoostReducer::new();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 0.0,
             dt: 0.0,
@@ -5085,7 +5085,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 1.0,
             dt: 1.0,
@@ -5144,7 +5144,7 @@ fn test_boost_reducer_treats_midfield_fallback_pads_as_neutral() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 11.0,
             dt: 10.0,
@@ -5215,7 +5215,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
     let team_one = sample_player(epic_id("team-one"), false);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 1.0,
@@ -5240,7 +5240,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
         })
         .unwrap();
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 0.0,
@@ -5271,7 +5271,7 @@ fn test_possession_reducer_tracks_team_possession_time() {
         })
         .unwrap();
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -5312,7 +5312,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
     let team_one = sample_player(epic_id("team-one"), false);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -5344,7 +5344,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -5370,7 +5370,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -5402,7 +5402,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 4.0,
             dt: 1.0,
@@ -5434,7 +5434,7 @@ fn test_possession_reducer_uses_touch_event_boundaries() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 5,
             time: 5.0,
             dt: 1.0,
@@ -5472,7 +5472,7 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
     let team_one = sample_player(epic_id("team-one-challenge"), false);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -5504,7 +5504,7 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -5536,7 +5536,7 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -5562,7 +5562,7 @@ fn test_possession_reducer_returns_to_neutral_after_unresolved_challenge() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 4.0,
             dt: 1.0,
@@ -5600,7 +5600,7 @@ fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
     let team_one = sample_player(epic_id("team-one-goal-reset"), false);
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 1,
             time: 1.0,
             dt: 0.0,
@@ -5632,7 +5632,7 @@ fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 2,
             time: 2.0,
             dt: 1.0,
@@ -5658,7 +5658,7 @@ fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 3,
             time: 3.0,
             dt: 1.0,
@@ -5691,7 +5691,7 @@ fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 4,
             time: 4.0,
             dt: 0.0,
@@ -5717,7 +5717,7 @@ fn test_possession_reducer_resets_after_goal_before_next_kickoff_touch() {
         .unwrap();
 
     reducer
-        .on_sample(&CoreSample {
+        .on_sample(&FrameState {
             frame_number: 5,
             time: 5.0,
             dt: 1.0,
@@ -5756,7 +5756,7 @@ fn test_demo_reducer_counts_events_and_dedupes_consecutive_frames() {
 
     for frame_number in [10, 11, 30] {
         reducer
-            .on_sample(&CoreSample {
+            .on_sample(&FrameState {
                 frame_number,
                 time: frame_number as f32 / 10.0,
                 dt: 0.1,

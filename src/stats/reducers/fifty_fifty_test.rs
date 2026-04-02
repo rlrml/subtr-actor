@@ -36,8 +36,8 @@ fn sample(
     touch_events: Vec<TouchEvent>,
     kickoff_countdown_time: Option<i32>,
     ball_has_been_hit: Option<bool>,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0 / 120.0,

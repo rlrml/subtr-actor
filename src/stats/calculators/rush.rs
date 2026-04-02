@@ -156,7 +156,7 @@ impl RushCalculator {
 
     fn rush_numbers(
         &self,
-        sample: &CoreSample,
+        sample: &FrameState,
         attacking_team_is_team_0: bool,
     ) -> Option<(usize, usize)> {
         let ball_position = sample.ball.as_ref()?.position();
@@ -223,7 +223,7 @@ impl RushCalculator {
         });
     }
 
-    fn update_active_rush(&mut self, sample: &CoreSample, current_team_is_team_0: Option<bool>) {
+    fn update_active_rush(&mut self, sample: &FrameState, current_team_is_team_0: Option<bool>) {
         let Some(active_team_is_team_0) = self.active_rush.as_ref().map(|rush| rush.is_team_0)
         else {
             return;
@@ -248,7 +248,7 @@ impl RushCalculator {
 
     fn maybe_start_rush(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         active_team_before_sample: Option<bool>,
         current_team_is_team_0: Option<bool>,
     ) {
@@ -275,7 +275,7 @@ impl RushCalculator {
 
     fn update_rush_state(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         active_team_before_sample: Option<bool>,
         current_team_is_team_0: Option<bool>,
     ) {
@@ -287,7 +287,7 @@ impl RushCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         possession_state: &PossessionState,
     ) -> SubtrActorResult<()> {
         if !self.live_play_tracker.is_live_play(sample)

@@ -22,7 +22,6 @@ pub struct PowerslideCalculator {
     team_zero_stats: PowerslideStats,
     team_one_stats: PowerslideStats,
     last_active: HashMap<PlayerId, bool>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl PowerslideCalculator {
@@ -50,9 +49,13 @@ impl PowerslideCalculator {
                 .unwrap_or(false)
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        for player in &sample.players {
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        for player in &players.players {
             let effective_powerslide = Self::is_effective_powerslide(player);
             let previous_active = self
                 .last_active
@@ -70,8 +73,8 @@ impl PowerslideCalculator {
             };
 
             if live_play && effective_powerslide {
-                stats.total_duration += sample.dt;
-                team_stats.total_duration += sample.dt;
+                stats.total_duration += frame.dt;
+                team_stats.total_duration += frame.dt;
             }
 
             if live_play && effective_powerslide && !previous_active {

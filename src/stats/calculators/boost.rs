@@ -564,7 +564,7 @@ impl BoostCalculator {
         }
     }
 
-    fn warn_for_sample_boost_invariants(&mut self, sample: &CoreSample) {
+    fn warn_for_sample_boost_invariants(&mut self, sample: &FrameState) {
         let team_zero_stats = self.team_zero_stats.clone();
         let team_one_stats = self.team_one_stats.clone();
         let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = sample
@@ -631,7 +631,7 @@ impl BoostCalculator {
         }
     }
 
-    fn boost_levels_live(_sample: &CoreSample, live_play: bool) -> bool {
+    fn boost_levels_live(_sample: &FrameState, live_play: bool) -> bool {
         live_play
     }
 
@@ -639,14 +639,14 @@ impl BoostCalculator {
         boost_levels_live
     }
 
-    fn tracks_boost_pickups(sample: &CoreSample, live_play: bool) -> bool {
+    fn tracks_boost_pickups(sample: &FrameState, live_play: bool) -> bool {
         live_play
             || (sample.ball_has_been_hit == Some(false)
                 && sample.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
                 && sample.kickoff_countdown_time.is_none_or(|t| t <= 0))
     }
 
-    pub fn update(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         let live_play = self.live_play_tracker.is_live_play(sample);
         let boost_levels_live = Self::boost_levels_live(sample, live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);

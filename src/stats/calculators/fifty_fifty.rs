@@ -293,14 +293,14 @@ impl FiftyFiftyCalculator {
         self.events.push(event.clone());
     }
 
-    pub(crate) fn kickoff_phase_active(sample: &CoreSample) -> bool {
+    pub(crate) fn kickoff_phase_active(sample: &FrameState) -> bool {
         sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
             || sample.ball_has_been_hit == Some(false)
     }
 
     pub(crate) fn contested_touch(
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_events: &[TouchEvent],
         is_kickoff: bool,
     ) -> Option<ActiveFiftyFifty> {
@@ -346,7 +346,7 @@ impl FiftyFiftyCalculator {
 
     pub(crate) fn winning_team_from_ball(
         active: &ActiveFiftyFifty,
-        sample: &CoreSample,
+        sample: &FrameState,
     ) -> Option<bool> {
         let ball = sample.ball.as_ref()?;
         let midpoint = active.midpoint_vec();

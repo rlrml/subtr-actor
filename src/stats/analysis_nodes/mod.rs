@@ -1,10 +1,15 @@
 #![allow(dead_code)]
 
+use std::collections::HashSet;
+
+use crate::{SubtrActorError, SubtrActorErrorVariant, SubtrActorResult};
+
 pub mod analysis_graph;
 
 mod backboard;
 mod backboard_bounce;
 mod ball_carry;
+mod ball_frame_state;
 mod boost;
 mod ceiling_shot;
 mod collector;
@@ -13,10 +18,16 @@ mod dodge_reset;
 mod double_tap;
 mod fifty_fifty;
 mod fifty_fifty_state;
+mod frame_events_state;
+mod frame_info;
+mod frame_state;
+mod gameplay_state;
+mod live_play;
 mod match_stats;
 mod movement;
 mod musty_flick;
 mod nodes;
+mod player_frame_state;
 mod positioning;
 mod possession;
 mod possession_state;
@@ -28,7 +39,7 @@ mod speed_flip;
 mod touch;
 mod touch_state;
 
-use crate::stats::calculators::CoreSample;
+use crate::stats::calculators::FrameInput;
 
 #[allow(unused_imports)]
 pub use backboard::BackboardNode;
@@ -36,6 +47,8 @@ pub use backboard::BackboardNode;
 pub use backboard_bounce::BackboardBounceStateNode;
 #[allow(unused_imports)]
 pub use ball_carry::BallCarryNode;
+#[allow(unused_imports)]
+pub use ball_frame_state::BallFrameStateNode;
 #[allow(unused_imports)]
 pub use boost::BoostNode;
 #[allow(unused_imports)]
@@ -53,11 +66,23 @@ pub use fifty_fifty::FiftyFiftyNode;
 #[allow(unused_imports)]
 pub use fifty_fifty_state::FiftyFiftyStateNode;
 #[allow(unused_imports)]
+pub use frame_events_state::FrameEventsStateNode;
+#[allow(unused_imports)]
+pub use frame_info::FrameInfoNode;
+#[allow(unused_imports)]
+pub use frame_state::FrameStateNode;
+#[allow(unused_imports)]
+pub use gameplay_state::GameplayStateNode;
+#[allow(unused_imports)]
+pub use live_play::LivePlayNode;
+#[allow(unused_imports)]
 pub use match_stats::MatchStatsNode;
 #[allow(unused_imports)]
 pub use movement::MovementNode;
 #[allow(unused_imports)]
 pub use musty_flick::MustyFlickNode;
+#[allow(unused_imports)]
+pub use player_frame_state::PlayerFrameStateNode;
 #[allow(unused_imports)]
 pub use positioning::PositioningNode;
 #[allow(unused_imports)]
@@ -78,6 +103,56 @@ pub use speed_flip::SpeedFlipNode;
 pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
+
+pub(crate) fn boxed_analysis_node_by_name(
+    name: &str,
+) -> Option<Box<dyn analysis_graph::AnalysisNodeDyn>> {
+    match name {
+        "core" => Some(match_stats::boxed_default()),
+        "backboard" => Some(backboard::boxed_default()),
+        "ceiling_shot" => Some(ceiling_shot::boxed_default()),
+        "double_tap" => Some(double_tap::boxed_default()),
+        "fifty_fifty" => Some(fifty_fifty::boxed_default()),
+        "possession" => Some(possession::boxed_default()),
+        "pressure" => Some(pressure::boxed_default()),
+        "rush" => Some(rush::boxed_default()),
+        "touch" => Some(touch::boxed_default()),
+        "speed_flip" => Some(speed_flip::boxed_default()),
+        "musty_flick" => Some(musty_flick::boxed_default()),
+        "dodge_reset" => Some(dodge_reset::boxed_default()),
+        "ball_carry" => Some(ball_carry::boxed_default()),
+        "boost" => Some(boost::boxed_default()),
+        "movement" => Some(movement::boxed_default()),
+        "positioning" => Some(positioning::boxed_default()),
+        "powerslide" => Some(powerslide::boxed_default()),
+        "demo" => Some(demo::boxed_default()),
+        _ => None,
+    }
+}
+
+pub(crate) fn graph_with_builtin_analysis_nodes<I, S>(
+    names: I,
+) -> SubtrActorResult<analysis_graph::AnalysisGraph>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut graph = analysis_graph::AnalysisGraph::new().with_input_state_type::<FrameInput>();
+    graph.push_boxed_node(live_play::boxed_default());
+    let mut seen = HashSet::new();
+    for name in names {
+        let name = name.as_ref();
+        if !seen.insert(name.to_owned()) {
+            continue;
+        }
+        graph.push_boxed_node(boxed_analysis_node_by_name(name).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
+                name.to_owned(),
+            ))
+        })?);
+    }
+    Ok(graph)
+}
 
 pub fn all_analysis_nodes() -> Vec<Box<dyn analysis_graph::AnalysisNodeDyn>> {
     vec![
@@ -104,7 +179,8 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn analysis_graph::AnalysisNodeDyn>> {
 }
 
 pub fn graph_with_all_analysis_nodes() -> analysis_graph::AnalysisGraph {
-    let mut graph = analysis_graph::AnalysisGraph::new().with_root_state_type::<CoreSample>();
+    let mut graph = analysis_graph::AnalysisGraph::new().with_input_state_type::<FrameInput>();
+    graph.push_boxed_node(live_play::boxed_default());
     for node in all_analysis_nodes() {
         graph.push_boxed_node(node);
     }

@@ -27,8 +27,8 @@ fn sample(
     game_state: Option<i32>,
     ball_has_been_hit: Option<bool>,
     kickoff_countdown_time: Option<i32>,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0,

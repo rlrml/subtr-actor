@@ -20,7 +20,7 @@ impl DerivedSignal for TestSignal {
 
     fn evaluate(
         &mut self,
-        _sample: &CoreSample,
+        _sample: &FrameState,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<Option<Box<dyn Any>>> {
         Ok(None)
@@ -72,8 +72,8 @@ fn rigid_body(x: f32, y: f32, z: f32, ang_vel_z: f32) -> RigidBody {
     }
 }
 
-fn sample(frame_number: usize, time: f32, ball_ang_vel_z: f32) -> CoreSample {
-    CoreSample {
+fn sample(frame_number: usize, time: f32, ball_ang_vel_z: f32) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt: 1.0 / 120.0,

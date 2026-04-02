@@ -9,13 +9,13 @@ impl StatsReducer for PositioningReducer {
         vec![POSSESSION_STATE_SIGNAL_ID]
     }
 
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         self.update_from_sample_touch_events(sample)
     }
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let possession_player_before_sample = ctx

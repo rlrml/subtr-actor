@@ -19,7 +19,7 @@ impl FiftyFiftyStateCalculator {
 
     fn maybe_resolve_active_event(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         possession_state: &PossessionState,
     ) -> Option<FiftyFiftyEvent> {
         let active = self.active_event.as_ref()?;
@@ -59,7 +59,7 @@ impl FiftyFiftyStateCalculator {
 
     pub fn update(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         touch_state: &TouchState,
         possession_state: &PossessionState,
     ) -> FiftyFiftyState {

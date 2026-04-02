@@ -1,5 +1,5 @@
 use super::analysis_graph::AnalysisGraph;
-use crate::stats::calculators::CoreSample;
+use crate::stats::calculators::FrameInput;
 use crate::*;
 
 #[allow(dead_code)]
@@ -17,7 +17,7 @@ pub struct AnalysisNodeCollector {
 #[allow(dead_code)]
 impl AnalysisNodeCollector {
     pub fn new(mut graph: AnalysisGraph) -> Self {
-        graph.register_root_state::<CoreSample>();
+        graph.register_input_state::<FrameInput>();
         Self {
             graph,
             last_sample_time: None,
@@ -60,18 +60,18 @@ impl Collector for AnalysisNodeCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
-        sample.active_demos.clear();
-        sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
-        sample.boost_pad_events =
-            processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
-        sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
-        sample.player_stat_events =
-            processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
-        sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
-
-        self.graph.set_root_state(sample);
-        self.graph.evaluate()?;
+        let frame_input = FrameInput::aggregate(
+            processor,
+            frame_number,
+            current_time,
+            dt,
+            self.last_demolish_count,
+            self.last_boost_pad_event_count,
+            self.last_touch_event_count,
+            self.last_player_stat_event_count,
+            self.last_goal_event_count,
+        );
+        self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
         self.last_demolish_count = processor.demolishes.len();
         self.last_boost_pad_event_count = processor.boost_pad_events.len();

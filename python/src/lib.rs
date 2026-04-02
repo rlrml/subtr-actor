@@ -263,20 +263,6 @@ where
     )
 }
 
-fn build_stats_timeline_collector(
-    modules: Option<Vec<String>>,
-) -> PyResult<subtr_actor::StatsTimelineCollector> {
-    let Some(modules) = modules else {
-        return Ok(subtr_actor::StatsTimelineCollector::new());
-    };
-
-    subtr_actor::StatsTimelineCollector::try_only_modules(modules).map_err(|error| {
-        PyErr::new::<exceptions::PyValueError, _>(format!(
-            "Invalid stats timeline module selection: {error:?}"
-        ))
-    })
-}
-
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 #[pyo3(signature = (filepath, global_feature_adders=None, player_feature_adders=None))]
@@ -354,35 +340,24 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath, modules=None))]
-fn get_stats_timeline<'p>(
-    py: Python<'p>,
-    filepath: PathBuf,
-    modules: Option<Vec<String>>,
-) -> PyResult<Py<PyAny>> {
+#[pyo3(signature = (filepath))]
+fn get_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
-    let timeline = build_stats_timeline_collector(modules)?
-        .get_replay_data(&replay)
+    let timeline = subtr_actor::StatsCollector::new()
+        .get_stats_timeline_value(&replay)
         .map_err(handle_frames_exception)?;
 
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(timeline).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &timeline))
 }
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath, modules=None))]
-fn get_dynamic_stats_timeline<'p>(
-    py: Python<'p>,
-    filepath: PathBuf,
-    modules: Option<Vec<String>>,
-) -> PyResult<Py<PyAny>> {
+#[pyo3(signature = (filepath))]
+fn get_dynamic_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
     let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
     let replay = replay_from_data(&data)?;
-    let timeline = build_stats_timeline_collector(modules)?
+    let timeline = subtr_actor::StatsTimelineCollector::new()
         .get_dynamic_replay_data(&replay)
         .map_err(handle_frames_exception)?;
 

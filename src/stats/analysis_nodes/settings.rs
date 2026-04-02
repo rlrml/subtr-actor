@@ -1,5 +1,4 @@
 use super::analysis_graph::*;
-use super::nodes::*;
 use crate::stats::calculators::*;
 use crate::*;
 
@@ -32,13 +31,9 @@ impl AnalysisNode for SettingsNode {
         self.calculator.apply_replay_meta(meta)
     }
 
-    fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
-    }
-
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
-        self.calculator.update(sample)
+        let _ = ctx;
+        self.calculator.update()
     }
 
     fn state(&self) -> &Self::State {

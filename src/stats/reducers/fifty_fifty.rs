@@ -10,7 +10,7 @@ impl StatsReducer for FiftyFiftyReducer {
 
     fn on_sample_with_context(
         &mut self,
-        _sample: &CoreSample,
+        _sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let default_state = FiftyFiftyState::default();

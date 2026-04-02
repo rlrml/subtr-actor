@@ -15,13 +15,13 @@ pub trait StatsReducer {
         Vec::new()
     }
 
-    fn on_sample(&mut self, _sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, _sample: &FrameState) -> SubtrActorResult<()> {
         Ok(())
     }
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         _ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         self.on_sample(sample)
@@ -76,7 +76,7 @@ impl StatsReducer for CompositeStatsReducer {
         signals.into_iter().collect()
     }
 
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         for child in &mut self.children {
             child.on_sample(sample)?;
         }
@@ -85,7 +85,7 @@ impl StatsReducer for CompositeStatsReducer {
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         for child in &mut self.children {
@@ -170,7 +170,7 @@ impl<R: StatsReducer> Collector for ReducerCollector<R> {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = CoreSample::from_processor(processor, frame_number, current_time, dt)?;
+        let mut sample = FrameState::from_processor(processor, frame_number, current_time, dt)?;
         sample.active_demos.clear();
         sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
         sample.boost_pad_events =

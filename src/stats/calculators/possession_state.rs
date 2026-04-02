@@ -11,7 +11,6 @@ pub struct PossessionState {
 #[derive(Default)]
 pub struct PossessionStateCalculator {
     tracker: PossessionTracker,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl PossessionStateCalculator {
@@ -19,13 +18,17 @@ impl PossessionStateCalculator {
         Self::default()
     }
 
-    pub fn update(&mut self, sample: &CoreSample, touch_state: &TouchState) -> PossessionState {
-        let live_play = self.live_play_tracker.is_live_play(sample);
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        touch_state: &TouchState,
+        live_play: bool,
+    ) -> PossessionState {
         if !live_play {
             self.tracker.reset();
             return PossessionState::default();
         }
 
-        self.tracker.update(sample, &touch_state.touch_events)
+        self.tracker.update(frame.time, &touch_state.touch_events)
     }
 }

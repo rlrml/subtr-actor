@@ -8,13 +8,13 @@ impl StatsReducer for MustyFlickReducer {
         vec![TOUCH_STATE_SIGNAL_ID]
     }
 
-    fn on_sample(&mut self, sample: &CoreSample) -> SubtrActorResult<()> {
+    fn on_sample(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
         self.update(sample, &sample.touch_events)
     }
 
     fn on_sample_with_context(
         &mut self,
-        sample: &CoreSample,
+        sample: &FrameState,
         ctx: &AnalysisContext,
     ) -> SubtrActorResult<()> {
         let default_state = TouchState::default();

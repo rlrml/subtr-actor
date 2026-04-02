@@ -51,8 +51,8 @@ fn sample(
     ball_y: f32,
     team_zero_goals: i32,
     goal_event: Option<GoalEvent>,
-) -> CoreSample {
-    CoreSample {
+) -> FrameState {
+    FrameState {
         frame_number,
         time,
         dt,

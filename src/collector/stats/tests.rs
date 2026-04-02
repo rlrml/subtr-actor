@@ -1,12 +1,10 @@
 use serde::{Serialize, Serializer};
+use serde_json::json;
 use std::sync::Arc;
 
 use crate::{ReplayMeta, StatsReducer, SubtrActorErrorVariant};
 
-use super::{
-    resolve_stats_module_factories, CollectedStats, RuntimeStatsModule, StatsModule,
-    StatsModuleFactory,
-};
+use super::{resolve_stats_module_factories, CollectedStats, StatsModule, StatsModuleFactory};
 
 #[derive(Serialize)]
 struct FakeModuleData {
@@ -127,9 +125,9 @@ fn collected_stats_serialize_modules_by_name() {
             team_one: Vec::new(),
             all_headers: Vec::new(),
         },
-        modules: vec![RuntimeStatsModule {
-            emit: true,
-            module: Box::new(FakeModule { name: "fake" }),
+        modules: vec![super::types::CollectedStatsModule {
+            name: "fake",
+            value: json!({ "value": "fake" }),
         }],
     };
 

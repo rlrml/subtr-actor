@@ -29,14 +29,13 @@ impl AnalysisNode for DoubleTapNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![
-            core_sample_dependency(),
-            backboard_bounce_state_dependency(),
-        ]
+        let mut dependencies = vec![frame_state_dependency()];
+        dependencies.push(backboard_bounce_state_dependency());
+        dependencies
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
+        let sample = ctx.get::<FrameState>()?;
         let backboard_bounce_state = ctx.get::<BackboardBounceState>()?;
         self.calculator.update(sample, backboard_bounce_state)
     }

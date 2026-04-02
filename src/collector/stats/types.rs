@@ -39,21 +39,6 @@ pub trait StatsModuleFactory: Send + Sync {
     fn build(&self) -> Box<dyn StatsModule>;
 }
 
-struct DynStatsModule<'a>(&'a dyn StatsModule);
-
-impl Serialize for DynStatsModule<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        erased_serde::serialize(self.0, serializer).map_err(serde::ser::Error::custom)
-    }
-}
-
-pub(crate) fn stats_module_to_json_value(module: &dyn StatsModule) -> SubtrActorResult<Value> {
-    serialize_to_json_value(&DynStatsModule(module))
-}
-
 pub(crate) fn serialize_to_json_value<T: Serialize + ?Sized>(value: &T) -> SubtrActorResult<Value> {
     serde_json::to_value(value).map_err(|error| {
         SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
@@ -62,30 +47,26 @@ pub(crate) fn serialize_to_json_value<T: Serialize + ?Sized>(value: &T) -> Subtr
     })
 }
 
-pub(crate) struct RuntimeStatsModule {
-    pub(crate) emit: bool,
-    pub(crate) module: Box<dyn StatsModule>,
+pub(crate) struct CollectedStatsModule {
+    pub(crate) name: &'static str,
+    pub(crate) value: Value,
 }
 
 pub struct CollectedStats {
     pub replay_meta: ReplayMeta,
-    pub(crate) modules: Vec<RuntimeStatsModule>,
+    pub(crate) modules: Vec<CollectedStatsModule>,
 }
 
-struct CollectedStatsModules<'a>(&'a [RuntimeStatsModule]);
+struct CollectedStatsModules<'a>(&'a [CollectedStatsModule]);
 
 impl Serialize for CollectedStatsModules<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let emitted = self.0.iter().filter(|module| module.emit).count();
-        let mut map = serializer.serialize_map(Some(emitted))?;
-        for module in self.0.iter().filter(|module| module.emit) {
-            map.serialize_entry(
-                module.module.name(),
-                &DynStatsModule(module.module.as_ref()),
-            )?;
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
+        for module in self.0 {
+            map.serialize_entry(module.name, &module.value)?;
         }
         map.end()
     }
@@ -93,10 +74,7 @@ impl Serialize for CollectedStatsModules<'_> {
 
 impl CollectedStats {
     pub fn module_names(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.modules
-            .iter()
-            .filter(|module| module.emit)
-            .map(|module| module.module.name())
+        self.modules.iter().map(|module| module.name)
     }
 }
 

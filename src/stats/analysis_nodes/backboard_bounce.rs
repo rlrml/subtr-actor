@@ -31,12 +31,21 @@ impl AnalysisNode for BackboardBounceStateNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![core_sample_dependency()]
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            frame_events_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
-        self.state = self.calculator.update(sample);
+        self.state = self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<FrameEventsState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        );
         Ok(())
     }
 

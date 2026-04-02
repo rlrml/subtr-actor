@@ -29,16 +29,13 @@ impl AnalysisNode for BackboardNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![
-            core_sample_dependency(),
-            backboard_bounce_state_dependency(),
-        ]
+        vec![frame_info_dependency(), backboard_bounce_state_dependency()]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<CoreSample>()?;
         let backboard_bounce_state = ctx.get::<BackboardBounceState>()?;
-        self.calculator.update(sample, backboard_bounce_state)
+        self.calculator
+            .update(ctx.get::<FrameInfo>()?, backboard_bounce_state)
     }
 
     fn state(&self) -> &Self::State {
