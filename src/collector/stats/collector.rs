@@ -3,6 +3,9 @@ use std::marker::PhantomData;
 
 use serde_json::{Map, Value};
 
+use crate::collector::frame_resolution::{
+    FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
+};
 use crate::stats::analysis_nodes::graph_with_builtin_analysis_nodes;
 use crate::*;
 
@@ -15,15 +18,11 @@ use super::playback::{
 };
 use super::types::{serialize_to_json_value, CollectedStats, CollectedStatsModule};
 
+#[derive(Default)]
 enum SampleMode {
+    #[default]
     Aggregate,
     Timeline,
-}
-
-impl Default for SampleMode {
-    fn default() -> Self {
-        Self::Aggregate
-    }
 }
 
 struct BuiltinModuleSelection {
@@ -251,6 +250,7 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
     last_sample_time: Option<f32>,
+    frame_persistence: StatsFramePersistenceController,
     last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
@@ -348,6 +348,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames: None,
             sample_mode: SampleMode::Aggregate,
             last_sample_time: None,
+            frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
             last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
@@ -371,6 +372,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames,
             sample_mode,
             last_sample_time,
+            frame_persistence,
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
@@ -386,6 +388,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames: captured_frames.map(|_| Vec::new()),
             sample_mode,
             last_sample_time,
+            frame_persistence,
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
@@ -403,6 +406,11 @@ impl<T, F> StatsCollector<T, F> {
         G: FnMut(Map<String, Value>) -> SubtrActorResult<Modules>,
     {
         self.with_frame_transform(ModuleFrameTransform::new(transform))
+    }
+
+    pub fn with_frame_resolution(mut self, resolution: StatsFrameResolution) -> Self {
+        self.frame_persistence = StatsFramePersistenceController::new(resolution);
+        self
     }
 
     pub fn get_stats(mut self, replay: &boxcars::Replay) -> SubtrActorResult<CollectedStats>
@@ -529,10 +537,11 @@ where
                 .as_ref()
                 .expect("replay metadata should be initialized before snapshotting")
                 .clone();
-            self.capture_frame_snapshot(
-                &replay_meta,
-                self.modules.snapshot_frame(&self.graph, &replay_meta)?,
-            )?;
+            if let Some(emitted_dt) = self.frame_persistence.on_frame(frame_number, current_time) {
+                let mut frame = self.modules.snapshot_frame(&self.graph, &replay_meta)?;
+                frame.dt = emitted_dt;
+                self.capture_frame_snapshot(&replay_meta, frame)?;
+            }
         }
 
         self.last_sample_time = Some(current_time);
@@ -555,9 +564,22 @@ where
         let Some(_) = self.graph.state::<FrameInfo>() else {
             return Ok(());
         };
-        let final_snapshot = self.modules.snapshot_frame(&self.graph, &replay_meta)?;
+        let mut final_snapshot = self.modules.snapshot_frame(&self.graph, &replay_meta)?;
         if self.captured_frames.is_some() {
-            self.replace_last_frame_snapshot(&replay_meta, final_snapshot)?;
+            match self
+                .frame_persistence
+                .final_frame_action(final_snapshot.frame_number, final_snapshot.time)
+            {
+                Some(FinalStatsFrameAction::Append { dt }) => {
+                    final_snapshot.dt = dt;
+                    self.capture_frame_snapshot(&replay_meta, final_snapshot)?;
+                }
+                Some(FinalStatsFrameAction::ReplaceLast { dt }) => {
+                    final_snapshot.dt = dt;
+                    self.replace_last_frame_snapshot(&replay_meta, final_snapshot)?;
+                }
+                None => {}
+            }
         }
         Ok(())
     }

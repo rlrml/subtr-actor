@@ -187,6 +187,7 @@ where
     }
 }
 
+#[derive(Default)]
 pub struct AnalysisGraph {
     nodes: Vec<Box<dyn AnalysisNodeDyn>>,
     evaluation_order: Vec<usize>,
@@ -194,19 +195,6 @@ pub struct AnalysisGraph {
     declared_input_states: HashMap<TypeId, &'static str>,
     root_states: HashMap<TypeId, Box<dyn Any>>,
     resolved: bool,
-}
-
-impl Default for AnalysisGraph {
-    fn default() -> Self {
-        Self {
-            nodes: Vec::new(),
-            evaluation_order: Vec::new(),
-            declared_root_states: HashMap::new(),
-            declared_input_states: HashMap::new(),
-            root_states: HashMap::new(),
-            resolved: false,
-        }
-    }
 }
 
 impl AnalysisGraph {
