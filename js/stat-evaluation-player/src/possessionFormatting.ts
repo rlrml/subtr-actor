@@ -1,4 +1,4 @@
-import type { StatsFrame } from "./statsTimeline.ts";
+import type { TeamStatsSnapshot } from "./statsTimeline.ts";
 
 export type PossessionBreakdownClass = "possession_state" | "field_third";
 
@@ -10,7 +10,6 @@ interface PossessionRenderOptions {
     }
     | {
       kind: "team";
-      isTeamZero: boolean;
     };
 }
 
@@ -99,23 +98,20 @@ function formatPossessionStateLabel(
   }
 
   if (labelPerspective.kind === "shared") {
-    return value === "team_zero" ? "Blue control" : "Orange control";
+    return value === "own" ? "Blue control" : "Orange control";
   }
 
-  const isOwnTeam = (value === "team_zero") === labelPerspective.isTeamZero;
-  return isOwnTeam ? "Team control" : "Opp control";
+  return value === "own" ? "Team control" : "Opp control";
 }
 
 function getOrderedPossessionStates(
   labelPerspective: PossessionRenderOptions["labelPerspective"],
 ): string[] {
   if (labelPerspective.kind === "shared") {
-    return ["team_zero", "neutral", "team_one"];
+    return ["own", "neutral", "opponent"];
   }
 
-  return labelPerspective.isTeamZero
-    ? ["team_zero", "neutral", "team_one"]
-    : ["team_one", "neutral", "team_zero"];
+  return ["own", "neutral", "opponent"];
 }
 
 function formatFieldThirdLabel(
@@ -127,23 +123,20 @@ function formatFieldThirdLabel(
   }
 
   if (labelPerspective.kind === "shared") {
-    return value === "team_zero_third" ? "Blue third" : "Orange third";
+    return value === "defensive_third" ? "Blue third" : "Orange third";
   }
 
-  const isOwnThird = (value === "team_zero_third") === labelPerspective.isTeamZero;
-  return isOwnThird ? "Own third" : "Opp third";
+  return value === "defensive_third" ? "Own third" : "Opp third";
 }
 
 function getOrderedFieldThirds(
   labelPerspective: PossessionRenderOptions["labelPerspective"],
 ): string[] {
   if (labelPerspective.kind === "shared") {
-    return ["team_zero_third", "neutral_third", "team_one_third"];
+    return ["defensive_third", "neutral_third", "offensive_third"];
   }
 
-  return labelPerspective.isTeamZero
-    ? ["team_zero_third", "neutral_third", "team_one_third"]
-    : ["team_one_third", "neutral_third", "team_zero_third"];
+  return ["defensive_third", "neutral_third", "offensive_third"];
 }
 
 type PossessionBreakdownValueMap = Record<PossessionBreakdownClass, string>;
@@ -191,7 +184,7 @@ function formatBreakdownLabel(
 }
 
 function renderPossessionBreakdownRows(
-  possession: StatsFrame["possession"],
+  possession: TeamStatsSnapshot["possession"],
   breakdownClasses: PossessionBreakdownClass[],
   trackedTime: number | undefined,
   labelPerspective: PossessionRenderOptions["labelPerspective"],
@@ -232,9 +225,9 @@ function renderPossessionBreakdownRows(
   if (groups.size === 0 && breakdownClasses.length === 1 && breakdownClasses[0] === "possession_state") {
     const totals = new Map<string, number>();
     if (possession) {
-      totals.set("team_zero", possession.team_zero_time);
+      totals.set("own", possession.possession_time);
       totals.set("neutral", possession.neutral_time ?? 0);
-      totals.set("team_one", possession.team_one_time);
+      totals.set("opponent", possession.opponent_possession_time);
     }
 
     if (!getOrderedPossessionStates(labelPerspective).some((state) => (totals.get(state) ?? 0) > 0)) {
@@ -265,7 +258,7 @@ function renderPossessionBreakdownRows(
 }
 
 export function renderPossessionStats(
-  possession: StatsFrame["possession"],
+  possession: TeamStatsSnapshot["possession"],
   options: PossessionRenderOptions,
 ): string {
   const trackedTime = possession?.tracked_time;

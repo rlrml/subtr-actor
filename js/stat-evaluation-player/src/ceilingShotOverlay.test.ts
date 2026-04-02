@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildCeilingShotMarkers,
   getVisibleCeilingShotMarkers,
 } from "./ceilingShotOverlay.ts";
+import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildCeilingShotMarkers uses replay-normalized frame time and player names", () => {
   const replay = {
@@ -26,9 +26,7 @@ test("buildCeilingShotMarkers uses replay-normalized frame time and player names
     teamOneNames: [],
   } as unknown as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     ceiling_shot_events: [
       {
         time: 9.2,
@@ -49,8 +47,7 @@ test("buildCeilingShotMarkers uses replay-normalized frame time and player names
         confidence: 0.84,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildCeilingShotMarkers(statsTimeline, replay), [
     {

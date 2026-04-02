@@ -40,9 +40,10 @@ export function getLastTouchPlayer(statsFrame: StatsFrame): PlayerStatsSnapshot 
   return statsFrame.players.find((player) => player.touch?.is_last_touch) ?? null;
 }
 
-export function playerIdToString(playerId: Record<string, string>): string {
+export function playerIdToString(playerId: Record<string, unknown>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
+  const normalizedValue = typeof value === "string" ? value : JSON.stringify(value);
+  return `${kind}:${normalizedValue}`;
 }
 
 export function buildTouchMarkers(

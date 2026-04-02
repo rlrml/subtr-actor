@@ -9,6 +9,7 @@ import {
   buildRushTimelineRanges,
   buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
+import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildPossessionTimelineRanges derives merged team and neutral control spans", () => {
   const timeline = {
@@ -19,11 +20,21 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
         frame_number: 1,
         time: 1,
         dt: 1,
-        possession: {
-          tracked_time: 1,
-          team_zero_time: 1,
-          team_one_time: 0,
-          neutral_time: 0,
+        team_zero: {
+          possession: {
+            tracked_time: 1,
+            possession_time: 1,
+            opponent_possession_time: 0,
+            neutral_time: 0,
+          },
+        },
+        team_one: {
+          possession: {
+            tracked_time: 1,
+            possession_time: 0,
+            opponent_possession_time: 1,
+            neutral_time: 0,
+          },
         },
         players: [],
       },
@@ -31,11 +42,21 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
         frame_number: 2,
         time: 2,
         dt: 1,
-        possession: {
-          tracked_time: 2,
-          team_zero_time: 2,
-          team_one_time: 0,
-          neutral_time: 0,
+        team_zero: {
+          possession: {
+            tracked_time: 2,
+            possession_time: 2,
+            opponent_possession_time: 0,
+            neutral_time: 0,
+          },
+        },
+        team_one: {
+          possession: {
+            tracked_time: 2,
+            possession_time: 0,
+            opponent_possession_time: 2,
+            neutral_time: 0,
+          },
         },
         players: [],
       },
@@ -43,11 +64,21 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
         frame_number: 3,
         time: 3,
         dt: 1,
-        possession: {
-          tracked_time: 3,
-          team_zero_time: 2,
-          team_one_time: 0,
-          neutral_time: 1,
+        team_zero: {
+          possession: {
+            tracked_time: 3,
+            possession_time: 2,
+            opponent_possession_time: 0,
+            neutral_time: 1,
+          },
+        },
+        team_one: {
+          possession: {
+            tracked_time: 3,
+            possession_time: 0,
+            opponent_possession_time: 2,
+            neutral_time: 1,
+          },
         },
         players: [],
       },
@@ -55,11 +86,21 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
         frame_number: 4,
         time: 4,
         dt: 1,
-        possession: {
-          tracked_time: 4,
-          team_zero_time: 2,
-          team_one_time: 1,
-          neutral_time: 1,
+        team_zero: {
+          possession: {
+            tracked_time: 4,
+            possession_time: 2,
+            opponent_possession_time: 1,
+            neutral_time: 1,
+          },
+        },
+        team_one: {
+          possession: {
+            tracked_time: 4,
+            possession_time: 1,
+            opponent_possession_time: 2,
+            neutral_time: 1,
+          },
         },
         players: [],
       },
@@ -109,11 +150,21 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
         frame_number: 1,
         time: 0.5,
         dt: 0.5,
-        pressure: {
-          tracked_time: 0.5,
-          team_zero_side_time: 0.5,
-          team_one_side_time: 0,
-          neutral_time: 0,
+        team_zero: {
+          pressure: {
+            tracked_time: 0.5,
+            defensive_half_time: 0.5,
+            offensive_half_time: 0,
+            neutral_time: 0,
+          },
+        },
+        team_one: {
+          pressure: {
+            tracked_time: 0.5,
+            defensive_half_time: 0,
+            offensive_half_time: 0.5,
+            neutral_time: 0,
+          },
         },
         players: [],
       },
@@ -121,11 +172,21 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
         frame_number: 2,
         time: 1,
         dt: 0.5,
-        pressure: {
-          tracked_time: 1,
-          team_zero_side_time: 0.5,
-          team_one_side_time: 0,
-          neutral_time: 0.5,
+        team_zero: {
+          pressure: {
+            tracked_time: 1,
+            defensive_half_time: 0.5,
+            offensive_half_time: 0,
+            neutral_time: 0.5,
+          },
+        },
+        team_one: {
+          pressure: {
+            tracked_time: 1,
+            defensive_half_time: 0,
+            offensive_half_time: 0.5,
+            neutral_time: 0.5,
+          },
         },
         players: [],
       },
@@ -165,9 +226,7 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
       { time: 3.5 },
     ],
   } as ReplayModel;
-  const timeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const timeline = createLegacyStatsTimeline({
     rush_events: [
       {
         start_time: 1.1,
@@ -189,7 +248,7 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
       },
     ],
     frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildRushTimelineRanges(timeline, replay), [
     {
@@ -228,11 +287,21 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
         frame_number: 1,
         time: 0.5,
         dt: 0.5,
-        pressure: {
-          tracked_time: 0.5,
-          team_zero_side_time: 0.5,
-          team_one_side_time: 0,
-          neutral_time: 0,
+        team_zero: {
+          pressure: {
+            tracked_time: 0.5,
+            defensive_half_time: 0.5,
+            offensive_half_time: 0,
+            neutral_time: 0,
+          },
+        },
+        team_one: {
+          pressure: {
+            tracked_time: 0.5,
+            defensive_half_time: 0,
+            offensive_half_time: 0.5,
+            neutral_time: 0,
+          },
         },
         players: [],
       },
@@ -240,11 +309,21 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
         frame_number: 2,
         time: 1,
         dt: 0.5,
-        pressure: {
-          tracked_time: 1,
-          team_zero_side_time: 0.5,
-          team_one_side_time: 0.5,
-          neutral_time: 0,
+        team_zero: {
+          pressure: {
+            tracked_time: 1,
+            defensive_half_time: 0.5,
+            offensive_half_time: 0.5,
+            neutral_time: 0,
+          },
+        },
+        team_one: {
+          pressure: {
+            tracked_time: 1,
+            defensive_half_time: 0.5,
+            offensive_half_time: 0.5,
+            neutral_time: 0,
+          },
         },
         players: [],
       },

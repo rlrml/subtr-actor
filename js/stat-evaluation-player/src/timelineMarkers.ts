@@ -29,14 +29,6 @@ const RUSH_MATCHUPS = [
 
 type RushTeamPrefix = "team_zero" | "team_one";
 
-function getRushCount(
-  rush: StatsTimeline["frames"][number]["rush"] | undefined,
-  key: string,
-): number {
-  const value = rush?.[key as keyof NonNullable<StatsTimeline["frames"][number]["rush"]>];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function getReplayFrameTime(
   replay: ReplayModel,
   frame: number | undefined,
@@ -143,10 +135,10 @@ export function buildRushTimelineEvents(
   statsTimeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineEvent[] {
-  if ((statsTimeline.rush_events?.length ?? 0) > 0) {
+  if (statsTimeline.events.rush.length > 0) {
     const teamEventCounts = new Map<RushTeamPrefix, number>();
 
-    return statsTimeline.rush_events!.map((event) => {
+    return statsTimeline.events.rush.map((event) => {
       const eventTime = replay?.frames[event.start_frame]?.time ?? event.start_time;
       const teamPrefix = event.is_team_0 ? "team_zero" : "team_one";
       const teamLabel = event.is_team_0 ? "Blue" : "Orange";
@@ -180,16 +172,19 @@ export function buildRushTimelineEvents(
       [true, "team_zero", "Blue", BLUE_TIMELINE_COLOR],
       [false, "team_one", "Orange", ORANGE_TIMELINE_COLOR],
     ] as const) {
-      const totalKey = `${teamPrefix}_count`;
-      const currentTotal = getRushCount(frame.rush, totalKey);
+      const rush = isTeamZero ? frame.team_zero?.rush : frame.team_one?.rush;
+      const totalKey = `${teamPrefix}:count`;
+      const currentTotal = rush?.count ?? 0;
       const previousTotal = previousCounts.get(totalKey) ?? 0;
       const totalDelta = Math.max(0, currentTotal - previousTotal);
       previousCounts.set(totalKey, currentTotal);
 
       const matchupLabels: string[] = [];
       for (const matchup of RUSH_MATCHUPS) {
-        const matchupKey = `${teamPrefix}_${matchup.suffix}`;
-        const currentMatchupCount = getRushCount(frame.rush, matchupKey);
+        const matchupKey = `${teamPrefix}:${matchup.suffix}`;
+        const currentMatchupCount = rush?.[
+          matchup.suffix as keyof NonNullable<typeof rush>
+        ] as number | undefined ?? 0;
         const previousMatchupCount = previousCounts.get(matchupKey) ?? 0;
         const matchupDelta = Math.max(0, currentMatchupCount - previousMatchupCount);
         previousCounts.set(matchupKey, currentMatchupCount);
@@ -283,7 +278,7 @@ export function buildBackboardTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.backboard_events ?? []).map((event, index) => {
+  return statsTimeline.events.backboard.map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     return {
@@ -323,7 +318,7 @@ export function buildDoubleTapTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.double_tap_events ?? []).map((event, index) => {
+  return statsTimeline.events.double_tap.map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     return {
@@ -420,7 +415,7 @@ export function buildSpeedFlipTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.speed_flip_events ?? []).map((event) => {
+  return statsTimeline.events.speed_flip.map((event) => {
     const playerId = event.player ? playerIdToString(event.player) : null;
     const playerName = playerId
       ? replay.players.find((player) => player.id === playerId)?.name ?? playerId

@@ -20,5 +20,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true
   },
-  "include": ["src", "src/env.d.ts"]
+  "include": ["src", "src/env.d.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

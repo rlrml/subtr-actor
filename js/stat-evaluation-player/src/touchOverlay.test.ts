@@ -2,20 +2,25 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsFrame, StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame } from "./statsTimeline.ts";
 import {
   buildTouchMarkers,
   getLastTouchPlayer,
   getVisibleTouchMarkers,
 } from "./touchOverlay.ts";
+import {
+  createLegacyStatsTimeline,
+  createPlayerStatsSnapshot,
+  createStatsFrame,
+} from "./testStatsTimeline.ts";
 
 test("getLastTouchPlayer returns the player marked as the current last touch", () => {
-  const statsFrame: StatsFrame = {
+  const statsFrame: StatsFrame = createStatsFrame({
     frame_number: 42,
     time: 12.3,
     dt: 0.1,
     players: [
-      {
+      createPlayerStatsSnapshot({
         player_id: { Steam: "blue" },
         name: "Blue",
         is_team_0: true,
@@ -23,8 +28,8 @@ test("getLastTouchPlayer returns the player marked as the current last touch", (
           touch_count: 2,
           is_last_touch: false,
         },
-      },
-      {
+      }),
+      createPlayerStatsSnapshot({
         player_id: { Steam: "orange" },
         name: "Orange",
         is_team_0: false,
@@ -33,9 +38,9 @@ test("getLastTouchPlayer returns the player marked as the current last touch", (
           is_last_touch: true,
           time_since_last_touch: 0.4,
         },
-      },
+      }),
     ],
-  };
+  });
 
   assert.equal(getLastTouchPlayer(statsFrame)?.name, "Orange");
 });
@@ -62,16 +67,14 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     frames: [
       {
         frame_number: 0,
         time: 0,
         dt: 0.1,
         players: [
-          {
+          createPlayerStatsSnapshot({
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
@@ -79,7 +82,7 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
               touch_count: 0,
               is_last_touch: false,
             },
-          },
+          }),
         ],
       },
       {
@@ -87,7 +90,7 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
         time: 1.25,
         dt: 0.1,
         players: [
-          {
+          createPlayerStatsSnapshot({
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
@@ -97,11 +100,11 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
               last_touch_time: 1.25,
               last_touch_frame: 1,
             },
-          },
+          }),
         ],
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildTouchMarkers(statsTimeline, replay), [
     {
@@ -134,16 +137,14 @@ test("buildTouchMarkers uses normalized replay frame time instead of raw stats t
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     frames: [
       {
         frame_number: 1,
         time: 4.75,
         dt: 0.1,
         players: [
-          {
+          createPlayerStatsSnapshot({
             player_id: { Steam: "blue-id" },
             name: "Blue",
             is_team_0: true,
@@ -153,11 +154,11 @@ test("buildTouchMarkers uses normalized replay frame time instead of raw stats t
               last_touch_time: 4.75,
               last_touch_frame: 1,
             },
-          },
+          }),
         ],
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.equal(buildTouchMarkers(statsTimeline, replay)[0]?.time, 1.25);
 });

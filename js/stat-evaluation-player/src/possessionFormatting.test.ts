@@ -7,22 +7,22 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
   const html = renderPossessionStats(
     {
       tracked_time: 10,
-      team_zero_time: 4,
-      team_one_time: 3,
+      possession_time: 4,
+      opponent_possession_time: 3,
       neutral_time: 3,
       labeled_time: {
         entries: [
           {
             labels: [
-              { key: "possession_state", value: "team_zero" },
-              { key: "field_third", value: "team_zero_third" },
+              { key: "possession_state", value: "own" },
+              { key: "field_third", value: "defensive_third" },
             ],
             value: 4,
           },
           {
             labels: [
-              { key: "possession_state", value: "team_one" },
-              { key: "field_third", value: "team_one_third" },
+              { key: "possession_state", value: "opponent" },
+              { key: "field_third", value: "offensive_third" },
             ],
             value: 3,
           },
@@ -39,7 +39,6 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: true,
       },
       breakdownClasses: ["possession_state"],
     },
@@ -55,8 +54,8 @@ test("renderPossessionStats can render a shared control breakdown", () => {
   const html = renderPossessionStats(
     {
       tracked_time: 10,
-      team_zero_time: 4,
-      team_one_time: 3,
+      possession_time: 4,
+      opponent_possession_time: 3,
       neutral_time: 3,
     },
     {
@@ -78,21 +77,21 @@ test("renderPossessionStats can render possession by third in team perspective",
   const html = renderPossessionStats(
     {
       tracked_time: 10,
-      team_zero_time: 6,
-      team_one_time: 3,
+      possession_time: 6,
+      opponent_possession_time: 3,
       neutral_time: 1,
       labeled_time: {
         entries: [
           {
             labels: [
-              { key: "possession_state", value: "team_zero" },
-              { key: "field_third", value: "team_zero_third" },
+              { key: "possession_state", value: "own" },
+              { key: "field_third", value: "defensive_third" },
             ],
             value: 2,
           },
           {
             labels: [
-              { key: "possession_state", value: "team_zero" },
+              { key: "possession_state", value: "own" },
               { key: "field_third", value: "neutral_third" },
             ],
             value: 4,
@@ -100,14 +99,14 @@ test("renderPossessionStats can render possession by third in team perspective",
           {
             labels: [
               { key: "possession_state", value: "neutral" },
-              { key: "field_third", value: "team_one_third" },
+              { key: "field_third", value: "offensive_third" },
             ],
             value: 1,
           },
           {
             labels: [
-              { key: "possession_state", value: "team_one" },
-              { key: "field_third", value: "team_one_third" },
+              { key: "possession_state", value: "opponent" },
+              { key: "field_third", value: "offensive_third" },
             ],
             value: 3,
           },
@@ -117,7 +116,6 @@ test("renderPossessionStats can render possession by third in team perspective",
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: true,
       },
       breakdownClasses: ["possession_state", "field_third"],
     },
@@ -133,15 +131,15 @@ test("renderPossessionStats can render a field-third breakdown on its own", () =
   const html = renderPossessionStats(
     {
       tracked_time: 10,
-      team_zero_time: 4,
-      team_one_time: 4,
+      possession_time: 4,
+      opponent_possession_time: 4,
       neutral_time: 2,
       labeled_time: {
         entries: [
           {
             labels: [
-              { key: "possession_state", value: "team_zero" },
-              { key: "field_third", value: "team_zero_third" },
+              { key: "possession_state", value: "own" },
+              { key: "field_third", value: "defensive_third" },
             ],
             value: 3,
           },
@@ -154,8 +152,8 @@ test("renderPossessionStats can render a field-third breakdown on its own", () =
           },
           {
             labels: [
-              { key: "possession_state", value: "team_one" },
-              { key: "field_third", value: "team_one_third" },
+              { key: "possession_state", value: "opponent" },
+              { key: "field_third", value: "offensive_third" },
             ],
             value: 5,
           },
@@ -179,14 +177,13 @@ test("renderPossessionStats omits breakdown rows when no classes are selected", 
   const html = renderPossessionStats(
     {
       tracked_time: 5,
-      team_zero_time: 2,
-      team_one_time: 1,
+      possession_time: 2,
+      opponent_possession_time: 1,
       neutral_time: 2,
     },
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: false,
       },
     },
   );

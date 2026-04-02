@@ -6,32 +6,28 @@ import {
   getStatsFrameForReplayFrame,
   type StatsTimeline,
 } from "./statsTimeline.ts";
+import { createStatsTimeline } from "./testStatsTimeline.ts";
 
 test("stats frame lookup uses replay frame_number instead of array index", () => {
-  const statsTimeline: StatsTimeline = {
-    replay_meta: null,
-    timeline_events: [],
+  const statsTimeline: StatsTimeline = createStatsTimeline({
     frames: [
       {
         frame_number: 10,
         time: 0,
         dt: 0,
-        players: [],
       },
       {
         frame_number: 11,
         time: 0.1,
         dt: 0.1,
-        players: [],
       },
       {
         frame_number: 15,
         time: 0.2,
         dt: 0.1,
-        players: [],
       },
     ],
-  };
+  });
 
   const lookup = createStatsFrameLookup(statsTimeline);
 

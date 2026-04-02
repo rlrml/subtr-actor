@@ -74,16 +74,16 @@ function createSharedZoneBoundaryOverlayManager() {
 export const zoneBoundaryOverlayManager = createSharedZoneBoundaryOverlayManager();
 
 function getPositioningZoneTime(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
   zone: "defensive" | "neutral" | "offensive",
 ): number | undefined {
   switch (zone) {
     case "defensive":
-      return positioning?.time_defensive_zone;
+      return positioning?.time_defensive_third;
     case "neutral":
-      return positioning?.time_neutral_zone;
+      return positioning?.time_neutral_third;
     case "offensive":
-      return positioning?.time_offensive_zone;
+      return positioning?.time_offensive_third;
   }
 }
 
@@ -117,13 +117,13 @@ function asNumber(value: unknown): number | undefined {
 }
 
 function getPositioningTrackedTime(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): number | undefined {
   return asNumber(positioning?.tracked_time);
 }
 
 function getPositioningPercentage(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
   percentFieldName: string,
   timeFieldName: string,
 ): number | undefined {
@@ -146,7 +146,7 @@ function getPositioningPercentage(
 }
 
 function getPositioningAverage(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
   averageFieldName: string,
   sumFieldName: string,
 ): number | undefined {
@@ -169,7 +169,7 @@ function getPositioningAverage(
 }
 
 export function renderRelativePositioningStats(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): string {
   return `
     <div class="stat-row"><span class="label">Most back</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_most_back", "time_most_back"))}</span></div>
@@ -184,7 +184,7 @@ export function renderRelativePositioningStats(
 }
 
 export function renderAbsolutePositioningStats(
-  positioning: PlayerStatsSnapshot["positioning"],
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): string {
   return `
     <div class="stat-row"><span class="label">Defensive zone</span><span class="value">${formatNumber(getPositioningZoneTime(positioning, "defensive"), 1, "s")}</span></div>
@@ -197,19 +197,22 @@ export function renderAbsolutePositioningStats(
   `;
 }
 
-export function renderCoreStats(core: PlayerStatsSnapshot["core"]): string {
+export function renderCoreStats(core: PlayerStatsSnapshot["core"] | undefined): string {
+  const shootingPercentage = core && core.shots > 0
+    ? (core.goals * 100) / core.shots
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Score</span><span class="value">${formatInteger(core?.score)}</span></div>
     <div class="stat-row"><span class="label">Goals</span><span class="value">${formatInteger(core?.goals)}</span></div>
     <div class="stat-row"><span class="label">Assists</span><span class="value">${formatInteger(core?.assists)}</span></div>
     <div class="stat-row"><span class="label">Saves</span><span class="value">${formatInteger(core?.saves)}</span></div>
     <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(core?.shots)}</span></div>
-    <div class="stat-row"><span class="label">Shooting %</span><span class="value">${formatPercentage(asNumber(core?.shooting_percentage))}</span></div>
+    <div class="stat-row"><span class="label">Shooting %</span><span class="value">${formatPercentage(shootingPercentage)}</span></div>
   `;
 }
 
 export function renderBackboardStats(
-  backboard: PlayerStatsSnapshot["backboard"],
+  backboard: PlayerStatsSnapshot["backboard"] | undefined,
 ): string {
   return `
     <div class="stat-row"><span class="label">Hits</span><span class="value">${formatInteger(backboard?.count)}</span></div>
@@ -218,7 +221,7 @@ export function renderBackboardStats(
 }
 
 export function renderDoubleTapStats(
-  doubleTap: PlayerStatsSnapshot["double_tap"],
+  doubleTap: PlayerStatsSnapshot["double_tap"] | undefined,
 ): string {
   return `
     <div class="stat-row"><span class="label">Count</span><span class="value">${formatInteger(doubleTap?.count)}</span></div>
@@ -227,41 +230,50 @@ export function renderDoubleTapStats(
 }
 
 export function renderCeilingShotStats(
-  ceilingShot: PlayerStatsSnapshot["ceiling_shot"],
+  ceilingShot: PlayerStatsSnapshot["ceiling_shot"] | undefined,
 ): string {
+  const averageConfidence = ceilingShot && ceilingShot.count > 0
+    ? ceilingShot.cumulative_confidence / ceilingShot.count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(ceilingShot?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(ceilingShot?.high_confidence_count)}</span></div>
     <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.last_confidence), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.average_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidence, 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(ceilingShot?.best_confidence), 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(ceilingShot?.time_since_last_ceiling_shot), 2, "s")}</span></div>
   `;
 }
 
 export function renderBallCarryStats(
-  ballCarry: PlayerStatsSnapshot["ball_carry"],
+  ballCarry: PlayerStatsSnapshot["ball_carry"] | undefined,
 ): string {
+  const averageHorizontalGap = ballCarry && ballCarry.carry_count > 0
+    ? ballCarry.average_horizontal_gap_sum / ballCarry.carry_count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Carries</span><span class="value">${formatInteger(ballCarry?.carry_count)}</span></div>
     <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(ballCarry?.total_carry_time, 1, "s")}</span></div>
     <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(ballCarry?.longest_carry_time, 1, "s")}</span></div>
     <div class="stat-row"><span class="label">Furthest</span><span class="value">${formatNumber(ballCarry?.furthest_carry_distance, 0)}</span></div>
-    <div class="stat-row"><span class="label">Avg gap</span><span class="value">${formatNumber(asNumber(ballCarry?.average_horizontal_gap), 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg gap</span><span class="value">${formatNumber(averageHorizontalGap, 0)}</span></div>
   `;
 }
 
 export function renderPowerslideStats(
-  powerslide: PlayerStatsSnapshot["powerslide"],
+  powerslide: PlayerStatsSnapshot["powerslide"] | undefined,
 ): string {
+  const averageDuration = powerslide && powerslide.press_count > 0
+    ? powerslide.total_duration / powerslide.press_count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Presses</span><span class="value">${formatInteger(powerslide?.press_count)}</span></div>
     <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(powerslide?.total_duration, 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Avg duration</span><span class="value">${formatNumber(asNumber(powerslide?.average_duration), 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg duration</span><span class="value">${formatNumber(averageDuration, 2, "s")}</span></div>
   `;
 }
 
-export function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
+export function renderDemoStats(demo: PlayerStatsSnapshot["demo"] | undefined): string {
   return `
     <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(demo?.demos_inflicted)}</span></div>
     <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(demo?.demos_taken)}</span></div>
@@ -269,7 +281,7 @@ export function renderDemoStats(demo: PlayerStatsSnapshot["demo"]): string {
 }
 
 export function renderDodgeResetStats(
-  dodgeReset: PlayerStatsSnapshot["dodge_reset"],
+  dodgeReset: PlayerStatsSnapshot["dodge_reset"] | undefined,
 ): string {
   return `
     <div class="stat-row"><span class="label">Count</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
@@ -278,32 +290,38 @@ export function renderDodgeResetStats(
 }
 
 export function renderMustyFlickStats(
-  mustyFlick: PlayerStatsSnapshot["musty_flick"],
+  mustyFlick: PlayerStatsSnapshot["musty_flick"] | undefined,
 ): string {
+  const averageConfidence = mustyFlick && mustyFlick.count > 0
+    ? mustyFlick.cumulative_confidence / mustyFlick.count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(mustyFlick?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(mustyFlick?.high_confidence_count)}</span></div>
-    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.last_quality), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.average_quality), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.best_quality), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(mustyFlick?.time_since_last_musty_flick), 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.last_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidence, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.best_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(mustyFlick?.time_since_last_musty), 2, "s")}</span></div>
   `;
 }
 
 export function renderSpeedFlipStats(
-  speedFlip: PlayerStatsSnapshot["speed_flip"],
+  speedFlip: PlayerStatsSnapshot["speed_flip"] | undefined,
 ): string {
+  const averageQuality = speedFlip && speedFlip.count > 0
+    ? speedFlip.cumulative_quality / speedFlip.count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(speedFlip?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(speedFlip?.high_confidence_count)}</span></div>
     <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(speedFlip?.last_quality), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(asNumber(speedFlip?.average_quality), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageQuality, 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(speedFlip?.best_quality), 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(speedFlip?.time_since_last_speed_flip), 2, "s")}</span></div>
   `;
 }
 
-export function renderBoostStats(boost: PlayerStatsSnapshot["boost"]): string {
+export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined): string {
   const avgBoost =
     boost && boost.tracked_time > 0
       ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)

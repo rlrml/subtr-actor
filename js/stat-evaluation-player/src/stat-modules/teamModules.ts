@@ -51,11 +51,12 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      if (!statsFrame?.possession) return "";
+      const possession = statsFrame?.team_zero?.possession;
+      if (!possession) return "";
 
       return renderSharedCard(
         "Control State",
-        renderPossessionStats(statsFrame.possession, {
+        renderPossessionStats(possession, {
           labelPerspective: {
             kind: "shared",
           },
@@ -70,12 +71,14 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         frameIndex,
       );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.possession || !player) return "";
+      const possession = player?.is_team_0
+        ? statsFrame?.team_zero?.possession
+        : statsFrame?.team_one?.possession;
+      if (!possession || !player) return "";
 
-      return renderPossessionStats(statsFrame.possession, {
+      return renderPossessionStats(possession, {
         labelPerspective: {
           kind: "team",
-          isTeamZero: player.is_team_0,
         },
         breakdownClasses: getActiveBreakdownClasses(),
       });
@@ -226,7 +229,7 @@ export function createFiftyFiftyModule(): StatModule {
 
       const summary = renderSharedCard(
         "Challenge Summary",
-        renderFiftyFiftySummary(statsFrame.fifty_fifty, {
+        renderFiftyFiftySummary(statsFrame.team_zero?.fifty_fifty, {
           kind: "shared",
         }),
       );
@@ -285,11 +288,12 @@ export function createPressureModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      if (!statsFrame?.pressure) return "";
+      const pressure = statsFrame?.team_zero?.pressure;
+      if (!pressure) return "";
 
       return renderSharedCard(
         "Field State",
-        renderPressureStats(statsFrame.pressure, {
+        renderPressureStats(pressure, {
           labelPerspective: {
             kind: "shared",
           },
@@ -303,12 +307,14 @@ export function createPressureModule(): StatModule {
         frameIndex,
       );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.pressure || !player) return "";
+      const pressure = player?.is_team_0
+        ? statsFrame?.team_zero?.pressure
+        : statsFrame?.team_one?.pressure;
+      if (!pressure || !player) return "";
 
-      return renderPressureStats(statsFrame.pressure, {
+      return renderPressureStats(pressure, {
         labelPerspective: {
           kind: "team",
-          isTeamZero: player.is_team_0,
         },
       });
     },
@@ -339,18 +345,20 @@ export function createRushModule(): StatModule {
         ctx.statsFrameLookup,
         frameIndex,
       );
-      if (!statsFrame?.rush) return "";
+      const teamZeroRush = statsFrame?.team_zero?.rush;
+      const teamOneRush = statsFrame?.team_one?.rush;
+      if (!teamZeroRush || !teamOneRush) return "";
 
       return [
         renderPlayerCard(
           "Blue Team",
           true,
-          renderRushStats(statsFrame.rush, true),
+          renderRushStats(teamZeroRush),
         ),
         renderPlayerCard(
           "Orange Team",
           false,
-          renderRushStats(statsFrame.rush, false),
+          renderRushStats(teamOneRush),
         ),
       ].join("");
     },
@@ -361,9 +369,12 @@ export function createRushModule(): StatModule {
         frameIndex,
       );
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!statsFrame?.rush || !player) return "";
+      const rush = player?.is_team_0
+        ? statsFrame?.team_zero?.rush
+        : statsFrame?.team_one?.rush;
+      if (!rush || !player) return "";
 
-      return renderRushStats(statsFrame.rush, player.is_team_0);
+      return renderRushStats(rush);
     },
   };
 }

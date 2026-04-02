@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildSpeedFlipMarkers,
   getVisibleSpeedFlipMarkers,
 } from "./speedFlipOverlay.ts";
+import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildSpeedFlipMarkers uses replay-normalized frame time and player names", () => {
   const replay = {
@@ -26,9 +26,7 @@ test("buildSpeedFlipMarkers uses replay-normalized frame time and player names",
     teamOneNames: [],
   } as unknown as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     speed_flip_events: [
       {
         time: 9.2,
@@ -47,8 +45,7 @@ test("buildSpeedFlipMarkers uses replay-normalized frame time and player names",
         confidence: 0.86,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildSpeedFlipMarkers(statsTimeline, replay), [
     {

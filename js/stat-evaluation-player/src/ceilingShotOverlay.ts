@@ -42,18 +42,19 @@ interface CeilingShotMarkerView {
   label: HTMLDivElement;
 }
 
-function playerIdToString(playerId: Record<string, string> | undefined): string | null {
+function playerIdToString(playerId: Record<string, unknown> | undefined): string | null {
   if (!playerId) {
     return null;
   }
 
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
+  const normalizedValue = typeof value === "string" ? value : JSON.stringify(value);
+  return `${kind}:${normalizedValue}`;
 }
 
 function findPlayerName(
   replay: ReplayModel,
-  playerId: Record<string, string> | undefined,
+  playerId: Record<string, unknown> | undefined,
 ): string {
   const normalizedId = playerIdToString(playerId);
   if (!normalizedId) {
@@ -67,7 +68,7 @@ export function buildCeilingShotMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): CeilingShotMarker[] {
-  return (statsTimeline.ceiling_shot_events ?? []).map((event) => {
+  return statsTimeline.events.ceiling_shot.map((event) => {
     const playerName = findPlayerName(replay, event.player);
     const playerId = playerIdToString(event.player);
     const time = replay.frames[event.frame]?.time ?? event.time;

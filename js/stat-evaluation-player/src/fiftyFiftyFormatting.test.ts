@@ -9,22 +9,21 @@ import {
 test("renderFiftyFiftySummary renders team-perspective win and possession counts", () => {
   const html = renderFiftyFiftySummary({
     count: 6,
-    team_zero_wins: 4,
-    team_one_wins: 1,
+    wins: 4,
+    losses: 1,
     neutral_outcomes: 1,
     kickoff_count: 3,
-    kickoff_team_zero_wins: 2,
-    kickoff_team_one_wins: 1,
+    kickoff_wins: 2,
+    kickoff_losses: 1,
     kickoff_neutral_outcomes: 0,
-    team_zero_possession_after_count: 5,
-    team_one_possession_after_count: 1,
+    possession_after_count: 5,
+    opponent_possession_after_count: 1,
     neutral_possession_after_count: 0,
-    kickoff_team_zero_possession_after_count: 2,
-    kickoff_team_one_possession_after_count: 1,
+    kickoff_possession_after_count: 2,
+    kickoff_opponent_possession_after_count: 1,
     kickoff_neutral_possession_after_count: 0,
   }, {
     kind: "team",
-    isTeamZero: true,
   });
 
   assert.match(html, /50s<\/span><span class="value">6<\/span>/);
@@ -36,18 +35,18 @@ test("renderFiftyFiftySummary renders team-perspective win and possession counts
 test("renderFiftyFiftySummary can render a shared challenge summary", () => {
   const html = renderFiftyFiftySummary({
     count: 6,
-    team_zero_wins: 4,
-    team_one_wins: 1,
+    wins: 4,
+    losses: 1,
     neutral_outcomes: 1,
     kickoff_count: 3,
-    kickoff_team_zero_wins: 2,
-    kickoff_team_one_wins: 1,
+    kickoff_wins: 2,
+    kickoff_losses: 1,
     kickoff_neutral_outcomes: 0,
-    team_zero_possession_after_count: 5,
-    team_one_possession_after_count: 1,
+    possession_after_count: 5,
+    opponent_possession_after_count: 1,
     neutral_possession_after_count: 0,
-    kickoff_team_zero_possession_after_count: 2,
-    kickoff_team_one_possession_after_count: 1,
+    kickoff_possession_after_count: 2,
+    kickoff_opponent_possession_after_count: 1,
     kickoff_neutral_possession_after_count: 0,
   }, {
     kind: "shared",

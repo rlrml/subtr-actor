@@ -99,9 +99,9 @@ export function buildPossessionTimelineRanges(
       continue;
     }
 
-    const currentTeamZero = frame.possession?.team_zero_time ?? 0;
-    const currentTeamOne = frame.possession?.team_one_time ?? 0;
-    const currentNeutral = frame.possession?.neutral_time ?? 0;
+    const currentTeamZero = frame.team_zero?.possession?.possession_time ?? 0;
+    const currentTeamOne = frame.team_one?.possession?.possession_time ?? 0;
+    const currentNeutral = frame.team_zero?.possession?.neutral_time ?? 0;
 
     const deltaTeamZero = currentTeamZero - previousTeamZero;
     const deltaTeamOne = currentTeamOne - previousTeamOne;
@@ -174,9 +174,9 @@ export function buildPressureTimelineRanges(
       continue;
     }
 
-    const currentTeamZero = frame.pressure?.team_zero_side_time ?? 0;
-    const currentTeamOne = frame.pressure?.team_one_side_time ?? 0;
-    const currentNeutral = frame.pressure?.neutral_time ?? 0;
+    const currentTeamZero = frame.team_zero?.pressure?.defensive_half_time ?? 0;
+    const currentTeamOne = frame.team_one?.pressure?.defensive_half_time ?? 0;
+    const currentNeutral = frame.team_zero?.pressure?.neutral_time ?? 0;
     const deltaTeamZero = currentTeamZero - previousTeamZero;
     const deltaTeamOne = currentTeamOne - previousTeamOne;
     const deltaNeutral = currentNeutral - previousNeutral;
@@ -209,7 +209,7 @@ export function buildRushTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  return (timeline.rush_events ?? []).map((event, index) => {
+  return timeline.events.rush.map((event, index) => {
     const startTime = replay?.frames[event.start_frame]?.time ?? event.start_time;
     const endTime = replay?.frames[event.end_frame]?.time ?? event.end_time;
     const matchupLabel = `${event.attackers}v${event.defenders}`;
@@ -268,9 +268,10 @@ function getPlayerZoneColor(spec: PlayerZoneSpec, isTeamZero: boolean): string {
     : "rgba(255, 193, 92, 0.78)";
 }
 
-function playerIdToString(playerId: Record<string, string>): string {
+function playerIdToString(playerId: Record<string, unknown>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
+  const normalizedValue = typeof value === "string" ? value : JSON.stringify(value);
+  return `${kind}:${normalizedValue}`;
 }
 
 function extractPlayerStatValue(

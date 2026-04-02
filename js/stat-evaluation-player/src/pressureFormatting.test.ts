@@ -7,9 +7,9 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
   const html = renderPressureStats(
     {
       tracked_time: 8,
-      team_zero_side_time: 4,
+      defensive_half_time: 4,
       neutral_time: 1,
-      team_one_side_time: 3,
+      offensive_half_time: 3,
       labeled_time: {
         entries: [
           {
@@ -17,11 +17,11 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
             value: 1,
           },
           {
-            labels: [{ key: "field_half", value: "team_zero_side" }],
+            labels: [{ key: "field_half", value: "defensive_half" }],
             value: 4,
           },
           {
-            labels: [{ key: "field_half", value: "team_one_side" }],
+            labels: [{ key: "field_half", value: "offensive_half" }],
             value: 3,
           },
         ],
@@ -30,7 +30,6 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: true,
       },
     },
   );
@@ -45,9 +44,9 @@ test("renderPressureStats can render a shared half-control breakdown", () => {
   const html = renderPressureStats(
     {
       tracked_time: 8,
-      team_zero_side_time: 4,
+      defensive_half_time: 4,
       neutral_time: 1,
-      team_one_side_time: 3,
+      offensive_half_time: 3,
     },
     {
       labelPerspective: {
@@ -67,14 +66,13 @@ test("renderPressureStats uses snapshot pressure totals without labeled exports"
   const html = renderPressureStats(
     {
       tracked_time: 4,
-      team_zero_side_time: 2,
+      defensive_half_time: 2,
       neutral_time: 0,
-      team_one_side_time: 2,
+      offensive_half_time: 2,
     },
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: false,
       },
     },
   );
@@ -88,14 +86,13 @@ test("renderPressureStats falls back to tracked time when no breakdown data exis
   const html = renderPressureStats(
     {
       tracked_time: 4,
-      team_zero_side_time: 0,
+      defensive_half_time: 0,
       neutral_time: 0,
-      team_one_side_time: 0,
+      offensive_half_time: 0,
     },
     {
       labelPerspective: {
         kind: "team",
-        isTeamZero: false,
       },
     },
   );

@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
@@ -19,6 +18,7 @@ import {
   filterReplayTimelineEvents,
   getReplayTimelineEventKinds,
 } from "./timelineMarkers.ts";
+import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("timeline defaults to goals and adds core and demo replay events when enabled", () => {
   assert.deepEqual(getReplayTimelineEventKinds([]), ["goal"]);
@@ -63,9 +63,7 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     fifty_fifty_events: [
       {
         start_time: 1,
@@ -83,8 +81,7 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
         possession_team_is_team_0: true,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildFiftyFiftyTimelineEvents(statsTimeline, replay), [
     {
@@ -110,9 +107,7 @@ test("buildRushTimelineEvents anchors rush markers to serialized rush event star
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     rush_events: [
       {
         start_time: 1.1,
@@ -138,21 +133,27 @@ test("buildRushTimelineEvents anchors rush markers to serialized rush event star
         frame_number: 1,
         time: 1,
         dt: 1,
-        rush: {
-          team_zero_count: 1,
-          team_zero_two_v_one_count: 1,
-          team_zero_two_v_two_count: 0,
-          team_zero_two_v_three_count: 0,
-          team_zero_three_v_one_count: 0,
-          team_zero_three_v_two_count: 0,
-          team_zero_three_v_three_count: 0,
-          team_one_count: 0,
-          team_one_two_v_one_count: 0,
-          team_one_two_v_two_count: 0,
-          team_one_two_v_three_count: 0,
-          team_one_three_v_one_count: 0,
-          team_one_three_v_two_count: 0,
-          team_one_three_v_three_count: 0,
+        team_zero: {
+          rush: {
+            count: 1,
+            two_v_one_count: 1,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
+        },
+        team_one: {
+          rush: {
+            count: 0,
+            two_v_one_count: 0,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
         },
         players: [],
       },
@@ -160,21 +161,27 @@ test("buildRushTimelineEvents anchors rush markers to serialized rush event star
         frame_number: 2,
         time: 2,
         dt: 1,
-        rush: {
-          team_zero_count: 1,
-          team_zero_two_v_one_count: 1,
-          team_zero_two_v_two_count: 0,
-          team_zero_two_v_three_count: 0,
-          team_zero_three_v_one_count: 0,
-          team_zero_three_v_two_count: 0,
-          team_zero_three_v_three_count: 0,
-          team_one_count: 1,
-          team_one_two_v_one_count: 0,
-          team_one_two_v_two_count: 0,
-          team_one_two_v_three_count: 0,
-          team_one_three_v_one_count: 0,
-          team_one_three_v_two_count: 1,
-          team_one_three_v_three_count: 0,
+        team_zero: {
+          rush: {
+            count: 1,
+            two_v_one_count: 1,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
+        },
+        team_one: {
+          rush: {
+            count: 1,
+            two_v_one_count: 0,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 1,
+            three_v_three_count: 0,
+          },
         },
         players: [],
       },
@@ -182,26 +189,32 @@ test("buildRushTimelineEvents anchors rush markers to serialized rush event star
         frame_number: 3,
         time: 3,
         dt: 1,
-        rush: {
-          team_zero_count: 1,
-          team_zero_two_v_one_count: 1,
-          team_zero_two_v_two_count: 0,
-          team_zero_two_v_three_count: 0,
-          team_zero_three_v_one_count: 0,
-          team_zero_three_v_two_count: 0,
-          team_zero_three_v_three_count: 0,
-          team_one_count: 1,
-          team_one_two_v_one_count: 0,
-          team_one_two_v_two_count: 0,
-          team_one_two_v_three_count: 0,
-          team_one_three_v_one_count: 0,
-          team_one_three_v_two_count: 1,
-          team_one_three_v_three_count: 0,
+        team_zero: {
+          rush: {
+            count: 1,
+            two_v_one_count: 1,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
+        },
+        team_one: {
+          rush: {
+            count: 1,
+            two_v_one_count: 0,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 1,
+            three_v_three_count: 0,
+          },
         },
         players: [],
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildRushTimelineEvents(statsTimeline, replay), [
     {
@@ -242,9 +255,7 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     ceiling_shot_events: [
       {
         time: 1.2,
@@ -265,8 +276,7 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
         confidence: 0.84,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildCeilingShotTimelineEvents(statsTimeline, replay), [
     {
@@ -366,9 +376,7 @@ test("buildBackboardTimelineEvents maps serialized backboard events to timeline 
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     backboard_events: [
       {
         time: 1.2,
@@ -377,8 +385,7 @@ test("buildBackboardTimelineEvents maps serialized backboard events to timeline 
         is_team_0: true,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildBackboardTimelineEvents(statsTimeline, replay), [
     {
@@ -410,9 +417,7 @@ test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     double_tap_events: [
       {
         time: 1.2,
@@ -423,8 +428,7 @@ test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline
         backboard_frame: 0,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildDoubleTapTimelineEvents(statsTimeline, replay), [
     {
@@ -688,9 +692,7 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     speed_flip_events: [
       {
         time: 1.2,
@@ -709,8 +711,7 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
         confidence: 0.86,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildSpeedFlipTimelineEvents(statsTimeline, replay), [
     {
@@ -754,9 +755,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
     ],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     fifty_fifty_events: [
       {
         start_time: 1,
@@ -835,21 +834,27 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         frame_number: 1,
         time: 1.25,
         dt: 0.1,
-        rush: {
-          team_zero_count: 1,
-          team_zero_two_v_one_count: 1,
-          team_zero_two_v_two_count: 0,
-          team_zero_two_v_three_count: 0,
-          team_zero_three_v_one_count: 0,
-          team_zero_three_v_two_count: 0,
-          team_zero_three_v_three_count: 0,
-          team_one_count: 0,
-          team_one_two_v_one_count: 0,
-          team_one_two_v_two_count: 0,
-          team_one_two_v_three_count: 0,
-          team_one_three_v_one_count: 0,
-          team_one_three_v_two_count: 0,
-          team_one_three_v_three_count: 0,
+        team_zero: {
+          rush: {
+            count: 1,
+            two_v_one_count: 1,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
+        },
+        team_one: {
+          rush: {
+            count: 0,
+            two_v_one_count: 0,
+            two_v_two_count: 0,
+            two_v_three_count: 0,
+            three_v_one_count: 0,
+            three_v_two_count: 0,
+            three_v_three_count: 0,
+          },
         },
         players: [
           {
@@ -899,7 +904,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         ],
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.equal(countEnabledTimelineEvents([], replay, statsTimeline), 1);
   assert.equal(

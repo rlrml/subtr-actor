@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { renderTouchStats } from "./touchFormatting.ts";
+import { createTouchStats } from "./testStatsTimeline.ts";
 
 test("renderTouchStats shows only total and selected breakdown rows", () => {
-  const html = renderTouchStats({
+  const html = renderTouchStats(createTouchStats({
     touch_count: 8,
     is_last_touch: true,
     labeled_touch_counts: {
@@ -39,7 +40,7 @@ test("renderTouchStats shows only total and selected breakdown rows", () => {
         },
       ],
     },
-  }, {
+  }), {
     breakdownClasses: ["kind", "height_band"],
   });
 
@@ -52,10 +53,10 @@ test("renderTouchStats shows only total and selected breakdown rows", () => {
 });
 
 test("renderTouchStats defaults to total touches when no classes are selected", () => {
-  const html = renderTouchStats({
+  const html = renderTouchStats(createTouchStats({
     touch_count: 1,
     is_last_touch: false,
-  });
+  }));
 
   assert.match(html, /Touches<\/span><span class="value">1/);
   assert.doesNotMatch(html, /Dribble<\/span>/);
@@ -63,7 +64,7 @@ test("renderTouchStats defaults to total touches when no classes are selected", 
 });
 
 test("renderTouchStats aggregates labeled rows by the selected class", () => {
-  const html = renderTouchStats({
+  const html = renderTouchStats(createTouchStats({
     touch_count: 6,
     is_last_touch: false,
     labeled_touch_counts: {
@@ -91,7 +92,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
         },
       ],
     },
-  }, {
+  }), {
     breakdownClasses: ["height_band"],
   });
 
@@ -101,7 +102,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
 });
 
 test("renderTouchStats falls back to typed labeled counts for combined breakdowns", () => {
-  const html = renderTouchStats({
+  const html = renderTouchStats(createTouchStats({
     touch_count: 4,
     is_last_touch: false,
     labeled_touch_counts: {
@@ -129,7 +130,7 @@ test("renderTouchStats falls back to typed labeled counts for combined breakdown
         },
       ],
     },
-  }, {
+  }), {
     breakdownClasses: ["kind", "height_band"],
   });
 
@@ -139,7 +140,7 @@ test("renderTouchStats falls back to typed labeled counts for combined breakdown
 });
 
 test("renderTouchStats falls back to legacy counts for single-class breakdowns", () => {
-  const html = renderTouchStats({
+  const html = renderTouchStats(createTouchStats({
     touch_count: 7,
     dribble_touch_count: 2,
     control_touch_count: 1,
@@ -148,7 +149,7 @@ test("renderTouchStats falls back to legacy counts for single-class breakdowns",
     aerial_touch_count: 2,
     high_aerial_touch_count: 1,
     is_last_touch: false,
-  }, {
+  }), {
     breakdownClasses: ["height_band"],
   });
 

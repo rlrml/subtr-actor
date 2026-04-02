@@ -1,4 +1,4 @@
-import type { StatsFrame } from "./statsTimeline.ts";
+import type { TeamStatsSnapshot } from "./statsTimeline.ts";
 
 interface PressureRenderOptions {
   labelPerspective:
@@ -7,7 +7,6 @@ interface PressureRenderOptions {
     }
     | {
       kind: "team";
-      isTeamZero: boolean;
     };
 }
 
@@ -80,24 +79,23 @@ function formatFieldHalfLabel(
   }
 
   if (labelPerspective.kind === "shared") {
-    return value === "team_zero_side" ? "Blue side" : "Orange side";
+    return value === "defensive_half" ? "Blue side" : "Orange side";
   }
 
-  const isOwnHalf = (value === "team_zero_side") === labelPerspective.isTeamZero;
-  return isOwnHalf ? "Own half" : "Opp half";
+  return value === "defensive_half" ? "Own half" : "Opp half";
 }
 
 function renderPressureBreakdownRows(
-  pressure: StatsFrame["pressure"],
+  pressure: TeamStatsSnapshot["pressure"],
   trackedTime: number | undefined,
   labelPerspective: PressureRenderOptions["labelPerspective"],
 ): string {
   const totals = new Map<string, number>();
 
   if (pressure) {
-    totals.set("team_zero_side", pressure.team_zero_side_time);
+    totals.set("defensive_half", pressure.defensive_half_time);
     totals.set("neutral", pressure.neutral_time ?? 0);
-    totals.set("team_one_side", pressure.team_one_side_time);
+    totals.set("offensive_half", pressure.offensive_half_time);
   }
 
   if (pressure?.labeled_time?.entries?.length) {
@@ -112,7 +110,7 @@ function renderPressureBreakdownRows(
     }
   }
 
-  const orderedHalves = ["team_zero_side", "neutral", "team_one_side"];
+  const orderedHalves = ["defensive_half", "neutral", "offensive_half"];
   if (!orderedHalves.some((half) => (totals.get(half) ?? 0) > 0)) {
     return "";
   }
@@ -127,7 +125,7 @@ function renderPressureBreakdownRows(
 }
 
 export function renderPressureStats(
-  pressure: StatsFrame["pressure"],
+  pressure: TeamStatsSnapshot["pressure"],
   options: PressureRenderOptions,
 ): string {
   const trackedTime = pressure?.tracked_time;

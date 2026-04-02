@@ -31,16 +31,17 @@ interface FiftyFiftyMarkerView {
   label: HTMLDivElement;
 }
 
-function playerIdToString(playerId: Record<string, string> | undefined): string | null {
+function playerIdToString(playerId: Record<string, unknown> | null | undefined): string | null {
   if (!playerId) {
     return null;
   }
 
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
+  const normalizedValue = typeof value === "string" ? value : JSON.stringify(value);
+  return `${kind}:${normalizedValue}`;
 }
 
-function findPlayerName(replay: ReplayModel, playerId: Record<string, string> | undefined): string {
+function findPlayerName(replay: ReplayModel, playerId: Record<string, unknown> | null | undefined): string {
   const normalizedId = playerIdToString(playerId);
   if (!normalizedId) {
     return "Unknown";
@@ -90,7 +91,7 @@ export function buildFiftyFiftyMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): FiftyFiftyMarker[] {
-  return (statsTimeline.fifty_fifty_events ?? []).map((event) => {
+  return statsTimeline.events.fifty_fifty.map((event) => {
     const label = formatWinnerLabel(event, replay);
     const teamZeroPosition = new THREE.Vector3(...event.team_zero_position);
     const teamOnePosition = new THREE.Vector3(...event.team_one_position);

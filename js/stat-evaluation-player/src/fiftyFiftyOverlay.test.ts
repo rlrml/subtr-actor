@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildFiftyFiftyMarkers,
   getVisibleFiftyFiftyMarkers,
 } from "./fiftyFiftyOverlay.ts";
+import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildFiftyFiftyMarkers anchors 50/50 markers to the challenge start", () => {
   const replay = {
@@ -30,9 +30,7 @@ test("buildFiftyFiftyMarkers anchors 50/50 markers to the challenge start", () =
     teamOneNames: ["Orange"],
   } as unknown as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     fifty_fifty_events: [
       {
         start_time: 1,
@@ -50,8 +48,7 @@ test("buildFiftyFiftyMarkers anchors 50/50 markers to the challenge start", () =
         possession_team_is_team_0: true,
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   const [marker] = buildFiftyFiftyMarkers(statsTimeline, replay);
 
@@ -80,9 +77,7 @@ test("buildFiftyFiftyMarkers falls back to stats timeline start_time when frame 
     teamOneNames: [],
   } as unknown as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
     fifty_fifty_events: [
       {
         start_time: 1.25,
@@ -96,8 +91,7 @@ test("buildFiftyFiftyMarkers falls back to stats timeline start_time when frame 
         plane_normal: [1, 0, 0],
       },
     ],
-    frames: [],
-  } as StatsTimeline;
+  });
 
   assert.equal(buildFiftyFiftyMarkers(statsTimeline, replay)[0]?.time, 1.25);
 });

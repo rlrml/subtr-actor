@@ -5,10 +5,10 @@ import {
   renderAbsolutePositioningStats,
   renderRelativePositioningStats,
 } from "./stat-modules/renderers.ts";
-import type { PlayerStatsSnapshot } from "./statsTimeline.ts";
+import { createPositioningStats } from "./testStatsTimeline.ts";
 
 test("relative positioning renderer derives percentages from accumulated times", () => {
-  const positioning = {
+  const positioning = createPositioningStats({
     active_game_time: 4,
     tracked_time: 4,
     time_defensive_half: 0,
@@ -23,7 +23,7 @@ test("relative positioning renderer derives percentages from accumulated times",
     time_farthest_from_ball: 1,
     time_behind_ball: 2,
     time_in_front_of_ball: 2,
-  } as PlayerStatsSnapshot["positioning"];
+  });
 
   const html = renderRelativePositioningStats(positioning);
 
@@ -38,7 +38,7 @@ test("relative positioning renderer derives percentages from accumulated times",
 });
 
 test("absolute positioning renderer derives averages from accumulated sums", () => {
-  const positioning = {
+  const positioning = createPositioningStats({
     active_game_time: 4,
     tracked_time: 4,
     time_demolished: 0,
@@ -47,14 +47,14 @@ test("absolute positioning renderer derives averages from accumulated sums", () 
     time_most_forward: 0,
     time_mid_role: 0,
     time_other_role: 0,
-    time_defensive_zone: 1.5,
-    time_neutral_zone: 1,
-    time_offensive_zone: 1.5,
+    time_defensive_third: 1.5,
+    time_neutral_third: 1,
+    time_offensive_third: 1.5,
     time_defensive_half: 2.5,
     time_offensive_half: 1.5,
     sum_distance_to_teammates: 420,
     sum_distance_to_ball: 820,
-  } as PlayerStatsSnapshot["positioning"];
+  });
 
   const html = renderAbsolutePositioningStats(positioning);
 
