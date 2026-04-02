@@ -42,7 +42,8 @@ impl TouchClassification {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TouchStats {
     pub touch_count: u32,
     pub dribble_touch_count: u32,

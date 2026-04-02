@@ -32,7 +32,7 @@ fn default_resolution_matches_every_frame_resolution() {
 }
 
 #[test]
-fn sampled_stats_collectors_share_frame_persistence_behavior() {
+fn stats_collector_and_timeline_collector_match_at_sampled_resolution() {
     let replay = common::parse_replay("assets/replays/rlcs.replay");
     let resolution = StatsFrameResolution::TimeStep { seconds: 0.5 };
 

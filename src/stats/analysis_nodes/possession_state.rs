@@ -34,7 +34,7 @@ impl AnalysisNode for PossessionStateNode {
         vec![
             frame_info_dependency(),
             touch_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

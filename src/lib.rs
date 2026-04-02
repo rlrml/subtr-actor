@@ -110,7 +110,7 @@
 //! let timeline = StatsTimelineCollector::new().get_replay_data(&replay).unwrap();
 //!
 //! println!("timeline frames: {}", timeline.frames.len());
-//! println!("rush events: {}", timeline.rush_events.len());
+//! println!("rush events: {}", timeline.events.rush.len());
 //! ```
 
 pub mod ballchasing;
@@ -124,6 +124,7 @@ pub mod replay_meta;
 pub mod replay_types;
 pub mod search;
 pub mod stats;
+pub mod ts_bindings;
 pub mod vec_map;
 
 #[cfg(test)]

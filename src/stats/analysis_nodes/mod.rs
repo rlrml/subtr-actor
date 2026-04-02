@@ -37,6 +37,7 @@ mod pressure;
 mod rush;
 mod settings;
 mod speed_flip;
+mod stats_timeline_events;
 mod stats_timeline_frame;
 mod touch;
 mod touch_state;
@@ -102,6 +103,8 @@ pub use settings::SettingsNode;
 #[allow(unused_imports)]
 pub use speed_flip::SpeedFlipNode;
 #[allow(unused_imports)]
+pub use stats_timeline_events::{StatsTimelineEventsNode, StatsTimelineEventsState};
+#[allow(unused_imports)]
 pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 #[allow(unused_imports)]
 pub use touch::TouchNode;
@@ -134,7 +137,7 @@ pub(crate) fn boxed_analysis_node_by_name(
     }
 }
 
-pub(crate) fn graph_with_builtin_analysis_nodes<I, S>(
+pub fn graph_with_builtin_analysis_nodes<I, S>(
     names: I,
 ) -> SubtrActorResult<analysis_graph::AnalysisGraph>
 where

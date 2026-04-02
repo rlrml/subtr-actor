@@ -33,7 +33,7 @@ impl AnalysisNode for MovementNode {
             frame_info_dependency(),
             player_frame_state_dependency(),
             player_vertical_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

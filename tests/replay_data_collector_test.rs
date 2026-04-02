@@ -18,7 +18,7 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 }
 
 #[test]
-fn kickoff_ball_frames_are_present_before_first_touch() {
+fn kickoff_replay_data_preserves_ball_countdown_and_initial_boost_state() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
@@ -45,14 +45,6 @@ fn kickoff_ball_frames_are_present_before_first_touch() {
         non_empty_pre_touch_frames > 0,
         "Expected kickoff frames before the first touch to retain ball position data"
     );
-}
-
-#[test]
-fn kickoff_countdown_metadata_is_exported() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
-    let replay_data = ReplayDataCollector::new()
-        .get_replay_data(&replay)
-        .expect("Failed to collect replay data");
 
     let countdowns: Vec<i32> = replay_data
         .frame_data
@@ -71,14 +63,6 @@ fn kickoff_countdown_metadata_is_exported() {
         countdowns.iter().any(|countdown| *countdown > 0),
         "Expected replay metadata export to include non-zero kickoff countdown frames"
     );
-}
-
-#[test]
-fn kickoff_player_boost_frames_start_initialized() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
-    let replay_data = ReplayDataCollector::new()
-        .get_replay_data(&replay)
-        .expect("Failed to collect replay data");
 
     let kickoff_frame_index = replay_data
         .frame_data

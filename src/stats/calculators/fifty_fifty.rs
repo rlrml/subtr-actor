@@ -45,14 +45,17 @@ impl ActiveFiftyFifty {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct FiftyFiftyEvent {
     pub start_time: f32,
     pub start_frame: usize,
     pub resolve_time: f32,
     pub resolve_frame: usize,
     pub is_kickoff: bool,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub team_zero_player: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub team_one_player: Option<PlayerId>,
     pub team_zero_position: [f32; 3],
     pub team_one_position: [f32; 3],
@@ -62,7 +65,8 @@ pub struct FiftyFiftyEvent {
     pub possession_team_is_team_0: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct FiftyFiftyStats {
     pub count: u32,
     pub team_zero_wins: u32,
@@ -80,7 +84,8 @@ pub struct FiftyFiftyStats {
     pub kickoff_neutral_possession_after_count: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct FiftyFiftyPlayerStats {
     pub count: u32,
     pub wins: u32,

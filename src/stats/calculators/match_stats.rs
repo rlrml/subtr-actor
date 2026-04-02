@@ -10,7 +10,8 @@ const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 2.5;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct GoalAfterKickoffStats {
     pub kickoff_goal_count: u32,
     pub short_goal_count: u32,
@@ -78,7 +79,8 @@ enum GoalBuildupKind {
     Other,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct GoalBuildupStats {
     pub counter_attack_goal_count: u32,
     pub sustained_pressure_goal_count: u32,
@@ -101,7 +103,8 @@ impl GoalBuildupStats {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PlayerScoringContextStats {
     pub goals_conceded_while_last_defender: u32,
     #[serde(flatten)]
@@ -110,7 +113,8 @@ pub struct PlayerScoringContextStats {
     pub goal_buildup: GoalBuildupStats,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct CorePlayerStats {
     pub score: i32,
     pub goals: i32,
@@ -143,7 +147,8 @@ impl CorePlayerStats {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TeamScoringContextStats {
     #[serde(flatten)]
     pub goal_after_kickoff: GoalAfterKickoffStats,
@@ -151,7 +156,8 @@ pub struct TeamScoringContextStats {
     pub goal_buildup: GoalBuildupStats,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct CoreTeamStats {
     pub score: i32,
     pub goals: i32,
@@ -184,7 +190,8 @@ impl CoreTeamStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub enum TimelineEventKind {
     Goal,
     Shot,
@@ -194,10 +201,12 @@ pub enum TimelineEventKind {
     Death,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TimelineEvent {
     pub time: f32,
     pub kind: TimelineEventKind,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
     pub is_team_0: Option<bool>,
 }

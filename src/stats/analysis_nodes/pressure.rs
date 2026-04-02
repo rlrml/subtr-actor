@@ -36,7 +36,7 @@ impl AnalysisNode for PressureNode {
         vec![
             frame_info_dependency(),
             ball_frame_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

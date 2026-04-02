@@ -41,6 +41,10 @@ impl StatsTimelineFrameNode {
         ctx: &AnalysisStateContext<'_>,
         is_team_zero: bool,
     ) -> SubtrActorResult<TeamStatsSnapshot> {
+        let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
+        let possession = ctx.get::<PossessionCalculator>()?;
+        let pressure = ctx.get::<PressureCalculator>()?;
+        let rush = ctx.get::<RushCalculator>()?;
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let backboard = ctx.get::<BackboardCalculator>()?;
         let double_tap = ctx.get::<DoubleTapCalculator>()?;
@@ -50,6 +54,10 @@ impl StatsTimelineFrameNode {
         let powerslide = ctx.get::<PowerslideCalculator>()?;
         let demo = ctx.get::<DemoCalculator>()?;
         Ok(TeamStatsSnapshot {
+            fifty_fifty: fifty_fifty.stats().for_team(is_team_zero),
+            possession: possession.stats().for_team(is_team_zero),
+            pressure: pressure.stats().for_team(is_team_zero),
+            rush: rush.stats().for_team(is_team_zero),
             core: if is_team_zero {
                 match_stats.team_zero_stats()
             } else {
@@ -223,24 +231,24 @@ impl AnalysisNode for StatsTimelineFrameNode {
             frame_info_dependency(),
             gameplay_state_dependency(),
             live_play_dependency(),
-            AnalysisDependency::required::<MatchStatsCalculator>(),
-            AnalysisDependency::required::<BackboardCalculator>(),
-            AnalysisDependency::required::<CeilingShotCalculator>(),
-            AnalysisDependency::required::<DoubleTapCalculator>(),
-            AnalysisDependency::required::<FiftyFiftyCalculator>(),
-            AnalysisDependency::required::<PossessionCalculator>(),
-            AnalysisDependency::required::<PressureCalculator>(),
-            AnalysisDependency::required::<RushCalculator>(),
-            AnalysisDependency::required::<TouchCalculator>(),
-            AnalysisDependency::required::<SpeedFlipCalculator>(),
-            AnalysisDependency::required::<MustyFlickCalculator>(),
-            AnalysisDependency::required::<DodgeResetCalculator>(),
-            AnalysisDependency::required::<BallCarryCalculator>(),
-            AnalysisDependency::required::<BoostCalculator>(),
-            AnalysisDependency::required::<MovementCalculator>(),
-            AnalysisDependency::required::<PositioningCalculator>(),
-            AnalysisDependency::required::<PowerslideCalculator>(),
-            AnalysisDependency::required::<DemoCalculator>(),
+            match_stats_dependency(),
+            backboard_dependency(),
+            ceiling_shot_dependency(),
+            double_tap_dependency(),
+            fifty_fifty_dependency(),
+            possession_dependency(),
+            pressure_dependency(),
+            rush_dependency(),
+            touch_dependency(),
+            speed_flip_dependency(),
+            musty_flick_dependency(),
+            dodge_reset_dependency(),
+            ball_carry_dependency(),
+            boost_dependency(),
+            movement_dependency(),
+            positioning_dependency(),
+            powerslide_dependency(),
+            demo_dependency(),
         ]
     }
 
@@ -256,10 +264,6 @@ impl AnalysisNode for StatsTimelineFrameNode {
             seconds_remaining: frame.seconds_remaining,
             game_state: gameplay.game_state,
             is_live_play: live_play,
-            fifty_fifty: ctx.get::<FiftyFiftyCalculator>()?.stats().clone(),
-            possession: ctx.get::<PossessionCalculator>()?.stats().clone(),
-            pressure: ctx.get::<PressureCalculator>()?.stats().clone(),
-            rush: ctx.get::<RushCalculator>()?.stats().clone(),
             team_zero: self.team_snapshot(ctx, true)?,
             team_one: self.team_snapshot(ctx, false)?,
             players: replay_meta

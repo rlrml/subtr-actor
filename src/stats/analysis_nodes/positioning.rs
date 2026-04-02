@@ -40,7 +40,7 @@ impl AnalysisNode for PositioningNode {
             player_frame_state_dependency(),
             frame_events_state_dependency(),
             possession_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

@@ -36,7 +36,7 @@ impl AnalysisNode for TouchStateNode {
             ball_frame_state_dependency(),
             player_frame_state_dependency(),
             frame_events_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

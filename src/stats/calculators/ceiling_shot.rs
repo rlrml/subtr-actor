@@ -13,10 +13,12 @@ const CEILING_SHOT_MIN_BALL_SPEED_CHANGE: f32 = 120.0;
 const CEILING_SHOT_MIN_CONFIDENCE: f32 = 0.54;
 const CEILING_SHOT_HIGH_CONFIDENCE: f32 = 0.78;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct CeilingShotEvent {
     pub time: f32,
     pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub ceiling_contact_time: f32,
@@ -33,7 +35,8 @@ pub struct CeilingShotEvent {
     pub confidence: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct CeilingShotStats {
     pub count: u32,
     pub high_confidence_count: u32,

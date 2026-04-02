@@ -34,7 +34,7 @@ impl AnalysisNode for DoubleTapNode {
             ball_frame_state_dependency(),
             frame_events_state_dependency(),
             backboard_bounce_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

@@ -9,6 +9,9 @@ struct DoubledState(usize);
 #[derive(Debug, Default, PartialEq, Eq)]
 struct TripledState(usize);
 
+#[derive(Debug, Default, PartialEq, Eq)]
+struct QuadrupledState(usize);
+
 #[derive(Default)]
 struct BaseNode {
     factor: usize,
@@ -85,6 +88,34 @@ impl AnalysisNode for TripledNode {
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         self.state.0 = ctx.get::<DoubledState>()?.0 * 3;
+        Ok(())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.state
+    }
+}
+
+#[derive(Default)]
+struct QuadrupledNode {
+    state: QuadrupledState,
+}
+
+impl AnalysisNode for QuadrupledNode {
+    type State = QuadrupledState;
+
+    fn name(&self) -> &'static str {
+        "quadrupled"
+    }
+
+    fn dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![AnalysisDependency::with_default::<BaseState>(|| {
+            Box::new(BaseNode::default())
+        })]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.state.0 = ctx.get::<BaseState>()?.0 * 4;
         Ok(())
     }
 
@@ -235,4 +266,35 @@ fn rejects_dependency_cycles() {
         error.variant,
         SubtrActorErrorVariant::CallbackError(_)
     ));
+}
+
+#[test]
+fn renders_ascii_dag() {
+    let rendered = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(TripledNode::default())
+        .render_ascii_dag()
+        .expect("graph should render");
+
+    assert!(rendered.starts_with("AnalysisGraph\n"));
+    assert!(rendered.contains("tripled"));
+    assert!(rendered.contains("doubled"));
+    assert!(rendered.contains("base"));
+    assert!(rendered.contains("root:usize"));
+}
+
+#[test]
+fn renders_shared_dependencies_as_references() {
+    let rendered = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(TripledNode::default())
+        .with_node(QuadrupledNode::default())
+        .render_ascii_dag()
+        .expect("graph should render");
+
+    assert!(rendered.starts_with("AnalysisGraph\n"));
+    assert!(rendered.contains("tripled"));
+    assert!(rendered.contains("quadrupled"));
+    assert_eq!(rendered.matches("base").count(), 1);
+    assert!(rendered.contains("root:usize"));
 }

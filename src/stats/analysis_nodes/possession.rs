@@ -33,7 +33,7 @@ impl AnalysisNode for PossessionNode {
             frame_info_dependency(),
             ball_frame_state_dependency(),
             possession_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

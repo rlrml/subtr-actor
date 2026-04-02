@@ -16,10 +16,12 @@ const MUSTY_MIN_DODGE_START_FORWARD_Z: f32 = -0.25;
 const MUSTY_MIN_CONFIDENCE: f32 = 0.55;
 const MUSTY_HIGH_CONFIDENCE: f32 = 0.80;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct MustyFlickEvent {
     pub time: f32,
     pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub dodge_time: f32,
@@ -34,7 +36,8 @@ pub struct MustyFlickEvent {
     pub ball_speed_change: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct MustyFlickStats {
     pub count: u32,
     pub aerial_count: u32,

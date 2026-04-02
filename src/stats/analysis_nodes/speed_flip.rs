@@ -34,7 +34,7 @@ impl AnalysisNode for SpeedFlipNode {
             gameplay_state_dependency(),
             ball_frame_state_dependency(),
             player_frame_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

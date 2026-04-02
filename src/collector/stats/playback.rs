@@ -78,33 +78,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
             replay_meta: self.replay_meta.clone(),
-            timeline_events: self.timeline_events_typed()?,
-            backboard_events: self.module_player_events(
-                "backboard",
-                "events",
-                parse_backboard_event,
-            )?,
-            ceiling_shot_events: self.module_player_events(
-                "ceiling_shot",
-                "events",
-                parse_ceiling_shot_event,
-            )?,
-            double_tap_events: self.module_player_events(
-                "double_tap",
-                "events",
-                parse_double_tap_event,
-            )?,
-            fifty_fifty_events: self.module_player_events(
-                "fifty_fifty",
-                "events",
-                parse_fifty_fifty_event,
-            )?,
-            rush_events: self.module_typed_array("rush", "events")?,
-            speed_flip_events: self.module_player_events(
-                "speed_flip",
-                "events",
-                parse_speed_flip_event,
-            )?,
+            events: self.timeline_event_sets_typed()?,
             frames,
         })
     }
@@ -120,34 +94,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "replay_meta".to_owned(),
             serialize_to_json_value(&self.replay_meta)?,
         );
-        timeline.insert(
-            "timeline_events".to_owned(),
-            Value::Array(self.timeline_events()),
-        );
-        timeline.insert(
-            "backboard_events".to_owned(),
-            Value::Array(self.module_array("backboard", "events")),
-        );
-        timeline.insert(
-            "ceiling_shot_events".to_owned(),
-            Value::Array(self.module_array("ceiling_shot", "events")),
-        );
-        timeline.insert(
-            "double_tap_events".to_owned(),
-            Value::Array(self.module_array("double_tap", "events")),
-        );
-        timeline.insert(
-            "fifty_fifty_events".to_owned(),
-            Value::Array(self.module_array("fifty_fifty", "events")),
-        );
-        timeline.insert(
-            "rush_events".to_owned(),
-            Value::Array(self.module_array("rush", "events")),
-        );
-        timeline.insert(
-            "speed_flip_events".to_owned(),
-            Value::Array(self.module_array("speed_flip", "events")),
-        );
+        timeline.insert("events".to_owned(), self.timeline_event_sets_value());
         timeline.insert(
             "frames".to_owned(),
             Value::Array(
@@ -176,6 +123,64 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .iter()
             .map(parse_timeline_event)
             .collect()
+    }
+
+    fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
+        Ok(ReplayStatsTimelineEvents {
+            timeline: self.timeline_events_typed()?,
+            backboard: self.module_player_events("backboard", "events", parse_backboard_event)?,
+            ceiling_shot: self.module_player_events(
+                "ceiling_shot",
+                "events",
+                parse_ceiling_shot_event,
+            )?,
+            double_tap: self.module_player_events(
+                "double_tap",
+                "events",
+                parse_double_tap_event,
+            )?,
+            fifty_fifty: self.module_player_events(
+                "fifty_fifty",
+                "events",
+                parse_fifty_fifty_event,
+            )?,
+            rush: self.module_typed_array("rush", "events")?,
+            speed_flip: self.module_player_events(
+                "speed_flip",
+                "events",
+                parse_speed_flip_event,
+            )?,
+        })
+    }
+
+    fn timeline_event_sets_value(&self) -> Value {
+        let mut events = Map::new();
+        events.insert("timeline".to_owned(), Value::Array(self.timeline_events()));
+        events.insert(
+            "backboard".to_owned(),
+            Value::Array(self.module_array("backboard", "events")),
+        );
+        events.insert(
+            "ceiling_shot".to_owned(),
+            Value::Array(self.module_array("ceiling_shot", "events")),
+        );
+        events.insert(
+            "double_tap".to_owned(),
+            Value::Array(self.module_array("double_tap", "events")),
+        );
+        events.insert(
+            "fifty_fifty".to_owned(),
+            Value::Array(self.module_array("fifty_fifty", "events")),
+        );
+        events.insert(
+            "rush".to_owned(),
+            Value::Array(self.module_array("rush", "events")),
+        );
+        events.insert(
+            "speed_flip".to_owned(),
+            Value::Array(self.module_array("speed_flip", "events")),
+        );
+        Value::Object(events)
     }
 
     fn timeline_config(&self) -> StatsTimelineConfig {
@@ -347,10 +352,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             seconds_remaining: frame.seconds_remaining,
             game_state: frame.game_state,
             is_live_play: frame.is_live_play,
-            fifty_fifty: self.frame_stats_or_default_typed(frame, "fifty_fifty")?,
-            possession: self.frame_stats_or_default_typed(frame, "possession")?,
-            pressure: self.frame_stats_or_default_typed(frame, "pressure")?,
-            rush: self.frame_stats_or_default_typed(frame, "rush")?,
             team_zero: self.replay_team_stats(frame, "team_zero")?,
             team_one: self.replay_team_stats(frame, "team_one")?,
             players: self
@@ -366,7 +367,20 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         frame: &StatsSnapshotFrame,
         team_key: &str,
     ) -> SubtrActorResult<TeamStatsSnapshot> {
+        let is_team_zero = team_key == "team_zero";
         Ok(TeamStatsSnapshot {
+            fifty_fifty: self
+                .frame_stats_or_default_typed::<FiftyFiftyStats>(frame, "fifty_fifty")?
+                .for_team(is_team_zero),
+            possession: self
+                .frame_stats_or_default_typed::<PossessionStats>(frame, "possession")?
+                .for_team(is_team_zero),
+            pressure: self
+                .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+                .for_team(is_team_zero),
+            rush: self
+                .frame_stats_or_default_typed::<RushStats>(frame, "rush")?
+                .for_team(is_team_zero),
             core: self.frame_team_stat_or_default_typed(frame, "core", team_key)?,
             backboard: self.frame_team_stat_or_default_typed(frame, "backboard", team_key)?,
             double_tap: self.frame_team_stat_or_default_typed(frame, "double_tap", team_key)?,
@@ -469,7 +483,40 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         frame: &StatsSnapshotFrame,
         team_key: &str,
     ) -> SubtrActorResult<Value> {
+        let is_team_zero = team_key == "team_zero";
         let mut team = Map::new();
+        team.insert(
+            "fifty_fifty".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<FiftyFiftyStats>(frame, "fifty_fifty")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "possession".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<PossessionStats>(frame, "possession")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "pressure".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "rush".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<RushStats>(frame, "rush")?
+                    .for_team(is_team_zero),
+            )?,
+        );
         team.insert(
             "core".to_owned(),
             self.frame_team_stat_or_default::<CoreTeamStats>(frame, "core", team_key),

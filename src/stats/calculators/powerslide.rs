@@ -1,6 +1,7 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PowerslideStats {
     pub total_duration: f32,
     pub press_count: u32,

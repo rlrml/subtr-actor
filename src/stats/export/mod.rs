@@ -34,7 +34,8 @@ pub enum StatUnit {
     Count,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct StatLabel {
     pub key: &'static str,
     pub value: &'static str,
@@ -109,13 +110,15 @@ pub enum StatValue {
     Signed(i32),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct LabeledCountEntry {
     pub labels: Vec<StatLabel>,
     pub count: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct LabeledCounts {
     pub entries: Vec<LabeledCountEntry>,
 }
@@ -166,13 +169,15 @@ impl LabeledCounts {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct LabeledFloatSumEntry {
     pub labels: Vec<StatLabel>,
     pub value: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct LabeledFloatSums {
     pub entries: Vec<LabeledFloatSumEntry>,
 }

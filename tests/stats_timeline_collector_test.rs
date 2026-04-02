@@ -41,6 +41,10 @@ fn normalized_team_stats_for_live_play_comparison(
 
 fn default_team_stats_snapshot() -> TeamStatsSnapshot {
     TeamStatsSnapshot {
+        fifty_fifty: FiftyFiftyTeamStats::default(),
+        possession: PossessionTeamStats::default(),
+        pressure: PressureTeamStats::default(),
+        rush: RushTeamStats::default(),
         core: CoreTeamStats::default(),
         backboard: BackboardTeamStats::default(),
         double_tap: DoubleTapTeamStats::default(),
@@ -251,13 +255,15 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             team_one: Vec::new(),
             all_headers: Vec::new(),
         },
-        timeline_events: Vec::new(),
-        backboard_events: Vec::new(),
-        ceiling_shot_events: Vec::new(),
-        double_tap_events: Vec::new(),
-        fifty_fifty_events: Vec::new(),
-        rush_events: Vec::new(),
-        speed_flip_events: Vec::new(),
+        events: ReplayStatsTimelineEvents {
+            timeline: Vec::new(),
+            backboard: Vec::new(),
+            ceiling_shot: Vec::new(),
+            double_tap: Vec::new(),
+            fifty_fifty: Vec::new(),
+            rush: Vec::new(),
+            speed_flip: Vec::new(),
+        },
         frames: vec![
             ReplayStatsFrame {
                 frame_number: 10,
@@ -266,10 +272,6 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
-                fifty_fifty: FiftyFiftyStats::default(),
-                possession: PossessionStats::default(),
-                pressure: PressureStats::default(),
-                rush: RushStats::default(),
                 team_zero: default_team_stats_snapshot(),
                 team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
@@ -281,10 +283,6 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
-                fifty_fifty: FiftyFiftyStats::default(),
-                possession: PossessionStats::default(),
-                pressure: PressureStats::default(),
-                rush: RushStats::default(),
                 team_zero: default_team_stats_snapshot(),
                 team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
@@ -296,10 +294,6 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 seconds_remaining: None,
                 game_state: None,
                 is_live_play: true,
-                fifty_fifty: FiftyFiftyStats::default(),
-                possession: PossessionStats::default(),
-                pressure: PressureStats::default(),
-                rush: RushStats::default(),
                 team_zero: default_team_stats_snapshot(),
                 team_one: default_team_stats_snapshot(),
                 players: Vec::new(),
@@ -329,8 +323,10 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     let graph = stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
         &replay,
         [
+            "fifty_fifty",
             "possession",
             "pressure",
+            "rush",
             "core",
             "backboard",
             "double_tap",
@@ -347,9 +343,15 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     let possession = graph
         .state::<PossessionCalculator>()
         .expect("missing possession calculator state");
+    let fifty_fifty = graph
+        .state::<FiftyFiftyCalculator>()
+        .expect("missing fifty_fifty calculator state");
     let pressure = graph
         .state::<PressureCalculator>()
         .expect("missing pressure calculator state");
+    let rush = graph
+        .state::<RushCalculator>()
+        .expect("missing rush calculator state");
     let match_stats = graph
         .state::<MatchStatsCalculator>()
         .expect("missing match stats calculator state");
@@ -461,8 +463,32 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
             );
         };
 
-    assert_eq!(final_frame.possession, possession.stats().clone());
-    assert_eq!(final_frame.pressure, pressure.stats().clone());
+    assert_eq!(
+        final_frame.team_zero.fifty_fifty,
+        fifty_fifty.stats().for_team(true)
+    );
+    assert_eq!(
+        final_frame.team_one.fifty_fifty,
+        fifty_fifty.stats().for_team(false)
+    );
+    assert_eq!(
+        final_frame.team_zero.possession,
+        possession.stats().for_team(true)
+    );
+    assert_eq!(
+        final_frame.team_one.possession,
+        possession.stats().for_team(false)
+    );
+    assert_eq!(
+        final_frame.team_zero.pressure,
+        pressure.stats().for_team(true)
+    );
+    assert_eq!(
+        final_frame.team_one.pressure,
+        pressure.stats().for_team(false)
+    );
+    assert_eq!(final_frame.team_zero.rush, rush.stats().for_team(true));
+    assert_eq!(final_frame.team_one.rush, rush.stats().for_team(false));
     assert_core_team_stats_match(
         &final_frame.team_zero.core,
         &match_stats.team_zero_stats(),
@@ -597,8 +623,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
                 .unwrap_or_default()
         );
     }
-    assert_eq!(timeline.backboard_events, backboard.events());
-    assert_eq!(timeline.double_tap_events, double_tap.events());
+    assert_eq!(timeline.events.backboard, backboard.events());
+    assert_eq!(timeline.events.double_tap, double_tap.events());
 }
 
 #[test]
@@ -634,7 +660,8 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
     );
     assert!(
         timeline
-            .timeline_events
+            .events
+            .timeline
             .windows(2)
             .all(|events| events[1].time >= events[0].time),
         "Expected emitted timeline events to be time sorted"
@@ -692,8 +719,12 @@ fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
         "Expected the score to stay fixed throughout the post-goal reset"
     );
     assert_eq!(
-        last_post_goal_frame.possession,
-        first_post_goal_frame.possession
+        last_post_goal_frame.team_zero.possession,
+        first_post_goal_frame.team_zero.possession
+    );
+    assert_eq!(
+        last_post_goal_frame.team_one.possession,
+        first_post_goal_frame.team_one.possession
     );
     assert_eq!(
         normalized_team_stats_for_live_play_comparison(&last_post_goal_frame.team_zero),
@@ -781,7 +812,8 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
 
     // Diagnostic: count goals to verify kickoff count
     let goal_count = timeline
-        .timeline_events
+        .events
+        .timeline
         .iter()
         .filter(|e| matches!(e.kind, TimelineEventKind::Goal))
         .count();

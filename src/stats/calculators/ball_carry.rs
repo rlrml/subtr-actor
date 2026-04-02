@@ -1,6 +1,7 @@
 use super::*;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BallCarryStats {
     pub carry_count: u32,
     pub total_carry_time: f32,

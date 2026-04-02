@@ -11,7 +11,8 @@ const DEFAULT_RUSH_ATTACK_SUPPORT_DISTANCE_Y: f32 = 900.0;
 const DEFAULT_RUSH_DEFENDER_DISTANCE_Y: f32 = 150.0;
 const DEFAULT_RUSH_MIN_POSSESSION_RETAINED_SECONDS: f32 = 0.75;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct RushEvent {
     pub start_time: f32,
     pub start_frame: usize,

@@ -34,7 +34,7 @@ impl AnalysisNode for BallCarryNode {
             ball_frame_state_dependency(),
             player_frame_state_dependency(),
             touch_state_dependency(),
-            AnalysisDependency::required::<LivePlayState>(),
+            live_play_dependency(),
         ]
     }
 

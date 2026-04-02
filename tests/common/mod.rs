@@ -19,49 +19,7 @@ pub fn parse_replay(path: &str) -> boxcars::Replay {
 pub fn assert_replay_stats_timeline_eq(left: &ReplayStatsTimeline, right: &ReplayStatsTimeline) {
     if let Some(diff) = compare_field("config", &left.config, &right.config)
         .or_else(|| compare_field("replay_meta", &left.replay_meta, &right.replay_meta))
-        .or_else(|| {
-            compare_slice(
-                "timeline_events",
-                &left.timeline_events,
-                &right.timeline_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "backboard_events",
-                &left.backboard_events,
-                &right.backboard_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "ceiling_shot_events",
-                &left.ceiling_shot_events,
-                &right.ceiling_shot_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "double_tap_events",
-                &left.double_tap_events,
-                &right.double_tap_events,
-            )
-        })
-        .or_else(|| {
-            compare_slice(
-                "fifty_fifty_events",
-                &left.fifty_fifty_events,
-                &right.fifty_fifty_events,
-            )
-        })
-        .or_else(|| compare_slice("rush_events", &left.rush_events, &right.rush_events))
-        .or_else(|| {
-            compare_slice(
-                "speed_flip_events",
-                &left.speed_flip_events,
-                &right.speed_flip_events,
-            )
-        })
+        .or_else(|| compare_field("events", &left.events, &right.events))
         .or_else(|| compare_replay_frame_slice("frames", &left.frames, &right.frames))
     {
         panic!("replay stats timelines differ at {diff}");
@@ -145,28 +103,6 @@ fn compare_replay_frame(
         )
     })
     .or_else(|| {
-        compare_field(
-            &format!("{label}.fifty_fifty"),
-            &left.fifty_fifty,
-            &right.fifty_fifty,
-        )
-    })
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.possession"),
-            &left.possession,
-            &right.possession,
-        )
-    })
-    .or_else(|| {
-        compare_field(
-            &format!("{label}.pressure"),
-            &left.pressure,
-            &right.pressure,
-        )
-    })
-    .or_else(|| compare_field(&format!("{label}.rush"), &left.rush, &right.rush))
-    .or_else(|| {
         compare_team_snapshot(
             &format!("{label}.team_zero"),
             &left.team_zero,
@@ -188,44 +124,64 @@ fn compare_team_snapshot(
     left: &TeamStatsSnapshot,
     right: &TeamStatsSnapshot,
 ) -> Option<String> {
-    compare_core_team_stats(&format!("{label}.core"), &left.core, &right.core)
-        .or_else(|| {
-            compare_field(
-                &format!("{label}.backboard"),
-                &left.backboard,
-                &right.backboard,
-            )
-        })
-        .or_else(|| {
-            compare_field(
-                &format!("{label}.double_tap"),
-                &left.double_tap,
-                &right.double_tap,
-            )
-        })
-        .or_else(|| {
-            compare_field(
-                &format!("{label}.ball_carry"),
-                &left.ball_carry,
-                &right.ball_carry,
-            )
-        })
-        .or_else(|| compare_field(&format!("{label}.boost"), &left.boost, &right.boost))
-        .or_else(|| {
-            compare_field(
-                &format!("{label}.movement"),
-                &left.movement,
-                &right.movement,
-            )
-        })
-        .or_else(|| {
-            compare_field(
-                &format!("{label}.powerslide"),
-                &left.powerslide,
-                &right.powerslide,
-            )
-        })
-        .or_else(|| compare_field(&format!("{label}.demo"), &left.demo, &right.demo))
+    compare_field(
+        &format!("{label}.fifty_fifty"),
+        &left.fifty_fifty,
+        &right.fifty_fifty,
+    )
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.possession"),
+            &left.possession,
+            &right.possession,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.pressure"),
+            &left.pressure,
+            &right.pressure,
+        )
+    })
+    .or_else(|| compare_field(&format!("{label}.rush"), &left.rush, &right.rush))
+    .or_else(|| compare_core_team_stats(&format!("{label}.core"), &left.core, &right.core))
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.backboard"),
+            &left.backboard,
+            &right.backboard,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.double_tap"),
+            &left.double_tap,
+            &right.double_tap,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.ball_carry"),
+            &left.ball_carry,
+            &right.ball_carry,
+        )
+    })
+    .or_else(|| compare_field(&format!("{label}.boost"), &left.boost, &right.boost))
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.movement"),
+            &left.movement,
+            &right.movement,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.powerslide"),
+            &left.powerslide,
+            &right.powerslide,
+        )
+    })
+    .or_else(|| compare_field(&format!("{label}.demo"), &left.demo, &right.demo))
 }
 
 fn compare_core_team_stats(

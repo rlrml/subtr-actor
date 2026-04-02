@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{builtin_stats_module_names, StatsCollector};
+use subtr_actor::{builtin_stats_module_names, StatsCollector, StatsFrameResolution};
 
 #[test]
 fn stats_collector_serializes_selected_modules_by_name() {
@@ -48,6 +48,7 @@ fn stats_collector_captures_module_keyed_snapshot_frames() {
     let replay = common::parse_replay("assets/replays/soccar-lan.replay");
     let snapshot = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
         .get_snapshot_data(&replay)
         .expect("snapshot collection should succeed");
 
@@ -69,6 +70,7 @@ fn stats_collector_transforms_captured_frame_modules() {
     let replay = common::parse_replay("assets/replays/soccar-lan.replay");
     let transformed = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
         .with_module_transform(|modules| {
             let mut names = modules
                 .into_iter()

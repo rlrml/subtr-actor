@@ -2,17 +2,20 @@ use super::*;
 
 const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct DoubleTapEvent {
     pub time: f32,
     pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub backboard_time: f32,
     pub backboard_frame: usize,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct DoubleTapPlayerStats {
     pub count: u32,
     pub is_last_double_tap: bool,
@@ -22,7 +25,8 @@ pub struct DoubleTapPlayerStats {
     pub frames_since_last_double_tap: Option<usize>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct DoubleTapTeamStats {
     pub count: u32,
 }

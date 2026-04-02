@@ -10,10 +10,12 @@ const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 const SPEED_FLIP_TARGET_DIAGONAL_RATIO: f32 = 0.42;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct SpeedFlipEvent {
     pub time: f32,
     pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub time_since_kickoff_start: f32,
@@ -28,7 +30,8 @@ pub struct SpeedFlipEvent {
     pub confidence: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct SpeedFlipStats {
     pub count: u32,
     pub high_confidence_count: u32,

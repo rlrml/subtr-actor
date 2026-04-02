@@ -145,13 +145,15 @@ pub struct TouchEvent {
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
 /// This includes information about the players in the match and all replay headers.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ReplayMeta {
     /// A vector of [`PlayerInfo`] instances representing the players on team zero.
     pub team_zero: Vec<PlayerInfo>,
     /// A vector of [`PlayerInfo`] instances representing the players on team one.
     pub team_one: Vec<PlayerInfo>,
     /// A vector of tuples containing the names and properties of all the headers in the replay.
+    #[ts(as = "Vec<(String, crate::ts_bindings::HeaderPropTs)>")]
     pub all_headers: Vec<(String, HeaderProp)>,
 }
 
@@ -171,13 +173,16 @@ impl ReplayMeta {
 /// [`PlayerInfo`] struct provides detailed information about a specific player in the replay.
 ///
 /// This includes player's unique remote ID, player stats if available, and their name.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PlayerInfo {
     /// The unique remote ID of the player. This could be their online ID or local ID.
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub remote_id: RemoteId,
     /// An optional HashMap containing player-specific stats.
     /// The keys of this HashMap are the names of the stats,
     /// and the values are the corresponding `HeaderProp` instances.
+    #[ts(as = "Option<std::collections::HashMap<String, crate::ts_bindings::HeaderPropTs>>")]
     pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
     /// The name of the player as represented in the replay.
     pub name: String,
