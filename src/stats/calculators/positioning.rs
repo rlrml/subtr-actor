@@ -219,6 +219,7 @@ impl PositioningCalculator {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn process_sample(
         &mut self,
         frame: &FrameInfo,
@@ -479,6 +480,7 @@ impl PositioningCalculator {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         frame: &FrameInfo,

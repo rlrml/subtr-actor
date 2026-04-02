@@ -310,6 +310,7 @@ impl RushCalculator {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_parts(
         &mut self,
         frame: &FrameInfo,

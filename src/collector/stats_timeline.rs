@@ -1,3 +1,6 @@
+use crate::collector::frame_resolution::{
+    FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
+};
 use crate::stats::analysis_nodes::analysis_graph::{AnalysisGraph, AnalysisNodeDyn};
 use crate::stats::analysis_nodes::{
     boxed_analysis_node_by_name, LivePlayNode, PositioningNode, PressureNode, RushNode,
@@ -140,6 +143,7 @@ pub struct StatsTimelineCollector {
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
+    frame_persistence: StatsFramePersistenceController,
 }
 
 impl Default for StatsTimelineCollector {
@@ -168,6 +172,7 @@ impl StatsTimelineCollector {
             replay_meta: None,
             frames: Vec::new(),
             last_sample_time: None,
+            frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
         }
     }
 
@@ -233,9 +238,10 @@ impl StatsTimelineCollector {
                 .graph_value_or_default::<Vec<CeilingShotEvent>, CeilingShotCalculator, _>(
                     |calculator| calculator.events().to_vec(),
                 ),
-            double_tap_events: self.graph_value_or_default::<Vec<DoubleTapEvent>, DoubleTapCalculator, _>(
-                |calculator| calculator.events().to_vec(),
-            ),
+            double_tap_events: self
+                .graph_value_or_default::<Vec<DoubleTapEvent>, DoubleTapCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
             fifty_fifty_events: self
                 .graph_value_or_default::<Vec<FiftyFiftyEvent>, FiftyFiftyCalculator, _>(
                     |calculator| calculator.events().to_vec(),
@@ -279,6 +285,11 @@ impl StatsTimelineCollector {
         )
     }
 
+    pub fn with_frame_resolution(mut self, resolution: StatsFrameResolution) -> Self {
+        self.frame_persistence = StatsFramePersistenceController::new(resolution);
+        self
+    }
+
     pub fn get_replay_data(
         mut self,
         replay: &boxcars::Replay,
@@ -316,7 +327,11 @@ impl Collector for StatsTimelineCollector {
         self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
 
-        self.frames.push(self.snapshot_frame()?);
+        if let Some(emitted_dt) = self.frame_persistence.on_frame(frame_number, current_time) {
+            let mut frame = self.snapshot_frame()?;
+            frame.dt = emitted_dt;
+            self.frames.push(frame);
+        }
 
         Ok(TimeAdvance::NextFrame)
     }
@@ -329,9 +344,22 @@ impl Collector for StatsTimelineCollector {
         let Some(_) = self.graph.state::<StatsTimelineFrameState>() else {
             return Ok(());
         };
-        let final_snapshot = self.snapshot_frame()?;
-        if let Some(last_frame) = self.frames.last_mut() {
-            *last_frame = final_snapshot;
+        let mut final_snapshot = self.snapshot_frame()?;
+        match self
+            .frame_persistence
+            .final_frame_action(final_snapshot.frame_number, final_snapshot.time)
+        {
+            Some(FinalStatsFrameAction::Append { dt }) => {
+                final_snapshot.dt = dt;
+                self.frames.push(final_snapshot);
+            }
+            Some(FinalStatsFrameAction::ReplaceLast { dt }) => {
+                final_snapshot.dt = dt;
+                if let Some(last_frame) = self.frames.last_mut() {
+                    *last_frame = final_snapshot;
+                }
+            }
+            None => {}
         }
         Ok(())
     }

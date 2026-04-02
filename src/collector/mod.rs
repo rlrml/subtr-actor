@@ -1,5 +1,6 @@
 pub mod callback;
 pub mod decorator;
+mod frame_resolution;
 pub mod ndarray;
 pub mod replay_data;
 pub mod replay_data_heuristics;
@@ -9,6 +10,7 @@ pub mod stats_timeline;
 pub use self::ndarray::*;
 pub use callback::*;
 pub use decorator::*;
+pub use frame_resolution::StatsFrameResolution;
 pub use replay_data::*;
 pub use replay_data_heuristics::*;
 pub use stats::*;

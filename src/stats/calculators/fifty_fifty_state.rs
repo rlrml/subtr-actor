@@ -57,6 +57,7 @@ impl FiftyFiftyStateCalculator {
         Some(event)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         frame: &FrameInfo,
