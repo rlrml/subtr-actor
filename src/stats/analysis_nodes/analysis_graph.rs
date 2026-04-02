@@ -632,7 +632,7 @@ fn analysis_node_graph_error(message: String) -> SubtrActorError {
     )))
 }
 
-fn ensure_external_render_node<'a>(
+fn ensure_external_render_node(
     labels: &mut Vec<(TypeId, usize, Box<str>)>,
     external_node_ids: &mut HashMap<TypeId, usize>,
     next_node_id: &mut usize,
