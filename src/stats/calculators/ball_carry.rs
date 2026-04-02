@@ -97,7 +97,6 @@ pub struct BallCarryCalculator {
     carry_events: Vec<BallCarryEvent>,
     active_carry: Option<ActiveBallCarry>,
     last_touch_player: Option<PlayerId>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl BallCarryCalculator {
@@ -153,44 +152,44 @@ impl BallCarryCalculator {
 
     fn begin_carry(
         &self,
-        sample: &FrameState,
+        frame: &FrameInfo,
         player: &PlayerSample,
         frame_sample: BallCarryFrameSample,
     ) -> ActiveBallCarry {
-        let start_time = (sample.time - sample.dt).max(0.0);
-        let start_frame = sample.frame_number.saturating_sub(1);
+        let start_time = (frame.time - frame.dt).max(0.0);
+        let start_frame = frame.frame_number.saturating_sub(1);
         ActiveBallCarry {
             player_id: player.player_id.clone(),
             is_team_0: player.is_team_0,
             start_frame,
-            last_frame: sample.frame_number,
+            last_frame: frame.frame_number,
             start_time,
-            last_time: sample.time,
+            last_time: frame.time,
             start_position: frame_sample.player_position,
             last_position: frame_sample.player_position,
-            duration: sample.dt,
+            duration: frame.dt,
             path_distance: 0.0,
-            horizontal_gap_integral: frame_sample.horizontal_gap * sample.dt,
-            vertical_gap_integral: frame_sample.vertical_gap * sample.dt,
-            speed_integral: frame_sample.speed * sample.dt,
+            horizontal_gap_integral: frame_sample.horizontal_gap * frame.dt,
+            vertical_gap_integral: frame_sample.vertical_gap * frame.dt,
+            speed_integral: frame_sample.speed * frame.dt,
         }
     }
 
     fn extend_carry(
         active_carry: &mut ActiveBallCarry,
-        sample: &FrameState,
+        frame: &FrameInfo,
         frame_sample: BallCarryFrameSample,
     ) {
-        active_carry.duration += sample.dt;
+        active_carry.duration += frame.dt;
         active_carry.path_distance += frame_sample
             .player_position
             .distance(active_carry.last_position);
         active_carry.last_position = frame_sample.player_position;
-        active_carry.last_time = sample.time;
-        active_carry.last_frame = sample.frame_number;
-        active_carry.horizontal_gap_integral += frame_sample.horizontal_gap * sample.dt;
-        active_carry.vertical_gap_integral += frame_sample.vertical_gap * sample.dt;
-        active_carry.speed_integral += frame_sample.speed * sample.dt;
+        active_carry.last_time = frame.time;
+        active_carry.last_frame = frame.frame_number;
+        active_carry.horizontal_gap_integral += frame_sample.horizontal_gap * frame.dt;
+        active_carry.vertical_gap_integral += frame_sample.vertical_gap * frame.dt;
+        active_carry.speed_integral += frame_sample.speed * frame.dt;
     }
 
     fn finalize_active_carry(&mut self) {
@@ -254,13 +253,15 @@ impl BallCarryCalculator {
 
     fn process_sample(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        live_play: bool,
         controlling_player: Option<PlayerId>,
     ) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        let carry_candidate = if live_play && sample.dt > 0.0 {
-            if let (Some(ball), Some(player_id)) = (&sample.ball, controlling_player.as_ref()) {
-                sample
+        let carry_candidate = if live_play && frame.dt > 0.0 {
+            if let (Some(ball), Some(player_id)) = (ball.sample(), controlling_player.as_ref()) {
+                players
                     .players
                     .iter()
                     .find(|player| &player.player_id == player_id)
@@ -279,17 +280,17 @@ impl BallCarryCalculator {
             (Some(active_carry), Some((player, frame_sample)))
                 if active_carry.player_id == player.player_id =>
             {
-                Self::extend_carry(active_carry, sample, frame_sample);
+                Self::extend_carry(active_carry, frame, frame_sample);
             }
             (Some(_), Some((player, frame_sample))) => {
                 self.finalize_active_carry();
-                self.active_carry = Some(self.begin_carry(sample, player, frame_sample));
+                self.active_carry = Some(self.begin_carry(frame, player, frame_sample));
             }
             (Some(_), None) => {
                 self.finalize_active_carry();
             }
             (None, Some((player, frame_sample))) => {
-                self.active_carry = Some(self.begin_carry(sample, player, frame_sample));
+                self.active_carry = Some(self.begin_carry(frame, player, frame_sample));
             }
             (None, None) => {}
         }
@@ -306,21 +307,14 @@ impl BallCarryCalculator {
 
     pub fn update(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        live_play: bool,
         controlling_player: Option<PlayerId>,
     ) -> SubtrActorResult<()> {
-        self.process_sample(sample, controlling_player)
+        self.process_sample(frame, ball, players, live_play, controlling_player)
     }
-
-    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let controlling_player = sample
-            .touch_events
-            .last()
-            .and_then(|touch_event| touch_event.player.clone())
-            .or_else(|| self.last_touch_player.clone());
-        self.update(sample, controlling_player)
-    }
-
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
         self.finalize_active_carry();
         Ok(())

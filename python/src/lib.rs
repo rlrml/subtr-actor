@@ -35,7 +35,6 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
     m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_timeline, m)?)?;
-    m.add_function(wrap_pyfunction!(get_dynamic_stats_timeline, m)?)?;
     Ok(())
 }
 
@@ -315,7 +314,7 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
     let mut processor = ReplayProcessor::new(&replay).map_err(handle_frames_exception)?;
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut flip_reset_tracker = FlipResetTracker::new();
-    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut boost_pad_collector = ResolvedBoostPadCollector::new();
 
     processor
         .process_all(&mut [
@@ -326,7 +325,7 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
         .map_err(handle_frames_exception)?;
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
 
     let replay_data = replay_data_collector
         .into_replay_data_with_supplemental_data(processor, supplemental_data)
@@ -349,20 +348,4 @@ fn get_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAn
         .map_err(handle_frames_exception)?;
 
     Ok(convert_to_py(py, &timeline))
-}
-
-#[allow(clippy::useless_conversion)]
-#[pyfunction]
-#[pyo3(signature = (filepath))]
-fn get_dynamic_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
-    let replay = replay_from_data(&data)?;
-    let timeline = subtr_actor::StatsCollector::new()
-        .get_dynamic_replay_stats_timeline(&replay)
-        .map_err(handle_frames_exception)?;
-
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(timeline).map_err(to_py_error)?,
-    ))
 }

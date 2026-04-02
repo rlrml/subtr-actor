@@ -32,6 +32,7 @@ impl AnalysisNode for MovementNode {
         vec![
             frame_info_dependency(),
             player_frame_state_dependency(),
+            player_vertical_state_dependency(),
             AnalysisDependency::required::<LivePlayState>(),
         ]
     }
@@ -40,6 +41,7 @@ impl AnalysisNode for MovementNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
+            ctx.get::<PlayerVerticalState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

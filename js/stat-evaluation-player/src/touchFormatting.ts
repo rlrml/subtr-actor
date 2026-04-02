@@ -1,18 +1,9 @@
-import type { ExportedStat, PlayerStatsSnapshot, StatLabel } from "./statsTimeline.ts";
-import {
-  getExportedStatDomain,
-  getExportedStatLabels,
-  getExportedStatName,
-  getExportedStatValue,
-  getExportedStatValueType,
-  getExportedStatVariant,
-} from "./exportedStats.ts";
+import type { PlayerStatsSnapshot, StatLabel } from "./statsTimeline.ts";
 
 export type TouchBreakdownClass = "kind" | "height_band";
 
 interface TouchRenderOptions {
   breakdownClasses?: TouchBreakdownClass[];
-  exportedStats?: ExportedStat[];
 }
 
 type TouchBreakdownValueMap = Record<TouchBreakdownClass, string>;
@@ -121,23 +112,6 @@ function formatBreakdownLabel(
     .join(" / ");
 }
 
-function labeledEntriesFromExportedStats(
-  exportedStats: ExportedStat[] | undefined,
-): TouchBreakdownEntry[] {
-  return (exportedStats ?? [])
-    .filter((stat) =>
-      getExportedStatDomain(stat) === "touch"
-      && getExportedStatName(stat) === "touch_count"
-      && getExportedStatVariant(stat) === "labeled"
-      && getExportedStatValueType(stat) === "unsigned"
-      && getExportedStatValue(stat) !== undefined
-    )
-    .map((stat) => ({
-      labels: getExportedStatLabels(stat),
-      count: Math.round(getExportedStatValue(stat) ?? 0),
-    }));
-}
-
 function labeledEntriesFromTouchSnapshot(
   touch: PlayerStatsSnapshot["touch"],
 ): TouchBreakdownEntry[] {
@@ -229,9 +203,7 @@ export function renderTouchStats(
 ): string {
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const snapshotEntries = labeledEntriesFromTouchSnapshot(touch);
-  const exportedEntries = labeledEntriesFromExportedStats(options.exportedStats);
   const breakdownRows = renderTouchBreakdownRows(snapshotEntries, breakdownClasses)
-    || renderTouchBreakdownRows(exportedEntries, breakdownClasses)
     || renderTouchBreakdownFallbackRows(touch, breakdownClasses);
 
   return `

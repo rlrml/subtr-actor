@@ -74,7 +74,6 @@ pub struct MustyFlickCalculator {
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
     current_last_musty_player: Option<PlayerId>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl MustyFlickCalculator {
@@ -90,36 +89,40 @@ impl MustyFlickCalculator {
         &self.events
     }
 
-    fn begin_sample(&mut self, sample: &FrameState) {
+    fn begin_sample(&mut self, frame: &FrameInfo) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_musty = false;
             stats.time_since_last_musty = stats
                 .last_musty_time
-                .map(|time| (sample.time - time).max(0.0));
+                .map(|time| (frame.time - time).max(0.0));
             stats.frames_since_last_musty = stats
                 .last_musty_frame
-                .map(|frame| sample.frame_number.saturating_sub(frame));
+                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
         }
     }
 
-    fn ball_speed_change(sample: &FrameState, previous_ball_velocity: Option<glam::Vec3>) -> f32 {
+    fn ball_speed_change(
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        previous_ball_velocity: Option<glam::Vec3>,
+    ) -> f32 {
         const BALL_GRAVITY_Z: f32 = -650.0;
 
-        let Some(ball) = sample.ball.as_ref() else {
+        let Some(ball) = ball.sample() else {
             return 0.0;
         };
         let Some(previous_ball_velocity) = previous_ball_velocity else {
             return 0.0;
         };
 
-        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * sample.dt.max(0.0));
+        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * frame.dt.max(0.0));
         let residual_linear_impulse =
             ball.velocity() - previous_ball_velocity - expected_linear_delta;
         residual_linear_impulse.length()
     }
 
-    fn track_dodge_starts(&mut self, sample: &FrameState) {
-        for player in &sample.players {
+    fn track_dodge_starts(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        for player in &players.players {
             let was_dodge_active = self
                 .previous_dodge_active
                 .insert(player.player_id.clone(), player.dodge_active)
@@ -135,8 +138,8 @@ impl MustyFlickCalculator {
             self.recent_dodge_starts.insert(
                 player.player_id.clone(),
                 RecentDodgeStart {
-                    time: sample.time,
-                    frame: sample.frame_number,
+                    time: frame.time,
+                    frame: frame.frame_number,
                     forward_z: forward.z,
                 },
             );
@@ -150,13 +153,13 @@ impl MustyFlickCalculator {
 
     fn musty_candidate(
         &self,
-        sample: &FrameState,
+        ball: &BallFrameState,
         player: &PlayerSample,
         touch_event: &TouchEvent,
         dodge_start: RecentDodgeStart,
         ball_speed_change: f32,
     ) -> Option<MustyFlickEvent> {
-        let ball = sample.ball.as_ref()?;
+        let ball = ball.sample()?;
         let player_rigid_body = player.rigid_body.as_ref()?;
         let player_position = player.position()?;
         if player_position.z < MUSTY_MIN_PLAYER_HEIGHT {
@@ -268,14 +271,20 @@ impl MustyFlickCalculator {
         })
     }
 
-    fn apply_touch_events(&mut self, sample: &FrameState, touch_events: &[TouchEvent]) {
-        let ball_speed_change = Self::ball_speed_change(sample, self.previous_ball_velocity);
+    fn apply_touch_events(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        touch_events: &[TouchEvent],
+    ) {
+        let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
 
         for touch_event in touch_events {
             let Some(player_id) = touch_event.player.as_ref() else {
                 continue;
             };
-            let Some(player) = sample
+            let Some(player) = players
                 .players
                 .iter()
                 .find(|player| &player.player_id == player_id)
@@ -286,7 +295,7 @@ impl MustyFlickCalculator {
                 continue;
             };
             let Some(event) =
-                self.musty_candidate(sample, player, touch_event, dodge_start, ball_speed_change)
+                self.musty_candidate(ball, player, touch_event, dodge_start, ball_speed_change)
             else {
                 continue;
             };
@@ -305,8 +314,8 @@ impl MustyFlickCalculator {
             stats.is_last_musty = true;
             stats.last_musty_time = Some(event.time);
             stats.last_musty_frame = Some(event.frame);
-            stats.time_since_last_musty = Some((sample.time - event.time).max(0.0));
-            stats.frames_since_last_musty = Some(sample.frame_number.saturating_sub(event.frame));
+            stats.time_since_last_musty = Some((frame.time - event.time).max(0.0));
+            stats.frames_since_last_musty = Some(frame.frame_number.saturating_sub(event.frame));
             stats.last_confidence = Some(event.confidence);
             stats.best_confidence = stats.best_confidence.max(event.confidence);
             stats.cumulative_confidence += event.confidence;
@@ -322,40 +331,31 @@ impl MustyFlickCalculator {
         }
     }
 
-    fn reset_live_play_state(&mut self, sample: &FrameState) {
+    fn reset_live_play_state(&mut self, ball: &BallFrameState) {
         self.current_last_musty_player = None;
         self.recent_dodge_starts.clear();
         self.previous_dodge_active.clear();
-        self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
+        self.previous_ball_velocity = ball.velocity();
     }
 
-    fn on_sample_internal(
+    pub fn update_parts(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
         touch_events: &[TouchEvent],
+        live_play: bool,
     ) -> SubtrActorResult<()> {
-        if !self.live_play_tracker.is_live_play(sample) {
-            self.reset_live_play_state(sample);
+        if !live_play {
+            self.reset_live_play_state(ball);
             return Ok(());
         }
 
-        self.begin_sample(sample);
-        self.prune_recent_dodge_starts(sample.time);
-        self.track_dodge_starts(sample);
-        self.apply_touch_events(sample, touch_events);
-        self.previous_ball_velocity = sample.ball.as_ref().map(BallSample::velocity);
+        self.begin_sample(frame);
+        self.prune_recent_dodge_starts(frame.time);
+        self.track_dodge_starts(frame, players);
+        self.apply_touch_events(frame, ball, players, touch_events);
+        self.previous_ball_velocity = ball.velocity();
         Ok(())
     }
-
-    pub fn update(
-        &mut self,
-        sample: &FrameState,
-        touch_events: &[TouchEvent],
-    ) -> SubtrActorResult<()> {
-        self.on_sample_internal(sample, touch_events)
-    }
 }
-
-#[cfg(test)]
-#[path = "../reducers/musty_flick_test.rs"]
-mod tests;

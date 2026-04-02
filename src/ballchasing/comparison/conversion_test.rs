@@ -16,32 +16,42 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 fn compute_comparable_stats_reference(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
-    let mut match_collector = ReducerCollector::new(MatchStatsCalculator::new());
-    let mut boost_collector = ReducerCollector::new(BoostCalculator::new());
-    let mut movement_collector = ReducerCollector::new(MovementCalculator::new());
-    let mut positioning_collector = ReducerCollector::new(PositioningCalculator::new());
-    let mut demo_collector = ReducerCollector::new(DemoCalculator::new());
-    let mut powerslide_collector = ReducerCollector::new(PowerslideCalculator::new());
-
-    let mut processor = ReplayProcessor::new(replay)?;
-    let mut collectors: [&mut dyn Collector; 6] = [
-        &mut match_collector,
-        &mut boost_collector,
-        &mut movement_collector,
-        &mut positioning_collector,
-        &mut demo_collector,
-        &mut powerslide_collector,
-    ];
-    processor.process_all(&mut collectors)?;
+    let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
+    let graph = stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+        replay,
+        [
+            "core",
+            "boost",
+            "movement",
+            "positioning",
+            "demo",
+            "powerslide",
+        ],
+    )?;
 
     Ok(ComputedComparableStats {
-        replay_meta: processor.get_replay_meta()?,
-        match_stats: match_collector.into_inner(),
-        boost: boost_collector.into_inner(),
-        movement: movement_collector.into_inner(),
-        positioning: positioning_collector.into_inner(),
-        demo: demo_collector.into_inner(),
-        powerslide: powerslide_collector.into_inner(),
+        replay_meta,
+        match_stats: graph
+            .state::<MatchStatsCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        boost: graph
+            .state::<BoostCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        movement: graph
+            .state::<MovementCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        positioning: graph
+            .state::<PositioningCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        demo: graph.state::<DemoCalculator>().cloned().unwrap_or_default(),
+        powerslide: graph
+            .state::<PowerslideCalculator>()
+            .cloned()
+            .unwrap_or_default(),
     })
 }
 

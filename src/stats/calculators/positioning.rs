@@ -160,8 +160,6 @@ pub struct PositioningCalculator {
     player_stats: HashMap<PlayerId, PositioningStats>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
-    possession_tracker: PossessionTracker,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl PositioningCalculator {
@@ -184,15 +182,20 @@ impl PositioningCalculator {
         &self.player_stats
     }
 
-    fn record_goal_positioning_events(&mut self, sample: &FrameState, ball_position: glam::Vec3) {
-        for goal_event in &sample.goal_events {
+    fn record_goal_positioning_events(
+        &mut self,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        ball_position: glam::Vec3,
+    ) {
+        for goal_event in &events.goal_events {
             let defending_team_is_team_0 = !goal_event.scoring_team_is_team_0;
             let normalized_ball_y = normalized_y(defending_team_is_team_0, ball_position);
             if normalized_ball_y > GOAL_CAUGHT_AHEAD_MAX_BALL_Y {
                 continue;
             }
 
-            for player in sample
+            for player in players
                 .players
                 .iter()
                 .filter(|player| player.is_team_0 == defending_team_is_team_0)
@@ -218,15 +221,19 @@ impl PositioningCalculator {
 
     fn process_sample(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
         live_play: bool,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
-        if sample.dt == 0.0 {
-            if let Some(ball) = &sample.ball {
+        if frame.dt == 0.0 {
+            if let Some(ball) = ball.sample() {
                 self.previous_ball_position = Some(ball.position());
             }
-            for player in &sample.players {
+            for player in &players.players {
                 if let Some(position) = player.position() {
                     self.previous_player_positions
                         .insert(player.player_id.clone(), position);
@@ -235,28 +242,28 @@ impl PositioningCalculator {
             return Ok(());
         }
 
-        let Some(ball) = &sample.ball else {
+        let Some(ball) = ball.sample() else {
             return Ok(());
         };
         let ball_position = ball.position();
-        if !sample.goal_events.is_empty() {
-            self.record_goal_positioning_events(sample, ball_position);
+        if !events.goal_events.is_empty() {
+            self.record_goal_positioning_events(players, events, ball_position);
         }
-        let demoed_players: HashSet<_> = sample
+        let demoed_players: HashSet<_> = events
             .active_demos
             .iter()
             .map(|demo| demo.victim.clone())
             .collect();
 
-        for player in &sample.players {
+        for player in &players.players {
             let is_demoed = demoed_players.contains(&player.player_id);
             if live_play && is_demoed {
                 let stats = self
                     .player_stats
                     .entry(player.player_id.clone())
                     .or_default();
-                stats.active_game_time += sample.dt;
-                stats.time_demolished += sample.dt;
+                stats.active_game_time += frame.dt;
+                stats.time_demolished += frame.dt;
                 continue;
             }
 
@@ -279,18 +286,18 @@ impl PositioningCalculator {
                 .or_default();
 
             if live_play {
-                stats.active_game_time += sample.dt;
-                stats.tracked_time += sample.dt;
-                stats.sum_distance_to_ball += position.distance(ball_position) * sample.dt;
+                stats.active_game_time += frame.dt;
+                stats.tracked_time += frame.dt;
+                stats.sum_distance_to_ball += position.distance(ball_position) * frame.dt;
 
                 if possession_player_before_sample == Some(&player.player_id) {
-                    stats.time_has_possession += sample.dt;
+                    stats.time_has_possession += frame.dt;
                     stats.sum_distance_to_ball_has_possession +=
-                        position.distance(ball_position) * sample.dt;
+                        position.distance(ball_position) * frame.dt;
                 } else if possession_player_before_sample.is_some() {
-                    stats.time_no_possession += sample.dt;
+                    stats.time_no_possession += frame.dt;
                     stats.sum_distance_to_ball_no_possession +=
-                        position.distance(ball_position) * sample.dt;
+                        position.distance(ball_position) * frame.dt;
                 }
 
                 let defensive_zone_fraction = interval_fraction_below_threshold(
@@ -309,43 +316,43 @@ impl PositioningCalculator {
                     -FIELD_ZONE_BOUNDARY_Y,
                     FIELD_ZONE_BOUNDARY_Y,
                 );
-                stats.time_defensive_zone += sample.dt * defensive_zone_fraction;
-                stats.time_neutral_zone += sample.dt * neutral_zone_fraction;
-                stats.time_offensive_zone += sample.dt * offensive_zone_fraction;
+                stats.time_defensive_zone += frame.dt * defensive_zone_fraction;
+                stats.time_neutral_zone += frame.dt * neutral_zone_fraction;
+                stats.time_offensive_zone += frame.dt * offensive_zone_fraction;
 
                 let defensive_half_fraction = interval_fraction_below_threshold(
                     normalized_previous_position_y,
                     normalized_position_y,
                     0.0,
                 );
-                stats.time_defensive_half += sample.dt * defensive_half_fraction;
-                stats.time_offensive_half += sample.dt * (1.0 - defensive_half_fraction);
+                stats.time_defensive_half += frame.dt * defensive_half_fraction;
+                stats.time_offensive_half += frame.dt * (1.0 - defensive_half_fraction);
 
                 let previous_ball_delta =
                     normalized_previous_position_y - normalized_previous_ball_y;
                 let current_ball_delta = normalized_position_y - normalized_ball_y;
                 let behind_ball_fraction =
                     interval_fraction_below_threshold(previous_ball_delta, current_ball_delta, 0.0);
-                stats.time_behind_ball += sample.dt * behind_ball_fraction;
-                stats.time_in_front_of_ball += sample.dt * (1.0 - behind_ball_fraction);
+                stats.time_behind_ball += frame.dt * behind_ball_fraction;
+                stats.time_in_front_of_ball += frame.dt * (1.0 - behind_ball_fraction);
             }
         }
 
         if live_play {
             for is_team_0 in [true, false] {
-                let team_present_player_count = sample
+                let team_present_player_count = players
                     .players
                     .iter()
                     .filter(|player| player.is_team_0 == is_team_0)
                     .count();
-                let team_roster_count = sample.current_in_game_team_player_count(is_team_0).max(
-                    sample
+                let team_roster_count = gameplay.current_in_game_team_player_count(is_team_0).max(
+                    players
                         .players
                         .iter()
                         .filter(|player| player.is_team_0 == is_team_0)
                         .count(),
                 );
-                let team_players: Vec<_> = sample
+                let team_players: Vec<_> = players
                     .players
                     .iter()
                     .filter(|player| player.is_team_0 == is_team_0)
@@ -370,7 +377,7 @@ impl PositioningCalculator {
                             .entry(player.player_id.clone())
                             .or_default();
                         stats.sum_distance_to_teammates +=
-                            teammate_distance_sum * sample.dt / teammate_count as f32;
+                            teammate_distance_sum * frame.dt / teammate_count as f32;
                     }
                 }
 
@@ -382,7 +389,7 @@ impl PositioningCalculator {
                         self.player_stats
                             .entry(player.player_id.clone())
                             .or_default()
-                            .time_no_teammates += sample.dt;
+                            .time_no_teammates += frame.dt;
                     }
                 } else {
                     let mut sorted_team: Vec<_> = team_players
@@ -399,7 +406,7 @@ impl PositioningCalculator {
                             self.player_stats
                                 .entry(player_id.clone())
                                 .or_default()
-                                .time_other_role += sample.dt;
+                                .time_other_role += frame.dt;
                         }
                     } else {
                         let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
@@ -416,22 +423,22 @@ impl PositioningCalculator {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
-                                    .time_most_back += sample.dt;
+                                    .time_most_back += frame.dt;
                             } else if near_front && !near_back {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
-                                    .time_most_forward += sample.dt;
+                                    .time_most_forward += frame.dt;
                             } else if can_assign_mid_role {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
-                                    .time_mid_role += sample.dt;
+                                    .time_mid_role += frame.dt;
                             } else {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
-                                    .time_other_role += sample.dt;
+                                    .time_other_role += frame.dt;
                             }
                         }
                     }
@@ -445,7 +452,7 @@ impl PositioningCalculator {
                     self.player_stats
                         .entry(closest_player.player_id.clone())
                         .or_default()
-                        .time_closest_to_ball += sample.dt;
+                        .time_closest_to_ball += frame.dt;
                 }
 
                 if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
@@ -456,13 +463,13 @@ impl PositioningCalculator {
                     self.player_stats
                         .entry(farthest_player.player_id.clone())
                         .or_default()
-                        .time_farthest_from_ball += sample.dt;
+                        .time_farthest_from_ball += frame.dt;
                 }
             }
         }
 
         self.previous_ball_position = Some(ball_position);
-        for player in &sample.players {
+        for player in &players.players {
             if let Some(position) = player.position() {
                 self.previous_player_positions
                     .insert(player.player_id.clone(), position);
@@ -474,28 +481,22 @@ impl PositioningCalculator {
 
     pub fn update(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        live_play: bool,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        self.process_sample(sample, live_play, possession_player_before_sample)
-    }
-
-    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        let possession_player_before_sample = if live_play {
-            let possession_state = self
-                .possession_tracker
-                .update(sample.time, &sample.touch_events);
-            possession_state.active_player_before_sample
-        } else {
-            self.possession_tracker.reset();
-            None
-        };
-        self.update(sample, possession_player_before_sample.as_ref())
+        self.process_sample(
+            frame,
+            gameplay,
+            ball,
+            players,
+            events,
+            live_play,
+            possession_player_before_sample,
+        )
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/positioning_test.rs"]
-mod tests;

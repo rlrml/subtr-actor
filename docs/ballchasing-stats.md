@@ -3,8 +3,8 @@
 ## Design Direction
 
 - Prefer one outer stats collector that implements `Collector` and owns sampling policy.
-- Compute stats with small composable reducers rather than one monolithic accumulator.
-- Separate reducer inputs into:
+- Compute stats with small composable analysis calculators and nodes rather than one monolithic accumulator.
+- Separate graph inputs into:
   - Replay/header metadata
   - Discrete events
   - Time-integrated samples with explicit `dt`
@@ -12,21 +12,21 @@
   - Exact stats should use replay frame deltas and event boundaries when possible.
   - Resampling should remain an optional collection policy for approximate or ML-oriented consumers.
 
-## Implemented Reducers
+## Implemented Calculators
 
-- `MatchStatsReducer`: score, goals, assists, saves, shots, shooting percentage, exact goal timeline, exact shot/save/assist timeline, goals conceded while last defender
-- `DemoReducer`: demos inflicted by team and player, demos taken by player, kill timeline, death timeline
-- `PressureReducer`: time and percentage of ball-side pressure
-- `PossessionReducer`: team possession time and percentage using exact team-touch boundaries
-- `BoostReducer`: boost amount buckets, BPM, exact pad pickup counts and pad-size classification, collected/stolen amounts, overfill, supersonic boost usage
-- `PositioningReducer`: teammate distance, ball distance, back/forward role percentages, defensive/neutral/offensive zones plus halves, closest/farthest to ball, behind/in front of ball
-- `MovementReducer`: distance, average speed, speed buckets, ground/air buckets, team aggregates
-- `PowerslideReducer`: total powerslide duration, count, average duration, team aggregates
-- `SettingsReducer`: camera settings and steering sensitivity from replay metadata
+- `MatchStatsCalculator`: score, goals, assists, saves, shots, shooting percentage, exact goal timeline, exact shot/save/assist timeline, goals conceded while last defender
+- `DemoCalculator`: demos inflicted by team and player, demos taken by player, kill timeline, death timeline
+- `PressureCalculator`: time and percentage of ball-side pressure
+- `PossessionCalculator`: team possession time and percentage using exact team-touch boundaries
+- `BoostCalculator`: boost amount buckets, BPM, exact pad pickup counts and pad-size classification, collected/stolen amounts, overfill, supersonic boost usage
+- `PositioningCalculator`: teammate distance, ball distance, back/forward role percentages, defensive/neutral/offensive zones plus halves, closest/farthest to ball, behind/in front of ball
+- `MovementCalculator`: distance, average speed, speed buckets, ground/air buckets, team aggregates
+- `PowerslideCalculator`: total powerslide duration, count, average duration, team aggregates
+- `SettingsCalculator`: camera settings and steering sensitivity from replay metadata
 
 ## Status Key
 
-- `Available`: already exposed well enough to build reducers now
+- `Available`: already exposed well enough to build analysis nodes now
 - `Partial`: some source data exists, but reducer or normalization work is still needed
 - `Missing`: processor support is not exposed yet or not identified yet
 
@@ -82,7 +82,7 @@
 
 | Stat(s) | Source needed | Computation plan | Sampling | Processor status |
 | --- | --- | --- | --- | --- |
-| Possession | Ball touch ownership per player/team | Exact team-touch timestamps are available from `HitTeamNum` updates and reducers now buffer those events across sampled frames. Player ownership remains heuristic rather than replay-native | Event-driven plus `dt` for exact team parity | `Partial` |
+| Possession | Ball touch ownership per player/team | Exact team-touch timestamps are available from `HitTeamNum` updates and analysis nodes now buffer those events across sampled frames. Player ownership remains heuristic rather than replay-native | Event-driven plus `dt` for exact team parity | `Partial` |
 | Pressure (time ball is in each side) | Ball position | Classify ball side per sample and integrate `dt` | Prefer full frame deltas | `Available` |
 | Shots on timeline | Exact `PRI_TA:MatchShots` counter increment events | Emit shot events directly from replay counter increments and buffer them across sampled frames | Exact event time from replay frame updates | `Available` |
 | Saves on timeline | Exact `PRI_TA:MatchSaves` counter increment events | Emit save events directly from replay counter increments and buffer them across sampled frames | Exact event time from replay frame updates | `Available` |

@@ -231,25 +231,19 @@ fn dump_final_boost_stats(timeline: &ReplayStatsTimeline) {
     }
 }
 
-fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a ExportedStat {
-    fields
-        .iter()
-        .find(|field| field.descriptor.domain == domain && field.descriptor.name == name)
-        .unwrap_or_else(|| panic!("Missing field {domain}.{name}"))
-}
-
 #[test]
 fn test_stats_timeline_frame_lookup_uses_frame_number() {
     let timeline = ReplayStatsTimeline {
         config: StatsTimelineConfig {
-            most_back_forward_threshold_y: PositioningReducerConfig::default()
+            most_back_forward_threshold_y: PositioningCalculatorConfig::default()
                 .most_back_forward_threshold_y,
-            pressure_neutral_zone_half_width_y: PressureReducerConfig::default()
+            pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
-            rush_max_start_y: RushReducerConfig::default().max_start_y,
-            rush_attack_support_distance_y: RushReducerConfig::default().attack_support_distance_y,
-            rush_defender_distance_y: RushReducerConfig::default().defender_distance_y,
-            rush_min_possession_retained_seconds: RushReducerConfig::default()
+            rush_max_start_y: RushCalculatorConfig::default().max_start_y,
+            rush_attack_support_distance_y: RushCalculatorConfig::default()
+                .attack_support_distance_y,
+            rush_defender_distance_y: RushCalculatorConfig::default().defender_distance_y,
+            rush_min_possession_retained_seconds: RushCalculatorConfig::default()
                 .min_possession_retained_seconds,
         },
         replay_meta: ReplayMeta {
@@ -325,87 +319,103 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 }
 
 #[test]
-fn test_stats_timeline_collector_final_frame_matches_reducers() {
+fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
     let final_frame = timeline.frames.last().expect("Expected at least one frame");
 
-    let mut possession_collector = ReducerCollector::new(PossessionReducer::new());
-    let mut pressure_collector = ReducerCollector::new(PressureReducer::new());
-    let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
-    let mut backboard_collector = ReducerCollector::new(BackboardReducer::new());
-    let mut double_tap_collector = ReducerCollector::new(DoubleTapReducer::new());
-    let mut ball_carry_collector = ReducerCollector::new(BallCarryReducer::new());
-    let mut boost_collector = ReducerCollector::new(BoostReducer::new());
-    let mut movement_collector = ReducerCollector::new(MovementReducer::new());
-    let mut positioning_collector = ReducerCollector::new(PositioningReducer::new());
-    let mut powerslide_collector = ReducerCollector::new(PowerslideReducer::new());
-    let mut demo_collector = ReducerCollector::new(DemoReducer::new());
+    let graph = stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+        &replay,
+        [
+            "possession",
+            "pressure",
+            "core",
+            "backboard",
+            "double_tap",
+            "ball_carry",
+            "boost",
+            "movement",
+            "positioning",
+            "powerslide",
+            "demo",
+        ],
+    )
+    .expect("Expected analysis graph to process replay");
 
-    let mut processor = ReplayProcessor::new(&replay).expect("Expected replay processor");
-    let mut collectors: [&mut dyn Collector; 11] = [
-        &mut possession_collector,
-        &mut pressure_collector,
-        &mut match_collector,
-        &mut backboard_collector,
-        &mut double_tap_collector,
-        &mut ball_carry_collector,
-        &mut boost_collector,
-        &mut movement_collector,
-        &mut positioning_collector,
-        &mut powerslide_collector,
-        &mut demo_collector,
-    ];
-    processor
-        .process_all(&mut collectors)
-        .expect("Expected reducers to process replay");
+    let possession = graph
+        .state::<PossessionCalculator>()
+        .expect("missing possession calculator state");
+    let pressure = graph
+        .state::<PressureCalculator>()
+        .expect("missing pressure calculator state");
+    let match_stats = graph
+        .state::<MatchStatsCalculator>()
+        .expect("missing match stats calculator state");
+    let backboard = graph
+        .state::<BackboardCalculator>()
+        .expect("missing backboard calculator state");
+    let double_tap = graph
+        .state::<DoubleTapCalculator>()
+        .expect("missing double tap calculator state");
+    let ball_carry = graph
+        .state::<BallCarryCalculator>()
+        .expect("missing ball carry calculator state");
+    let boost = graph
+        .state::<BoostCalculator>()
+        .expect("missing boost calculator state");
+    let movement = graph
+        .state::<MovementCalculator>()
+        .expect("missing movement calculator state");
+    let positioning = graph
+        .state::<PositioningCalculator>()
+        .expect("missing positioning calculator state");
+    let powerslide = graph
+        .state::<PowerslideCalculator>()
+        .expect("missing powerslide calculator state");
+    let demo = graph
+        .state::<DemoCalculator>()
+        .expect("missing demo calculator state");
 
-    let possession = possession_collector.into_inner();
-    let pressure = pressure_collector.into_inner();
-    let match_stats = match_collector.into_inner();
-    let backboard = backboard_collector.into_inner();
-    let double_tap = double_tap_collector.into_inner();
-    let ball_carry = ball_carry_collector.into_inner();
-    let boost = boost_collector.into_inner();
-    let movement = movement_collector.into_inner();
-    let positioning = positioning_collector.into_inner();
-    let powerslide = powerslide_collector.into_inner();
-    let demo = demo_collector.into_inner();
-
-    let assert_core_team_stats_match = |actual: &CoreTeamStats,
-                                        expected: &CoreTeamStats,
-                                        team_label: &str| {
-        assert_eq!(actual.score, expected.score, "{team_label} score");
-        assert_eq!(actual.goals, expected.goals, "{team_label} goals");
-        assert_eq!(actual.assists, expected.assists, "{team_label} assists");
-        assert_eq!(actual.saves, expected.saves, "{team_label} saves");
-        assert_eq!(actual.shots, expected.shots, "{team_label} shots");
-        assert_eq!(
-            actual.goal_after_kickoff.kickoff_goal_count,
-            expected.goal_after_kickoff.kickoff_goal_count,
-            "{team_label} kickoff-goal bucket counts",
-        );
-        assert_eq!(
-            actual.goal_after_kickoff.short_goal_count,
-            expected.goal_after_kickoff.short_goal_count,
-            "{team_label} short-goal bucket counts",
-        );
-        assert_eq!(
-            actual.goal_after_kickoff.medium_goal_count,
-            expected.goal_after_kickoff.medium_goal_count,
-            "{team_label} medium-goal bucket counts",
-        );
-        assert_eq!(
-            actual.goal_after_kickoff.long_goal_count, expected.goal_after_kickoff.long_goal_count,
-            "{team_label} long-goal bucket counts",
-        );
-        assert_eq!(
-            actual.goal_buildup, expected.goal_buildup,
-            "{team_label} goal buildup classifications",
-        );
-    };
+    let assert_core_team_stats_match =
+        |actual: &CoreTeamStats, expected: &CoreTeamStats, team_label: &str| {
+            assert_eq!(actual.score, expected.score, "{team_label} score");
+            assert_eq!(actual.goals, expected.goals, "{team_label} goals");
+            assert_eq!(actual.assists, expected.assists, "{team_label} assists");
+            assert_eq!(actual.saves, expected.saves, "{team_label} saves");
+            assert_eq!(actual.shots, expected.shots, "{team_label} shots");
+            assert_eq!(
+                actual.scoring_context.goal_after_kickoff.kickoff_goal_count,
+                expected
+                    .scoring_context
+                    .goal_after_kickoff
+                    .kickoff_goal_count,
+                "{team_label} kickoff-goal bucket counts",
+            );
+            assert_eq!(
+                actual.scoring_context.goal_after_kickoff.short_goal_count,
+                expected.scoring_context.goal_after_kickoff.short_goal_count,
+                "{team_label} short-goal bucket counts",
+            );
+            assert_eq!(
+                actual.scoring_context.goal_after_kickoff.medium_goal_count,
+                expected
+                    .scoring_context
+                    .goal_after_kickoff
+                    .medium_goal_count,
+                "{team_label} medium-goal bucket counts",
+            );
+            assert_eq!(
+                actual.scoring_context.goal_after_kickoff.long_goal_count,
+                expected.scoring_context.goal_after_kickoff.long_goal_count,
+                "{team_label} long-goal bucket counts",
+            );
+            assert_eq!(
+                actual.scoring_context.goal_buildup, expected.scoring_context.goal_buildup,
+                "{team_label} goal buildup classifications",
+            );
+        };
 
     let assert_core_player_stats_match =
         |actual: &CorePlayerStats, expected: &CorePlayerStats, player_label: &str| {
@@ -415,32 +425,38 @@ fn test_stats_timeline_collector_final_frame_matches_reducers() {
             assert_eq!(actual.saves, expected.saves, "{player_label} saves");
             assert_eq!(actual.shots, expected.shots, "{player_label} shots");
             assert_eq!(
-                actual.goals_conceded_while_last_defender,
-                expected.goals_conceded_while_last_defender,
+                actual.scoring_context.goals_conceded_while_last_defender,
+                expected.scoring_context.goals_conceded_while_last_defender,
                 "{player_label} last-defender concessions",
             );
             assert_eq!(
-                actual.goal_after_kickoff.kickoff_goal_count,
-                expected.goal_after_kickoff.kickoff_goal_count,
+                actual.scoring_context.goal_after_kickoff.kickoff_goal_count,
+                expected
+                    .scoring_context
+                    .goal_after_kickoff
+                    .kickoff_goal_count,
                 "{player_label} kickoff-goal bucket counts",
             );
             assert_eq!(
-                actual.goal_after_kickoff.short_goal_count,
-                expected.goal_after_kickoff.short_goal_count,
+                actual.scoring_context.goal_after_kickoff.short_goal_count,
+                expected.scoring_context.goal_after_kickoff.short_goal_count,
                 "{player_label} short-goal bucket counts",
             );
             assert_eq!(
-                actual.goal_after_kickoff.medium_goal_count,
-                expected.goal_after_kickoff.medium_goal_count,
+                actual.scoring_context.goal_after_kickoff.medium_goal_count,
+                expected
+                    .scoring_context
+                    .goal_after_kickoff
+                    .medium_goal_count,
                 "{player_label} medium-goal bucket counts",
             );
             assert_eq!(
-                actual.goal_after_kickoff.long_goal_count,
-                expected.goal_after_kickoff.long_goal_count,
+                actual.scoring_context.goal_after_kickoff.long_goal_count,
+                expected.scoring_context.goal_after_kickoff.long_goal_count,
                 "{player_label} long-goal bucket counts",
             );
             assert_eq!(
-                actual.goal_buildup, expected.goal_buildup,
+                actual.scoring_context.goal_buildup, expected.scoring_context.goal_buildup,
                 "{player_label} goal buildup classifications",
             );
         };
@@ -854,65 +870,5 @@ fn test_stats_timeline_first_kickoff_credits_both_players() {
     assert!(
         kickoff_resolution_blue.touch.touch_count > baseline_blue.touch.touch_count,
         "Expected mrtyzz. to receive a credited touch during the first kickoff sequence by frame 205"
-    );
-}
-
-#[test]
-fn test_stats_timeline_collector_can_export_dynamic_stats() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
-    let typed_timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
-        .expect("Expected typed stats timeline data");
-    let dynamic_timeline = StatsCollector::new()
-        .get_dynamic_replay_stats_timeline(&replay)
-        .expect("Expected dynamic stats timeline data");
-
-    let typed_frame = typed_timeline
-        .frames
-        .last()
-        .expect("Expected typed final frame");
-    let dynamic_frame = dynamic_timeline
-        .frames
-        .last()
-        .expect("Expected dynamic final frame");
-
-    assert_eq!(
-        find_field(&dynamic_frame.possession, "possession", "team_zero_time").value,
-        StatValue::Float(typed_frame.possession.team_zero_time)
-    );
-    assert_eq!(
-        find_field(&dynamic_frame.pressure, "pressure", "team_zero_side_time").value,
-        StatValue::Float(typed_frame.pressure.team_zero_side_time)
-    );
-    assert_eq!(
-        find_field(&dynamic_frame.team_zero.stats, "core", "goals").value,
-        StatValue::Signed(typed_frame.team_zero.core.goals)
-    );
-    assert_eq!(
-        find_field(&dynamic_frame.team_zero.stats, "ball_carry", "count").value,
-        StatValue::Unsigned(typed_frame.team_zero.ball_carry.carry_count)
-    );
-
-    let typed_player = typed_frame
-        .players
-        .first()
-        .expect("Expected at least one player");
-    let dynamic_player = dynamic_frame
-        .players
-        .iter()
-        .find(|player| player.player_id == typed_player.player_id)
-        .expect("Expected matching dynamic player");
-
-    assert_eq!(
-        find_field(&dynamic_player.stats, "positioning", "percent_behind_ball").value,
-        StatValue::Float(typed_player.positioning.behind_ball_pct())
-    );
-    assert_eq!(
-        find_field(&dynamic_player.stats, "movement", "total_distance").value,
-        StatValue::Float(typed_player.movement.total_distance)
-    );
-    assert_eq!(
-        find_field(&dynamic_player.stats, "ball_carry", "count").value,
-        StatValue::Unsigned(typed_player.ball_carry.carry_count)
     );
 }

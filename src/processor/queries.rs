@@ -233,9 +233,9 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         let search_direction = if time_and_frame_difference > 0.0 {
-            util::SearchDirection::Forward
+            SearchDirection::Forward
         } else {
-            util::SearchDirection::Backward
+            SearchDirection::Backward
         };
 
         let object_id = self.get_object_id_for_key(RIGID_BODY_STATE_KEY)?;
@@ -251,11 +251,11 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         let (start_body, start_time, end_body, end_time) = match search_direction {
-            util::SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
-            util::SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
+            SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
+            SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
         };
 
-        util::get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
+        get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
             .map(|rigid_body| self.normalize_rigid_body(&rigid_body))
     }
 

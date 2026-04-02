@@ -2,7 +2,6 @@ export { mountStatEvaluationPlayer } from "./main.ts";
 export type { StatEvaluationPlayerHandle } from "./main.ts";
 export * from "./boostFormatting.ts";
 export * from "./ceilingShotOverlay.ts";
-export * from "./exportedStats.ts";
 export * from "./fiftyFiftyFormatting.ts";
 export * from "./fiftyFiftyOverlay.ts";
 export * from "./movementFormatting.ts";

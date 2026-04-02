@@ -33,16 +33,18 @@
 //!   metadata and headers. It supports both explicit feature adders and the
 //!   string-based registry exposed through [`NDArrayCollector::from_strings`]
 //!   and [`NDArrayCollector::from_strings_typed`].
-//! - [`StatsCollector`] accumulates reducer-based replay statistics as a
-//!   module-keyed dynamic payload suitable for extensible module registries.
-//! - [`StatsTimelineCollector`] accumulates reducer-based replay statistics
-//!   frame by frame and returns typed snapshots
-//!   ([`ReplayStatsTimeline`]) for the full builtin reducer bundle.
+//! - [`StatsCollector`] accumulates graph-backed replay statistics as a
+//!   module-keyed dynamic payload suitable for builtin module selection and
+//!   JSON export.
+//! - [`StatsTimelineCollector`] accumulates graph-backed replay statistics
+//!   frame by frame and returns typed snapshots ([`ReplayStatsTimeline`]) for
+//!   the builtin analysis modules.
 //!
 //! ## Stats and exports
 //!
-//! The [`stats`] module houses reducer implementations, stat mechanics helpers,
-//! and the exported stat-field model built around [`ExportedStat`].
+//! The [`stats`] module houses analysis calculators, graph nodes, stat
+//! mechanics helpers, and the exported stat-field model built around
+//! [`ExportedStat`].
 //!
 //! ## Examples
 //!
@@ -115,13 +117,17 @@ pub mod ballchasing;
 pub mod collector;
 pub mod constants;
 pub mod error;
+pub mod geometry;
 pub mod mechanics;
 pub mod processor;
+pub mod replay_meta;
+pub mod replay_types;
+pub mod search;
 pub mod stats;
-pub mod util;
+pub mod vec_map;
 
 #[cfg(test)]
-mod util_test;
+mod shared_test;
 
 pub mod actor_state {
     //! Compatibility re-export for processor actor-state types.
@@ -132,7 +138,11 @@ pub use crate::actor_state::*;
 pub use crate::collector::*;
 pub use crate::constants::*;
 pub use crate::error::*;
+pub use crate::geometry::*;
 pub use crate::mechanics::*;
 pub use crate::processor::*;
+pub use crate::replay_meta::*;
+pub use crate::replay_types::*;
+pub use crate::search::*;
 pub use crate::stats::*;
-pub use crate::util::*;
+pub(crate) use crate::vec_map::*;

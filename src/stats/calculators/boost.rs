@@ -109,7 +109,6 @@ pub struct BoostCalculator {
     pending_demo_respawns: HashSet<PlayerId>,
     previous_boost_levels_live: Option<bool>,
     active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
-    live_play_tracker: LivePlayTracker,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -564,10 +563,10 @@ impl BoostCalculator {
         }
     }
 
-    fn warn_for_sample_boost_invariants(&mut self, sample: &FrameState) {
+    fn warn_for_sample_boost_invariants(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
         let team_zero_stats = self.team_zero_stats.clone();
         let team_one_stats = self.team_one_stats.clone();
-        let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = sample
+        let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = players
             .players
             .iter()
             .map(|player| {
@@ -584,23 +583,23 @@ impl BoostCalculator {
 
         self.warn_for_boost_invariant_violations(
             "team_zero",
-            sample.frame_number,
-            sample.time,
+            frame.frame_number,
+            frame.time,
             &team_zero_stats,
             None,
         );
         self.warn_for_boost_invariant_violations(
             "team_one",
-            sample.frame_number,
-            sample.time,
+            frame.frame_number,
+            frame.time,
             &team_one_stats,
             None,
         );
         for (player_id, observed_boost_amount, stats) in player_scopes {
             self.warn_for_boost_invariant_violations(
                 &format!("player {player_id:?}"),
-                sample.frame_number,
-                sample.time,
+                frame.frame_number,
+                frame.time,
                 &stats,
                 observed_boost_amount,
             );
@@ -631,7 +630,7 @@ impl BoostCalculator {
         }
     }
 
-    fn boost_levels_live(_sample: &FrameState, live_play: bool) -> bool {
+    fn boost_levels_live(live_play: bool) -> bool {
         live_play
     }
 
@@ -639,28 +638,35 @@ impl BoostCalculator {
         boost_levels_live
     }
 
-    fn tracks_boost_pickups(sample: &FrameState, live_play: bool) -> bool {
+    fn tracks_boost_pickups(gameplay: &GameplayState, live_play: bool) -> bool {
         live_play
-            || (sample.ball_has_been_hit == Some(false)
-                && sample.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
-                && sample.kickoff_countdown_time.is_none_or(|t| t <= 0))
+            || (gameplay.ball_has_been_hit == Some(false)
+                && gameplay.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
+                && gameplay.kickoff_countdown_time.is_none_or(|t| t <= 0))
     }
 
-    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        let boost_levels_live = Self::boost_levels_live(sample, live_play);
+    pub fn update_parts(
+        &mut self,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        vertical_state: &PlayerVerticalState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
-        let track_boost_pickups = Self::tracks_boost_pickups(sample, live_play);
+        let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);
         let boost_levels_resumed_this_sample =
             boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
-        let kickoff_phase_active = sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || sample.kickoff_countdown_time.is_some_and(|t| t > 0)
-            || sample.ball_has_been_hit == Some(false);
+        let kickoff_phase_active = gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+            || gameplay.kickoff_countdown_time.is_some_and(|t| t > 0)
+            || gameplay.ball_has_been_hit == Some(false);
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
         if kickoff_phase_started {
             self.kickoff_respawn_awarded.clear();
         }
-        for demo in &sample.demo_events {
+        for demo in &events.demo_events {
             self.pending_demo_respawns.insert(demo.victim.clone());
         }
 
@@ -668,7 +674,7 @@ impl BoostCalculator {
         let mut pickup_counts_by_player = HashMap::<PlayerId, usize>::new();
         let mut respawn_amounts_by_player = HashMap::<PlayerId, f32>::new();
 
-        for event in &sample.boost_pad_events {
+        for event in &events.boost_pad_events {
             let BoostPadEventKind::PickedUp { .. } = event.kind else {
                 continue;
             };
@@ -680,7 +686,7 @@ impl BoostCalculator {
                 .or_default() += 1;
         }
 
-        for player in &sample.players {
+        for player in &players.players {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
@@ -709,42 +715,42 @@ impl BoostCalculator {
 
             if track_boost_levels {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
-                let time_zero_boost = sample.dt
+                let time_zero_boost = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
                         0.0,
                         BOOST_ZERO_BAND_RAW,
                     );
-                let time_hundred_boost = sample.dt
+                let time_hundred_boost = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
                         BOOST_FULL_BAND_MIN_RAW,
                         BOOST_MAX_AMOUNT + 1.0,
                     );
-                let time_boost_0_25 = sample.dt
+                let time_boost_0_25 = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
                         0.0,
                         boost_percent_to_amount(25.0),
                     );
-                let time_boost_25_50 = sample.dt
+                let time_boost_25_50 = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
                         boost_percent_to_amount(25.0),
                         boost_percent_to_amount(50.0),
                     );
-                let time_boost_50_75 = sample.dt
+                let time_boost_50_75 = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
                         boost_percent_to_amount(50.0),
                         boost_percent_to_amount(75.0),
                     );
-                let time_boost_75_100 = sample.dt
+                let time_boost_75_100 = frame.dt
                     * Self::interval_fraction_in_boost_range(
                         previous_boost_amount,
                         boost_amount,
@@ -757,15 +763,12 @@ impl BoostCalculator {
                 {
                     (previous_boost_amount - boost_amount)
                         .max(0.0)
-                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * sample.dt)
+                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * frame.dt)
                 } else {
                     0.0
                 };
                 let observed_usage = (previous_boost_amount - boost_amount).max(0.0);
-                let grounded_usage = if player
-                    .position()
-                    .is_some_and(|position| position.z <= GROUND_Z_THRESHOLD)
-                {
+                let grounded_usage = if vertical_state.is_grounded(&player.player_id) {
                     observed_usage
                 } else {
                     0.0
@@ -782,10 +785,10 @@ impl BoostCalculator {
                     &mut self.team_one_stats
                 };
 
-                stats.tracked_time += sample.dt;
-                stats.boost_integral += average_boost_amount * sample.dt;
-                team_stats.tracked_time += sample.dt;
-                team_stats.boost_integral += average_boost_amount * sample.dt;
+                stats.tracked_time += frame.dt;
+                stats.boost_integral += average_boost_amount * frame.dt;
+                team_stats.tracked_time += frame.dt;
+                team_stats.boost_integral += average_boost_amount * frame.dt;
                 stats.time_zero_boost += time_zero_boost;
                 team_stats.time_zero_boost += time_zero_boost;
                 stats.time_hundred_boost += time_hundred_boost;
@@ -834,7 +837,7 @@ impl BoostCalculator {
             current_boost_amounts.push((player.player_id.clone(), boost_amount));
         }
 
-        for event in &sample.boost_pad_events {
+        for event in &events.boost_pad_events {
             match event.kind {
                 BoostPadEventKind::PickedUp { sequence } => {
                     if !track_boost_pickups && !self.config.include_non_live_pickups {
@@ -860,7 +863,7 @@ impl BoostCalculator {
                     self.unavailable_pads.insert(event.pad_id.clone());
                     self.last_pickup_times
                         .insert(event.pad_id.clone(), event.time);
-                    let Some(player) = sample
+                    let Some(player) = players
                         .players
                         .iter()
                         .find(|player| &player.player_id == player_id)
@@ -964,7 +967,7 @@ impl BoostCalculator {
         for (player_id, boost_amount) in current_boost_amounts {
             self.previous_boost_amounts.insert(player_id, boost_amount);
         }
-        for player in &sample.players {
+        for player in &players.players {
             if let Some(speed) = player.speed() {
                 self.previous_player_speeds
                     .insert(player.player_id.clone(), speed);
@@ -972,7 +975,7 @@ impl BoostCalculator {
         }
         let mut team_zero_used = 0.0;
         let mut team_one_used = 0.0;
-        for player in &sample.players {
+        for player in &players.players {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
@@ -989,14 +992,10 @@ impl BoostCalculator {
         }
         self.team_zero_stats.amount_used = team_zero_used;
         self.team_one_stats.amount_used = team_one_used;
-        self.warn_for_sample_boost_invariants(sample);
+        self.warn_for_sample_boost_invariants(frame, players);
         self.kickoff_phase_active_last_frame = kickoff_phase_active;
         self.previous_boost_levels_live = Some(boost_levels_live);
 
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/boost_test.rs"]
-mod tests;

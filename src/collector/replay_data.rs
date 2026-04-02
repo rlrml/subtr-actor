@@ -796,7 +796,7 @@ impl ReplayDataCollector {
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
         let mut flip_reset_tracker = FlipResetTracker::new();
-        let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+        let mut boost_pad_collector = ResolvedBoostPadCollector::new();
         processor.process_all(&mut [
             &mut self,
             &mut flip_reset_tracker,
@@ -804,7 +804,7 @@ impl ReplayDataCollector {
         ])?;
         let supplemental_data =
             ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-                .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+                .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
         self.into_replay_data_with_supplemental_data(processor, supplemental_data)
     }
 

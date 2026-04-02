@@ -80,7 +80,6 @@ pub struct SpeedFlipCalculator {
     kickoff_approach_active_last_frame: bool,
     current_kickoff_start_time: Option<f32>,
     current_last_speed_flip_player: Option<PlayerId>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl SpeedFlipCalculator {
@@ -156,9 +155,7 @@ impl SpeedFlipCalculator {
     }
 
     fn kickoff_alignment_target(ball: &BallFrameState) -> glam::Vec3 {
-        ball
-            .ball
-            .as_ref()
+        ball.sample()
             .map(BallSample::position)
             .unwrap_or(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))
     }
@@ -486,51 +483,7 @@ impl SpeedFlipCalculator {
         Ok(())
     }
 
-    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        self.update_parts(
-            &FrameInfo {
-                frame_number: sample.frame_number,
-                time: sample.time,
-                dt: sample.dt,
-                seconds_remaining: sample.seconds_remaining,
-            },
-            &GameplayState {
-                game_state: sample.game_state,
-                ball_has_been_hit: sample.ball_has_been_hit,
-                kickoff_countdown_time: sample.kickoff_countdown_time,
-                team_zero_score: sample.team_zero_score,
-                team_one_score: sample.team_one_score,
-                possession_team_is_team_0: sample.possession_team_is_team_0,
-                scored_on_team_is_team_0: sample.scored_on_team_is_team_0,
-                current_in_game_team_player_counts: sample
-                    .current_in_game_team_player_counts
-                    .unwrap_or_default(),
-            },
-            &BallFrameState {
-                ball: sample.ball.clone(),
-            },
-            &PlayerFrameState {
-                players: sample.players.clone(),
-            },
-            live_play,
-        )
-    }
-
     pub fn finalize_parts(&mut self, frame: &FrameInfo) {
         self.finalize_candidates(frame, true);
     }
-
-    pub fn finalize(&mut self, sample: &FrameState) {
-        self.finalize_parts(&FrameInfo {
-            frame_number: sample.frame_number,
-            time: sample.time,
-            dt: sample.dt,
-            seconds_remaining: sample.seconds_remaining,
-        });
-    }
 }
-
-#[cfg(test)]
-#[path = "../reducers/speed_flip_test.rs"]
-mod tests;

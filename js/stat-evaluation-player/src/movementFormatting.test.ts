@@ -14,46 +14,33 @@ test("renderMovementStats shows movement-time breakdowns for selected classes", 
     time_on_ground: 0,
     time_low_air: 0,
     time_high_air: 0,
+    labeled_tracked_time: {
+      entries: [
+        {
+          labels: [
+            { key: "speed_band", value: "slow" },
+            { key: "height_band", value: "ground" },
+          ],
+          value: 2,
+        },
+        {
+          labels: [
+            { key: "speed_band", value: "boost" },
+            { key: "height_band", value: "low_air" },
+          ],
+          value: 1.5,
+        },
+        {
+          labels: [
+            { key: "speed_band", value: "supersonic" },
+            { key: "height_band", value: "high_air" },
+          ],
+          value: 2.5,
+        },
+      ],
+    },
   }, {
     breakdownClasses: ["speed_band", "height_band"],
-    exportedStats: [
-      {
-        domain: "movement",
-        name: "tracked_time",
-        variant: "labeled",
-        unit: "seconds",
-        labels: [
-          { key: "speed_band", value: "slow" },
-          { key: "height_band", value: "ground" },
-        ],
-        value_type: "float",
-        value: 2,
-      },
-      {
-        domain: "movement",
-        name: "tracked_time",
-        variant: "labeled",
-        unit: "seconds",
-        labels: [
-          { key: "speed_band", value: "boost" },
-          { key: "height_band", value: "low_air" },
-        ],
-        value_type: "float",
-        value: 1.5,
-      },
-      {
-        domain: "movement",
-        name: "tracked_time",
-        variant: "labeled",
-        unit: "seconds",
-        labels: [
-          { key: "speed_band", value: "supersonic" },
-          { key: "height_band", value: "high_air" },
-        ],
-        value_type: "float",
-        value: 2.5,
-      },
-    ],
   });
 
   assert.match(html, /Tracked<\/span><span class="value">6\.0s/);

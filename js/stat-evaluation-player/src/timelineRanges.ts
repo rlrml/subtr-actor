@@ -1,17 +1,8 @@
 import type { ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
 import type {
-  DynamicStatsTimeline,
-  ExportedStat,
   PlayerStatsSnapshot,
   StatsTimeline,
 } from "./statsTimeline.ts";
-import {
-  getExportedStatDomain,
-  getExportedStatLabels,
-  getExportedStatName,
-  getExportedStatValue,
-  getExportedStatVariant,
-} from "./exportedStats.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
@@ -20,7 +11,7 @@ const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y = 200;
 type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
 
 function getPressureNeutralZoneHalfWidthY(
-  timeline: StatsTimeline | DynamicStatsTimeline,
+  timeline: StatsTimeline,
 ): number {
   const configured = timeline.config?.pressure_neutral_zone_half_width_y;
   if (typeof configured === "number" && Number.isFinite(configured)) {
@@ -93,13 +84,8 @@ function createPressureRange(
 
 export function buildPossessionTimelineRanges(
   timeline: StatsTimeline,
-  dynamicTimeline?: DynamicStatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if (dynamicTimeline) {
-    return buildPossessionTimelineRangesFromDynamic(dynamicTimeline, replay);
-  }
-
   const ranges: ReplayTimelineRange[] = [];
 
   let previousTeamZero = 0;
@@ -172,13 +158,8 @@ export function buildPossessionTimelineRanges(
 
 export function buildPressureTimelineRanges(
   timeline: StatsTimeline,
-  dynamicTimeline?: DynamicStatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if (dynamicTimeline) {
-    return buildPressureTimelineRangesFromDynamic(dynamicTimeline, replay);
-  }
-
   const ranges: ReplayTimelineRange[] = [];
 
   let previousTeamZero = 0;
@@ -371,241 +352,6 @@ export function buildTimeInZoneTimelineRanges(
   }
 
   return ranges;
-}
-
-function buildPossessionTimelineRangesFromDynamic(
-  timeline: DynamicStatsTimeline,
-  replay?: ReplayModel,
-): ReplayTimelineRange[] {
-  const ranges: ReplayTimelineRange[] = [];
-  let previousTeamZero = 0;
-  let previousTeamOne = 0;
-  let previousNeutral = 0;
-
-  let previousFrame: DynamicStatsTimeline["frames"][number] | null = null;
-  for (const frame of timeline.frames) {
-    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
-      previousFrame = frame;
-      continue;
-    }
-
-    const currentTeamZero = getLabeledOrNamedTime(
-      frame.possession,
-      "possession",
-      "possession_state",
-      "team_zero",
-      "team_zero_time",
-    );
-    const currentTeamOne = getLabeledOrNamedTime(
-      frame.possession,
-      "possession",
-      "possession_state",
-      "team_one",
-      "team_one_time",
-    );
-    const currentNeutral = getLabeledOrNamedTime(
-      frame.possession,
-      "possession",
-      "possession_state",
-      "neutral",
-      "neutral_time",
-    );
-
-    const deltaTeamZero = currentTeamZero - previousTeamZero;
-    const deltaTeamOne = currentTeamOne - previousTeamOne;
-    const deltaNeutral = currentNeutral - previousNeutral;
-
-    previousTeamZero = currentTeamZero;
-    previousTeamOne = currentTeamOne;
-    previousNeutral = currentNeutral;
-
-    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
-    let nextRange: ReplayTimelineRange | null = null;
-
-    if (deltaTeamZero > deltaTeamOne + DELTA_EPSILON && deltaTeamZero > deltaNeutral + DELTA_EPSILON) {
-      nextRange = {
-        id: `possession:team_zero:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: "possession",
-        laneLabel: "Possession",
-        label: "Blue possession",
-        color: "rgba(59, 130, 246, 0.88)",
-        isTeamZero: true,
-      };
-    } else if (deltaTeamOne > deltaTeamZero + DELTA_EPSILON && deltaTeamOne > deltaNeutral + DELTA_EPSILON) {
-      nextRange = {
-        id: `possession:team_one:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: "possession",
-        laneLabel: "Possession",
-        label: "Orange possession",
-        color: "rgba(245, 158, 11, 0.88)",
-        isTeamZero: false,
-      };
-    } else if (deltaNeutral > DELTA_EPSILON) {
-      nextRange = {
-        id: `possession:neutral:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: "possession",
-        laneLabel: "Possession",
-        label: "Neutral possession",
-        color: "rgba(209, 217, 224, 0.7)",
-        isTeamZero: null,
-      };
-    }
-
-    mergeRange(ranges, nextRange);
-    previousFrame = frame;
-  }
-
-  return ranges;
-}
-
-function buildPressureTimelineRangesFromDynamic(
-  timeline: DynamicStatsTimeline,
-  replay?: ReplayModel,
-): ReplayTimelineRange[] {
-  const ranges: ReplayTimelineRange[] = [];
-  let previousTeamZero = 0;
-  let previousTeamOne = 0;
-  let previousNeutral = 0;
-  const neutralZoneHalfWidthY = getPressureNeutralZoneHalfWidthY(timeline);
-
-  let previousFrame: DynamicStatsTimeline["frames"][number] | null = null;
-  for (const frame of timeline.frames) {
-    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
-      previousFrame = frame;
-      continue;
-    }
-
-    const currentTeamZero = getLabeledOrNamedTime(
-      frame.pressure,
-      "pressure",
-      "field_half",
-      "team_zero_side",
-      "team_zero_side_time",
-    );
-    const currentTeamOne = getLabeledOrNamedTime(
-      frame.pressure,
-      "pressure",
-      "field_half",
-      "team_one_side",
-      "team_one_side_time",
-    );
-    const currentNeutral = getLabeledOrNamedTime(
-      frame.pressure,
-      "pressure",
-      "field_half",
-      "neutral",
-      "neutral_time",
-    );
-    const deltaTeamZero = currentTeamZero - previousTeamZero;
-    const deltaTeamOne = currentTeamOne - previousTeamOne;
-    const deltaNeutral = currentNeutral - previousNeutral;
-
-    previousTeamZero = currentTeamZero;
-    previousTeamOne = currentTeamOne;
-    previousNeutral = currentNeutral;
-
-    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
-    const halfControlState = resolvePressureHalfControlState(
-      frame.frame_number,
-      replay,
-      neutralZoneHalfWidthY,
-      deltaTeamZero,
-      deltaTeamOne,
-      deltaNeutral,
-    );
-    const nextRange = halfControlState
-      ? createPressureRange(halfControlState, startTime, endTime)
-      : null;
-
-    mergeRange(ranges, nextRange);
-    previousFrame = frame;
-  }
-
-  return ranges;
-}
-
-function getLabeledOrNamedTime(
-  stats: ExportedStat[] | undefined,
-  domain: string,
-  labelKey: string,
-  labelValue: string,
-  fallbackName: string,
-): number {
-  const labeledValue = getLabeledTime(stats, domain, labelKey, labelValue);
-  if (labeledValue !== null) {
-    return labeledValue;
-  }
-
-  return getNamedTime(stats, domain, fallbackName) ?? 0;
-}
-
-function getLabeledTime(
-  stats: ExportedStat[] | undefined,
-  domain: string,
-  labelKey: string,
-  labelValue: string,
-): number | null {
-  if (!stats || stats.length === 0) {
-    return null;
-  }
-
-  let found = false;
-  let total = 0;
-  for (const stat of stats) {
-    if (
-      getExportedStatDomain(stat) !== domain ||
-      getExportedStatName(stat) !== "time" ||
-      getExportedStatVariant(stat) !== "labeled"
-    ) {
-      continue;
-    }
-
-    const numericValue = getExportedStatValue(stat);
-    if (numericValue === undefined) {
-      continue;
-    }
-
-    const value = getExportedStatLabels(stat).find((label) => label.key === labelKey)?.value;
-    if (value !== labelValue) {
-      continue;
-    }
-
-    found = true;
-    total += numericValue;
-  }
-
-  return found ? total : null;
-}
-
-function getNamedTime(
-  stats: ExportedStat[] | undefined,
-  domain: string,
-  name: string,
-): number | null {
-  if (!stats || stats.length === 0) {
-    return null;
-  }
-
-  for (const stat of stats) {
-    if (
-      getExportedStatDomain(stat) === domain &&
-      getExportedStatName(stat) === name &&
-      getExportedStatVariant(stat) !== "labeled"
-    ) {
-      const value = getExportedStatValue(stat);
-      if (value !== undefined) {
-        return value;
-      }
-    }
-  }
-
-  return null;
 }
 
 function resolveRangeBounds(

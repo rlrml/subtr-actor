@@ -18,7 +18,7 @@ pub struct CapturedStatsFrame<Modules> {
     pub modules: Modules,
 }
 
-pub type StatsPlaybackFrame = CapturedStatsFrame<Map<String, Value>>;
+pub type StatsSnapshotFrame = CapturedStatsFrame<Map<String, Value>>;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CapturedStatsData<Frame> {
@@ -28,7 +28,7 @@ pub struct CapturedStatsData<Frame> {
     pub frames: Vec<Frame>,
 }
 
-pub type StatsPlaybackData = CapturedStatsData<StatsPlaybackFrame>;
+pub type StatsSnapshotData = CapturedStatsData<StatsSnapshotFrame>;
 
 impl<Modules> CapturedStatsFrame<Modules> {
     pub fn map_modules<Mapped, F>(
@@ -50,7 +50,7 @@ impl<Modules> CapturedStatsFrame<Modules> {
     }
 }
 
-impl CapturedStatsData<StatsPlaybackFrame> {
+impl CapturedStatsData<StatsSnapshotFrame> {
     pub fn into_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         self.to_stats_timeline()
     }
@@ -76,14 +76,10 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         frames: Vec<ReplayStatsFrame>,
     ) -> SubtrActorResult<ReplayStatsTimeline> {
         Ok(ReplayStatsTimeline {
-            config: self.legacy_config(),
+            config: self.timeline_config(),
             replay_meta: self.replay_meta.clone(),
             timeline_events: self.timeline_events_typed()?,
-            backboard_events: self.module_player_events(
-                "backboard",
-                "events",
-                parse_backboard_event,
-            )?,
+            backboard_events: self.module_player_events("backboard", "events", parse_backboard_event)?,
             ceiling_shot_events: self.module_player_events(
                 "ceiling_shot",
                 "events",
@@ -114,58 +110,47 @@ impl CapturedStatsData<StatsPlaybackFrame> {
     }
 
     pub fn to_stats_timeline_value(&self) -> SubtrActorResult<Value> {
-        let mut legacy = Map::new();
-        legacy.insert("config".to_owned(), self.legacy_config_value()?);
-        legacy.insert(
+        let mut timeline = Map::new();
+        timeline.insert("config".to_owned(), self.timeline_config_value()?);
+        timeline.insert(
             "replay_meta".to_owned(),
             serialize_to_json_value(&self.replay_meta)?,
         );
-        legacy.insert(
-            "timeline_events".to_owned(),
-            Value::Array(self.timeline_events()),
-        );
-        legacy.insert(
+        timeline.insert("timeline_events".to_owned(), Value::Array(self.timeline_events()));
+        timeline.insert(
             "backboard_events".to_owned(),
             Value::Array(self.module_array("backboard", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "ceiling_shot_events".to_owned(),
             Value::Array(self.module_array("ceiling_shot", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "double_tap_events".to_owned(),
             Value::Array(self.module_array("double_tap", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "fifty_fifty_events".to_owned(),
             Value::Array(self.module_array("fifty_fifty", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "rush_events".to_owned(),
             Value::Array(self.module_array("rush", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "speed_flip_events".to_owned(),
             Value::Array(self.module_array("speed_flip", "events")),
         );
-        legacy.insert(
+        timeline.insert(
             "frames".to_owned(),
             Value::Array(
                 self.frames
                     .iter()
-                    .map(|frame| self.legacy_frame_value(frame))
+                    .map(|frame| self.timeline_frame_value(frame))
                     .collect::<SubtrActorResult<Vec<_>>>()?,
             ),
         );
-        Ok(Value::Object(legacy))
-    }
-
-    pub fn into_legacy_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.into_stats_timeline_value()
-    }
-
-    pub fn to_legacy_stats_timeline_value(&self) -> SubtrActorResult<Value> {
-        self.to_stats_timeline_value()
+        Ok(Value::Object(timeline))
     }
 
     fn timeline_events(&self) -> Vec<Value> {
@@ -186,21 +171,21 @@ impl CapturedStatsData<StatsPlaybackFrame> {
             .collect()
     }
 
-    fn legacy_config(&self) -> StatsTimelineConfig {
+    fn timeline_config(&self) -> StatsTimelineConfig {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
-        let rush_defaults = RushReducerConfig::default();
+        let rush_defaults = RushCalculatorConfig::default();
 
         StatsTimelineConfig {
             most_back_forward_threshold_y: positioning_config
                 .and_then(|config| config.get("most_back_forward_threshold_y"))
                 .and_then(json_f32)
-                .unwrap_or(PositioningReducerConfig::default().most_back_forward_threshold_y),
+                .unwrap_or(PositioningCalculatorConfig::default().most_back_forward_threshold_y),
             pressure_neutral_zone_half_width_y: pressure_config
                 .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
-                .unwrap_or(PressureReducerConfig::default().neutral_zone_half_width_y),
+                .unwrap_or(PressureCalculatorConfig::default().neutral_zone_half_width_y),
             rush_max_start_y: rush_config
                 .and_then(|config| config.get("rush_max_start_y"))
                 .and_then(json_f32)
@@ -220,7 +205,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         }
     }
 
-    fn legacy_config_value(&self) -> SubtrActorResult<Value> {
+    fn timeline_config_value(&self) -> SubtrActorResult<Value> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
@@ -233,7 +218,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
                     .and_then(|config| config.get("most_back_forward_threshold_y"))
                     .and_then(Value::as_f64)
                     .unwrap_or(
-                        PositioningReducerConfig::default().most_back_forward_threshold_y as f64,
+                        PositioningCalculatorConfig::default().most_back_forward_threshold_y as f64,
                     ),
             )?,
         );
@@ -243,10 +228,12 @@ impl CapturedStatsData<StatsPlaybackFrame> {
                 &pressure_config
                     .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                     .and_then(Value::as_f64)
-                    .unwrap_or(PressureReducerConfig::default().neutral_zone_half_width_y as f64),
+                    .unwrap_or(
+                        PressureCalculatorConfig::default().neutral_zone_half_width_y as f64,
+                    ),
             )?,
         );
-        let rush_defaults = RushReducerConfig::default();
+        let rush_defaults = RushCalculatorConfig::default();
         config.insert(
             "rush_max_start_y".to_owned(),
             serialize_to_json_value(
@@ -286,65 +273,65 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         Ok(Value::Object(config))
     }
 
-    fn legacy_frame_value(&self, frame: &StatsPlaybackFrame) -> SubtrActorResult<Value> {
-        let mut legacy = Map::new();
-        legacy.insert(
+    fn timeline_frame_value(&self, frame: &StatsSnapshotFrame) -> SubtrActorResult<Value> {
+        let mut timeline = Map::new();
+        timeline.insert(
             "frame_number".to_owned(),
             serialize_to_json_value(&frame.frame_number)?,
         );
-        legacy.insert("time".to_owned(), serialize_to_json_value(&frame.time)?);
-        legacy.insert("dt".to_owned(), serialize_to_json_value(&frame.dt)?);
-        legacy.insert(
+        timeline.insert("time".to_owned(), serialize_to_json_value(&frame.time)?);
+        timeline.insert("dt".to_owned(), serialize_to_json_value(&frame.dt)?);
+        timeline.insert(
             "seconds_remaining".to_owned(),
             serialize_to_json_value(&frame.seconds_remaining)?,
         );
-        legacy.insert(
+        timeline.insert(
             "game_state".to_owned(),
             serialize_to_json_value(&frame.game_state)?,
         );
-        legacy.insert(
+        timeline.insert(
             "is_live_play".to_owned(),
             serialize_to_json_value(&frame.is_live_play)?,
         );
-        legacy.insert(
+        timeline.insert(
             "fifty_fifty".to_owned(),
             self.frame_stats_or_default::<FiftyFiftyStats>(frame, "fifty_fifty"),
         );
-        legacy.insert(
+        timeline.insert(
             "possession".to_owned(),
             self.frame_stats_or_default::<PossessionStats>(frame, "possession"),
         );
-        legacy.insert(
+        timeline.insert(
             "pressure".to_owned(),
             self.frame_stats_or_default::<PressureStats>(frame, "pressure"),
         );
-        legacy.insert(
+        timeline.insert(
             "rush".to_owned(),
             self.frame_stats_or_default::<RushStats>(frame, "rush"),
         );
-        legacy.insert(
+        timeline.insert(
             "team_zero".to_owned(),
-            self.legacy_team_value(frame, "team_zero")?,
+            self.timeline_team_value(frame, "team_zero")?,
         );
-        legacy.insert(
+        timeline.insert(
             "team_one".to_owned(),
-            self.legacy_team_value(frame, "team_one")?,
+            self.timeline_team_value(frame, "team_one")?,
         );
-        legacy.insert(
+        timeline.insert(
             "players".to_owned(),
             Value::Array(
                 self.replay_meta
                     .player_order()
-                    .map(|player| self.legacy_player_value(frame, player))
+                    .map(|player| self.timeline_player_value(frame, player))
                     .collect::<SubtrActorResult<Vec<_>>>()?,
             ),
         );
-        Ok(Value::Object(legacy))
+        Ok(Value::Object(timeline))
     }
 
     pub(crate) fn replay_stats_frame(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
     ) -> SubtrActorResult<ReplayStatsFrame> {
         Ok(ReplayStatsFrame {
             frame_number: frame.frame_number,
@@ -369,7 +356,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn replay_team_stats(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         team_key: &str,
     ) -> SubtrActorResult<TeamStatsSnapshot> {
         Ok(TeamStatsSnapshot {
@@ -386,7 +373,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn replay_player_stats(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         player: &PlayerInfo,
     ) -> SubtrActorResult<PlayerStatsSnapshot> {
         let player_key = player_info_key(player)?;
@@ -470,9 +457,9 @@ impl CapturedStatsData<StatsPlaybackFrame> {
             .any(|team_player| team_player.remote_id == player.remote_id)
     }
 
-    fn legacy_team_value(
+    fn timeline_team_value(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         team_key: &str,
     ) -> SubtrActorResult<Value> {
         let mut team = Map::new();
@@ -511,9 +498,9 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         Ok(Value::Object(team))
     }
 
-    fn legacy_player_value(
+    fn timeline_player_value(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         player: &PlayerInfo,
     ) -> SubtrActorResult<Value> {
         let player_key = player_info_key(player)?;
@@ -666,7 +653,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
         Ok(Value::Object(player_value))
     }
 
-    fn frame_stats_or_default<T>(&self, frame: &StatsPlaybackFrame, module_name: &str) -> Value
+    fn frame_stats_or_default<T>(&self, frame: &StatsSnapshotFrame, module_name: &str) -> Value
     where
         T: Default + Serialize,
     {
@@ -681,7 +668,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_team_stat_or_default<T>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         team_key: &str,
     ) -> Value
@@ -699,7 +686,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_player_stat_or_default_by_key<T>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         player_key: &str,
     ) -> SubtrActorResult<Value>
@@ -716,7 +703,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_player_stat_or_value_by_key(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         player_key: &str,
         default_value: Value,
@@ -730,7 +717,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_stats_or_default_typed<T>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
     ) -> SubtrActorResult<T>
     where
@@ -741,7 +728,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_team_stat_or_default_typed<T>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         team_key: &str,
     ) -> SubtrActorResult<T>
@@ -753,7 +740,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_player_stat_or_default_typed_by_key<T>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         player_key: &str,
     ) -> SubtrActorResult<T>
@@ -765,7 +752,7 @@ impl CapturedStatsData<StatsPlaybackFrame> {
 
     fn frame_player_stat_or_default_with_by_key<T, F>(
         &self,
-        frame: &StatsPlaybackFrame,
+        frame: &StatsSnapshotFrame,
         module_name: &str,
         player_key: &str,
         default: F,
@@ -823,7 +810,7 @@ impl CapturedStatsData<ReplayStatsFrame> {
             modules,
             frames,
         } = self;
-        CapturedStatsData::<StatsPlaybackFrame> {
+        CapturedStatsData::<StatsSnapshotFrame> {
             replay_meta,
             config,
             modules,

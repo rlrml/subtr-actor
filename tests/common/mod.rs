@@ -240,16 +240,16 @@ fn compare_core_team_stats(
         .or_else(|| compare_field(&format!("{label}.shots"), &left.shots, &right.shots))
         .or_else(|| {
             compare_field(
-                &format!("{label}.goal_after_kickoff"),
-                &left.goal_after_kickoff,
-                &right.goal_after_kickoff,
+                &format!("{label}.scoring_context.goal_after_kickoff"),
+                &left.scoring_context.goal_after_kickoff,
+                &right.scoring_context.goal_after_kickoff,
             )
         })
         .or_else(|| {
             compare_field(
-                &format!("{label}.goal_buildup"),
-                &left.goal_buildup,
-                &right.goal_buildup,
+                &format!("{label}.scoring_context.goal_buildup"),
+                &left.scoring_context.goal_buildup,
+                &right.scoring_context.goal_buildup,
             )
         })
 }

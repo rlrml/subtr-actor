@@ -30,7 +30,7 @@ impl DodgeResetCalculator {
         const MAX_CENTER_DISTANCE: f32 = 180.0;
         const MAX_LOCAL_VERTICAL_OFFSET: f32 = 140.0;
 
-        let Some(ball) = &ball.ball else {
+        let Some(ball) = ball.sample() else {
             return false;
         };
         let Some(player) = players

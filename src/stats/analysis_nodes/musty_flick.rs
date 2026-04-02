@@ -29,15 +29,28 @@ impl AnalysisNode for MustyFlickNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        let mut dependencies = vec![frame_state_dependency()];
-        dependencies.push(touch_state_dependency());
-        dependencies
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            touch_state_dependency(),
+            live_play_dependency(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<FrameState>()?;
+        let frame = ctx.get::<FrameInfo>()?;
+        let ball = ctx.get::<BallFrameState>()?;
+        let players = ctx.get::<PlayerFrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
-        self.calculator.update(sample, &touch_state.touch_events)
+        let live_play_state = ctx.get::<LivePlayState>()?;
+        self.calculator.update_parts(
+            frame,
+            ball,
+            players,
+            &touch_state.touch_events,
+            live_play_state.is_live_play,
+        )
     }
 
     fn state(&self) -> &Self::State {

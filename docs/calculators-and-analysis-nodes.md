@@ -20,9 +20,9 @@ in the dependency graph.
 
 This layer owns the domain logic.
 
-- `core/` defines shared frame-level inputs such as `FrameInput`, `FrameState`,
-  `FrameInfo`, `GameplayState`, `BallFrameState`, `PlayerFrameState`, and
-  `FrameEventsState`.
+- Shared frame-level inputs such as `FrameInput`, `FrameInfo`,
+  `GameplayState`, `BallFrameState`, `PlayerFrameState`, and
+  `FrameEventsState` live in the top-level calculator modules.
 - Per-stat files such as `pressure.rs`, `rush.rs`, `positioning.rs`, and
   `boost.rs` define the calculators and their stat/event/state types.
 - Some files expose intermediate state calculators rather than exported stats,

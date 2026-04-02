@@ -36,7 +36,6 @@ headers = subtr_actor.get_column_headers(
 replay_meta = subtr_actor.get_replay_meta(replay_path)
 frames_data = subtr_actor.get_replay_frames_data(replay_path)
 stats_timeline = subtr_actor.get_stats_timeline(replay_path)
-dynamic_stats_timeline = subtr_actor.get_dynamic_stats_timeline(replay_path)
 
 print(ndarray.shape)
 print(headers["player_headers"][:5])
@@ -77,14 +76,6 @@ Get structured frame-by-frame game state data with no FPS resampling.
 ### `get_stats_timeline(filepath) -> dict`
 
 Get cumulative typed stats snapshots for each replay sample.
-
-Parameters:
-
-- `filepath`: path to the replay file
-
-### `get_dynamic_stats_timeline(filepath) -> dict`
-
-Get cumulative dynamic stats snapshots for each replay sample.
 
 Parameters:
 

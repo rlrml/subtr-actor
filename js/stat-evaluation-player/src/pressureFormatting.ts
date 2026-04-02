@@ -1,15 +1,6 @@
-import type { ExportedStat, StatsFrame } from "./statsTimeline.ts";
-import {
-  getExportedStatDomain,
-  getExportedStatLabels,
-  getExportedStatName,
-  getExportedStatValue,
-  getExportedStatValueType,
-  getExportedStatVariant,
-} from "./exportedStats.ts";
+import type { StatsFrame } from "./statsTimeline.ts";
 
 interface PressureRenderOptions {
-  exportedStats?: ExportedStat[];
   labelPerspective:
     | {
       kind: "shared";
@@ -98,7 +89,6 @@ function formatFieldHalfLabel(
 
 function renderPressureBreakdownRows(
   pressure: StatsFrame["pressure"],
-  exportedStats: ExportedStat[] | undefined,
   trackedTime: number | undefined,
   labelPerspective: PressureRenderOptions["labelPerspective"],
 ): string {
@@ -120,30 +110,6 @@ function renderPressureBreakdownRows(
 
       totals.set(half, (totals.get(half) ?? 0) + entry.value);
     }
-  } else if (totals.size === 0) {
-    for (const stat of exportedStats ?? []) {
-      const domain = getExportedStatDomain(stat);
-      const name = getExportedStatName(stat);
-      const variant = getExportedStatVariant(stat);
-      const valueType = getExportedStatValueType(stat);
-      const value = getExportedStatValue(stat);
-      if (
-        domain !== "pressure" ||
-        name !== "time" ||
-        variant !== "labeled" ||
-        valueType !== "float" ||
-        value === undefined
-      ) {
-        continue;
-      }
-
-      const half = getExportedStatLabels(stat).find((label) => label.key === "field_half")?.value;
-      if (!half) {
-        continue;
-      }
-
-      totals.set(half, (totals.get(half) ?? 0) + value);
-    }
   }
 
   const orderedHalves = ["team_zero_side", "neutral", "team_one_side"];
@@ -164,18 +130,9 @@ export function renderPressureStats(
   pressure: StatsFrame["pressure"],
   options: PressureRenderOptions,
 ): string {
-  const trackedTimeStat = options.exportedStats?.find((stat) =>
-    getExportedStatDomain(stat) === "pressure"
-    && getExportedStatName(stat) === "time"
-    && getExportedStatVariant(stat) !== "labeled"
-    && getExportedStatValueType(stat) === "float"
-    && getExportedStatValue(stat) !== undefined
-  );
-  const trackedTime = pressure?.tracked_time
-    ?? (trackedTimeStat ? getExportedStatValue(trackedTimeStat) : undefined);
+  const trackedTime = pressure?.tracked_time;
   const breakdownRows = renderPressureBreakdownRows(
     pressure,
-    options.exportedStats,
     trackedTime,
     options.labelPerspective,
   );

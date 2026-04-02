@@ -1,7 +1,5 @@
 use super::*;
 
-pub const FIFTY_FIFTY_STATE_SIGNAL_ID: DerivedSignalId = "fifty_fifty_state";
-
 pub(crate) const FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS: f32 = 0.2;
 pub(crate) const FIFTY_FIFTY_RESOLUTION_DELAY_SECONDS: f32 = 0.35;
 pub(crate) const FIFTY_FIFTY_MAX_DURATION_SECONDS: f32 = 1.25;
@@ -293,28 +291,29 @@ impl FiftyFiftyCalculator {
         self.events.push(event.clone());
     }
 
-    pub(crate) fn kickoff_phase_active(sample: &FrameState) -> bool {
-        sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || sample.ball_has_been_hit == Some(false)
+    pub(crate) fn kickoff_phase_active(gameplay: &GameplayState) -> bool {
+        gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+            || gameplay.kickoff_countdown_time.is_some_and(|time| time > 0)
+            || gameplay.ball_has_been_hit == Some(false)
     }
 
     pub(crate) fn contested_touch(
-        sample: &FrameState,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
         touch_events: &[TouchEvent],
         is_kickoff: bool,
     ) -> Option<ActiveFiftyFifty> {
         let team_zero_touch = touch_events.iter().find(|touch| touch.team_is_team_0)?;
         let team_one_touch = touch_events.iter().find(|touch| !touch.team_is_team_0)?;
         let team_zero_position = team_zero_touch.player.as_ref().and_then(|player_id| {
-            sample
+            players
                 .players
                 .iter()
                 .find(|player| &player.player_id == player_id)
                 .and_then(PlayerSample::position)
         })?;
         let team_one_position = team_one_touch.player.as_ref().and_then(|player_id| {
-            sample
+            players
                 .players
                 .iter()
                 .find(|player| &player.player_id == player_id)
@@ -330,10 +329,10 @@ impl FiftyFiftyCalculator {
         }
 
         Some(ActiveFiftyFifty {
-            start_time: sample.time,
-            start_frame: sample.frame_number,
-            last_touch_time: sample.time,
-            last_touch_frame: sample.frame_number,
+            start_time: frame.time,
+            start_frame: frame.frame_number,
+            last_touch_time: frame.time,
+            last_touch_frame: frame.frame_number,
             is_kickoff,
             team_zero_player: team_zero_touch.player.clone(),
             team_one_player: team_one_touch.player.clone(),
@@ -346,9 +345,9 @@ impl FiftyFiftyCalculator {
 
     pub(crate) fn winning_team_from_ball(
         active: &ActiveFiftyFifty,
-        sample: &FrameState,
+        ball: &BallFrameState,
     ) -> Option<bool> {
-        let ball = sample.ball.as_ref()?;
+        let ball = ball.sample()?;
         let midpoint = active.midpoint_vec();
         let plane_normal = active.plane_normal_vec();
         let displacement = ball.position() - midpoint;
@@ -372,7 +371,3 @@ impl FiftyFiftyCalculator {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/fifty_fifty_test.rs"]
-mod tests;

@@ -46,8 +46,7 @@ impl TouchStateCalculator {
     }
 
     fn current_ball_angular_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
-        ball.ball
-            .as_ref()
+        ball.sample()
             .map(|ball| {
                 ball.rigid_body
                     .angular_velocity
@@ -61,7 +60,7 @@ impl TouchStateCalculator {
     }
 
     fn current_ball_linear_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
-        ball.ball.as_ref().map(BallSample::velocity)
+        ball.velocity()
     }
 
     fn is_touch_candidate(&self, frame: &FrameInfo, ball: &BallFrameState) -> bool {
@@ -104,7 +103,7 @@ impl TouchStateCalculator {
         const OCTANE_HITBOX_OFFSET: f32 = 13.88;
         const OCTANE_HITBOX_ELEVATION: f32 = 17.05;
 
-        let Some(ball) = ball.ball.as_ref() else {
+        let Some(ball) = ball.sample() else {
             return Vec::new();
         };
         let ball_position = vec_to_glam(&ball.rigid_body.location);

@@ -112,20 +112,11 @@ pub enum SubtrActorErrorVariant {
     #[error("{0:?} was not a recognized feature adder")]
     UnknownFeatureAdderName(String),
 
-    #[error("Derived signal graph error: {0}")]
-    DerivedSignalGraphError(String),
-
     #[error("Callback error: {0}")]
     CallbackError(String),
 
-    #[error("Stats module dependency cycle detected: {cycle:?}")]
-    StatsModuleDependencyCycle { cycle: Vec<String> },
-
     #[error("Unknown builtin stats module '{0}'")]
     UnknownStatsModuleName(String),
-
-    #[error("Duplicate emitted stats module name '{name}' for dependency keys {keys:?}")]
-    DuplicateStatsModuleName { name: String, keys: Vec<String> },
 
     #[error("Stats serialization error: {0}")]
     StatsSerializationError(String),

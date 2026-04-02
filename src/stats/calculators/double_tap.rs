@@ -66,15 +66,15 @@ impl DoubleTapCalculator {
         &self.events
     }
 
-    fn begin_sample(&mut self, sample: &FrameState) {
+    fn begin_sample(&mut self, frame: &FrameInfo) {
         for stats in self.player_stats.values_mut() {
             stats.is_last_double_tap = false;
             stats.time_since_last_double_tap = stats
                 .last_double_tap_time
-                .map(|time| (sample.time - time).max(0.0));
+                .map(|time| (frame.time - time).max(0.0));
             stats.frames_since_last_double_tap = stats
                 .last_double_tap_frame
-                .map(|frame| sample.frame_number.saturating_sub(frame));
+                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
         }
     }
 
@@ -107,33 +107,37 @@ impl DoubleTapCalculator {
         }
     }
 
-    fn resolve_double_tap_touches(&mut self, sample: &FrameState) {
-        if sample.touch_events.is_empty() || self.pending_backboard_bounces.is_empty() {
+    fn resolve_double_tap_touches(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        touch_events: &[TouchEvent],
+    ) {
+        if touch_events.is_empty() || self.pending_backboard_bounces.is_empty() {
             return;
         }
 
         let mut completed_events = Vec::new();
         self.pending_backboard_bounces.retain(|pending| {
-            if sample.time <= pending.time {
+            if frame.time <= pending.time {
                 return true;
             }
 
-            let matching_touch = sample.touch_events.iter().any(|touch| {
+            let matching_touch = touch_events.iter().any(|touch| {
                 touch.team_is_team_0 == pending.is_team_0
                     && touch.player.as_ref() == Some(&pending.player_id)
             });
-            let conflicting_touch = sample
-                .touch_events
+            let conflicting_touch = touch_events
                 .iter()
                 .any(|touch| touch.player.as_ref() != Some(&pending.player_id));
 
             if matching_touch
                 && !conflicting_touch
-                && Self::followup_touch_is_goal_directed(sample, pending.is_team_0)
+                && Self::followup_touch_is_goal_directed(ball, pending.is_team_0)
             {
                 completed_events.push(DoubleTapEvent {
-                    time: sample.time,
-                    frame: sample.frame_number,
+                    time: frame.time,
+                    frame: frame.frame_number,
                     player: pending.player_id.clone(),
                     is_team_0: pending.is_team_0,
                     backboard_time: pending.time,
@@ -144,17 +148,17 @@ impl DoubleTapCalculator {
         });
 
         for event in completed_events {
-            self.record_double_tap(sample, event);
+            self.record_double_tap(frame, event);
         }
     }
 
-    fn record_double_tap(&mut self, sample: &FrameState, event: DoubleTapEvent) {
+    fn record_double_tap(&mut self, frame: &FrameInfo, event: DoubleTapEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.count += 1;
         stats.last_double_tap_time = Some(event.time);
         stats.last_double_tap_frame = Some(event.frame);
-        stats.time_since_last_double_tap = Some((sample.time - event.time).max(0.0));
-        stats.frames_since_last_double_tap = Some(sample.frame_number.saturating_sub(event.frame));
+        stats.time_since_last_double_tap = Some((frame.time - event.time).max(0.0));
+        stats.frames_since_last_double_tap = Some(frame.frame_number.saturating_sub(event.frame));
 
         let team_stats = if event.is_team_0 {
             &mut self.team_zero_stats
@@ -166,11 +170,11 @@ impl DoubleTapCalculator {
         self.events.push(event);
     }
 
-    fn followup_touch_is_goal_directed(sample: &FrameState, is_team_0: bool) -> bool {
+    fn followup_touch_is_goal_directed(ball: &BallFrameState, is_team_0: bool) -> bool {
         const GOAL_CENTER_Y: f32 = 5120.0;
         const MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.6;
 
-        let Some(ball) = sample.ball.as_ref() else {
+        let Some(ball) = ball.sample() else {
             return false;
         };
 
@@ -193,17 +197,20 @@ impl DoubleTapCalculator {
 
     pub fn update(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        events: &FrameEventsState,
         backboard_bounce_state: &BackboardBounceState,
+        live_play: bool,
     ) -> SubtrActorResult<()> {
-        self.begin_sample(sample);
-        if !sample.is_live_play() {
+        self.begin_sample(frame);
+        if !live_play {
             self.pending_backboard_bounces.clear();
         }
 
-        self.prune_pending_backboard_bounces(sample.time);
+        self.prune_pending_backboard_bounces(frame.time);
         self.record_backboard_bounces(backboard_bounce_state);
-        self.resolve_double_tap_touches(sample);
+        self.resolve_double_tap_touches(frame, ball, &events.touch_events);
 
         if let Some(player_id) = self.current_last_double_tap_player.as_ref() {
             if let Some(stats) = self.player_stats.get_mut(player_id) {

@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use serde_json::Value;
 
 use crate::*;
@@ -299,156 +297,45 @@ pub(crate) struct ComputedComparableStats {
     pub(super) powerslide: PowerslideCalculator,
 }
 
-struct ComparableStatsCollector {
-    match_stats: MatchStatsCalculator,
-    boost: BoostCalculator,
-    movement: MovementCalculator,
-    positioning: PositioningCalculator,
-    demo: DemoCalculator,
-    powerslide: PowerslideCalculator,
-    derived_signals: DerivedSignalGraph,
-    replay_meta: Option<ReplayMeta>,
-    last_sample_time: Option<f32>,
-    last_demolish_count: usize,
-    last_boost_pad_event_count: usize,
-    last_touch_event_count: usize,
-    last_player_stat_event_count: usize,
-    last_goal_event_count: usize,
-}
-
-impl ComparableStatsCollector {
-    fn new() -> Self {
-        let match_stats = MatchStatsCalculator::new();
-        let boost = BoostCalculator::new();
-        let movement = MovementCalculator::new();
-        let positioning = PositioningCalculator::new();
-        let demo = DemoCalculator::new();
-        let powerslide = PowerslideCalculator::new();
-
-        let mut required_signals = BTreeSet::new();
-        for signals in [
-            match_stats.required_derived_signals(),
-            boost.required_derived_signals(),
-            movement.required_derived_signals(),
-            positioning.required_derived_signals(),
-            demo.required_derived_signals(),
-            powerslide.required_derived_signals(),
-        ] {
-            required_signals.extend(signals);
-        }
-
-        Self {
-            match_stats,
-            boost,
-            movement,
-            positioning,
-            demo,
-            powerslide,
-            derived_signals: derived_signal_graph_for_ids(required_signals.into_iter()),
-            replay_meta: None,
-            last_sample_time: None,
-            last_demolish_count: 0,
-            last_boost_pad_event_count: 0,
-            last_touch_event_count: 0,
-            last_player_stat_event_count: 0,
-            last_goal_event_count: 0,
-        }
-    }
-
-    fn into_stats(self) -> ComputedComparableStats {
-        ComputedComparableStats {
-            replay_meta: self
-                .replay_meta
-                .expect("replay metadata should be initialized before building comparable stats"),
-            match_stats: self.match_stats,
-            boost: self.boost,
-            movement: self.movement,
-            positioning: self.positioning,
-            demo: self.demo,
-            powerslide: self.powerslide,
-        }
-    }
-}
-
-impl Collector for ComparableStatsCollector {
-    fn process_frame(
-        &mut self,
-        processor: &ReplayProcessor,
-        _frame: &boxcars::Frame,
-        frame_number: usize,
-        current_time: f32,
-    ) -> SubtrActorResult<TimeAdvance> {
-        if self.replay_meta.is_none() {
-            let replay_meta = processor.get_replay_meta()?;
-            self.derived_signals.on_replay_meta(&replay_meta)?;
-            self.match_stats.on_replay_meta(&replay_meta)?;
-            self.boost.on_replay_meta(&replay_meta)?;
-            self.movement.on_replay_meta(&replay_meta)?;
-            self.positioning.on_replay_meta(&replay_meta)?;
-            self.demo.on_replay_meta(&replay_meta)?;
-            self.powerslide.on_replay_meta(&replay_meta)?;
-            self.replay_meta = Some(replay_meta);
-        }
-
-        let dt = self
-            .last_sample_time
-            .map(|last_time| (current_time - last_time).max(0.0))
-            .unwrap_or(0.0);
-        let sample = ReducerSample::from_input(&FrameInput::aggregate(
-            processor,
-            frame_number,
-            current_time,
-            dt,
-            self.last_demolish_count,
-            self.last_boost_pad_event_count,
-            self.last_touch_event_count,
-            self.last_player_stat_event_count,
-            self.last_goal_event_count,
-        ));
-        let analysis_context = self.derived_signals.evaluate(&sample)?;
-
-        self.match_stats
-            .on_sample_with_context(&sample, analysis_context)?;
-        self.boost
-            .on_sample_with_context(&sample, analysis_context)?;
-        self.movement
-            .on_sample_with_context(&sample, analysis_context)?;
-        self.positioning
-            .on_sample_with_context(&sample, analysis_context)?;
-        self.demo
-            .on_sample_with_context(&sample, analysis_context)?;
-        self.powerslide
-            .on_sample_with_context(&sample, analysis_context)?;
-
-        self.last_sample_time = Some(current_time);
-        self.last_demolish_count = processor.demolishes.len();
-        self.last_boost_pad_event_count = processor.boost_pad_events.len();
-        self.last_touch_event_count = processor.touch_events.len();
-        self.last_player_stat_event_count = processor.player_stat_events.len();
-        self.last_goal_event_count = processor.goal_events.len();
-
-        Ok(TimeAdvance::NextFrame)
-    }
-
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
-        self.derived_signals.finish()?;
-        self.match_stats.finish()?;
-        self.boost.finish()?;
-        self.movement.finish()?;
-        self.positioning.finish()?;
-        self.demo.finish()?;
-        self.powerslide.finish()?;
-        Ok(())
-    }
-}
-
 pub(crate) fn compute_comparable_stats(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
-    let mut collector = ComparableStatsCollector::new();
-    let mut processor = ReplayProcessor::new(replay)?;
-    processor.process(&mut collector)?;
-    Ok(collector.into_stats())
+    let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
+    let graph = crate::stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+        replay,
+        [
+            "core",
+            "boost",
+            "movement",
+            "positioning",
+            "demo",
+            "powerslide",
+        ],
+    )?;
+    Ok(ComputedComparableStats {
+        replay_meta,
+        match_stats: graph
+            .state::<MatchStatsCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        boost: graph
+            .state::<BoostCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        movement: graph
+            .state::<MovementCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        positioning: graph
+            .state::<PositioningCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+        demo: graph.state::<DemoCalculator>().cloned().unwrap_or_default(),
+        powerslide: graph
+            .state::<PowerslideCalculator>()
+            .cloned()
+            .unwrap_or_default(),
+    })
 }
 
 pub(crate) fn build_actual_comparable_stats(

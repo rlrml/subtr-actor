@@ -2,8 +2,8 @@ use js_sys::{Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector, ReplayDataSupplementalData},
     collector::CallbackCollector,
-    BoostReducer, Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector,
-    ReducerCollector, ReplayProcessor, StatsCollector, SubtrActorError, SubtrActorErrorVariant,
+    Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector, ReplayProcessor,
+    ResolvedBoostPadCollector, StatsCollector, SubtrActorError, SubtrActorErrorVariant,
     SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
@@ -86,7 +86,7 @@ fn collect_replay_data_with_optional_progress(
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut flip_reset_tracker = FlipResetTracker::new();
-    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
         .map(|(callback, frame_interval)| {
@@ -124,7 +124,7 @@ fn collect_replay_data_with_optional_progress(
     }
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
     replay_data_collector
         .into_replay_data_with_supplemental_data(processor, supplemental_data)
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))
@@ -140,7 +140,7 @@ fn collect_replay_bundle_with_optional_progress(
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut stats_collector = StatsCollector::new().capture_frames();
     let mut flip_reset_tracker = FlipResetTracker::new();
-    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
         .map(|(callback, frame_interval)| {
@@ -179,7 +179,7 @@ fn collect_replay_bundle_with_optional_progress(
     }
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
     let stats_timeline = stats_collector
         .into_stats_timeline_value()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
@@ -364,31 +364,6 @@ pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 
     let stats_timeline = StatsCollector::new()
         .get_stats_timeline_value(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
-
-    serde_json::to_vec(&stats_timeline)
-        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
-}
-
-/// Get dynamically-described cumulative stats snapshots for each replay sample.
-#[wasm_bindgen]
-pub fn get_dynamic_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
-    let replay = parse_replay_from_data(data)?;
-
-    let stats_timeline = StatsCollector::new()
-        .get_dynamic_replay_stats_timeline(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
-
-    serde_wasm_bindgen::to_value(&stats_timeline)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
-}
-
-#[wasm_bindgen]
-pub fn get_dynamic_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
-    let replay = parse_replay_from_data(data)?;
-
-    let stats_timeline = StatsCollector::new()
-        .get_dynamic_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)

@@ -2,7 +2,6 @@ use super::*;
 
 const SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 320.0;
 const HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 900.0;
-const AERIAL_TOUCH_Z_THRESHOLD: f32 = 180.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TouchKind {
@@ -32,33 +31,9 @@ impl TouchKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TouchHeightBand {
-    Ground,
-    LowAir,
-    HighAir,
-}
-
-const ALL_TOUCH_HEIGHT_BANDS: [TouchHeightBand; 3] = [
-    TouchHeightBand::Ground,
-    TouchHeightBand::LowAir,
-    TouchHeightBand::HighAir,
-];
-
-impl TouchHeightBand {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
-            Self::Ground => "ground",
-            Self::LowAir => "low_air",
-            Self::HighAir => "high_air",
-        };
-        StatLabel::new("height_band", value)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TouchClassification {
     kind: TouchKind,
-    height_band: TouchHeightBand,
+    height_band: PlayerVerticalBand,
 }
 
 impl TouchClassification {
@@ -102,7 +77,7 @@ impl TouchStats {
     }
 
     pub fn complete_labeled_touch_counts(&self) -> LabeledCounts {
-        let mut entries: Vec<_> = ALL_TOUCH_HEIGHT_BANDS
+        let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
             .into_iter()
             .flat_map(|height_band| {
                 ALL_TOUCH_KINDS.into_iter().map(move |kind| {
@@ -150,7 +125,7 @@ impl TouchCalculator {
     ) -> f32 {
         const BALL_GRAVITY_Z: f32 = -650.0;
 
-        let Some(ball) = ball.ball.as_ref() else {
+        let Some(ball) = ball.sample() else {
             return 0.0;
         };
         let Some(previous_ball_velocity) = previous_ball_velocity else {
@@ -163,18 +138,12 @@ impl TouchCalculator {
         residual_linear_impulse.length()
     }
 
-    fn classify_touch(player_height: Option<f32>, ball_speed_change: f32) -> TouchClassification {
-        let player_height = player_height.unwrap_or(0.0);
-        let height_band = if player_height >= HIGH_AIR_Z_THRESHOLD {
-            TouchHeightBand::HighAir
-        } else if player_height >= AERIAL_TOUCH_Z_THRESHOLD {
-            TouchHeightBand::LowAir
-        } else {
-            TouchHeightBand::Ground
-        };
-
+    fn classify_touch(
+        height_band: PlayerVerticalBand,
+        ball_speed_change: f32,
+    ) -> TouchClassification {
         let kind = if ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
-            if height_band != TouchHeightBand::Ground {
+            if height_band.is_airborne() {
                 TouchKind::Control
             } else {
                 TouchKind::Dribble
@@ -190,9 +159,9 @@ impl TouchCalculator {
 
     fn apply_touch_classification(stats: &mut TouchStats, classification: TouchClassification) {
         match classification.height_band {
-            TouchHeightBand::Ground => {}
-            TouchHeightBand::LowAir => stats.aerial_touch_count += 1,
-            TouchHeightBand::HighAir => {
+            PlayerVerticalBand::Ground => {}
+            PlayerVerticalBand::LowAir => stats.aerial_touch_count += 1,
+            PlayerVerticalBand::HighAir => {
                 stats.aerial_touch_count += 1;
                 stats.high_aerial_touch_count += 1;
             }
@@ -226,7 +195,7 @@ impl TouchCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        players: &PlayerFrameState,
+        vertical_state: &PlayerVerticalState,
         touch_events: &[TouchEvent],
     ) {
         let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
@@ -235,13 +204,10 @@ impl TouchCalculator {
             let Some(player_id) = touch_event.player.as_ref() else {
                 continue;
             };
-            let player_height = players
-                .players
-                .iter()
-                .find(|player| player.player_id == *player_id)
-                .and_then(PlayerSample::position)
-                .map(|position| position.z);
-            let classification = Self::classify_touch(player_height, ball_speed_change);
+            let height_band = vertical_state
+                .band_for_player(player_id)
+                .unwrap_or(PlayerVerticalBand::Ground);
+            let classification = Self::classify_touch(height_band, ball_speed_change);
             let stats = self.player_stats.entry(player_id.clone()).or_default();
             stats.touch_count += 1;
             Self::apply_touch_classification(stats, classification);
@@ -270,19 +236,19 @@ impl TouchCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        players: &PlayerFrameState,
+        vertical_state: &PlayerVerticalState,
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         if !live_play {
             self.current_last_touch_player = None;
-            self.previous_ball_velocity = ball.ball.as_ref().map(BallSample::velocity);
+            self.previous_ball_velocity = ball.velocity();
             return Ok(());
         }
 
         self.begin_sample(frame);
-        self.apply_touch_events(frame, ball, players, &touch_state.touch_events);
-        self.previous_ball_velocity = ball.ball.as_ref().map(BallSample::velocity);
+        self.apply_touch_events(frame, ball, vertical_state, &touch_state.touch_events);
+        self.previous_ball_velocity = ball.velocity();
 
         if let Some(player_id) = touch_state.last_touch_player.as_ref() {
             self.current_last_touch_player = Some(player_id.clone());
@@ -296,36 +262,4 @@ impl TouchCalculator {
 
         Ok(())
     }
-
-    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let touch_state = TouchState {
-            touch_events: sample.touch_events.clone(),
-            last_touch: sample.touch_events.last().cloned(),
-            last_touch_player: sample
-                .touch_events
-                .last()
-                .and_then(|touch| touch.player.clone()),
-            last_touch_team_is_team_0: sample.touch_events.last().map(|touch| touch.team_is_team_0),
-        };
-        self.update(
-            &FrameInfo {
-                frame_number: sample.frame_number,
-                time: sample.time,
-                dt: sample.dt,
-                seconds_remaining: sample.seconds_remaining,
-            },
-            &BallFrameState {
-                ball: sample.ball.clone(),
-            },
-            &PlayerFrameState {
-                players: sample.players.clone(),
-            },
-            &touch_state,
-            sample.is_live_play(),
-        )
-    }
 }
-
-#[cfg(test)]
-#[path = "../reducers/touch_test.rs"]
-mod tests;

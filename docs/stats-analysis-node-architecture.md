@@ -2,15 +2,15 @@
 
 ## Goal
 
-Replace the current overlapping `StatsSample` / `StatsReducer` / `StatsModule`
-architecture with a simpler model:
+This document captured the migration away from the old `StatsSample` /
+`StatsReducer` / `StatsModule` architecture toward a simpler model:
 
 - one runtime DAG of stateful analysis nodes
 - one projection layer for exporting current node state
 - one place where dependency solving and type erasure live
 
-This document describes the target architecture and the migration path from the
-current stats pipeline.
+The reducer layer has since been removed. Historical mentions of those types
+below are only useful as migration context.
 
 ## Problems With The Current Design
 

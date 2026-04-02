@@ -43,11 +43,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
     onBeforeRender() {},
 
     getTimelineRanges(ctx) {
-      return buildPossessionTimelineRanges(
-        ctx.statsTimeline,
-        undefined,
-        ctx.replay,
-      );
+      return buildPossessionTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
@@ -281,7 +277,7 @@ export function createPressureModule(): StatModule {
     },
 
     getTimelineRanges(ctx) {
-      return buildPressureTimelineRanges(ctx.statsTimeline, undefined, ctx.replay);
+      return buildPressureTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {

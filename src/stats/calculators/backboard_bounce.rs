@@ -96,14 +96,14 @@ impl BackboardBounceCalculator {
         live_play: bool,
     ) -> BackboardBounceState {
         if !live_play {
-            self.previous_ball_velocity = ball.ball.as_ref().map(BallSample::velocity);
+            self.previous_ball_velocity = ball.velocity();
             self.last_touch = None;
             self.last_bounce_event = None;
             return BackboardBounceState::default();
         }
 
         let bounce_events: Vec<_> = self
-            .detect_bounce(frame, ball.ball.as_ref(), &events.touch_events)
+            .detect_bounce(frame, ball.sample(), &events.touch_events)
             .into_iter()
             .collect();
         if let Some(last_bounce_event) = bounce_events.last() {
@@ -113,7 +113,7 @@ impl BackboardBounceCalculator {
         if let Some(last_touch) = events.touch_events.last() {
             self.last_touch = Some(last_touch.clone());
         }
-        self.previous_ball_velocity = ball.ball.as_ref().map(BallSample::velocity);
+        self.previous_ball_velocity = ball.velocity();
 
         BackboardBounceState {
             bounce_events,

@@ -38,7 +38,7 @@ impl StatFieldProvider for CorePlayerStats {
             "core",
             "goals_conceded_while_last_defender",
             StatUnit::Count,
-            self.goals_conceded_while_last_defender,
+            self.scoring_context.goals_conceded_while_last_defender,
         ));
         visitor(ExportedStat::float(
             "core",
@@ -56,25 +56,25 @@ impl StatFieldProvider for CorePlayerStats {
             "core",
             "kickoff_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.kickoff_goal_count,
+            self.scoring_context.goal_after_kickoff.kickoff_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "short_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.short_goal_count,
+            self.scoring_context.goal_after_kickoff.short_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "medium_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.medium_goal_count,
+            self.scoring_context.goal_after_kickoff.medium_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "long_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.long_goal_count,
+            self.scoring_context.goal_after_kickoff.long_goal_count,
         ));
         visitor(ExportedStat::float(
             "core",
@@ -86,19 +86,21 @@ impl StatFieldProvider for CorePlayerStats {
             "core",
             "counter_attack_goal_count",
             StatUnit::Count,
-            self.goal_buildup.counter_attack_goal_count,
+            self.scoring_context.goal_buildup.counter_attack_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "sustained_pressure_goal_count",
             StatUnit::Count,
-            self.goal_buildup.sustained_pressure_goal_count,
+            self.scoring_context
+                .goal_buildup
+                .sustained_pressure_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "other_buildup_goal_count",
             StatUnit::Count,
-            self.goal_buildup.other_buildup_goal_count,
+            self.scoring_context.goal_buildup.other_buildup_goal_count,
         ));
     }
 }
@@ -151,25 +153,25 @@ impl StatFieldProvider for CoreTeamStats {
             "core",
             "kickoff_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.kickoff_goal_count,
+            self.scoring_context.goal_after_kickoff.kickoff_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "short_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.short_goal_count,
+            self.scoring_context.goal_after_kickoff.short_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "medium_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.medium_goal_count,
+            self.scoring_context.goal_after_kickoff.medium_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "long_goal_count",
             StatUnit::Count,
-            self.goal_after_kickoff.long_goal_count,
+            self.scoring_context.goal_after_kickoff.long_goal_count,
         ));
         visitor(ExportedStat::float(
             "core",
@@ -181,19 +183,21 @@ impl StatFieldProvider for CoreTeamStats {
             "core",
             "counter_attack_goal_count",
             StatUnit::Count,
-            self.goal_buildup.counter_attack_goal_count,
+            self.scoring_context.goal_buildup.counter_attack_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "sustained_pressure_goal_count",
             StatUnit::Count,
-            self.goal_buildup.sustained_pressure_goal_count,
+            self.scoring_context
+                .goal_buildup
+                .sustained_pressure_goal_count,
         ));
         visitor(ExportedStat::unsigned(
             "core",
             "other_buildup_goal_count",
             StatUnit::Count,
-            self.goal_buildup.other_buildup_goal_count,
+            self.scoring_context.goal_buildup.other_buildup_goal_count,
         ));
     }
 }

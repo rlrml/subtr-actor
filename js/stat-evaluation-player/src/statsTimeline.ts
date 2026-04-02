@@ -380,52 +380,6 @@ export interface StatLabel {
   value: string;
 }
 
-export interface ExportedStat {
-  domain: string;
-  name: string;
-  variant: string;
-  unit: string;
-  labels?: StatLabel[];
-  value_type: "float" | "unsigned" | "signed";
-  value: number;
-}
-
-export interface DynamicStatsFrame {
-  frame_number: number;
-  time: number;
-  dt: number;
-  possession?: ExportedStat[];
-  pressure?: ExportedStat[];
-  rush?: ExportedStat[];
-  players: DynamicPlayerStatsSnapshot[];
-  [key: string]: unknown;
-}
-
-export interface DynamicPlayerStatsSnapshot {
-  player_id: Record<string, string>;
-  name: string;
-  is_team_0: boolean;
-  stats: ExportedStat[];
-  [key: string]: unknown;
-}
-
-export interface DynamicStatsTimeline {
-  config?: {
-    most_back_forward_threshold_y: number;
-    pressure_neutral_zone_half_width_y?: number;
-    rush_max_start_y?: number;
-    rush_attack_support_distance_y?: number;
-    rush_defender_distance_y?: number;
-    rush_min_possession_retained_seconds?: number;
-    [key: string]: unknown;
-  };
-  replay_meta: unknown;
-  timeline_events: unknown[];
-  rush_events?: RushEvent[];
-  frames: DynamicStatsFrame[];
-  [key: string]: unknown;
-}
-
 export function createStatsFrameLookup(statsTimeline: StatsTimeline): Map<number, StatsFrame> {
   return new Map(statsTimeline.frames.map((frame) => [frame.frame_number, frame]));
 }
@@ -434,18 +388,5 @@ export function getStatsFrameForReplayFrame(
   statsFrameLookup: Map<number, StatsFrame>,
   replayFrameNumber: number,
 ): StatsFrame | null {
-  return statsFrameLookup.get(replayFrameNumber) ?? null;
-}
-
-export function createDynamicStatsFrameLookup(
-  statsTimeline: DynamicStatsTimeline,
-): Map<number, DynamicStatsFrame> {
-  return new Map(statsTimeline.frames.map((frame) => [frame.frame_number, frame]));
-}
-
-export function getDynamicStatsFrameForReplayFrame(
-  statsFrameLookup: Map<number, DynamicStatsFrame>,
-  replayFrameNumber: number,
-): DynamicStatsFrame | null {
   return statsFrameLookup.get(replayFrameNumber) ?? null;
 }

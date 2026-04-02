@@ -3,7 +3,7 @@ use subtr_actor::collector::replay_data::{
     BallFrame, PlayerFrame, ReplayDataCollector, ReplayDataSupplementalData,
 };
 use subtr_actor::{
-    BoostReducer, FlipResetTracker, ReducerCollector, ReplayProcessor, BOOST_KICKOFF_START_AMOUNT,
+    FlipResetTracker, ReplayProcessor, ResolvedBoostPadCollector, BOOST_KICKOFF_START_AMOUNT,
 };
 
 fn parse_replay(path: &str) -> boxcars::Replay {
@@ -124,7 +124,7 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to build replay processor");
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut flip_reset_tracker = FlipResetTracker::new();
-    let mut boost_pad_collector = ReducerCollector::new(BoostReducer::new());
+    let mut boost_pad_collector = ResolvedBoostPadCollector::new();
 
     processor
         .process_all(&mut [
@@ -135,7 +135,7 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
         .expect("Failed to process replay with composed collectors");
 
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_inner().resolved_boost_pads());
+        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
 
     let actual = replay_data_collector
         .into_replay_data_with_supplemental_data(processor, supplemental_data)

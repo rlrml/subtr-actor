@@ -39,13 +39,12 @@ impl AnalysisNode for PossessionNode {
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let possession_state = ctx.get::<PossessionState>()?;
-        self.calculator
-            .update(
-                ctx.get::<FrameInfo>()?,
-                ctx.get::<BallFrameState>()?,
-                ctx.get::<LivePlayState>()?.is_live_play,
-                possession_state.active_team_before_sample,
-            )
+        self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+            possession_state.active_team_before_sample,
+        )
     }
 
     fn state(&self) -> &Self::State {

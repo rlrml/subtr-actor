@@ -77,7 +77,6 @@ impl Default for PressureCalculatorConfig {
 pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     stats: PressureStats,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl PressureCalculator {
@@ -146,7 +145,7 @@ impl PressureCalculator {
         if !live_play {
             return Ok(());
         }
-        if let Some(ball) = &ball.ball {
+        if let Some(ball) = ball.sample() {
             self.stats.tracked_time += frame.dt;
             let ball_y = ball.position().y;
             let half = if ball_y.abs() <= self.config.neutral_zone_half_width_y {
@@ -161,7 +160,3 @@ impl PressureCalculator {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/pressure_test.rs"]
-mod tests;

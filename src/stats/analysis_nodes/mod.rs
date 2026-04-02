@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::Collector;
 use crate::{SubtrActorError, SubtrActorErrorVariant, SubtrActorResult};
 
 pub mod analysis_graph;
@@ -20,7 +21,6 @@ mod fifty_fifty;
 mod fifty_fifty_state;
 mod frame_events_state;
 mod frame_info;
-mod frame_state;
 mod gameplay_state;
 mod live_play;
 mod match_stats;
@@ -28,6 +28,7 @@ mod movement;
 mod musty_flick;
 mod nodes;
 mod player_frame_state;
+mod player_vertical_state;
 mod positioning;
 mod possession;
 mod possession_state;
@@ -36,6 +37,7 @@ mod pressure;
 mod rush;
 mod settings;
 mod speed_flip;
+mod stats_timeline_frame;
 mod touch;
 mod touch_state;
 
@@ -70,8 +72,6 @@ pub use frame_events_state::FrameEventsStateNode;
 #[allow(unused_imports)]
 pub use frame_info::FrameInfoNode;
 #[allow(unused_imports)]
-pub use frame_state::FrameStateNode;
-#[allow(unused_imports)]
 pub use gameplay_state::GameplayStateNode;
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
@@ -83,6 +83,8 @@ pub use movement::MovementNode;
 pub use musty_flick::MustyFlickNode;
 #[allow(unused_imports)]
 pub use player_frame_state::PlayerFrameStateNode;
+#[allow(unused_imports)]
+pub use player_vertical_state::PlayerVerticalStateNode;
 #[allow(unused_imports)]
 pub use positioning::PositioningNode;
 #[allow(unused_imports)]
@@ -99,6 +101,8 @@ pub use rush::RushNode;
 pub use settings::SettingsNode;
 #[allow(unused_imports)]
 pub use speed_flip::SpeedFlipNode;
+#[allow(unused_imports)]
+pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 #[allow(unused_imports)]
 pub use touch::TouchNode;
 #[allow(unused_imports)]
@@ -152,6 +156,25 @@ where
         })?);
     }
     Ok(graph)
+}
+
+pub fn collect_analysis_graph_for_replay(
+    replay: &boxcars::Replay,
+    graph: analysis_graph::AnalysisGraph,
+) -> SubtrActorResult<analysis_graph::AnalysisGraph> {
+    let collector = collector::AnalysisNodeCollector::new(graph).process_replay(replay)?;
+    Ok(collector.into_graph())
+}
+
+pub fn collect_builtin_analysis_graph_for_replay<I, S>(
+    replay: &boxcars::Replay,
+    names: I,
+) -> SubtrActorResult<analysis_graph::AnalysisGraph>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    collect_analysis_graph_for_replay(replay, graph_with_builtin_analysis_nodes(names)?)
 }
 
 pub fn all_analysis_nodes() -> Vec<Box<dyn analysis_graph::AnalysisNodeDyn>> {

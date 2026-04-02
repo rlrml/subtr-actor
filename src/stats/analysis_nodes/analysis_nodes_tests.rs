@@ -1,25 +1,19 @@
 use super::*;
-use crate::stats::reducers::*;
+use crate::{
+    BackboardCalculator, MatchStatsCalculator, PlayerVerticalState, PossessionState, TouchState,
+};
 use std::collections::HashSet;
+use std::path::Path;
 
-fn empty_frame_info() -> FrameInfo {
-    FrameInfo::default()
-}
-
-fn empty_gameplay_state() -> GameplayState {
-    GameplayState::default()
-}
-
-fn empty_ball_frame_state() -> BallFrameState {
-    BallFrameState::default()
-}
-
-fn empty_player_frame_state() -> PlayerFrameState {
-    PlayerFrameState::default()
-}
-
-fn empty_frame_events_state() -> FrameEventsState {
-    FrameEventsState::default()
+fn parse_replay(path: &str) -> boxcars::Replay {
+    let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+    let data = std::fs::read(&replay_path)
+        .unwrap_or_else(|_| panic!("Failed to read replay file: {}", replay_path.display()));
+    boxcars::ParserBuilder::new(&data[..])
+        .always_check_crc()
+        .must_parse_network_data()
+        .parse()
+        .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
 }
 
 #[test]
@@ -28,7 +22,8 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 25);
+    assert_eq!(names.len(), 30);
+    assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
     assert!(names.contains("backboard_bounce_state"));
@@ -39,17 +34,12 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
 }
 
 #[test]
-fn evaluates_all_reducer_nodes_against_an_empty_sample() {
-    let mut graph = graph_with_all_analysis_nodes();
-    graph.set_root_state(empty_frame_info());
-    graph.set_root_state(empty_gameplay_state());
-    graph.set_root_state(empty_ball_frame_state());
-    graph.set_root_state(empty_player_frame_state());
-    graph.set_root_state(empty_frame_events_state());
-    graph
-        .evaluate()
-        .expect("graph should evaluate an empty sample");
+fn evaluates_all_reducer_nodes_against_a_real_replay() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
+        .expect("graph should evaluate a real replay");
 
+    assert!(graph.state::<PlayerVerticalState>().is_some());
     assert!(graph.state::<TouchState>().is_some());
     assert!(graph.state::<PossessionState>().is_some());
     assert!(graph.state::<BackboardCalculator>().is_some());

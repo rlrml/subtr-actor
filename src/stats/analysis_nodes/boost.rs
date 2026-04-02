@@ -33,12 +33,25 @@ impl AnalysisNode for BoostNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![frame_state_dependency()]
+        vec![
+            frame_info_dependency(),
+            gameplay_state_dependency(),
+            player_frame_state_dependency(),
+            frame_events_state_dependency(),
+            player_vertical_state_dependency(),
+            live_play_dependency(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<FrameState>()?;
-        self.calculator.update(sample)
+        self.calculator.update_parts(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<GameplayState>()?,
+            ctx.get::<PlayerFrameState>()?,
+            ctx.get::<FrameEventsState>()?,
+            ctx.get::<PlayerVerticalState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+        )
     }
 
     fn state(&self) -> &Self::State {

@@ -25,33 +25,9 @@ impl MovementSpeedBand {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MovementHeightBand {
-    Ground,
-    LowAir,
-    HighAir,
-}
-
-const ALL_MOVEMENT_HEIGHT_BANDS: [MovementHeightBand; 3] = [
-    MovementHeightBand::Ground,
-    MovementHeightBand::LowAir,
-    MovementHeightBand::HighAir,
-];
-
-impl MovementHeightBand {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
-            Self::Ground => "ground",
-            Self::LowAir => "low_air",
-            Self::HighAir => "high_air",
-        };
-        StatLabel::new("height_band", value)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct MovementClassification {
     speed_band: MovementSpeedBand,
-    height_band: MovementHeightBand,
+    height_band: PlayerVerticalBand,
 }
 
 impl MovementClassification {
@@ -141,7 +117,7 @@ impl MovementStats {
     }
 
     pub fn complete_labeled_tracked_time(&self) -> LabeledFloatSums {
-        let mut entries: Vec<_> = ALL_MOVEMENT_HEIGHT_BANDS
+        let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
             .into_iter()
             .flat_map(|height_band| {
                 ALL_MOVEMENT_SPEED_BANDS.into_iter().map(move |speed_band| {
@@ -192,21 +168,13 @@ impl MovementCalculator {
         &self.team_one_stats
     }
 
-    fn classify_movement(speed: f32, height: f32) -> MovementClassification {
+    fn classify_movement(speed: f32, height_band: PlayerVerticalBand) -> MovementClassification {
         let speed_band = if speed >= SUPERSONIC_SPEED_THRESHOLD {
             MovementSpeedBand::Supersonic
         } else if speed >= BOOST_SPEED_THRESHOLD {
             MovementSpeedBand::Boost
         } else {
             MovementSpeedBand::Slow
-        };
-
-        let height_band = if height <= GROUND_Z_THRESHOLD {
-            MovementHeightBand::Ground
-        } else if height >= HIGH_AIR_Z_THRESHOLD {
-            MovementHeightBand::HighAir
-        } else {
-            MovementHeightBand::LowAir
         };
 
         MovementClassification {
@@ -227,9 +195,9 @@ impl MovementCalculator {
         }
 
         match classification.height_band {
-            MovementHeightBand::Ground => stats.time_on_ground += dt,
-            MovementHeightBand::LowAir => stats.time_low_air += dt,
-            MovementHeightBand::HighAir => stats.time_high_air += dt,
+            PlayerVerticalBand::Ground => stats.time_on_ground += dt,
+            PlayerVerticalBand::LowAir => stats.time_low_air += dt,
+            PlayerVerticalBand::HighAir => stats.time_high_air += dt,
         }
 
         stats.labeled_tracked_time.add(classification.labels(), dt);
@@ -239,6 +207,7 @@ impl MovementCalculator {
         &mut self,
         frame: &FrameInfo,
         players: &PlayerFrameState,
+        vertical_state: &PlayerVerticalState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         if frame.dt == 0.0 {
@@ -280,7 +249,10 @@ impl MovementCalculator {
                     team_stats.total_distance += distance;
                 }
 
-                let classification = Self::classify_movement(speed, position.z);
+                let height_band = vertical_state
+                    .band_for_player(&player.player_id)
+                    .unwrap_or_else(|| PlayerVerticalBand::from_height(position.z));
+                let classification = Self::classify_movement(speed, height_band);
                 Self::apply_classification(stats, classification, frame.dt);
                 Self::apply_classification(team_stats, classification, frame.dt);
             }
@@ -292,7 +264,3 @@ impl MovementCalculator {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/movement_test.rs"]
-mod tests;

@@ -10,41 +10,28 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
       team_zero_side_time: 4,
       neutral_time: 1,
       team_one_side_time: 3,
+      labeled_time: {
+        entries: [
+          {
+            labels: [{ key: "field_half", value: "neutral" }],
+            value: 1,
+          },
+          {
+            labels: [{ key: "field_half", value: "team_zero_side" }],
+            value: 4,
+          },
+          {
+            labels: [{ key: "field_half", value: "team_one_side" }],
+            value: 3,
+          },
+        ],
+      },
     },
     {
       labelPerspective: {
         kind: "team",
         isTeamZero: true,
       },
-      exportedStats: [
-        {
-          domain: "pressure",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [{ key: "field_half", value: "neutral" }],
-          value_type: "float",
-          value: 1,
-        },
-        {
-          domain: "pressure",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [{ key: "field_half", value: "team_zero_side" }],
-          value_type: "float",
-          value: 4,
-        },
-        {
-          domain: "pressure",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [{ key: "field_half", value: "team_one_side" }],
-          value_type: "float",
-          value: 3,
-        },
-      ],
     },
   );
 

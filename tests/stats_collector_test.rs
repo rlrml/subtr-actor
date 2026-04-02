@@ -44,21 +44,21 @@ fn stats_collector_processes_all_builtin_modules() {
 }
 
 #[test]
-fn stats_collector_captures_module_keyed_playback_frames() {
+fn stats_collector_captures_module_keyed_snapshot_frames() {
     let replay = common::parse_replay("assets/replays/soccar-lan.replay");
-    let playback = StatsCollector::with_builtin_module_names(["boost", "movement"])
+    let snapshot = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
-        .get_playback_data(&replay)
-        .expect("playback collection should succeed");
+        .get_snapshot_data(&replay)
+        .expect("snapshot collection should succeed");
 
     assert!(
-        !playback.frames.is_empty(),
-        "expected playback frames to be captured"
+        !snapshot.frames.is_empty(),
+        "expected snapshot frames to be captured"
     );
-    let final_frame = playback
+    let final_frame = snapshot
         .frames
         .last()
-        .expect("expected a final playback frame");
+        .expect("expected a final snapshot frame");
     assert!(final_frame.modules.contains_key("boost"));
     assert!(final_frame.modules.contains_key("movement"));
     assert!(!final_frame.modules.contains_key("core"));

@@ -31,19 +31,34 @@ impl AnalysisNode for FiftyFiftyStateNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        let mut dependencies = vec![frame_state_dependency()];
-        dependencies.push(touch_state_dependency());
-        dependencies.push(possession_state_dependency());
-        dependencies
+        vec![
+            frame_info_dependency(),
+            gameplay_state_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            touch_state_dependency(),
+            possession_state_dependency(),
+            live_play_dependency(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<FrameState>()?;
+        let frame = ctx.get::<FrameInfo>()?;
+        let gameplay = ctx.get::<GameplayState>()?;
+        let ball = ctx.get::<BallFrameState>()?;
+        let players = ctx.get::<PlayerFrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
         let possession_state = ctx.get::<PossessionState>()?;
-        self.state = self
-            .calculator
-            .update(sample, touch_state, possession_state);
+        let live_play_state = ctx.get::<LivePlayState>()?;
+        self.state = self.calculator.update(
+            frame,
+            gameplay,
+            ball,
+            players,
+            touch_state,
+            possession_state,
+            live_play_state.is_live_play,
+        );
         Ok(())
     }
 

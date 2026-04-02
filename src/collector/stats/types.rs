@@ -1,43 +1,8 @@
-use std::sync::Arc;
-
-use erased_serde::serialize_trait_object;
 use serde::ser::{SerializeMap, SerializeStruct};
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 
 use crate::*;
-
-pub trait StatsModule: StatsReducer + erased_serde::Serialize {
-    fn name(&self) -> &'static str;
-
-    fn playback_frame_json(&self, _replay_meta: &ReplayMeta) -> SubtrActorResult<Option<Value>> {
-        Ok(None)
-    }
-
-    fn playback_config_json(&self) -> SubtrActorResult<Option<Value>> {
-        Ok(None)
-    }
-}
-
-serialize_trait_object!(StatsModule);
-
-pub trait StatsModuleFactory: Send + Sync {
-    fn key(&self) -> String {
-        self.name().to_owned()
-    }
-
-    fn name(&self) -> &'static str;
-
-    fn dependencies(&self) -> Vec<Arc<dyn StatsModuleFactory>> {
-        Vec::new()
-    }
-
-    fn required_derived_signals(&self) -> Vec<DerivedSignalId> {
-        self.build().required_derived_signals()
-    }
-
-    fn build(&self) -> Box<dyn StatsModule>;
-}
 
 pub(crate) fn serialize_to_json_value<T: Serialize + ?Sized>(value: &T) -> SubtrActorResult<Value> {
     serde_json::to_value(value).map_err(|error| {

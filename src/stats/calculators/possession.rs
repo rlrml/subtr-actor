@@ -294,7 +294,7 @@ impl PossessionCalculator {
     ) -> SubtrActorResult<()> {
         if live_play {
             self.stats.tracked_time += frame.dt;
-            let field_third = ball.ball.as_ref().map(FieldThirdLabel::from_ball);
+            let field_third = ball.sample().map(FieldThirdLabel::from_ball);
             if let Some(possession_team_is_team_0) = active_team_before_sample {
                 let state = if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
@@ -313,33 +313,4 @@ impl PossessionCalculator {
         }
         Ok(())
     }
-
-    pub fn update_from_sample_touch_events(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        let live_play = sample.is_live_play();
-        let active_team_before_sample = if live_play {
-            self.tracker
-                .update(sample.time, &sample.touch_events)
-                .active_team_before_sample
-        } else {
-            self.tracker.reset();
-            None
-        };
-        self.update(
-            &FrameInfo {
-                frame_number: sample.frame_number,
-                time: sample.time,
-                dt: sample.dt,
-                seconds_remaining: sample.seconds_remaining,
-            },
-            &BallFrameState {
-                ball: sample.ball.clone(),
-            },
-            live_play,
-            active_team_before_sample,
-        )
-    }
 }
-
-#[cfg(test)]
-#[path = "../reducers/possession_test.rs"]
-mod tests;

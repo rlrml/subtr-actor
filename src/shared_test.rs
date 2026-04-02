@@ -107,13 +107,13 @@ fn test_find_update_in_direction() {
 
     // Test forward search.
     let result_forward =
-        util::find_in_direction(&items, current_index, SearchDirection::Forward, predicate);
+        find_in_direction(&items, current_index, SearchDirection::Forward, predicate);
     // Check that the result is as expected.
     assert_eq!(result_forward, Some((5, 6))); // First even number after index 4 is 6 at index 5
 
     // Test backward search.
     let result_backward =
-        util::find_in_direction(&items, current_index, SearchDirection::Backward, predicate);
+        find_in_direction(&items, current_index, SearchDirection::Backward, predicate);
     // Check that the result is as expected.
     assert_eq!(result_backward, Some((3, 4))); // First even number before index 4 is 4 at index 3
 }

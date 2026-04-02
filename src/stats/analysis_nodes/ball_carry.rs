@@ -29,16 +29,24 @@ impl AnalysisNode for BallCarryNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        let mut dependencies = vec![frame_state_dependency()];
-        dependencies.push(touch_state_dependency());
-        dependencies
+        vec![
+            frame_info_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            touch_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<FrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
-        self.calculator
-            .update(sample, touch_state.last_touch_player.clone())
+        self.calculator.update(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+            touch_state.last_touch_player.clone(),
+        )
     }
 
     fn finish(&mut self) -> SubtrActorResult<()> {

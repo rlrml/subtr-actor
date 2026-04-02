@@ -28,8 +28,6 @@ declare module "@colonelpanic8/subtr-actor" {
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;
   export function get_stats_timeline_json(data: Uint8Array): Uint8Array;
-  export function get_dynamic_stats_timeline(data: Uint8Array): unknown;
-  export function get_dynamic_stats_timeline_json(data: Uint8Array): Uint8Array;
 }
 
 declare module "../scripts/ensure-wasm-package.mjs" {

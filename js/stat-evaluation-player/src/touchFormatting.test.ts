@@ -7,58 +7,40 @@ test("renderTouchStats shows only total and selected breakdown rows", () => {
   const html = renderTouchStats({
     touch_count: 8,
     is_last_touch: true,
+    labeled_touch_counts: {
+      entries: [
+        {
+          labels: [
+            { key: "kind", value: "dribble" },
+            { key: "height_band", value: "ground" },
+          ],
+          count: 2,
+        },
+        {
+          labels: [
+            { key: "kind", value: "control" },
+            { key: "height_band", value: "low_air" },
+          ],
+          count: 1,
+        },
+        {
+          labels: [
+            { key: "kind", value: "medium_hit" },
+            { key: "height_band", value: "ground" },
+          ],
+          count: 3,
+        },
+        {
+          labels: [
+            { key: "kind", value: "hard_hit" },
+            { key: "height_band", value: "high_air" },
+          ],
+          count: 2,
+        },
+      ],
+    },
   }, {
     breakdownClasses: ["kind", "height_band"],
-    exportedStats: [
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "dribble" },
-          { key: "height_band", value: "ground" },
-        ],
-        value_type: "unsigned",
-        value: 2,
-      },
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "control" },
-          { key: "height_band", value: "low_air" },
-        ],
-        value_type: "unsigned",
-        value: 1,
-      },
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "medium_hit" },
-          { key: "height_band", value: "ground" },
-        ],
-        value_type: "unsigned",
-        value: 3,
-      },
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "hard_hit" },
-          { key: "height_band", value: "high_air" },
-        ],
-        value_type: "unsigned",
-        value: 2,
-      },
-    ],
   });
 
   assert.match(html, /Touches<\/span><span class="value">8/);
@@ -84,46 +66,33 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
   const html = renderTouchStats({
     touch_count: 6,
     is_last_touch: false,
+    labeled_touch_counts: {
+      entries: [
+        {
+          labels: [
+            { key: "kind", value: "dribble" },
+            { key: "height_band", value: "ground" },
+          ],
+          count: 2,
+        },
+        {
+          labels: [
+            { key: "kind", value: "control" },
+            { key: "height_band", value: "low_air" },
+          ],
+          count: 1,
+        },
+        {
+          labels: [
+            { key: "kind", value: "hard_hit" },
+            { key: "height_band", value: "high_air" },
+          ],
+          count: 3,
+        },
+      ],
+    },
   }, {
     breakdownClasses: ["height_band"],
-    exportedStats: [
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "dribble" },
-          { key: "height_band", value: "ground" },
-        ],
-        value_type: "unsigned",
-        value: 2,
-      },
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "control" },
-          { key: "height_band", value: "low_air" },
-        ],
-        value_type: "unsigned",
-        value: 1,
-      },
-      {
-        domain: "touch",
-        name: "touch_count",
-        variant: "labeled",
-        unit: "count",
-        labels: [
-          { key: "kind", value: "hard_hit" },
-          { key: "height_band", value: "high_air" },
-        ],
-        value_type: "unsigned",
-        value: 3,
-      },
-    ],
   });
 
   assert.match(html, /Ground<\/span><span class="value">2/);

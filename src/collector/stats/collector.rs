@@ -7,11 +7,11 @@ use crate::stats::analysis_nodes::graph_with_builtin_analysis_nodes;
 use crate::*;
 
 use super::builtins::{
-    builtin_module_json, builtin_playback_config_json, builtin_playback_frame_json,
+    builtin_module_json, builtin_snapshot_config_json, builtin_snapshot_frame_json,
     builtin_stats_module_names,
 };
 use super::playback::{
-    CapturedStatsData, CapturedStatsFrame, StatsPlaybackData, StatsPlaybackFrame,
+    CapturedStatsData, CapturedStatsFrame, StatsSnapshotData, StatsSnapshotFrame,
 };
 use super::types::{serialize_to_json_value, CollectedStats, CollectedStatsModule};
 
@@ -70,10 +70,6 @@ impl BuiltinModuleSelection {
         graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
     }
 
-    fn emitted_module_names(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.module_names.iter().copied()
-    }
-
     fn collected_modules(
         &self,
         graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
@@ -111,20 +107,20 @@ impl BuiltinModuleSelection {
     ) -> SubtrActorResult<Map<String, Value>> {
         let mut modules = Map::new();
         for module_name in self.module_names.iter().copied() {
-            if let Some(snapshot) = builtin_playback_frame_json(module_name, graph, replay_meta)? {
+            if let Some(snapshot) = builtin_snapshot_frame_json(module_name, graph, replay_meta)? {
                 modules.insert(module_name.to_owned(), snapshot);
             }
         }
         Ok(modules)
     }
 
-    fn playback_config_json(
+    fn snapshot_config_json(
         &self,
         graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
     ) -> SubtrActorResult<Map<String, Value>> {
         let mut config = Map::new();
         for module_name in self.module_names.iter().copied() {
-            if let Some(module_config) = builtin_playback_config_json(module_name, graph)? {
+            if let Some(module_config) = builtin_snapshot_config_json(module_name, graph)? {
                 config.insert(module_name.to_owned(), module_config);
             }
         }
@@ -135,22 +131,22 @@ impl BuiltinModuleSelection {
         &self,
         graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
         replay_meta: &ReplayMeta,
-    ) -> SubtrActorResult<StatsPlaybackFrame> {
+    ) -> SubtrActorResult<StatsSnapshotFrame> {
         let frame = graph.state::<FrameInfo>().ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-                "missing FrameInfo state while snapshotting playback frame".to_owned(),
+                "missing FrameInfo state while snapshotting stats frame".to_owned(),
             ))
         })?;
         let gameplay = graph.state::<GameplayState>().ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-                "missing GameplayState state while snapshotting playback frame".to_owned(),
+                "missing GameplayState state while snapshotting stats frame".to_owned(),
             ))
         })?;
         let is_live_play = graph
             .state::<LivePlayState>()
             .map(|state| state.is_live_play)
             .unwrap_or(false);
-        Ok(StatsPlaybackFrame {
+        Ok(StatsSnapshotFrame {
             frame_number: frame.frame_number,
             time: frame.time,
             dt: frame.dt,
@@ -168,20 +164,20 @@ pub trait FrameTransform {
     fn transform(
         &mut self,
         replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<Self::Output>;
 }
 
 impl<F, T> FrameTransform for F
 where
-    F: FnMut(&ReplayMeta, StatsPlaybackFrame) -> SubtrActorResult<T>,
+    F: FnMut(&ReplayMeta, StatsSnapshotFrame) -> SubtrActorResult<T>,
 {
     type Output = T;
 
     fn transform(
         &mut self,
         replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<Self::Output> {
         self(replay_meta, frame)
     }
@@ -191,12 +187,12 @@ where
 pub struct IdentityFrameTransform;
 
 impl FrameTransform for IdentityFrameTransform {
-    type Output = StatsPlaybackFrame;
+    type Output = StatsSnapshotFrame;
 
     fn transform(
         &mut self,
         _replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<Self::Output> {
         Ok(frame)
     }
@@ -221,7 +217,7 @@ where
     fn transform(
         &mut self,
         _replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<Self::Output> {
         frame.map_modules(&mut self.transform)
     }
@@ -235,9 +231,9 @@ impl FrameTransform for ReplayStatsFrameTransform {
     fn transform(
         &mut self,
         replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<Self::Output> {
-        CapturedStatsData::<StatsPlaybackFrame> {
+        CapturedStatsData::<StatsSnapshotFrame> {
             replay_meta: replay_meta.clone(),
             config: Map::new(),
             modules: Map::new(),
@@ -247,7 +243,7 @@ impl FrameTransform for ReplayStatsFrameTransform {
     }
 }
 
-pub struct StatsCollector<T = StatsPlaybackFrame, F = IdentityFrameTransform> {
+pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     modules: BuiltinModuleSelection,
     graph: crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
@@ -263,13 +259,13 @@ pub struct StatsCollector<T = StatsPlaybackFrame, F = IdentityFrameTransform> {
     _marker: PhantomData<T>,
 }
 
-impl Default for StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
+impl Default for StatsCollector<StatsSnapshotFrame, IdentityFrameTransform> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
+impl StatsCollector<StatsSnapshotFrame, IdentityFrameTransform> {
     pub fn new() -> Self {
         Self::with_selection_and_frame_transform(
             BuiltinModuleSelection::all(),
@@ -305,9 +301,9 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
         )
     }
 
-    pub fn get_playback_data(self, replay: &boxcars::Replay) -> SubtrActorResult<StatsPlaybackData>
+    pub fn get_snapshot_data(self, replay: &boxcars::Replay) -> SubtrActorResult<StatsSnapshotData>
     where
-        IdentityFrameTransform: FrameTransform<Output = StatsPlaybackFrame>,
+        IdentityFrameTransform: FrameTransform<Output = StatsSnapshotFrame>,
     {
         self.capture_frames().get_captured_data(replay)
     }
@@ -326,38 +322,16 @@ impl StatsCollector<StatsPlaybackFrame, IdentityFrameTransform> {
             .into_replay_stats_timeline()
     }
 
-    pub fn get_dynamic_replay_stats_timeline(
-        self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        self.get_replay_stats_timeline(replay)
-            .map(ReplayStatsTimeline::into_dynamic)
-    }
-
-    pub fn get_legacy_stats_timeline_value(
-        self,
-        replay: &boxcars::Replay,
-    ) -> SubtrActorResult<Value> {
-        self.get_stats_timeline_value(replay)
-    }
-
-    pub fn into_playback_data(self) -> SubtrActorResult<StatsPlaybackData> {
+    pub fn into_snapshot_data(self) -> SubtrActorResult<StatsSnapshotData> {
         self.into_captured_data()
     }
 
     pub fn into_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.into_playback_data()?.to_stats_timeline_value()
+        self.into_snapshot_data()?.to_stats_timeline_value()
     }
 
     pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
-        self.into_playback_data()?.into_stats_timeline()
-    }
-
-    pub fn into_dynamic_replay_stats_timeline(
-        self,
-    ) -> SubtrActorResult<DynamicReplayStatsTimeline> {
-        self.into_replay_stats_timeline()
-            .map(ReplayStatsTimeline::into_dynamic)
+        self.into_snapshot_data()?.into_stats_timeline()
     }
 }
 
@@ -475,7 +449,7 @@ impl<T, F> StatsCollector<T, F> {
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
         Ok(CapturedStatsData {
             replay_meta: replay_meta.clone(),
-            config: self.modules.playback_config_json(&self.graph)?,
+            config: self.modules.snapshot_config_json(&self.graph)?,
             modules: self.modules.modules_json(&self.graph)?,
             frames: self.captured_frames.unwrap_or_default(),
         })
@@ -484,7 +458,7 @@ impl<T, F> StatsCollector<T, F> {
     fn capture_frame_snapshot(
         &mut self,
         replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<()>
     where
         F: FrameTransform<Output = T>,
@@ -498,7 +472,7 @@ impl<T, F> StatsCollector<T, F> {
     fn replace_last_frame_snapshot(
         &mut self,
         replay_meta: &ReplayMeta,
-        frame: StatsPlaybackFrame,
+        frame: StatsSnapshotFrame,
     ) -> SubtrActorResult<()>
     where
         F: FrameTransform<Output = T>,

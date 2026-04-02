@@ -1,10 +1,10 @@
 use subtr_actor::stats::export::{
     ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue, LEGACY_STAT_VARIANT,
 };
-use subtr_actor::stats::reducers::{
+use subtr_actor::{
     BackboardPlayerStats, BoostStats, CorePlayerStats, DodgeResetStats, DoubleTapPlayerStats,
-    GoalAfterKickoffStats, GoalBuildupStats, PositioningStats, PossessionStats, PressureStats,
-    TouchStats,
+    GoalAfterKickoffStats, GoalBuildupStats, PlayerScoringContextStats, PositioningStats,
+    PossessionStats, PressureStats, TouchStats,
 };
 
 fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a ExportedStat {
@@ -107,9 +107,11 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
         assists: 1,
         saves: 3,
         shots: 4,
-        goals_conceded_while_last_defender: 1,
-        goal_after_kickoff,
-        goal_buildup: GoalBuildupStats::default(),
+        scoring_context: PlayerScoringContextStats {
+            goals_conceded_while_last_defender: 1,
+            goal_after_kickoff,
+            goal_buildup: GoalBuildupStats::default(),
+        },
     };
 
     let fields = stats.stat_fields();

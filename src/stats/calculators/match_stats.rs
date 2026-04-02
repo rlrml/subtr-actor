@@ -102,17 +102,23 @@ impl GoalBuildupStats {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PlayerScoringContextStats {
+    pub goals_conceded_while_last_defender: u32,
+    #[serde(flatten)]
+    pub goal_after_kickoff: GoalAfterKickoffStats,
+    #[serde(flatten)]
+    pub goal_buildup: GoalBuildupStats,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CorePlayerStats {
     pub score: i32,
     pub goals: i32,
     pub assists: i32,
     pub saves: i32,
     pub shots: i32,
-    pub goals_conceded_while_last_defender: u32,
     #[serde(flatten)]
-    pub goal_after_kickoff: GoalAfterKickoffStats,
-    #[serde(flatten)]
-    pub goal_buildup: GoalBuildupStats,
+    pub scoring_context: PlayerScoringContextStats,
 }
 
 impl CorePlayerStats {
@@ -125,12 +131,24 @@ impl CorePlayerStats {
     }
 
     pub fn average_goal_time_after_kickoff(&self) -> f32 {
-        self.goal_after_kickoff.average_goal_time_after_kickoff()
+        self.scoring_context
+            .goal_after_kickoff
+            .average_goal_time_after_kickoff()
     }
 
     pub fn median_goal_time_after_kickoff(&self) -> f32 {
-        self.goal_after_kickoff.median_goal_time_after_kickoff()
+        self.scoring_context
+            .goal_after_kickoff
+            .median_goal_time_after_kickoff()
     }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TeamScoringContextStats {
+    #[serde(flatten)]
+    pub goal_after_kickoff: GoalAfterKickoffStats,
+    #[serde(flatten)]
+    pub goal_buildup: GoalBuildupStats,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -141,9 +159,7 @@ pub struct CoreTeamStats {
     pub saves: i32,
     pub shots: i32,
     #[serde(flatten)]
-    pub goal_after_kickoff: GoalAfterKickoffStats,
-    #[serde(flatten)]
-    pub goal_buildup: GoalBuildupStats,
+    pub scoring_context: TeamScoringContextStats,
 }
 
 impl CoreTeamStats {
@@ -156,11 +172,15 @@ impl CoreTeamStats {
     }
 
     pub fn average_goal_time_after_kickoff(&self) -> f32 {
-        self.goal_after_kickoff.average_goal_time_after_kickoff()
+        self.scoring_context
+            .goal_after_kickoff
+            .average_goal_time_after_kickoff()
     }
 
     pub fn median_goal_time_after_kickoff(&self) -> f32 {
-        self.goal_after_kickoff.median_goal_time_after_kickoff()
+        self.scoring_context
+            .goal_after_kickoff
+            .median_goal_time_after_kickoff()
     }
 }
 
@@ -206,7 +226,6 @@ pub struct MatchStatsCalculator {
     kickoff_waiting_for_first_touch: bool,
     active_kickoff_touch_time: Option<f32>,
     goal_buildup_samples: Vec<GoalBuildupSample>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl MatchStatsCalculator {
@@ -242,12 +261,17 @@ impl MatchStatsCalculator {
                 stats.saves += player_stats.saves;
                 stats.shots += player_stats.shots;
                 stats
+                    .scoring_context
                     .goal_after_kickoff
-                    .merge(&player_stats.goal_after_kickoff);
-                stats.goal_buildup.merge(&player_stats.goal_buildup);
+                    .merge(&player_stats.scoring_context.goal_after_kickoff);
+                stats
+                    .scoring_context
+                    .goal_buildup
+                    .merge(&player_stats.scoring_context.goal_buildup);
                 stats
             });
         stats
+            .scoring_context
             .goal_after_kickoff
             .goal_times
             .sort_by(|left, right| left.total_cmp(right));
@@ -272,14 +296,14 @@ impl MatchStatsCalculator {
         }
     }
 
-    fn kickoff_phase_active(sample: &FrameState) -> bool {
-        sample.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || sample.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || sample.ball_has_been_hit == Some(false)
+    fn kickoff_phase_active(gameplay: &GameplayState) -> bool {
+        gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+            || gameplay.kickoff_countdown_time.is_some_and(|time| time > 0)
+            || gameplay.ball_has_been_hit == Some(false)
     }
 
-    fn update_kickoff_reference(&mut self, sample: &FrameState) {
-        if let Some(first_touch_time) = sample
+    fn update_kickoff_reference(&mut self, gameplay: &GameplayState, events: &FrameEventsState) {
+        if let Some(first_touch_time) = events
             .touch_events
             .iter()
             .map(|event| event.time)
@@ -290,7 +314,7 @@ impl MatchStatsCalculator {
             return;
         }
 
-        if Self::kickoff_phase_active(sample) {
+        if Self::kickoff_phase_active(gameplay) {
             self.kickoff_waiting_for_first_touch = true;
             self.active_kickoff_touch_time = None;
         }
@@ -316,10 +340,10 @@ impl MatchStatsCalculator {
 
     fn last_defender(
         &self,
-        sample: &FrameState,
+        players: &PlayerFrameState,
         defending_team_is_team_0: bool,
     ) -> Option<PlayerId> {
-        sample
+        players
             .players
             .iter()
             .filter(|player| player.is_team_0 == defending_team_is_team_0)
@@ -349,16 +373,16 @@ impl MatchStatsCalculator {
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
     }
 
-    fn record_goal_buildup_sample(&mut self, sample: &FrameState) {
-        let Some(ball) = sample.ball.as_ref() else {
+    fn record_goal_buildup_sample(&mut self, frame: &FrameInfo, ball: &BallFrameState) {
+        let Some(ball) = ball.sample() else {
             return;
         };
-        if sample.dt <= 0.0 {
+        if frame.dt <= 0.0 {
             return;
         }
         self.goal_buildup_samples.push(GoalBuildupSample {
-            time: sample.time,
-            dt: sample.dt,
+            time: frame.time,
+            dt: frame.dt,
             ball_y: ball.position().y,
         });
     }
@@ -432,15 +456,22 @@ impl MatchStatsCalculator {
 }
 
 impl MatchStatsCalculator {
-    fn on_sample_internal(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        self.update_kickoff_reference(sample);
-        let live_play = self.live_play_tracker.is_live_play(sample);
-        self.prune_goal_buildup_samples(sample.time);
+    pub fn update_parts(
+        &mut self,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
+        self.update_kickoff_reference(gameplay, events);
+        self.prune_goal_buildup_samples(frame.time);
         if live_play {
-            self.record_goal_buildup_sample(sample);
+            self.record_goal_buildup_sample(frame, ball);
         }
         self.pending_goal_events
-            .extend(sample.goal_events.iter().cloned().map(|event| {
+            .extend(events.goal_events.iter().cloned().map(|event| {
                 PendingGoalEvent {
                     time_after_kickoff: self
                         .active_kickoff_touch_time
@@ -450,7 +481,7 @@ impl MatchStatsCalculator {
             }));
         let mut processor_event_counts: HashMap<(PlayerId, TimelineEventKind), i32> =
             HashMap::new();
-        for event in &sample.player_stat_events {
+        for event in &events.player_stat_events {
             let kind = match event.kind {
                 PlayerStatEventKind::Shot => TimelineEventKind::Shot,
                 PlayerStatEventKind::Save => TimelineEventKind::Save,
@@ -467,7 +498,7 @@ impl MatchStatsCalculator {
                 .or_default() += 1;
         }
 
-        for player in &sample.players {
+        for player in &players.players {
             self.player_teams
                 .insert(player.player_id.clone(), player.is_team_0);
             let mut current_stats = CorePlayerStats {
@@ -476,20 +507,10 @@ impl MatchStatsCalculator {
                 assists: player.match_assists.unwrap_or(0),
                 saves: player.match_saves.unwrap_or(0),
                 shots: player.match_shots.unwrap_or(0),
-                goals_conceded_while_last_defender: self
+                scoring_context: self
                     .player_stats
                     .get(&player.player_id)
-                    .map(|stats| stats.goals_conceded_while_last_defender)
-                    .unwrap_or(0),
-                goal_after_kickoff: self
-                    .player_stats
-                    .get(&player.player_id)
-                    .map(|stats| stats.goal_after_kickoff.clone())
-                    .unwrap_or_default(),
-                goal_buildup: self
-                    .player_stats
-                    .get(&player.player_id)
-                    .map(|stats| stats.goal_buildup.clone())
+                    .map(|stats| stats.scoring_context.clone())
                     .unwrap_or_default(),
             };
 
@@ -521,7 +542,7 @@ impl MatchStatsCalculator {
 
             if shot_fallback_delta > 0 {
                 self.emit_timeline_events(
-                    sample.time,
+                    frame.time,
                     TimelineEventKind::Shot,
                     &player.player_id,
                     player.is_team_0,
@@ -530,7 +551,7 @@ impl MatchStatsCalculator {
             }
             if save_fallback_delta > 0 {
                 self.emit_timeline_events(
-                    sample.time,
+                    frame.time,
                     TimelineEventKind::Save,
                     &player.player_id,
                     player.is_team_0,
@@ -539,7 +560,7 @@ impl MatchStatsCalculator {
             }
             if assist_fallback_delta > 0 {
                 self.emit_timeline_events(
-                    sample.time,
+                    frame.time,
                     TimelineEventKind::Assist,
                     &player.player_id,
                     player.is_team_0,
@@ -553,7 +574,7 @@ impl MatchStatsCalculator {
                     let goal_time = pending_goal_event
                         .as_ref()
                         .map(|event| event.event.time)
-                        .unwrap_or(sample.time);
+                        .unwrap_or(frame.time);
                     let time_after_kickoff = pending_goal_event
                         .and_then(|event| event.time_after_kickoff)
                         .or_else(|| {
@@ -562,10 +583,12 @@ impl MatchStatsCalculator {
                         });
                     if let Some(time_after_kickoff) = time_after_kickoff {
                         current_stats
+                            .scoring_context
                             .goal_after_kickoff
                             .record_goal(time_after_kickoff);
                     }
                     current_stats
+                        .scoring_context
                         .goal_buildup
                         .record(self.classify_goal_buildup(goal_time, player.is_team_0));
                     self.timeline.push(TimelineEvent {
@@ -584,24 +607,26 @@ impl MatchStatsCalculator {
         }
 
         if let (Some(team_zero_score), Some(team_one_score)) =
-            (sample.team_zero_score, sample.team_one_score)
+            (gameplay.team_zero_score, gameplay.team_one_score)
         {
             if let Some((prev_team_zero_score, prev_team_one_score)) = self.previous_team_scores {
                 let team_zero_delta = team_zero_score - prev_team_zero_score;
                 let team_one_delta = team_one_score - prev_team_one_score;
 
                 if team_zero_delta > 0 {
-                    if let Some(last_defender) = self.last_defender(sample, false) {
+                    if let Some(last_defender) = self.last_defender(players, false) {
                         if let Some(stats) = self.player_stats.get_mut(&last_defender) {
-                            stats.goals_conceded_while_last_defender += team_zero_delta as u32;
+                            stats.scoring_context.goals_conceded_while_last_defender +=
+                                team_zero_delta as u32;
                         }
                     }
                 }
 
                 if team_one_delta > 0 {
-                    if let Some(last_defender) = self.last_defender(sample, true) {
+                    if let Some(last_defender) = self.last_defender(players, true) {
                         if let Some(stats) = self.player_stats.get_mut(&last_defender) {
-                            stats.goals_conceded_while_last_defender += team_one_delta as u32;
+                            stats.scoring_context.goals_conceded_while_last_defender +=
+                                team_one_delta as u32;
                         }
                     }
                 }
@@ -618,12 +643,4 @@ impl MatchStatsCalculator {
 
         Ok(())
     }
-
-    pub fn update(&mut self, sample: &FrameState) -> SubtrActorResult<()> {
-        self.on_sample_internal(sample)
-    }
 }
-
-#[cfg(test)]
-#[path = "../reducers/match_stats_test.rs"]
-mod tests;

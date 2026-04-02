@@ -1,18 +1,9 @@
-import type { ExportedStat, StatsFrame } from "./statsTimeline.ts";
-import {
-  getExportedStatDomain,
-  getExportedStatLabels,
-  getExportedStatName,
-  getExportedStatValue,
-  getExportedStatValueType,
-  getExportedStatVariant,
-} from "./exportedStats.ts";
+import type { StatsFrame } from "./statsTimeline.ts";
 
 export type PossessionBreakdownClass = "possession_state" | "field_third";
 
 interface PossessionRenderOptions {
   breakdownClasses?: PossessionBreakdownClass[];
-  exportedStats?: ExportedStat[];
   labelPerspective:
     | {
       kind: "shared";
@@ -201,7 +192,6 @@ function formatBreakdownLabel(
 
 function renderPossessionBreakdownRows(
   possession: StatsFrame["possession"],
-  exportedStats: ExportedStat[] | undefined,
   breakdownClasses: PossessionBreakdownClass[],
   trackedTime: number | undefined,
   labelPerspective: PossessionRenderOptions["labelPerspective"],
@@ -235,46 +225,6 @@ function renderPossessionBreakdownRows(
         existing.total += entry.value;
       } else {
         groups.set(key, { values, total: entry.value });
-      }
-    }
-  } else if (exportedStats?.length) {
-    for (const stat of exportedStats ?? []) {
-      const domain = getExportedStatDomain(stat);
-      const name = getExportedStatName(stat);
-      const variant = getExportedStatVariant(stat);
-      const valueType = getExportedStatValueType(stat);
-      const value = getExportedStatValue(stat);
-      if (
-        domain !== "possession" ||
-        name !== "time" ||
-        variant !== "labeled" ||
-        valueType !== "float" ||
-        value === undefined
-      ) {
-        continue;
-      }
-
-      const labelMap = new Map(getExportedStatLabels(stat).map((label) => [label.key, label.value]));
-      const values = {} as PossessionBreakdownValueMap;
-      let complete = true;
-      for (const className of breakdownClasses) {
-        const labelValue = labelMap.get(className);
-        if (labelValue === undefined) {
-          complete = false;
-          break;
-        }
-        values[className] = labelValue;
-      }
-      if (!complete) {
-        continue;
-      }
-
-      const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
-      const existing = groups.get(key);
-      if (existing) {
-        existing.total += value;
-      } else {
-        groups.set(key, { values, total: value });
       }
     }
   }
@@ -322,7 +272,6 @@ export function renderPossessionStats(
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const breakdownRows = renderPossessionBreakdownRows(
     possession,
-    options.exportedStats,
     breakdownClasses,
     trackedTime,
     options.labelPerspective,

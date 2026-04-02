@@ -33,23 +33,23 @@ These are the important places where we are making an explicit semantic choice.
 
 | Area | Current `subtr-actor` behavior | Code | Do we know Ballchasing does the same? |
 | --- | --- | --- | --- |
-| Live-play gating | Exclude kickoff countdown and goal-scored replay states from time-based stats | [`StatsSample::is_live_play`](src/stats.rs) | No |
-| Boost pickup gating | Ignore non-live `PickedUp` events by default; configurable opt-in exists | [`BoostReducerConfig`](src/stats.rs) | No |
+| Live-play gating | Exclude kickoff countdown and goal-scored replay states from time-based stats | `LivePlayState` / `LivePlayNode` | No |
+| Boost pickup gating | Ignore non-live `PickedUp` events by default; configurable opt-in exists | `BoostCalculatorConfig` | No |
 | Boost scale | Comparison normalizes raw replay boost `0..255` into Ballchasing-style `0..100` units | [`src/ballchasing.rs`](src/ballchasing.rs) | Ballchasing appears to use `0..100`-style reporting |
 | Small pad amount | `12%` of full boost | [`SMALL_PAD_AMOUNT_RAW`](src/stats.rs) | Probably yes |
-| Pad size inference | Infer size from observed respawn cadence using `>= 7s` => big | [`BoostReducer`](src/stats.rs) | Unknown |
+| Pad size inference | Infer size from observed respawn cadence using `>= 7s` => big | `BoostCalculator` | Unknown |
 | Canonical pad matching radius | Match standard soccar pads within `400uu` | [`STANDARD_PAD_MATCH_RADIUS`](src/stats.rs) | Unknown |
 | Midfield stolen/neutral tolerance | Treat near-midfield fallback pads as neutral with `128uu` tolerance on `y` | [`BOOST_PAD_MIDFIELD_TOLERANCE_Y`](src/stats.rs) | Unknown |
 | Supersonic threshold | `2200uu/s` | [`SUPERSONIC_SPEED_THRESHOLD`](src/stats.rs) | Probably, but not confirmed |
 | Boost-speed threshold | `1410uu/s` | [`BOOST_SPEED_THRESHOLD`](src/stats.rs) | Probably, but not confirmed |
 | Ground threshold | `z <= 20` | [`GROUND_Z_THRESHOLD`](src/stats.rs) | Unknown |
 | High-air threshold | `z >= 300` | [`HIGH_AIR_Z_THRESHOLD`](src/stats.rs) | Unknown |
-| Field halves | Normalize to team attack direction; `y < 0` is defensive half | [`PositioningReducer`](src/stats.rs) | Probably similar, not confirmed |
-| Field zones | Normalize to team attack direction; split using `FIELD_ZONE_BOUNDARY_Y = BOOST_PAD_SIDE_LANE_Y` | [`PositioningReducer`](src/stats.rs) | Unknown |
-| Behind / in front of ball | Compare normalized player `y` to normalized ball `y` | [`PositioningReducer`](src/stats.rs) | Unknown |
-| Closest / farthest / most back / most forward | Pure per-sample ranking among teammates | [`PositioningReducer`](src/stats.rs) | Unknown |
-| Possession owner | Use team last-touch signal, not replay-native player possession | [`PositioningReducer`](src/stats.rs), [`PossessionReducer`](src/stats.rs) | No |
-| Powerslide count | Count rising edges of `bReplicatedHandbrake` | [`PowerslideReducer`](src/stats.rs) | Unknown |
+| Field halves | Normalize to team attack direction; `y < 0` is defensive half | `PositioningCalculator` | Probably similar, not confirmed |
+| Field zones | Normalize to team attack direction; split using `FIELD_ZONE_BOUNDARY_Y = BOOST_PAD_SIDE_LANE_Y` | `PositioningCalculator` | Unknown |
+| Behind / in front of ball | Compare normalized player `y` to normalized ball `y` | `PositioningCalculator` | Unknown |
+| Closest / farthest / most back / most forward | Pure per-sample ranking among teammates | `PositioningCalculator` | Unknown |
+| Possession owner | Use team last-touch signal, not replay-native player possession | `PositioningCalculator`, `PossessionCalculator` | No |
+| Powerslide count | Count rising edges of `bReplicatedHandbrake` | `PowerslideCalculator` | Unknown |
 
 ## Directional Patterns Seen So Far
 
@@ -113,7 +113,7 @@ Likely causes:
 Impact:
 
 - this can hide stat agreement for those players
-- it is a comparison-layer problem, not necessarily a reducer problem
+- it is a comparison-layer problem, not necessarily an analysis-node problem
 
 ## Disagreement Tracker By Stat Family
 

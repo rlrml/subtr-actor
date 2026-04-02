@@ -111,7 +111,6 @@ pub struct RushCalculator {
     stats: RushStats,
     events: Vec<RushEvent>,
     active_rush: Option<ActiveRush>,
-    live_play_tracker: LivePlayTracker,
 }
 
 impl RushCalculator {
@@ -156,22 +155,24 @@ impl RushCalculator {
 
     fn rush_numbers(
         &self,
-        sample: &FrameState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
         attacking_team_is_team_0: bool,
     ) -> Option<(usize, usize)> {
-        let ball_position = sample.ball.as_ref()?.position();
+        let ball_position = ball.position()?;
         let normalized_ball_y = normalized_y(attacking_team_is_team_0, ball_position);
         if normalized_ball_y > self.config.max_start_y {
             return None;
         }
 
-        let demoed_players: HashSet<_> = sample
+        let demoed_players: HashSet<_> = events
             .active_demos
             .iter()
             .map(|demo| demo.victim.clone())
             .collect();
 
-        let attackers = sample
+        let attackers = players
             .players
             .iter()
             .filter(|player| player.is_team_0 == attacking_team_is_team_0)
@@ -184,7 +185,7 @@ impl RushCalculator {
             .count()
             .min(3);
 
-        let defenders = sample
+        let defenders = players
             .players
             .iter()
             .filter(|player| player.is_team_0 != attacking_team_is_team_0)
@@ -223,18 +224,27 @@ impl RushCalculator {
         });
     }
 
-    fn update_active_rush(&mut self, sample: &FrameState, current_team_is_team_0: Option<bool>) {
+    fn update_active_rush(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        current_team_is_team_0: Option<bool>,
+    ) {
         let Some(active_team_is_team_0) = self.active_rush.as_ref().map(|rush| rush.is_team_0)
         else {
             return;
         };
 
         let active_continues = current_team_is_team_0 == Some(active_team_is_team_0)
-            && self.rush_numbers(sample, active_team_is_team_0).is_some();
+            && self
+                .rush_numbers(ball, players, events, active_team_is_team_0)
+                .is_some();
         if active_continues {
             if let Some(active_rush) = self.active_rush.as_mut() {
-                active_rush.last_time = sample.time;
-                active_rush.last_frame = sample.frame_number;
+                active_rush.last_time = frame.time;
+                active_rush.last_frame = frame.frame_number;
             }
             if let Some(mut active_rush) = self.active_rush.take() {
                 self.record_active_rush(&mut active_rush);
@@ -248,7 +258,10 @@ impl RushCalculator {
 
     fn maybe_start_rush(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
         active_team_before_sample: Option<bool>,
         current_team_is_team_0: Option<bool>,
     ) {
@@ -259,12 +272,14 @@ impl RushCalculator {
             return;
         }
 
-        if let Some((attackers, defenders)) = self.rush_numbers(sample, attacking_team_is_team_0) {
+        if let Some((attackers, defenders)) =
+            self.rush_numbers(ball, players, events, attacking_team_is_team_0)
+        {
             self.active_rush = Some(ActiveRush {
-                start_time: sample.time,
-                start_frame: sample.frame_number,
-                last_time: sample.time,
-                last_frame: sample.frame_number,
+                start_time: frame.time,
+                start_frame: frame.frame_number,
+                last_time: frame.time,
+                last_frame: frame.frame_number,
                 is_team_0: attacking_team_is_team_0,
                 attackers,
                 defenders,
@@ -275,43 +290,54 @@ impl RushCalculator {
 
     fn update_rush_state(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
         active_team_before_sample: Option<bool>,
         current_team_is_team_0: Option<bool>,
     ) {
-        self.update_active_rush(sample, current_team_is_team_0);
+        self.update_active_rush(frame, ball, players, events, current_team_is_team_0);
         if self.active_rush.is_none() {
-            self.maybe_start_rush(sample, active_team_before_sample, current_team_is_team_0);
+            self.maybe_start_rush(
+                frame,
+                ball,
+                players,
+                events,
+                active_team_before_sample,
+                current_team_is_team_0,
+            );
         }
     }
 
-    pub fn update(
+    pub fn update_parts(
         &mut self,
-        sample: &FrameState,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        live_play: bool,
         possession_state: &PossessionState,
     ) -> SubtrActorResult<()> {
-        if !self.live_play_tracker.is_live_play(sample)
-            || FiftyFiftyCalculator::kickoff_phase_active(sample)
-        {
+        if !live_play || gameplay.kickoff_phase_active() {
             self.finalize_active_rush();
             return Ok(());
         }
 
         self.update_rush_state(
-            sample,
+            frame,
+            ball,
+            players,
+            events,
             possession_state.active_team_before_sample,
             possession_state.current_team_is_team_0,
         );
 
         Ok(())
     }
-
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
         self.finalize_active_rush();
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "../reducers/rush_test.rs"]
-mod tests;

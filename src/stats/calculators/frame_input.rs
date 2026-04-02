@@ -1,8 +1,8 @@
 use crate::*;
 
 use super::{
-    BallFrameState, BallSample, DemoEventSample, FrameEventsState, FrameInfo, FrameState,
-    GameplayState, PlayerFrameState, PlayerSample,
+    BallFrameState, BallSample, DemoEventSample, FrameEventsState, FrameInfo, GameplayState,
+    PlayerFrameState, PlayerSample,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -75,16 +75,6 @@ impl FrameInput {
         unsafe { &*(self.processor as *const ReplayProcessor<'_>) }
     }
 
-    pub fn frame_state(&self) -> SubtrActorResult<FrameState> {
-        Ok(FrameState::from_parts(
-            self.frame_info(),
-            self.gameplay_state(),
-            self.ball_frame_state(),
-            self.player_frame_state(),
-            self.frame_events_state(),
-        ))
-    }
-
     pub fn frame_info(&self) -> FrameInfo {
         FrameInfo {
             frame_number: self.frame_number,
@@ -128,13 +118,11 @@ impl FrameInput {
     }
 
     pub fn ball_frame_state(&self) -> BallFrameState {
-        let ball = self
-            .processor()
+        self.processor()
             .get_interpolated_ball_rigid_body(self.current_time, 0.0)
             .ok()
-            .filter(|rigid_body| !rigid_body.sleeping)
-            .map(|rigid_body| BallSample { rigid_body });
-        BallFrameState { ball }
+            .map(|rigid_body| BallSample { rigid_body })
+            .into()
     }
 
     pub fn player_frame_state(&self) -> PlayerFrameState {

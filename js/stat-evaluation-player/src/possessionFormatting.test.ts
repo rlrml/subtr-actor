@@ -10,6 +10,31 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
       team_zero_time: 4,
       team_one_time: 3,
       neutral_time: 3,
+      labeled_time: {
+        entries: [
+          {
+            labels: [
+              { key: "possession_state", value: "team_zero" },
+              { key: "field_third", value: "team_zero_third" },
+            ],
+            value: 4,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "team_one" },
+              { key: "field_third", value: "team_one_third" },
+            ],
+            value: 3,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "neutral" },
+              { key: "field_third", value: "neutral_third" },
+            ],
+            value: 3,
+          },
+        ],
+      },
     },
     {
       labelPerspective: {
@@ -17,44 +42,6 @@ test("renderPossessionStats shows possession-state breakdown rows when selected"
         isTeamZero: true,
       },
       breakdownClasses: ["possession_state"],
-      exportedStats: [
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_zero" },
-            { key: "field_third", value: "team_zero_third" },
-          ],
-          value_type: "float",
-          value: 4,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_one" },
-            { key: "field_third", value: "team_one_third" },
-          ],
-          value_type: "float",
-          value: 3,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "neutral" },
-            { key: "field_third", value: "neutral_third" },
-          ],
-          value_type: "float",
-          value: 3,
-        },
-      ],
     },
   );
 
@@ -94,6 +81,38 @@ test("renderPossessionStats can render possession by third in team perspective",
       team_zero_time: 6,
       team_one_time: 3,
       neutral_time: 1,
+      labeled_time: {
+        entries: [
+          {
+            labels: [
+              { key: "possession_state", value: "team_zero" },
+              { key: "field_third", value: "team_zero_third" },
+            ],
+            value: 2,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "team_zero" },
+              { key: "field_third", value: "neutral_third" },
+            ],
+            value: 4,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "neutral" },
+              { key: "field_third", value: "team_one_third" },
+            ],
+            value: 1,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "team_one" },
+              { key: "field_third", value: "team_one_third" },
+            ],
+            value: 3,
+          },
+        ],
+      },
     },
     {
       labelPerspective: {
@@ -101,56 +120,6 @@ test("renderPossessionStats can render possession by third in team perspective",
         isTeamZero: true,
       },
       breakdownClasses: ["possession_state", "field_third"],
-      exportedStats: [
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_zero" },
-            { key: "field_third", value: "team_zero_third" },
-          ],
-          value_type: "float",
-          value: 2,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_zero" },
-            { key: "field_third", value: "neutral_third" },
-          ],
-          value_type: "float",
-          value: 4,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "neutral" },
-            { key: "field_third", value: "team_one_third" },
-          ],
-          value_type: "float",
-          value: 1,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_one" },
-            { key: "field_third", value: "team_one_third" },
-          ],
-          value_type: "float",
-          value: 3,
-        },
-      ],
     },
   );
 
@@ -167,50 +136,37 @@ test("renderPossessionStats can render a field-third breakdown on its own", () =
       team_zero_time: 4,
       team_one_time: 4,
       neutral_time: 2,
+      labeled_time: {
+        entries: [
+          {
+            labels: [
+              { key: "possession_state", value: "team_zero" },
+              { key: "field_third", value: "team_zero_third" },
+            ],
+            value: 3,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "neutral" },
+              { key: "field_third", value: "neutral_third" },
+            ],
+            value: 2,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "team_one" },
+              { key: "field_third", value: "team_one_third" },
+            ],
+            value: 5,
+          },
+        ],
+      },
     },
     {
       labelPerspective: {
         kind: "shared",
       },
       breakdownClasses: ["field_third"],
-      exportedStats: [
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_zero" },
-            { key: "field_third", value: "team_zero_third" },
-          ],
-          value_type: "float",
-          value: 3,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "neutral" },
-            { key: "field_third", value: "neutral_third" },
-          ],
-          value_type: "float",
-          value: 2,
-        },
-        {
-          domain: "possession",
-          name: "time",
-          variant: "labeled",
-          unit: "seconds",
-          labels: [
-            { key: "possession_state", value: "team_one" },
-            { key: "field_third", value: "team_one_third" },
-          ],
-          value_type: "float",
-          value: 5,
-        },
-      ],
     },
   );
 

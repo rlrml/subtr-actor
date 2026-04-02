@@ -33,15 +33,28 @@ impl AnalysisNode for RushNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        let mut dependencies = vec![frame_state_dependency()];
-        dependencies.push(possession_state_dependency());
-        dependencies
+        vec![
+            frame_info_dependency(),
+            gameplay_state_dependency(),
+            ball_frame_state_dependency(),
+            player_frame_state_dependency(),
+            frame_events_state_dependency(),
+            possession_state_dependency(),
+            AnalysisDependency::required::<LivePlayState>(),
+        ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let sample = ctx.get::<FrameState>()?;
         let possession_state = ctx.get::<PossessionState>()?;
-        self.calculator.update(sample, possession_state)
+        self.calculator.update_parts(
+            ctx.get::<FrameInfo>()?,
+            ctx.get::<GameplayState>()?,
+            ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
+            ctx.get::<FrameEventsState>()?,
+            ctx.get::<LivePlayState>()?.is_live_play,
+            possession_state,
+        )
     }
 
     fn finish(&mut self) -> SubtrActorResult<()> {
