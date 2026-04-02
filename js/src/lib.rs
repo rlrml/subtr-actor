@@ -133,7 +133,7 @@ fn collect_replay_data_with_optional_progress(
 fn collect_replay_bundle_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
-) -> Result<(ReplayData, serde_json::Value), JsValue> {
+) -> Result<(ReplayData, subtr_actor::ReplayStatsTimeline), JsValue> {
     let total_frames = get_total_frames(replay)?;
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
@@ -181,7 +181,7 @@ fn collect_replay_bundle_with_optional_progress(
     let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
         .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
     let stats_timeline = stats_collector
-        .into_stats_timeline_value()
+        .into_replay_stats_timeline()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
     let replay_data = replay_data_collector
         .into_replay_data_with_supplemental_data(processor, supplemental_data)

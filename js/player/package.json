@@ -23,10 +23,10 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build:bindings": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message PATH=$HOME/.cargo/bin:/run/current-system/sw/bin:/usr/bin:/bin:$PATH npm --prefix .. run build",
+    "build:bindings": "sh -lc 'cd .. && node --run=build'",
     "check": "tsc --noEmit",
     "build:types": "tsc --project tsconfig.build.json",
-    "build": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build:bindings && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run check && vite build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run build:types",
+    "build": "node --run=build:bindings && node --run=check && vite build && node --run=build:types",
     "prepare:package": "node ./scripts/prepare-package.mjs",
     "smoke:install": "node ./scripts/smoke-install.mjs"
   },

@@ -670,6 +670,19 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
 }
 
 #[test]
+fn test_stats_timeline_value_serializes_for_rlcs_replay() {
+    let replay = parse_replay("assets/replays/rlcs.replay");
+    let captured = StatsCollector::new()
+        .capture_frames()
+        .get_captured_data(&replay)
+        .expect("Expected captured stats data");
+
+    captured
+        .into_stats_timeline_value()
+        .expect("Expected stats timeline value");
+}
+
+#[test]
 fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let replay_data = ReplayDataCollector::new()
