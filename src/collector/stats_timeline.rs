@@ -238,9 +238,10 @@ impl StatsTimelineCollector {
                 .graph_value_or_default::<Vec<CeilingShotEvent>, CeilingShotCalculator, _>(
                     |calculator| calculator.events().to_vec(),
                 ),
-            double_tap_events: self.graph_value_or_default::<Vec<DoubleTapEvent>, DoubleTapCalculator, _>(
-                |calculator| calculator.events().to_vec(),
-            ),
+            double_tap_events: self
+                .graph_value_or_default::<Vec<DoubleTapEvent>, DoubleTapCalculator, _>(
+                    |calculator| calculator.events().to_vec(),
+                ),
             fifty_fifty_events: self
                 .graph_value_or_default::<Vec<FiftyFiftyEvent>, FiftyFiftyCalculator, _>(
                     |calculator| calculator.events().to_vec(),

@@ -79,7 +79,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             config: self.timeline_config(),
             replay_meta: self.replay_meta.clone(),
             timeline_events: self.timeline_events_typed()?,
-            backboard_events: self.module_player_events("backboard", "events", parse_backboard_event)?,
+            backboard_events: self.module_player_events(
+                "backboard",
+                "events",
+                parse_backboard_event,
+            )?,
             ceiling_shot_events: self.module_player_events(
                 "ceiling_shot",
                 "events",
@@ -116,7 +120,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "replay_meta".to_owned(),
             serialize_to_json_value(&self.replay_meta)?,
         );
-        timeline.insert("timeline_events".to_owned(), Value::Array(self.timeline_events()));
+        timeline.insert(
+            "timeline_events".to_owned(),
+            Value::Array(self.timeline_events()),
+        );
         timeline.insert(
             "backboard_events".to_owned(),
             Value::Array(self.module_array("backboard", "events")),
