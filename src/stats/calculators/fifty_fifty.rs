@@ -151,6 +151,79 @@ impl FiftyFiftyPlayerStats {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct FiftyFiftyTeamStats {
+    pub count: u32,
+    pub wins: u32,
+    pub losses: u32,
+    pub neutral_outcomes: u32,
+    pub kickoff_count: u32,
+    pub kickoff_wins: u32,
+    pub kickoff_losses: u32,
+    pub kickoff_neutral_outcomes: u32,
+    pub possession_after_count: u32,
+    pub opponent_possession_after_count: u32,
+    pub neutral_possession_after_count: u32,
+    pub kickoff_possession_after_count: u32,
+    pub kickoff_opponent_possession_after_count: u32,
+    pub kickoff_neutral_possession_after_count: u32,
+}
+
+impl FiftyFiftyStats {
+    pub fn for_team(&self, is_team_zero: bool) -> FiftyFiftyTeamStats {
+        let (
+            wins,
+            losses,
+            kickoff_wins,
+            kickoff_losses,
+            possession_after_count,
+            opponent_possession_after_count,
+            kickoff_possession_after_count,
+            kickoff_opponent_possession_after_count,
+        ) = if is_team_zero {
+            (
+                self.team_zero_wins,
+                self.team_one_wins,
+                self.kickoff_team_zero_wins,
+                self.kickoff_team_one_wins,
+                self.team_zero_possession_after_count,
+                self.team_one_possession_after_count,
+                self.kickoff_team_zero_possession_after_count,
+                self.kickoff_team_one_possession_after_count,
+            )
+        } else {
+            (
+                self.team_one_wins,
+                self.team_zero_wins,
+                self.kickoff_team_one_wins,
+                self.kickoff_team_zero_wins,
+                self.team_one_possession_after_count,
+                self.team_zero_possession_after_count,
+                self.kickoff_team_one_possession_after_count,
+                self.kickoff_team_zero_possession_after_count,
+            )
+        };
+
+        FiftyFiftyTeamStats {
+            count: self.count,
+            wins,
+            losses,
+            neutral_outcomes: self.neutral_outcomes,
+            kickoff_count: self.kickoff_count,
+            kickoff_wins,
+            kickoff_losses,
+            kickoff_neutral_outcomes: self.kickoff_neutral_outcomes,
+            possession_after_count,
+            opponent_possession_after_count,
+            neutral_possession_after_count: self.neutral_possession_after_count,
+            kickoff_possession_after_count,
+            kickoff_opponent_possession_after_count,
+            kickoff_neutral_possession_after_count: self.kickoff_neutral_possession_after_count,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FiftyFiftyCalculator {
     stats: FiftyFiftyStats,

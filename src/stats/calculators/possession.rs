@@ -89,6 +89,74 @@ impl PossessionStats {
     pub fn time_with_labels(&self, labels: &[StatLabel]) -> f32 {
         self.labeled_time.sum_matching(labels)
     }
+
+    pub fn for_team(&self, is_team_zero: bool) -> PossessionTeamStats {
+        let (possession_time, opponent_possession_time) = if is_team_zero {
+            (self.team_zero_time, self.team_one_time)
+        } else {
+            (self.team_one_time, self.team_zero_time)
+        };
+
+        let mut labeled_time = LabeledFloatSums::default();
+        for entry in &self.labeled_time.entries {
+            labeled_time.add(
+                entry
+                    .labels
+                    .iter()
+                    .map(|label| team_relative_possession_label(label, is_team_zero)),
+                entry.value,
+            );
+        }
+
+        PossessionTeamStats {
+            tracked_time: self.tracked_time,
+            possession_time,
+            opponent_possession_time,
+            neutral_time: self.neutral_time,
+            labeled_time,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PossessionTeamStats {
+    pub tracked_time: f32,
+    pub possession_time: f32,
+    pub opponent_possession_time: f32,
+    pub neutral_time: f32,
+    #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
+    pub labeled_time: LabeledFloatSums,
+}
+
+fn team_relative_possession_label(label: &StatLabel, is_team_zero: bool) -> StatLabel {
+    match (label.key, label.value) {
+        ("possession_state", "team_zero") => StatLabel::new(
+            "possession_state",
+            if is_team_zero { "own" } else { "opponent" },
+        ),
+        ("possession_state", "team_one") => StatLabel::new(
+            "possession_state",
+            if is_team_zero { "opponent" } else { "own" },
+        ),
+        ("field_third", "team_zero_third") => StatLabel::new(
+            "field_third",
+            if is_team_zero {
+                "defensive_third"
+            } else {
+                "offensive_third"
+            },
+        ),
+        ("field_third", "team_one_third") => StatLabel::new(
+            "field_third",
+            if is_team_zero {
+                "offensive_third"
+            } else {
+                "defensive_third"
+            },
+        ),
+        _ => label.clone(),
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
