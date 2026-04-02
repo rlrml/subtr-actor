@@ -4,5 +4,6 @@
 - [RELEASING.md](./RELEASING.md): release process for crates.io, PyPI, npm, and GitHub Releases.
 - [ballchasing-disagreement-tracker.md](./ballchasing-disagreement-tracker.md): notes on mismatches between exported stats and ballchasing data.
 - [ballchasing-stats.md](./ballchasing-stats.md): reference material for ballchasing-related stat handling.
+- [calculators-and-analysis-nodes.md](./calculators-and-analysis-nodes.md): concise guide to the current calculator layer, analysis-node DAG, and their relationship.
 - [js-player-library-plan.md](./js-player-library-plan.md): design notes for turning the JS example viewer into a reusable player library.
 - [positioning-stat-proposal.md](./positioning-stat-proposal.md): design notes for positioning-oriented stats.

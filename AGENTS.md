@@ -29,6 +29,8 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 
 - Treat the Rust crate as the source of truth. Binding changes in `python/` and
   `js/` usually mirror behavior already defined in `src/`.
+- For the current stats DAG layout, see
+  [`docs/calculators-and-analysis-nodes.md`](./docs/calculators-and-analysis-nodes.md).
 - Most feature extraction work lands either in `src/collector/ndarray/`,
   `src/collector/replay_data.rs`, `src/collector/stats_timeline.rs`, or
   `src/stats/export/`, depending on whether the output is numeric, structured,
