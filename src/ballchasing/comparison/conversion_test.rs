@@ -16,12 +16,12 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 fn compute_comparable_stats_reference(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
-    let mut match_collector = ReducerCollector::new(MatchStatsReducer::new());
-    let mut boost_collector = ReducerCollector::new(BoostReducer::new());
-    let mut movement_collector = ReducerCollector::new(MovementReducer::new());
-    let mut positioning_collector = ReducerCollector::new(PositioningReducer::new());
-    let mut demo_collector = ReducerCollector::new(DemoReducer::new());
-    let mut powerslide_collector = ReducerCollector::new(PowerslideReducer::new());
+    let mut match_collector = ReducerCollector::new(MatchStatsCalculator::new());
+    let mut boost_collector = ReducerCollector::new(BoostCalculator::new());
+    let mut movement_collector = ReducerCollector::new(MovementCalculator::new());
+    let mut positioning_collector = ReducerCollector::new(PositioningCalculator::new());
+    let mut demo_collector = ReducerCollector::new(DemoCalculator::new());
+    let mut powerslide_collector = ReducerCollector::new(PowerslideCalculator::new());
 
     let mut processor = ReplayProcessor::new(replay)?;
     let mut collectors: [&mut dyn Collector; 6] = [

@@ -1,7 +1,6 @@
 pub(crate) mod analysis_nodes;
 mod boost_invariants;
 pub(crate) mod calculators;
-pub(crate) mod comparison;
 pub mod export;
 pub mod reducers;
 

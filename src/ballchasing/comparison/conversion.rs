@@ -291,21 +291,21 @@ fn comparable_demo_from_team(stats: &DemoTeamStats) -> ComparableDemoStats {
 
 pub(crate) struct ComputedComparableStats {
     pub(super) replay_meta: ReplayMeta,
-    pub(super) match_stats: MatchStatsReducer,
-    pub(super) boost: BoostReducer,
-    pub(super) movement: MovementReducer,
-    pub(super) positioning: PositioningReducer,
-    pub(super) demo: DemoReducer,
-    pub(super) powerslide: PowerslideReducer,
+    pub(super) match_stats: MatchStatsCalculator,
+    pub(super) boost: BoostCalculator,
+    pub(super) movement: MovementCalculator,
+    pub(super) positioning: PositioningCalculator,
+    pub(super) demo: DemoCalculator,
+    pub(super) powerslide: PowerslideCalculator,
 }
 
 struct ComparableStatsCollector {
-    match_stats: MatchStatsReducer,
-    boost: BoostReducer,
-    movement: MovementReducer,
-    positioning: PositioningReducer,
-    demo: DemoReducer,
-    powerslide: PowerslideReducer,
+    match_stats: MatchStatsCalculator,
+    boost: BoostCalculator,
+    movement: MovementCalculator,
+    positioning: PositioningCalculator,
+    demo: DemoCalculator,
+    powerslide: PowerslideCalculator,
     derived_signals: DerivedSignalGraph,
     replay_meta: Option<ReplayMeta>,
     last_sample_time: Option<f32>,
@@ -318,12 +318,12 @@ struct ComparableStatsCollector {
 
 impl ComparableStatsCollector {
     fn new() -> Self {
-        let match_stats = MatchStatsReducer::new();
-        let boost = BoostReducer::new();
-        let movement = MovementReducer::new();
-        let positioning = PositioningReducer::new();
-        let demo = DemoReducer::new();
-        let powerslide = PowerslideReducer::new();
+        let match_stats = MatchStatsCalculator::new();
+        let boost = BoostCalculator::new();
+        let movement = MovementCalculator::new();
+        let positioning = PositioningCalculator::new();
+        let demo = DemoCalculator::new();
+        let powerslide = PowerslideCalculator::new();
 
         let mut required_signals = BTreeSet::new();
         for signals in [
@@ -394,15 +394,17 @@ impl Collector for ComparableStatsCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let mut sample = FrameState::from_processor(processor, frame_number, current_time, dt)?;
-        sample.active_demos.clear();
-        sample.demo_events = processor.demolishes[self.last_demolish_count..].to_vec();
-        sample.boost_pad_events =
-            processor.boost_pad_events[self.last_boost_pad_event_count..].to_vec();
-        sample.touch_events = processor.touch_events[self.last_touch_event_count..].to_vec();
-        sample.player_stat_events =
-            processor.player_stat_events[self.last_player_stat_event_count..].to_vec();
-        sample.goal_events = processor.goal_events[self.last_goal_event_count..].to_vec();
+        let sample = ReducerSample::from_input(&FrameInput::aggregate(
+            processor,
+            frame_number,
+            current_time,
+            dt,
+            self.last_demolish_count,
+            self.last_boost_pad_event_count,
+            self.last_touch_event_count,
+            self.last_player_stat_event_count,
+            self.last_goal_event_count,
+        ));
         let analysis_context = self.derived_signals.evaluate(&sample)?;
 
         self.match_stats

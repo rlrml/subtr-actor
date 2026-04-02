@@ -3,11 +3,11 @@ use std::path::Path;
 use anyhow::Context;
 use serde_json::Value;
 
-use super::report::BallchasingComparisonReport;
-use crate::stats::comparison::{
+use super::comparison::{
     build_actual_comparable_stats, build_expected_comparable_stats, compute_comparable_stats,
     MatchConfig, StatMatcher,
 };
+use super::report::BallchasingComparisonReport;
 use crate::*;
 
 pub fn parse_replay_bytes(data: &[u8]) -> anyhow::Result<boxcars::Replay> {
