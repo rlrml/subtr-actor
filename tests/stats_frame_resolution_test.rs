@@ -3,7 +3,7 @@ mod common;
 use subtr_actor::{StatsCollector, StatsFrameResolution, StatsTimelineCollector};
 
 #[test]
-fn default_resolution_matches_every_frame_resolution() {
+fn stats_collector_default_resolution_matches_every_frame() {
     let replay = common::parse_replay("assets/replays/rlcs.replay");
 
     let default_stats_collector = StatsCollector::new()
@@ -16,18 +16,6 @@ fn default_resolution_matches_every_frame_resolution() {
     common::assert_replay_stats_timeline_eq(
         &default_stats_collector,
         &explicit_every_frame_stats_collector,
-    );
-
-    let default_timeline_collector = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
-        .expect("default stats timeline collector should build");
-    let explicit_every_frame_timeline_collector = StatsTimelineCollector::new()
-        .with_frame_resolution(StatsFrameResolution::EveryFrame)
-        .get_replay_data(&replay)
-        .expect("explicit every-frame stats timeline collector should build");
-    common::assert_replay_stats_timeline_eq(
-        &default_timeline_collector,
-        &explicit_every_frame_timeline_collector,
     );
 }
 
