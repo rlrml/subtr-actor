@@ -9,7 +9,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "build-wasm": "node ../scripts/ensure-wasm-package.mjs --force",
-        "dev-with-wasm": "env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm run dev"
+        "dev-with-wasm": "node --run=dev"
     },
     "dependencies": {
         "chart.js": "^4.4.0",
