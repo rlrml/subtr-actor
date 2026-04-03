@@ -24,7 +24,9 @@
   "sideEffects": false,
   "scripts": {
     "build:bindings": "sh -lc 'cd .. && node --run=build'",
-    "check": "tsc --noEmit",
+    "generate:raw-types": "sh -lc 'root=$(git rev-parse --show-toplevel) && out=\"$root/js/player/src/generated\" && mkdir -p \"$out\" && env TS_RS_EXPORT_DIR=\"$out\" TS_RS_IMPORT_EXTENSION=ts cargo test --manifest-path \"$root/Cargo.toml\" collector::replay_data::export_bindings --lib && env TS_RS_EXPORT_DIR=\"$out\" TS_RS_IMPORT_EXTENSION=ts cargo test --manifest-path \"$root/Cargo.toml\" collector::replay_data_heuristics::export_bindings --lib && env TS_RS_EXPORT_DIR=\"$out\" TS_RS_IMPORT_EXTENSION=ts cargo test --manifest-path \"$root/Cargo.toml\" replay_types::export_bindings --lib && env TS_RS_EXPORT_DIR=\"$out\" TS_RS_IMPORT_EXTENSION=ts cargo test --manifest-path \"$root/Cargo.toml\" stats::calculators::flip_reset::export_bindings --lib && env TS_RS_EXPORT_DIR=\"$out\" TS_RS_IMPORT_EXTENSION=ts cargo test --manifest-path \"$root/Cargo.toml\" ts_bindings::export_bindings --lib && find \"$out\" -type f -name \"*.ts\" -exec sed -i \"s/[[:space:]]\\+$//\" {} +'",
+    "verify:raw-types": "sh -lc 'root=$(git rev-parse --show-toplevel) && node --run=generate:raw-types && git -C \"$root\" diff --exit-code -- js/player/src/generated && test -z \"$(git -C \"$root\" ls-files --others --exclude-standard -- js/player/src/generated)\"'",
+    "check": "node --run=verify:raw-types && tsc --noEmit",
     "build:types": "tsc --project tsconfig.build.json",
     "build": "node --run=build:bindings && node --run=check && vite build && node --run=build:types",
     "prepare:package": "node ./scripts/prepare-package.mjs",

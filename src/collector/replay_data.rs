@@ -53,13 +53,15 @@ pub use super::replay_data_heuristics::{ReplayDataHeuristicData, ReplayDataSuppl
 ///
 /// - [`Empty`](BallFrame::Empty) - Indicates the ball is unavailable or ball syncing is disabled
 /// - [`Data`](BallFrame::Data) - Contains the ball's rigid body physics information
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub enum BallFrame {
     /// Empty frame indicating the ball is unavailable or ball syncing is disabled
     Empty,
     /// Frame containing the ball's rigid body physics data
     Data {
         /// The ball's rigid body containing position, rotation, and velocity information
+        #[ts(as = "crate::ts_bindings::RigidBodyTs")]
         rigid_body: boxcars::RigidBody,
     },
 }
@@ -118,13 +120,15 @@ impl BallFrame {
 ///
 /// - [`Empty`](PlayerFrame::Empty) - Indicates the player is inactive or sleeping
 /// - [`Data`](PlayerFrame::Data) - Contains the player's complete state information
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub enum PlayerFrame {
     /// Empty frame indicating the player is inactive or sleeping
     Empty,
     /// Frame containing the player's complete state data
     Data {
         /// The player's rigid body containing position, rotation, and velocity information
+        #[ts(as = "crate::ts_bindings::RigidBodyTs")]
         rigid_body: boxcars::RigidBody,
         /// The player's current boost amount in raw replay units (0.0 to 255.0)
         boost_amount: f32,
@@ -271,7 +275,8 @@ impl PlayerFrame {
 /// # Fields
 ///
 /// * `frames` - A vector of [`PlayerFrame`] instances in chronological order
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PlayerData {
     /// Vector of player frames in chronological order
     frames: Vec<PlayerFrame>,
@@ -333,7 +338,8 @@ impl PlayerData {
 /// # Fields
 ///
 /// * `frames` - A vector of [`BallFrame`] instances in chronological order
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BallData {
     /// Vector of ball frames in chronological order
     frames: Vec<BallFrame>,
@@ -398,7 +404,8 @@ impl BallData {
 /// * `seconds_remaining` - The number of seconds remaining in the current game period
 /// * `replicated_game_state_name` - The game state enum value (indicates countdown, playing, goal, etc.)
 /// * `replicated_game_state_time_remaining` - The kickoff countdown timer, usually 3 to 0
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct MetadataFrame {
     /// The current time in seconds since the start of the replay
     pub time: f32,
@@ -477,11 +484,13 @@ impl MetadataFrame {
 /// * `ball_data` - All ball state information across all frames
 /// * `players` - Player data for each player, indexed by [`PlayerId`]
 /// * `metadata_frames` - Game metadata for each frame including timing information
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct FrameData {
     /// All ball state information across all frames
     pub ball_data: BallData,
     /// Player data for each player, indexed by PlayerId
+    #[ts(as = "Vec<(crate::ts_bindings::RemoteIdTs, PlayerData)>")]
     pub players: Vec<(PlayerId, PlayerData)>,
     /// Game metadata for each frame including timing information
     pub metadata_frames: Vec<MetadataFrame>,
@@ -525,7 +534,8 @@ pub struct FrameData {
 /// // Access demolition events
 /// println!("Total demolitions: {}", replay_data.demolish_infos.len());
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ReplayData {
     /// All frame-by-frame data including ball, player, and metadata information
     pub frame_data: FrameData,

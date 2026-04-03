@@ -1,132 +1,29 @@
 import type { Group, Object3D } from "three";
+import type { RawReplayFramesData } from "./raw-types";
 import type { ReplayScene } from "./scene";
 import type { ReplayPlayer } from "./player";
 
-export interface RawVec3 {
-  x: number;
-  y: number;
-  z: number;
-}
-
-export interface RawRotation {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-}
-
-export interface RawRigidBody {
-  sleeping: boolean;
-  location: RawVec3;
-  rotation: RawRotation;
-  linear_velocity: RawVec3;
-  angular_velocity: RawVec3;
-}
-
-export interface RawBallFrameData {
-  rigid_body: RawRigidBody;
-}
-
-export interface RawPlayerFrameData {
-  rigid_body: RawRigidBody;
-  boost_amount: number;
-  boost_active: boolean;
-  powerslide_active: boolean;
-  jump_active: boolean;
-  double_jump_active: boolean;
-  dodge_active: boolean;
-  player_name?: string;
-  team?: number;
-  is_team_0?: boolean;
-}
-
-export type RawBallFrame = "Empty" | { Data: RawBallFrameData };
-export type RawPlayerFrame = "Empty" | { Data: RawPlayerFrameData };
-
-export interface RawPlayerData {
-  frames: RawPlayerFrame[];
-}
-
-export interface RawBallData {
-  frames: RawBallFrame[];
-}
-
-export interface RawMetadataFrame {
-  time: number;
-  seconds_remaining: number;
-  replicated_game_state_name: number;
-  replicated_game_state_time_remaining: number;
-}
-
-export interface RawPlayerInfo {
-  remote_id?: Record<string, string>;
-  stats?: Map<string, unknown> | Record<string, unknown> | null;
-  name: string;
-}
-
-export type RawPlayerStatEventKind = "Shot" | "Save" | "Assist";
-
-export interface RawDemolishInfo {
-  time: number;
-  seconds_remaining: number;
-  frame: number;
-  attacker: Record<string, string>;
-  victim: Record<string, string>;
-  attacker_velocity: RawVec3;
-  victim_velocity: RawVec3;
-  victim_location: RawVec3;
-}
-
-export interface RawGoalEvent {
-  time: number;
-  frame: number;
-  scoring_team_is_team_0: boolean;
-  player?: Record<string, string> | null;
-  team_zero_score?: number | null;
-  team_one_score?: number | null;
-}
-
-export interface RawPlayerStatEvent {
-  time: number;
-  frame: number;
-  player: Record<string, string>;
-  is_team_0: boolean;
-  kind: RawPlayerStatEventKind;
-}
-
-export interface RawBoostPadEvent {
-  time: number;
-  frame: number;
-  pad_id: string;
-  player?: Record<string, string> | null;
-  kind: unknown;
-}
-
-export interface RawBoostPad {
-  index: number;
-  pad_id?: string | null;
-  size: unknown;
-  position: RawVec3;
-}
-
-export interface RawReplayFramesData {
-  frame_data: {
-    ball_data: RawBallData;
-    players: Array<[Record<string, string>, RawPlayerData]>;
-    metadata_frames: RawMetadataFrame[];
-  };
-  meta: {
-    team_zero: RawPlayerInfo[];
-    team_one: RawPlayerInfo[];
-    all_headers: unknown[];
-  };
-  demolish_infos?: RawDemolishInfo[];
-  boost_pad_events?: RawBoostPadEvent[];
-  boost_pads?: RawBoostPad[];
-  goal_events?: RawGoalEvent[];
-  touch_events?: unknown[];
-  player_stat_events?: RawPlayerStatEvent[];
-}
+export type {
+  RawBallData,
+  RawBallFrame,
+  RawBallFrameData,
+  RawBoostPad,
+  RawBoostPadEvent,
+  RawDemolishInfo,
+  RawGoalEvent,
+  RawMetadataFrame,
+  RawPlayerData,
+  RawPlayerFrame,
+  RawPlayerFrameData,
+  RawPlayerId,
+  RawPlayerInfo,
+  RawPlayerStatEvent,
+  RawPlayerStatEventKind,
+  RawReplayFramesData,
+  RawRigidBody,
+  RawRotation,
+  RawVec3,
+} from "./raw-types";
 
 export interface Vec3 {
   x: number;

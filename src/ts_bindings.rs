@@ -1,5 +1,32 @@
 use ts_rs::TS;
 
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(export)]
+pub struct Vector3fTs {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(export)]
+pub struct QuaternionTs {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(export)]
+pub struct RigidBodyTs {
+    pub sleeping: bool,
+    pub location: Vector3fTs,
+    pub rotation: QuaternionTs,
+    pub linear_velocity: Option<Vector3fTs>,
+    pub angular_velocity: Option<Vector3fTs>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TS)]
 #[ts(export)]
 pub struct PsyNetIdTs {

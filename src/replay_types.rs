@@ -58,7 +58,8 @@ impl DemolishAttribute {
 /// Demolition events occur when one player 'demolishes' or 'destroys' another by
 /// hitting them at a sufficiently high speed. This results in the demolished player
 /// being temporarily removed from play.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct DemolishInfo {
     /// The exact game time (in seconds) at which the demolition event occurred.
     pub time: f32,
@@ -67,77 +68,95 @@ pub struct DemolishInfo {
     /// The frame number at which the demolition occurred.
     pub frame: usize,
     /// The [`PlayerId`] of the player who initiated the demolition.
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub attacker: PlayerId,
     /// The [`PlayerId`] of the player who was demolished.
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub victim: PlayerId,
     /// The velocity of the attacker at the time of demolition.
+    #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub attacker_velocity: boxcars::Vector3f,
     /// The velocity of the victim at the time of demolition.
+    #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub victim_velocity: boxcars::Vector3f,
     /// The location of the victim at the time of demolition.
+    #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub victim_location: boxcars::Vector3f,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub enum BoostPadEventKind {
     PickedUp { sequence: u8 },
     Available,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub enum BoostPadSize {
     Big,
     Small,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BoostPadEvent {
     pub time: f32,
     pub frame: usize,
     pub pad_id: String,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
     pub kind: BoostPadEventKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ResolvedBoostPad {
     pub index: usize,
     pub pad_id: Option<String>,
     pub size: BoostPadSize,
+    #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub position: boxcars::Vector3f,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct GoalEvent {
     pub time: f32,
     pub frame: usize,
     pub scoring_team_is_team_0: bool,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
     pub team_zero_score: Option<i32>,
     pub team_one_score: Option<i32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub enum PlayerStatEventKind {
     Shot,
     Save,
     Assist,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PlayerStatEvent {
     pub time: f32,
     pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub kind: PlayerStatEventKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TouchEvent {
     pub time: f32,
     pub frame: usize,
     pub team_is_team_0: bool,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
     pub closest_approach_distance: Option<f32>,
 }

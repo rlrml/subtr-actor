@@ -3,7 +3,8 @@ use serde::Serialize;
 use crate::*;
 
 /// Heuristic or otherwise derived replay enrichments attached to [`ReplayData`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ReplayDataHeuristicData {
     pub flip_reset_events: Vec<FlipResetEvent>,
     pub post_wall_dodge_events: Vec<PostWallDodgeEvent>,

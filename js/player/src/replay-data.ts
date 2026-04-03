@@ -7,6 +7,7 @@ import type {
   RawDemolishInfo,
   RawGoalEvent,
   RawPlayerStatEvent,
+  RawPlayerId,
   PlayerSample,
   RawBallFrame,
   RawPlayerFrame,
@@ -47,9 +48,20 @@ const BOOST_PAD_CENTER_X = 1024;
 const BOOST_PAD_CENTER_MID_Y = 1024;
 const BOOST_PAD_GOAL_LINE_Y = 4240;
 
-function playerIdToString(playerId: Record<string, string>): string {
+function playerIdToString(playerId: RawPlayerId): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
-  return `${kind}:${value}`;
+  if (typeof value === "string" || typeof value === "number") {
+    return `${kind}:${value}`;
+  }
+
+  if (value && typeof value === "object" && "online_id" in value) {
+    const onlineId = value.online_id;
+    if (typeof onlineId === "string" || typeof onlineId === "number") {
+      return `${kind}:${onlineId}`;
+    }
+  }
+
+  return `${kind}:${JSON.stringify(value)}`;
 }
 
 function normalizeVector(value: Vec3): Vec3 | null {
@@ -124,8 +136,8 @@ function parseBallFrame(frame: RawBallFrame): BallSample {
   const rigidBody = frame.Data.rigid_body;
   return {
     position: rigidBody.location,
-    linearVelocity: rigidBody.linear_velocity,
-    angularVelocity: rigidBody.angular_velocity,
+    linearVelocity: rigidBody.linear_velocity ?? null,
+    angularVelocity: rigidBody.angular_velocity ?? null,
     rotation: normalizeQuaternion(rigidBody.rotation),
   };
 }
@@ -164,8 +176,8 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
 
   return {
     position: rigidBody.location,
-    linearVelocity: rigidBody.linear_velocity,
-    angularVelocity: rigidBody.angular_velocity,
+    linearVelocity: rigidBody.linear_velocity ?? null,
+    angularVelocity: rigidBody.angular_velocity ?? null,
     rotation,
     forward,
     up,
@@ -203,20 +215,22 @@ function inferTeamSide(
     return false;
   }
 
-  if (firstFrame && firstFrame !== "Empty" && firstFrame.Data.is_team_0 !== undefined) {
+  if (
+    firstFrame &&
+    firstFrame !== "Empty" &&
+    typeof firstFrame.Data.is_team_0 === "boolean"
+  ) {
     return firstFrame.Data.is_team_0;
   }
 
   return true;
 }
 
-function getStatEntries(stats: RawPlayerInfo["stats"]): Array<[string, unknown]> {
+function getStatEntries(
+  stats: RawPlayerInfo["stats"] | undefined
+): Array<[string, unknown]> {
   if (!stats) {
     return [];
-  }
-
-  if (stats instanceof Map) {
-    return Array.from(stats.entries());
   }
 
   return Object.entries(stats);
