@@ -1,8 +1,8 @@
 use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
-use crate::stats::analysis_nodes::analysis_graph::AnalysisGraph;
-use crate::stats::analysis_nodes::{
+use crate::stats::analysis_graph::{
+    AnalysisGraph,
     StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
     StatsTimelineFrameState,
 };

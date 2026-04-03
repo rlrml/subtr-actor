@@ -301,7 +301,7 @@ pub(crate) fn compute_comparable_stats(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
     let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
-    let graph = crate::stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+    let graph = crate::stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
         replay,
         [
             "core",

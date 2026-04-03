@@ -1,4 +1,4 @@
-use crate::stats::analysis_nodes::{self, AnalysisNodeCollector};
+use crate::stats::analysis_graph::{self, AnalysisNodeCollector};
 use crate::*;
 
 pub struct ResolvedBoostPadCollector {
@@ -13,7 +13,7 @@ impl Default for ResolvedBoostPadCollector {
 
 impl ResolvedBoostPadCollector {
     pub fn new() -> Self {
-        let graph = analysis_nodes::graph_with_builtin_analysis_nodes(["boost"])
+        let graph = analysis_graph::graph_with_builtin_analysis_nodes(["boost"])
             .expect("builtin boost analysis graph should be valid");
         Self {
             collector: AnalysisNodeCollector::new(graph),

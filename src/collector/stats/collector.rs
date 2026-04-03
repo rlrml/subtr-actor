@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
-use crate::stats::analysis_nodes::graph_with_builtin_analysis_nodes;
+use crate::stats::analysis_graph::{graph_with_builtin_analysis_nodes, AnalysisGraph};
 use crate::*;
 
 use super::builtins::{
@@ -65,13 +65,13 @@ impl BuiltinModuleSelection {
 
     fn graph(
         &self,
-    ) -> SubtrActorResult<crate::stats::analysis_nodes::analysis_graph::AnalysisGraph> {
+    ) -> SubtrActorResult<AnalysisGraph> {
         graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
     }
 
     fn collected_modules(
         &self,
-        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        graph: &AnalysisGraph,
     ) -> SubtrActorResult<Vec<CollectedStatsModule>> {
         self.module_names
             .iter()
@@ -87,7 +87,7 @@ impl BuiltinModuleSelection {
 
     fn modules_json(
         &self,
-        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        graph: &AnalysisGraph,
     ) -> SubtrActorResult<Map<String, Value>> {
         let mut modules = Map::new();
         for module_name in self.module_names.iter().copied() {
@@ -101,7 +101,7 @@ impl BuiltinModuleSelection {
 
     fn frame_modules_json(
         &self,
-        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        graph: &AnalysisGraph,
         replay_meta: &ReplayMeta,
     ) -> SubtrActorResult<Map<String, Value>> {
         let mut modules = Map::new();
@@ -115,7 +115,7 @@ impl BuiltinModuleSelection {
 
     fn snapshot_config_json(
         &self,
-        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        graph: &AnalysisGraph,
     ) -> SubtrActorResult<Map<String, Value>> {
         let mut config = Map::new();
         for module_name in self.module_names.iter().copied() {
@@ -128,7 +128,7 @@ impl BuiltinModuleSelection {
 
     fn snapshot_frame(
         &self,
-        graph: &crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+        graph: &AnalysisGraph,
         replay_meta: &ReplayMeta,
     ) -> SubtrActorResult<StatsSnapshotFrame> {
         let frame = graph.state::<FrameInfo>().ok_or_else(|| {
@@ -242,7 +242,7 @@ impl FrameTransform for ReplayStatsFrameTransform {
 
 pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     modules: BuiltinModuleSelection,
-    graph: crate::stats::analysis_nodes::analysis_graph::AnalysisGraph,
+    graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
     frame_transform: F,
     captured_frames: Option<Vec<T>>,

@@ -323,7 +323,7 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         .expect("Expected stats timeline data");
     let final_frame = timeline.frames.last().expect("Expected at least one frame");
 
-    let graph = stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+    let graph = stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
         &replay,
         [
             "fifty_fifty",

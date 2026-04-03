@@ -1,4 +1,4 @@
-pub mod analysis_nodes;
+pub mod analysis_graph;
 mod boost_invariants;
 pub(crate) mod calculators;
 pub mod export;

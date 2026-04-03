@@ -17,7 +17,7 @@ fn compute_comparable_stats_reference(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
     let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
-    let graph = stats::analysis_nodes::collect_builtin_analysis_graph_for_replay(
+    let graph = stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
         replay,
         [
             "core",

@@ -5,11 +5,11 @@ This is the short map of the current stats runtime.
 ## Core split
 
 - `src/stats/calculators/` holds the actual stat logic and state machines.
-- `src/stats/analysis_nodes/` wraps calculator logic in the DAG runtime used by
+- `src/stats/analysis_graph/` wraps calculator logic in the DAG runtime used by
   the newer stats timeline/export flow.
 - `src/stats/reducers/` is the older reducer pipeline. It still matters, but if
   you are working on the analysis-node graph, treat calculators plus
-  `analysis_nodes/` as the primary structure.
+  `analysis_graph/` as the primary structure.
 
 In practice: calculators know how to compute; nodes know where a calculator fits
 in the dependency graph.
@@ -32,7 +32,7 @@ This layer owns the domain logic.
 Rule of thumb: if the change is about stat semantics, thresholds, event
 generation, counters, or owned state, it usually belongs in a calculator.
 
-### `src/stats/analysis_nodes/`
+### `src/stats/analysis_graph/`
 
 This layer adapts calculator/state logic into a typed dependency graph.
 
@@ -85,8 +85,8 @@ code wants the calculator's accumulated stats, config, and event lists.
 
 - Add or modify the core logic in `src/stats/calculators/<stat>.rs`.
 - If the stat participates in the DAG runtime, add or update the matching node
-  in `src/stats/analysis_nodes/<stat>.rs`.
-- Register the node in `src/stats/analysis_nodes/mod.rs`.
+  in `src/stats/analysis_graph/<stat>.rs`.
+- Register the node in `src/stats/analysis_graph/mod.rs`.
 - If shared frame-derived state is missing, add that as a dedicated dependency
   node instead of recomputing it inside each stat node.
 - If output wiring changes, update the relevant collector or exporter

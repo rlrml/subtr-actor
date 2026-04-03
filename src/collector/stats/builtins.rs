@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::stats::analysis_nodes::analysis_graph::AnalysisGraph;
+use crate::stats::analysis_graph::AnalysisGraph;
 use crate::*;
 
 use super::types::serialize_to_json_value;
