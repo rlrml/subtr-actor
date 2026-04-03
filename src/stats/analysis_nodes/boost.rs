@@ -44,13 +44,14 @@ impl AnalysisNode for BoostNode {
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        let live_play_state = ctx.get::<LivePlayState>()?;
         self.calculator.update_parts(
             ctx.get::<FrameInfo>()?,
             ctx.get::<GameplayState>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,
             ctx.get::<PlayerVerticalState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            live_play_state.counts_toward_player_motion(),
         )
     }
 

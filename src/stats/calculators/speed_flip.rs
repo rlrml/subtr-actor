@@ -98,8 +98,8 @@ impl SpeedFlipCalculator {
         &self.events
     }
 
-    fn kickoff_approach_active(gameplay: &GameplayState, live_play: bool) -> bool {
-        live_play && gameplay.ball_has_been_hit == Some(false)
+    fn kickoff_approach_active(gameplay: &GameplayState) -> bool {
+        gameplay.ball_has_been_hit == Some(false)
     }
 
     fn player_by_id<'a>(
@@ -245,7 +245,7 @@ impl SpeedFlipCalculator {
         gameplay: &GameplayState,
         ball: &BallFrameState,
         player: &PlayerSample,
-        live_play: bool,
+        _live_play: bool,
     ) {
         let was_dodge_active = self
             .previous_dodge_active
@@ -255,7 +255,7 @@ impl SpeedFlipCalculator {
             return;
         }
 
-        let is_kickoff = Self::kickoff_approach_active(gameplay, live_play);
+        let is_kickoff = Self::kickoff_approach_active(gameplay);
         let kickoff_start_time = if is_kickoff {
             let Some(kickoff_start_time) = self.current_kickoff_start_time else {
                 return;
@@ -447,7 +447,8 @@ impl SpeedFlipCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
-        if !live_play {
+        let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
+        if !live_play && !kickoff_approach_active {
             self.active_candidates.clear();
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
@@ -456,7 +457,6 @@ impl SpeedFlipCalculator {
 
         self.begin_sample(frame);
 
-        let kickoff_approach_active = Self::kickoff_approach_active(gameplay, live_play);
         if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
             self.reset_kickoff_state(frame);
         }
@@ -488,5 +488,38 @@ impl SpeedFlipCalculator {
 
     pub fn finalize_parts(&mut self, frame: &FrameInfo) {
         self.finalize_candidates(frame, true);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kickoff_approach_stays_active_before_first_touch_even_when_not_live_play() {
+        let mut calculator = SpeedFlipCalculator::default();
+        let frame = FrameInfo {
+            frame_number: 1,
+            time: 0.5,
+            dt: 0.1,
+            seconds_remaining: None,
+        };
+        let gameplay = GameplayState {
+            ball_has_been_hit: Some(false),
+            ..Default::default()
+        };
+
+        calculator
+            .update_parts(
+                &frame,
+                &gameplay,
+                &BallFrameState::default(),
+                &PlayerFrameState::default(),
+                false,
+            )
+            .unwrap();
+
+        assert!(calculator.kickoff_approach_active_last_frame);
+        assert_eq!(calculator.current_kickoff_start_time, Some(frame.time));
     }
 }

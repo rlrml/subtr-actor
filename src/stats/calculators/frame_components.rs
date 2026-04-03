@@ -24,10 +24,7 @@ pub struct GameplayState {
 
 impl GameplayState {
     pub fn is_live_play(&self) -> bool {
-        !matches!(
-            self.game_state,
-            Some(GAME_STATE_KICKOFF_COUNTDOWN | GAME_STATE_GOAL_SCORED_REPLAY)
-        )
+        !self.kickoff_phase_active() && self.game_state != Some(GAME_STATE_GOAL_SCORED_REPLAY)
     }
 
     pub fn current_score(&self) -> Option<(i32, i32)> {
@@ -37,6 +34,7 @@ impl GameplayState {
     pub fn kickoff_phase_active(&self) -> bool {
         self.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
             || self.kickoff_countdown_time.is_some_and(|time| time > 0)
+            || self.ball_has_been_hit == Some(false)
     }
 
     pub fn current_in_game_team_player_count(&self, is_team_0: bool) -> usize {

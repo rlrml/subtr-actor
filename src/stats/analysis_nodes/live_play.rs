@@ -35,9 +35,9 @@ impl AnalysisNode for LivePlayNode {
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.state.is_live_play = self
+        self.state = self
             .tracker
-            .is_live_play_parts(ctx.get::<GameplayState>()?, ctx.get::<FrameEventsState>()?);
+            .state_parts(ctx.get::<GameplayState>()?, ctx.get::<FrameEventsState>()?);
         Ok(())
     }
 

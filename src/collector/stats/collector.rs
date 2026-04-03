@@ -141,17 +141,15 @@ impl BuiltinModuleSelection {
                 "missing GameplayState state while snapshotting stats frame".to_owned(),
             ))
         })?;
-        let is_live_play = graph
-            .state::<LivePlayState>()
-            .map(|state| state.is_live_play)
-            .unwrap_or(false);
+        let live_play_state = graph.state::<LivePlayState>().cloned().unwrap_or_default();
         Ok(StatsSnapshotFrame {
             frame_number: frame.frame_number,
             time: frame.time,
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: gameplay.game_state,
-            is_live_play,
+            gameplay_phase: live_play_state.gameplay_phase,
+            is_live_play: live_play_state.is_live_play,
             modules: self.frame_modules_json(graph, replay_meta)?,
         })
     }

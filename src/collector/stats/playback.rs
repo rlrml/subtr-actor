@@ -14,6 +14,7 @@ pub struct CapturedStatsFrame<Modules> {
     pub dt: f32,
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
+    pub gameplay_phase: GameplayPhase,
     pub is_live_play: bool,
     pub modules: Modules,
 }
@@ -44,6 +45,7 @@ impl<Modules> CapturedStatsFrame<Modules> {
             dt: self.dt,
             seconds_remaining: self.seconds_remaining,
             game_state: self.game_state,
+            gameplay_phase: self.gameplay_phase,
             is_live_play: self.is_live_play,
             modules: transform(self.modules)?,
         })
@@ -302,6 +304,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             serialize_to_json_value(&frame.game_state)?,
         );
         timeline.insert(
+            "gameplay_phase".to_owned(),
+            serialize_to_json_value(&frame.gameplay_phase)?,
+        );
+        timeline.insert(
             "is_live_play".to_owned(),
             serialize_to_json_value(&frame.is_live_play)?,
         );
@@ -351,6 +357,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: frame.game_state,
+            gameplay_phase: frame.gameplay_phase,
             is_live_play: frame.is_live_play,
             team_zero: self.replay_team_stats(frame, "team_zero")?,
             team_one: self.replay_team_stats(frame, "team_one")?,

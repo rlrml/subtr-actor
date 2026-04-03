@@ -49,6 +49,7 @@ pub struct ReplayStatsFrame {
     pub dt: f32,
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
+    pub gameplay_phase: GameplayPhase,
     pub is_live_play: bool,
     pub team_zero: TeamStatsSnapshot,
     pub team_one: TeamStatsSnapshot,

@@ -97,6 +97,13 @@ fn compare_replay_frame(
     })
     .or_else(|| {
         compare_field(
+            &format!("{label}.gameplay_phase"),
+            &left.gameplay_phase,
+            &right.gameplay_phase,
+        )
+    })
+    .or_else(|| {
+        compare_field(
             &format!("{label}.is_live_play"),
             &left.is_live_play,
             &right.is_live_play,

@@ -37,10 +37,11 @@ impl AnalysisNode for PowerslideNode {
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        let live_play_state = ctx.get::<LivePlayState>()?;
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            live_play_state.counts_toward_player_motion(),
         )
     }
 
