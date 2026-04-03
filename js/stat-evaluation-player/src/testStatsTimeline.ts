@@ -352,6 +352,7 @@ export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFram
     dt: 0,
     seconds_remaining: null,
     game_state: null,
+    gameplay_phase: "unknown",
     is_live_play: true,
     team_zero: createTeamStatsSnapshot(),
     team_one: createTeamStatsSnapshot(),

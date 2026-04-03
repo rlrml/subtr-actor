@@ -15,6 +15,9 @@
       "subtr-actor-player": [
         "../player/dist/lib.d.ts"
       ],
+      "subtr-actor-player/generated/*": [
+        "../player/dist/generated/*"
+      ],
       "three": [
         "./node_modules/@types/three/index.d.ts"
       ],

@@ -16,6 +16,9 @@
       "types": "./dist/lib.d.ts",
       "import": "./dist/index.js"
     },
+    "./generated/*": {
+      "types": "./dist/generated/*.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

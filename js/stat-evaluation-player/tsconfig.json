@@ -12,6 +12,7 @@
     "paths": {
       "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
       "subtr-actor-player": ["../player/src/lib.ts"],
+      "subtr-actor-player/generated/*": ["../player/src/generated/*"],
       "three": ["./node_modules/@types/three/index.d.ts"],
       "three/examples/jsm/*": ["./node_modules/@types/three/examples/jsm/*"]
     },
