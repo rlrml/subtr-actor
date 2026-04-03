@@ -22,7 +22,6 @@ import {
 import {
   createAbsolutePositioningModule,
   createRelativePositioningModule,
-  createTimeInZoneModule,
 } from "./positioningModules.ts";
 export {
   getCurrentRole,
@@ -50,7 +49,6 @@ export function createStatModules(runtime: import("./types.ts").StatModuleRuntim
     createRushModule(),
     createRelativePositioningModule(),
     createAbsolutePositioningModule(),
-    createTimeInZoneModule(),
     createSpeedFlipModule(),
     createTouchModule(runtime),
     createMustyFlickModule(),
