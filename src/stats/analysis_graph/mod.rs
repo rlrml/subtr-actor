@@ -11,6 +11,9 @@ pub use graph::{
     AnalysisStateRef,
 };
 
+#[macro_use]
+mod node_macros;
+
 mod backboard;
 mod backboard_bounce;
 mod ball_carry;

@@ -200,9 +200,9 @@ impl PressureCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        if !live_play {
+        if !live_play_state.is_live_play {
             return Ok(());
         }
         if let Some(ball) = ball.sample() {

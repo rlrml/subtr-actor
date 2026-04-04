@@ -17,42 +17,14 @@ impl PossessionStateNode {
     }
 }
 
-impl Default for PossessionStateNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for PossessionStateNode {
-    type State = PossessionState;
-
-    fn name(&self) -> &'static str {
-        "possession_state"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![
-            frame_info_dependency(),
-            touch_state_dependency(),
-            live_play_dependency(),
-        ]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let touch_state = ctx.get::<TouchState>()?;
-        self.state = self.calculator.update(
-            ctx.get::<FrameInfo>()?,
-            touch_state,
-            ctx.get::<LivePlayState>()?.is_live_play,
-        );
-        Ok(())
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(PossessionStateNode::new())
+impl_analysis_node! {
+    node = PossessionStateNode,
+    state = PossessionState,
+    name = "possession_state",
+    dependencies = [
+        frame_info_dependency() => FrameInfo,
+        touch_state_dependency() => TouchState,
+        live_play_dependency() => LivePlayState,
+    ],
+    update_state = calculator.update,
 }

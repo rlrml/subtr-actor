@@ -276,9 +276,9 @@ impl TouchStateCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> TouchState {
-        let touch_events = if live_play {
+        let touch_events = if live_play_state.is_live_play {
             self.prune_recent_touch_candidates(frame.frame_number);
             self.update_recent_touch_candidates(frame, ball, players);
             self.confirmed_touch_events(frame, ball, players, events)

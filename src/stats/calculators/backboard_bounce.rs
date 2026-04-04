@@ -95,9 +95,9 @@ impl BackboardBounceCalculator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> BackboardBounceState {
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.previous_ball_velocity = ball.velocity();
             self.last_touch = None;
             self.last_bounce_event = None;

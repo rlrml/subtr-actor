@@ -19,53 +19,19 @@ impl RushNode {
     }
 }
 
-impl Default for RushNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for RushNode {
-    type State = RushCalculator;
-
-    fn name(&self) -> &'static str {
-        "rush"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![
-            frame_info_dependency(),
-            gameplay_state_dependency(),
-            ball_frame_state_dependency(),
-            player_frame_state_dependency(),
-            frame_events_state_dependency(),
-            possession_state_dependency(),
-            live_play_dependency(),
-        ]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let possession_state = ctx.get::<PossessionState>()?;
-        self.calculator.update_parts(
-            ctx.get::<FrameInfo>()?,
-            ctx.get::<GameplayState>()?,
-            ctx.get::<BallFrameState>()?,
-            ctx.get::<PlayerFrameState>()?,
-            ctx.get::<FrameEventsState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
-            possession_state,
-        )
-    }
-
-    fn finish(&mut self) -> SubtrActorResult<()> {
-        self.calculator.finish_calculation()
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.calculator
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(RushNode::new())
+impl_analysis_node! {
+    node = RushNode,
+    state = RushCalculator,
+    name = "rush",
+    dependencies = [
+        frame_info_dependency() => FrameInfo,
+        gameplay_state_dependency() => GameplayState,
+        ball_frame_state_dependency() => BallFrameState,
+        player_frame_state_dependency() => PlayerFrameState,
+        frame_events_state_dependency() => FrameEventsState,
+        possession_state_dependency() => PossessionState,
+        live_play_dependency() => LivePlayState,
+    ],
+    call = calculator.update_parts,
+    finish = calculator.finish_calculation,
 }

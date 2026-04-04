@@ -17,35 +17,13 @@ impl LivePlayNode {
     }
 }
 
-impl Default for LivePlayNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for LivePlayNode {
-    type State = LivePlayState;
-
-    fn name(&self) -> &'static str {
-        "live_play"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![gameplay_state_dependency(), frame_events_state_dependency()]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.state = self
-            .tracker
-            .state_parts(ctx.get::<GameplayState>()?, ctx.get::<FrameEventsState>()?);
-        Ok(())
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(LivePlayNode::new())
+impl_analysis_node! {
+    node = LivePlayNode,
+    state = LivePlayState,
+    name = "live_play",
+    dependencies = [
+        gameplay_state_dependency() => GameplayState,
+        frame_events_state_dependency() => FrameEventsState,
+    ],
+    update_state = tracker.state_parts,
 }

@@ -14,33 +14,13 @@ impl SettingsNode {
     }
 }
 
-impl Default for SettingsNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for SettingsNode {
-    type State = SettingsCalculator;
-
-    fn name(&self) -> &'static str {
-        "settings"
-    }
-
-    fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
-        self.calculator.apply_replay_meta(meta)
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let _ = ctx;
-        self.calculator.update()
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.calculator
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(SettingsNode::new())
+impl_analysis_node! {
+    node = SettingsNode,
+    state = SettingsCalculator,
+    name = "settings",
+    dependencies = [],
+    on_replay_meta = |node, meta| {
+        node.calculator.apply_replay_meta(meta)
+    },
+    call = calculator.update,
 }

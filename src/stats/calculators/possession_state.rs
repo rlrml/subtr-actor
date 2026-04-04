@@ -22,9 +22,9 @@ impl PossessionStateCalculator {
         &mut self,
         frame: &FrameInfo,
         touch_state: &TouchState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> PossessionState {
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.tracker.reset();
             return PossessionState::default();
         }

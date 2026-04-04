@@ -357,13 +357,13 @@ impl PossessionCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        live_play: bool,
-        active_team_before_sample: Option<bool>,
+        possession_state: &PossessionState,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        if live_play {
+        if live_play_state.is_live_play {
             self.stats.tracked_time += frame.dt;
             let field_third = ball.sample().map(FieldThirdLabel::from_ball);
-            if let Some(possession_team_is_team_0) = active_team_before_sample {
+            if let Some(possession_team_is_team_0) = possession_state.active_team_before_sample {
                 let state = if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
                 } else {

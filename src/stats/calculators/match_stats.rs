@@ -472,11 +472,11 @@ impl MatchStatsCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
-        if live_play {
+        if live_play_state.is_live_play {
             self.record_goal_buildup_sample(frame, ball);
         }
         self.pending_goal_events

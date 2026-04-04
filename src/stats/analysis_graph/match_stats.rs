@@ -15,46 +15,17 @@ impl MatchStatsNode {
     }
 }
 
-impl Default for MatchStatsNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for MatchStatsNode {
-    type State = MatchStatsCalculator;
-
-    fn name(&self) -> &'static str {
-        "match_stats"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![
-            frame_info_dependency(),
-            gameplay_state_dependency(),
-            ball_frame_state_dependency(),
-            player_frame_state_dependency(),
-            frame_events_state_dependency(),
-            live_play_dependency(),
-        ]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.calculator.update_parts(
-            ctx.get::<FrameInfo>()?,
-            ctx.get::<GameplayState>()?,
-            ctx.get::<BallFrameState>()?,
-            ctx.get::<PlayerFrameState>()?,
-            ctx.get::<FrameEventsState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
-        )
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.calculator
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(MatchStatsNode::new())
+impl_analysis_node! {
+    node = MatchStatsNode,
+    state = MatchStatsCalculator,
+    name = "match_stats",
+    dependencies = [
+        frame_info_dependency() => FrameInfo,
+        gameplay_state_dependency() => GameplayState,
+        ball_frame_state_dependency() => BallFrameState,
+        player_frame_state_dependency() => PlayerFrameState,
+        frame_events_state_dependency() => FrameEventsState,
+        live_play_dependency() => LivePlayState,
+    ],
+    call = calculator.update_parts,
 }

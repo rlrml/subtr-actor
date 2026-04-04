@@ -19,40 +19,14 @@ impl PressureNode {
     }
 }
 
-impl Default for PressureNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for PressureNode {
-    type State = PressureCalculator;
-
-    fn name(&self) -> &'static str {
-        "pressure"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![
-            frame_info_dependency(),
-            ball_frame_state_dependency(),
-            live_play_dependency(),
-        ]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.calculator.update(
-            ctx.get::<FrameInfo>()?,
-            ctx.get::<BallFrameState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
-        )
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.calculator
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(PressureNode::new())
+impl_analysis_node! {
+    node = PressureNode,
+    state = PressureCalculator,
+    name = "pressure",
+    dependencies = [
+        frame_info_dependency() => FrameInfo,
+        ball_frame_state_dependency() => BallFrameState,
+        live_play_dependency() => LivePlayState,
+    ],
+    call = calculator.update,
 }

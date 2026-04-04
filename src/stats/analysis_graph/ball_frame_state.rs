@@ -14,33 +14,15 @@ impl BallFrameStateNode {
     }
 }
 
-impl Default for BallFrameStateNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for BallFrameStateNode {
-    type State = BallFrameState;
-
-    fn name(&self) -> &'static str {
-        "ball_frame_state"
-    }
-
-    fn dependencies(&self) -> Vec<AnalysisDependency> {
-        vec![AnalysisDependency::required::<FrameInput>()]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.state = ctx.get::<FrameInput>()?.ball_frame_state();
+impl_analysis_node! {
+    node = BallFrameStateNode,
+    state = BallFrameState,
+    name = "ball_frame_state",
+    dependencies = [AnalysisDependency::required::<FrameInput>()],
+    inputs = { frame_input: FrameInput },
+    evaluate = |node| {
+        node.state = frame_input.ball_frame_state();
         Ok(())
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(BallFrameStateNode::new())
+    },
+    state_ref = |node| &node.state,
 }

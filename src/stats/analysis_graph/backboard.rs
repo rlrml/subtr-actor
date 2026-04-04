@@ -15,34 +15,13 @@ impl BackboardNode {
     }
 }
 
-impl Default for BackboardNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for BackboardNode {
-    type State = BackboardCalculator;
-
-    fn name(&self) -> &'static str {
-        "backboard"
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![frame_info_dependency(), backboard_bounce_state_dependency()]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let backboard_bounce_state = ctx.get::<BackboardBounceState>()?;
-        self.calculator
-            .update(ctx.get::<FrameInfo>()?, backboard_bounce_state)
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.calculator
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(BackboardNode::new())
+impl_analysis_node! {
+    node = BackboardNode,
+    state = BackboardCalculator,
+    name = "backboard",
+    dependencies = [
+        frame_info_dependency() => FrameInfo,
+        backboard_bounce_state_dependency() => BackboardBounceState,
+    ],
+    call = calculator.update,
 }

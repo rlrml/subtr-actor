@@ -355,10 +355,10 @@ impl RushCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
         possession_state: &PossessionState,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        if !live_play || gameplay.kickoff_phase_active() {
+        if !live_play_state.is_live_play || gameplay.kickoff_phase_active() {
             self.finalize_active_rush();
             return Ok(());
         }

@@ -311,10 +311,16 @@ impl BallCarryCalculator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        live_play: bool,
-        controlling_player: Option<PlayerId>,
+        touch_state: &TouchState,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        self.process_sample(frame, ball, players, live_play, controlling_player)
+        self.process_sample(
+            frame,
+            ball,
+            players,
+            live_play_state.is_live_play,
+            touch_state.last_touch_player.clone(),
+        )
     }
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
         self.finalize_active_carry();

@@ -14,33 +14,15 @@ impl GameplayStateNode {
     }
 }
 
-impl Default for GameplayStateNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for GameplayStateNode {
-    type State = GameplayState;
-
-    fn name(&self) -> &'static str {
-        "gameplay_state"
-    }
-
-    fn dependencies(&self) -> Vec<AnalysisDependency> {
-        vec![AnalysisDependency::required::<FrameInput>()]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.state = ctx.get::<FrameInput>()?.gameplay_state();
+impl_analysis_node! {
+    node = GameplayStateNode,
+    state = GameplayState,
+    name = "gameplay_state",
+    dependencies = [AnalysisDependency::required::<FrameInput>()],
+    inputs = { frame_input: FrameInput },
+    evaluate = |node| {
+        node.state = frame_input.gameplay_state();
         Ok(())
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(GameplayStateNode::new())
+    },
+    state_ref = |node| &node.state,
 }

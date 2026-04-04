@@ -14,33 +14,15 @@ impl FrameEventsStateNode {
     }
 }
 
-impl Default for FrameEventsStateNode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AnalysisNode for FrameEventsStateNode {
-    type State = FrameEventsState;
-
-    fn name(&self) -> &'static str {
-        "frame_events_state"
-    }
-
-    fn dependencies(&self) -> Vec<AnalysisDependency> {
-        vec![AnalysisDependency::required::<FrameInput>()]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.state = ctx.get::<FrameInput>()?.frame_events_state();
+impl_analysis_node! {
+    node = FrameEventsStateNode,
+    state = FrameEventsState,
+    name = "frame_events_state",
+    dependencies = [AnalysisDependency::required::<FrameInput>()],
+    inputs = { frame_input: FrameInput },
+    evaluate = |node| {
+        node.state = frame_input.frame_events_state();
         Ok(())
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
-    }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(FrameEventsStateNode::new())
+    },
+    state_ref = |node| &node.state,
 }

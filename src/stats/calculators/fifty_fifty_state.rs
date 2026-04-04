@@ -66,13 +66,13 @@ impl FiftyFiftyStateCalculator {
         players: &PlayerFrameState,
         touch_state: &TouchState,
         possession_state: &PossessionState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> FiftyFiftyState {
         if FiftyFiftyCalculator::kickoff_phase_active(gameplay) {
             self.kickoff_touch_window_open = true;
         }
 
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.reset();
             return FiftyFiftyState {
                 active_event: None,
