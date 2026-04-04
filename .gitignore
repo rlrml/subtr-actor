@@ -1,4 +1,5 @@
 /target
+/bindings
 *.replay
 *.replay.zip
 perf.data
