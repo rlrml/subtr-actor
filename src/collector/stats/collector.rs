@@ -63,9 +63,7 @@ impl BuiltinModuleSelection {
         })
     }
 
-    fn graph(
-        &self,
-    ) -> SubtrActorResult<AnalysisGraph> {
+    fn graph(&self) -> SubtrActorResult<AnalysisGraph> {
         graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
     }
 
@@ -85,10 +83,7 @@ impl BuiltinModuleSelection {
             .collect()
     }
 
-    fn modules_json(
-        &self,
-        graph: &AnalysisGraph,
-    ) -> SubtrActorResult<Map<String, Value>> {
+    fn modules_json(&self, graph: &AnalysisGraph) -> SubtrActorResult<Map<String, Value>> {
         let mut modules = Map::new();
         for module_name in self.module_names.iter().copied() {
             modules.insert(
@@ -113,10 +108,7 @@ impl BuiltinModuleSelection {
         Ok(modules)
     }
 
-    fn snapshot_config_json(
-        &self,
-        graph: &AnalysisGraph,
-    ) -> SubtrActorResult<Map<String, Value>> {
+    fn snapshot_config_json(&self, graph: &AnalysisGraph) -> SubtrActorResult<Map<String, Value>> {
         let mut config = Map::new();
         for module_name in self.module_names.iter().copied() {
             if let Some(module_config) = builtin_snapshot_config_json(module_name, graph)? {

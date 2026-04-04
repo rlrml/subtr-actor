@@ -118,9 +118,7 @@ pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
 
-pub(crate) fn boxed_analysis_node_by_name(
-    name: &str,
-) -> Option<Box<dyn AnalysisNodeDyn>> {
+pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn AnalysisNodeDyn>> {
     match name {
         "core" => Some(match_stats::boxed_default()),
         "backboard" => Some(backboard::boxed_default()),
@@ -144,9 +142,7 @@ pub(crate) fn boxed_analysis_node_by_name(
     }
 }
 
-pub fn graph_with_builtin_analysis_nodes<I, S>(
-    names: I,
-) -> SubtrActorResult<AnalysisGraph>
+pub fn graph_with_builtin_analysis_nodes<I, S>(names: I) -> SubtrActorResult<AnalysisGraph>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,

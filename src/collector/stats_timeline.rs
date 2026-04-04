@@ -2,8 +2,7 @@ use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
 use crate::stats::analysis_graph::{
-    AnalysisGraph,
-    StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
+    AnalysisGraph, StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
     StatsTimelineFrameState,
 };
 use crate::*;
@@ -45,6 +44,7 @@ impl StatsTimelineCollector {
         StatsTimelineConfig {
             most_back_forward_threshold_y: PositioningCalculatorConfig::default()
                 .most_back_forward_threshold_y,
+            level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
             rush_max_start_y: RushCalculatorConfig::default().max_start_y,
