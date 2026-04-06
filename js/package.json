@@ -9,9 +9,9 @@
     "build:nodejs": "npm exec -- wasm-pack build --target nodejs --out-dir pkg-node",
     "build:bundler": "npm exec -- wasm-pack build --target bundler --out-dir pkg-bundler",
     "test": "npm exec -- wasm-pack test --headless --firefox",
-    "pack": "node --run=build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm pack pkg/",
-    "publish": "node --run=build && env -u npm_config_argv -u npm_config_version_git_tag -u npm_config_version_commit_hooks -u npm_config_version_tag_prefix -u npm_config_version_git_message npm publish pkg/",
-    "prepublishOnly": "node --run=build"
+    "pack": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm pack pkg/",
+    "publish": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm publish pkg/",
+    "prepublishOnly": "./scripts/with-clean-npm-env.sh node --run=build"
   },
   "repository": "git+https://github.com/rlrml/subtr-actor.git",
   "keywords": [

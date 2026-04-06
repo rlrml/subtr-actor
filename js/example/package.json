@@ -9,7 +9,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "build-wasm": "node ../scripts/ensure-wasm-package.mjs --force",
-        "dev-with-wasm": "node --run=dev"
+        "dev-with-wasm": "../scripts/with-clean-npm-env.sh node --run=dev"
     },
     "dependencies": {
         "chart.js": "^4.4.0",
