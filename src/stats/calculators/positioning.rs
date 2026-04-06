@@ -3,6 +3,7 @@ use super::*;
 const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
 const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
 const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
+const DEFAULT_LEVEL_BALL_DEPTH_MARGIN: f32 = 150.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
@@ -32,6 +33,7 @@ pub struct PositioningStats {
     pub time_closest_to_ball: f32,
     pub time_farthest_from_ball: f32,
     pub time_behind_ball: f32,
+    pub time_level_with_ball: f32,
     pub time_in_front_of_ball: f32,
     pub times_caught_ahead_of_play_on_conceded_goals: u32,
 }
@@ -137,6 +139,10 @@ impl PositioningStats {
         self.pct(self.time_behind_ball)
     }
 
+    pub fn level_with_ball_pct(&self) -> f32 {
+        self.pct(self.time_level_with_ball)
+    }
+
     pub fn in_front_of_ball_pct(&self) -> f32 {
         self.pct(self.time_in_front_of_ball)
     }
@@ -145,12 +151,14 @@ impl PositioningStats {
 #[derive(Debug, Clone)]
 pub struct PositioningCalculatorConfig {
     pub most_back_forward_threshold_y: f32,
+    pub level_ball_depth_margin: f32,
 }
 
 impl Default for PositioningCalculatorConfig {
     fn default() -> Self {
         Self {
             most_back_forward_threshold_y: DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y,
+            level_ball_depth_margin: DEFAULT_LEVEL_BALL_DEPTH_MARGIN,
         }
     }
 }
@@ -333,10 +341,15 @@ impl PositioningCalculator {
                 let previous_ball_delta =
                     normalized_previous_position_y - normalized_previous_ball_y;
                 let current_ball_delta = normalized_position_y - normalized_ball_y;
-                let behind_ball_fraction =
-                    interval_fraction_below_threshold(previous_ball_delta, current_ball_delta, 0.0);
+                let (behind_ball_fraction, level_ball_fraction, in_front_ball_fraction) =
+                    ball_depth_fractions(
+                        self.config.level_ball_depth_margin,
+                        previous_ball_delta,
+                        current_ball_delta,
+                    );
                 stats.time_behind_ball += frame.dt * behind_ball_fraction;
-                stats.time_in_front_of_ball += frame.dt * (1.0 - behind_ball_fraction);
+                stats.time_level_with_ball += frame.dt * level_ball_fraction;
+                stats.time_in_front_of_ball += frame.dt * in_front_ball_fraction;
             }
         }
 
@@ -501,5 +514,42 @@ impl PositioningCalculator {
             live_play,
             possession_player_before_sample,
         )
+    }
+}
+
+fn ball_depth_fractions(level_margin: f32, start_delta: f32, end_delta: f32) -> (f32, f32, f32) {
+    let behind_fraction = interval_fraction_below_threshold(start_delta, end_delta, -level_margin);
+    let level_fraction =
+        interval_fraction_in_scalar_range(start_delta, end_delta, -level_margin, level_margin);
+    let in_front_fraction = (1.0 - behind_fraction - level_fraction).clamp(0.0, 1.0);
+    (behind_fraction, level_fraction, in_front_fraction)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ball_depth_fractions_treat_near_ball_band_as_level() {
+        let (behind, level, in_front) = ball_depth_fractions(150.0, -100.0, 100.0);
+        assert_eq!(behind, 0.0);
+        assert_eq!(level, 1.0);
+        assert_eq!(in_front, 0.0);
+    }
+
+    #[test]
+    fn ball_depth_fractions_split_crossing_time_across_all_three_buckets() {
+        let (behind, level, in_front) = ball_depth_fractions(150.0, -300.0, 300.0);
+        assert!((behind - 0.25).abs() < 1e-6);
+        assert!((level - 0.5).abs() < 1e-6);
+        assert!((in_front - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn ball_depth_fractions_count_boundary_point_as_in_front_not_level() {
+        let (behind, level, in_front) = ball_depth_fractions(150.0, 150.0, 150.0);
+        assert_eq!(behind, 0.0);
+        assert_eq!(level, 0.0);
+        assert_eq!(in_front, 1.0);
     }
 }

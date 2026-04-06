@@ -196,6 +196,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("most_back_forward_threshold_y"))
                 .and_then(json_f32)
                 .unwrap_or(PositioningCalculatorConfig::default().most_back_forward_threshold_y),
+            level_ball_depth_margin: positioning_config
+                .and_then(|config| config.get("level_ball_depth_margin"))
+                .and_then(json_f32)
+                .unwrap_or(PositioningCalculatorConfig::default().level_ball_depth_margin),
             pressure_neutral_zone_half_width_y: pressure_config
                 .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
@@ -233,6 +237,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     .and_then(Value::as_f64)
                     .unwrap_or(
                         PositioningCalculatorConfig::default().most_back_forward_threshold_y as f64,
+                    ),
+            )?,
+        );
+        config.insert(
+            "level_ball_depth_margin".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("level_ball_depth_margin"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(
+                        PositioningCalculatorConfig::default().level_ball_depth_margin as f64,
                     ),
             )?,
         );

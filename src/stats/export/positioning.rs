@@ -72,6 +72,12 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
+            "time_level_with_ball",
+            StatUnit::Seconds,
+            self.time_level_with_ball,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "time_in_front_of_ball",
             StatUnit::Seconds,
             self.time_in_front_of_ball,
@@ -159,6 +165,12 @@ impl StatFieldProvider for PositioningStats {
             "percent_behind_ball",
             StatUnit::Percent,
             self.behind_ball_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "percent_level_with_ball",
+            StatUnit::Percent,
+            self.level_with_ball_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",

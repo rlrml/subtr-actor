@@ -5,6 +5,7 @@ use serde::Serialize;
 #[ts(export)]
 pub struct StatsTimelineConfig {
     pub most_back_forward_threshold_y: f32,
+    pub level_ball_depth_margin: f32,
     pub pressure_neutral_zone_half_width_y: f32,
     pub rush_max_start_y: f32,
     pub rush_attack_support_distance_y: f32,

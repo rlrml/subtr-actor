@@ -567,6 +567,7 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "most_back_forward_threshold_y": calculator.config().most_back_forward_threshold_y,
+                "level_ball_depth_margin": calculator.config().level_ball_depth_margin,
             }))?)
         }
         "pressure" => {

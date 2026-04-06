@@ -39,7 +39,8 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_closest_to_ball: 2.0,
         time_farthest_from_ball: 4.0,
         time_behind_ball: 7.0,
-        time_in_front_of_ball: 3.0,
+        time_level_with_ball: 1.0,
+        time_in_front_of_ball: 2.0,
         times_caught_ahead_of_play_on_conceded_goals: 0,
     };
 
@@ -60,6 +61,14 @@ fn test_positioning_stats_export_includes_derived_metrics() {
     assert_eq!(
         find_field(&fields, "positioning", "percent_behind_ball").value,
         StatValue::Float(70.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "percent_level_with_ball").value,
+        StatValue::Float(10.0)
+    );
+    assert_eq!(
+        find_field(&fields, "positioning", "percent_in_front_of_ball").value,
+        StatValue::Float(20.0)
     );
     assert_eq!(
         find_field(&fields, "positioning", "time_defensive_third").value,

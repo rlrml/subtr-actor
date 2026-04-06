@@ -241,6 +241,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         config: StatsTimelineConfig {
             most_back_forward_threshold_y: PositioningCalculatorConfig::default()
                 .most_back_forward_threshold_y,
+            level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
             rush_max_start_y: RushCalculatorConfig::default().max_start_y,

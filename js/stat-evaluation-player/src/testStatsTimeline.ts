@@ -319,6 +319,7 @@ export function createPlayerStatsSnapshot(
       time_closest_to_ball: 0,
       time_farthest_from_ball: 0,
       time_behind_ball: 0,
+      time_level_with_ball: 0,
       time_in_front_of_ball: 0,
       times_caught_ahead_of_play_on_conceded_goals: 0,
     },
@@ -370,6 +371,7 @@ export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): Sta
   const merged = merge<StatsTimeline>({
     config: {
       most_back_forward_threshold_y: 0,
+      level_ball_depth_margin: 0,
       pressure_neutral_zone_half_width_y: 0,
       rush_max_start_y: 0,
       rush_attack_support_distance_y: 0,
