@@ -110,6 +110,43 @@ function formatPercentage(
   return formatNumber(value, digits, "%");
 }
 
+function formatTimeShare(
+  value: number | undefined,
+  percentage: number | undefined,
+  timeDigits = 1,
+  percentageDigits = 0,
+): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return formatPercentage(percentage, percentageDigits);
+  }
+
+  const timeDisplay = formatNumber(value, timeDigits, "s");
+  if (percentage === undefined || Number.isNaN(percentage)) {
+    return timeDisplay;
+  }
+
+  return `${timeDisplay} (${formatPercentage(percentage, percentageDigits)})`;
+}
+
+function formatTimeShareFromTrackedTime(
+  value: number | undefined,
+  trackedTime: number | undefined,
+  timeDigits = 1,
+  percentageDigits = 0,
+): string {
+  const percentage = (
+    value !== undefined &&
+    trackedTime !== undefined &&
+    !Number.isNaN(value) &&
+    !Number.isNaN(trackedTime) &&
+    trackedTime > 0
+  )
+    ? (value * 100) / trackedTime
+    : undefined;
+
+  return formatTimeShare(value, percentage, timeDigits, percentageDigits);
+}
+
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
@@ -145,6 +182,17 @@ function getPositioningPercentage(
   return (timeValue * 100) / trackedTime;
 }
 
+function formatPositioningTimeShare(
+  positioning: PlayerStatsSnapshot["positioning"] | undefined,
+  percentFieldName: string,
+  timeFieldName: string,
+): string {
+  return formatTimeShare(
+    asNumber(positioning?.[timeFieldName as keyof NonNullable<typeof positioning>]),
+    getPositioningPercentage(positioning, percentFieldName, timeFieldName),
+  );
+}
+
 function getPositioningAverage(
   positioning: PlayerStatsSnapshot["positioning"] | undefined,
   averageFieldName: string,
@@ -172,14 +220,15 @@ export function renderRelativePositioningStats(
   positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): string {
   return `
-    <div class="stat-row"><span class="label">Most back</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_most_back", "time_most_back"))}</span></div>
-    <div class="stat-row"><span class="label">Most forward</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_most_forward", "time_most_forward"))}</span></div>
-    <div class="stat-row"><span class="label">Mid role</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_mid_role", "time_mid_role"))}</span></div>
-    <div class="stat-row"><span class="label">Other role</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_other_role", "time_other_role"))}</span></div>
-    <div class="stat-row"><span class="label">Closest to ball</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_closest_to_ball", "time_closest_to_ball"))}</span></div>
-    <div class="stat-row"><span class="label">Farthest from ball</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_farthest_from_ball", "time_farthest_from_ball"))}</span></div>
-    <div class="stat-row"><span class="label">Behind ball</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_behind_ball", "time_behind_ball"))}</span></div>
-    <div class="stat-row"><span class="label">In front of ball</span><span class="value">${formatPercentage(getPositioningPercentage(positioning, "percent_in_front_of_ball", "time_in_front_of_ball"))}</span></div>
+    <div class="stat-row"><span class="label">Most back</span><span class="value">${formatPositioningTimeShare(positioning, "percent_most_back", "time_most_back")}</span></div>
+    <div class="stat-row"><span class="label">Most forward</span><span class="value">${formatPositioningTimeShare(positioning, "percent_most_forward", "time_most_forward")}</span></div>
+    <div class="stat-row"><span class="label">Mid role</span><span class="value">${formatPositioningTimeShare(positioning, "percent_mid_role", "time_mid_role")}</span></div>
+    <div class="stat-row"><span class="label">Other role</span><span class="value">${formatPositioningTimeShare(positioning, "percent_other_role", "time_other_role")}</span></div>
+    <div class="stat-row"><span class="label">Closest to ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball", "time_closest_to_ball")}</span></div>
+    <div class="stat-row"><span class="label">Farthest from ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_farthest_from_ball", "time_farthest_from_ball")}</span></div>
+    <div class="stat-row"><span class="label">Behind ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_behind_ball", "time_behind_ball")}</span></div>
+    <div class="stat-row"><span class="label">Level with ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_level_with_ball", "time_level_with_ball")}</span></div>
+    <div class="stat-row"><span class="label">In front of ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_in_front_of_ball", "time_in_front_of_ball")}</span></div>
   `;
 }
 
@@ -187,11 +236,11 @@ export function renderAbsolutePositioningStats(
   positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): string {
   return `
-    <div class="stat-row"><span class="label">Defensive zone</span><span class="value">${formatNumber(getPositioningZoneTime(positioning, "defensive"), 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Neutral zone</span><span class="value">${formatNumber(getPositioningZoneTime(positioning, "neutral"), 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Offensive zone</span><span class="value">${formatNumber(getPositioningZoneTime(positioning, "offensive"), 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Defensive half</span><span class="value">${formatNumber(asNumber(positioning?.time_defensive_half), 1, "s")}</span></div>
-    <div class="stat-row"><span class="label">Offensive half</span><span class="value">${formatNumber(asNumber(positioning?.time_offensive_half), 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Defensive zone</span><span class="value">${formatPositioningTimeShare(positioning, "percent_defensive_third", "time_defensive_third")}</span></div>
+    <div class="stat-row"><span class="label">Neutral zone</span><span class="value">${formatPositioningTimeShare(positioning, "percent_neutral_third", "time_neutral_third")}</span></div>
+    <div class="stat-row"><span class="label">Offensive zone</span><span class="value">${formatPositioningTimeShare(positioning, "percent_offensive_third", "time_offensive_third")}</span></div>
+    <div class="stat-row"><span class="label">Defensive half</span><span class="value">${formatPositioningTimeShare(positioning, "percent_defensive_half", "time_defensive_half")}</span></div>
+    <div class="stat-row"><span class="label">Offensive half</span><span class="value">${formatPositioningTimeShare(positioning, "percent_offensive_half", "time_offensive_half")}</span></div>
     <div class="stat-row"><span class="label">To teammates</span><span class="value">${formatNumber(getPositioningAverage(positioning, "average_distance_to_teammates", "sum_distance_to_teammates"), 0)}</span></div>
     <div class="stat-row"><span class="label">To ball</span><span class="value">${formatNumber(getPositioningAverage(positioning, "average_distance_to_ball", "sum_distance_to_ball"), 0)}</span></div>
   `;
@@ -326,6 +375,7 @@ export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined
     boost && boost.tracked_time > 0
       ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
       : "?";
+  const trackedTime = asNumber(boost?.tracked_time);
 
   return `
     <div class="stat-row"><span class="label">Collected</span><span class="value">${formatCollectedWithRespawnBound(boost?.amount_collected, boost?.amount_respawned)}</span></div>
@@ -340,7 +390,11 @@ export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined
     <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
     <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}</span></div>
-    <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${boost?.time_zero_boost?.toFixed(1) ?? "?"}s</span></div>
-    <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${boost?.time_hundred_boost?.toFixed(1) ?? "?"}s</span></div>
+    <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_zero_boost), trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Time 0-25</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_boost_0_25), trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Time 25-50</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_boost_25_50), trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Time 50-75</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_boost_50_75), trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Time 75-100</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_boost_75_100), trackedTime)}</span></div>
+    <div class="stat-row"><span class="label">Time @ 100</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_hundred_boost), trackedTime)}</span></div>
   `;
 }
