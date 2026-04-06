@@ -65,7 +65,7 @@ export async function loadReplayBundleInWorker(
       worker.terminate();
     };
 
-    worker.onmessage = (event: MessageEvent<ReplayWorkerMessage>) => {
+    worker.onmessage = async (event: MessageEvent<ReplayWorkerMessage>) => {
       const message = event.data;
 
       if (message.type === "progress") {
@@ -81,14 +81,29 @@ export async function loadReplayBundleInWorker(
 
       cleanup();
       const decoder = new TextDecoder();
+      options.onProgress?.({ stage: "normalizing", progress: 0.1 });
+      if (typeof requestAnimationFrame === "function") {
+        await new Promise<void>((done) => requestAnimationFrame(() => done()));
+      }
       const rawReplayData = JSON.parse(
         decoder.decode(new Uint8Array(message.rawReplayDataBuffer)),
       ) as RawReplayFramesData;
+      options.onProgress?.({ stage: "normalizing", progress: 0.4 });
       const statsTimeline = JSON.parse(
         decoder.decode(new Uint8Array(message.statsTimelineBuffer)),
       ) as StatsTimeline;
+      options.onProgress?.({ stage: "normalizing", progress: 0.65 });
+      const replay = normalizeReplayData(rawReplayData, {
+        onProgress(progress) {
+          options.onProgress?.({
+            stage: "normalizing",
+            progress: 0.65 + (progress * 0.35),
+          });
+        },
+      });
+      options.onProgress?.({ stage: "normalizing", progress: 1 });
       resolve({
-        replay: normalizeReplayData(rawReplayData),
+        replay,
         statsTimeline,
       });
     };

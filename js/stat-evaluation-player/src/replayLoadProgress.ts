@@ -28,7 +28,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "validating",
     index: 1,
-    total: 4,
+    total: 3,
     label: "Parse replay",
     start: 0,
     end: 0.1,
@@ -36,23 +36,15 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "processing",
     index: 2,
-    total: 4,
-    label: "Extract replay frames",
+    total: 3,
+    label: "Process replay frames and stats",
     start: 0.1,
-    end: 0.55,
-  },
-  {
-    stage: "stats-timeline",
-    index: 3,
-    total: 4,
-    label: "Build stats timeline",
-    start: 0.55,
     end: 0.9,
   },
   {
     stage: "normalizing",
-    index: 4,
-    total: 4,
+    index: 3,
+    total: 3,
     label: "Normalize replay data",
     start: 0.9,
     end: 0.99,
@@ -80,15 +72,6 @@ export function listReplayLoadPhases(): ReplayLoadPhase[] {
 }
 
 export function getReplayLoadPhase(progress: ReplayLoadProgress): ReplayLoadPhase {
-  if (progress.stage === "processing") {
-    return {
-      stage: "processing",
-      index: 2,
-      total: 4,
-      label: "Process replay frames and stats",
-    };
-  }
-
   const phase = getReplayLoadPhaseConfig(progress);
   return {
     stage: phase.stage,
@@ -101,7 +84,7 @@ export function getReplayLoadPhase(progress: ReplayLoadProgress): ReplayLoadPhas
 export function getReplayLoadPhaseStates(
   progress: ReplayLoadProgress,
 ): ReplayLoadPhaseState[] {
-  if (progress.stage === "processing") {
+  if (progress.stage === "processing" || progress.stage === "stats-timeline") {
     const completion = clampUnitInterval(progress.progress ?? 0);
 
     return REPLAY_LOAD_PHASES.map(({ stage, index, total, label }) => {
@@ -117,7 +100,7 @@ export function getReplayLoadPhaseStates(
         };
       }
 
-      if (stage === "processing" || stage === "stats-timeline") {
+      if (stage === "processing") {
         return {
           stage,
           index,
@@ -168,7 +151,7 @@ export function getReplayLoadPhaseStates(
       };
     }
 
-    const isDeterminate = progress.stage === "processing";
+    const isDeterminate = progress.progress !== undefined;
     return {
       stage,
       index,
@@ -182,11 +165,16 @@ export function getReplayLoadPhaseStates(
 }
 
 export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
-  if (progress.stage === "processing") {
-    const percent = progress.progress === undefined
-      ? null
-      : Math.round(progress.progress * 100);
-    if (percent === null || progress.totalFrames === undefined) {
+  const percent = progress.progress === undefined
+    ? null
+    : Math.round(progress.progress * 100);
+
+  if (progress.stage === "processing" || progress.stage === "stats-timeline") {
+    if (
+      progress.stage !== "processing" ||
+      percent === null ||
+      progress.totalFrames === undefined
+    ) {
       return "Processing replay frames and stats...";
     }
     return `Processing replay frames and stats... ${percent}% (${progress.processedFrames ?? 0}/${progress.totalFrames})`;
@@ -195,9 +183,10 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
   switch (progress.stage) {
     case "validating":
       return "Parsing replay...";
-    case "stats-timeline":
-      return "Building stats timeline...";
     case "normalizing":
+      if (percent !== null) {
+        return `Normalizing replay data... ${percent}%`;
+      }
       return "Normalizing replay data...";
     default:
       return "Loading replay...";
@@ -205,11 +194,10 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
 }
 
 export function getReplayLoadCompletion(progress: ReplayLoadProgress): number {
-  if (progress.stage === "processing") {
-    const processingPhase = REPLAY_LOAD_PHASES.find((phase) => phase.stage === "processing")!;
-    return processingPhase.start + (
-      clampUnitInterval(progress.progress ?? 0)
-        * (processingPhase.end - processingPhase.start)
+  if (progress.stage !== "validating" && progress.progress !== undefined) {
+    const phase = getReplayLoadPhaseConfig(progress);
+    return phase.start + (
+      clampUnitInterval(progress.progress) * (phase.end - phase.start)
     );
   }
 

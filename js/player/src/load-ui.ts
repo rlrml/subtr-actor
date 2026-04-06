@@ -85,10 +85,11 @@ function ensureStyles(): void {
 }
 
 export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
+  const percent = progress.progress === undefined
+    ? null
+    : Math.round(progress.progress * 100);
+
   if (progress.stage === "processing") {
-    const percent = progress.progress === undefined
-      ? null
-      : Math.round(progress.progress * 100);
     if (percent === null || progress.totalFrames === undefined) {
       return "Processing replay frames...";
     }
@@ -100,6 +101,9 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
   }
 
   if (progress.stage === "normalizing") {
+    if (percent !== null) {
+      return `Normalizing replay data... ${percent}%`;
+    }
     return "Normalizing replay data...";
   }
 

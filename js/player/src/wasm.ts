@@ -111,15 +111,26 @@ async function loadReplayFromBytesWithWorker(
       }
 
       cleanup();
-      options.onProgress?.({ stage: "normalizing", progress: 0 });
+      options.onProgress?.({ stage: "normalizing", progress: 0.1 });
       if (typeof requestAnimationFrame === "function") {
         await new Promise<void>((done) => requestAnimationFrame(() => done()));
       }
       const rawJson = new TextDecoder().decode(new Uint8Array(message.rawBuffer));
+      options.onProgress?.({ stage: "normalizing", progress: 0.45 });
       const raw = JSON.parse(rawJson) as RawReplayFramesData;
+      options.onProgress?.({ stage: "normalizing", progress: 0.65 });
+      const replay = normalizeReplayData(raw, {
+        onProgress(progress) {
+          options.onProgress?.({
+            stage: "normalizing",
+            progress: 0.65 + (progress * 0.35),
+          });
+        },
+      });
+      options.onProgress?.({ stage: "normalizing", progress: 1 });
       resolve({
         raw,
-        replay: normalizeReplayData(raw),
+        replay,
       });
     };
 
@@ -166,9 +177,14 @@ export async function loadReplayFromBytes(
       : subtrActor.get_replay_frames_data(data),
   ) as RawReplayFramesData;
   options.onProgress?.({ stage: "normalizing", progress: 0 });
+  const replay = normalizeReplayData(raw, {
+    onProgress(progress) {
+      options.onProgress?.({ stage: "normalizing", progress });
+    },
+  });
   return {
     raw,
-    replay: normalizeReplayData(raw),
+    replay,
   };
 }
 

@@ -23,6 +23,15 @@ import type {
   Quaternion,
 } from "./types";
 
+interface NormalizeReplayDataOptions {
+  onProgress?: (progress: number) => void;
+}
+
+interface NormalizeReplayProgressTracker {
+  advance(units?: number): void;
+  finish(): void;
+}
+
 const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
   distance: 270,
   height: 100,
@@ -47,6 +56,8 @@ const BOOST_PAD_FRONT_LANE_Y = 1036;
 const BOOST_PAD_CENTER_X = 1024;
 const BOOST_PAD_CENTER_MID_Y = 1024;
 const BOOST_PAD_GOAL_LINE_Y = 4240;
+const STANDARD_SOCCAR_BOOST_PAD_COUNT = 34;
+const NORMALIZATION_PROGRESS_REPORT_MIN_DELTA = 0.005;
 
 function playerIdToString(playerId: RawPlayerId): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
@@ -191,14 +202,95 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   };
 }
 
-function buildPlaybackFrames(raw: RawReplayFramesData): PlaybackFrame[] {
-  const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
-  return raw.frame_data.metadata_frames.map((frame) => ({
-    time: frame.time - startTime,
-    secondsRemaining: frame.seconds_remaining,
-    gameState: frame.replicated_game_state_name,
-    kickoffCountdown: frame.replicated_game_state_time_remaining,
-  }));
+function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
+  const playerInfoCount = raw.meta.team_zero.length + raw.meta.team_one.length;
+  const playerFrameCount = raw.frame_data.players.reduce(
+    (count, [, playerData]) => count + playerData.frames.length,
+    0,
+  );
+  const boostPadCount = raw.boost_pads?.length ?? STANDARD_SOCCAR_BOOST_PAD_COUNT;
+  const boostPadEventCount = raw.boost_pad_events?.length ?? 0;
+  const timelineEventCount =
+    (raw.goal_events?.length ?? 0)
+    + (raw.player_stat_events?.length ?? 0)
+    + (raw.demolish_infos?.length ?? 0);
+
+  return [
+    Math.max(1, raw.frame_data.metadata_frames.length),
+    Math.max(1, playerInfoCount),
+    Math.max(1, playerFrameCount),
+    Math.max(1, raw.frame_data.ball_data.frames.length),
+    Math.max(1, boostPadCount + boostPadEventCount),
+    Math.max(1, timelineEventCount),
+  ].reduce((sum, count) => sum + count, 0);
+}
+
+function createNormalizationProgressTracker(
+  raw: RawReplayFramesData,
+  onProgress?: (progress: number) => void,
+): NormalizeReplayProgressTracker {
+  if (!onProgress) {
+    return {
+      advance() {},
+      finish() {},
+    };
+  }
+
+  const totalUnits = getNormalizationTotalUnits(raw);
+  let completedUnits = 0;
+  let lastReportedProgress = -1;
+
+  const maybeReport = () => {
+    const progress = Math.max(0, Math.min(1, completedUnits / totalUnits));
+    if (
+      progress >= 1
+      || progress - lastReportedProgress >= NORMALIZATION_PROGRESS_REPORT_MIN_DELTA
+    ) {
+      lastReportedProgress = progress;
+      onProgress(progress);
+    }
+  };
+
+  return {
+    advance(units = 1) {
+      if (units <= 0) {
+        return;
+      }
+      completedUnits = Math.min(totalUnits, completedUnits + units);
+      maybeReport();
+    },
+    finish() {
+      completedUnits = totalUnits;
+      maybeReport();
+    },
+  };
+}
+
+function buildPlaybackFrames(
+  raw: RawReplayFramesData,
+  progressTracker?: NormalizeReplayProgressTracker,
+): PlaybackFrame[] {
+  const metadataFrames = raw.frame_data.metadata_frames;
+  if (metadataFrames.length === 0) {
+    progressTracker?.advance();
+    return [];
+  }
+
+  const startTime = metadataFrames[0]?.time ?? 0;
+  const frames = new Array<PlaybackFrame>(metadataFrames.length);
+
+  for (let index = 0; index < metadataFrames.length; index += 1) {
+    const frame = metadataFrames[index]!;
+    frames[index] = {
+      time: frame.time - startTime,
+      secondsRemaining: frame.seconds_remaining,
+      gameState: frame.replicated_game_state_name,
+      kickoffCountdown: frame.replicated_game_state_time_remaining,
+    };
+    progressTracker?.advance();
+  }
+
+  return frames;
 }
 
 function inferTeamSide(
@@ -263,32 +355,57 @@ function extractCameraSettings(playerInfo?: RawPlayerInfo): CameraSettings {
   };
 }
 
-function indexReplayPlayers(raw: RawReplayFramesData): {
+function indexReplayPlayers(
+  raw: RawReplayFramesData,
+  progressTracker?: NormalizeReplayProgressTracker,
+): {
   byId: Map<string, RawPlayerInfo>;
   byName: Map<string, RawPlayerInfo>;
 } {
   const byId = new Map<string, RawPlayerInfo>();
   const byName = new Map<string, RawPlayerInfo>();
 
-  for (const playerInfo of [...raw.meta.team_zero, ...raw.meta.team_one]) {
+  const playerInfos = [...raw.meta.team_zero, ...raw.meta.team_one];
+  if (playerInfos.length === 0) {
+    progressTracker?.advance();
+    return { byId, byName };
+  }
+
+  for (const playerInfo of playerInfos) {
     byName.set(playerInfo.name, playerInfo);
     if (playerInfo.remote_id) {
       byId.set(playerIdToString(playerInfo.remote_id), playerInfo);
     }
+    progressTracker?.advance();
   }
 
   return { byId, byName };
 }
 
-function buildPlayerTracks(raw: RawReplayFramesData): ReplayPlayerTrack[] {
+function buildPlayerTracks(
+  raw: RawReplayFramesData,
+  progressTracker?: NormalizeReplayProgressTracker,
+): ReplayPlayerTrack[] {
   const teamZeroNames = new Set(raw.meta.team_zero.map((player) => player.name));
   const teamOneNames = new Set(raw.meta.team_one.map((player) => player.name));
-  const replayPlayers = indexReplayPlayers(raw);
+  const replayPlayers = indexReplayPlayers(raw, progressTracker);
+  const players: ReplayPlayerTrack[] = [];
+  let processedPlayerFrames = 0;
 
-  return raw.frame_data.players.map(([playerId, playerData]) => {
-    const firstFrame = playerData.frames.find(
-      (frame): frame is Exclude<RawPlayerFrame, "Empty"> => frame !== "Empty"
-    );
+  for (const [playerId, playerData] of raw.frame_data.players) {
+    const frames = new Array<PlayerSample>(playerData.frames.length);
+    let firstFrame: Exclude<RawPlayerFrame, "Empty"> | undefined;
+
+    for (let index = 0; index < playerData.frames.length; index += 1) {
+      const frame = playerData.frames[index]!;
+      if (firstFrame === undefined && frame !== "Empty") {
+        firstFrame = frame;
+      }
+      frames[index] = parsePlayerFrame(frame);
+      processedPlayerFrames += 1;
+      progressTracker?.advance();
+    }
+
     const playerIdString = playerIdToString(playerId);
     const name =
       firstFrame !== undefined && firstFrame.Data.player_name
@@ -297,14 +414,20 @@ function buildPlayerTracks(raw: RawReplayFramesData): ReplayPlayerTrack[] {
     const replayPlayerInfo =
       replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
 
-    return {
+    players.push({
       id: playerIdString,
       name,
       isTeamZero: inferTeamSide(name, teamZeroNames, teamOneNames, firstFrame),
       cameraSettings: extractCameraSettings(replayPlayerInfo),
-      frames: playerData.frames.map(parsePlayerFrame),
-    };
-  });
+      frames,
+    });
+  }
+
+  if (processedPlayerFrames === 0) {
+    progressTracker?.advance();
+  }
+
+  return players;
 }
 
 function buildPlayerLookup(
@@ -416,6 +539,25 @@ function buildStandardSoccarBoostPads(): ReplayBoostPad[] {
   return pads;
 }
 
+function buildBallFrames(
+  raw: RawReplayFramesData,
+  progressTracker?: NormalizeReplayProgressTracker,
+): BallSample[] {
+  const rawBallFrames = raw.frame_data.ball_data.frames;
+  if (rawBallFrames.length === 0) {
+    progressTracker?.advance();
+    return [];
+  }
+
+  const ballFrames = new Array<BallSample>(rawBallFrames.length);
+  for (let index = 0; index < rawBallFrames.length; index += 1) {
+    ballFrames[index] = parseBallFrame(rawBallFrames[index]!);
+    progressTracker?.advance();
+  }
+
+  return ballFrames;
+}
+
 function parseBoostPadAvailability(kind: unknown): boolean | null {
   if (kind === "Available") {
     return true;
@@ -467,7 +609,8 @@ function inferBoostPadSize(events: RawBoostPadEvent[]): ReplayBoostPadSize | nul
 function buildBoostPads(
   raw: RawReplayFramesData,
   players: ReplayPlayerTrack[],
-  startTime: number
+  startTime: number,
+  progressTracker?: NormalizeReplayProgressTracker,
 ): ReplayBoostPad[] {
   const playersById = buildPlayerLookup(players);
   const eventsByPadId = new Map<string, RawBoostPadEvent[]>();
@@ -475,6 +618,7 @@ function buildBoostPads(
   for (const event of raw.boost_pad_events ?? []) {
     const availability = parseBoostPadAvailability(event.kind);
     if (availability === null) {
+      progressTracker?.advance();
       continue;
     }
     const bucket = eventsByPadId.get(event.pad_id);
@@ -483,44 +627,53 @@ function buildBoostPads(
     } else {
       eventsByPadId.set(event.pad_id, [event]);
     }
+    progressTracker?.advance();
   }
 
   const rawPads = raw.boost_pads;
   if (!rawPads || rawPads.length === 0) {
+    progressTracker?.advance(STANDARD_SOCCAR_BOOST_PAD_COUNT);
     return buildStandardSoccarBoostPads();
   }
 
-  return [...rawPads]
-    .sort((left, right) => left.index - right.index)
-    .map((pad: RawBoostPad): ReplayBoostPad => {
-      const padId = typeof pad.pad_id === "string" ? pad.pad_id : null;
-      const rawEvents = padId ? [...(eventsByPadId.get(padId) ?? [])] : [];
-      const size =
-        parseBoostPadSize(pad.size) ??
-        inferBoostPadSize(rawEvents) ??
-        (pad.position.z >= 72 ? "big" : "small");
+  const sortedPads = [...rawPads].sort((left, right) => left.index - right.index);
+  const pads = new Array<ReplayBoostPad>(sortedPads.length);
 
-      const events = rawEvents
-        .sort((left, right) => left.time - right.time)
-        .map((event): ReplayBoostPadEvent => {
-          const playerId = event.player ? playerIdToString(event.player) : null;
-          return {
-            time: normalizeReplayTime(event.time, startTime),
-            frame: event.frame,
-            available: parseBoostPadAvailability(event.kind) ?? true,
-            playerId,
-            playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
-          };
-        });
+  for (let index = 0; index < sortedPads.length; index += 1) {
+    const pad = sortedPads[index]!;
+    const padId = typeof pad.pad_id === "string" ? pad.pad_id : null;
+    const rawEvents = padId ? [...(eventsByPadId.get(padId) ?? [])] : [];
+    const size =
+      parseBoostPadSize(pad.size) ??
+      inferBoostPadSize(rawEvents) ??
+      (pad.position.z >= 72 ? "big" : "small");
 
-      return {
-        index: pad.index,
-        padId,
-        size,
-        position: pad.position,
-        events,
+    const sortedEvents = rawEvents.sort((left, right) => left.time - right.time);
+    const events = new Array<ReplayBoostPadEvent>(sortedEvents.length);
+
+    for (let eventIndex = 0; eventIndex < sortedEvents.length; eventIndex += 1) {
+      const event = sortedEvents[eventIndex]!;
+      const playerId = event.player ? playerIdToString(event.player) : null;
+      events[eventIndex] = {
+        time: normalizeReplayTime(event.time, startTime),
+        frame: event.frame,
+        available: parseBoostPadAvailability(event.kind) ?? true,
+        playerId,
+        playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
       };
-    });
+    }
+
+    pads[index] = {
+      index: pad.index,
+      padId,
+      size,
+      position: pad.position,
+      events,
+    };
+    progressTracker?.advance();
+  }
+
+  return pads;
 }
 
 function createTimelineEventId(
@@ -604,20 +757,32 @@ function demoTimelineEvent(
 function buildTimelineEvents(
   raw: RawReplayFramesData,
   players: ReplayPlayerTrack[],
-  startTime: number
+  startTime: number,
+  progressTracker?: NormalizeReplayProgressTracker,
 ): ReplayTimelineEvent[] {
   const playersById = buildPlayerLookup(players);
-  const goalEvents = (raw.goal_events ?? []).map((event) =>
-    goalTimelineEvent(event, playersById, startTime)
-  );
-  const playerStatEvents = (raw.player_stat_events ?? []).map((event) =>
-    playerStatTimelineEvent(event, playersById, startTime)
-  );
-  const demoEvents = (raw.demolish_infos ?? []).map((event) =>
-    demoTimelineEvent(event, playersById, startTime)
-  );
+  const timelineEvents: ReplayTimelineEvent[] = [];
 
-  return [...goalEvents, ...playerStatEvents, ...demoEvents].sort((left, right) => {
+  for (const event of raw.goal_events ?? []) {
+    timelineEvents.push(goalTimelineEvent(event, playersById, startTime));
+    progressTracker?.advance();
+  }
+
+  for (const event of raw.player_stat_events ?? []) {
+    timelineEvents.push(playerStatTimelineEvent(event, playersById, startTime));
+    progressTracker?.advance();
+  }
+
+  for (const event of raw.demolish_infos ?? []) {
+    timelineEvents.push(demoTimelineEvent(event, playersById, startTime));
+    progressTracker?.advance();
+  }
+
+  if (timelineEvents.length === 0) {
+    progressTracker?.advance();
+  }
+
+  return timelineEvents.sort((left, right) => {
     if (left.time !== right.time) {
       return left.time - right.time;
     }
@@ -625,19 +790,27 @@ function buildTimelineEvents(
   });
 }
 
-export function normalizeReplayData(raw: RawReplayFramesData): ReplayModel {
+export function normalizeReplayData(
+  raw: RawReplayFramesData,
+  options: NormalizeReplayDataOptions = {},
+): ReplayModel {
+  const progressTracker = createNormalizationProgressTracker(raw, options.onProgress);
   const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
-  const frames = buildPlaybackFrames(raw);
-  const players = buildPlayerTracks(raw);
+  const frames = buildPlaybackFrames(raw, progressTracker);
+  const players = buildPlayerTracks(raw, progressTracker);
+  const ballFrames = buildBallFrames(raw, progressTracker);
+  const boostPads = buildBoostPads(raw, players, startTime, progressTracker);
+  const timelineEvents = buildTimelineEvents(raw, players, startTime, progressTracker);
+  progressTracker.finish();
 
   return {
     frameCount: frames.length,
     duration: frames.at(-1)?.time ?? 0,
     frames,
-    ballFrames: raw.frame_data.ball_data.frames.map(parseBallFrame),
-    boostPads: buildBoostPads(raw, players, startTime),
+    ballFrames,
+    boostPads,
     players,
-    timelineEvents: buildTimelineEvents(raw, players, startTime),
+    timelineEvents,
     teamZeroNames: raw.meta.team_zero.map((player) => player.name),
     teamOneNames: raw.meta.team_one.map((player) => player.name),
   };
