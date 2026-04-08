@@ -205,6 +205,9 @@ just fmt
 just clippy
 ```
 
+These `just` recipes enter the flake dev shell, so they use the Rust toolchain
+from `nix develop` instead of any older `cargo`/`rustc` on your ambient `PATH`.
+
 Bindings:
 
 ```bash

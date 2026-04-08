@@ -83,4 +83,3 @@ js/example/
 
 - The app currently uses the web-target JS package build, not the repo-local bundler target from `just build-js`.
 - The example is the integration harness for the local player library in [`js/player`](../player/README.md).
-- The player-library design notes live in [`docs/js-player-library-plan.md`](../../docs/js-player-library-plan.md).

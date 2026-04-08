@@ -1,16 +1,21 @@
 # justfile for subtr-actor
 
+# Rust and Python tooling should come from the flake dev shell rather than the
+# caller's ambient PATH.
+nix_develop := "nix develop -c"
+nix_shell_bash := "nix develop -c bash -lc"
+
 # Default recipe to list available commands
 default:
     @just --list
 
 # Build all packages
 build:
-    cargo build --release
+    {{nix_develop}} cargo build --release
 
 # Build Python package
 build-python:
-    cd python && cargo build --release
+    {{nix_shell_bash}} 'cd python && cargo build --release'
 
 # Build JavaScript/WASM package
 build-js:
@@ -18,7 +23,7 @@ build-js:
 
 # Run tests
 test:
-    cargo test
+    {{nix_develop}} cargo test
 
 # Download replay metadata/stats JSON from ballchasing.com for a specific replay id
 ballchasing-replay-json replay_id output='':
@@ -69,16 +74,16 @@ ballchasing-fixture replay_id name:
 
 # Run Python tests
 test-python:
-    cd python && pytest
+    {{nix_shell_bash}} 'cd python && pytest'
 
 # Publish main Rust crate to crates.io
 publish-rust:
-    cargo publish -p subtr-actor
+    {{nix_develop}} cargo publish -p subtr-actor
 
 # Publish Python package to PyPI (builds sdist for cross-platform compatibility)
 publish-python:
-    cd python && maturin build --release --sdist
-    cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '{print $2}') twine upload ../target/wheels/*
+    {{nix_shell_bash}} 'cd python && maturin build --release --sdist'
+    {{nix_shell_bash}} 'cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '"'"'{print $2}'"'"') twine upload ../target/wheels/*'
 
 # Publish JavaScript package to npm
 publish-js: build-js
@@ -90,22 +95,22 @@ publish-all: publish-rust publish-python publish-js
 
 # Clean build artifacts
 clean:
-    cargo clean
+    {{nix_develop}} cargo clean
     rm -rf python/dist
     rm -rf js/pkg
     rm -f python/*.so
 
 # Format code
 fmt:
-    cargo fmt
+    {{nix_develop}} cargo fmt
 
 # Check formatting
 fmt-check:
-    cargo fmt -- --check
+    {{nix_develop}} cargo fmt -- --check
 
 # Run clippy
 clippy:
-    cargo clippy -- -D warnings
+    {{nix_develop}} cargo clippy -- -D warnings
 
 # Version bump (requires version as argument)
 # Updates workspace version and subtr-actor dependency in bindings, tags and pushes
@@ -117,7 +122,7 @@ bump version:
     sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/stat-evaluation-player/package.json
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' js/Cargo.toml
     sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' python/Cargo.toml
-    cargo metadata --format-version 1 > /dev/null
+    {{nix_develop}} cargo metadata --format-version 1 > /dev/null
     git add -A
     git commit -m "Bump version to {{version}}"
     git tag -a "v{{version}}" -m "Release v{{version}}"

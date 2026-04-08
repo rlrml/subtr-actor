@@ -5,7 +5,7 @@ fn main() {
     match graph.render_ascii_dag() {
         Ok(rendered) => println!("{rendered}"),
         Err(error) => {
-            eprintln!("{:?}", error);
+            eprintln!("{error:?}");
             std::process::exit(1);
         }
     }

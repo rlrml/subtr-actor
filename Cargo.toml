@@ -35,7 +35,6 @@ ballchasing-cli = ["dep:reqwest"]
 
 [dependencies]
 anyhow = "1.0.98"
-ascii-dag = "0.9.1"
 boxcars.workspace = true
 derive-new = "0.7.0"
 erased-serde = "0.4.6"

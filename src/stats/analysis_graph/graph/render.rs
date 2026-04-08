@@ -1,8 +1,6 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 
-use ascii_dag::graph::{Graph as AsciiGraph, RenderMode};
-
 use super::{analysis_node_graph_error, AnalysisGraph};
 use crate::*;
 
@@ -10,19 +8,9 @@ impl AnalysisGraph {
     pub fn render_ascii_dag(&mut self) -> SubtrActorResult<String> {
         self.resolve()?;
 
-        if self.nodes.is_empty() {
-            return Ok("AnalysisGraph\n\\- (empty)".to_owned());
-        }
-
         let providers = self.provider_index_by_type()?;
-        let node_labels: Vec<Box<str>> = self
-            .nodes
-            .iter()
-            .map(|node| node.name().to_owned().into_boxed_str())
-            .collect();
         let mut external_labels = Vec::new();
         let mut external_node_ids = HashMap::new();
-        let mut next_node_id = self.nodes.len();
 
         for node in &self.nodes {
             for dependency in node.dependencies() {
@@ -45,28 +33,31 @@ impl AnalysisGraph {
                 ensure_external_render_node(
                     &mut external_labels,
                     &mut external_node_ids,
-                    &mut next_node_id,
                     dependency_type_id,
                     label,
                 );
             }
         }
 
-        let mut dag = AsciiGraph::new().with_render_mode(RenderMode::Vertical);
-
-        for (index, label) in node_labels.iter().enumerate() {
-            dag.add_node(index, label);
+        if self.nodes.is_empty() && external_labels.is_empty() {
+            return Ok("AnalysisGraph\n\\- (empty)".to_owned());
         }
 
-        for (_, node_id, label) in &external_labels {
-            dag.add_node(*node_id, label);
+        let external_count = external_labels.len();
+        let mut lines = Vec::with_capacity(1 + external_count + self.nodes.len());
+        lines.push("AnalysisGraph".to_owned());
+
+        for (display_id, (_, label)) in external_labels.iter().enumerate() {
+            lines.push(format!("[{display_id}] {label}"));
         }
 
         for (index, node) in self.nodes.iter().enumerate() {
+            let display_id = external_count + index;
+            let mut dependency_refs = Vec::new();
             for dependency in node.dependencies() {
                 let dependency_type_id = dependency.state_type_id();
                 let source_id = if let Some(provider_index) = providers.get(&dependency_type_id) {
-                    *provider_index
+                    external_count + *provider_index
                 } else if self.declared_root_states.contains_key(&dependency_type_id) {
                     *external_node_ids
                         .get(&dependency_type_id)
@@ -82,18 +73,27 @@ impl AnalysisGraph {
                         dependency.state_type_name(),
                     )));
                 };
-                dag.add_edge(source_id, index, None);
+                dependency_refs.push(format!("[{source_id}]"));
+            }
+
+            if dependency_refs.is_empty() {
+                lines.push(format!("[{display_id}] {}", node.name()));
+            } else {
+                lines.push(format!(
+                    "[{display_id}] {} <- {}",
+                    node.name(),
+                    dependency_refs.join(", "),
+                ));
             }
         }
 
-        Ok(format!("AnalysisGraph\n{}", dag.render()))
+        Ok(lines.join("\n"))
     }
 }
 
 fn ensure_external_render_node(
-    labels: &mut Vec<(TypeId, usize, Box<str>)>,
+    labels: &mut Vec<(TypeId, Box<str>)>,
     external_node_ids: &mut HashMap<TypeId, usize>,
-    next_node_id: &mut usize,
     dependency_type_id: TypeId,
     label: String,
 ) -> usize {
@@ -101,9 +101,8 @@ fn ensure_external_render_node(
         return *node_id;
     }
 
-    let node_id = *next_node_id;
-    *next_node_id += 1;
-    labels.push((dependency_type_id, node_id, label.into_boxed_str()));
+    let node_id = labels.len();
+    labels.push((dependency_type_id, label.into_boxed_str()));
     external_node_ids.insert(dependency_type_id, node_id);
     node_id
 }
