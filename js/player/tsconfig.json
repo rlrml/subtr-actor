@@ -7,7 +7,7 @@
     "baseUrl": ".",
     "paths": {
       "@colonelpanic8/subtr-actor": [
-        "../pkg/rl_replay_subtr_actor"
+        "../pkg/rl_replay_subtr_actor.js"
       ]
     },
     "strict": true,
