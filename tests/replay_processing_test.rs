@@ -109,6 +109,43 @@ fn test_replay_data_collector_multiple_replays() {
 }
 
 #[test]
+fn test_issue_5_ballchasing_replay_processes_default_python_ndarray_features() {
+    // Ballchasing replay id from GitHub issue #5: bb589e36-9b6d-4f29-89ac-582962edf8c9
+    let replay = parse_replay("assets/replays/issue_5_car_actor_not_found.replay");
+    let mut collector = NDArrayCollector::<f32>::from_strings(
+        &["BallRigidBody"],
+        &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
+    )
+    .expect("Should create collector");
+
+    FrameRateDecorator::new_from_fps(10.0, &mut collector)
+        .process_replay(&replay)
+        .expect("Issue #5 replay should process without losing player car mappings");
+
+    let (meta, array) = collector
+        .get_meta_and_ndarray()
+        .expect("Issue #5 replay should produce ndarray output");
+
+    assert!(
+        array.nrows() > 0,
+        "Issue #5 replay should yield at least one frame of ndarray output"
+    );
+    assert_eq!(
+        meta.replay_meta.player_order().count(),
+        4,
+        "Issue #5 replay should still expose all four players in replay order"
+    );
+    assert_eq!(
+        meta.replay_meta
+            .player_order()
+            .filter(|player| matches!(player.remote_id, boxcars::RemoteId::Xbox(_)))
+            .count(),
+        2,
+        "Issue #5 replay should retain both Xbox players through ndarray processing"
+    );
+}
+
+#[test]
 fn test_replay_data_exposes_powerslide_activity() {
     let replay = parse_replay("assets/replays/rlcs.replay");
     let replay_data = ReplayDataCollector::new()

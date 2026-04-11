@@ -1,6 +1,7 @@
 /target
 /bindings
 *.replay
+!assets/replays/*.replay
 *.replay.zip
 perf.data
 perf.data.old
