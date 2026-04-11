@@ -34,6 +34,9 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_replay_meta, m)?)?;
     m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
     m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stats_module_names, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stats_snapshot_data, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_timeline, m)?)?;
     Ok(())
 }
@@ -44,6 +47,22 @@ fn to_py_error<E: std::error::Error>(e: E) -> PyErr {
 
 fn handle_frames_exception(e: subtr_actor::SubtrActorError) -> PyErr {
     PyErr::new::<exceptions::PyException, _>(format!("{:?} {}", e.variant, e.backtrace))
+}
+
+fn handle_subtr_actor_exception(e: subtr_actor::SubtrActorError) -> PyErr {
+    match e.variant {
+        SubtrActorErrorVariant::UnknownFeatureAdderName(feature_name) => {
+            PyErr::new::<exceptions::PyValueError, _>(format!(
+                "Unknown feature adder '{feature_name}'"
+            ))
+        }
+        SubtrActorErrorVariant::UnknownStatsModuleName(module_name) => {
+            PyErr::new::<exceptions::PyValueError, _>(format!(
+                "Unknown builtin stats module '{module_name}'"
+            ))
+        }
+        _ => handle_frames_exception(e),
+    }
 }
 
 fn convert_to_py(py: Python, value: &Value) -> Py<PyAny> {
@@ -114,6 +133,38 @@ fn parse_ndarray_dtype(dtype: Option<String>) -> PyResult<NDArrayDType> {
     }
 }
 
+fn replay_from_filepath(filepath: &PathBuf) -> PyResult<boxcars::Replay> {
+    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
+    replay_from_data(&data)
+}
+
+fn parse_stats_frame_resolution(
+    frame_step_seconds: Option<f32>,
+) -> PyResult<subtr_actor::StatsFrameResolution> {
+    match frame_step_seconds {
+        None => Ok(subtr_actor::StatsFrameResolution::EveryFrame),
+        Some(seconds) if seconds.is_finite() && seconds > 0.0 => {
+            Ok(subtr_actor::StatsFrameResolution::TimeStep { seconds })
+        }
+        Some(seconds) => Err(PyErr::new::<exceptions::PyValueError, _>(format!(
+            "frame_step_seconds must be a finite value greater than 0, got {seconds}"
+        ))),
+    }
+}
+
+fn build_stats_collector(
+    module_names: Option<Vec<String>>,
+    frame_step_seconds: Option<f32>,
+) -> PyResult<subtr_actor::StatsCollector> {
+    let collector = match module_names {
+        Some(module_names) => subtr_actor::StatsCollector::with_builtin_module_names(module_names),
+        None => Ok(subtr_actor::StatsCollector::new()),
+    }
+    .map_err(handle_subtr_actor_exception)?;
+
+    Ok(collector.with_frame_resolution(parse_stats_frame_resolution(frame_step_seconds)?))
+}
+
 fn get_ndarray_with_info_for_type<'p, F>(
     py: Python<'p>,
     replay: &boxcars::Replay,
@@ -126,7 +177,7 @@ where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     let mut collector = build_ndarray_collector::<F>(global_feature_adders, player_feature_adders)
-        .map_err(handle_frames_exception)?;
+        .map_err(handle_subtr_actor_exception)?;
 
     FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector)
         .process_replay(replay)
@@ -191,8 +242,7 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
     fps: Option<f32>,
     dtype: Option<String>,
 ) -> PyResult<Py<PyAny>> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
-    let replay = replay_from_data(&data)?;
+    let replay = replay_from_filepath(&filepath)?;
 
     let (python_replay_meta, python_nd_array) = match parse_ndarray_dtype(dtype)? {
         NDArrayDType::Float16 => {
@@ -271,12 +321,11 @@ fn get_replay_meta<'p>(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
 ) -> PyResult<Py<PyAny>> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
-    let replay = replay_from_data(&data)?;
+    let replay = replay_from_filepath(&filepath)?;
 
     let mut collector =
         build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
-            .map_err(handle_frames_exception)?;
+            .map_err(handle_subtr_actor_exception)?;
 
     let replay_meta = collector
         .process_and_get_meta_and_headers(&replay)
@@ -297,7 +346,7 @@ fn get_column_headers<'p>(
     player_feature_adders: Option<Vec<String>>,
 ) -> PyResult<Py<PyAny>> {
     let header_info = build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
-        .map_err(handle_frames_exception)?
+        .map_err(handle_subtr_actor_exception)?
         .get_column_headers();
     Ok(convert_to_py(
         py,
@@ -308,8 +357,7 @@ fn get_column_headers<'p>(
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
-    let replay = replay_from_data(&data)?;
+    let replay = replay_from_filepath(&filepath)?;
 
     let mut processor = ReplayProcessor::new(&replay).map_err(handle_frames_exception)?;
     let mut replay_data_collector = ReplayDataCollector::new();
@@ -339,13 +387,65 @@ fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath))]
-fn get_stats_timeline<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
-    let replay = replay_from_data(&data)?;
-    let timeline = subtr_actor::StatsCollector::new()
+fn get_stats_module_names<'p>(py: Python<'p>) -> PyResult<Py<PyAny>> {
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(subtr_actor::builtin_stats_module_names()).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, module_names=None))]
+fn get_stats<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    module_names: Option<Vec<String>>,
+) -> PyResult<Py<PyAny>> {
+    let replay = replay_from_filepath(&filepath)?;
+    let stats = build_stats_collector(module_names, None)?
+        .get_stats(&replay)
+        .map_err(handle_subtr_actor_exception)?;
+
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(stats).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, module_names=None, frame_step_seconds=None))]
+fn get_stats_snapshot_data<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    module_names: Option<Vec<String>>,
+    frame_step_seconds: Option<f32>,
+) -> PyResult<Py<PyAny>> {
+    let replay = replay_from_filepath(&filepath)?;
+    let snapshot_data = build_stats_collector(module_names, frame_step_seconds)?
+        .get_snapshot_data(&replay)
+        .map_err(handle_subtr_actor_exception)?;
+
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(snapshot_data).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, module_names=None, frame_step_seconds=None))]
+fn get_stats_timeline<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    module_names: Option<Vec<String>>,
+    frame_step_seconds: Option<f32>,
+) -> PyResult<Py<PyAny>> {
+    let replay = replay_from_filepath(&filepath)?;
+    let timeline = build_stats_collector(module_names, frame_step_seconds)?
         .get_stats_timeline_value(&replay)
-        .map_err(handle_frames_exception)?;
+        .map_err(handle_subtr_actor_exception)?;
 
     Ok(convert_to_py(py, &timeline))
 }

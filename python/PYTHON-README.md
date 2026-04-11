@@ -35,11 +35,25 @@ headers = subtr_actor.get_column_headers(
 
 replay_meta = subtr_actor.get_replay_meta(replay_path)
 frames_data = subtr_actor.get_replay_frames_data(replay_path)
-stats_timeline = subtr_actor.get_stats_timeline(replay_path)
+stats_module_names = subtr_actor.get_stats_module_names()
+stats = subtr_actor.get_stats(replay_path, module_names=["core", "boost", "movement"])
+stats_snapshot_data = subtr_actor.get_stats_snapshot_data(
+    replay_path,
+    module_names=["core", "boost"],
+    frame_step_seconds=1.0,
+)
+stats_timeline = subtr_actor.get_stats_timeline(
+    replay_path,
+    module_names=["core", "boost", "movement"],
+    frame_step_seconds=1.0,
+)
 
 print(ndarray.shape)
 print(headers["player_headers"][:5])
 print(replay_meta["map_name"])
+print(stats_module_names)
+print(stats["modules"]["core"]["team_zero"]["score"])
+print(stats_snapshot_data["frames"][-1]["modules"]["boost"]["team_zero"]["amount_collected"])
 print(stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
 ```
 
@@ -73,13 +87,48 @@ Get header information for the configured ndarray layout.
 
 Get structured frame-by-frame game state data with no FPS resampling.
 
-### `get_stats_timeline(filepath) -> dict`
+### `get_stats_module_names() -> list[str]`
+
+List the builtin stats modules that can be selected in `get_stats`,
+`get_stats_snapshot_data`, and `get_stats_timeline`.
+
+### `get_stats(filepath, module_names=None) -> dict`
+
+Get aggregate replay stats for the selected builtin modules.
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `module_names`: optional list of builtin stats module names. By default all
+  builtin modules are included.
+
+### `get_stats_snapshot_data(filepath, module_names=None, frame_step_seconds=None) -> dict`
+
+Get the raw stats snapshot payload produced by `StatsCollector`, including:
+
+- `config`: module configuration emitted by the selected stats modules
+- `modules`: aggregate module outputs
+- `frames`: per-sample module snapshots keyed by module name
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `module_names`: optional list of builtin stats module names. By default all
+  builtin modules are included.
+- `frame_step_seconds`: optional positive sampling interval in seconds. By
+  default every replay frame is captured.
+
+### `get_stats_timeline(filepath, module_names=None, frame_step_seconds=None) -> dict`
 
 Get cumulative typed stats snapshots for each replay sample.
 
 Parameters:
 
 - `filepath`: path to the replay file
+- `module_names`: optional list of builtin stats module names. By default all
+  builtin modules are included.
+- `frame_step_seconds`: optional positive sampling interval in seconds. By
+  default every replay frame is captured.
 
 ## Feature Adders
 

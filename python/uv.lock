@@ -527,7 +527,7 @@ wheels = [
 
 [[package]]
 name = "subtr-actor-py"
-version = "0.2.3"
+version = "0.3.1"
 source = { editable = "." }
 
 [package.dev-dependencies]
