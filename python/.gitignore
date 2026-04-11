@@ -1,1 +1,5 @@
 /target/*
+/subtr_actor.so
+/subtr_actor.pyd
+/subtr_actor/*.so
+/subtr_actor/*.pyd
