@@ -13,11 +13,6 @@ export default defineConfig({
       "@": srcDir,
     },
   },
-  worker: {
-    rollupOptions: {
-      external: ["@colonelpanic8/subtr-actor"],
-    },
-  },
   server: {
     fs: {
       allow: [path.resolve(rootDir, "..")],

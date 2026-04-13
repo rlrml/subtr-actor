@@ -76,7 +76,9 @@ export default defineConfig(({ command, mode }) => {
     },
     worker: {
       rollupOptions: {
-        external: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+        // Workers run directly in the browser, so externalizing the wasm package
+        // turns it into a missing global (`subtrActor`) in Pages builds.
+        external: ["subtr-actor-player"],
       },
     },
     optimizeDeps: {
