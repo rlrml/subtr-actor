@@ -166,11 +166,25 @@ fn assert_boost_accounting_consistent(timeline: &ReplayStatsTimeline) {
 /// Check that pad counts imply the same nominal boost total as
 /// collected boost plus tracked overfill.
 fn assert_boost_pickup_nominal_amounts_consistent(timeline: &ReplayStatsTimeline) {
-    fn assert_stats(scope: &str, frame_number: usize, time: f32, stats: &BoostStats) {
+    fn assert_stats(
+        scope: &str,
+        frame_number: usize,
+        time: f32,
+        stats: &BoostStats,
+        is_live_play: bool,
+    ) {
         let violations = boost_invariant_violations(stats, None);
+        let violations = if is_live_play {
+            violations
+        } else {
+            violations
+                .into_iter()
+                .filter(|violation| violation.kind != BoostInvariantKind::UsedSplitAmounts)
+                .collect()
+        };
         assert!(
             violations.is_empty(),
-            "{scope} boost invariant violations at frame {frame_number} (t={time:.3}): {violations:?}"
+            "{scope} boost invariant violations at frame {frame_number} (t={time:.3}, is_live_play={is_live_play}): {violations:?}"
         );
     }
 
@@ -180,12 +194,14 @@ fn assert_boost_pickup_nominal_amounts_consistent(timeline: &ReplayStatsTimeline
             frame.frame_number,
             frame.time,
             &frame.team_zero.boost,
+            frame.is_live_play,
         );
         assert_stats(
             "team_one",
             frame.frame_number,
             frame.time,
             &frame.team_one.boost,
+            frame.is_live_play,
         );
         for player in &frame.players {
             assert_stats(
@@ -193,6 +209,7 @@ fn assert_boost_pickup_nominal_amounts_consistent(timeline: &ReplayStatsTimeline
                 frame.frame_number,
                 frame.time,
                 &player.boost,
+                frame.is_live_play,
             );
         }
     }

@@ -16,14 +16,16 @@ pub enum BoostInvariantKind {
     NominalPickupAmount,
     NominalStolenPickupAmount,
     CurrentAmount,
+    UsedSplitAmounts,
 }
 
 impl BoostInvariantKind {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::BucketAmounts,
         Self::NominalPickupAmount,
         Self::NominalStolenPickupAmount,
         Self::CurrentAmount,
+        Self::UsedSplitAmounts,
     ];
 
     pub fn label(self) -> &'static str {
@@ -32,6 +34,7 @@ impl BoostInvariantKind {
             Self::NominalPickupAmount => "nominal_pickup_amount",
             Self::NominalStolenPickupAmount => "nominal_stolen_pickup_amount",
             Self::CurrentAmount => "current_amount",
+            Self::UsedSplitAmounts => "used_split_amounts",
         }
     }
 }
@@ -65,6 +68,11 @@ impl BoostInvariantViolation {
             ),
             BoostInvariantKind::CurrentAmount => format!(
                 "amount_obtained - amount_used should match observed current boost \
+                 (actual={:.1}, expected={:.1}, diff={:.1}, tolerance={:.1})",
+                self.actual, self.expected, self.diff, self.tolerance
+            ),
+            BoostInvariantKind::UsedSplitAmounts => format!(
+                "amount_used_while_grounded + amount_used_while_airborne should match amount_used \
                  (actual={:.1}, expected={:.1}, diff={:.1}, tolerance={:.1})",
                 self.actual, self.expected, self.diff, self.tolerance
             ),
@@ -144,6 +152,50 @@ pub fn boost_invariant_violations(
             1.0,
         );
     }
+    push_violation(
+        &mut violations,
+        BoostInvariantKind::UsedSplitAmounts,
+        stats.amount_used,
+        stats.amount_used_by_vertical_band(),
+        1.0,
+    );
 
     violations
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reports_used_split_mismatch() {
+        let stats = BoostStats {
+            amount_used: 20.0,
+            amount_used_while_grounded: 8.0,
+            amount_used_while_airborne: 9.0,
+            ..Default::default()
+        };
+
+        let violations = boost_invariant_violations(&stats, None);
+
+        assert!(violations
+            .iter()
+            .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts));
+    }
+
+    #[test]
+    fn accepts_matching_used_split() {
+        let stats = BoostStats {
+            amount_used: 20.0,
+            amount_used_while_grounded: 8.0,
+            amount_used_while_airborne: 12.0,
+            ..Default::default()
+        };
+
+        let violations = boost_invariant_violations(&stats, None);
+
+        assert!(!violations
+            .iter()
+            .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts));
+    }
 }

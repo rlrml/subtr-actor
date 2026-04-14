@@ -82,6 +82,10 @@ impl BoostStats {
     pub fn amount_obtained(&self) -> f32 {
         self.amount_collected_big + self.amount_collected_small + self.amount_respawned
     }
+
+    pub fn amount_used_by_vertical_band(&self) -> f32 {
+        self.amount_used_while_grounded + self.amount_used_while_airborne
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -702,18 +706,6 @@ impl BoostCalculator {
             } else {
                 previous_boost_amount
             };
-            let speed = player.speed();
-            let previous_speed = self
-                .previous_player_speeds
-                .get(&player.player_id)
-                .copied()
-                .or(speed);
-            let previous_speed = if boost_levels_resumed_this_sample {
-                speed
-            } else {
-                previous_speed
-            };
-
             if track_boost_levels {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 let time_zero_boost = frame.dt
@@ -758,24 +750,6 @@ impl BoostCalculator {
                         boost_percent_to_amount(75.0),
                         BOOST_MAX_AMOUNT + 1.0,
                     );
-                let supersonic_usage = if player.boost_active
-                    && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
-                    && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
-                {
-                    (previous_boost_amount - boost_amount)
-                        .max(0.0)
-                        .min(BOOST_USED_RAW_UNITS_PER_SECOND * frame.dt)
-                } else {
-                    0.0
-                };
-                let observed_usage = (previous_boost_amount - boost_amount).max(0.0);
-                let grounded_usage = if vertical_state.is_grounded(&player.player_id) {
-                    observed_usage
-                } else {
-                    0.0
-                };
-                let airborne_usage = observed_usage - grounded_usage;
-
                 let stats = self
                     .player_stats
                     .entry(player.player_id.clone())
@@ -802,12 +776,6 @@ impl BoostCalculator {
                 team_stats.time_boost_50_75 += time_boost_50_75;
                 stats.time_boost_75_100 += time_boost_75_100;
                 team_stats.time_boost_75_100 += time_boost_75_100;
-                stats.amount_used_while_grounded += grounded_usage;
-                team_stats.amount_used_while_grounded += grounded_usage;
-                stats.amount_used_while_airborne += airborne_usage;
-                team_stats.amount_used_while_airborne += airborne_usage;
-                stats.amount_used_while_supersonic += supersonic_usage;
-                team_stats.amount_used_while_supersonic += supersonic_usage;
             }
 
             let mut respawn_amount = 0.0;
@@ -965,6 +933,68 @@ impl BoostCalculator {
             }
         }
 
+        let mut team_zero_used = self.team_zero_stats.amount_used;
+        let mut team_one_used = self.team_one_stats.amount_used;
+        for player in &players.players {
+            let Some(boost_amount) = player.boost_amount else {
+                continue;
+            };
+            let stats = self
+                .player_stats
+                .entry(player.player_id.clone())
+                .or_default();
+            let previous_amount_used = stats.amount_used;
+            let amount_used_raw = (stats.amount_obtained() - boost_amount).max(0.0);
+            let amount_used = amount_used_raw.max(stats.amount_used);
+            if track_boost_levels {
+                let split_amount = stats.amount_used_by_vertical_band();
+                let amount_used_delta = (amount_used - split_amount).max(0.0);
+                if amount_used_delta > 0.0 {
+                    let speed = player.speed();
+                    let previous_speed = self
+                        .previous_player_speeds
+                        .get(&player.player_id)
+                        .copied()
+                        .or(speed);
+                    let previous_speed = if boost_levels_resumed_this_sample {
+                        speed
+                    } else {
+                        previous_speed
+                    };
+                    let used_while_supersonic = player.boost_active
+                        && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
+                        && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD;
+                    let team_stats = if player.is_team_0 {
+                        &mut self.team_zero_stats
+                    } else {
+                        &mut self.team_one_stats
+                    };
+                    if vertical_state.is_grounded(&player.player_id) {
+                        stats.amount_used_while_grounded += amount_used_delta;
+                        team_stats.amount_used_while_grounded += amount_used_delta;
+                    } else {
+                        stats.amount_used_while_airborne += amount_used_delta;
+                        team_stats.amount_used_while_airborne += amount_used_delta;
+                    }
+                    if used_while_supersonic {
+                        stats.amount_used_while_supersonic += amount_used_delta;
+                        team_stats.amount_used_while_supersonic += amount_used_delta;
+                    }
+                }
+            }
+            stats.amount_used = amount_used;
+            let amount_used_delta = amount_used - previous_amount_used;
+            if amount_used_delta <= 0.0 {
+                continue;
+            }
+            if player.is_team_0 {
+                team_zero_used += amount_used_delta;
+            } else {
+                team_one_used += amount_used_delta;
+            }
+        }
+        self.team_zero_stats.amount_used = team_zero_used;
+        self.team_one_stats.amount_used = team_one_used;
         for (player_id, boost_amount) in current_boost_amounts {
             self.previous_boost_amounts.insert(player_id, boost_amount);
         }
@@ -974,25 +1004,6 @@ impl BoostCalculator {
                     .insert(player.player_id.clone(), speed);
             }
         }
-        let mut team_zero_used = 0.0;
-        let mut team_one_used = 0.0;
-        for player in &players.players {
-            let Some(boost_amount) = player.boost_amount else {
-                continue;
-            };
-            let stats = self
-                .player_stats
-                .entry(player.player_id.clone())
-                .or_default();
-            stats.amount_used = (stats.amount_obtained() - boost_amount).max(0.0);
-            if player.is_team_0 {
-                team_zero_used += stats.amount_used;
-            } else {
-                team_one_used += stats.amount_used;
-            }
-        }
-        self.team_zero_stats.amount_used = team_zero_used;
-        self.team_one_stats.amount_used = team_one_used;
         self.warn_for_sample_boost_invariants(frame, players);
         self.kickoff_phase_active_last_frame = kickoff_phase_active;
         self.previous_boost_levels_live = Some(boost_levels_live);
