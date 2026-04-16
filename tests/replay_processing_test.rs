@@ -168,6 +168,11 @@ fn test_legacy_replays_use_spatial_normalization() {
             100.0,
             "Expected legacy replay {path} to use 100x spatial normalization"
         );
+        assert_eq!(
+            processor.rigid_body_velocity_normalization_factor(),
+            10.0,
+            "Expected legacy replay {path} to use 10x rigid-body velocity normalization"
+        );
     }
 }
 
@@ -185,6 +190,11 @@ fn test_modern_replays_keep_native_spatial_scale() {
             processor.spatial_normalization_factor(),
             1.0,
             "Expected modern replay {path} to keep native spatial scale"
+        );
+        assert_eq!(
+            processor.rigid_body_velocity_normalization_factor(),
+            1.0,
+            "Expected modern replay {path} to keep native rigid-body velocity scale"
         );
     }
 }
@@ -698,6 +708,55 @@ fn test_new_demolition_format_replay_has_demolishes() {
                 || info.victim_location.z != 0.0
         }),
         "Expected deleted-victim demolitions to keep a real last-known location instead of origin"
+    );
+}
+
+#[test]
+fn test_demolition_velocities_are_in_physical_units() {
+    let replay = parse_replay("assets/replays/new_demolition_format.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for new_demolition_format.replay");
+
+    let mut attacker_velocity_ratios = Vec::new();
+    for demolish in &replay_data.demolish_infos {
+        let attacker_data = replay_data
+            .frame_data
+            .players
+            .iter()
+            .find(|(player_id, _)| player_id == &demolish.attacker)
+            .map(|(_, player_data)| player_data)
+            .expect("Expected demolish attacker to have player data");
+        if let Some(PlayerFrame::Data { rigid_body, .. }) =
+            attacker_data.frames().get(demolish.frame)
+        {
+            if let Some(linear_velocity) = rigid_body.linear_velocity {
+                let demo_speed = glam::Vec3::new(
+                    demolish.attacker_velocity.x,
+                    demolish.attacker_velocity.y,
+                    demolish.attacker_velocity.z,
+                )
+                .length();
+                let rigid_body_speed =
+                    glam::Vec3::new(linear_velocity.x, linear_velocity.y, linear_velocity.z)
+                        .length();
+                if demo_speed.is_finite()
+                    && rigid_body_speed.is_finite()
+                    && demo_speed > 0.0
+                    && rigid_body_speed > 0.0
+                {
+                    attacker_velocity_ratios.push(demo_speed / rigid_body_speed);
+                }
+            }
+        }
+    }
+
+    attacker_velocity_ratios
+        .sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
+    let median_ratio = attacker_velocity_ratios[attacker_velocity_ratios.len() / 2];
+    assert!(
+        (0.5..=2.0).contains(&median_ratio),
+        "Expected demolish attacker velocities to be on the same physical scale as rigid-body velocities, got median ratio {median_ratio}"
     );
 }
 

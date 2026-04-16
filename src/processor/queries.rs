@@ -211,10 +211,11 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<boxcars::RigidBody> {
         let rb_frame = self.get_frame(rb_frame_index)?;
         let interpolation_amount = target_time - rb_frame.time;
-        Ok(self.normalize_rigid_body(&apply_velocities_to_rigid_body(
-            rigid_body,
+        let normalized_rigid_body = self.normalize_rigid_body(rigid_body);
+        Ok(apply_velocities_to_rigid_body(
+            &normalized_rigid_body,
             interpolation_amount,
-        )))
+        ))
     }
 
     /// Interpolates an arbitrary actor rigid body to the requested replay time.

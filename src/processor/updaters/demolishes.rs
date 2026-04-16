@@ -1,5 +1,7 @@
 use super::*;
 
+const DEMOLISH_VELOCITY_NORMALIZATION_FACTOR: f32 = 100.0;
+
 impl<'a> ReplayProcessor<'a> {
     /// Detects and records demolishes observed in actor state and frame updates.
     pub(crate) fn update_demolishes(
@@ -74,8 +76,14 @@ impl<'a> ReplayProcessor<'a> {
             frame: frame_index,
             attacker,
             victim,
-            attacker_velocity: self.normalize_vector(demo.attacker_velocity()),
-            victim_velocity: self.normalize_vector(demo.victim_velocity()),
+            attacker_velocity: self.normalize_vector_by_factor(
+                demo.attacker_velocity(),
+                DEMOLISH_VELOCITY_NORMALIZATION_FACTOR,
+            ),
+            victim_velocity: self.normalize_vector_by_factor(
+                demo.victim_velocity(),
+                DEMOLISH_VELOCITY_NORMALIZATION_FACTOR,
+            ),
             victim_location: self.normalize_vector(current_rigid_body.location),
         })
     }
