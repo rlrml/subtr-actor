@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 
-import * as subtrActor from "@colonelpanic8/subtr-actor";
+// Bundle the generated local bindings into the worker so Vite can resolve the
+// wasm entry during library builds without depending on the publish-time package
+// name.
+import * as subtrActor from "../../pkg/rl_replay_subtr_actor.js";
 import type { ReplayLoadProgress } from "./types";
 
 type ReplayValidation = {
