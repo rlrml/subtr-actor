@@ -35,7 +35,7 @@ import type { TouchEvent } from "./TouchEvent.ts";
  * use subtr_actor::collector::replay_data::ReplayDataCollector;
  * use boxcars::ParserBuilder;
  *
- * let data = std::fs::read("assets/replays/new_boost_format.replay").unwrap();
+ * let data = std::fs::read("assets/new_boost_format.replay").unwrap();
  * let replay = ParserBuilder::new(&data).parse().unwrap();
  * let collector = ReplayDataCollector::new();
  * let replay_data = collector.get_replay_data(&replay).unwrap();

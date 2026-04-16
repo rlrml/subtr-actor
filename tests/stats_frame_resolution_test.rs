@@ -4,7 +4,7 @@ use subtr_actor::{StatsCollector, StatsFrameResolution, StatsTimelineCollector};
 
 #[test]
 fn stats_collector_default_resolution_matches_every_frame() {
-    let replay = common::parse_replay("assets/replays/rlcs.replay");
+    let replay = common::parse_replay("assets/rlcs.replay");
 
     let default_stats_collector = StatsCollector::new()
         .get_replay_stats_timeline(&replay)
@@ -21,7 +21,7 @@ fn stats_collector_default_resolution_matches_every_frame() {
 
 #[test]
 fn stats_collector_and_timeline_collector_match_at_sampled_resolution() {
-    let replay = common::parse_replay("assets/replays/rlcs.replay");
+    let replay = common::parse_replay("assets/rlcs.replay");
     let resolution = StatsFrameResolution::TimeStep { seconds: 0.5 };
 
     let full_timeline = StatsTimelineCollector::new()

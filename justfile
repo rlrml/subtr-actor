@@ -61,16 +61,15 @@ ballchasing-replay-file replay_id output='':
         -o "$target_path"
     echo "Wrote $target_path"
 
-# Download both the replay file and ballchasing JSON into a named fixture directory
+# Download both the replay file and ballchasing JSON into flat asset files
 ballchasing-fixture replay_id name:
     #!/usr/bin/env bash
     set -euo pipefail
-    fixture_dir="assets/ballchasing-fixtures/{{name}}"
-    mkdir -p "$fixture_dir"
-    just ballchasing-replay-json {{replay_id}} "$fixture_dir/ballchasing.json"
-    just ballchasing-replay-file {{replay_id}} "$fixture_dir/replay.replay"
-    printf '%s\n' '{{replay_id}}' > "$fixture_dir/replay_id.txt"
-    echo "Prepared fixture $fixture_dir"
+    mkdir -p assets
+    just ballchasing-replay-json {{replay_id}} "assets/{{name}}.ballchasing.json"
+    just ballchasing-replay-file {{replay_id}} "assets/{{name}}.replay"
+    printf '%s\n' '{{replay_id}}' > "assets/{{name}}.replay_id.txt"
+    echo "Prepared fixture assets/{{name}}.*"
 
 # Run Python tests
 test-python:

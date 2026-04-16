@@ -15,10 +15,10 @@ fn plausibility_report(path: &str) -> ReplayPlausibilityReport {
 #[test]
 fn modern_replay_motion_consistency_passes() {
     for path in [
-        "assets/replays/old_boost_format.replay",
-        "assets/replays/new_boost_format.replay",
-        "assets/replays/tourny.replay",
-        "assets/replays/dodges_refreshed_counter.replay",
+        "assets/old_boost_format.replay",
+        "assets/new_boost_format.replay",
+        "assets/tourny.replay",
+        "assets/dodges_refreshed_counter.replay",
     ] {
         let report = plausibility_report(path);
         assert!(
@@ -52,7 +52,7 @@ fn modern_replay_motion_consistency_passes() {
 
 #[test]
 fn rlcs_replay_legacy_velocities_normalize_but_rotations_still_fail() {
-    let report = plausibility_report("assets/replays/rlcs.replay");
+    let report = plausibility_report("assets/rlcs.replay");
     assert!(
         report.all_motion_consistent(),
         "expected rlcs.replay legacy rigid-body velocities to be motion-consistent after normalization"

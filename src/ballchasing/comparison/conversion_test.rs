@@ -64,7 +64,7 @@ fn test_raw_boost_amount_conversion_matches_percent_scale() {
 
 #[test]
 fn comparable_stats_collector_matches_reference_bundle() {
-    let replay = parse_replay("assets/replays/new_boost_format.replay");
+    let replay = parse_replay("assets/new_boost_format.replay");
     let combined_start = std::time::Instant::now();
     let combined =
         compute_comparable_stats(&replay).expect("combined comparable stats should succeed");
