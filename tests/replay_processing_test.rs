@@ -157,10 +157,7 @@ fn test_replay_data_exposes_powerslide_activity() {
 
 #[test]
 fn test_legacy_replays_use_spatial_normalization() {
-    for path in [
-        "assets/rlcs.replay",
-        "assets/soccar-lan.replay",
-    ] {
+    for path in ["assets/rlcs.replay", "assets/soccar-lan.replay"] {
         let replay = parse_replay(path);
         let processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
         assert_eq!(
@@ -235,10 +232,7 @@ fn test_modern_replay_player_positions_are_not_overscaled() {
 
 #[test]
 fn test_legacy_replay_ndarray_positions_are_normalized_to_field_units() {
-    for path in [
-        "assets/rlcs.replay",
-        "assets/soccar-lan.replay",
-    ] {
+    for path in ["assets/rlcs.replay", "assets/soccar-lan.replay"] {
         let replay = parse_replay(path);
         let max_abs_position = max_abs_position_from_ndarray(
             &replay,
@@ -1146,7 +1140,7 @@ fn test_column_header_generation() {
 #[test]
 fn test_replay_meta_extraction() {
     let replays = [
-        ("assets/rlcs.replay", 6), // RLCS should have 6 players (3v3)
+        ("assets/rlcs.replay", 6),       // RLCS should have 6 players (3v3)
         ("assets/soccar-lan.replay", 2), // Might be 1v1 or 2v2
     ];
 
