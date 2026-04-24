@@ -3,6 +3,10 @@
 This note captures the current evidence behind the legacy rigid-body
 normalization rules and the remaining legacy rotation issue.
 
+The local probe entrypoint for these experiments is:
+
+`cargo run --bin replay_probe -- <metadata|plausibility|legacy-rotation|demolition|vector-ranges> <replay-path>`
+
 ### Version fields
 
 Replays expose several useful version markers:
@@ -53,6 +57,19 @@ These rules are backed by replay plausibility checks and historical samples:
 - `net=5` and `net=7` replays look correct without the legacy rigid-body scale.
 
 This supports the current rigid-body boundary at `< 5`, not `< 7`.
+
+Raw vector range checks provide another field-specific signal:
+
+| Field | Observed raw magnitude pattern | Current interpretation |
+| --- | --- | --- |
+| `RigidBody.location` | about `60` for `net=None/2`, about `6000` for `net>=5` | legacy location needs `*100`; `net>=5` is already field-scale |
+| `RigidBody.linear_velocity` | about `300` for old LAN samples, about `2300-3300` for `net>=5` | legacy velocity needs `*10`; `net>=5` is already velocity-scale |
+| `RigidBody.angular_velocity` | about `60` for old LAN samples, about `600` for `net>=5` | legacy angular velocity needs `*10`; `net>=5` is already angular-velocity-scale |
+| `Demolish.*velocity` | about `23` across sampled versions | demo velocities are not rigid-body velocities as decoded; current export scales them by `*100` |
+| `Explosion.location` / `ExtendedExplosion.explosion.location` | about `30-52` across sampled versions and modes | explosion positions appear to be encoded in `1/100` field units across versions |
+| `AppliedDamage.position` / `DamageState.ball_position` | about `40-46` in Dropshot samples | damage positions appear to be encoded in `1/100` field units across versions |
+| `Attribute::Location` | about `2.6` across sampled versions | likely not a field position; do not apply rigid-body normalization blindly |
+| `Welded.offset` | about `1-2` in sampled Rumble replays | likely a local offset; do not apply rigid-body normalization blindly |
 
 ### Rotation issue
 
