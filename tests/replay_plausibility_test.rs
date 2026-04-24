@@ -51,36 +51,33 @@ fn modern_replay_motion_consistency_passes() {
 }
 
 #[test]
-fn rlcs_replay_legacy_velocities_normalize_but_rotations_still_fail() {
-    let report = plausibility_report("assets/rlcs.replay");
+fn legacy_replay_rigid_body_normalization_passes() {
+    let path = "assets/rlcs.replay";
+    let report = plausibility_report(path);
     assert!(
         report.all_motion_consistent(),
-        "expected rlcs.replay legacy rigid-body velocities to be motion-consistent after normalization"
+        "expected {path} legacy rigid-body velocities to be motion-consistent after normalization"
     );
     assert!(
-        report.all_location_bounds_plausible(),
-        "legacy positions are currently normalized into plausible field bounds"
+        report.all_field_bounds_plausible(),
+        "expected {path} legacy positions and velocities to stay within plausible bounds"
     );
     assert!(
-        report.all_linear_speed_bounds_plausible(),
-        "expected rlcs.replay normalized rigid-body velocities to stay within plausible speed bounds"
-    );
-    assert!(
-        !report.all_quaternion_norms_plausible(),
-        "expected rlcs.replay to expose the legacy compressed-rotation normalization issue"
+        report.all_quaternion_norms_plausible(),
+        "expected {path} legacy compressed rotations to normalize into unit quaternions"
     );
     assert!(
         report
             .players
             .median_grounded_forward_alignment
-            .is_some_and(|alignment| alignment < -0.5),
-        "expected rlcs.replay grounded player forward vectors to point away from travel"
+            .is_some_and(|alignment| alignment > 0.95),
+        "expected {path} grounded player forward vectors to align with travel direction"
     );
     assert!(
         report
             .players
             .grounded_forward_alignment_positive_fraction
-            .is_some_and(|fraction| fraction < 0.2),
-        "expected rlcs.replay grounded player forward vectors to rarely point forward"
+            .is_some_and(|fraction| fraction > 0.9),
+        "expected {path} grounded player forward vectors to be mostly forward-facing"
     );
 }

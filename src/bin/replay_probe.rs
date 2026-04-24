@@ -12,19 +12,28 @@ const MAX_GROUNDED_VERTICAL_SPEED: f32 = 200.0;
 const MAX_PAIR_DT_SECONDS: f32 = 0.2;
 const MIN_DISPLACEMENT_SPEED: f32 = 100.0;
 const MIN_REPORTED_SPEED: f32 = 100.0;
+const MIN_ROTATION_MODE_SAMPLE_COUNT: usize = 100;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct QuaternionMode {
-    zero_slot: usize,
+    missing_slot: usize,
     order: [usize; 3],
     signs: [i8; 3],
+    reconstruct_missing: bool,
 }
 
 impl QuaternionMode {
     fn label(&self) -> String {
         format!(
-            "zero@{} order={:?} signs={:?}",
-            self.zero_slot, self.order, self.signs
+            "{}@{} order={:?} signs={:?}",
+            if self.reconstruct_missing {
+                "reconstruct"
+            } else {
+                "zero"
+            },
+            self.missing_slot,
+            self.order,
+            self.signs
         )
     }
 }
@@ -33,6 +42,63 @@ impl QuaternionMode {
 struct ModeAccumulator {
     alignments: Vec<f32>,
     up_zs: Vec<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct EulerMode {
+    order: [usize; 3],
+    signs: [i8; 3],
+    scale: EulerScale,
+    rotation_order: EulerRotationOrder,
+}
+
+impl EulerMode {
+    fn label(&self) -> String {
+        format!(
+            "euler order={:?} signs={:?} scale={:?} rot={:?}",
+            self.order, self.signs, self.scale, self.rotation_order
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum EulerScale {
+    Pi,
+    TwoPi,
+    HalfPi,
+}
+
+impl EulerScale {
+    fn factor(self) -> f32 {
+        match self {
+            Self::Pi => std::f32::consts::PI,
+            Self::TwoPi => std::f32::consts::TAU,
+            Self::HalfPi => std::f32::consts::FRAC_PI_2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum EulerRotationOrder {
+    Xyz,
+    Xzy,
+    Yxz,
+    Yzx,
+    Zxy,
+    Zyx,
+}
+
+impl EulerRotationOrder {
+    fn to_glam(self) -> glam::EulerRot {
+        match self {
+            Self::Xyz => glam::EulerRot::XYZ,
+            Self::Xzy => glam::EulerRot::XZY,
+            Self::Yxz => glam::EulerRot::YXZ,
+            Self::Yzx => glam::EulerRot::YZX,
+            Self::Zxy => glam::EulerRot::ZXY,
+            Self::Zyx => glam::EulerRot::ZYX,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -44,6 +110,8 @@ struct VelocityScaleAccumulator {
 struct LegacyRotationProbe {
     modes: Vec<QuaternionMode>,
     accumulators: HashMap<QuaternionMode, ModeAccumulator>,
+    euler_modes: Vec<EulerMode>,
+    euler_accumulators: HashMap<EulerMode, ModeAccumulator>,
     velocity_accumulators: Vec<(f32, VelocityScaleAccumulator)>,
     previous_bodies: HashMap<subtr_actor::PlayerId, (f32, boxcars::RigidBody)>,
 }
@@ -56,6 +124,12 @@ impl LegacyRotationProbe {
             .copied()
             .map(|mode| (mode, ModeAccumulator::default()))
             .collect();
+        let euler_modes = build_euler_modes();
+        let euler_accumulators = euler_modes
+            .iter()
+            .copied()
+            .map(|mode| (mode, ModeAccumulator::default()))
+            .collect();
         let velocity_accumulators = [1.0, 0.1, 0.01]
             .into_iter()
             .map(|scale| (scale, VelocityScaleAccumulator::default()))
@@ -63,6 +137,8 @@ impl LegacyRotationProbe {
         Self {
             modes,
             accumulators,
+            euler_modes,
+            euler_accumulators,
             velocity_accumulators,
             previous_bodies: HashMap::new(),
         }
@@ -81,16 +157,22 @@ impl LegacyRotationProbe {
             if grounded && planar_speed >= MIN_FORWARD_ALIGNMENT_SPEED {
                 for mode in &self.modes {
                     if let Some(quaternion) = reinterpret_quaternion(rigid_body.rotation, *mode) {
-                        let forward = quaternion * glam::Vec3::X;
-                        let forward_xy = forward.truncate().normalize_or_zero();
-                        let velocity_xy = glam::Vec2::new(linear_velocity.x, linear_velocity.y)
-                            .normalize_or_zero();
-                        let alignment = forward_xy.dot(velocity_xy);
-                        if alignment.is_finite() {
+                        if let Some((alignment, up_z)) =
+                            rotation_alignment(quaternion, linear_velocity)
+                        {
                             let accumulator = self.accumulators.get_mut(mode).unwrap();
                             accumulator.alignments.push(alignment);
-                            accumulator.up_zs.push((quaternion * glam::Vec3::Z).z);
+                            accumulator.up_zs.push(up_z);
                         }
+                    }
+                }
+                for mode in &self.euler_modes {
+                    let quaternion = reinterpret_euler_rotation(rigid_body.rotation, *mode);
+                    if let Some((alignment, up_z)) = rotation_alignment(quaternion, linear_velocity)
+                    {
+                        let accumulator = self.euler_accumulators.get_mut(mode).unwrap();
+                        accumulator.alignments.push(alignment);
+                        accumulator.up_zs.push(up_z);
                     }
                 }
             }
@@ -149,9 +231,10 @@ impl LegacyRotationProbe {
             })
             .collect();
         let baseline_mode = QuaternionMode {
-            zero_slot: 3,
+            missing_slot: 3,
             order: [0, 1, 2],
             signs: [1, 1, 1],
+            reconstruct_missing: false,
         };
 
         let baseline_summary = mode_summaries
@@ -159,7 +242,11 @@ impl LegacyRotationProbe {
             .find(|(mode, ..)| *mode == baseline_mode)
             .copied();
 
-        let mut alignment_ranked = mode_summaries.clone();
+        let mut alignment_ranked: Vec<_> = mode_summaries
+            .iter()
+            .copied()
+            .filter(|(_, samples, ..)| *samples >= MIN_ROTATION_MODE_SAMPLE_COUNT)
+            .collect();
         alignment_ranked.sort_by(|left, right| {
             right
                 .2
@@ -179,7 +266,7 @@ impl LegacyRotationProbe {
                 })
         });
 
-        let mut upright_ranked = mode_summaries.clone();
+        let mut upright_ranked = alignment_ranked.clone();
         upright_ranked.sort_by(|left, right| {
             right
                 .4
@@ -193,7 +280,7 @@ impl LegacyRotationProbe {
                 })
         });
 
-        let mut combined_ranked = mode_summaries.clone();
+        let mut combined_ranked = alignment_ranked.clone();
         combined_ranked.sort_by(|left, right| {
             let left_score = left.2.min(left.4);
             let right_score = right.2.min(right.4);
@@ -270,6 +357,53 @@ impl LegacyRotationProbe {
         }
 
         println!();
+        println!("Top Euler interpretations by combined min(alignment, up_z):");
+        let mut euler_ranked: Vec<_> = self
+            .euler_modes
+            .iter()
+            .filter_map(|mode| {
+                let accumulator = self.euler_accumulators.get_mut(mode)?;
+                let median_alignment = median(&mut accumulator.alignments)?;
+                let positive_fraction = positive_fraction(&accumulator.alignments)?;
+                let median_up_z = median(&mut accumulator.up_zs)?;
+                Some((
+                    *mode,
+                    accumulator.alignments.len(),
+                    median_alignment,
+                    positive_fraction,
+                    median_up_z,
+                ))
+            })
+            .filter(|(_, samples, ..)| *samples >= MIN_ROTATION_MODE_SAMPLE_COUNT)
+            .collect();
+        euler_ranked.sort_by(|left, right| {
+            let left_score = left.2.min(left.4);
+            let right_score = right.2.min(right.4);
+            right_score
+                .partial_cmp(&left_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    right
+                        .2
+                        .partial_cmp(&left.2)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        });
+        for (rank, (mode, samples, median_alignment, positive_fraction, median_up_z)) in
+            euler_ranked.iter().take(12).enumerate()
+        {
+            println!(
+                "{:>2}. {:<72} samples={:<6} median_alignment={:>7.4} positive_fraction={:>7.4} median_up_z={:>7.4}",
+                rank + 1,
+                mode.label(),
+                samples,
+                median_alignment,
+                positive_fraction,
+                median_up_z
+            );
+        }
+
+        println!();
         println!("Velocity scale hypotheses:");
         for (scale, accumulator) in &mut self.velocity_accumulators {
             let median_ratio = median(&mut accumulator.ratios).unwrap_or(f32::NAN);
@@ -299,9 +433,8 @@ impl Collector for LegacyRotationProbe {
     ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
         for player_id in &player_ids {
-            if let Ok(rigid_body) =
-                processor.get_interpolated_player_rigid_body(player_id, current_time, 0.0)
-            {
+            if let Ok(rigid_body) = processor.get_player_rigid_body(player_id) {
+                let rigid_body = normalize_probe_rigid_body_vectors(processor, *rigid_body);
                 if !rigid_body.sleeping {
                     self.sample_player(player_id, current_time, rigid_body);
                 }
@@ -741,14 +874,64 @@ fn build_modes() -> Vec<QuaternionMode> {
     ];
 
     let mut modes = Vec::new();
-    for zero_slot in 0..4 {
+    for missing_slot in 0..4 {
         for order in orders {
             for sign in signs {
-                modes.push(QuaternionMode {
-                    zero_slot,
-                    order,
-                    signs: sign,
-                });
+                for reconstruct_missing in [false, true] {
+                    modes.push(QuaternionMode {
+                        missing_slot,
+                        order,
+                        signs: sign,
+                        reconstruct_missing,
+                    });
+                }
+            }
+        }
+    }
+    modes
+}
+
+fn build_euler_modes() -> Vec<EulerMode> {
+    let orders = [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
+    let signs = [
+        [1, 1, 1],
+        [1, 1, -1],
+        [1, -1, 1],
+        [1, -1, -1],
+        [-1, 1, 1],
+        [-1, 1, -1],
+        [-1, -1, 1],
+        [-1, -1, -1],
+    ];
+    let scales = [EulerScale::Pi, EulerScale::TwoPi, EulerScale::HalfPi];
+    let rotation_orders = [
+        EulerRotationOrder::Xyz,
+        EulerRotationOrder::Xzy,
+        EulerRotationOrder::Yxz,
+        EulerRotationOrder::Yzx,
+        EulerRotationOrder::Zxy,
+        EulerRotationOrder::Zyx,
+    ];
+
+    let mut modes = Vec::new();
+    for order in orders {
+        for sign in signs {
+            for scale in scales {
+                for rotation_order in rotation_orders {
+                    modes.push(EulerMode {
+                        order,
+                        signs: sign,
+                        scale,
+                        rotation_order,
+                    });
+                }
             }
         }
     }
@@ -765,15 +948,82 @@ fn reinterpret_quaternion(raw: boxcars::Quaternion, mode: QuaternionMode) -> Opt
     let mut components = [0.0; 4];
     let mut value_index = 0;
     for (slot, component) in components.iter_mut().enumerate() {
-        if slot == mode.zero_slot {
+        if slot == mode.missing_slot {
             continue;
         }
         *component = values[value_index];
         value_index += 1;
     }
+    if mode.reconstruct_missing {
+        let sum_squares: f32 = components
+            .iter()
+            .map(|component| component * component)
+            .sum();
+        if sum_squares > 1.0 + 0.001 {
+            return None;
+        }
+        components[mode.missing_slot] = (1.0 - sum_squares.min(1.0)).sqrt();
+    }
     let quaternion =
         glam::Quat::from_xyzw(components[0], components[1], components[2], components[3]);
     (quaternion.length_squared() > f32::EPSILON).then(|| quaternion.normalize())
+}
+
+fn reinterpret_euler_rotation(raw: boxcars::Quaternion, mode: EulerMode) -> glam::Quat {
+    let source = [raw.x, raw.y, raw.z];
+    let factor = mode.scale.factor();
+    let values = [
+        source[mode.order[0]] * f32::from(mode.signs[0]) * factor,
+        source[mode.order[1]] * f32::from(mode.signs[1]) * factor,
+        source[mode.order[2]] * f32::from(mode.signs[2]) * factor,
+    ];
+    glam::Quat::from_euler(
+        mode.rotation_order.to_glam(),
+        values[0],
+        values[1],
+        values[2],
+    )
+}
+
+fn normalize_probe_rigid_body_vectors(
+    processor: &ReplayProcessor,
+    rigid_body: boxcars::RigidBody,
+) -> boxcars::RigidBody {
+    boxcars::RigidBody {
+        sleeping: rigid_body.sleeping,
+        location: scale_vector(
+            rigid_body.location,
+            processor.spatial_normalization_factor(),
+        ),
+        rotation: rigid_body.rotation,
+        linear_velocity: rigid_body.linear_velocity.map(|vector| {
+            scale_vector(vector, processor.rigid_body_velocity_normalization_factor())
+        }),
+        angular_velocity: rigid_body.angular_velocity.map(|vector| {
+            scale_vector(vector, processor.rigid_body_velocity_normalization_factor())
+        }),
+    }
+}
+
+fn scale_vector(vector: boxcars::Vector3f, factor: f32) -> boxcars::Vector3f {
+    boxcars::Vector3f {
+        x: vector.x * factor,
+        y: vector.y * factor,
+        z: vector.z * factor,
+    }
+}
+
+fn rotation_alignment(
+    quaternion: glam::Quat,
+    linear_velocity: boxcars::Vector3f,
+) -> Option<(f32, f32)> {
+    let forward = quaternion * glam::Vec3::X;
+    let forward_xy = forward.truncate().normalize_or_zero();
+    let velocity_xy = glam::Vec2::new(linear_velocity.x, linear_velocity.y).normalize_or_zero();
+    let alignment = forward_xy.dot(velocity_xy);
+    alignment
+        .is_finite()
+        .then_some((alignment, (quaternion * glam::Vec3::Z).z))
 }
 
 fn vec_length(vector: boxcars::Vector3f) -> f32 {

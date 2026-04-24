@@ -1,7 +1,7 @@
 ## Legacy replay investigation
 
 This note captures the current evidence behind the legacy rigid-body
-normalization rules and the remaining legacy rotation issue.
+normalization rules.
 
 The local probe entrypoint for these experiments is:
 
@@ -46,6 +46,9 @@ The current processor rules are:
 - `RigidBody.location`: `*100` when `net_version` is missing or `< 5`
 - `RigidBody.linear_velocity`: `*10` when `net_version` is missing or `< 5`
 - `RigidBody.angular_velocity`: `*10` when `net_version` is missing or `< 5`
+- `RigidBody.rotation`: legacy compressed rotator conversion when
+  `net_version` is missing or `< 7`; modern quaternion passthrough for
+  `net_version >= 7`
 - `Demolish.attacker_velocity` / `victim_velocity`: `*100` across versions
 
 These rules are backed by replay plausibility checks and historical samples:
@@ -71,23 +74,36 @@ Raw vector range checks provide another field-specific signal:
 | `Attribute::Location` | about `2.6` across sampled versions | likely not a field position; do not apply rigid-body normalization blindly |
 | `Welded.offset` | about `1-2` in sampled Rumble replays | likely a local offset; do not apply rigid-body normalization blindly |
 
-### Rotation issue
+### Rotation normalization
 
-Legacy rigid-body rotation is still wrong for sampled `net < 7` replays.
+Legacy rigid-body rotation uses a different encoding for sampled `net < 7`
+replays. `boxcars` decodes that path as three compressed fixed floats and
+stores them in `Quaternion { x, y, z, w: 0 }`, but those values are not a
+modern quaternion.
 
-Observed plausibility pattern:
+Other parsers agree on the version boundary:
 
-- `net=None` and `net=2` replays:
-  quaternion norm error is about `0.73`, and grounded forward alignment is
-  strongly negative.
-- `net=5` replays:
-  same failure pattern as `net=2`.
-- `net=7` replays:
-  quaternion norms are near unit length and forward alignment is correct.
+- `jjbott/RocketLeagueReplayParser` reads `netVersion >= 7` as `Quaternion`
+  and older versions as a fixed compressed `Vector3D`.
+- `Rattletrap` reads `net_version >= 7` as `Quaternion` and older versions as a
+  `CompressedWordVector`.
 
-This means the remaining rotation bug is not specific to the oldest replays.
-It appears to affect the whole legacy compressed-quaternion path used by
-`boxcars` for `net_version < 7`.
+The processor converts the legacy vector into a quaternion with:
+
+`Quat::from_euler(EulerRot::ZYX, y * PI, x * PI, z * PI)`
+
+This treats the raw legacy vector as `(pitch, yaw, roll)` and converts it to a
+quaternion using the usual yaw/pitch/roll axis order. The sign and order were
+checked against historical replay plausibility checks.
+Before this conversion, `net=None`, `net=2`, and `net=5` samples had quaternion
+norm errors around `0.73` and grounded player forward vectors usually pointed
+opposite travel. After conversion, those samples have unit-length rotations and
+grounded forward alignment consistent with modern `net=7` replays.
+
+The remaining uncertainty is semantic rather than operational: grounded motion
+strongly validates yaw and uprightness, while roll sign is less directly
+observable from grounded samples. The selected roll sign is the direct parser
+order and remains plausible across the historical samples checked so far.
 
 ### Current conclusion
 
@@ -98,5 +114,6 @@ It appears to affect the whole legacy compressed-quaternion path used by
   far; `major_version` / `minor_version` are too coarse.
 - `BuildVersion` is still useful supporting evidence when comparing samples
   within the same `major.minor`.
-- The remaining unresolved issue is legacy compressed rigid-body rotation for
-  `net_version < 7`.
+- Rigid-body rotation has a different boundary from rigid-body vector scale:
+  vector scale changes at `net_version >= 5`, while rotation changes at
+  `net_version >= 7`.

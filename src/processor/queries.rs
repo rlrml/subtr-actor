@@ -255,9 +255,10 @@ impl<'a> ReplayProcessor<'a> {
             SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
             SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
         };
+        let start_body = self.normalize_rigid_body(start_body);
+        let end_body = self.normalize_rigid_body(end_body);
 
-        get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
-            .map(|rigid_body| self.normalize_rigid_body(&rigid_body))
+        get_interpolated_rigid_body(&start_body, start_time, &end_body, end_time, time)
     }
 
     /// Looks up the object id associated with a replay property name.
