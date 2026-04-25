@@ -23,13 +23,22 @@ import type {
   Quaternion,
 } from "./types";
 
-interface NormalizeReplayDataOptions {
+export interface NormalizeReplayDataOptions {
   onProgress?: (progress: number) => void;
 }
 
+export interface NormalizeReplayDataAsyncOptions extends NormalizeReplayDataOptions {
+  yieldEveryMs?: number;
+  yieldToMainThread?: () => Promise<void>;
+}
+
 interface NormalizeReplayProgressTracker {
-  advance(units?: number): void;
+  advance(units?: number): boolean;
   finish(): void;
+}
+
+interface AsyncNormalizeReplayProgressTracker extends NormalizeReplayProgressTracker {
+  yieldToMainThread(): Promise<void>;
 }
 
 const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
@@ -58,6 +67,7 @@ const BOOST_PAD_CENTER_MID_Y = 1024;
 const BOOST_PAD_GOAL_LINE_Y = 4240;
 const STANDARD_SOCCAR_BOOST_PAD_COUNT = 34;
 const NORMALIZATION_PROGRESS_REPORT_MIN_DELTA = 0.005;
+const NORMALIZATION_ASYNC_YIELD_INTERVAL_MS = 16;
 
 function playerIdToString(playerId: RawPlayerId): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
@@ -202,6 +212,14 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   };
 }
 
+function currentTimeMs(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function defaultYieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
   const playerInfoCount = raw.meta.team_zero.length + raw.meta.team_one.length;
   const playerFrameCount = raw.frame_data.players.reduce(
@@ -228,10 +246,13 @@ function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
 function createNormalizationProgressTracker(
   raw: RawReplayFramesData,
   onProgress?: (progress: number) => void,
+  options: { yieldEveryMs?: number } = {},
 ): NormalizeReplayProgressTracker {
   if (!onProgress) {
     return {
-      advance() {},
+      advance() {
+        return false;
+      },
       finish() {},
     };
   }
@@ -239,6 +260,9 @@ function createNormalizationProgressTracker(
   const totalUnits = getNormalizationTotalUnits(raw);
   let completedUnits = 0;
   let lastReportedProgress = -1;
+  let lastYieldedAt = currentTimeMs();
+  const yieldEveryMs =
+    options.yieldEveryMs ?? Number.POSITIVE_INFINITY;
 
   const maybeReport = () => {
     const progress = Math.max(0, Math.min(1, completedUnits / totalUnits));
@@ -251,18 +275,48 @@ function createNormalizationProgressTracker(
     }
   };
 
+  const shouldYield = () => {
+    const now = currentTimeMs();
+    if (now - lastYieldedAt < yieldEveryMs) {
+      return false;
+    }
+    lastYieldedAt = now;
+    return true;
+  };
+
   return {
     advance(units = 1) {
       if (units <= 0) {
-        return;
+        return false;
       }
       completedUnits = Math.min(totalUnits, completedUnits + units);
       maybeReport();
+      return shouldYield();
     },
     finish() {
       completedUnits = totalUnits;
       maybeReport();
     },
+  };
+}
+
+function createAsyncNormalizationProgressTracker(
+  raw: RawReplayFramesData,
+  options: NormalizeReplayDataAsyncOptions,
+): AsyncNormalizeReplayProgressTracker {
+  const progressTracker = createNormalizationProgressTracker(
+    raw,
+    options.onProgress,
+    {
+      yieldEveryMs:
+        options.yieldEveryMs ?? NORMALIZATION_ASYNC_YIELD_INTERVAL_MS,
+    },
+  );
+
+  return {
+    ...progressTracker,
+    yieldToMainThread:
+      options.yieldToMainThread ?? defaultYieldToMainThread,
   };
 }
 
@@ -288,6 +342,37 @@ function buildPlaybackFrames(
       kickoffCountdown: frame.replicated_game_state_time_remaining,
     };
     progressTracker?.advance();
+  }
+
+  return frames;
+}
+
+async function buildPlaybackFramesAsync(
+  raw: RawReplayFramesData,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<PlaybackFrame[]> {
+  const metadataFrames = raw.frame_data.metadata_frames;
+  if (metadataFrames.length === 0) {
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+    return [];
+  }
+
+  const startTime = metadataFrames[0]?.time ?? 0;
+  const frames = new Array<PlaybackFrame>(metadataFrames.length);
+
+  for (let index = 0; index < metadataFrames.length; index += 1) {
+    const frame = metadataFrames[index]!;
+    frames[index] = {
+      time: frame.time - startTime,
+      secondsRemaining: frame.seconds_remaining,
+      gameState: frame.replicated_game_state_name,
+      kickoffCountdown: frame.replicated_game_state_time_remaining,
+    };
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
   }
 
   return frames;
@@ -382,6 +467,37 @@ function indexReplayPlayers(
   return { byId, byName };
 }
 
+async function indexReplayPlayersAsync(
+  raw: RawReplayFramesData,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<{
+  byId: Map<string, RawPlayerInfo>;
+  byName: Map<string, RawPlayerInfo>;
+}> {
+  const byId = new Map<string, RawPlayerInfo>();
+  const byName = new Map<string, RawPlayerInfo>();
+
+  const playerInfos = [...raw.meta.team_zero, ...raw.meta.team_one];
+  if (playerInfos.length === 0) {
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+    return { byId, byName };
+  }
+
+  for (const playerInfo of playerInfos) {
+    byName.set(playerInfo.name, playerInfo);
+    if (playerInfo.remote_id) {
+      byId.set(playerIdToString(playerInfo.remote_id), playerInfo);
+    }
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  return { byId, byName };
+}
+
 function buildPlayerTracks(
   raw: RawReplayFramesData,
   progressTracker?: NormalizeReplayProgressTracker,
@@ -425,6 +541,56 @@ function buildPlayerTracks(
 
   if (processedPlayerFrames === 0) {
     progressTracker?.advance();
+  }
+
+  return players;
+}
+
+async function buildPlayerTracksAsync(
+  raw: RawReplayFramesData,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<ReplayPlayerTrack[]> {
+  const teamZeroNames = new Set(raw.meta.team_zero.map((player) => player.name));
+  const teamOneNames = new Set(raw.meta.team_one.map((player) => player.name));
+  const replayPlayers = await indexReplayPlayersAsync(raw, progressTracker);
+  const players: ReplayPlayerTrack[] = [];
+  let processedPlayerFrames = 0;
+
+  for (const [playerId, playerData] of raw.frame_data.players) {
+    const frames = new Array<PlayerSample>(playerData.frames.length);
+    let firstFrame: Exclude<RawPlayerFrame, "Empty"> | undefined;
+
+    for (let index = 0; index < playerData.frames.length; index += 1) {
+      const frame = playerData.frames[index]!;
+      if (firstFrame === undefined && frame !== "Empty") {
+        firstFrame = frame;
+      }
+      frames[index] = parsePlayerFrame(frame);
+      processedPlayerFrames += 1;
+      if (progressTracker.advance()) {
+        await progressTracker.yieldToMainThread();
+      }
+    }
+
+    const playerIdString = playerIdToString(playerId);
+    const name =
+      firstFrame !== undefined && firstFrame.Data.player_name
+        ? firstFrame.Data.player_name
+        : replayPlayers.byId.get(playerIdString)?.name ?? playerIdString;
+    const replayPlayerInfo =
+      replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
+
+    players.push({
+      id: playerIdString,
+      name,
+      isTeamZero: inferTeamSide(name, teamZeroNames, teamOneNames, firstFrame),
+      cameraSettings: extractCameraSettings(replayPlayerInfo),
+      frames,
+    });
+  }
+
+  if (processedPlayerFrames === 0 && progressTracker.advance()) {
+    await progressTracker.yieldToMainThread();
   }
 
   return players;
@@ -558,6 +724,29 @@ function buildBallFrames(
   return ballFrames;
 }
 
+async function buildBallFramesAsync(
+  raw: RawReplayFramesData,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<BallSample[]> {
+  const rawBallFrames = raw.frame_data.ball_data.frames;
+  if (rawBallFrames.length === 0) {
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+    return [];
+  }
+
+  const ballFrames = new Array<BallSample>(rawBallFrames.length);
+  for (let index = 0; index < rawBallFrames.length; index += 1) {
+    ballFrames[index] = parseBallFrame(rawBallFrames[index]!);
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  return ballFrames;
+}
+
 function parseBoostPadAvailability(kind: unknown): boolean | null {
   if (kind === "Available") {
     return true;
@@ -671,6 +860,84 @@ function buildBoostPads(
       events,
     };
     progressTracker?.advance();
+  }
+
+  return pads;
+}
+
+async function buildBoostPadsAsync(
+  raw: RawReplayFramesData,
+  players: ReplayPlayerTrack[],
+  startTime: number,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<ReplayBoostPad[]> {
+  const playersById = buildPlayerLookup(players);
+  const eventsByPadId = new Map<string, RawBoostPadEvent[]>();
+
+  for (const event of raw.boost_pad_events ?? []) {
+    const availability = parseBoostPadAvailability(event.kind);
+    if (availability === null) {
+      if (progressTracker.advance()) {
+        await progressTracker.yieldToMainThread();
+      }
+      continue;
+    }
+    const bucket = eventsByPadId.get(event.pad_id);
+    if (bucket) {
+      bucket.push(event);
+    } else {
+      eventsByPadId.set(event.pad_id, [event]);
+    }
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  const rawPads = raw.boost_pads;
+  if (!rawPads || rawPads.length === 0) {
+    if (progressTracker.advance(STANDARD_SOCCAR_BOOST_PAD_COUNT)) {
+      await progressTracker.yieldToMainThread();
+    }
+    return buildStandardSoccarBoostPads();
+  }
+
+  const sortedPads = [...rawPads].sort((left, right) => left.index - right.index);
+  const pads = new Array<ReplayBoostPad>(sortedPads.length);
+
+  for (let index = 0; index < sortedPads.length; index += 1) {
+    const pad = sortedPads[index]!;
+    const padId = typeof pad.pad_id === "string" ? pad.pad_id : null;
+    const rawEvents = padId ? [...(eventsByPadId.get(padId) ?? [])] : [];
+    const size =
+      parseBoostPadSize(pad.size) ??
+      inferBoostPadSize(rawEvents) ??
+      (pad.position.z >= 72 ? "big" : "small");
+
+    const sortedEvents = rawEvents.sort((left, right) => left.time - right.time);
+    const events = new Array<ReplayBoostPadEvent>(sortedEvents.length);
+
+    for (let eventIndex = 0; eventIndex < sortedEvents.length; eventIndex += 1) {
+      const event = sortedEvents[eventIndex]!;
+      const playerId = event.player ? playerIdToString(event.player) : null;
+      events[eventIndex] = {
+        time: normalizeReplayTime(event.time, startTime),
+        frame: event.frame,
+        available: parseBoostPadAvailability(event.kind) ?? true,
+        playerId,
+        playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
+      };
+    }
+
+    pads[index] = {
+      index: pad.index,
+      padId,
+      size,
+      position: pad.position,
+      events,
+    };
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
   }
 
   return pads;
@@ -790,6 +1057,48 @@ function buildTimelineEvents(
   });
 }
 
+async function buildTimelineEventsAsync(
+  raw: RawReplayFramesData,
+  players: ReplayPlayerTrack[],
+  startTime: number,
+  progressTracker: AsyncNormalizeReplayProgressTracker,
+): Promise<ReplayTimelineEvent[]> {
+  const playersById = buildPlayerLookup(players);
+  const timelineEvents: ReplayTimelineEvent[] = [];
+
+  for (const event of raw.goal_events ?? []) {
+    timelineEvents.push(goalTimelineEvent(event, playersById, startTime));
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  for (const event of raw.player_stat_events ?? []) {
+    timelineEvents.push(playerStatTimelineEvent(event, playersById, startTime));
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  for (const event of raw.demolish_infos ?? []) {
+    timelineEvents.push(demoTimelineEvent(event, playersById, startTime));
+    if (progressTracker.advance()) {
+      await progressTracker.yieldToMainThread();
+    }
+  }
+
+  if (timelineEvents.length === 0 && progressTracker.advance()) {
+    await progressTracker.yieldToMainThread();
+  }
+
+  return timelineEvents.sort((left, right) => {
+    if (left.time !== right.time) {
+      return left.time - right.time;
+    }
+    return (left.frame ?? 0) - (right.frame ?? 0);
+  });
+}
+
 export function normalizeReplayData(
   raw: RawReplayFramesData,
   options: NormalizeReplayDataOptions = {},
@@ -801,6 +1110,42 @@ export function normalizeReplayData(
   const ballFrames = buildBallFrames(raw, progressTracker);
   const boostPads = buildBoostPads(raw, players, startTime, progressTracker);
   const timelineEvents = buildTimelineEvents(raw, players, startTime, progressTracker);
+  progressTracker.finish();
+
+  return {
+    frameCount: frames.length,
+    duration: frames.at(-1)?.time ?? 0,
+    frames,
+    ballFrames,
+    boostPads,
+    players,
+    timelineEvents,
+    teamZeroNames: raw.meta.team_zero.map((player) => player.name),
+    teamOneNames: raw.meta.team_one.map((player) => player.name),
+  };
+}
+
+export async function normalizeReplayDataAsync(
+  raw: RawReplayFramesData,
+  options: NormalizeReplayDataAsyncOptions = {},
+): Promise<ReplayModel> {
+  const progressTracker = createAsyncNormalizationProgressTracker(raw, options);
+  const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
+  const frames = await buildPlaybackFramesAsync(raw, progressTracker);
+  const players = await buildPlayerTracksAsync(raw, progressTracker);
+  const ballFrames = await buildBallFramesAsync(raw, progressTracker);
+  const boostPads = await buildBoostPadsAsync(
+    raw,
+    players,
+    startTime,
+    progressTracker,
+  );
+  const timelineEvents = await buildTimelineEventsAsync(
+    raw,
+    players,
+    startTime,
+    progressTracker,
+  );
   progressTracker.finish();
 
   return {

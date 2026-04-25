@@ -5,7 +5,7 @@ import type {
   ReplayLoadProgress,
   ReplayLoadResult,
 } from "./types";
-import { normalizeReplayData } from "./replay-data";
+import { normalizeReplayDataAsync } from "./replay-data";
 
 let bindingsReady: Promise<unknown> | null = null;
 
@@ -119,7 +119,7 @@ async function loadReplayFromBytesWithWorker(
       options.onProgress?.({ stage: "normalizing", progress: 0.45 });
       const raw = JSON.parse(rawJson) as RawReplayFramesData;
       options.onProgress?.({ stage: "normalizing", progress: 0.65 });
-      const replay = normalizeReplayData(raw, {
+      const replay = await normalizeReplayDataAsync(raw, {
         onProgress(progress) {
           options.onProgress?.({
             stage: "normalizing",
@@ -177,7 +177,7 @@ export async function loadReplayFromBytes(
       : subtrActor.get_replay_frames_data(data),
   ) as RawReplayFramesData;
   options.onProgress?.({ stage: "normalizing", progress: 0 });
-  const replay = normalizeReplayData(raw, {
+  const replay = await normalizeReplayDataAsync(raw, {
     onProgress(progress) {
       options.onProgress?.({ stage: "normalizing", progress });
     },

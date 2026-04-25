@@ -24,7 +24,15 @@ export {
   resolvePlaylistItem,
   timeBound,
 } from "./playlist";
-export { findFrameIndexAtTime, normalizeReplayData } from "./replay-data";
+export {
+  findFrameIndexAtTime,
+  normalizeReplayData,
+  normalizeReplayDataAsync,
+} from "./replay-data";
+export type {
+  NormalizeReplayDataAsyncOptions,
+  NormalizeReplayDataOptions,
+} from "./replay-data";
 export {
   createReplayLoadOverlay,
   formatReplayLoadProgress,

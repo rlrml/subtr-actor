@@ -1,4 +1,4 @@
-import { normalizeReplayData } from "subtr-actor-player";
+import { normalizeReplayDataAsync } from "subtr-actor-player";
 import type { ReplayModel, RawReplayFramesData } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
@@ -93,7 +93,7 @@ export async function loadReplayBundleInWorker(
         decoder.decode(new Uint8Array(message.statsTimelineBuffer)),
       ) as StatsTimeline;
       options.onProgress?.({ stage: "normalizing", progress: 0.65 });
-      const replay = normalizeReplayData(rawReplayData, {
+      const replay = await normalizeReplayDataAsync(rawReplayData, {
         onProgress(progress) {
           options.onProgress?.({
             stage: "normalizing",
