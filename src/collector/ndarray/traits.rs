@@ -1,9 +1,9 @@
 use crate::*;
-use boxcars;
 /// Re-export of `derive_new` used by the public ndarray feature macros.
-pub use derive_new;
+pub use ::derive_new;
 /// Re-export of `paste` used by the public ndarray feature macros.
-pub use paste;
+pub use ::paste;
+use boxcars;
 use std::sync::Arc;
 
 /// Object-safe interface for frame-level feature extraction.

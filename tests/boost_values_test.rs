@@ -54,7 +54,7 @@ impl Collector for BoostTracker {
 #[test]
 fn test_boost_values_change_over_time_new_replay() {
     // Test with the new replay file to verify boost values change over time
-    let replay_path = "assets/replays/new_boost_format.replay";
+    let replay_path = "assets/new_boost_format.replay";
     let data = std::fs::read(replay_path).expect("Failed to read replay file");
     let replay = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
@@ -102,7 +102,7 @@ fn test_boost_values_change_over_time_new_replay() {
 #[test]
 fn test_boost_values_change_over_time_old_replay() {
     // Test with an older replay file that should work
-    let replay_path = "assets/replays/old_boost_format.replay";
+    let replay_path = "assets/old_boost_format.replay";
     let data = std::fs::read(replay_path).expect("Failed to read test replay file");
     let replay = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()

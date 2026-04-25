@@ -13,6 +13,12 @@ export default defineConfig({
       "@": srcDir,
     },
   },
+  worker: {
+    rollupOptions: {
+      // The player library keeps the wasm package external so consumers resolve it.
+      external: ["@colonelpanic8/subtr-actor"],
+    },
+  },
   server: {
     fs: {
       allow: [path.resolve(rootDir, "..")],

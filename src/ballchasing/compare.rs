@@ -62,7 +62,13 @@ pub fn compare_fixture_directory(
     path: &Path,
     config: &MatchConfig,
 ) -> anyhow::Result<BallchasingComparisonReport> {
-    let replay_path = path.join("replay.replay");
-    let json_path = path.join("ballchasing.json");
+    let (replay_path, json_path) = if path.is_dir() {
+        (path.join("replay.replay"), path.join("ballchasing.json"))
+    } else {
+        (
+            path.with_extension("replay"),
+            path.with_extension("ballchasing.json"),
+        )
+    };
     compare_replay_against_ballchasing_json(&replay_path, &json_path, config)
 }

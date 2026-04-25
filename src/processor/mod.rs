@@ -254,6 +254,8 @@ pub struct ReplayProcessor<'a> {
     /// The replay currently being traversed.
     pub replay: &'a boxcars::Replay,
     spatial_normalization_factor: f32,
+    rigid_body_velocity_normalization_factor: f32,
+    uses_legacy_rigid_body_rotation: bool,
     cached_object_ids: CachedObjectIds,
     is_boost_pad_object: Vec<bool>,
     /// Modeled actor state for the current replay frame.
@@ -309,6 +311,36 @@ pub struct ReplayProcessor<'a> {
 }
 
 impl<'a> ReplayProcessor<'a> {
+    const LEGACY_RIGID_BODY_NET_VERSION_CUTOFF: i32 = 5;
+    const LEGACY_RIGID_BODY_ROTATION_NET_VERSION_CUTOFF: i32 = 7;
+    const LEGACY_RIGID_BODY_LOCATION_FACTOR: f32 = 100.0;
+    const LEGACY_RIGID_BODY_VELOCITY_FACTOR: f32 = 10.0;
+
+    fn uses_legacy_rigid_body_vector_scale(net_version: Option<i32>) -> bool {
+        net_version.is_none_or(|version| version < Self::LEGACY_RIGID_BODY_NET_VERSION_CUTOFF)
+    }
+
+    fn uses_legacy_rigid_body_rotation_for_net_version(net_version: Option<i32>) -> bool {
+        net_version
+            .is_none_or(|version| version < Self::LEGACY_RIGID_BODY_ROTATION_NET_VERSION_CUTOFF)
+    }
+
+    fn rigid_body_location_normalization_factor_for_net_version(net_version: Option<i32>) -> f32 {
+        if Self::uses_legacy_rigid_body_vector_scale(net_version) {
+            Self::LEGACY_RIGID_BODY_LOCATION_FACTOR
+        } else {
+            1.0
+        }
+    }
+
+    fn rigid_body_velocity_normalization_factor_for_net_version(net_version: Option<i32>) -> f32 {
+        if Self::uses_legacy_rigid_body_vector_scale(net_version) {
+            Self::LEGACY_RIGID_BODY_VELOCITY_FACTOR
+        } else {
+            1.0
+        }
+    }
+
     /// Constructs a new [`ReplayProcessor`] instance with the provided replay.
     ///
     /// # Arguments
@@ -325,6 +357,12 @@ impl<'a> ReplayProcessor<'a> {
     pub fn new(replay: &'a boxcars::Replay) -> SubtrActorResult<Self> {
         let mut object_id_to_name = HashMap::new();
         let mut name_to_object_id = HashMap::new();
+        let spatial_normalization_factor =
+            Self::rigid_body_location_normalization_factor_for_net_version(replay.net_version);
+        let rigid_body_velocity_normalization_factor =
+            Self::rigid_body_velocity_normalization_factor_for_net_version(replay.net_version);
+        let uses_legacy_rigid_body_rotation =
+            Self::uses_legacy_rigid_body_rotation_for_net_version(replay.net_version);
         for (id, name) in replay.objects.iter().enumerate() {
             let object_id = boxcars::ObjectId(id as i32);
             object_id_to_name.insert(object_id, name.clone());
@@ -334,11 +372,9 @@ impl<'a> ReplayProcessor<'a> {
         let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
-            spatial_normalization_factor: if replay.net_version.unwrap_or(0) < 7 {
-                100.0
-            } else {
-                1.0
-            },
+            spatial_normalization_factor,
+            rigid_body_velocity_normalization_factor,
+            uses_legacy_rigid_body_rotation,
             cached_object_ids,
             is_boost_pad_object: replay
                 .objects
@@ -387,35 +423,78 @@ impl<'a> ReplayProcessor<'a> {
         self.spatial_normalization_factor
     }
 
-    fn normalize_vector(&self, vector: boxcars::Vector3f) -> boxcars::Vector3f {
-        if (self.spatial_normalization_factor - 1.0).abs() < f32::EPSILON {
+    /// Returns the scale factor applied when normalizing rigid-body linear and angular velocity.
+    pub fn rigid_body_velocity_normalization_factor(&self) -> f32 {
+        self.rigid_body_velocity_normalization_factor
+    }
+
+    fn normalize_vector_by_factor(
+        &self,
+        vector: boxcars::Vector3f,
+        factor: f32,
+    ) -> boxcars::Vector3f {
+        if (factor - 1.0).abs() < f32::EPSILON {
             vector
         } else {
             boxcars::Vector3f {
-                x: vector.x * self.spatial_normalization_factor,
-                y: vector.y * self.spatial_normalization_factor,
-                z: vector.z * self.spatial_normalization_factor,
+                x: vector.x * factor,
+                y: vector.y * factor,
+                z: vector.z * factor,
             }
         }
     }
 
-    fn normalize_optional_vector(
+    fn normalize_vector(&self, vector: boxcars::Vector3f) -> boxcars::Vector3f {
+        self.normalize_vector_by_factor(vector, self.spatial_normalization_factor)
+    }
+
+    fn normalize_rigid_body_velocity(&self, vector: boxcars::Vector3f) -> boxcars::Vector3f {
+        self.normalize_vector_by_factor(vector, self.rigid_body_velocity_normalization_factor)
+    }
+
+    fn normalize_optional_rigid_body_velocity(
         &self,
         vector: Option<boxcars::Vector3f>,
     ) -> Option<boxcars::Vector3f> {
-        vector.map(|value| self.normalize_vector(value))
+        vector.map(|value| self.normalize_rigid_body_velocity(value))
+    }
+
+    fn normalize_rigid_body_rotation(&self, rotation: boxcars::Quaternion) -> boxcars::Quaternion {
+        if !self.uses_legacy_rigid_body_rotation {
+            return rotation;
+        }
+
+        // Older replays store rigid-body rotation as fixed compressed
+        // (pitch, yaw, roll), not as the modern quaternion shape.
+        let normalized = glam::Quat::from_euler(
+            glam::EulerRot::ZYX,
+            rotation.y * std::f32::consts::PI,
+            rotation.x * std::f32::consts::PI,
+            rotation.z * std::f32::consts::PI,
+        );
+        boxcars::Quaternion {
+            x: normalized.x,
+            y: normalized.y,
+            z: normalized.z,
+            w: normalized.w,
+        }
     }
 
     fn normalize_rigid_body(&self, rigid_body: &boxcars::RigidBody) -> boxcars::RigidBody {
-        if (self.spatial_normalization_factor - 1.0).abs() < f32::EPSILON {
+        if (self.spatial_normalization_factor - 1.0).abs() < f32::EPSILON
+            && (self.rigid_body_velocity_normalization_factor - 1.0).abs() < f32::EPSILON
+            && !self.uses_legacy_rigid_body_rotation
+        {
             *rigid_body
         } else {
             boxcars::RigidBody {
                 sleeping: rigid_body.sleeping,
                 location: self.normalize_vector(rigid_body.location),
-                rotation: rigid_body.rotation,
-                linear_velocity: self.normalize_optional_vector(rigid_body.linear_velocity),
-                angular_velocity: self.normalize_optional_vector(rigid_body.angular_velocity),
+                rotation: self.normalize_rigid_body_rotation(rigid_body.rotation),
+                linear_velocity: self
+                    .normalize_optional_rigid_body_velocity(rigid_body.linear_velocity),
+                angular_velocity: self
+                    .normalize_optional_rigid_body_velocity(rigid_body.angular_velocity),
             }
         }
     }
@@ -573,5 +652,50 @@ impl<'a> ReplayProcessor<'a> {
         self.known_demolishes = Vec::new();
         self.demolish_format = None;
         self.kickoff_phase_active_last_frame = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ReplayProcessor;
+
+    #[test]
+    fn rigid_body_normalization_factors_split_at_expected_legacy_boundary() {
+        assert_eq!(
+            ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(None),
+            100.0
+        );
+        assert_eq!(
+            ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(None),
+            10.0
+        );
+        assert_eq!(
+            ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(2)),
+            100.0
+        );
+        assert_eq!(
+            ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(2)),
+            10.0
+        );
+        assert!(ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(2)));
+        assert_eq!(
+            ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(5)),
+            1.0
+        );
+        assert_eq!(
+            ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(5)),
+            1.0
+        );
+        assert!(ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(5)));
+        assert_eq!(
+            ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(10)),
+            1.0
+        );
+        assert_eq!(
+            ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(10)),
+            1.0
+        );
+        assert!(!ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(7)));
+        assert!(!ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(10)));
     }
 }

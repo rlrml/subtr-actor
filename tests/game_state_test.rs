@@ -43,7 +43,7 @@ fn test_game_state_column_headers() {
 #[test]
 fn test_game_state_with_replay() {
     // Test extraction from an actual replay
-    let replay_path = "assets/replays/old_boost_format.replay";
+    let replay_path = "assets/old_boost_format.replay";
     let data = std::fs::read(replay_path).expect("Failed to read replay file");
     let replay = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
@@ -127,7 +127,7 @@ fn test_game_state_with_replay() {
 
 #[test]
 fn test_ndarray_collector_from_strings_supports_f64() {
-    let replay_path = "assets/replays/old_boost_format.replay";
+    let replay_path = "assets/old_boost_format.replay";
     let data = std::fs::read(replay_path).expect("Failed to read replay file");
     let replay = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()

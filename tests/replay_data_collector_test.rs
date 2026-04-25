@@ -19,7 +19,7 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 
 #[test]
 fn kickoff_replay_data_preserves_ball_countdown_and_initial_boost_state() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay = parse_replay("assets/rlcs.replay");
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .expect("Failed to collect replay data");
@@ -100,7 +100,7 @@ fn kickoff_replay_data_preserves_ball_countdown_and_initial_boost_state() {
 
 #[test]
 fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
-    let replay = parse_replay("assets/replays/rlcs.replay");
+    let replay = parse_replay("assets/rlcs.replay");
     let expected = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .expect("Failed to collect replay data from convenience API");

@@ -211,10 +211,11 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<boxcars::RigidBody> {
         let rb_frame = self.get_frame(rb_frame_index)?;
         let interpolation_amount = target_time - rb_frame.time;
-        Ok(self.normalize_rigid_body(&apply_velocities_to_rigid_body(
-            rigid_body,
+        let normalized_rigid_body = self.normalize_rigid_body(rigid_body);
+        Ok(apply_velocities_to_rigid_body(
+            &normalized_rigid_body,
             interpolation_amount,
-        )))
+        ))
     }
 
     /// Interpolates an arbitrary actor rigid body to the requested replay time.
@@ -254,9 +255,10 @@ impl<'a> ReplayProcessor<'a> {
             SearchDirection::Forward => (frame_body, frame_time, &found_body, found_time),
             SearchDirection::Backward => (&found_body, found_time, frame_body, frame_time),
         };
+        let start_body = self.normalize_rigid_body(start_body);
+        let end_body = self.normalize_rigid_body(end_body);
 
-        get_interpolated_rigid_body(start_body, start_time, end_body, end_time, time)
-            .map(|rigid_body| self.normalize_rigid_body(&rigid_body))
+        get_interpolated_rigid_body(&start_body, start_time, &end_body, end_time, time)
     }
 
     /// Looks up the object id associated with a replay property name.

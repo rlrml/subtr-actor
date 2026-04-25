@@ -84,10 +84,10 @@ fn test_boost_unit_conversion_helpers() {
 
 #[test]
 fn test_boost_percentage_helper_new_replay() {
-    verify_replay_boost_units("assets/replays/new_boost_format.replay");
+    verify_replay_boost_units("assets/new_boost_format.replay");
 }
 
 #[test]
 fn test_boost_percentage_helper_old_replay() {
-    verify_replay_boost_units("assets/replays/old_boost_format.replay");
+    verify_replay_boost_units("assets/old_boost_format.replay");
 }

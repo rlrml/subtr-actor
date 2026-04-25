@@ -45,7 +45,7 @@ README, or refactor-only commit.
   keyed by car actor ID rather than player actor ID.
 - Preserve the victim's last known rigid body location for same-frame deletions
   instead of falling back to origin.
-- Add `assets/replays/test/new_demolition_format.replay` and a regression test
+- Add `assets/new_demolition_format.replay` and a regression test
   that asserts it yields 10 demolition events.
 
 ## v0.1.16 - 2026-03-09

@@ -13,8 +13,8 @@ These fixtures were downloaded from the Ballchasing API on 2026-03-10.
   - title: `2026-03-10.19.56 .estarl1n Ranked Standard Win`
   - playlist: `ranked-standard`
 
-Each fixture directory contains:
+Each fixture uses a shared filename prefix in `assets/`:
 
-- `ballchasing.json`: the replay stats JSON from `GET /api/replays/{id}`
-- `replay.replay`: the raw replay file from `GET /api/replays/{id}/file`
-- `replay_id.txt`: the source replay id for easy re-fetching
+- `<fixture>.ballchasing.json`: the replay stats JSON from `GET /api/replays/{id}`
+- `<fixture>.replay`: the raw replay file from `GET /api/replays/{id}/file`
+- `<fixture>.replay_id.txt`: the source replay id for easy re-fetching

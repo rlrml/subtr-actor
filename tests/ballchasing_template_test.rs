@@ -6,7 +6,7 @@ macro_rules! ballchasing_fixture_test {
         #[ignore = "Ballchasing fixtures are opt-in and should be enabled fixture-by-fixture"]
         fn $test_name() {
             let report = subtr_actor::ballchasing::compare_fixture_directory(
-                std::path::Path::new(concat!("assets/ballchasing-fixtures/", $fixture_dir)),
+                std::path::Path::new(concat!("assets/", $fixture_dir)),
                 &subtr_actor::ballchasing::recommended_match_config(),
             )
             .expect("Failed to compare Ballchasing fixture");
