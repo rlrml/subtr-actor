@@ -1,6 +1,6 @@
 {
   "name": "subtr-actor-stats-player",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Stats-focused replay player UI for subtr-actor Rocket League replay workflows",
   "type": "module",
   "main": "./dist/index.js",

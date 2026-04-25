@@ -6,6 +6,19 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.4.0 - 2026-04-25
+
+- Fix legacy replay rigid-body normalization across position, velocity, and
+  rotation format boundaries, with fixture-backed replay-format documentation.
+- Add replay plausibility probes and regression coverage for historical replay
+  interpretation.
+- Flatten checked-in replay fixture assets and add viewer links for visual
+  inspection through the GitHub Pages stats player.
+- Add URL preloading to the stats player, including readable `replayUrl=`
+  links and compressed `r=` replay URL links.
+- Improve stats replay loading progress and fixture handling in the viewer.
+- Refresh Rust, Python, and JavaScript release metadata to `0.4.0`.
+
 ## v0.2.3 - 2026-03-19
 
 - Fix PyPI wheel builds by keeping the `reqwest` and `ring` dependency chain
