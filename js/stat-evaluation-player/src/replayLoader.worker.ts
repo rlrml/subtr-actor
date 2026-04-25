@@ -16,8 +16,19 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
+  statsTimelineParts: TransferableStatsTimelineParts;
+}
+
+interface ReplayRawDataMessage {
+  type: "raw-replay-data";
   rawReplayDataBuffer: ArrayBuffer;
-  statsTimelineBuffer: ArrayBuffer;
+}
+
+interface TransferableStatsTimelineParts {
+  configBuffer: ArrayBuffer;
+  replayMetaBuffer: ArrayBuffer;
+  eventsBuffer: ArrayBuffer;
+  frameChunkBuffers: ArrayBuffer[];
 }
 
 interface ReplayErrorMessage {
@@ -27,6 +38,7 @@ interface ReplayErrorMessage {
 
 type ReplayWorkerResponse =
   | ReplayProgressMessage
+  | ReplayRawDataMessage
   | ReplayDoneMessage
   | ReplayErrorMessage;
 
@@ -79,7 +91,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       progress: { stage: "validating", progress: 0 },
     });
 
-    const replayBundle = subtrActor.get_replay_bundle_json_with_progress(
+    const rawReplayData = subtrActor.get_replay_frames_data_json_with_progress(
       bytes,
       (progress: unknown) => {
         postMessageToMain({
@@ -90,6 +102,25 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       event.data.reportEveryNFrames,
     );
 
+    self.postMessage({
+      type: "raw-replay-data",
+      rawReplayDataBuffer: rawReplayData.buffer,
+    }, [rawReplayData.buffer]);
+
+    postMessageToMain({
+      type: "progress",
+      progress: { stage: "stats-timeline", progress: 1 },
+    });
+
+    const statsTimelineParts = subtrActor.get_stats_timeline_json_parts(
+      bytes,
+      32 * 1024 * 1024,
+    );
+    const frameChunkBuffers = Array.from(
+      statsTimelineParts.frameChunks,
+      (chunk) => chunk.buffer,
+    );
+
     postMessageToMain({
       type: "progress",
       progress: { stage: "normalizing", progress: 0 },
@@ -97,11 +128,17 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
 
     self.postMessage({
       type: "done",
-      rawReplayDataBuffer: replayBundle.rawReplayData.buffer,
-      statsTimelineBuffer: replayBundle.statsTimeline.buffer,
+      statsTimelineParts: {
+        configBuffer: statsTimelineParts.config.buffer,
+        replayMetaBuffer: statsTimelineParts.replayMeta.buffer,
+        eventsBuffer: statsTimelineParts.events.buffer,
+        frameChunkBuffers,
+      },
     }, [
-      replayBundle.rawReplayData.buffer,
-      replayBundle.statsTimeline.buffer,
+      statsTimelineParts.config.buffer,
+      statsTimelineParts.replayMeta.buffer,
+      statsTimelineParts.events.buffer,
+      ...frameChunkBuffers,
     ]);
   } catch (error: unknown) {
     postMessageToMain({

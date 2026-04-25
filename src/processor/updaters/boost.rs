@@ -76,7 +76,7 @@ impl<'a> ReplayProcessor<'a> {
         let Ok(metadata_actor_id) = self.get_metadata_actor_id() else {
             return false;
         };
-        let Ok(metadata_state) = self.get_actor_state(metadata_actor_id) else {
+        let Ok(metadata_state) = self.get_actor_state(&metadata_actor_id) else {
             return false;
         };
         let metadata_attributes = &metadata_state.attributes;

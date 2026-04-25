@@ -1,4 +1,4 @@
-use js_sys::{Function, Object, Reflect, Uint8Array};
+use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector, ReplayDataSupplementalData},
     collector::CallbackCollector,
@@ -27,6 +27,7 @@ pub fn main() {
 // Default feature adders (same as Python bindings)
 const DEFAULT_GLOBAL_FEATURE_ADDERS: &[&str] = &["BallRigidBody"];
 const DEFAULT_PLAYER_FEATURE_ADDERS: &[&str] = &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
+const DEFAULT_STATS_TIMELINE_FRAME_CHUNK_BYTES: usize = 32 * 1024 * 1024;
 
 fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
     boxcars::ParserBuilder::new(data)
@@ -189,6 +190,68 @@ fn collect_replay_bundle_with_optional_progress(
     Ok((replay_data, stats_timeline))
 }
 
+fn set_json_bytes<T: serde::Serialize>(
+    object: &Object,
+    key: &str,
+    value: &T,
+) -> Result<(), JsValue> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize {key}: {e}")))?;
+    Reflect::set(
+        object,
+        &JsValue::from_str(key),
+        &Uint8Array::from(bytes.as_slice()),
+    )?;
+    Ok(())
+}
+
+fn stats_timeline_json_parts(
+    timeline: subtr_actor::ReplayStatsTimeline,
+    max_frame_chunk_bytes: Option<usize>,
+) -> Result<JsValue, JsValue> {
+    let max_frame_chunk_bytes = max_frame_chunk_bytes
+        .unwrap_or(DEFAULT_STATS_TIMELINE_FRAME_CHUNK_BYTES)
+        .max(1024);
+    let result = Object::new();
+    set_json_bytes(&result, "config", &timeline.config)?;
+    set_json_bytes(&result, "replayMeta", &timeline.replay_meta)?;
+    set_json_bytes(&result, "events", &timeline.events)?;
+
+    let frame_chunks = Array::new();
+    let mut current_chunk = Vec::new();
+    current_chunk.push(b'[');
+    let mut current_chunk_frames = 0usize;
+
+    for frame in &timeline.frames {
+        let frame_bytes = serde_json::to_vec(frame)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats frame: {e}")))?;
+        let separator_bytes = usize::from(current_chunk_frames > 0);
+        if current_chunk_frames > 0
+            && current_chunk.len() + separator_bytes + frame_bytes.len() + 1 > max_frame_chunk_bytes
+        {
+            current_chunk.push(b']');
+            frame_chunks.push(&Uint8Array::from(current_chunk.as_slice()));
+            current_chunk = Vec::new();
+            current_chunk.push(b'[');
+            current_chunk_frames = 0;
+        }
+        if current_chunk_frames > 0 {
+            current_chunk.push(b',');
+        }
+        current_chunk.extend_from_slice(&frame_bytes);
+        current_chunk_frames += 1;
+    }
+
+    current_chunk.push(b']');
+    frame_chunks.push(&Uint8Array::from(current_chunk.as_slice()));
+    Reflect::set(
+        &result,
+        &JsValue::from_str("frameChunks"),
+        &frame_chunks.into(),
+    )?;
+    Ok(result.into())
+}
+
 /// Parse a replay file and return the raw replay data as JavaScript object
 #[wasm_bindgen]
 pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
@@ -326,22 +389,27 @@ pub fn get_replay_bundle_json_with_progress(
         Some((&callback, report_every_n_frames.unwrap_or(1000))),
     )?;
 
-    let replay_data_bytes = serde_json::to_vec(&replay_data)
-        .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
-    let stats_timeline_bytes = serde_json::to_vec(&stats_timeline)
-        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))?;
-
     let result = Object::new();
-    Reflect::set(
-        &result,
-        &JsValue::from_str("rawReplayData"),
-        &Uint8Array::from(replay_data_bytes.as_slice()),
-    )?;
-    Reflect::set(
-        &result,
-        &JsValue::from_str("statsTimeline"),
-        &Uint8Array::from(stats_timeline_bytes.as_slice()),
-    )?;
+    {
+        let replay_data_bytes = serde_json::to_vec(&replay_data)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
+        Reflect::set(
+            &result,
+            &JsValue::from_str("rawReplayData"),
+            &Uint8Array::from(replay_data_bytes.as_slice()),
+        )?;
+    }
+    drop(replay_data);
+
+    {
+        let stats_timeline_bytes = serde_json::to_vec(&stats_timeline)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))?;
+        Reflect::set(
+            &result,
+            &JsValue::from_str("statsTimeline"),
+            &Uint8Array::from(stats_timeline_bytes.as_slice()),
+        )?;
+    }
     Ok(result.into())
 }
 
@@ -351,7 +419,7 @@ pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
     let stats_timeline = StatsCollector::new()
-        .get_stats_timeline_value(&replay)
+        .get_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
@@ -363,11 +431,25 @@ pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
     let stats_timeline = StatsCollector::new()
-        .get_stats_timeline_value(&replay)
+        .get_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn get_stats_timeline_json_parts(
+    data: &[u8],
+    max_frame_chunk_bytes: Option<usize>,
+) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+
+    let stats_timeline = StatsCollector::new()
+        .get_replay_stats_timeline(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+
+    stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes)
 }
 
 /// Validate that a replay file can be parsed

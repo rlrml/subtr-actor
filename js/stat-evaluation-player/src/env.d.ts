@@ -6,6 +6,7 @@ declare module "*.wasm?url" {
 }
 
 declare module "@colonelpanic8/subtr-actor" {
+  export default function init(moduleOrPath?: unknown): Promise<unknown>;
   export function get_replay_frames_data(data: Uint8Array): unknown;
   export function get_replay_frames_data_with_progress(
     data: Uint8Array,
@@ -28,6 +29,15 @@ declare module "@colonelpanic8/subtr-actor" {
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;
   export function get_stats_timeline_json(data: Uint8Array): Uint8Array;
+  export function get_stats_timeline_json_parts(
+    data: Uint8Array,
+    maxFrameChunkBytes?: number,
+  ): {
+    config: Uint8Array;
+    replayMeta: Uint8Array;
+    events: Uint8Array;
+    frameChunks: Uint8Array[];
+  };
 }
 
 declare module "../scripts/ensure-wasm-package.mjs" {
