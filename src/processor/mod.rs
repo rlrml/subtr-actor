@@ -465,12 +465,13 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         // Older replays store rigid-body rotation as fixed compressed
-        // (pitch, yaw, roll), not as the modern quaternion shape.
+        // (pitch, yaw, roll), not as the modern quaternion shape. The decoded
+        // legacy roll component is opposite the modern angular-velocity sign.
         let normalized = glam::Quat::from_euler(
             glam::EulerRot::ZYX,
             rotation.y * std::f32::consts::PI,
             rotation.x * std::f32::consts::PI,
-            rotation.z * std::f32::consts::PI,
+            -rotation.z * std::f32::consts::PI,
         );
         boxcars::Quaternion {
             x: normalized.x,

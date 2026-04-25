@@ -13,6 +13,8 @@ const MAX_PAIR_DT_SECONDS: f32 = 0.2;
 const MIN_DISPLACEMENT_SPEED: f32 = 100.0;
 const MIN_REPORTED_SPEED: f32 = 100.0;
 const MIN_ROTATION_MODE_SAMPLE_COUNT: usize = 100;
+const MIN_ANGULAR_VELOCITY_SPEED: f32 = 30.0;
+const MIN_DERIVED_ORIENTATION_SPEED: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct QuaternionMode {
@@ -106,12 +108,18 @@ struct VelocityScaleAccumulator {
     ratios: Vec<f32>,
 }
 
+#[derive(Debug, Default)]
+struct AngularVelocityAccumulator {
+    direction_dots: Vec<f32>,
+}
+
 #[derive(Debug)]
 struct LegacyRotationProbe {
     modes: Vec<QuaternionMode>,
     accumulators: HashMap<QuaternionMode, ModeAccumulator>,
     euler_modes: Vec<EulerMode>,
     euler_accumulators: HashMap<EulerMode, ModeAccumulator>,
+    euler_angular_accumulators: HashMap<EulerMode, AngularVelocityAccumulator>,
     velocity_accumulators: Vec<(f32, VelocityScaleAccumulator)>,
     previous_bodies: HashMap<subtr_actor::PlayerId, (f32, boxcars::RigidBody)>,
 }
@@ -130,6 +138,11 @@ impl LegacyRotationProbe {
             .copied()
             .map(|mode| (mode, ModeAccumulator::default()))
             .collect();
+        let euler_angular_accumulators = euler_modes
+            .iter()
+            .copied()
+            .map(|mode| (mode, AngularVelocityAccumulator::default()))
+            .collect();
         let velocity_accumulators = [1.0, 0.1, 0.01]
             .into_iter()
             .map(|scale| (scale, VelocityScaleAccumulator::default()))
@@ -139,6 +152,7 @@ impl LegacyRotationProbe {
             accumulators,
             euler_modes,
             euler_accumulators,
+            euler_angular_accumulators,
             velocity_accumulators,
             previous_bodies: HashMap::new(),
         }
@@ -200,6 +214,46 @@ impl LegacyRotationProbe {
                                 let ratio = (reported_speed * *scale) / displacement_speed;
                                 if ratio.is_finite() && ratio > 0.0 {
                                     accumulator.ratios.push(ratio);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(reported_angular_velocity) = previous_body
+                    .angular_velocity
+                    .or(rigid_body.angular_velocity)
+                {
+                    let reported_angular_velocity = glam::Vec3::new(
+                        reported_angular_velocity.x,
+                        reported_angular_velocity.y,
+                        reported_angular_velocity.z,
+                    );
+                    let reported_angular_speed = reported_angular_velocity.length();
+                    if reported_angular_speed >= MIN_ANGULAR_VELOCITY_SPEED {
+                        for mode in &self.euler_modes {
+                            let previous_rotation =
+                                reinterpret_euler_rotation(previous_body.rotation, *mode);
+                            let current_rotation =
+                                reinterpret_euler_rotation(rigid_body.rotation, *mode);
+                            if let Some(derived_angular_velocity) = derive_world_angular_velocity(
+                                previous_rotation,
+                                current_rotation,
+                                dt,
+                            ) {
+                                if derived_angular_velocity.length()
+                                    >= MIN_DERIVED_ORIENTATION_SPEED
+                                {
+                                    let direction_dot = derived_angular_velocity
+                                        .normalize()
+                                        .dot(reported_angular_velocity.normalize());
+                                    if direction_dot.is_finite() {
+                                        self.euler_angular_accumulators
+                                            .get_mut(mode)
+                                            .unwrap()
+                                            .direction_dots
+                                            .push(direction_dot);
+                                    }
                                 }
                             }
                         }
@@ -400,6 +454,49 @@ impl LegacyRotationProbe {
                 median_alignment,
                 positive_fraction,
                 median_up_z
+            );
+        }
+
+        println!();
+        println!("Top Euler interpretations by angular-velocity direction:");
+        let mut euler_angular_ranked: Vec<_> = self
+            .euler_modes
+            .iter()
+            .filter_map(|mode| {
+                let accumulator = self.euler_angular_accumulators.get_mut(mode)?;
+                let median_direction_dot = median(&mut accumulator.direction_dots)?;
+                let positive_fraction = positive_fraction(&accumulator.direction_dots)?;
+                Some((
+                    *mode,
+                    accumulator.direction_dots.len(),
+                    median_direction_dot,
+                    positive_fraction,
+                ))
+            })
+            .filter(|(_, samples, ..)| *samples >= MIN_ROTATION_MODE_SAMPLE_COUNT)
+            .collect();
+        euler_angular_ranked.sort_by(|left, right| {
+            right
+                .2
+                .partial_cmp(&left.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    right
+                        .3
+                        .partial_cmp(&left.3)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        });
+        for (rank, (mode, samples, median_direction_dot, positive_fraction)) in
+            euler_angular_ranked.iter().take(12).enumerate()
+        {
+            println!(
+                "{:>2}. {:<72} samples={:<6} median_direction_dot={:>7.4} positive_fraction={:>7.4}",
+                rank + 1,
+                mode.label(),
+                samples,
+                median_direction_dot,
+                positive_fraction
             );
         }
 
@@ -1024,6 +1121,28 @@ fn rotation_alignment(
     alignment
         .is_finite()
         .then_some((alignment, (quaternion * glam::Vec3::Z).z))
+}
+
+fn derive_world_angular_velocity(
+    previous_rotation: glam::Quat,
+    mut current_rotation: glam::Quat,
+    dt: f32,
+) -> Option<glam::Vec3> {
+    if dt <= 0.0 {
+        return None;
+    }
+    if previous_rotation.dot(current_rotation) < 0.0 {
+        current_rotation = glam::Quat::from_xyzw(
+            -current_rotation.x,
+            -current_rotation.y,
+            -current_rotation.z,
+            -current_rotation.w,
+        );
+    }
+    let delta = current_rotation * previous_rotation.inverse();
+    let (axis, angle) = delta.to_axis_angle();
+    let angular_velocity = axis * (angle / dt);
+    angular_velocity.is_finite().then_some(angular_velocity)
 }
 
 fn vec_length(vector: boxcars::Vector3f) -> f32 {

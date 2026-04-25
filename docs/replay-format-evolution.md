@@ -101,7 +101,7 @@ Current normalized-output rule:
 
 - `net_version` missing or `< 7`: interpret boxcars' `Quaternion { x, y, z, w: 0 }`
   as a legacy fixed compressed `(pitch, yaw, roll)` rotator and convert it to a
-  quaternion with `Quat::from_euler(EulerRot::ZYX, y * PI, x * PI, z * PI)`
+  quaternion with `Quat::from_euler(EulerRot::ZYX, y * PI, x * PI, -z * PI)`
 - `net_version >= 7`: passthrough modern quaternion
 
 Evidence:
@@ -117,6 +117,10 @@ Evidence:
   grounded car forward vectors point mostly opposite travel. After conversion,
   historical samples from 2016-08 through 2018-04 have unit-length quaternions
   and grounded forward alignment in the same range as a sampled `net=7` replay.
+- On `assets/rlcs.replay`, the negated legacy roll sign makes frame-to-frame
+  orientation deltas align with reported rigid-body angular velocity during
+  high-spin aerial frames; direct `+roll` preserves grounded yaw but mirrors
+  flip/roll motion more often.
 
 Rotation changes later than rigid-body vector scale: `net=5` uses modern
 location and velocity units, but still uses legacy rotation.
@@ -176,9 +180,8 @@ Medium confidence:
 
 - The legacy rotation conversion is operationally correct for player-car
   orientation in sampled historical replays. Grounded motion validates yaw,
-  pitch/uprightness, and unit norms strongly.
-- The roll sign is plausible and follows direct parser order, but grounded
-  motion is a weaker roll validator than an aerial-specific fixture would be.
+  pitch/uprightness, and unit norms strongly, and the RLCS angular-velocity
+  regression validates the roll sign during aerial spins.
 
 Open areas:
 

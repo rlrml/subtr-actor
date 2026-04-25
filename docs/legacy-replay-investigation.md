@@ -90,20 +90,21 @@ Other parsers agree on the version boundary:
 
 The processor converts the legacy vector into a quaternion with:
 
-`Quat::from_euler(EulerRot::ZYX, y * PI, x * PI, z * PI)`
+`Quat::from_euler(EulerRot::ZYX, y * PI, x * PI, -z * PI)`
 
 This treats the raw legacy vector as `(pitch, yaw, roll)` and converts it to a
-quaternion using the usual yaw/pitch/roll axis order. The sign and order were
-checked against historical replay plausibility checks.
+quaternion using the usual yaw/pitch/roll axis order, with the decoded legacy
+roll component negated. The sign and order were checked against historical
+replay plausibility checks.
 Before this conversion, `net=None`, `net=2`, and `net=5` samples had quaternion
 norm errors around `0.73` and grounded player forward vectors usually pointed
 opposite travel. After conversion, those samples have unit-length rotations and
 grounded forward alignment consistent with modern `net=7` replays.
 
-The remaining uncertainty is semantic rather than operational: grounded motion
-strongly validates yaw and uprightness, while roll sign is less directly
-observable from grounded samples. The selected roll sign is the direct parser
-order and remains plausible across the historical samples checked so far.
+The roll sign is backed by an aerial-sensitive angular-velocity check on
+`assets/rlcs.replay`: frame-to-frame orientation deltas align with reported
+rigid-body angular velocity much more consistently with `-roll` than with
+direct `+roll`, which is especially visible during flips.
 
 ### Current conclusion
 
