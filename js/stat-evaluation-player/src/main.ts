@@ -33,6 +33,10 @@ import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
 } from "./replayLoader.ts";
+import {
+  getReplayFileNameFromUrl,
+  getReplayUrlFromSearch,
+} from "./replayUrl.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
@@ -109,6 +113,12 @@ let skipKickoffs!: HTMLInputElement;
 let currentMountCleanup: (() => void) | null = null;
 let statsRenderCacheKey: string | null = null;
 let focusedPlayerOverlayCacheKey: string | null = null;
+
+interface ReplayInputSource {
+  name: string;
+  preparingStatus: string;
+  readBytes(): Promise<Uint8Array>;
+}
 
 function getActiveModuleSignature(): string {
   return activeModules.map((mod) => mod.id).join("|");
@@ -553,10 +563,42 @@ function renderSnapshot(state: ReplayPlayerState): void {
   renderFocusedPlayerOverlay(state);
 }
 
-async function loadReplay(file: File): Promise<void> {
-  statusReadout.textContent = "Parsing replay...";
+function createFileReplaySource(file: File): ReplayInputSource {
+  return {
+    name: file.name,
+    preparingStatus: "Preparing replay...",
+    async readBytes() {
+      return new Uint8Array(await file.arrayBuffer());
+    },
+  };
+}
+
+function createUrlReplaySource(
+  url: URL,
+  signal: AbortSignal,
+): ReplayInputSource {
+  return {
+    name: getReplayFileNameFromUrl(url),
+    preparingStatus: "Fetching replay...",
+    async readBytes() {
+      const response = await fetch(url, { signal });
+      if (!response.ok) {
+        const statusText = response.statusText
+          ? ` ${response.statusText}`
+          : "";
+        throw new Error(
+          `Failed to fetch replay from ${url.href} (${response.status}${statusText})`,
+        );
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    },
+  };
+}
+
+async function loadReplay(source: ReplayInputSource): Promise<void> {
+  statusReadout.textContent = source.preparingStatus;
   fileInput.disabled = true;
-  replayLoadModal?.show(file.name, "Parsing replay...");
+  replayLoadModal?.show(source.name, source.preparingStatus);
   setTransportEnabled(false);
   syncCameraControlAvailability();
   emptyState.hidden = false;
@@ -579,7 +621,9 @@ async function loadReplay(file: File): Promise<void> {
   renderModuleSettings();
 
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = await source.readBytes();
+    statusReadout.textContent = "Parsing replay...";
+    replayLoadModal?.show(source.name, "Parsing replay...");
     const loadedReplay = await loadReplayBundleInWorker(bytes, {
       reportEveryNFrames: 500,
       onProgress(progress) {
@@ -614,7 +658,7 @@ async function loadReplay(file: File): Promise<void> {
 
     populateAttachedPlayerOptions(replay.players);
     emptyState.hidden = true;
-    statusReadout.textContent = `Loaded ${file.name}`;
+    statusReadout.textContent = `Loaded ${source.name}`;
     playersReadout.textContent = replay.players.map((player) => player.name)
       .join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
@@ -630,6 +674,36 @@ async function loadReplay(file: File): Promise<void> {
   } finally {
     fileInput.disabled = false;
   }
+}
+
+function loadReplayFromLocation(signal: AbortSignal): void {
+  let replayUrl: URL | null;
+  try {
+    replayUrl = getReplayUrlFromSearch(
+      window.location.search,
+      window.location.href,
+    );
+  } catch (error) {
+    console.error("Invalid replay URL:", error);
+    statusReadout.textContent = error instanceof Error
+      ? error.message
+      : "Invalid replay URL";
+    return;
+  }
+
+  if (!replayUrl) {
+    return;
+  }
+
+  void loadReplay(createUrlReplaySource(replayUrl, signal)).catch((error) => {
+    if (signal.aborted) {
+      return;
+    }
+    console.error("Failed to load replay URL:", error);
+    statusReadout.textContent = error instanceof Error
+      ? error.message
+      : "Failed to load replay URL";
+  });
 }
 
 export function mountStatEvaluationPlayer(
@@ -743,7 +817,7 @@ export function mountStatEvaluationPlayer(
     if (!file) return;
 
     try {
-      await loadReplay(file);
+      await loadReplay(createFileReplaySource(file));
     } catch (error) {
       console.error("Failed to load replay:", error);
       statusReadout.textContent =
@@ -806,6 +880,7 @@ export function mountStatEvaluationPlayer(
   renderCameraProfile(null);
   syncCameraModeButtons();
   renderTimelineEventCount();
+  loadReplayFromLocation(listeners.signal);
 
   return {
     root,

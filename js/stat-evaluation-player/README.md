@@ -31,6 +31,32 @@ player.destroy();
 The mounted UI exposes the same replay file chooser, replay camera controls,
 timeline overlays, and per-module stat panels as the in-repo demo app.
 
+To preload a replay from a URL, pass the replay file URL in the query string.
+GitHub raw replay URLs work well because they are stable and include permissive
+CORS headers:
+
+```text
+https://example.com/stats-player/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay
+```
+
+For shorter share links, encode the replay URL into the compressed `r=` query
+parameter. This uses raw deflate plus base64url encoding, so it is deterministic
+and does not depend on an external URL shortener:
+
+```ts
+import { encodeCompressedReplayUrl } from "subtr-actor-stats-player";
+
+const replayParam = encodeCompressedReplayUrl(
+  "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay",
+);
+const link = `https://example.com/stats-player/?r=${replayParam}`;
+```
+
+The aliases `replay_url` and `replay` are also accepted for readable URLs.
+The aliases `replayUrlZ` and `replay_url_z` are also accepted for compressed
+URLs. Remote replay files must be served with CORS headers that allow the viewer
+origin to fetch them.
+
 The package also exports the stat timeline helpers and overlay utilities used by
 the viewer, so consumers can build their own derived UI around the same data.
 

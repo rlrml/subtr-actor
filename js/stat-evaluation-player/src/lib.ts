@@ -8,6 +8,7 @@ export * from "./movementFormatting.ts";
 export * from "./overlays.ts";
 export * from "./possessionFormatting.ts";
 export * from "./pressureFormatting.ts";
+export * from "./replayUrl.ts";
 export * from "./rushFormatting.ts";
 export * from "./speedFlipOverlay.ts";
 export * from "./statsTimeline.ts";
