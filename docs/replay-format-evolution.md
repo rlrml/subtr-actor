@@ -38,6 +38,23 @@ Sampled timeline:
 | 2018-04-04 | `868.20` | `5` | `180315.66224.188644` | vector scale changed, rotation still legacy |
 | 2018-06-01 | `868.22` | `7` | `180517.71295.194805` | modern rigid-body rotation |
 
+Checked-in fixture inspection links:
+
+| Fixture | Replay version | Spatial rule | Format signal | Raw | Viewer |
+| --- | --- | --- | --- | --- | --- |
+| `rlcs.replay` | `868.14`, `net_version = None` | Legacy, `100x` | Older replay with no net version; exercises legacy rigid-body position scaling and 3v3 stats/touch extraction. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/rlcs.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Frlcs.replay) |
+| `soccar-lan.replay` | `868.12`, `net_version = None` | Legacy, `100x` | Older LAN-style replay with no net version; useful for checking legacy player and ball positions. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/soccar-lan.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fsoccar-lan.replay) |
+| `old_boost_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Modern spatial scale with the older boost attribute shape. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/old_boost_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fold_boost_format.replay) |
+| `new_boost_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Modern spatial scale with the newer `ReplicatedBoost` format. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/new_boost_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fnew_boost_format.replay) |
+| `new_demolition_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Newer `ReplicatedDemolishExtended` demolition payload; regression coverage expects 10 demos and preserved victim locations. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/new_demolition_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fnew_demolition_format.replay) |
+| `tourny.replay` | `868.29`, `net_version = 10` | Modern, native scale | Tournament-style replay; useful for checking metadata/header handling around ordinary spatial interpretation. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/tourny.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Ftourny.replay) |
+| `dodges_refreshed_counter.replay` | `868.32`, `net_version = 11` | Modern, native scale | Newer replay with `DodgeRefreshedCounter`; expected to expose 12 exact dodge refreshes. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/dodges_refreshed_counter.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fdodges_refreshed_counter.replay) |
+
+Use these links to visually check that cars and ball fit normal Rocket League
+field dimensions, rotations track plausible car orientation, and replay events
+line up with visible play. Legacy fixtures should appear in field units after
+normalization, while modern fixtures should not be multiplied by `100`.
+
 ## Rigid-body state
 
 `TAGame.RBActor_TA:ReplicatedRBState` is the main field where historical
