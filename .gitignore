@@ -8,3 +8,5 @@ perf.data.old
 flamegraph.svg
 .worktrees
 .envrc.local
+.agents/local/
+.agents/feature-checklists/

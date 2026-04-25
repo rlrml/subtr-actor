@@ -1,0 +1,35 @@
+{
+  "description": "Codex-agnostic command guidance translated from the legacy .claude/settings.local.json allowlist.",
+  "source": ".claude/settings.local.json",
+  "commands": {
+    "rust": [
+      "cargo",
+      "cargo fmt",
+      "cargo clean"
+    ],
+    "javascript": [
+      "npm install",
+      "npm run build",
+      "npm run dev",
+      "npm run pack",
+      "npm pack",
+      "npm publish"
+    ],
+    "wasm": [
+      "wasm-pack build"
+    ],
+    "shell": [
+      "ls",
+      "node",
+      "rm"
+    ],
+    "search": [
+      "rg",
+      "grep"
+    ]
+  },
+  "notes": [
+    "This file is guidance for agents and repo tooling, not a Codex permission policy.",
+    "Codex-facing prose belongs in the root AGENTS.md file."
+  ]
+}

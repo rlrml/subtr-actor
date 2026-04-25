@@ -38,3 +38,24 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 - Replay-player infrastructure work usually belongs in `js/player/`. Stats UI
   and stat-timeline visualization work usually belongs in
   `js/stat-evaluation-player/`.
+
+## Agent Workspace
+
+- Codex reads this `AGENTS.md` file as the canonical repo instructions.
+- Shared agent workflows, reusable rules, and local agent helper docs belong
+  under `.agents/`.
+- Legacy Claude-only settings may remain under `.claude/`, but they are not a
+  Codex configuration surface. If a Claude setting contains durable project
+  guidance, translate it into this file or `.agents/`.
+
+## Common Commands
+
+- Rust formatting and checks generally use `cargo fmt` and `cargo test`.
+- Rust build and maintenance commands should use `cargo ...`; `cargo clean`
+  is acceptable when stale build artifacts are the issue.
+- JavaScript package work under `js/` commonly uses `npm install`,
+  `npm run build`, `npm run dev`, `npm run pack`, `npm pack`, and
+  `npm publish`.
+- WASM binding builds commonly use `wasm-pack build`.
+- Prefer `rg` for text search. Use `grep` only when matching an existing
+  script or when `rg` is unavailable.
