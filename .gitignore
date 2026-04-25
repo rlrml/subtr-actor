@@ -2,6 +2,7 @@
 /bindings
 *.replay
 *.replay.zip
+!assets/replay-format-*.replay
 perf.data
 perf.data.old
 flamegraph.svg

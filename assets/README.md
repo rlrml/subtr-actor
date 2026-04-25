@@ -1,3 +1,27 @@
+Replay-format fixtures use descriptive filenames:
+
+`replay-format-<build-date>-v<major>-<minor>-net<net-or-none>-<signal>.replay`
+
+The date in these names comes from the replay `BuildVersion` header. These
+fixtures are the coverage set used by `docs/replay-format-evolution.md`.
+Existing shorter fixture names remain checked in for compatibility with older
+tests.
+
+| Replay-format fixture | Source fixture |
+| --- | --- |
+| `replay-format-2016-07-21-v868-12-net-none-lan.replay` | `soccar-lan.replay` |
+| `replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay` | `rlcs.replay` |
+| `replay-format-2017-03-16-v868-17-net-none-online.replay` | `boxcars/assets/replays/good/2266.replay` |
+| `replay-format-2017-11-22-v868-20-net2-legacy-vectors.replay` | `boxcars/assets/replays/good/netversion.replay` |
+| `replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay` | `boxcars/assets/replays/good/db70.replay` |
+| `replay-format-2018-05-17-v868-22-net7-modern-rigidbody.replay` | `boxcars/assets/replays/good/6cc24.replay` |
+| `replay-format-2019-04-19-v868-24-net10-modern-rigidbody.replay` | `boxcars/assets/replays/good/70204.replay` |
+| `replay-format-2020-09-25-v868-29-net10-tournament.replay` | `tourny.replay` |
+| `replay-format-2022-09-29-v868-32-net10-legacy-boost.replay` | `old_boost_format.replay` |
+| `replay-format-2025-06-10-v868-32-net10-replicated-boost.replay` | `new_boost_format.replay` |
+| `replay-format-2026-01-14-v868-32-net10-demolish-extended.replay` | `new_demolition_format.replay` |
+| `replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay` | `dodges_refreshed_counter.replay` |
+
 These fixtures were downloaded from the Ballchasing API on 2026-03-10.
 
 - `recent-ranked-doubles-2026-03-10`

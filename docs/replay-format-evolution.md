@@ -24,31 +24,61 @@ example, both sampled 2018-04-02 and 2018-04-04 replays are `868.20`, but the
 former has `net_version = 2` and the latter has `net_version = 5`, and their
 rigid-body vector units differ.
 
-Sampled timeline:
+Checked-in coverage timeline:
 
-| Replay date | major.minor | net | BuildVersion | Notes |
-| --- | --- | --- | --- | --- |
-| 2016-08-01 | `868.12` | `None` | `160705.43783.134970` | old LAN/online era |
-| 2016-11-01 | `868.12` | `None` | `160921.8478.141010` | old LAN/online era |
-| 2017-06-01 | `868.17` | `None` | `170501.51736.158700` | old LAN/online era |
-| 2017-12-01 | `868.20` | `2` | `171105.50789.177172` | pre-vector-scale transition |
-| 2018-02-01 | `868.20` | `2` | `171122.50648.178784` | pre-vector-scale transition |
-| 2018-03-01 | `868.20` | `2` | `180123.67440.183219` | pre-vector-scale transition |
-| 2018-04-02 | `868.20` | `2` | `180215.52441.185728` | pre-vector-scale transition |
-| 2018-04-04 | `868.20` | `5` | `180315.66224.188644` | vector scale changed, rotation still legacy |
-| 2018-06-01 | `868.22` | `7` | `180517.71295.194805` | modern rigid-body rotation |
+The fixture filenames use the `BuildVersion` date because that is the stable
+format marker available in the replay header. Older short fixture names are
+still checked in for compatibility with existing tests, but the table below uses
+the clearer replay-format fixture names.
 
-Checked-in fixture inspection links:
+| Fixture | Replay version | BuildVersion | Rigid-body rule | Format signal | Raw | Viewer |
+| --- | --- | --- | --- | --- | --- | --- |
+| `replay-format-2016-07-21-v868-12-net-none-lan.replay` | `868.12`, `net_version = None` | `160721.58730.135786` | Legacy vectors and legacy rotation | Old LAN-style replay with no `GameEvent_Soccar` archetype; useful for checking metadata fallback plus legacy player and ball positions. | [raw][raw-2016-07-lan] | [viewer][viewer-2016-07-lan] |
+| `replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay` | `868.14`, `net_version = None` | `161109.39595.145160` | Legacy vectors and legacy rotation | Older RLCS LAN replay with no net version; exercises legacy rigid-body position scaling and 3v3 stats/touch extraction. | [raw][raw-2016-11-rlcs] | [viewer][viewer-2016-11-rlcs] |
+| `replay-format-2017-03-16-v868-17-net-none-online.replay` | `868.17`, `net_version = None` | `170316.47017.154572` | Legacy vectors and legacy rotation | Later no-net online replay; keeps the old-era coverage from being only 2016 LAN-style samples. | [raw][raw-2017-03-net-none] | [viewer][viewer-2017-03-net-none] |
+| `replay-format-2017-11-22-v868-20-net2-legacy-vectors.replay` | `868.20`, `net_version = 2` | `171122.50648.178784` | Legacy vectors and legacy rotation | Pre-vector-scale transition sample; validates that `net=2` still uses old location, velocity, and rotation interpretation. | [raw][raw-2017-11-net2] | [viewer][viewer-2017-11-net2] |
+| `replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay` | `868.20`, `net_version = 5` | `180315.66224.188644` | Modern vectors, legacy rotation | Boundary sample where rigid-body location and velocity are native scale but rotation is still legacy compressed rotator data. | [raw][raw-2018-03-net5] | [viewer][viewer-2018-03-net5] |
+| `replay-format-2018-05-17-v868-22-net7-modern-rigidbody.replay` | `868.22`, `net_version = 7` | `180517.71295.194805` | Modern vectors and modern quaternion rotation | First checked-in boundary sample where rigid-body rotation is already a modern quaternion. | [raw][raw-2018-05-net7] | [viewer][viewer-2018-05-net7] |
+| `replay-format-2019-04-19-v868-24-net10-modern-rigidbody.replay` | `868.24`, `net_version = 10` | `190419.41693.231343` | Modern rigid body | Early `net=10` sample before later boost and demolition payload changes. | [raw][raw-2019-04-net10] | [viewer][viewer-2019-04-net10] |
+| `replay-format-2020-09-25-v868-29-net10-tournament.replay` | `868.29`, `net_version = 10` | `200925.55985.293168` | Modern rigid body | Tournament-style replay; useful for checking metadata/header handling around ordinary spatial interpretation. | [raw][raw-2020-09-tournament] | [viewer][viewer-2020-09-tournament] |
+| `replay-format-2022-09-29-v868-32-net10-legacy-boost.replay` | `868.32`, `net_version = 10` | `220929.397994` | Modern rigid body | Modern spatial scale with the older boost attribute shape. | [raw][raw-2022-09-legacy-boost] | [viewer][viewer-2022-09-legacy-boost] |
+| `replay-format-2025-06-10-v868-32-net10-replicated-boost.replay` | `868.32`, `net_version = 10` | `250610.60392.487806` | Modern rigid body | Modern spatial scale with the newer `ReplicatedBoost` format. | [raw][raw-2025-06-replicated-boost] | [viewer][viewer-2025-06-replicated-boost] |
+| `replay-format-2026-01-14-v868-32-net10-demolish-extended.replay` | `868.32`, `net_version = 10` | `260114.55864.507183` | Modern rigid body | Newer `ReplicatedDemolishExtended` demolition payload; regression coverage expects 10 demos and preserved victim locations. | [raw][raw-2026-01-demolish-extended] | [viewer][viewer-2026-01-demolish-extended] |
+| `replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay` | `868.32`, `net_version = 11` | `260303.78181.511382` | Modern rigid body | Newer replay with `DodgeRefreshedCounter`; expected to expose 12 exact dodge refreshes. | [raw][raw-2026-03-dodge-refresh] | [viewer][viewer-2026-03-dodge-refresh] |
 
-| Fixture | Replay version | Spatial rule | Format signal | Raw | Viewer |
-| --- | --- | --- | --- | --- | --- |
-| `rlcs.replay` | `868.14`, `net_version = None` | Legacy, `100x` | Older replay with no net version; exercises legacy rigid-body position scaling and 3v3 stats/touch extraction. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/rlcs.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Frlcs.replay) |
-| `soccar-lan.replay` | `868.12`, `net_version = None` | Legacy, `100x` | Older LAN-style replay with no net version; useful for checking legacy player and ball positions. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/soccar-lan.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fsoccar-lan.replay) |
-| `old_boost_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Modern spatial scale with the older boost attribute shape. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/old_boost_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fold_boost_format.replay) |
-| `new_boost_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Modern spatial scale with the newer `ReplicatedBoost` format. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/new_boost_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fnew_boost_format.replay) |
-| `new_demolition_format.replay` | `868.32`, `net_version = 10` | Modern, native scale | Newer `ReplicatedDemolishExtended` demolition payload; regression coverage expects 10 demos and preserved victim locations. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/new_demolition_format.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fnew_demolition_format.replay) |
-| `tourny.replay` | `868.29`, `net_version = 10` | Modern, native scale | Tournament-style replay; useful for checking metadata/header handling around ordinary spatial interpretation. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/tourny.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Ftourny.replay) |
-| `dodges_refreshed_counter.replay` | `868.32`, `net_version = 11` | Modern, native scale | Newer replay with `DodgeRefreshedCounter`; expected to expose 12 exact dodge refreshes. | [raw](https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/dodges_refreshed_counter.replay) | [viewer](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fdodges_refreshed_counter.replay) |
+Known coverage gaps:
+
+- The checked-in fixtures cover the boundaries currently known to affect
+  `subtr-actor`: missing/old `net_version`, `net=2`, `net=5`, `net=7`,
+  `net=10`, and `net=11`.
+- We do not currently have checked-in fixtures for every intermediate
+  `net_version` value such as `0`, `1`, `3`, `4`, `6`, `8`, or `9`. Add those
+  if a parser behavior or public output depends on them.
+
+[raw-2016-07-lan]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-07-21-v868-12-net-none-lan.replay
+[viewer-2016-07-lan]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-07-21-v868-12-net-none-lan.replay
+[raw-2016-11-rlcs]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay
+[viewer-2016-11-rlcs]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay
+[raw-2017-03-net-none]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2017-03-16-v868-17-net-none-online.replay
+[viewer-2017-03-net-none]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2017-03-16-v868-17-net-none-online.replay
+[raw-2017-11-net2]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2017-11-22-v868-20-net2-legacy-vectors.replay
+[viewer-2017-11-net2]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2017-11-22-v868-20-net2-legacy-vectors.replay
+[raw-2018-03-net5]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay
+[viewer-2018-03-net5]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay
+[raw-2018-05-net7]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2018-05-17-v868-22-net7-modern-rigidbody.replay
+[viewer-2018-05-net7]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2018-05-17-v868-22-net7-modern-rigidbody.replay
+[raw-2019-04-net10]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2019-04-19-v868-24-net10-modern-rigidbody.replay
+[viewer-2019-04-net10]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2019-04-19-v868-24-net10-modern-rigidbody.replay
+[raw-2020-09-tournament]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2020-09-25-v868-29-net10-tournament.replay
+[viewer-2020-09-tournament]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2020-09-25-v868-29-net10-tournament.replay
+[raw-2022-09-legacy-boost]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2022-09-29-v868-32-net10-legacy-boost.replay
+[viewer-2022-09-legacy-boost]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2022-09-29-v868-32-net10-legacy-boost.replay
+[raw-2025-06-replicated-boost]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay
+[viewer-2025-06-replicated-boost]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay
+[raw-2026-01-demolish-extended]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay
+[viewer-2026-01-demolish-extended]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay
+[raw-2026-03-dodge-refresh]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay
+[viewer-2026-03-dodge-refresh]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay
 
 Use these links to visually check that cars and ball fit normal Rocket League
 field dimensions, rotations track plausible car orientation, and replay events
@@ -117,10 +147,10 @@ Evidence:
   grounded car forward vectors point mostly opposite travel. After conversion,
   historical samples from 2016-08 through 2018-04 have unit-length quaternions
   and grounded forward alignment in the same range as a sampled `net=7` replay.
-- On `assets/rlcs.replay`, the negated legacy roll sign makes frame-to-frame
-  orientation deltas align with reported rigid-body angular velocity during
-  high-spin aerial frames; direct `+roll` preserves grounded yaw but mirrors
-  flip/roll motion more often.
+- On `assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay`, the
+  negated legacy roll sign makes frame-to-frame orientation deltas align with
+  reported rigid-body angular velocity during high-spin aerial frames; direct
+  `+roll` preserves grounded yaw but mirrors flip/roll motion more often.
 
 Rotation changes later than rigid-body vector scale: `net=5` uses modern
 location and velocity units, but still uses legacy rotation.
