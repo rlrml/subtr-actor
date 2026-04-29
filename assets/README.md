@@ -42,3 +42,28 @@ Each fixture uses a shared filename prefix in `assets/`:
 - `<fixture>.ballchasing.json`: the replay stats JSON from `GET /api/replays/{id}`
 - `<fixture>.replay`: the raw replay file from `GET /api/replays/{id}/file`
 - `<fixture>.replay_id.txt`: the source replay id for easy re-fetching
+
+Post-EAC fixtures were downloaded from public Ballchasing replay pages on
+2026-04-29. The local Ballchasing API token was invalid at the time, so these
+fixtures include replay files and source ids but not API stats JSON.
+
+- `post-eac-ranked-duel-2026-04-28-a`
+  - replay id: `8c0b4bf6-775b-4d4e-ac59-a0756805f94e`
+  - title: `Ranked Duel Win 2026-04-28.09`
+  - playlist: `ranked-duels`
+- `post-eac-ranked-duel-2026-04-28-b`
+  - replay id: `5a4e1f4f-8343-4ce6-948a-8353fe1a6941`
+  - title: `Ranked Duel Win 2026-04-28.09`
+  - playlist: `ranked-duels`
+- `post-eac-ranked-doubles-2026-04-28`
+  - replay id: `96f96431-634b-466e-af50-ca10521a6397`
+  - title: `2026-04-28.18.07 2Fum2Tastic Ranked Doubles Loss`
+  - playlist: `ranked-doubles`
+- `post-eac-ranked-standard-2026-04-28`
+  - replay id: `358c6147-3eae-489c-b8d4-c33f362386ca`
+  - title: `2026-04-28.12.06 X2 ACID Ranked Standard Win`
+  - playlist: `ranked-standard`
+- `post-eac-private-2026-04-28`
+  - replay id: `54272940-8859-4ee8-a37b-ca49328dbce7`
+  - title: `2026-04-28.21.17 hashir Private Win`
+  - playlist: `private`

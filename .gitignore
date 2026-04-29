@@ -3,6 +3,7 @@
 *.replay
 *.replay.zip
 !assets/replay-format-*.replay
+!assets/post-eac-*.replay
 perf.data
 perf.data.old
 flamegraph.svg
