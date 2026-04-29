@@ -6,6 +6,16 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.5.0 - 2026-04-29
+
+- Relax Cargo dependency version bounds so downstream builds can pick up newer
+  `boxcars` releases with EAC replay-format support.
+- Add April 2026 post-EAC Ballchasing replay fixtures across duel, doubles,
+  standard, and private matches.
+- Add post-EAC regression coverage for parsing, structured replay data, ndarray
+  features, aggregate stats, typed and dynamic stats timelines, JSON
+  serialization, and motion plausibility.
+
 ## v0.4.0 - 2026-04-25
 
 - Fix legacy replay rigid-body normalization across position, velocity, and
