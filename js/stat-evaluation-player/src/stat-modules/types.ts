@@ -40,6 +40,7 @@ export interface StatModule {
 
 export interface StatModuleRuntime {
   rerenderCurrentState(): void;
+  refreshTimelineRanges?(): void;
 }
 
 const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;

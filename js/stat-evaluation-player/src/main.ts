@@ -69,6 +69,9 @@ const MODULES = createStatModules({
     renderStats(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   },
+  refreshTimelineRanges() {
+    syncTimelineRanges();
+  },
 });
 
 let activeModules: StatModule[] = [];
@@ -247,12 +250,14 @@ function syncTimelineRanges(): void {
   }
 
   for (const mod of activeModules) {
-    const ranges = mod.getTimelineRanges?.(ctx);
-    if (!ranges || ranges.length === 0) {
+    if (!mod.getTimelineRanges) {
       continue;
     }
 
-    timelineRangeSourceRemovers.set(mod.id, timelineOverlay.addRangeSource(ranges));
+    timelineRangeSourceRemovers.set(
+      mod.id,
+      timelineOverlay.addRangeSource(() => mod.getTimelineRanges?.(ctx) ?? []),
+    );
   }
 
   timelineOverlay.refreshRanges();

@@ -1,4 +1,8 @@
-import type { ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
+import type {
+  ReplayBoostPadSize,
+  ReplayModel,
+  ReplayTimelineRange,
+} from "subtr-actor-player";
 import type {
   PlayerStatsSnapshot,
   StatsTimeline,
@@ -7,8 +11,17 @@ import type {
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
 const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y = 200;
+const BOOST_PICKUP_TICK_SECONDS = 0.08;
+const BOOST_PICKUP_COLORS: Record<ReplayBoostPadSize, string> = {
+  big: "rgba(245, 158, 11, 0.92)",
+  small: "rgba(52, 211, 153, 0.86)",
+};
 
 type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
+
+export interface BoostPickupTimelineRangeOptions {
+  sizes?: Iterable<ReplayBoostPadSize>;
+}
 
 function getPressureNeutralZoneHalfWidthY(
   timeline: StatsTimeline,
@@ -225,6 +238,59 @@ export function buildRushTimelineRanges(
       color: isTeamZero ? "rgba(59, 130, 246, 0.4)" : "rgba(245, 158, 11, 0.4)",
       isTeamZero,
     };
+  });
+}
+
+export function buildBoostPickupTimelineRanges(
+  replay: ReplayModel,
+  options: BoostPickupTimelineRangeOptions = {},
+): ReplayTimelineRange[] {
+  const enabledSizes = new Set<ReplayBoostPadSize>(options.sizes ?? [
+    "small",
+    "big",
+  ]);
+  if (enabledSizes.size === 0) {
+    return [];
+  }
+
+  const playerTeams = new Map(
+    replay.players.map((player) => [player.id, player.isTeamZero]),
+  );
+  const ranges: ReplayTimelineRange[] = [];
+
+  for (const pad of replay.boostPads) {
+    if (!enabledSizes.has(pad.size)) {
+      continue;
+    }
+
+    for (let eventIndex = 0; eventIndex < pad.events.length; eventIndex += 1) {
+      const event = pad.events[eventIndex]!;
+      if (event.available || !Number.isFinite(event.time)) {
+        continue;
+      }
+
+      const startTime = Math.max(0, event.time);
+      const sizeLabel = pad.size === "big" ? "Big" : "Small";
+      const playerLabel = event.playerName ? `${event.playerName} ` : "";
+      ranges.push({
+        id: `boost-pickup:${pad.index}:${event.frame}:${eventIndex}`,
+        startTime,
+        endTime: Math.max(startTime + BOOST_PICKUP_TICK_SECONDS, startTime),
+        lane: "boost-pickups",
+        laneLabel: "Boost Pickups",
+        label: `${playerLabel}picked up ${sizeLabel.toLowerCase()} boost pad ${pad.index}`,
+        shortLabel: pad.size === "big" ? "100" : "12",
+        color: BOOST_PICKUP_COLORS[pad.size],
+        isTeamZero: event.playerId ? playerTeams.get(event.playerId) ?? null : null,
+      });
+    }
+  }
+
+  return ranges.sort((left, right) => {
+    if (left.startTime !== right.startTime) {
+      return left.startTime - right.startTime;
+    }
+    return (left.id ?? "").localeCompare(right.id ?? "");
   });
 }
 

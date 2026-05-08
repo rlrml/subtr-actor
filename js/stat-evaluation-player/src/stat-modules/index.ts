@@ -53,7 +53,7 @@ export function createStatModules(runtime: import("./types.ts").StatModuleRuntim
     createTouchModule(runtime),
     createMustyFlickModule(),
     createDodgeResetModule(),
-    createBoostModule(),
+    createBoostModule(runtime),
     createBallCarryModule(),
     createMovementModule(runtime),
     createPowerslideModule(),

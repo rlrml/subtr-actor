@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import type { ReplayModel } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
+  buildBoostPickupTimelineRanges,
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
   buildRushTimelineRanges,
@@ -271,6 +272,78 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
       color: "rgba(245, 158, 11, 0.4)",
       isTeamZero: false,
     },
+  ]);
+});
+
+test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtered lane", () => {
+  const replay = {
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+        isTeamZero: true,
+        cameraSettings: {},
+        frames: [],
+      },
+    ],
+    boostPads: [
+      {
+        index: 3,
+        padId: "Boost_TA_3",
+        size: "small",
+        position: { x: 0, y: 0, z: 70 },
+        events: [
+          {
+            time: 1,
+            frame: 10,
+            available: false,
+            playerId: "Steam:blue-id",
+            playerName: "Blue",
+          },
+          {
+            time: 5,
+            frame: 50,
+            available: true,
+          },
+        ],
+      },
+      {
+        index: 9,
+        padId: "Boost_TA_9",
+        size: "big",
+        position: { x: 0, y: 0, z: 73 },
+        events: [
+          {
+            time: 2,
+            frame: 20,
+            available: false,
+            playerId: null,
+            playerName: null,
+          },
+        ],
+      },
+    ],
+  } as Partial<ReplayModel> as ReplayModel;
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(replay, {
+    sizes: ["small"],
+  }), [
+    {
+      id: "boost-pickup:3:10:0",
+      startTime: 1,
+      endTime: 1.08,
+      lane: "boost-pickups",
+      laneLabel: "Boost Pickups",
+      label: "Blue picked up small boost pad 3",
+      shortLabel: "12",
+      color: "rgba(52, 211, 153, 0.86)",
+      isTeamZero: true,
+    },
+  ]);
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(replay).map((range) => range.id), [
+    "boost-pickup:3:10:0",
+    "boost-pickup:9:20:0",
   ]);
 });
 

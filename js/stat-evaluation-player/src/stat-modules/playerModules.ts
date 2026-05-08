@@ -2,6 +2,7 @@ import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
+import type { ReplayBoostPadSize } from "subtr-actor-player";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
@@ -16,6 +17,7 @@ import {
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
 } from "../timelineMarkers.ts";
+import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
@@ -38,16 +40,29 @@ import {
   type StatModuleRuntime,
 } from "./types.ts";
 
-export function createBoostModule(): StatModule {
+export function createBoostModule(runtime: StatModuleRuntime): StatModule {
+  let settingsEl: HTMLDivElement | null = null;
+  let pickupReadoutEl: HTMLElement | null = null;
+  const activePickupSizes = new Set<ReplayBoostPadSize>(["small", "big"]);
+  const orderedPickupSizes: ReplayBoostPadSize[] = ["small", "big"];
+
   return {
     id: "boost",
     label: "Boost",
 
-    setup() {},
+    setup() {
+      syncBoostSettingsUi();
+    },
 
     teardown() {},
 
     onBeforeRender() {},
+
+    getTimelineRanges(ctx) {
+      return buildBoostPickupTimelineRanges(ctx.replay, {
+        sizes: orderedPickupSizes.filter((size) => activePickupSizes.has(size)),
+      });
+    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
@@ -69,7 +84,85 @@ export function createBoostModule(): StatModule {
 
       return renderBoostStats(player.boost);
     },
+
+    renderSettings() {
+      if (!settingsEl) {
+        settingsEl = document.createElement("div");
+        settingsEl.className = "module-settings-card";
+
+        const header = document.createElement("div");
+        header.className = "module-settings-header";
+
+        const text = document.createElement("div");
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "module-settings-eyebrow";
+        eyebrow.textContent = "Timeline";
+        const title = document.createElement("h3");
+        title.textContent = "Boost pickups";
+        text.append(eyebrow, title);
+
+        pickupReadoutEl = document.createElement("strong");
+        pickupReadoutEl.className = "metric-readout";
+        header.append(text, pickupReadoutEl);
+
+        const options = document.createElement("div");
+        options.className = "module-settings-options";
+
+        for (const option of [
+          { size: "small", label: "Small pads" },
+          { size: "big", label: "Big pads" },
+        ] satisfies Array<{ size: ReplayBoostPadSize; label: string }>) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "toggle";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.pickupSize = option.size;
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+              activePickupSizes.add(option.size);
+            } else {
+              activePickupSizes.delete(option.size);
+            }
+            syncBoostSettingsUi();
+            runtime.refreshTimelineRanges?.();
+          });
+
+          const optionText = document.createElement("span");
+          optionText.textContent = option.label;
+          optionLabel.append(checkbox, optionText);
+          options.append(optionLabel);
+        }
+
+        settingsEl.append(header, options);
+      }
+
+      syncBoostSettingsUi();
+      return settingsEl;
+    },
   };
+
+  function syncBoostSettingsUi(): void {
+    if (!settingsEl) {
+      return;
+    }
+
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-pickup-size]",
+    )) {
+      const size = checkbox.dataset.pickupSize as ReplayBoostPadSize | undefined;
+      checkbox.checked = size ? activePickupSizes.has(size) : false;
+    }
+
+    if (pickupReadoutEl) {
+      const enabled = orderedPickupSizes.filter((size) =>
+        activePickupSizes.has(size)
+      );
+      pickupReadoutEl.textContent = enabled.length === 0
+        ? "Hidden"
+        : enabled.map((size) => size === "small" ? "Small" : "Big").join(" + ");
+    }
+  }
 }
 
 export function createCoreModule(): StatModule {
