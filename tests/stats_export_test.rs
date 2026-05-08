@@ -247,6 +247,9 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
         amount_collected_inactive: 12.0,
         big_pads_collected_inactive: 2,
         small_pads_collected_inactive: 3,
+        inferred_big_pads_collected: 4,
+        inferred_small_pads_collected: 5,
+        inferred_ambiguous_pads_collected: 1,
         amount_respawned: 68.0,
         amount_used: 91.0,
         amount_used_while_grounded: 61.0,
@@ -273,6 +276,18 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
     assert_eq!(
         find_field(&fields, "boost", "count_collected_inactive_small").value,
         StatValue::Unsigned(3)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "count_inferred_collected_big").value,
+        StatValue::Unsigned(4)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "count_inferred_collected_small").value,
+        StatValue::Unsigned(5)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "count_inferred_collected_ambiguous").value,
+        StatValue::Unsigned(1)
     );
     assert_eq!(
         find_field(&fields, "boost", "amount_respawned")

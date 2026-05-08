@@ -391,6 +391,9 @@ export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined
     <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Inactive big pads</span><span class="value">${boost?.big_pads_collected_inactive ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Inactive small pads</span><span class="value">${boost?.small_pads_collected_inactive ?? "?"}</span></div>
+    <div class="stat-row"><span class="label">Inferred big pads</span><span class="value">${boost?.inferred_big_pads_collected ?? "?"}</span></div>
+    <div class="stat-row"><span class="label">Inferred small pads</span><span class="value">${boost?.inferred_small_pads_collected ?? "?"}</span></div>
+    <div class="stat-row"><span class="label">Inferred ambiguous pads</span><span class="value">${boost?.inferred_ambiguous_pads_collected ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
     <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}</span></div>
     <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_zero_boost), trackedTime)}</span></div>

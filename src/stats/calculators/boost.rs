@@ -15,6 +15,9 @@ pub struct BoostStats {
     pub amount_collected_inactive: f32,
     pub big_pads_collected_inactive: u32,
     pub small_pads_collected_inactive: u32,
+    pub inferred_big_pads_collected: u32,
+    pub inferred_small_pads_collected: u32,
+    pub inferred_ambiguous_pads_collected: u32,
     pub amount_stolen: f32,
     pub big_pads_collected: u32,
     pub small_pads_collected: u32,
@@ -31,6 +34,17 @@ pub struct BoostStats {
     pub amount_used_while_grounded: f32,
     pub amount_used_while_airborne: f32,
     pub amount_used_while_supersonic: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoostIncreaseReason {
+    KickoffRespawn,
+    DemoRespawn,
+    Respawn,
+    BigPad,
+    SmallPad,
+    AmbiguousPad,
+    Unknown,
 }
 
 impl BoostStats {
@@ -723,6 +737,76 @@ impl BoostCalculator {
                 && gameplay.kickoff_countdown_time.is_none_or(|t| t <= 0))
     }
 
+    fn classify_boost_increase_reason(
+        previous_boost: f32,
+        boost: f32,
+        kickoff_phase_active: bool,
+        demo_respawn_supported: bool,
+    ) -> BoostIncreaseReason {
+        const TOLERANCE: f32 = 1.0;
+        let delta = boost - previous_boost;
+        if delta <= TOLERANCE {
+            return BoostIncreaseReason::Unknown;
+        }
+
+        let is_respawn_value = (boost - BOOST_KICKOFF_START_AMOUNT).abs() <= TOLERANCE;
+        if demo_respawn_supported && is_respawn_value {
+            return BoostIncreaseReason::DemoRespawn;
+        }
+        if kickoff_phase_active && is_respawn_value {
+            return BoostIncreaseReason::KickoffRespawn;
+        }
+        if is_respawn_value {
+            return BoostIncreaseReason::Respawn;
+        }
+
+        let small_pad_floor = SMALL_PAD_AMOUNT_RAW - 3.0;
+        let big_pad_floor = SMALL_PAD_AMOUNT_RAW + 5.0;
+        if delta > big_pad_floor {
+            return BoostIncreaseReason::BigPad;
+        }
+        if boost >= BOOST_MAX_AMOUNT - TOLERANCE {
+            return BoostIncreaseReason::AmbiguousPad;
+        }
+        if delta >= small_pad_floor {
+            return BoostIncreaseReason::SmallPad;
+        }
+        BoostIncreaseReason::Unknown
+    }
+
+    fn apply_inferred_boost_increase(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        reason: BoostIncreaseReason,
+    ) {
+        let stats = self.player_stats.entry(player_id.clone()).or_default();
+        let team_stats = if is_team_0 {
+            &mut self.team_zero_stats
+        } else {
+            &mut self.team_one_stats
+        };
+
+        match reason {
+            BoostIncreaseReason::BigPad => {
+                stats.inferred_big_pads_collected += 1;
+                team_stats.inferred_big_pads_collected += 1;
+            }
+            BoostIncreaseReason::SmallPad => {
+                stats.inferred_small_pads_collected += 1;
+                team_stats.inferred_small_pads_collected += 1;
+            }
+            BoostIncreaseReason::AmbiguousPad => {
+                stats.inferred_ambiguous_pads_collected += 1;
+                team_stats.inferred_ambiguous_pads_collected += 1;
+            }
+            BoostIncreaseReason::KickoffRespawn
+            | BoostIncreaseReason::DemoRespawn
+            | BoostIncreaseReason::Respawn
+            | BoostIncreaseReason::Unknown => {}
+        }
+    }
+
     fn inactive_pickup_stats(
         &self,
         player: &PlayerSample,
@@ -803,17 +887,27 @@ impl BoostCalculator {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
-            let previous_boost_amount = player.last_boost_amount.unwrap_or_else(|| {
-                self.previous_boost_amounts
-                    .get(&player.player_id)
-                    .copied()
-                    .unwrap_or(boost_amount)
-            });
+            let previous_sample_boost_amount =
+                self.previous_boost_amounts.get(&player.player_id).copied();
+            let previous_boost_amount = player
+                .last_boost_amount
+                .unwrap_or_else(|| previous_sample_boost_amount.unwrap_or(boost_amount));
             let previous_boost_amount = if boost_levels_resumed_this_sample {
                 boost_amount
             } else {
                 previous_boost_amount
             };
+            let demo_respawn_supported = self.pending_demo_respawns.contains(&player.player_id)
+                && player.rigid_body.is_some();
+            if let Some(previous_sample_boost_amount) = previous_sample_boost_amount {
+                let reason = Self::classify_boost_increase_reason(
+                    previous_sample_boost_amount,
+                    boost_amount,
+                    kickoff_phase_active,
+                    demo_respawn_supported,
+                );
+                self.apply_inferred_boost_increase(&player.player_id, player.is_team_0, reason);
+            }
             if track_boost_levels {
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 let time_zero_boost = frame.dt
@@ -901,8 +995,7 @@ impl BoostCalculator {
                 self.kickoff_respawn_awarded
                     .insert(player.player_id.clone());
             }
-            if self.pending_demo_respawns.contains(&player.player_id) && player.rigid_body.is_some()
-            {
+            if demo_respawn_supported {
                 respawn_amount += BOOST_KICKOFF_START_AMOUNT;
                 self.pending_demo_respawns.remove(&player.player_id);
             }
@@ -1476,5 +1569,119 @@ mod tests {
             .expect("player stats should be recorded");
         assert_eq!(player_stats.big_pads_collected_inactive, 0);
         assert_eq!(player_stats.amount_collected_inactive, 0.0);
+    }
+
+    #[test]
+    fn infers_pad_counts_from_observed_boost_increases() {
+        let mut calculator = BoostCalculator::new();
+        let small_player = PlayerId::Steam(1);
+        let big_player = PlayerId::Steam(2);
+        let ambiguous_player = PlayerId::Steam(3);
+        let respawn_player = PlayerId::Steam(4);
+        let position = glam::Vec3::ZERO;
+        let active_gameplay = GameplayState {
+            ball_has_been_hit: Some(true),
+            ..GameplayState::default()
+        };
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 1,
+                    time: 1.0,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![
+                        test_player(small_player.clone(), 10.0, 10.0, position),
+                        test_player(big_player.clone(), 10.0, 10.0, position),
+                        test_player(ambiguous_player.clone(), 230.0, 230.0, position),
+                        test_player(respawn_player.clone(), 0.0, 0.0, position),
+                    ],
+                },
+                &FrameEventsState::default(),
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("first boost update should succeed");
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 2,
+                    time: 1.1,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![
+                        test_player(
+                            small_player.clone(),
+                            10.0 + SMALL_PAD_AMOUNT_RAW,
+                            10.0,
+                            position,
+                        ),
+                        test_player(big_player.clone(), 100.0, 10.0, position),
+                        test_player(ambiguous_player.clone(), BOOST_MAX_AMOUNT, 230.0, position),
+                        test_player(
+                            respawn_player.clone(),
+                            BOOST_KICKOFF_START_AMOUNT,
+                            0.0,
+                            position,
+                        ),
+                    ],
+                },
+                &FrameEventsState::default(),
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("second boost update should succeed");
+
+        let small_stats = calculator
+            .player_stats()
+            .get(&small_player)
+            .expect("small player stats should be recorded");
+        assert_eq!(small_stats.inferred_small_pads_collected, 1);
+        assert_eq!(small_stats.inferred_big_pads_collected, 0);
+        assert_eq!(small_stats.inferred_ambiguous_pads_collected, 0);
+
+        let big_stats = calculator
+            .player_stats()
+            .get(&big_player)
+            .expect("big player stats should be recorded");
+        assert_eq!(big_stats.inferred_big_pads_collected, 1);
+        assert_eq!(big_stats.inferred_small_pads_collected, 0);
+        assert_eq!(big_stats.inferred_ambiguous_pads_collected, 0);
+
+        let ambiguous_stats = calculator
+            .player_stats()
+            .get(&ambiguous_player)
+            .expect("ambiguous player stats should be recorded");
+        assert_eq!(ambiguous_stats.inferred_ambiguous_pads_collected, 1);
+        assert_eq!(ambiguous_stats.inferred_big_pads_collected, 0);
+        assert_eq!(ambiguous_stats.inferred_small_pads_collected, 0);
+
+        let respawn_stats = calculator
+            .player_stats()
+            .get(&respawn_player)
+            .expect("respawn player stats should be recorded");
+        assert_eq!(respawn_stats.inferred_big_pads_collected, 0);
+        assert_eq!(respawn_stats.inferred_small_pads_collected, 0);
+        assert_eq!(respawn_stats.inferred_ambiguous_pads_collected, 0);
+
+        assert_eq!(calculator.team_zero_stats().inferred_big_pads_collected, 1);
+        assert_eq!(
+            calculator.team_zero_stats().inferred_small_pads_collected,
+            1
+        );
+        assert_eq!(
+            calculator
+                .team_zero_stats()
+                .inferred_ambiguous_pads_collected,
+            1
+        );
     }
 }

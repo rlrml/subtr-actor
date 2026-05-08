@@ -85,6 +85,12 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
       time_boost_50_75: 1,
       time_boost_75_100: 0.5,
       amount_collected: 0,
+      amount_collected_inactive: 0,
+      big_pads_collected_inactive: 0,
+      small_pads_collected_inactive: 0,
+      inferred_big_pads_collected: 3,
+      inferred_small_pads_collected: 7,
+      inferred_ambiguous_pads_collected: 1,
       amount_stolen: 0,
       big_pads_collected: 0,
       small_pads_collected: 0,
@@ -112,4 +118,7 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
   assert.match(html, /Time 50-75.*1\.0s \(13%\)/s);
   assert.match(html, /Time 75-100.*0\.5s \(6%\)/s);
   assert.match(html, /Time @ 100.*2\.0s \(25%\)/s);
+  assert.match(html, /Inferred big pads.*3/s);
+  assert.match(html, /Inferred small pads.*7/s);
+  assert.match(html, /Inferred ambiguous pads.*1/s);
 });
