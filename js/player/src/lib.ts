@@ -36,6 +36,7 @@ export type {
 export {
   createReplayLoadOverlay,
   formatReplayLoadProgress,
+  formatReplayLoadProgressMeta,
 } from "./load-ui";
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
 export type {

@@ -25,6 +25,7 @@ import type {
 
 export interface NormalizeReplayDataOptions {
   onProgress?: (progress: number) => void;
+  progressReportMinDelta?: number;
 }
 
 export interface NormalizeReplayDataAsyncOptions extends NormalizeReplayDataOptions {
@@ -246,29 +247,33 @@ function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
 function createNormalizationProgressTracker(
   raw: RawReplayFramesData,
   onProgress?: (progress: number) => void,
-  options: { yieldEveryMs?: number } = {},
+  options: {
+    progressReportMinDelta?: number;
+    yieldEveryMs?: number;
+  } = {},
 ): NormalizeReplayProgressTracker {
-  if (!onProgress) {
-    return {
-      advance() {
-        return false;
-      },
-      finish() {},
-    };
-  }
-
   const totalUnits = getNormalizationTotalUnits(raw);
   let completedUnits = 0;
   let lastReportedProgress = -1;
   let lastYieldedAt = currentTimeMs();
   const yieldEveryMs =
     options.yieldEveryMs ?? Number.POSITIVE_INFINITY;
+  const progressReportMinDelta =
+    options.progressReportMinDelta ?? NORMALIZATION_PROGRESS_REPORT_MIN_DELTA;
 
   const maybeReport = () => {
+    if (!onProgress) {
+      return;
+    }
+
     const progress = Math.max(0, Math.min(1, completedUnits / totalUnits));
+    if (progress <= lastReportedProgress) {
+      return;
+    }
+
     if (
       progress >= 1
-      || progress - lastReportedProgress >= NORMALIZATION_PROGRESS_REPORT_MIN_DELTA
+      || progress - lastReportedProgress >= progressReportMinDelta
     ) {
       lastReportedProgress = progress;
       onProgress(progress);
@@ -283,6 +288,8 @@ function createNormalizationProgressTracker(
     lastYieldedAt = now;
     return true;
   };
+
+  maybeReport();
 
   return {
     advance(units = 1) {
@@ -308,6 +315,7 @@ function createAsyncNormalizationProgressTracker(
     raw,
     options.onProgress,
     {
+      progressReportMinDelta: options.progressReportMinDelta,
       yieldEveryMs:
         options.yieldEveryMs ?? NORMALIZATION_ASYNC_YIELD_INTERVAL_MS,
     },
@@ -1103,7 +1111,13 @@ export function normalizeReplayData(
   raw: RawReplayFramesData,
   options: NormalizeReplayDataOptions = {},
 ): ReplayModel {
-  const progressTracker = createNormalizationProgressTracker(raw, options.onProgress);
+  const progressTracker = createNormalizationProgressTracker(
+    raw,
+    options.onProgress,
+    {
+      progressReportMinDelta: options.progressReportMinDelta,
+    },
+  );
   const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
   const frames = buildPlaybackFrames(raw, progressTracker);
   const players = buildPlayerTracks(raw, progressTracker);

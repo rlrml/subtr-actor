@@ -110,6 +110,38 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
   return "Loading replay...";
 }
 
+export function formatReplayLoadProgressMeta(progress: ReplayLoadProgress): string {
+  const percent = progress.progress ?? 0;
+
+  if (progress.stage === "processing") {
+    if (progress.totalFrames !== undefined) {
+      return progress.processedFrames === undefined
+        ? `${progress.totalFrames} frames`
+        : `${progress.processedFrames}/${progress.totalFrames} frames`;
+    }
+    return "Extracting frame data";
+  }
+
+  if (progress.stage === "validating") {
+    return "Checking replay file";
+  }
+
+  if (progress.stage === "normalizing") {
+    if (percent < 0.45) {
+      return "Decoding structured replay data";
+    }
+    if (percent < 0.65) {
+      return "Parsing frame data";
+    }
+    if (percent < 1) {
+      return "Building playback model";
+    }
+    return "Playback model ready";
+  }
+
+  return progress.stage;
+}
+
 export function createReplayLoadOverlay(
   container: HTMLElement,
   options: ReplayLoadOverlayOptions = {},
@@ -163,13 +195,7 @@ export function createReplayLoadOverlay(
       status.textContent = options.formatProgress?.(progress)
         ?? formatReplayLoadProgress(progress);
       setProgressWidth(progress.progress);
-      if (progress.totalFrames !== undefined) {
-        meta.textContent = progress.processedFrames === undefined
-          ? `${progress.totalFrames} frames`
-          : `${progress.processedFrames}/${progress.totalFrames} frames`;
-      } else {
-        meta.textContent = progress.stage;
-      }
+      meta.textContent = formatReplayLoadProgressMeta(progress);
     },
     complete(message = "Replay loaded") {
       panel.dataset.state = "complete";
