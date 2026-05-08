@@ -84,14 +84,14 @@ pub struct DemolishInfo {
     pub victim_location: boxcars::Vector3f,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub enum BoostPadEventKind {
     PickedUp { sequence: u8 },
     Available,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub enum BoostPadSize {
     Big,

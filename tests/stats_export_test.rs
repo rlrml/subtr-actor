@@ -244,6 +244,9 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
     let stats = BoostStats {
         amount_collected_big: 55.0,
         amount_collected_small: 24.0,
+        amount_collected_inactive: 12.0,
+        big_pads_collected_inactive: 2,
+        small_pads_collected_inactive: 3,
         amount_respawned: 68.0,
         amount_used: 91.0,
         amount_used_while_grounded: 61.0,
@@ -253,6 +256,24 @@ fn test_boost_stats_export_includes_respawn_and_used_fields() {
 
     let fields = stats.stat_fields();
 
+    assert_eq!(
+        find_field(&fields, "boost", "amount_collected_inactive")
+            .descriptor
+            .unit,
+        StatUnit::Boost
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "amount_collected_inactive").value,
+        StatValue::Float(12.0)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "count_collected_inactive_big").value,
+        StatValue::Unsigned(2)
+    );
+    assert_eq!(
+        find_field(&fields, "boost", "count_collected_inactive_small").value,
+        StatValue::Unsigned(3)
+    );
     assert_eq!(
         find_field(&fields, "boost", "amount_respawned")
             .descriptor

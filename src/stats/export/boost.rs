@@ -24,6 +24,24 @@ impl StatFieldProvider for BoostStats {
         ));
         visitor(ExportedStat::float(
             "boost",
+            "amount_collected_inactive",
+            StatUnit::Boost,
+            self.amount_collected_inactive,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_inactive_big",
+            StatUnit::Count,
+            self.big_pads_collected_inactive,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_inactive_small",
+            StatUnit::Count,
+            self.small_pads_collected_inactive,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
             "amount_stolen",
             StatUnit::Boost,
             self.amount_stolen,
