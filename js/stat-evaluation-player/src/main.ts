@@ -23,7 +23,10 @@ import {
   ROLE_LABELS,
 } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
-import { createStatsFrameLookup } from "./statsTimeline.ts";
+import {
+  createStatsFrameLookup,
+  getStatsFrameForReplayFrame,
+} from "./statsTimeline.ts";
 import type { StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 import {
   countEnabledTimelineEvents,
@@ -37,6 +40,7 @@ import {
   getReplayFileNameFromUrl,
   getReplayUrlFromSearch,
 } from "./replayUrl.ts";
+import { StatMonitor } from "./statMonitor.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
@@ -50,6 +54,7 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 let removeRenderHook: (() => void) | null = null;
+let statMonitor: StatMonitor | null = null;
 
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
@@ -80,6 +85,7 @@ let viewport!: HTMLDivElement;
 let emptyState!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let followedPlayerOverlay!: HTMLDivElement;
+let statMonitorOverlay!: HTMLDivElement;
 let playbackRate!: HTMLSelectElement;
 let attachedPlayer!: HTMLSelectElement;
 let cameraViewFreeButton!: HTMLButtonElement;
@@ -101,6 +107,8 @@ let playersReadout!: HTMLElement;
 let framesReadout!: HTMLElement;
 let eventsReadout!: HTMLElement;
 let playerStatsEl!: HTMLDivElement;
+let statMonitorSlotZero!: HTMLElement;
+let statMonitorSlotOne!: HTMLElement;
 let cameraProfileReadout!: HTMLElement;
 let cameraFovReadout!: HTMLElement;
 let cameraHeightReadout!: HTMLElement;
@@ -561,6 +569,11 @@ function renderSnapshot(state: ReplayPlayerState): void {
   );
   renderStats(state.frameIndex);
   renderFocusedPlayerOverlay(state);
+  statMonitor?.renderFrame(
+    statsFrameLookup
+      ? getStatsFrameForReplayFrame(statsFrameLookup, state.frameIndex)
+      : null,
+  );
 }
 
 function createFileReplaySource(file: File): ReplayInputSource {
@@ -614,6 +627,8 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
+  statMonitor?.setStatsTimeline(null);
+  statMonitor?.renderFrame(null);
   clearTimelineEventSources();
   clearTimelineRangeSources();
   clearRenderCaches();
@@ -634,6 +649,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     const { replay } = loadedReplay;
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
+    statMonitor?.setStatsTimeline(statsTimeline);
 
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>
@@ -723,6 +739,10 @@ export function mountStatEvaluationPlayer(
     root,
     "#followed-player-overlay",
   );
+  statMonitorOverlay = mustElement<HTMLDivElement>(
+    root,
+    "#stat-monitor-overlay",
+  );
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
   cameraViewFreeButton = mustElement<HTMLButtonElement>(
@@ -762,6 +782,8 @@ export function mountStatEvaluationPlayer(
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
   playerStatsEl = mustElement<HTMLDivElement>(root, "#player-stats");
+  statMonitorSlotZero = mustElement<HTMLElement>(root, "#stat-monitor-slot-0");
+  statMonitorSlotOne = mustElement<HTMLElement>(root, "#stat-monitor-slot-1");
   cameraProfileReadout = mustElement<HTMLElement>(
     root,
     "#camera-profile-readout",
@@ -782,6 +804,10 @@ export function mountStatEvaluationPlayer(
     "#skip-post-goal-transitions",
   );
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
+  statMonitor = new StatMonitor(
+    [statMonitorSlotZero, statMonitorSlotOne],
+    statMonitorOverlay,
+  );
 
   const listeners = new AbortController();
   const cleanup = () => {
@@ -794,6 +820,8 @@ export function mountStatEvaluationPlayer(
     timelineOverlay = null;
     statsTimeline = null;
     statsFrameLookup = null;
+    statMonitor?.destroy();
+    statMonitor = null;
     clearTimelineEventSources();
     clearTimelineRangeSources();
     clearRenderCaches();

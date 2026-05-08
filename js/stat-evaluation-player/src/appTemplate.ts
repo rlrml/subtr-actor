@@ -25,6 +25,11 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             class="followed-player-overlay"
             hidden
           ></div>
+          <div
+            id="stat-monitor-overlay"
+            class="stat-monitor-overlay"
+            hidden
+          ></div>
           <div id="empty-state" class="empty-state">
             Choose a replay to start the viewer.
           </div>
@@ -106,6 +111,15 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <dd id="camera-stiffness-readout">--</dd>
             </div>
           </dl>
+        </section>
+
+        <section class="panel">
+          <p class="panel-eyebrow">Monitor</p>
+          <h2>Stat watch</h2>
+          <div class="stat-monitor-slots">
+            <div id="stat-monitor-slot-0"></div>
+            <div id="stat-monitor-slot-1"></div>
+          </div>
         </section>
 
         <section class="panel">

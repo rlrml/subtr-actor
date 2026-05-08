@@ -92,6 +92,7 @@ input {
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(21rem, 0.9fr);
+  align-items: start;
   gap: 1rem;
   min-height: 0;
 }
@@ -352,6 +353,94 @@ input {
   padding: 0.08rem 0;
 }
 
+.stat-monitor-overlay {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 7.25rem;
+  z-index: 3;
+  display: grid;
+  gap: 0.55rem;
+  width: min(25rem, calc(100% - 2.5rem));
+  pointer-events: none;
+}
+
+.stat-monitor-overlay[hidden] {
+  display: none;
+}
+
+.stat-monitor-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(4, 12, 18, 0.78);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+}
+
+.stat-monitor-card-header,
+.stat-monitor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.stat-monitor-card-header {
+  margin-bottom: 0.45rem;
+}
+
+.stat-monitor-card-title {
+  min-width: 0;
+  color: #edf5fa;
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-monitor-card-scope {
+  flex-shrink: 0;
+  color: #9eb4c6;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stat-monitor-card-rows {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.stat-monitor-row {
+  min-height: 1.35rem;
+  padding-left: 0.55rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.76rem;
+}
+
+.stat-monitor-row.team-blue {
+  border-left-color: var(--blue);
+}
+
+.stat-monitor-row.team-orange {
+  border-left-color: var(--orange);
+}
+
+.stat-monitor-row-label {
+  min-width: 0;
+  color: #bdd0de;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-monitor-row-value {
+  flex-shrink: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 .empty-state {
   position: absolute;
   inset: auto 1.25rem 1.25rem;
@@ -494,6 +583,7 @@ input {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
+  align-items: start;
   gap: 1rem;
 }
 
@@ -624,6 +714,102 @@ input[type="range"] {
   gap: 0.5rem;
 }
 
+.stat-monitor-slots {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.stat-monitor-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.stat-monitor-input-label {
+  min-width: 0;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.stat-monitor-input-label input {
+  min-width: 0;
+  width: 100%;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.62rem 0.75rem;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.stat-monitor-clear {
+  padding: 0.62rem 0.72rem;
+  border-radius: 0.8rem;
+  font-size: 0.8rem;
+}
+
+.stat-monitor-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 12;
+  overflow: hidden;
+  display: grid;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.85rem;
+  background: rgba(5, 14, 22, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36);
+}
+
+.stat-monitor-suggestions[hidden] {
+  display: none;
+}
+
+.stat-monitor-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0.62rem 0.72rem;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.stat-monitor-suggestion + .stat-monitor-suggestion {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stat-monitor-suggestion:hover {
+  background: rgba(75, 148, 255, 0.12);
+}
+
+.stat-monitor-suggestion span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-monitor-suggestion strong {
+  flex-shrink: 0;
+  color: #87afd4;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stat-monitor-suggestion-empty {
+  padding: 0.7rem 0.75rem;
+  color: #9eb4c6;
+  font-size: 0.82rem;
+}
+
 .module-settings {
   display: grid;
   gap: 0.75rem;
@@ -747,6 +933,12 @@ input[type="range"] {
     left: 1rem;
     width: min(22rem, calc(100% - 2rem));
   }
+
+  .stat-monitor-overlay {
+    right: 1rem;
+    bottom: 6.5rem;
+    width: min(23rem, calc(100% - 2rem));
+  }
 }
 
 @media (max-width: 560px) {
@@ -765,6 +957,16 @@ input[type="range"] {
   }
 
   .followed-player-overlay-card {
+    width: 100%;
+  }
+
+  .stat-monitor-overlay {
+    position: static;
+    width: 100%;
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .stat-monitor-card {
     width: 100%;
   }
 }
