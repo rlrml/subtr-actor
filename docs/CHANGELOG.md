@@ -6,6 +6,12 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.5.3 - 2026-05-08
+
+- Fix the stats evaluation player npm smoke-install fixture so it includes the
+  required `boost_pickups` stats event bucket.
+- Refresh Rust, Python, and JavaScript release metadata to `0.5.3`.
+
 ## v0.5.2 - 2026-05-08
 
 - Fix the Nix-powered GitHub Pages build metadata for the stats evaluation
