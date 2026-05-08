@@ -836,6 +836,13 @@ input[type="range"] {
   gap: 0.45rem;
 }
 
+.module-settings-group-title {
+  margin: 0;
+  color: #d7e5ef;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .module-settings-header {
   display: flex;
   align-items: start;

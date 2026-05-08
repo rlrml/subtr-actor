@@ -2,7 +2,7 @@ import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
-import type { ReplayBoostPadSize } from "subtr-actor-player";
+import type { ReplayModel } from "subtr-actor-player";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
@@ -18,6 +18,11 @@ import {
   buildTouchTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
+import type { BoostPickupTimelineRangeOptions } from "../timelineRanges.ts";
+import type { BoostPickupActivity } from "../generated/BoostPickupActivity.ts";
+import type { BoostPickupComparison } from "../generated/BoostPickupComparison.ts";
+import type { BoostPickupFieldHalf } from "../generated/BoostPickupFieldHalf.ts";
+import type { BoostPickupPadType } from "../generated/BoostPickupPadType.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot, StatsTimeline } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
@@ -77,18 +82,64 @@ function boostPickupAuditCountsForPlayer(
   return counts;
 }
 
+type BoostPickupFilterOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
+const BOOST_PICKUP_PAD_TYPE_OPTIONS = [
+  { value: "big", label: "Big pads" },
+  { value: "small", label: "Small pads" },
+  { value: "ambiguous", label: "Ambiguous pads" },
+] satisfies Array<BoostPickupFilterOption<BoostPickupPadType>>;
+
+const BOOST_PICKUP_COMPARISON_OPTIONS = [
+  { value: "both", label: "Matched pickups" },
+  { value: "ghost", label: "Ghost pickups" },
+  { value: "missed", label: "Missed pickups" },
+] satisfies Array<BoostPickupFilterOption<BoostPickupComparison>>;
+
+const BOOST_PICKUP_ACTIVITY_OPTIONS = [
+  { value: "active", label: "Active play" },
+  { value: "inactive", label: "Inactive play" },
+  { value: "unknown", label: "Unknown activity" },
+] satisfies Array<BoostPickupFilterOption<BoostPickupActivity>>;
+
+const BOOST_PICKUP_FIELD_HALF_OPTIONS = [
+  { value: "own", label: "Own half" },
+  { value: "opponent", label: "Opponent half" },
+  { value: "unknown", label: "Unknown half" },
+] satisfies Array<BoostPickupFilterOption<BoostPickupFieldHalf>>;
+
 export function createBoostModule(runtime: StatModuleRuntime): StatModule {
   let settingsEl: HTMLDivElement | null = null;
   let pickupReadoutEl: HTMLElement | null = null;
-  const activePickupSizes = new Set<ReplayBoostPadSize>(["small", "big"]);
-  const orderedPickupSizes: ReplayBoostPadSize[] = ["small", "big"];
+  let playerOptionsEl: HTMLDivElement | null = null;
+  let lastReplay: ReplayModel | null = null;
+  const activePadTypes = new Set<BoostPickupPadType>(
+    BOOST_PICKUP_PAD_TYPE_OPTIONS.map((option) => option.value),
+  );
+  const activeComparisons = new Set<BoostPickupComparison>(
+    BOOST_PICKUP_COMPARISON_OPTIONS.map((option) => option.value),
+  );
+  const activeActivities = new Set<BoostPickupActivity>(
+    BOOST_PICKUP_ACTIVITY_OPTIONS.map((option) => option.value),
+  );
+  const activeFieldHalves = new Set<BoostPickupFieldHalf>(
+    BOOST_PICKUP_FIELD_HALF_OPTIONS.map((option) => option.value),
+  );
+  let activePlayerIds: Set<string> | null = null;
 
   return {
     id: "boost",
     label: "Boost",
 
-    setup() {
-      syncBoostSettingsUi();
+    setup(ctx) {
+      if (lastReplay !== ctx.replay) {
+        lastReplay = ctx.replay;
+        activePlayerIds = null;
+      }
+      syncBoostSettingsUi(ctx.replay);
     },
 
     teardown() {},
@@ -96,9 +147,17 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
     onBeforeRender() {},
 
     getTimelineRanges(ctx) {
-      return buildBoostPickupTimelineRanges(ctx.statsTimeline, ctx.replay, {
-        sizes: orderedPickupSizes.filter((size) => activePickupSizes.has(size)),
-      });
+      const options: BoostPickupTimelineRangeOptions = {
+        padTypes: activePadTypes,
+        comparisons: activeComparisons,
+        activities: activeActivities,
+        fieldHalves: activeFieldHalves,
+      };
+      if (activePlayerIds) {
+        options.playerIds = activePlayerIds;
+      }
+
+      return buildBoostPickupTimelineRanges(ctx.statsTimeline, ctx.replay, options);
     },
 
     renderStats(frameIndex, ctx) {
@@ -134,7 +193,7 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
       );
     },
 
-    renderSettings() {
+    renderSettings(ctx) {
       if (!settingsEl) {
         settingsEl = document.createElement("div");
         settingsEl.className = "module-settings-card";
@@ -154,63 +213,208 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
         pickupReadoutEl.className = "metric-readout";
         header.append(text, pickupReadoutEl);
 
-        const options = document.createElement("div");
-        options.className = "module-settings-options";
-
-        for (const option of [
-          { size: "small", label: "Small pads" },
-          { size: "big", label: "Big pads" },
-        ] satisfies Array<{ size: ReplayBoostPadSize; label: string }>) {
-          const optionLabel = document.createElement("label");
-          optionLabel.className = "toggle";
-
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.dataset.pickupSize = option.size;
-          checkbox.addEventListener("change", () => {
-            if (checkbox.checked) {
-              activePickupSizes.add(option.size);
-            } else {
-              activePickupSizes.delete(option.size);
-            }
-            syncBoostSettingsUi();
-            runtime.refreshTimelineRanges?.();
-          });
-
-          const optionText = document.createElement("span");
-          optionText.textContent = option.label;
-          optionLabel.append(checkbox, optionText);
-          options.append(optionLabel);
-        }
-
-        settingsEl.append(header, options);
+        settingsEl.append(
+          header,
+          createFilterGroup(
+            "Pad type",
+            BOOST_PICKUP_PAD_TYPE_OPTIONS,
+            activePadTypes,
+            "pad-type",
+          ),
+          createFilterGroup(
+            "Pickup label",
+            BOOST_PICKUP_COMPARISON_OPTIONS,
+            activeComparisons,
+            "comparison",
+          ),
+          createFilterGroup(
+            "Activity",
+            BOOST_PICKUP_ACTIVITY_OPTIONS,
+            activeActivities,
+            "activity",
+          ),
+          createFilterGroup(
+            "Field half",
+            BOOST_PICKUP_FIELD_HALF_OPTIONS,
+            activeFieldHalves,
+            "field-half",
+          ),
+          createPlayerFilterGroup(),
+        );
       }
 
-      syncBoostSettingsUi();
+      rebuildPlayerOptions(ctx?.replay ?? null);
+      syncBoostSettingsUi(ctx?.replay ?? null);
       return settingsEl;
     },
   };
 
-  function syncBoostSettingsUi(): void {
+  function createFilterGroup<T extends string>(
+    title: string,
+    optionSpecs: Array<BoostPickupFilterOption<T>>,
+    activeValues: Set<T>,
+    filterKey: string,
+  ): HTMLDivElement {
+    const group = document.createElement("div");
+    group.className = "module-settings-subgroup";
+
+    const groupTitle = document.createElement("p");
+    groupTitle.className = "module-settings-group-title";
+    groupTitle.textContent = title;
+
+    const groupOptions = document.createElement("div");
+    groupOptions.className = "module-settings-options";
+
+    for (const option of optionSpecs) {
+      const optionLabel = document.createElement("label");
+      optionLabel.className = "toggle";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.boostPickupFilter = filterKey;
+      checkbox.dataset.boostPickupValue = option.value;
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          activeValues.add(option.value);
+        } else {
+          activeValues.delete(option.value);
+        }
+        syncBoostSettingsUi(lastReplay);
+        runtime.refreshTimelineRanges?.();
+      });
+
+      const optionText = document.createElement("span");
+      optionText.textContent = option.label;
+      optionLabel.append(checkbox, optionText);
+      groupOptions.append(optionLabel);
+    }
+
+    group.append(groupTitle, groupOptions);
+    return group;
+  }
+
+  function createPlayerFilterGroup(): HTMLDivElement {
+    const group = document.createElement("div");
+    group.className = "module-settings-subgroup";
+
+    const groupTitle = document.createElement("p");
+    groupTitle.className = "module-settings-group-title";
+    groupTitle.textContent = "Player";
+
+    playerOptionsEl = document.createElement("div");
+    playerOptionsEl.className = "module-settings-options";
+
+    group.append(groupTitle, playerOptionsEl);
+    return group;
+  }
+
+  function rebuildPlayerOptions(replay: ReplayModel | null): void {
+    if (!playerOptionsEl) {
+      return;
+    }
+
+    playerOptionsEl.replaceChildren();
+    if (!replay) {
+      return;
+    }
+
+    for (const player of replay.players) {
+      const optionLabel = document.createElement("label");
+      optionLabel.className = "toggle";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.boostPickupPlayerId = player.id;
+      checkbox.addEventListener("change", () => {
+        if (!activePlayerIds) {
+          activePlayerIds = new Set(replay.players.map((candidate) => candidate.id));
+        }
+        if (checkbox.checked) {
+          activePlayerIds.add(player.id);
+        } else {
+          activePlayerIds.delete(player.id);
+        }
+        syncBoostSettingsUi(replay);
+        runtime.refreshTimelineRanges?.();
+      });
+
+      const optionText = document.createElement("span");
+      optionText.textContent = `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`;
+      optionLabel.append(checkbox, optionText);
+      playerOptionsEl.append(optionLabel);
+    }
+  }
+
+  function syncBoostSettingsUi(replay: ReplayModel | null): void {
     if (!settingsEl) {
       return;
     }
 
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-pickup-size]",
+      "input[data-boost-pickup-filter][data-boost-pickup-value]",
     )) {
-      const size = checkbox.dataset.pickupSize as ReplayBoostPadSize | undefined;
-      checkbox.checked = size ? activePickupSizes.has(size) : false;
+      const filterKey = checkbox.dataset.boostPickupFilter;
+      const value = checkbox.dataset.boostPickupValue;
+      checkbox.checked = isBoostFilterValueActive(filterKey, value);
+    }
+
+    for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-boost-pickup-player-id]",
+    )) {
+      const playerId = checkbox.dataset.boostPickupPlayerId;
+      checkbox.checked = playerId
+        ? activePlayerIds?.has(playerId) ?? true
+        : false;
     }
 
     if (pickupReadoutEl) {
-      const enabled = orderedPickupSizes.filter((size) =>
-        activePickupSizes.has(size)
-      );
-      pickupReadoutEl.textContent = enabled.length === 0
-        ? "Hidden"
-        : enabled.map((size) => size === "small" ? "Small" : "Big").join(" + ");
+      pickupReadoutEl.textContent = getBoostPickupReadout(replay);
     }
+  }
+
+  function isBoostFilterValueActive(
+    filterKey: string | undefined,
+    value: string | undefined,
+  ): boolean {
+    if (!value) {
+      return false;
+    }
+
+    switch (filterKey) {
+      case "pad-type":
+        return activePadTypes.has(value as BoostPickupPadType);
+      case "comparison":
+        return activeComparisons.has(value as BoostPickupComparison);
+      case "activity":
+        return activeActivities.has(value as BoostPickupActivity);
+      case "field-half":
+        return activeFieldHalves.has(value as BoostPickupFieldHalf);
+      default:
+        return false;
+    }
+  }
+
+  function getBoostPickupReadout(replay: ReplayModel | null): string {
+    const playerCount = replay?.players.length ?? 0;
+    const visiblePlayerCount = activePlayerIds ? activePlayerIds.size : playerCount;
+    const hidden = activePadTypes.size === 0 ||
+      activeComparisons.size === 0 ||
+      activeActivities.size === 0 ||
+      activeFieldHalves.size === 0 ||
+      (activePlayerIds !== null && activePlayerIds.size === 0);
+    if (hidden) {
+      return "Hidden";
+    }
+
+    const constrainedGroups = [
+      activePadTypes.size < BOOST_PICKUP_PAD_TYPE_OPTIONS.length,
+      activeComparisons.size < BOOST_PICKUP_COMPARISON_OPTIONS.length,
+      activeActivities.size < BOOST_PICKUP_ACTIVITY_OPTIONS.length,
+      activeFieldHalves.size < BOOST_PICKUP_FIELD_HALF_OPTIONS.length,
+      activePlayerIds !== null && visiblePlayerCount < playerCount,
+    ].filter(Boolean).length;
+
+    return constrainedGroups === 0 ? "All labels" : `${constrainedGroups} filters`;
   }
 }
 

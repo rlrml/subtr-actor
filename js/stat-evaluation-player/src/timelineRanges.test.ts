@@ -350,6 +350,10 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
     "boost-pickup:3:10:0",
     "boost-pickup:9:20:0",
   ]);
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay, {
+    comparisons: ["ghost"],
+  }), []);
 });
 
 test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events", () => {
@@ -426,6 +430,20 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
       color: "#f59e0b",
       isTeamZero: false,
     },
+  ]);
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
+    padTypes: ["big"],
+    comparisons: ["ghost"],
+    playerIds: ["Steam:orange-id"],
+  }), []);
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
+    padTypes: ["small"],
+    comparisons: ["ghost"],
+    playerIds: ["Steam:orange-id"],
+  }).map((range) => range.id), [
+    "boost-pickup:ghost:20:Steam:orange-id:0",
   ]);
 });
 
