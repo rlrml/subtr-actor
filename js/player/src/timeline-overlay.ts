@@ -78,6 +78,7 @@ function ensureStyles(): void {
 
     .sap-tl-shell {
       --sap-tl-thumb-size: 1.35rem;
+      --sap-tl-track-height: 0.6rem;
       --sap-tl-gutter-width: clamp(4.5rem, 10vw, 6.75rem);
       --sap-tl-gutter-gap: 0.7rem;
       --sap-tl-marker-offset: 1.05rem;
@@ -208,7 +209,7 @@ function ensureStyles(): void {
     .sap-tl-range-lane-track {
       position: relative;
       grid-column: 2;
-      height: 0.55rem;
+      height: var(--sap-tl-track-height);
       margin: 0 calc(var(--sap-tl-thumb-size) / 2);
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.06);
@@ -258,12 +259,30 @@ function ensureStyles(): void {
       position: relative;
       grid-column: 2;
       min-width: 0;
+      min-height: var(--sap-tl-thumb-size);
+    }
+
+    .sap-tl-main-rail {
+      position: absolute;
+      left: calc(var(--sap-tl-thumb-size) / 2);
+      right: calc(var(--sap-tl-thumb-size) / 2);
+      top: 50%;
+      height: var(--sap-tl-track-height);
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(90deg, rgba(60, 134, 255, 0.42), rgba(103, 179, 255, 0.58) 45%, rgba(242, 138, 37, 0.58));
+      box-shadow: inset 0 0 0 999px rgba(5, 10, 15, 0.4);
+      transform: translateY(-50%);
+      pointer-events: none;
+      z-index: 0;
     }
 
     .sap-tl-range {
       position: relative;
       z-index: 2;
       width: 100%;
+      height: var(--sap-tl-thumb-size);
       margin: 0;
       appearance: none;
       background: transparent;
@@ -275,21 +294,19 @@ function ensureStyles(): void {
     }
 
     .sap-tl-range::-webkit-slider-runnable-track {
-      height: 0.6rem;
+      height: var(--sap-tl-track-height);
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background:
-        linear-gradient(90deg, rgba(60, 134, 255, 0.42), rgba(103, 179, 255, 0.58) 45%, rgba(242, 138, 37, 0.58));
-      box-shadow: inset 0 0 0 999px rgba(5, 10, 15, 0.4);
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .sap-tl-range::-moz-range-track {
-      height: 0.6rem;
+      height: var(--sap-tl-track-height);
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background:
-        linear-gradient(90deg, rgba(60, 134, 255, 0.42), rgba(103, 179, 255, 0.58) 45%, rgba(242, 138, 37, 0.58));
-      box-shadow: inset 0 0 0 999px rgba(5, 10, 15, 0.4);
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .sap-tl-range::-webkit-slider-thumb {
@@ -1013,6 +1030,9 @@ export function createTimelineOverlayPlugin(
       const trackRail = document.createElement("div");
       trackRail.className = "sap-tl-track-rail";
 
+      const mainRail = document.createElement("div");
+      mainRail.className = "sap-tl-main-rail";
+
       markers = document.createElement("div");
       markers.className = "sap-tl-markers";
 
@@ -1053,7 +1073,7 @@ export function createTimelineOverlayPlugin(
         window.removeEventListener("pointercancel", handleWindowPointerUp);
       };
 
-      trackRail.append(markers, range);
+      trackRail.append(mainRail, markers, range);
       trackWrap.append(rangesRoot, toggleButton, trackRail);
       shell.append(topLine, trackWrap);
       root.append(shell);

@@ -277,6 +277,9 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
 
 test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtered lane", () => {
   const replay = {
+    frames: Array.from({ length: 51 }, (_, index) => ({
+      time: index === 10 ? 1.25 : index === 20 ? 2.5 : index / 10,
+    })),
     players: [
       {
         id: "Steam:blue-id",
@@ -332,13 +335,13 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
   }), [
     {
       id: "boost-pickup:3:10:0",
-      startTime: 1,
-      endTime: 1.08,
+      startTime: 1.25,
+      endTime: 1.33,
       lane: "boost-pickups",
       laneLabel: "Boost Pickups",
       label: "Blue picked up small boost pad 3",
       shortLabel: "12",
-      color: "rgba(52, 211, 153, 0.86)",
+      color: "#3b82f6",
       isTeamZero: true,
     },
   ]);
@@ -387,6 +390,9 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
     ],
   });
   const replay = {
+    frames: Array.from({ length: 21 }, (_, index) => ({
+      time: index === 20 ? 2.25 : index / 10,
+    })),
     players: [
       {
         id: "Steam:blue-id",
@@ -411,13 +417,13 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
   }), [
     {
       id: "boost-pickup:ghost:20:Steam:orange-id:0",
-      startTime: 2,
-      endTime: 2.08,
+      startTime: 2.25,
+      endTime: 2.33,
       lane: "boost-pickups",
       laneLabel: "Boost Pickups",
       label: "Orange ghost small boost pickup",
       shortLabel: "G",
-      color: "rgba(239, 68, 68, 0.9)",
+      color: "#f59e0b",
       isTeamZero: false,
     },
   ]);
