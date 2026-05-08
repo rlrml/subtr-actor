@@ -88,9 +88,6 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
       amount_collected_inactive: 0,
       big_pads_collected_inactive: 0,
       small_pads_collected_inactive: 0,
-      inferred_big_pads_collected: 3,
-      inferred_small_pads_collected: 7,
-      inferred_ambiguous_pads_collected: 1,
       amount_stolen: 0,
       big_pads_collected: 0,
       small_pads_collected: 0,
@@ -110,7 +107,14 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
     },
   }).boost;
 
-  const html = renderBoostStats(boost);
+  const html = renderBoostStats(boost, {
+    both: 9,
+    ghost: 2,
+    missed: 1,
+    inferredBig: 3,
+    inferredSmall: 7,
+    inferredAmbiguous: 1,
+  });
 
   assert.match(html, /Time @ 0.*1\.0s \(13%\)/s);
   assert.match(html, /Time 0-25.*1\.5s \(19%\)/s);
@@ -121,4 +125,7 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
   assert.match(html, /Inferred big pads.*3/s);
   assert.match(html, /Inferred small pads.*7/s);
   assert.match(html, /Inferred ambiguous pads.*1/s);
+  assert.match(html, /Matched pickups.*9/s);
+  assert.match(html, /Ghost pickups.*2/s);
+  assert.match(html, /Missed pickups.*1/s);
 });

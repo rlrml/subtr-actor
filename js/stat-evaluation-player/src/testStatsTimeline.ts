@@ -50,6 +50,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     fifty_fifty: [],
     rush: [],
     speed_flip: [],
+    boost_pickups: [],
   }, overrides);
 }
 
@@ -137,9 +138,6 @@ export function createTeamStatsSnapshot(
       amount_collected_inactive: 0,
       big_pads_collected_inactive: 0,
       small_pads_collected_inactive: 0,
-      inferred_big_pads_collected: 0,
-      inferred_small_pads_collected: 0,
-      inferred_ambiguous_pads_collected: 0,
       amount_stolen: 0,
       big_pads_collected: 0,
       small_pads_collected: 0,
@@ -406,6 +404,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
   fifty_fifty_events?: StatsEvents["fifty_fifty"];
   rush_events?: StatsEvents["rush"];
   speed_flip_events?: StatsEvents["speed_flip"];
+  boost_pickups?: StatsEvents["boost_pickups"];
 } = {}): StatsTimeline {
   return createStatsTimeline({
     ...overrides,
@@ -418,6 +417,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
+      boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
     },
   });
 }

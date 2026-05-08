@@ -281,6 +281,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             fifty_fifty: Vec::new(),
             rush: Vec::new(),
             speed_flip: Vec::new(),
+            boost_pickups: Vec::new(),
         },
         frames: vec![
             ReplayStatsFrame {

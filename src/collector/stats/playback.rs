@@ -152,6 +152,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_speed_flip_event,
             )?,
+            boost_pickups: Vec::new(),
         })
     }
 

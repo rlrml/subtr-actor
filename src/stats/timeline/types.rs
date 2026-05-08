@@ -40,6 +40,7 @@ pub struct ReplayStatsTimelineEvents {
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
+    pub boost_pickups: Vec<BoostPickupComparisonEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

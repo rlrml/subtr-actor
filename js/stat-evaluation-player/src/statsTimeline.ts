@@ -1,4 +1,5 @@
 import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
+import type { BoostPickupComparisonEvent } from "./generated/BoostPickupComparisonEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
@@ -37,6 +38,7 @@ export type {
   StatLabel,
   StatsTimelineConfig,
   TimelineEvent,
+  BoostPickupComparisonEvent,
 };
 
 export function createStatsFrameLookup(statsTimeline: StatsTimeline): Map<number, StatsFrame> {

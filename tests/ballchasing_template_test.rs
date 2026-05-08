@@ -68,6 +68,43 @@ fn expected_player_big_pad_count(ballchasing: &Value, team_key: &str, player_nam
     json_u32(player, "/stats/boost/count_collected_big")
 }
 
+fn expected_team_pad_count(ballchasing: &Value, team_key: &str, field: &str) -> u32 {
+    json_u32(ballchasing, &format!("/{team_key}/stats/boost/{field}"))
+}
+
+fn describe_inactive_inclusive_team_pad_counts_against_ballchasing(
+    boost: &BoostCalculator,
+    ballchasing: &Value,
+    team_key: &str,
+    fixture_name: &str,
+) {
+    let team_stats = match team_key {
+        "blue" => boost.team_zero_stats(),
+        "orange" => boost.team_one_stats(),
+        _ => panic!("Unexpected team key {team_key}"),
+    };
+    let actual_big = team_stats.big_pads_collected + team_stats.big_pads_collected_inactive;
+    let actual_small = team_stats.small_pads_collected + team_stats.small_pads_collected_inactive;
+    let expected_big = expected_team_pad_count(ballchasing, team_key, "count_collected_big");
+    let expected_small = expected_team_pad_count(ballchasing, team_key, "count_collected_small");
+
+    eprintln!(
+        "{fixture_name} {team_key}: \
+         big actual={} expected={} delta={} (active={} inactive={}); \
+         small actual={} expected={} delta={} (active={} inactive={})",
+        actual_big,
+        expected_big,
+        i64::from(actual_big) - i64::from(expected_big),
+        team_stats.big_pads_collected,
+        team_stats.big_pads_collected_inactive,
+        actual_small,
+        expected_small,
+        i64::from(actual_small) - i64::from(expected_small),
+        team_stats.small_pads_collected,
+        team_stats.small_pads_collected_inactive,
+    );
+}
+
 fn assert_inactive_inclusive_big_pad_counts_match_ballchasing(
     boost: &BoostCalculator,
     players: &[PlayerInfo],
@@ -139,6 +176,43 @@ fn problematic_private_duel_big_pad_counts_match_ballchasing_with_inactive_picku
         &ballchasing,
         "orange",
     );
+}
+
+#[test]
+#[ignore = "Diagnostic output for inactive-inclusive team pad count deltas across Ballchasing fixtures."]
+fn describe_ballchasing_fixture_team_pad_count_deltas_with_inactive_pickups() {
+    for fixture_name in [
+        "problematic-private-duel-2026-03-20",
+        "recent-ranked-doubles-2026-03-10",
+        "recent-ranked-standard-2026-03-10-a",
+        "recent-ranked-standard-2026-03-10-b",
+    ] {
+        let replay = parse_replay(&format!("assets/{fixture_name}.replay"));
+        let ballchasing: Value = serde_json::from_slice(
+            &std::fs::read(format!("assets/{fixture_name}.ballchasing.json"))
+                .unwrap_or_else(|_| panic!("Failed to read Ballchasing JSON for {fixture_name}")),
+        )
+        .unwrap_or_else(|_| panic!("Failed to parse Ballchasing JSON for {fixture_name}"));
+        let graph =
+            stats::analysis_graph::collect_builtin_analysis_graph_for_replay(&replay, ["boost"])
+                .unwrap_or_else(|_| panic!("Expected boost analysis graph for {fixture_name}"));
+        let boost = graph
+            .state::<BoostCalculator>()
+            .unwrap_or_else(|| panic!("Expected boost calculator state for {fixture_name}"));
+
+        describe_inactive_inclusive_team_pad_counts_against_ballchasing(
+            boost,
+            &ballchasing,
+            "blue",
+            fixture_name,
+        );
+        describe_inactive_inclusive_team_pad_counts_against_ballchasing(
+            boost,
+            &ballchasing,
+            "orange",
+            fixture_name,
+        );
+    }
 }
 
 #[derive(Clone)]

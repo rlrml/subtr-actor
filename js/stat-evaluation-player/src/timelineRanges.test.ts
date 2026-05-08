@@ -325,7 +325,9 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
     ],
   } as Partial<ReplayModel> as ReplayModel;
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(replay, {
+  const legacyTimeline = createLegacyStatsTimeline();
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay, {
     sizes: ["small"],
   }), [
     {
@@ -341,9 +343,83 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
     },
   ]);
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(replay).map((range) => range.id), [
+  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay).map((range) => range.id), [
     "boost-pickup:3:10:0",
     "boost-pickup:9:20:0",
+  ]);
+});
+
+test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events", () => {
+  const timeline = createLegacyStatsTimeline({
+    boost_pickups: [
+      {
+        comparison: "both",
+        frame: 10,
+        time: 1,
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        pad_type: "big",
+        field_half: "own",
+        activity: "active",
+        reported_frame: 10,
+        reported_time: 1,
+        inferred_frame: 9,
+        inferred_time: 0.98,
+        boost_before: 0,
+        boost_after: 100,
+      },
+      {
+        comparison: "ghost",
+        frame: 20,
+        time: 2,
+        player_id: { Steam: "orange-id" },
+        is_team_0: false,
+        pad_type: "small",
+        field_half: "opponent",
+        activity: "active",
+        reported_frame: 20,
+        reported_time: 2,
+        inferred_frame: null,
+        inferred_time: null,
+        boost_before: null,
+        boost_after: null,
+      },
+    ],
+  });
+  const replay = {
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+        isTeamZero: true,
+        cameraSettings: {},
+        frames: [],
+      },
+      {
+        id: "Steam:orange-id",
+        name: "Orange",
+        isTeamZero: false,
+        cameraSettings: {},
+        frames: [],
+      },
+    ],
+    boostPads: [],
+  } as Partial<ReplayModel> as ReplayModel;
+
+  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
+    comparisons: ["ghost"],
+  }), [
+    {
+      id: "boost-pickup:ghost:20:Steam:orange-id:0",
+      startTime: 2,
+      endTime: 2.08,
+      lane: "boost-pickups",
+      laneLabel: "Boost Pickups",
+      label: "Orange ghost small boost pickup",
+      shortLabel: "G",
+      color: "rgba(239, 68, 68, 0.9)",
+      isTeamZero: false,
+    },
   ]);
 });
 

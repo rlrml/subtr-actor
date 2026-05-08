@@ -40,24 +40,6 @@ impl StatFieldProvider for BoostStats {
             StatUnit::Count,
             self.small_pads_collected_inactive,
         ));
-        visitor(ExportedStat::unsigned(
-            "boost",
-            "count_inferred_collected_big",
-            StatUnit::Count,
-            self.inferred_big_pads_collected,
-        ));
-        visitor(ExportedStat::unsigned(
-            "boost",
-            "count_inferred_collected_small",
-            StatUnit::Count,
-            self.inferred_small_pads_collected,
-        ));
-        visitor(ExportedStat::unsigned(
-            "boost",
-            "count_inferred_collected_ambiguous",
-            StatUnit::Count,
-            self.inferred_ambiguous_pads_collected,
-        ));
         visitor(ExportedStat::float(
             "boost",
             "amount_stolen",

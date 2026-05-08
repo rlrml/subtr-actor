@@ -93,6 +93,15 @@ function formatInteger(value: number | undefined): string {
     : `${Math.round(value)}`;
 }
 
+export interface BoostPickupAuditCounts {
+  both: number;
+  ghost: number;
+  missed: number;
+  inferredBig: number;
+  inferredSmall: number;
+  inferredAmbiguous: number;
+}
+
 function formatNumber(
   value: number | undefined,
   digits = 1,
@@ -370,7 +379,10 @@ export function renderSpeedFlipStats(
   `;
 }
 
-export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined): string {
+export function renderBoostStats(
+  boost: PlayerStatsSnapshot["boost"] | undefined,
+  pickupAuditCounts?: BoostPickupAuditCounts,
+): string {
   const avgBoost =
     boost && boost.tracked_time > 0
       ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)
@@ -391,9 +403,12 @@ export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined
     <div class="stat-row"><span class="label">Small pads</span><span class="value">${boost?.small_pads_collected ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Inactive big pads</span><span class="value">${boost?.big_pads_collected_inactive ?? "?"}</span></div>
     <div class="stat-row"><span class="label">Inactive small pads</span><span class="value">${boost?.small_pads_collected_inactive ?? "?"}</span></div>
-    <div class="stat-row"><span class="label">Inferred big pads</span><span class="value">${boost?.inferred_big_pads_collected ?? "?"}</span></div>
-    <div class="stat-row"><span class="label">Inferred small pads</span><span class="value">${boost?.inferred_small_pads_collected ?? "?"}</span></div>
-    <div class="stat-row"><span class="label">Inferred ambiguous pads</span><span class="value">${boost?.inferred_ambiguous_pads_collected ?? "?"}</span></div>
+    <div class="stat-row"><span class="label">Inferred big pads</span><span class="value">${formatInteger(pickupAuditCounts?.inferredBig)}</span></div>
+    <div class="stat-row"><span class="label">Inferred small pads</span><span class="value">${formatInteger(pickupAuditCounts?.inferredSmall)}</span></div>
+    <div class="stat-row"><span class="label">Inferred ambiguous pads</span><span class="value">${formatInteger(pickupAuditCounts?.inferredAmbiguous)}</span></div>
+    <div class="stat-row"><span class="label">Matched pickups</span><span class="value">${formatInteger(pickupAuditCounts?.both)}</span></div>
+    <div class="stat-row"><span class="label">Ghost pickups</span><span class="value">${formatInteger(pickupAuditCounts?.ghost)}</span></div>
+    <div class="stat-row"><span class="label">Missed pickups</span><span class="value">${formatInteger(pickupAuditCounts?.missed)}</span></div>
     <div class="stat-row"><span class="label">Stolen</span><span class="value">${formatBoostDisplayAmount(boost?.amount_stolen)}</span></div>
     <div class="stat-row"><span class="label">Avg boost</span><span class="value">${avgBoost}</span></div>
     <div class="stat-row"><span class="label">Time @ 0</span><span class="value">${formatTimeShareFromTrackedTime(asNumber(boost?.time_zero_boost), trackedTime)}</span></div>

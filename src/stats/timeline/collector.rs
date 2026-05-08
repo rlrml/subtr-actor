@@ -72,11 +72,14 @@ impl StatsTimelineCollector {
             .replay_meta
             .clone()
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
-        let events = self
+        let mut events = self
             .graph
             .state::<StatsTimelineEventsState>()
             .map(|state| state.events.clone())
             .unwrap_or_default();
+        if let Some(boost) = self.graph.state::<BoostCalculator>() {
+            events.boost_pickups = boost.pickup_comparison_events().to_vec();
+        }
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
             replay_meta,

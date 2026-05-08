@@ -48,5 +48,8 @@ impl_analysis_node! {
             live_play_state.counts_toward_player_motion(),
         )
     },
+    finish = |node| {
+        node.calculator.finish_calculation()
+    },
     state_ref = |node| &node.calculator,
 }
