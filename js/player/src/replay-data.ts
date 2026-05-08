@@ -24,8 +24,12 @@ import type {
 } from "./types";
 
 export interface NormalizeReplayDataOptions {
-  onProgress?: (progress: number) => void;
+  onProgress?: (
+    progress: number,
+    details: NormalizeReplayProgress,
+  ) => void;
   progressReportMinDelta?: number;
+  progressReportFrameInterval?: number;
 }
 
 export interface NormalizeReplayDataAsyncOptions extends NormalizeReplayDataOptions {
@@ -33,8 +37,17 @@ export interface NormalizeReplayDataAsyncOptions extends NormalizeReplayDataOpti
   yieldToMainThread?: () => Promise<void>;
 }
 
+export interface NormalizeReplayProgress {
+  progress: number;
+  processedFrames: number;
+  totalFrames: number;
+  processedUnits: number;
+  totalUnits: number;
+}
+
 interface NormalizeReplayProgressTracker {
   advance(units?: number): boolean;
+  advanceFrame(units?: number): boolean;
   finish(): void;
 }
 
@@ -68,6 +81,7 @@ const BOOST_PAD_CENTER_MID_Y = 1024;
 const BOOST_PAD_GOAL_LINE_Y = 4240;
 const STANDARD_SOCCAR_BOOST_PAD_COUNT = 34;
 const NORMALIZATION_PROGRESS_REPORT_MIN_DELTA = 0.005;
+const NORMALIZATION_PROGRESS_REPORT_FRAME_INTERVAL = Number.POSITIVE_INFINITY;
 const NORMALIZATION_ASYNC_YIELD_INTERVAL_MS = 16;
 
 function playerIdToString(playerId: RawPlayerId): string {
@@ -244,45 +258,83 @@ function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
   ].reduce((sum, count) => sum + count, 0);
 }
 
+function getNormalizationTotalFrameUnits(raw: RawReplayFramesData): number {
+  const playerFrameCount = raw.frame_data.players.reduce(
+    (count, [, playerData]) => count + playerData.frames.length,
+    0,
+  );
+
+  return [
+    Math.max(1, raw.frame_data.metadata_frames.length),
+    Math.max(1, playerFrameCount),
+    Math.max(1, raw.frame_data.ball_data.frames.length),
+  ].reduce((sum, count) => sum + count, 0);
+}
+
 function createNormalizationProgressTracker(
   raw: RawReplayFramesData,
-  onProgress?: (progress: number) => void,
+  onProgress?: (
+    progress: number,
+    details: NormalizeReplayProgress,
+  ) => void,
   options: {
     progressReportMinDelta?: number;
+    progressReportFrameInterval?: number;
     yieldEveryMs?: number;
   } = {},
 ): NormalizeReplayProgressTracker {
   const totalUnits = getNormalizationTotalUnits(raw);
+  const totalFrameUnits = getNormalizationTotalFrameUnits(raw);
   let completedUnits = 0;
+  let completedFrameUnits = 0;
   let lastReportedProgress = -1;
+  let lastReportedFrameUnits = -1;
   let lastYieldedAt = currentTimeMs();
   const yieldEveryMs =
     options.yieldEveryMs ?? Number.POSITIVE_INFINITY;
   const progressReportMinDelta =
     options.progressReportMinDelta ?? NORMALIZATION_PROGRESS_REPORT_MIN_DELTA;
+  const progressReportFrameInterval = Math.max(
+    1,
+    options.progressReportFrameInterval
+      ?? NORMALIZATION_PROGRESS_REPORT_FRAME_INTERVAL,
+  );
 
   const maybeReport = () => {
     if (!onProgress) {
-      return;
+      return false;
     }
 
     const progress = Math.max(0, Math.min(1, completedUnits / totalUnits));
     if (progress <= lastReportedProgress) {
-      return;
+      return false;
     }
 
+    const frameDelta = completedFrameUnits - lastReportedFrameUnits;
+    const reachedFrameInterval = frameDelta >= progressReportFrameInterval;
     if (
       progress >= 1
       || progress - lastReportedProgress >= progressReportMinDelta
+      || reachedFrameInterval
     ) {
       lastReportedProgress = progress;
-      onProgress(progress);
+      lastReportedFrameUnits = completedFrameUnits;
+      onProgress(progress, {
+        progress,
+        processedFrames: Math.min(completedFrameUnits, totalFrameUnits),
+        totalFrames: totalFrameUnits,
+        processedUnits: completedUnits,
+        totalUnits,
+      });
+      return reachedFrameInterval;
     }
+
+    return false;
   };
 
-  const shouldYield = () => {
+  const shouldYield = (force = false) => {
     const now = currentTimeMs();
-    if (now - lastYieldedAt < yieldEveryMs) {
+    if (!force && now - lastYieldedAt < yieldEveryMs) {
       return false;
     }
     lastYieldedAt = now;
@@ -297,11 +349,21 @@ function createNormalizationProgressTracker(
         return false;
       }
       completedUnits = Math.min(totalUnits, completedUnits + units);
-      maybeReport();
-      return shouldYield();
+      const shouldYieldForReport = maybeReport();
+      return shouldYield(shouldYieldForReport);
+    },
+    advanceFrame(units = 1) {
+      if (units <= 0) {
+        return false;
+      }
+      completedFrameUnits = Math.min(totalFrameUnits, completedFrameUnits + units);
+      completedUnits = Math.min(totalUnits, completedUnits + units);
+      const shouldYieldForReport = maybeReport();
+      return shouldYield(shouldYieldForReport);
     },
     finish() {
       completedUnits = totalUnits;
+      completedFrameUnits = totalFrameUnits;
       maybeReport();
     },
   };
@@ -316,6 +378,7 @@ function createAsyncNormalizationProgressTracker(
     options.onProgress,
     {
       progressReportMinDelta: options.progressReportMinDelta,
+      progressReportFrameInterval: options.progressReportFrameInterval,
       yieldEveryMs:
         options.yieldEveryMs ?? NORMALIZATION_ASYNC_YIELD_INTERVAL_MS,
     },
@@ -334,7 +397,7 @@ function buildPlaybackFrames(
 ): PlaybackFrame[] {
   const metadataFrames = raw.frame_data.metadata_frames;
   if (metadataFrames.length === 0) {
-    progressTracker?.advance();
+    progressTracker?.advanceFrame();
     return [];
   }
 
@@ -349,7 +412,7 @@ function buildPlaybackFrames(
       gameState: frame.replicated_game_state_name,
       kickoffCountdown: frame.replicated_game_state_time_remaining,
     };
-    progressTracker?.advance();
+    progressTracker?.advanceFrame();
   }
 
   return frames;
@@ -361,7 +424,7 @@ async function buildPlaybackFramesAsync(
 ): Promise<PlaybackFrame[]> {
   const metadataFrames = raw.frame_data.metadata_frames;
   if (metadataFrames.length === 0) {
-    if (progressTracker.advance()) {
+    if (progressTracker.advanceFrame()) {
       await progressTracker.yieldToMainThread();
     }
     return [];
@@ -378,7 +441,7 @@ async function buildPlaybackFramesAsync(
       gameState: frame.replicated_game_state_name,
       kickoffCountdown: frame.replicated_game_state_time_remaining,
     };
-    if (progressTracker.advance()) {
+    if (progressTracker.advanceFrame()) {
       await progressTracker.yieldToMainThread();
     }
   }
@@ -527,7 +590,7 @@ function buildPlayerTracks(
       }
       frames[index] = parsePlayerFrame(frame);
       processedPlayerFrames += 1;
-      progressTracker?.advance();
+      progressTracker?.advanceFrame();
     }
 
     const playerIdString = playerIdToString(playerId);
@@ -548,7 +611,7 @@ function buildPlayerTracks(
   }
 
   if (processedPlayerFrames === 0) {
-    progressTracker?.advance();
+    progressTracker?.advanceFrame();
   }
 
   return players;
@@ -575,7 +638,7 @@ async function buildPlayerTracksAsync(
       }
       frames[index] = parsePlayerFrame(frame);
       processedPlayerFrames += 1;
-      if (progressTracker.advance()) {
+      if (progressTracker.advanceFrame()) {
         await progressTracker.yieldToMainThread();
       }
     }
@@ -597,7 +660,7 @@ async function buildPlayerTracksAsync(
     });
   }
 
-  if (processedPlayerFrames === 0 && progressTracker.advance()) {
+  if (processedPlayerFrames === 0 && progressTracker.advanceFrame()) {
     await progressTracker.yieldToMainThread();
   }
 
@@ -719,14 +782,14 @@ function buildBallFrames(
 ): BallSample[] {
   const rawBallFrames = raw.frame_data.ball_data.frames;
   if (rawBallFrames.length === 0) {
-    progressTracker?.advance();
+    progressTracker?.advanceFrame();
     return [];
   }
 
   const ballFrames = new Array<BallSample>(rawBallFrames.length);
   for (let index = 0; index < rawBallFrames.length; index += 1) {
     ballFrames[index] = parseBallFrame(rawBallFrames[index]!);
-    progressTracker?.advance();
+    progressTracker?.advanceFrame();
   }
 
   return ballFrames;
@@ -738,7 +801,7 @@ async function buildBallFramesAsync(
 ): Promise<BallSample[]> {
   const rawBallFrames = raw.frame_data.ball_data.frames;
   if (rawBallFrames.length === 0) {
-    if (progressTracker.advance()) {
+    if (progressTracker.advanceFrame()) {
       await progressTracker.yieldToMainThread();
     }
     return [];
@@ -747,7 +810,7 @@ async function buildBallFramesAsync(
   const ballFrames = new Array<BallSample>(rawBallFrames.length);
   for (let index = 0; index < rawBallFrames.length; index += 1) {
     ballFrames[index] = parseBallFrame(rawBallFrames[index]!);
-    if (progressTracker.advance()) {
+    if (progressTracker.advanceFrame()) {
       await progressTracker.yieldToMainThread();
     }
   }
@@ -1116,6 +1179,7 @@ export function normalizeReplayData(
     options.onProgress,
     {
       progressReportMinDelta: options.progressReportMinDelta,
+      progressReportFrameInterval: options.progressReportFrameInterval,
     },
   );
   const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;

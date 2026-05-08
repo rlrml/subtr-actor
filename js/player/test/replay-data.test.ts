@@ -116,14 +116,18 @@ function assertMonotonicProgress(progressValues: number[]): void {
 
 test("normalization progress is reported headlessly at a bounded cadence", () => {
   const progressValues: number[] = [];
+  const frameCounts: number[] = [];
 
   normalizeReplayData(buildReplayData(240), {
-    onProgress(progress) {
+    onProgress(progress, details) {
       progressValues.push(progress);
+      frameCounts.push(details.processedFrames);
     },
   });
 
   assertMonotonicProgress(progressValues);
+  assert.equal(frameCounts[0], 0);
+  assert.equal(frameCounts.at(-1), 1440);
   assert.ok(progressValues.length > 10, "expected incremental progress reports");
   assert.ok(progressValues.length <= 210, "expected throttled progress reports");
 
@@ -138,6 +142,25 @@ test("normalization progress is reported headlessly at a bounded cadence", () =>
       "expected reports to respect the default progress delta",
     );
   }
+});
+
+test("normalization progress can be reported by processed frame records", () => {
+  const progressValues: number[] = [];
+  const frameCounts: number[] = [];
+
+  normalizeReplayData(buildReplayData(240), {
+    progressReportMinDelta: 1,
+    progressReportFrameInterval: 300,
+    onProgress(progress, details) {
+      progressValues.push(progress);
+      frameCounts.push(details.processedFrames);
+      assert.equal(details.totalFrames, 1440);
+    },
+  });
+
+  assert.deepEqual(frameCounts, [0, 300, 600, 900, 1200, 1440]);
+  assert.equal(progressValues[0], 0);
+  assert.equal(progressValues.at(-1), 1);
 });
 
 test("normalization progress report cadence is configurable", () => {
@@ -180,6 +203,27 @@ test("async normalization can yield without a progress callback", async () => {
 
   assert.deepEqual(replay, normalizeReplayData(raw));
   assert.ok(yieldCount > 1, "expected async normalization to yield headlessly");
+});
+
+test("async normalization yields at configured frame progress intervals", async () => {
+  let yieldCount = 0;
+  const raw = buildReplayData(24);
+
+  const replay = await normalizeReplayDataAsync(raw, {
+    progressReportMinDelta: 1,
+    progressReportFrameInterval: 24,
+    yieldEveryMs: Number.POSITIVE_INFINITY,
+    onProgress() {},
+    yieldToMainThread: async () => {
+      yieldCount += 1;
+    },
+  });
+
+  assert.deepEqual(replay, normalizeReplayData(raw));
+  assert.ok(
+    yieldCount >= 5,
+    "expected frame progress reports to give the browser paint opportunities",
+  );
 });
 
 test("replay loading text shows incremental normalization substeps", () => {

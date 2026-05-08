@@ -135,6 +135,7 @@ export async function loadReplayBundleInWorker(
       );
       options.onProgress?.({ stage: "normalizing", progress: 0.65 });
       const replay = await normalizeReplayDataAsync(rawReplayData, {
+        progressReportFrameInterval: reportEveryNFrames,
         onProgress(progress) {
           options.onProgress?.({
             stage: "normalizing",

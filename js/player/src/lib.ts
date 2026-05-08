@@ -32,6 +32,7 @@ export {
 export type {
   NormalizeReplayDataAsyncOptions,
   NormalizeReplayDataOptions,
+  NormalizeReplayProgress,
 } from "./replay-data";
 export {
   createReplayLoadOverlay,
