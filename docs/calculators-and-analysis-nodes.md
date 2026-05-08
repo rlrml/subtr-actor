@@ -90,7 +90,7 @@ code wants the calculator's accumulated stats, config, and event lists.
 - If shared frame-derived state is missing, add that as a dedicated dependency
   node instead of recomputing it inside each stat node.
 - If output wiring changes, update the relevant collector or exporter
-  (`src/collector/stats_timeline.rs`, `src/collector/stats/`, or
+  (`src/stats/timeline/`, `src/collector/stats/`, or
   `src/stats/export/`).
 
 ## Legacy note

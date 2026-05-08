@@ -1,12 +1,10 @@
 pub mod callback;
 pub mod decorator;
-mod frame_resolution;
+pub(crate) mod frame_resolution;
 pub mod ndarray;
 pub mod replay_data;
 pub mod replay_data_heuristics;
 pub mod stats;
-pub mod stats_timeline;
-pub mod stats_timeline_types;
 
 pub use self::ndarray::*;
 pub use callback::*;
@@ -15,8 +13,6 @@ pub use frame_resolution::StatsFrameResolution;
 pub use replay_data::*;
 pub use replay_data_heuristics::*;
 pub use stats::*;
-pub use stats_timeline::*;
-pub use stats_timeline_types::*;
 
 use crate::*;
 use boxcars;
