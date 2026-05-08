@@ -15,8 +15,11 @@ interface BoostPadMeshes {
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   core: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   cooldown: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  orb: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial>;
-  glow: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  orb: THREE.Mesh<
+    THREE.BufferGeometry,
+    THREE.MeshBasicMaterial | THREE.MeshPhongMaterial
+  >;
+  glow: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 }
 
 function configureOverlayMaterial(material: THREE.MeshBasicMaterial): void {
@@ -30,22 +33,49 @@ function configureOverlayMaterial(material: THREE.MeshBasicMaterial): void {
 }
 
 const PAD_SURFACE_Z_OFFSET = 6;
+const PAD_VISUAL_SCALE = 0.6;
+
+function scaledPadDimension(value: number): number {
+  return value * PAD_VISUAL_SCALE;
+}
 
 function padRadius(pad: ReplayBoostPad): number {
-  return pad.size === "big" ? 150 : 92;
+  return scaledPadDimension(pad.size === "big" ? 150 : 92);
 }
 
 function padOrbRadius(pad: ReplayBoostPad): number {
-  return pad.size === "big" ? 155 : 46;
+  return scaledPadDimension(pad.size === "big" ? 155 : 46);
 }
 
 function padOrbBottomClearance(pad: ReplayBoostPad): number {
-  return pad.size === "big" ? 34 : 14;
+  return scaledPadDimension(pad.size === "big" ? 34 : 14);
 }
 
 function padOrbCenterZ(pad: ReplayBoostPad): number {
   return (
     PAD_SURFACE_Z_OFFSET + padOrbBottomClearance(pad) + padOrbRadius(pad)
+  );
+}
+
+function padSmallLightBeamHeight(): number {
+  return scaledPadDimension(105);
+}
+
+function padLightCenterZ(pad: ReplayBoostPad): number {
+  if (pad.size === "big") {
+    return padOrbCenterZ(pad);
+  }
+  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(5);
+}
+
+function padGlowCenterZ(pad: ReplayBoostPad): number {
+  if (pad.size === "big") {
+    return padOrbCenterZ(pad);
+  }
+  return (
+    PAD_SURFACE_Z_OFFSET +
+    scaledPadDimension(4) +
+    padSmallLightBeamHeight() / 2
   );
 }
 
@@ -57,6 +87,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
   const radius = padRadius(pad);
   const color = padColor(pad);
   const orbRadius = padOrbRadius(pad);
+  const isBigPad = pad.size === "big";
   const group = new THREE.Group();
   group.position.set(pad.position.x, pad.position.y, pad.position.z);
   group.renderOrder = 20;
@@ -111,38 +142,57 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
   group.add(cooldown);
 
   const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(orbRadius, pad.size === "big" ? 32 : 20, 18),
-    new THREE.MeshPhongMaterial({
-      color,
-      emissive: new THREE.Color(color),
-      emissiveIntensity: pad.size === "big" ? 0.6 : 0.42,
-      shininess: 88,
-      specular: new THREE.Color(0xfff2c2),
-      transparent: true,
-      opacity: 0.92,
-      depthWrite: false,
-    })
+    isBigPad
+      ? new THREE.SphereGeometry(orbRadius, 32, 18)
+      : new THREE.CircleGeometry(orbRadius * 0.9, 24),
+    isBigPad
+      ? new THREE.MeshPhongMaterial({
+          color,
+          emissive: new THREE.Color(color),
+          emissiveIntensity: 0.6,
+          shininess: 88,
+          specular: new THREE.Color(0xfff2c2),
+          transparent: true,
+          opacity: 0.92,
+          depthWrite: false,
+        })
+      : new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.88,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
   );
-  orb.position.z = padOrbCenterZ(pad);
+  orb.position.z = padLightCenterZ(pad);
   orb.renderOrder = 23;
   orb.frustumCulled = false;
   group.add(orb);
 
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(
-      orbRadius * 1.36,
-      pad.size === "big" ? 32 : 20,
-      14
-    ),
+    isBigPad
+      ? new THREE.SphereGeometry(orbRadius * 1.36, 32, 14)
+      : new THREE.ConeGeometry(
+          orbRadius * 0.82,
+          padSmallLightBeamHeight(),
+          28,
+          1,
+          true
+        ),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
-      opacity: pad.size === "big" ? 0.2 : 0.13,
+      opacity: isBigPad ? 0.2 : 0.16,
+      side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
   );
-  glow.position.z = padOrbCenterZ(pad);
+  glow.position.z = padGlowCenterZ(pad);
+  if (!isBigPad) {
+    glow.rotation.x = Math.PI / 2;
+  }
   glow.renderOrder = 24;
   glow.frustumCulled = false;
   group.add(glow);
@@ -198,33 +248,39 @@ function updatePadMeshes(
   showCooldownProgress: boolean
 ): void {
   const { available, progress } = boostPadAvailableState(pad, currentTime);
+  const isBigPad = pad.size === "big";
   const pulse = 0.92 + 0.08 * Math.sin(currentTime * 6 + pad.index * 0.45);
   const orbPulse =
-    0.96 + 0.04 * Math.sin(currentTime * 4.8 + pad.index * 0.37);
-  const hover =
-    Math.sin(currentTime * 2.2 + pad.index * 0.61) *
-    (pad.size === "big" ? 18 : 7);
-  const orbZ = padOrbCenterZ(pad) + hover;
+    0.96 +
+    0.04 *
+      Math.sin(currentTime * (isBigPad ? 4.8 : 7.2) + pad.index * 0.37);
+  const hover = isBigPad
+    ? Math.sin(currentTime * 2.2 + pad.index * 0.61) * 18
+    : 0;
+  const lightZ = padLightCenterZ(pad) + hover;
+  const glowZ = padGlowCenterZ(pad) + hover;
 
-  meshes.orb.position.z = orbZ;
-  meshes.glow.position.z = orbZ;
-  meshes.orb.rotation.z = currentTime * (pad.size === "big" ? 0.9 : 1.25);
+  meshes.orb.position.z = lightZ;
+  meshes.glow.position.z = glowZ;
+  meshes.orb.rotation.z = currentTime * (isBigPad ? 0.9 : 1.25);
   meshes.glow.rotation.z = -currentTime * 0.45;
 
   if (available) {
     meshes.group.visible = true;
     meshes.ring.material.opacity = 0.95;
-    meshes.core.material.opacity = pad.size === "big" ? 0.56 : 0.44;
+    meshes.core.material.opacity = isBigPad ? 0.56 : 0.5;
     meshes.cooldown.visible = false;
     meshes.ring.scale.setScalar(pulse);
     meshes.core.scale.setScalar(1);
     meshes.orb.visible = true;
     meshes.glow.visible = true;
-    meshes.orb.material.opacity = pad.size === "big" ? 0.96 : 0.84;
+    meshes.orb.material.opacity = isBigPad ? 0.96 : 0.9;
     meshes.glow.material.opacity =
-      (pad.size === "big" ? 0.2 : 0.13) + (orbPulse - 0.96);
+      (isBigPad ? 0.2 : 0.16) + (orbPulse - 0.96);
     meshes.orb.scale.setScalar(orbPulse);
-    meshes.glow.scale.setScalar(1.02 + (orbPulse - 0.96) * 2);
+    meshes.glow.scale.setScalar(
+      isBigPad ? 1.02 + (orbPulse - 0.96) * 2 : 1
+    );
     return;
   }
 
