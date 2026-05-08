@@ -6,6 +6,13 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.5.1 - 2026-05-08
+
+- Improve the stats evaluation player replay-loading modal with more granular,
+  callback-backed progress phases for stats construction, serialization,
+  decoding, and replay-model normalization.
+- Refresh Rust, Python, and JavaScript release metadata to `0.5.1`.
+
 ## v0.5.0 - 2026-04-29
 
 - Relax Cargo dependency version bounds so downstream builds can pick up newer
