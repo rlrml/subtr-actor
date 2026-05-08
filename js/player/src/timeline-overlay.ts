@@ -46,6 +46,10 @@ interface TimelineRangeRecord {
   endTimelineTime: number;
 }
 
+interface TimelineRangeLanePlayhead {
+  element: HTMLDivElement;
+}
+
 interface TimelineMarkerRecord {
   element: HTMLButtonElement;
   timelineTime: number;
@@ -253,6 +257,20 @@ function ensureStyles(): void {
       opacity: 0.92;
       filter: brightness(1.12);
       transform: scaleY(1.06);
+    }
+
+    .sap-tl-range-playhead {
+      position: absolute;
+      top: -0.14rem;
+      bottom: -0.14rem;
+      width: 1px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(245, 251, 255, 0.74);
+      box-shadow: 0 0 0 1px rgba(6, 12, 18, 0.45);
+      opacity: 0.9;
+      pointer-events: none;
+      z-index: 3;
     }
 
     .sap-tl-track-rail {
@@ -687,6 +705,7 @@ export function createTimelineOverlayPlugin(
   let projectionCacheKey: string | null = null;
   const markerElements = new Map<string, TimelineMarkerRecord>();
   const rangeElements: TimelineRangeRecord[] = [];
+  const rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
 
   function refreshMarkers(): void {
     if (!playerContext) {
@@ -780,6 +799,11 @@ export function createTimelineOverlayPlugin(
       record.element.dataset.active =
         currentTime >= leftTime && currentTime <= rightTime ? "true" : "false";
     }
+
+    const playheadLeft = markerLeftPercent(Math.min(currentTime, duration), duration);
+    for (const playhead of rangeLanePlayheads) {
+      playhead.element.style.left = playheadLeft;
+    }
   }
 
   function buildMarkers(
@@ -831,6 +855,7 @@ export function createTimelineOverlayPlugin(
 
     rangesRoot.replaceChildren();
     rangeElements.splice(0, rangeElements.length);
+    rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
 
     const customRanges = resolveRangeSources(extraRangeSources, context).filter((range) =>
       Number.isFinite(range.startTime) &&
@@ -890,6 +915,11 @@ export function createTimelineOverlayPlugin(
           endTimelineTime: endProjection.timelineTime,
         });
       }
+
+      const playhead = document.createElement("div");
+      playhead.className = "sap-tl-range-playhead";
+      track.append(playhead);
+      rangeLanePlayheads.push({ element: playhead });
 
       laneEl.append(track);
       rangesRoot.append(laneEl);
@@ -1110,6 +1140,7 @@ export function createTimelineOverlayPlugin(
       projectionCacheKey = null;
       markerElements.clear();
       rangeElements.splice(0, rangeElements.length);
+      rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
       if (changedContainerPosition) {
         context.container.style.position = originalContainerPosition;
         changedContainerPosition = false;
