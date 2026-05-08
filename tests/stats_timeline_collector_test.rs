@@ -34,7 +34,7 @@ fn normalized_team_stats_for_live_play_comparison(
 ) -> TeamStatsSnapshot {
     let mut normalized = snapshot.clone();
     normalized.core = CoreTeamStats::default();
-    normalized.boost.amount_used = 0.0;
+    normalize_boost_for_live_play_comparison(&mut normalized.boost);
     normalized.demo = DemoTeamStats::default();
     normalized
 }
@@ -61,9 +61,16 @@ fn normalized_player_stats_for_live_play_comparison(
 ) -> PlayerStatsSnapshot {
     let mut normalized = snapshot.clone();
     normalized.core = CorePlayerStats::default();
-    normalized.boost.amount_used = 0.0;
+    normalize_boost_for_live_play_comparison(&mut normalized.boost);
     normalized.demo = DemoPlayerStats::default();
     normalized
+}
+
+fn normalize_boost_for_live_play_comparison(boost: &mut BoostStats) {
+    boost.amount_used = 0.0;
+    boost.amount_collected_inactive = 0.0;
+    boost.big_pads_collected_inactive = 0;
+    boost.small_pads_collected_inactive = 0;
 }
 
 /// Check that a cumulative stat field never decreases between consecutive frames

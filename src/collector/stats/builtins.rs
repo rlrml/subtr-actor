@@ -350,10 +350,11 @@ pub(crate) fn builtin_module_json(
         }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
-            serialize_to_json_value(&TeamPlayerStatsExport {
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
                 team_zero: calculator.team_zero_stats(),
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.pickup_comparison_events(),
             })
         }
         "movement" => {

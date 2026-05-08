@@ -152,7 +152,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_speed_flip_event,
             )?,
-            boost_pickups: Vec::new(),
+            boost_pickups: self.module_player_events(
+                "boost",
+                "events",
+                parse_boost_pickup_comparison_event,
+            )?,
         })
     }
 
@@ -182,6 +186,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "speed_flip".to_owned(),
             Value::Array(self.module_array("speed_flip", "events")),
+        );
+        events.insert(
+            "boost_pickups".to_owned(),
+            Value::Array(self.module_array("boost", "events")),
         );
         Value::Object(events)
     }
@@ -1050,6 +1058,28 @@ fn parse_speed_flip_event(value: &Value) -> SubtrActorResult<SpeedFlipEvent> {
     })
 }
 
+fn parse_boost_pickup_comparison_event(
+    value: &Value,
+) -> SubtrActorResult<BoostPickupComparisonEvent> {
+    let object = json_object(value, "boost pickup comparison event")?;
+    Ok(BoostPickupComparisonEvent {
+        comparison: decode_json_value(json_required_value(object, "comparison")?.clone())?,
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        pad_type: decode_json_value(json_required_value(object, "pad_type")?.clone())?,
+        field_half: decode_json_value(json_required_value(object, "field_half")?.clone())?,
+        activity: decode_json_value(json_required_value(object, "activity")?.clone())?,
+        reported_frame: json_optional_usize(object.get("reported_frame"))?,
+        reported_time: json_optional_f32(object.get("reported_time"))?,
+        inferred_frame: json_optional_usize(object.get("inferred_frame"))?,
+        inferred_time: json_optional_f32(object.get("inferred_time"))?,
+        boost_before: json_optional_f32(object.get("boost_before"))?,
+        boost_after: json_optional_f32(object.get("boost_after"))?,
+    })
+}
+
 fn json_object<'a>(
     value: &'a Value,
     context: &str,
@@ -1116,6 +1146,31 @@ fn json_required_bool(
 
 fn json_optional_bool(value: Option<&Value>) -> Option<bool> {
     value.and_then(Value::as_bool)
+}
+
+fn json_optional_f32(value: Option<&Value>) -> SubtrActorResult<Option<f32>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => json_f32(value).map(Some).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                "Expected optional JSON value to be a float".to_owned(),
+            ))
+        }),
+    }
+}
+
+fn json_optional_usize(value: Option<&Value>) -> SubtrActorResult<Option<usize>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(|number| Some(number as usize))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                    "Expected optional JSON value to be an unsigned integer".to_owned(),
+                ))
+            }),
+    }
 }
 
 fn json_required_vec3(
