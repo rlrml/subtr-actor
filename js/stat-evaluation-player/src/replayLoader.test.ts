@@ -238,6 +238,15 @@ test("getReplayLoadPhaseStates keeps legacy stats timeline indeterminate without
 
 test("formatReplayLoadProgress reports detailed stats and decode work", () => {
   assert.equal(
+    formatReplayLoadProgress({
+      stage: "building-stats",
+      processedFrames: 3,
+      totalFrames: 10,
+      progress: 0.3,
+    }),
+    "Building stats snapshots... 30% (3/10)",
+  );
+  assert.equal(
     formatReplayLoadProgress({ stage: "stats-timeline", progress: 0.42 }),
     "Serializing replay data... 35%",
   );

@@ -239,6 +239,9 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
       return "Processing replay frames...";
     case "building-stats":
       if (percent !== null) {
+        if (normalizedProgress.totalFrames !== undefined) {
+          return `Building stats snapshots... ${percent}% (${normalizedProgress.processedFrames ?? 0}/${normalizedProgress.totalFrames})`;
+        }
         return `Building stats snapshots... ${percent}%`;
       }
       return "Building stats snapshots...";
