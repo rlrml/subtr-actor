@@ -133,6 +133,10 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             <input id="show-followed-player-overlay" type="checkbox" />
             <span>Show followed player in viewport</span>
           </label>
+          <label class="toggle">
+            <input id="show-boost-pickup-animation" type="checkbox" checked />
+            <span>Boost pickup counts in viewport</span>
+          </label>
           <div class="module-list" id="module-summary"></div>
           <div id="module-settings" class="module-settings" hidden></div>
         </section>

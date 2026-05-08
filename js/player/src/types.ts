@@ -357,6 +357,7 @@ export interface ReplayPlayerOptions {
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
   initialBoostMeterEnabled?: boolean;
+  initialBoostPickupAnimationEnabled?: boolean;
   initialPlaybackRate?: number;
   initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
@@ -384,6 +385,7 @@ export interface ReplayPlayerState {
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   boostMeterEnabled: boolean;
+  boostPickupAnimationEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -407,6 +409,7 @@ export interface ReplayPlaylistPlayerState {
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  boostPickupAnimationEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -425,6 +428,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "attachedPlayerId"
     | "ballCamEnabled"
     | "boostMeterEnabled"
+    | "boostPickupAnimationEnabled"
     | "skipPostGoalTransitionsEnabled"
     | "skipKickoffsEnabled"
   >

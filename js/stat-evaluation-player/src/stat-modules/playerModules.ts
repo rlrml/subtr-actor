@@ -2,7 +2,10 @@ import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
-import type { ReplayModel } from "subtr-actor-player";
+import type {
+  BoostPickupAnimationPickup,
+  ReplayModel,
+} from "subtr-actor-player";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
@@ -116,6 +119,7 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
   let pickupReadoutEl: HTMLElement | null = null;
   let playerOptionsEl: HTMLDivElement | null = null;
   let lastReplay: ReplayModel | null = null;
+  let lastStatsTimeline: StatsTimeline | null = null;
   const activePadTypes = new Set<BoostPickupPadType>(
     BOOST_PICKUP_PAD_TYPE_OPTIONS.map((option) => option.value),
   );
@@ -139,6 +143,7 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
         lastReplay = ctx.replay;
         activePlayerIds = null;
       }
+      lastStatsTimeline = ctx.statsTimeline;
       syncBoostSettingsUi(ctx.replay);
     },
 
@@ -158,6 +163,10 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
       }
 
       return buildBoostPickupTimelineRanges(ctx.statsTimeline, ctx.replay, options);
+    },
+
+    includeBoostPickupAnimationPickup(pickup) {
+      return isBoostPickupAnimationPickupIncluded(pickup);
     },
 
     renderStats(frameIndex, ctx) {
@@ -415,6 +424,48 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
     ].filter(Boolean).length;
 
     return constrainedGroups === 0 ? "All labels" : `${constrainedGroups} filters`;
+  }
+
+  function isBoostPickupAnimationPickupIncluded(
+    pickup: BoostPickupAnimationPickup,
+  ): boolean {
+    if (activePlayerIds && !activePlayerIds.has(pickup.player.id)) {
+      return false;
+    }
+
+    const comparisonEvents = lastStatsTimeline?.events.boost_pickups ?? [];
+    if (comparisonEvents.length === 0) {
+      return activePadTypes.has(pickup.pad.size) &&
+        activeComparisons.has("both") &&
+        activeActivities.has("unknown") &&
+        activeFieldHalves.has("unknown");
+    }
+
+    const matchedEvent = comparisonEvents.find((event) => {
+      const playerId = playerIdToString(event.player_id);
+      const reportedFrame = event.reported_frame ?? event.frame;
+      return (
+        playerId === pickup.player.id &&
+        event.comparison !== "missed" &&
+        reportedFrame === pickup.event.frame &&
+        isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
+      );
+    });
+    if (!matchedEvent) {
+      return false;
+    }
+
+    return activePadTypes.has(matchedEvent.pad_type) &&
+      activeComparisons.has(matchedEvent.comparison) &&
+      activeActivities.has(matchedEvent.activity) &&
+      activeFieldHalves.has(matchedEvent.field_half);
+  }
+
+  function isBoostPickupPadTypeCompatible(
+    padType: BoostPickupPadType,
+    padSize: "big" | "small",
+  ): boolean {
+    return padType === padSize || padType === "ambiguous";
   }
 }
 

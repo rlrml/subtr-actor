@@ -91,6 +91,7 @@ export class ReplayPlayer extends EventTarget {
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
   private boostMeterEnabled: boolean;
+  private boostPickupAnimationEnabled: boolean;
   private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
@@ -117,6 +118,8 @@ export class ReplayPlayer extends EventTarget {
       (this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE);
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
     this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
+    this.boostPickupAnimationEnabled =
+      options.initialBoostPickupAnimationEnabled ?? true;
     this.skipPostGoalTransitionsEnabled =
       options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
@@ -229,6 +232,12 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setBoostPickupAnimationEnabled(enabled: boolean): void {
+    this.boostPickupAnimationEnabled = enabled;
+    this.render();
+    this.emitChange();
+  }
+
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.skipPostGoalTransitionsEnabled = enabled;
     if (enabled) {
@@ -323,6 +332,10 @@ export class ReplayPlayer extends EventTarget {
         }
       }
     }
+    if (nextState.boostPickupAnimationEnabled !== undefined) {
+      this.boostPickupAnimationEnabled =
+        nextState.boostPickupAnimationEnabled;
+    }
     if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
       this.skipPostGoalTransitionsEnabled =
         nextState.skipPostGoalTransitionsEnabled;
@@ -371,6 +384,7 @@ export class ReplayPlayer extends EventTarget {
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
       boostMeterEnabled: this.boostMeterEnabled,
+      boostPickupAnimationEnabled: this.boostPickupAnimationEnabled,
       skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
       skipKickoffsEnabled: this.skipKickoffsEnabled,
     };

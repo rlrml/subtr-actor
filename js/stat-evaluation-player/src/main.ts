@@ -2,10 +2,12 @@ import "./styles.css";
 import {
   createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
+  createBoostPickupAnimationPlugin,
   createTimelineOverlayPlugin,
   ReplayPlayer,
 } from "subtr-actor-player";
 import type {
+  BoostPickupAnimationPickup,
   ReplayCameraViewMode,
   ReplayPlayerState,
   ReplayPlayerTrack,
@@ -99,6 +101,7 @@ let cameraDistance!: HTMLInputElement;
 let cameraDistanceReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
 let showFollowedPlayerOverlay!: HTMLInputElement;
+let showBoostPickupAnimation!: HTMLInputElement;
 let moduleSummaryEl!: HTMLDivElement;
 let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
@@ -563,6 +566,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   cameraDistance.value = `${state.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
   ballCam.checked = state.ballCamEnabled;
+  showBoostPickupAnimation.checked = state.boostPickupAnimationEnabled;
   attachedPlayer.value = state.attachedPlayerId ?? "";
   skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = state.skipKickoffsEnabled;
@@ -579,6 +583,13 @@ function renderSnapshot(state: ReplayPlayerState): void {
       ? getStatsFrameForReplayFrame(statsFrameLookup, state.frameIndex)
       : null,
   );
+}
+
+function includeBoostPickupAnimationPickup(
+  pickup: BoostPickupAnimationPickup,
+): boolean {
+  const boostModule = activeModules.find((mod) => mod.id === "boost");
+  return boostModule?.includeBoostPickupAnimationPickup?.(pickup) ?? true;
 }
 
 function createFileReplaySource(file: File): ReplayInputSource {
@@ -665,11 +676,15 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
       initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
       initialAttachedPlayerId: null,
       initialBallCamEnabled: false,
+      initialBoostPickupAnimationEnabled: showBoostPickupAnimation.checked,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
       plugins: [
         createBallchasingOverlayPlugin(),
         createBoostPadOverlayPlugin(),
+        createBoostPickupAnimationPlugin({
+          includePickup: includeBoostPickupAnimationPickup,
+        }),
         timelineOverlay,
       ],
     });
@@ -772,6 +787,10 @@ export function mountStatEvaluationPlayer(
   showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
     root,
     "#show-followed-player-overlay",
+  );
+  showBoostPickupAnimation = mustElement<HTMLInputElement>(
+    root,
+    "#show-boost-pickup-animation",
   );
   moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
   moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
@@ -896,6 +915,12 @@ export function mountStatEvaluationPlayer(
 
   showFollowedPlayerOverlay.addEventListener("change", () => {
     renderFocusedPlayerOverlay(replayPlayer?.getState());
+  }, { signal: listeners.signal });
+
+  showBoostPickupAnimation.addEventListener("change", () => {
+    replayPlayer?.setBoostPickupAnimationEnabled(
+      showBoostPickupAnimation.checked,
+    );
   }, { signal: listeners.signal });
 
   skipPostGoalTransitions.addEventListener("change", () => {

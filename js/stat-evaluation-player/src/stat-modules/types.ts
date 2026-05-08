@@ -1,6 +1,7 @@
 import { ReplayPlayer } from "subtr-actor-player";
 import type {
   FrameRenderInfo,
+  BoostPickupAnimationPickup,
   ReplayModel,
   ReplayTimelineEvent,
   ReplayTimelineRange,
@@ -29,6 +30,9 @@ export interface StatModule {
   onBeforeRender(info: FrameRenderInfo): void;
   getTimelineEvents?(ctx: StatModuleContext): ReplayTimelineEvent[];
   getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
+  includeBoostPickupAnimationPickup?(
+    pickup: BoostPickupAnimationPickup,
+  ): boolean;
   renderStats(frameIndex: number, ctx: StatModuleContext): string;
   renderSettings?(ctx: StatModuleContext | null): HTMLElement | null;
   renderFocusedPlayerStats(
