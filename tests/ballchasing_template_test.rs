@@ -1,7 +1,12 @@
 #![allow(unused_macros)]
 
+use std::collections::HashMap;
+
 use serde_json::Value;
-use subtr_actor::{stats, BoostCalculator, PlayerInfo, ReplayProcessor};
+use subtr_actor::{
+    standard_soccar_boost_pad_layout, stats, BoostCalculator, BoostPadEventKind, BoostPadSize,
+    Collector, FrameInput, LivePlayTracker, PlayerInfo, ReplayProcessor, TimeAdvance,
+};
 
 macro_rules! ballchasing_fixture_test {
     ($test_name:ident, $fixture_dir:literal) => {
@@ -134,4 +139,120 @@ fn problematic_private_duel_big_pad_counts_match_ballchasing_with_inactive_picku
         &ballchasing,
         "orange",
     );
+}
+
+#[derive(Clone)]
+struct PickupSequenceObservation {
+    time: f32,
+    frame: usize,
+    player: String,
+    phase: String,
+    pad_size: Option<BoostPadSize>,
+}
+
+#[derive(Default)]
+struct PickupSequenceReportCollector {
+    live_play_tracker: LivePlayTracker,
+    previous_time: Option<f32>,
+    last_by_key: HashMap<(String, u8), PickupSequenceObservation>,
+    repeated_sequences: Vec<(
+        (String, u8),
+        PickupSequenceObservation,
+        PickupSequenceObservation,
+    )>,
+}
+
+fn nearest_standard_pad_size(position: glam::Vec3) -> Option<BoostPadSize> {
+    standard_soccar_boost_pad_layout()
+        .iter()
+        .min_by(|(left_position, _), (right_position, _)| {
+            position
+                .distance_squared(*left_position)
+                .partial_cmp(&position.distance_squared(*right_position))
+                .unwrap()
+        })
+        .map(|(_, size)| *size)
+}
+
+impl Collector for PickupSequenceReportCollector {
+    fn process_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        _frame: &boxcars::Frame,
+        frame_number: usize,
+        current_time: f32,
+    ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
+        let dt = self
+            .previous_time
+            .map(|previous_time| current_time - previous_time)
+            .unwrap_or(0.0);
+        self.previous_time = Some(current_time);
+        let input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        let gameplay = input.gameplay_state();
+        let events = input.frame_events_state();
+        let players = input.player_frame_state();
+        let live_play = self.live_play_tracker.state_parts(&gameplay, &events);
+
+        for event in &events.boost_pad_events {
+            let BoostPadEventKind::PickedUp { sequence } = event.kind else {
+                continue;
+            };
+            let player = event
+                .player
+                .as_ref()
+                .and_then(|player_id| players.players.iter().find(|p| &p.player_id == player_id));
+            let player_name = event
+                .player
+                .as_ref()
+                .and_then(|player_id| processor.get_player_name(player_id).ok())
+                .unwrap_or_else(|| "<unknown>".to_string());
+            let observation = PickupSequenceObservation {
+                time: event.time,
+                frame: event.frame,
+                player: player_name,
+                phase: format!("{:?}", live_play.gameplay_phase),
+                pad_size: player
+                    .and_then(|player| player.position())
+                    .and_then(nearest_standard_pad_size),
+            };
+            let key = (event.pad_id.clone(), sequence);
+            if let Some(previous) = self.last_by_key.insert(key.clone(), observation.clone()) {
+                self.repeated_sequences.push((key, previous, observation));
+            }
+        }
+
+        Ok(TimeAdvance::NextFrame)
+    }
+}
+
+#[test]
+#[ignore = "Diagnostic output for repeated boost pickup (pad_id, sequence) keys in the problematic replay."]
+fn describe_problematic_private_duel_repeated_boost_pickup_sequences() {
+    let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
+    let report = PickupSequenceReportCollector::default()
+        .process_replay(&replay)
+        .expect("Expected replay processing to produce sequence report");
+
+    for ((pad_id, sequence), previous, current) in report.repeated_sequences {
+        let gap = current.time - previous.time;
+        if gap < 10.0 {
+            continue;
+        }
+        eprintln!(
+            "pad_id={pad_id} sequence={sequence} gap={:.3}s | \
+             previous: t={:.3} frame={} player={} phase={} size={:?} | \
+             current: t={:.3} frame={} player={} phase={} size={:?}",
+            gap,
+            previous.time,
+            previous.frame,
+            previous.player,
+            previous.phase,
+            previous.pad_size,
+            current.time,
+            current.frame,
+            current.player,
+            current.phase,
+            current.pad_size,
+        );
+    }
 }

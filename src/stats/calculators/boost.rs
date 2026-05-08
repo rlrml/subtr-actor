@@ -108,7 +108,7 @@ pub struct BoostCalculator {
     known_pad_sizes: HashMap<String, BoostPadSize>,
     known_pad_indices: HashMap<String, usize>,
     unavailable_pads: HashSet<String>,
-    seen_pickup_sequences: HashSet<(String, u8)>,
+    seen_pickup_sequence_times: HashMap<(String, u8), f32>,
     pickup_frames: HashMap<(String, PlayerId), usize>,
     inactive_pickup_frames: HashSet<(PlayerId, usize, BoostPadSize)>,
     last_pickup_times: HashMap<String, f32>,
@@ -666,6 +666,28 @@ impl BoostCalculator {
         }
     }
 
+    fn seen_pickup_sequence_is_recent(
+        &self,
+        pad_id: &str,
+        sequence: u8,
+        event_time: f32,
+        player_position: Option<glam::Vec3>,
+    ) -> bool {
+        let Some(last_time) = self
+            .seen_pickup_sequence_times
+            .get(&(pad_id.to_string(), sequence))
+            .copied()
+        else {
+            return false;
+        };
+        let Some(pad_size) = self.known_pad_sizes.get(pad_id).copied().or_else(|| {
+            player_position.and_then(|position| self.guess_pad_size_from_position(pad_id, position))
+        }) else {
+            return false;
+        };
+        event_time - last_time < Self::pad_respawn_time_seconds(pad_size)
+    }
+
     fn boost_levels_live(live_play: bool) -> bool {
         live_play
     }
@@ -927,15 +949,6 @@ impl BoostCalculator {
                         continue;
                     }
                     self.pickup_frames.insert(pickup_key, event.frame);
-                    if !self
-                        .seen_pickup_sequences
-                        .insert((event.pad_id.clone(), sequence))
-                    {
-                        continue;
-                    }
-                    self.unavailable_pads.insert(event.pad_id.clone());
-                    self.last_pickup_times
-                        .insert(event.pad_id.clone(), event.time);
                     let Some(player) = players
                         .players
                         .iter()
@@ -943,6 +956,19 @@ impl BoostCalculator {
                     else {
                         continue;
                     };
+                    if self.seen_pickup_sequence_is_recent(
+                        &event.pad_id,
+                        sequence,
+                        event.time,
+                        player.position(),
+                    ) {
+                        continue;
+                    }
+                    self.seen_pickup_sequence_times
+                        .insert((event.pad_id.clone(), sequence), event.time);
+                    self.unavailable_pads.insert(event.pad_id.clone());
+                    self.last_pickup_times
+                        .insert(event.pad_id.clone(), event.time);
                     if let Some(position) = player.position() {
                         self.observed_pad_positions
                             .entry(event.pad_id.clone())
@@ -1120,7 +1146,12 @@ impl BoostCalculator {
 mod tests {
     use super::*;
 
-    fn test_player(player_id: PlayerId, boost_amount: f32, position: glam::Vec3) -> PlayerSample {
+    fn test_player(
+        player_id: PlayerId,
+        boost_amount: f32,
+        last_boost_amount: f32,
+        position: glam::Vec3,
+    ) -> PlayerSample {
         PlayerSample {
             player_id,
             is_team_0: true,
@@ -1137,7 +1168,7 @@ mod tests {
                 angular_velocity: None,
             }),
             boost_amount: Some(boost_amount),
-            last_boost_amount: Some(0.0),
+            last_boost_amount: Some(last_boost_amount),
             boost_active: false,
             dodge_active: false,
             powerslide_active: false,
@@ -1161,6 +1192,7 @@ mod tests {
         let player = test_player(
             player_id.clone(),
             BOOST_KICKOFF_START_AMOUNT + SMALL_PAD_AMOUNT_RAW,
+            0.0,
             pad_position,
         );
 
@@ -1212,5 +1244,109 @@ mod tests {
             calculator.team_zero_stats().small_pads_collected_inactive,
             1
         );
+    }
+
+    #[test]
+    fn counts_reused_pickup_sequence_after_pad_respawn() {
+        let mut calculator = BoostCalculator::new();
+        let player_id = PlayerId::Steam(1);
+        let (pad_position, _) = standard_soccar_boost_pad_layout()
+            .iter()
+            .find(|(_, size)| *size == BoostPadSize::Big)
+            .copied()
+            .expect("standard layout should include big pads");
+        let pad_id = "reused-sequence-big-pad".to_string();
+        let active_gameplay = GameplayState {
+            ball_has_been_hit: Some(true),
+            ..GameplayState::default()
+        };
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 1,
+                    time: 1.0,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(player_id.clone(), 100.0, 0.0, pad_position)],
+                },
+                &FrameEventsState {
+                    boost_pad_events: vec![BoostPadEvent {
+                        time: 1.0,
+                        frame: 1,
+                        pad_id: pad_id.clone(),
+                        player: Some(player_id.clone()),
+                        kind: BoostPadEventKind::PickedUp { sequence: 7 },
+                    }],
+                    ..FrameEventsState::default()
+                },
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("first boost update should succeed");
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 2,
+                    time: 11.1,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(player_id.clone(), 100.0, 100.0, pad_position)],
+                },
+                &FrameEventsState {
+                    boost_pad_events: vec![BoostPadEvent {
+                        time: 11.1,
+                        frame: 2,
+                        pad_id: pad_id.clone(),
+                        player: None,
+                        kind: BoostPadEventKind::Available,
+                    }],
+                    ..FrameEventsState::default()
+                },
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("pad availability update should succeed");
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 3,
+                    time: 11.2,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(player_id.clone(), 200.0, 100.0, pad_position)],
+                },
+                &FrameEventsState {
+                    boost_pad_events: vec![BoostPadEvent {
+                        time: 11.2,
+                        frame: 3,
+                        pad_id,
+                        player: Some(player_id.clone()),
+                        kind: BoostPadEventKind::PickedUp { sequence: 7 },
+                    }],
+                    ..FrameEventsState::default()
+                },
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("second boost update should succeed");
+
+        let player_stats = calculator
+            .player_stats()
+            .get(&player_id)
+            .expect("player stats should be recorded");
+        assert_eq!(player_stats.big_pads_collected, 2);
+        assert_eq!(calculator.team_zero_stats().big_pads_collected, 2);
     }
 }
