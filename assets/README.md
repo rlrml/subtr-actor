@@ -43,6 +43,15 @@ Each fixture uses a shared filename prefix in `assets/`:
 - `<fixture>.replay`: the raw replay file from `GET /api/replays/{id}/file`
 - `<fixture>.replay_id.txt`: the source replay id for easy re-fetching
 
+Problematic comparison fixture extracted from `problematic-replays.zip` on
+2026-05-08:
+
+- `problematic-private-duel-2026-03-20`
+  - replay id: `b75117e4-a56f-4ad9-8195-f3284574f5b4`
+  - title: `DWDAF`
+  - playlist: `private`
+  - note: 1v1 fixture reported for Ballchasing boost/stat comparison discrepancies
+
 Post-EAC fixtures were downloaded from public Ballchasing replay pages on
 2026-04-29. The local Ballchasing API token was invalid at the time, so these
 fixtures include replay files and source ids but not API stats JSON.

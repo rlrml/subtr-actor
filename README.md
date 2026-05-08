@@ -27,7 +27,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM bindings: [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
 - JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player)
-- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/))
+- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/?replayUrl=https%3A%2F%2Fraw.githubusercontent.com%2Frlrml%2Fsubtr-actor%2Fmaster%2Fassets%2Fproblematic-private-duel-2026-03-20.replay))
 
 ## What You Get
 
