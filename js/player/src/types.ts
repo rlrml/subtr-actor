@@ -353,6 +353,7 @@ export interface ReplayPlayerOptions {
   autoplay?: boolean;
   fieldScale?: number;
   initialCameraDistanceScale?: number;
+  initialCustomCameraSettings?: CameraSettings | null;
   initialCameraViewMode?: ReplayCameraViewMode;
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
@@ -381,6 +382,7 @@ export interface ReplayPlayerState {
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
+  customCameraSettings: CameraSettings | null;
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
@@ -406,6 +408,7 @@ export interface ReplayPlaylistPlayerState {
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
+  customCameraSettings: CameraSettings | null;
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
@@ -424,6 +427,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "playing"
     | "speed"
     | "cameraDistanceScale"
+    | "customCameraSettings"
     | "cameraViewMode"
     | "attachedPlayerId"
     | "ballCamEnabled"

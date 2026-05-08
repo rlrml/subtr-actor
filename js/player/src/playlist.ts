@@ -2,6 +2,7 @@ import { ReplayPlayer } from "./player";
 import { findFrameIndexAtTime } from "./replay-data";
 import { loadReplayFromBytes } from "./wasm";
 import type {
+  CameraSettings,
   LoadedReplay,
   PlaybackBound,
   PlaylistItem,
@@ -33,6 +34,7 @@ type ReplayPathLoader = (path: string) => Promise<LoadedReplay>;
 type PlayerPreferences = {
   speed: number;
   cameraDistanceScale: number;
+  customCameraSettings: CameraSettings | null;
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
@@ -60,6 +62,39 @@ function clampFrameIndex(replay: ReplayModel, value: number): number {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to load replay";
+}
+
+function finiteSetting(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeCustomCameraSettings(
+  settings: CameraSettings | null | undefined,
+): CameraSettings | null {
+  if (!settings) {
+    return null;
+  }
+
+  const normalized: CameraSettings = {};
+  const fov = finiteSetting(settings.fov);
+  const height = finiteSetting(settings.height);
+  const pitch = finiteSetting(settings.pitch);
+  const distance = finiteSetting(settings.distance);
+  const stiffness = finiteSetting(settings.stiffness);
+  const swivelSpeed = finiteSetting(settings.swivelSpeed);
+  const transitionSpeed = finiteSetting(settings.transitionSpeed);
+  if (fov !== undefined) normalized.fov = fov;
+  if (height !== undefined) normalized.height = height;
+  if (pitch !== undefined) normalized.pitch = pitch;
+  if (distance !== undefined) normalized.distance = distance;
+  if (stiffness !== undefined) normalized.stiffness = stiffness;
+  if (swivelSpeed !== undefined) normalized.swivelSpeed = swivelSpeed;
+  if (transitionSpeed !== undefined) {
+    normalized.transitionSpeed = transitionSpeed;
+  }
+  return normalized;
 }
 
 function resolvePlaybackBound(
@@ -100,6 +135,9 @@ function createInitialPreferences(
     cameraDistanceScale: Math.max(
       0.25,
       options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
+    ),
+    customCameraSettings: normalizeCustomCameraSettings(
+      options.initialCustomCameraSettings,
     ),
     cameraViewMode: options.initialCameraViewMode ??
       (options.initialAttachedPlayerId ? "follow" : "free"),
@@ -454,6 +492,13 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setCustomCameraSettings(settings: CameraSettings | null): void {
+    this.preferences.customCameraSettings =
+      normalizeCustomCameraSettings(settings);
+    this.player?.setCustomCameraSettings(this.preferences.customCameraSettings);
+    this.emitChange();
+  }
+
   setCameraViewMode(mode: ReplayCameraViewMode): void {
     this.preferences.cameraViewMode = mode;
     this.player?.setCameraViewMode(mode);
@@ -524,6 +569,9 @@ export class ReplayPlaylistPlayer extends EventTarget {
       speed: playerState?.speed ?? this.preferences.speed,
       cameraDistanceScale:
         playerState?.cameraDistanceScale ?? this.preferences.cameraDistanceScale,
+      customCameraSettings:
+        playerState?.customCameraSettings ??
+        this.preferences.customCameraSettings,
       cameraViewMode:
         playerState?.cameraViewMode ?? this.preferences.cameraViewMode,
       attachedPlayerId:
@@ -666,6 +714,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
       fieldScale: this.options.fieldScale,
       initialPlaybackRate: this.preferences.speed,
       initialCameraDistanceScale: this.preferences.cameraDistanceScale,
+      initialCustomCameraSettings: this.preferences.customCameraSettings,
       initialCameraViewMode: this.preferences.cameraViewMode,
       initialAttachedPlayerId: attachedPlayerId,
       initialBallCamEnabled: this.preferences.ballCamEnabled,

@@ -67,7 +67,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             <button id="camera-view-side" type="button" disabled>Diagonal</button>
           </div>
           <label>
-            <span class="label">Follow distance</span>
+            <span class="label">Distance scale</span>
             <input
               id="camera-distance"
               type="range"
@@ -81,6 +81,117 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           <strong id="camera-distance-readout" class="metric-readout">
             ${defaultCameraDistanceScale.toFixed(2)}x
           </strong>
+          <label class="toggle">
+            <input id="custom-camera-settings" type="checkbox" disabled />
+            <span>Custom camera settings</span>
+          </label>
+          <div class="camera-settings-controls">
+            <label>
+              <span class="camera-setting-label">
+                <span>FOV</span>
+                <strong id="custom-camera-fov-readout">110</strong>
+              </span>
+              <input
+                id="custom-camera-fov"
+                type="range"
+                min="60"
+                max="130"
+                step="1"
+                value="110"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Height</span>
+                <strong id="custom-camera-height-readout">100</strong>
+              </span>
+              <input
+                id="custom-camera-height"
+                type="range"
+                min="40"
+                max="250"
+                step="1"
+                value="100"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Pitch</span>
+                <strong id="custom-camera-pitch-readout">-4</strong>
+              </span>
+              <input
+                id="custom-camera-pitch"
+                type="range"
+                min="-30"
+                max="30"
+                step="1"
+                value="-4"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Distance</span>
+                <strong id="custom-camera-distance-readout">270</strong>
+              </span>
+              <input
+                id="custom-camera-distance"
+                type="range"
+                min="100"
+                max="500"
+                step="1"
+                value="270"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Stiffness</span>
+                <strong id="custom-camera-stiffness-readout">--</strong>
+              </span>
+              <input
+                id="custom-camera-stiffness"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value="0"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Swivel</span>
+                <strong id="custom-camera-swivel-speed-readout">--</strong>
+              </span>
+              <input
+                id="custom-camera-swivel-speed"
+                type="range"
+                min="1"
+                max="10"
+                step="0.1"
+                value="1"
+                disabled
+              />
+            </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Transition</span>
+                <strong id="custom-camera-transition-speed-readout">--</strong>
+              </span>
+              <input
+                id="custom-camera-transition-speed"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.05"
+                value="1"
+                disabled
+              />
+            </label>
+          </div>
           <label class="toggle">
             <input id="ball-cam" type="checkbox" disabled />
             <span>Ball cam</span>

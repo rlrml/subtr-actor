@@ -24,6 +24,7 @@ import {
 } from "./player-internals/spatial";
 import type {
   BeforeRenderCallback,
+  CameraSettings,
   FrameRenderInfo,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
@@ -60,6 +61,39 @@ type FreeCameraTransition = {
   fov: number;
 };
 
+function finiteSetting(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeCustomCameraSettings(
+  settings: CameraSettings | null | undefined,
+): CameraSettings | null {
+  if (!settings) {
+    return null;
+  }
+
+  const normalized: CameraSettings = {};
+  const fov = finiteSetting(settings.fov);
+  const height = finiteSetting(settings.height);
+  const pitch = finiteSetting(settings.pitch);
+  const distance = finiteSetting(settings.distance);
+  const stiffness = finiteSetting(settings.stiffness);
+  const swivelSpeed = finiteSetting(settings.swivelSpeed);
+  const transitionSpeed = finiteSetting(settings.transitionSpeed);
+  if (fov !== undefined) normalized.fov = fov;
+  if (height !== undefined) normalized.height = height;
+  if (pitch !== undefined) normalized.pitch = pitch;
+  if (distance !== undefined) normalized.distance = distance;
+  if (stiffness !== undefined) normalized.stiffness = stiffness;
+  if (swivelSpeed !== undefined) normalized.swivelSpeed = swivelSpeed;
+  if (transitionSpeed !== undefined) {
+    normalized.transitionSpeed = transitionSpeed;
+  }
+  return normalized;
+}
+
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
   readonly replay: ReplayModel;
@@ -86,6 +120,7 @@ export class ReplayPlayer extends EventTarget {
   private playbackStartedAt = 0;
   private playbackStartedTime = 0;
   private cameraDistanceScale: number;
+  private customCameraSettings: CameraSettings | null;
   private cameraViewMode: ReplayCameraViewMode;
   private freeCameraTransition: FreeCameraTransition | null = null;
   private attachedPlayerId: string | null;
@@ -112,6 +147,9 @@ export class ReplayPlayer extends EventTarget {
     this.cameraDistanceScale = Math.max(
       0.25,
       options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
+    );
+    this.customCameraSettings = normalizeCustomCameraSettings(
+      options.initialCustomCameraSettings
     );
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
     this.cameraViewMode = options.initialCameraViewMode ??
@@ -180,6 +218,12 @@ export class ReplayPlayer extends EventTarget {
 
   setCameraDistanceScale(scale: number): void {
     this.cameraDistanceScale = Math.max(0.25, scale);
+    this.render();
+    this.emitChange();
+  }
+
+  setCustomCameraSettings(settings: CameraSettings | null): void {
+    this.customCameraSettings = normalizeCustomCameraSettings(settings);
     this.render();
     this.emitChange();
   }
@@ -310,6 +354,11 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.cameraDistanceScale !== undefined) {
       this.cameraDistanceScale = Math.max(0.25, nextState.cameraDistanceScale);
     }
+    if (nextState.customCameraSettings !== undefined) {
+      this.customCameraSettings = normalizeCustomCameraSettings(
+        nextState.customCameraSettings,
+      );
+    }
     if (nextState.cameraViewMode !== undefined) {
       this.cameraViewMode = nextState.cameraViewMode;
     }
@@ -380,6 +429,7 @@ export class ReplayPlayer extends EventTarget {
       playing: this.playing,
       speed: this.speed,
       cameraDistanceScale: this.cameraDistanceScale,
+      customCameraSettings: this.customCameraSettings,
       cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
@@ -728,6 +778,7 @@ export class ReplayPlayer extends EventTarget {
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
       cameraDistanceScale: this.cameraDistanceScale,
+      customCameraSettings: this.customCameraSettings,
       frameIndex,
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,

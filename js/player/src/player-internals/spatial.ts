@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ReplayScene } from "../scene";
 import type {
+  CameraSettings,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayModel,
@@ -190,6 +191,7 @@ export function updateAttachedCamera(options: {
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   cameraDistanceScale: number;
+  customCameraSettings: CameraSettings | null;
   frameIndex: number;
   ballPosition: THREE.Vector3 | null;
   desiredCameraPosition: THREE.Vector3;
@@ -201,6 +203,7 @@ export function updateAttachedCamera(options: {
     ballCamEnabled,
     ballPosition,
     cameraDistanceScale,
+    customCameraSettings,
     desiredCameraPosition,
     desiredLookTarget,
     fieldScale,
@@ -249,7 +252,10 @@ export function updateAttachedCamera(options: {
   const forward = orientation?.forward ?? DEFAULT_FORWARD.clone();
   const right = orientation?.right ?? new THREE.Vector3(0, 1, 0);
 
-  const cameraSettings = attachedPlayer.cameraSettings;
+  const cameraSettings = {
+    ...attachedPlayer.cameraSettings,
+    ...(customCameraSettings ?? {}),
+  };
   const distance =
     (cameraSettings.distance ?? 270) *
     fieldScale *
@@ -259,16 +265,15 @@ export function updateAttachedCamera(options: {
     fieldScale *
     CHASE_CAMERA_HEIGHT_MULTIPLIER;
   const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4);
-  const lookDirection = forward
+  const followOffset = forward
     .clone()
-    .applyAxisAngle(right, pitch)
-    .normalize();
-  const chaseAnchor = basePosition
-    .clone()
-    .addScaledVector(DEFAULT_UP, height);
+    .multiplyScalar(-distance)
+    .addScaledVector(DEFAULT_UP, height)
+    .applyAxisAngle(right, pitch);
   const playerFocusPoint = basePosition
     .clone()
     .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * fieldScale);
+  const followLookDirection = followOffset.clone().negate().normalize();
   let targetFov = cameraSettings.fov ?? 110;
 
   if (ballCamEnabled && ballPosition) {
@@ -279,22 +284,22 @@ export function updateAttachedCamera(options: {
     const ballCamDirection = (
       playerToBall.lengthSq() > 0.0001
         ? playerToBall.normalize()
-        : lookDirection.clone()
+        : followLookDirection.clone()
     )
       .multiplyScalar(BALL_CAM_DIRECTION_BLEND)
-      .addScaledVector(lookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
+      .addScaledVector(followLookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
       .normalize();
 
+    desiredLookTarget
+      .copy(playerFocusPoint)
+      .lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
     desiredCameraPosition
-      .copy(chaseAnchor)
-      .addScaledVector(ballCamDirection, -distance);
+      .copy(desiredLookTarget)
+      .addScaledVector(ballCamDirection, -followOffset.length());
     desiredCameraPosition.z = Math.max(
       MIN_CAMERA_HEIGHT_UU * fieldScale,
       desiredCameraPosition.z,
     );
-    desiredLookTarget
-      .copy(playerFocusPoint)
-      .lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
     const cameraToPlayer = playerFocusPoint.clone().sub(desiredCameraPosition);
     const cameraToBall = ballFocusPoint.clone().sub(desiredCameraPosition);
     if (cameraToPlayer.lengthSq() > 0.0001 && cameraToBall.lengthSq() > 0.0001) {
@@ -306,16 +311,13 @@ export function updateAttachedCamera(options: {
     }
   } else {
     desiredCameraPosition
-      .copy(chaseAnchor)
-      .addScaledVector(forward, -distance);
+      .copy(playerFocusPoint)
+      .add(followOffset);
     desiredCameraPosition.z = Math.max(
       MIN_CAMERA_HEIGHT_UU * fieldScale,
       desiredCameraPosition.z,
     );
-    desiredLookTarget
-      .copy(basePosition)
-      .addScaledVector(lookDirection, distance + 8 * fieldScale)
-      .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * fieldScale);
+    desiredLookTarget.copy(playerFocusPoint);
   }
 
   sceneState.camera.position.lerp(

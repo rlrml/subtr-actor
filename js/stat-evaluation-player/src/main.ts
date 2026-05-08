@@ -8,6 +8,7 @@ import {
 } from "subtr-actor-player";
 import type {
   BoostPickupAnimationPickup,
+  CameraSettings,
   ReplayCameraViewMode,
   ReplayPlayerState,
   ReplayPlayerTrack,
@@ -99,6 +100,21 @@ let cameraViewOverheadButton!: HTMLButtonElement;
 let cameraViewSideButton!: HTMLButtonElement;
 let cameraDistance!: HTMLInputElement;
 let cameraDistanceReadout!: HTMLElement;
+let customCameraSettings!: HTMLInputElement;
+let customCameraFov!: HTMLInputElement;
+let customCameraHeight!: HTMLInputElement;
+let customCameraPitch!: HTMLInputElement;
+let customCameraDistance!: HTMLInputElement;
+let customCameraStiffness!: HTMLInputElement;
+let customCameraSwivelSpeed!: HTMLInputElement;
+let customCameraTransitionSpeed!: HTMLInputElement;
+let customCameraFovReadout!: HTMLElement;
+let customCameraHeightReadout!: HTMLElement;
+let customCameraPitchReadout!: HTMLElement;
+let customCameraDistanceReadout!: HTMLElement;
+let customCameraStiffnessReadout!: HTMLElement;
+let customCameraSwivelSpeedReadout!: HTMLElement;
+let customCameraTransitionSpeedReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
 let showFollowedPlayerOverlay!: HTMLInputElement;
 let showBoostPickupAnimation!: HTMLInputElement;
@@ -345,6 +361,91 @@ function formatSetting(
   return `${value.toFixed(digits)}${suffix}`;
 }
 
+function getFallbackCameraSettings(): Required<CameraSettings> {
+  return {
+    fov: 110,
+    height: 100,
+    pitch: -4,
+    distance: 270,
+    stiffness: 0,
+    swivelSpeed: 1,
+    transitionSpeed: 1,
+  };
+}
+
+function getAttachedPlayerCameraSettings(
+  attachedPlayerId: string | null,
+): CameraSettings | null {
+  if (!replayPlayer || attachedPlayerId === null) {
+    return null;
+  }
+
+  return replayPlayer.replay.players.find(
+    (candidate) => candidate.id === attachedPlayerId,
+  )?.cameraSettings ?? null;
+}
+
+function getEffectiveCameraSettings(state: ReplayPlayerState): CameraSettings {
+  return {
+    ...getFallbackCameraSettings(),
+    ...(getAttachedPlayerCameraSettings(state.attachedPlayerId) ?? {}),
+    ...(state.customCameraSettings ?? {}),
+  };
+}
+
+function readCustomCameraSettings(): CameraSettings {
+  return {
+    fov: Number(customCameraFov.value),
+    height: Number(customCameraHeight.value),
+    pitch: Number(customCameraPitch.value),
+    distance: Number(customCameraDistance.value),
+    stiffness: Number(customCameraStiffness.value),
+    swivelSpeed: Number(customCameraSwivelSpeed.value),
+    transitionSpeed: Number(customCameraTransitionSpeed.value),
+  };
+}
+
+function setCameraSettingControlsEnabled(enabled: boolean): void {
+  customCameraFov.disabled = !enabled;
+  customCameraHeight.disabled = !enabled;
+  customCameraPitch.disabled = !enabled;
+  customCameraDistance.disabled = !enabled;
+  customCameraStiffness.disabled = !enabled;
+  customCameraSwivelSpeed.disabled = !enabled;
+  customCameraTransitionSpeed.disabled = !enabled;
+}
+
+function syncCustomCameraSettingControls(settings: CameraSettings): void {
+  const fallback = getFallbackCameraSettings();
+  const fov = settings.fov ?? fallback.fov;
+  const height = settings.height ?? fallback.height;
+  const pitch = settings.pitch ?? fallback.pitch;
+  const distance = settings.distance ?? fallback.distance;
+  const stiffness = settings.stiffness ?? fallback.stiffness;
+  const swivelSpeed = settings.swivelSpeed ?? fallback.swivelSpeed;
+  const transitionSpeed = settings.transitionSpeed ?? fallback.transitionSpeed;
+
+  customCameraFov.value = `${fov}`;
+  customCameraHeight.value = `${height}`;
+  customCameraPitch.value = `${pitch}`;
+  customCameraDistance.value = `${distance}`;
+  customCameraStiffness.value = `${stiffness}`;
+  customCameraSwivelSpeed.value = `${swivelSpeed}`;
+  customCameraTransitionSpeed.value = `${transitionSpeed}`;
+
+  customCameraFovReadout.textContent = formatSetting(fov, "", 0);
+  customCameraHeightReadout.textContent = formatSetting(height, "", 0);
+  customCameraPitchReadout.textContent = formatSetting(pitch, "", 0);
+  customCameraDistanceReadout.textContent = formatSetting(distance, "", 0);
+  customCameraStiffnessReadout.textContent = formatSetting(stiffness, "", 2);
+  customCameraSwivelSpeedReadout.textContent = formatSetting(swivelSpeed, "", 1);
+  customCameraTransitionSpeedReadout.textContent = formatSetting(
+    transitionSpeed,
+    "",
+    2,
+  );
+}
+
 function setTransportEnabled(enabled: boolean): void {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
@@ -390,6 +491,10 @@ function syncCameraControlAvailability(state?: ReplayPlayerState): void {
     state?.cameraViewMode === "follow" &&
     (state.attachedPlayerId ?? null) !== null;
   cameraDistance.disabled = !hasAttachedCamera;
+  customCameraSettings.disabled = !hasAttachedCamera;
+  setCameraSettingControlsEnabled(
+    hasAttachedCamera && state?.customCameraSettings !== null,
+  );
   ballCam.disabled = !hasAttachedCamera;
 }
 
@@ -407,8 +512,9 @@ function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
   }
 }
 
-function renderCameraProfile(attachedPlayerId: string | null): void {
-  if (!replayPlayer || attachedPlayerId === null) {
+function renderCameraProfile(state?: ReplayPlayerState): void {
+  const attachedPlayerId = state?.attachedPlayerId ?? null;
+  if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {
     cameraProfileReadout.textContent = "Free camera";
     cameraFovReadout.textContent = "--";
     cameraHeightReadout.textContent = "--";
@@ -431,8 +537,10 @@ function renderCameraProfile(attachedPlayerId: string | null): void {
     return;
   }
 
-  const { cameraSettings } = player;
-  cameraProfileReadout.textContent = player.name;
+  const cameraSettings = getEffectiveCameraSettings(state);
+  cameraProfileReadout.textContent = state.customCameraSettings === null
+    ? player.name
+    : `${player.name} custom`;
   cameraFovReadout.textContent = formatSetting(cameraSettings.fov, "", 0);
   cameraHeightReadout.textContent = formatSetting(cameraSettings.height, "", 0);
   cameraPitchReadout.textContent = formatSetting(cameraSettings.pitch, "", 0);
@@ -565,6 +673,8 @@ function renderSnapshot(state: ReplayPlayerState): void {
   playbackRate.value = `${state.speed}`;
   cameraDistance.value = `${state.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
+  customCameraSettings.checked = state.customCameraSettings !== null;
+  syncCustomCameraSettingControls(getEffectiveCameraSettings(state));
   ballCam.checked = state.ballCamEnabled;
   showBoostPickupAnimation.checked = state.boostPickupAnimationEnabled;
   attachedPlayer.value = state.attachedPlayerId ?? "";
@@ -573,9 +683,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   emptyState.hidden = true;
 
   syncCameraControlAvailability(state);
-  renderCameraProfile(
-    state.cameraViewMode === "follow" ? state.attachedPlayerId : null,
-  );
+  renderCameraProfile(state);
   renderStats(state.frameIndex);
   renderFocusedPlayerOverlay(state);
   statMonitor?.renderFrame(
@@ -674,6 +782,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 
     replayPlayer = new ReplayPlayer(viewport, replay, {
       initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
+      initialCustomCameraSettings: null,
       initialAttachedPlayerId: null,
       initialBallCamEnabled: false,
       initialBoostPickupAnimationEnabled: showBoostPickupAnimation.checked,
@@ -783,6 +892,60 @@ export function mountStatEvaluationPlayer(
     root,
     "#camera-distance-readout",
   );
+  customCameraSettings = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-settings",
+  );
+  customCameraFov = mustElement<HTMLInputElement>(root, "#custom-camera-fov");
+  customCameraHeight = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-height",
+  );
+  customCameraPitch = mustElement<HTMLInputElement>(root, "#custom-camera-pitch");
+  customCameraDistance = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-distance",
+  );
+  customCameraStiffness = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-stiffness",
+  );
+  customCameraSwivelSpeed = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-swivel-speed",
+  );
+  customCameraTransitionSpeed = mustElement<HTMLInputElement>(
+    root,
+    "#custom-camera-transition-speed",
+  );
+  customCameraFovReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-fov-readout",
+  );
+  customCameraHeightReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-height-readout",
+  );
+  customCameraPitchReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-pitch-readout",
+  );
+  customCameraDistanceReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-distance-readout",
+  );
+  customCameraStiffnessReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-stiffness-readout",
+  );
+  customCameraSwivelSpeedReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-swivel-speed-readout",
+  );
+  customCameraTransitionSpeedReadout = mustElement<HTMLElement>(
+    root,
+    "#custom-camera-transition-speed-readout",
+  );
   ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
   showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
     root,
@@ -889,6 +1052,28 @@ export function mountStatEvaluationPlayer(
     replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
   }, { signal: listeners.signal });
 
+  customCameraSettings.addEventListener("change", () => {
+    replayPlayer?.setCustomCameraSettings(
+      customCameraSettings.checked ? readCustomCameraSettings() : null,
+    );
+  }, { signal: listeners.signal });
+
+  for (const input of [
+    customCameraFov,
+    customCameraHeight,
+    customCameraPitch,
+    customCameraDistance,
+    customCameraStiffness,
+    customCameraSwivelSpeed,
+    customCameraTransitionSpeed,
+  ]) {
+    input.addEventListener("input", () => {
+      const settings = readCustomCameraSettings();
+      syncCustomCameraSettingControls(settings);
+      replayPlayer?.setCustomCameraSettings(settings);
+    }, { signal: listeners.signal });
+  }
+
   attachedPlayer.addEventListener("change", () => {
     replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
   }, { signal: listeners.signal });
@@ -935,7 +1120,7 @@ export function mountStatEvaluationPlayer(
 
   renderModuleSummary();
   renderModuleSettings();
-  renderCameraProfile(null);
+  renderCameraProfile();
   syncCameraModeButtons();
   renderTimelineEventCount();
   loadReplayFromLocation(listeners.signal);
