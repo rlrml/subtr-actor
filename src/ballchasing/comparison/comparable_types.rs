@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 
+use serde::Serialize;
+
 use super::config::{MatchConfig, StatMatcher};
 use super::model::{ComparisonTarget, StatDomain, StatKey, StatScope, TeamColor};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparableCoreStats {
     pub(super) score: Option<f64>,
     pub(super) goals: Option<f64>,
@@ -13,7 +15,7 @@ pub(super) struct ComparableCoreStats {
     pub(super) shooting_percentage: Option<f64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparableBoostStats {
     pub(super) bpm: Option<f64>,
     pub(super) avg_amount: Option<f64>,
@@ -44,7 +46,7 @@ pub(super) struct ComparableBoostStats {
     pub(super) percent_boost_75_100: Option<f64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparableMovementStats {
     pub(super) avg_speed: Option<f64>,
     pub(super) total_distance: Option<f64>,
@@ -66,7 +68,7 @@ pub(super) struct ComparableMovementStats {
     pub(super) percent_high_air: Option<f64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparablePositioningStats {
     pub(super) avg_distance_to_ball: Option<f64>,
     pub(super) avg_distance_to_ball_possession: Option<f64>,
@@ -96,13 +98,13 @@ pub(super) struct ComparablePositioningStats {
     pub(super) percent_farthest_from_ball: Option<f64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparableDemoStats {
     pub(super) inflicted: Option<f64>,
     pub(super) taken: Option<f64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparablePlayerStats {
     pub(super) core: ComparableCoreStats,
     pub(super) boost: ComparableBoostStats,
@@ -111,7 +113,7 @@ pub(super) struct ComparablePlayerStats {
     pub(super) demo: ComparableDemoStats,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(super) struct ComparableTeamStats {
     pub(super) core: ComparableCoreStats,
     pub(super) boost: ComparableBoostStats,
@@ -120,7 +122,7 @@ pub(super) struct ComparableTeamStats {
     pub(super) players: BTreeMap<String, ComparablePlayerStats>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(crate) struct ComparableReplayStats {
     pub(super) blue: ComparableTeamStats,
     pub(super) orange: ComparableTeamStats,
