@@ -15,6 +15,8 @@ interface BoostPadMeshes {
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   core: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   cooldown: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  orb: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial>;
+  glow: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
 }
 
 function configureOverlayMaterial(material: THREE.MeshBasicMaterial): void {
@@ -27,8 +29,24 @@ function configureOverlayMaterial(material: THREE.MeshBasicMaterial): void {
   material.forceSinglePass = true;
 }
 
+const PAD_SURFACE_Z_OFFSET = 6;
+
 function padRadius(pad: ReplayBoostPad): number {
   return pad.size === "big" ? 150 : 92;
+}
+
+function padOrbRadius(pad: ReplayBoostPad): number {
+  return pad.size === "big" ? 155 : 46;
+}
+
+function padOrbBottomClearance(pad: ReplayBoostPad): number {
+  return pad.size === "big" ? 34 : 14;
+}
+
+function padOrbCenterZ(pad: ReplayBoostPad): number {
+  return (
+    PAD_SURFACE_Z_OFFSET + padOrbBottomClearance(pad) + padOrbRadius(pad)
+  );
 }
 
 function padColor(pad: ReplayBoostPad): number {
@@ -38,8 +56,9 @@ function padColor(pad: ReplayBoostPad): number {
 function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
   const radius = padRadius(pad);
   const color = padColor(pad);
+  const orbRadius = padOrbRadius(pad);
   const group = new THREE.Group();
-  group.position.set(pad.position.x, pad.position.y, pad.position.z + 6);
+  group.position.set(pad.position.x, pad.position.y, pad.position.z);
   group.renderOrder = 20;
   group.frustumCulled = false;
 
@@ -54,6 +73,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
     })
   );
   configureOverlayMaterial(ring.material);
+  ring.position.z = PAD_SURFACE_Z_OFFSET;
   ring.renderOrder = 20;
   ring.frustumCulled = false;
   group.add(ring);
@@ -69,7 +89,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
     })
   );
   configureOverlayMaterial(core.material);
-  core.position.z = 0.5;
+  core.position.z = PAD_SURFACE_Z_OFFSET + 0.5;
   core.renderOrder = 21;
   core.frustumCulled = false;
   group.add(core);
@@ -85,12 +105,49 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
     })
   );
   configureOverlayMaterial(cooldown.material);
-  cooldown.position.z = 1;
+  cooldown.position.z = PAD_SURFACE_Z_OFFSET + 1;
   cooldown.renderOrder = 22;
   cooldown.frustumCulled = false;
   group.add(cooldown);
 
-  return { group, ring, core, cooldown };
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(orbRadius, pad.size === "big" ? 32 : 20, 18),
+    new THREE.MeshPhongMaterial({
+      color,
+      emissive: new THREE.Color(color),
+      emissiveIntensity: pad.size === "big" ? 0.6 : 0.42,
+      shininess: 88,
+      specular: new THREE.Color(0xfff2c2),
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    })
+  );
+  orb.position.z = padOrbCenterZ(pad);
+  orb.renderOrder = 23;
+  orb.frustumCulled = false;
+  group.add(orb);
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(
+      orbRadius * 1.36,
+      pad.size === "big" ? 32 : 20,
+      14
+    ),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: pad.size === "big" ? 0.2 : 0.13,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  glow.position.z = padOrbCenterZ(pad);
+  glow.renderOrder = 24;
+  glow.frustumCulled = false;
+  group.add(glow);
+
+  return { group, ring, core, cooldown, orb, glow };
 }
 
 function boostPadAvailableState(
@@ -142,6 +199,17 @@ function updatePadMeshes(
 ): void {
   const { available, progress } = boostPadAvailableState(pad, currentTime);
   const pulse = 0.92 + 0.08 * Math.sin(currentTime * 6 + pad.index * 0.45);
+  const orbPulse =
+    0.96 + 0.04 * Math.sin(currentTime * 4.8 + pad.index * 0.37);
+  const hover =
+    Math.sin(currentTime * 2.2 + pad.index * 0.61) *
+    (pad.size === "big" ? 18 : 7);
+  const orbZ = padOrbCenterZ(pad) + hover;
+
+  meshes.orb.position.z = orbZ;
+  meshes.glow.position.z = orbZ;
+  meshes.orb.rotation.z = currentTime * (pad.size === "big" ? 0.9 : 1.25);
+  meshes.glow.rotation.z = -currentTime * 0.45;
 
   if (available) {
     meshes.group.visible = true;
@@ -150,6 +218,13 @@ function updatePadMeshes(
     meshes.cooldown.visible = false;
     meshes.ring.scale.setScalar(pulse);
     meshes.core.scale.setScalar(1);
+    meshes.orb.visible = true;
+    meshes.glow.visible = true;
+    meshes.orb.material.opacity = pad.size === "big" ? 0.96 : 0.84;
+    meshes.glow.material.opacity =
+      (pad.size === "big" ? 0.2 : 0.13) + (orbPulse - 0.96);
+    meshes.orb.scale.setScalar(orbPulse);
+    meshes.glow.scale.setScalar(1.02 + (orbPulse - 0.96) * 2);
     return;
   }
 
@@ -158,6 +233,8 @@ function updatePadMeshes(
   meshes.core.material.opacity = 0.07;
   meshes.ring.scale.setScalar(1);
   meshes.core.scale.setScalar(1);
+  meshes.orb.visible = false;
+  meshes.glow.visible = false;
 
   meshes.cooldown.visible = showCooldownProgress;
   if (showCooldownProgress) {
