@@ -6,110 +6,218 @@ import {
   getReplayLoadCompletion,
   getReplayLoadPhase,
   getReplayLoadPhaseStates,
+  listReplayLoadPhases,
 } from "./replayLoadProgress.ts";
 
 function assertApproximatelyEqual(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} !== ${expected}`);
 }
 
+test("replay loading exposes each user-visible work phase", () => {
+  assert.deepEqual(
+    listReplayLoadPhases().map((phase) => ({
+      stage: phase.stage,
+      index: phase.index,
+      total: phase.total,
+      label: phase.label,
+    })),
+    [
+      {
+        stage: "validating",
+        index: 1,
+        total: 8,
+        label: "Parse replay",
+      },
+      {
+        stage: "processing",
+        index: 2,
+        total: 8,
+        label: "Process replay frames",
+      },
+      {
+        stage: "building-stats",
+        index: 3,
+        total: 8,
+        label: "Build stats snapshots",
+      },
+      {
+        stage: "serializing-replay",
+        index: 4,
+        total: 8,
+        label: "Serialize replay data",
+      },
+      {
+        stage: "serializing-stats",
+        index: 5,
+        total: 8,
+        label: "Serialize stats timeline",
+      },
+      {
+        stage: "decoding-replay",
+        index: 6,
+        total: 8,
+        label: "Decode replay data",
+      },
+      {
+        stage: "decoding-stats",
+        index: 7,
+        total: 8,
+        label: "Decode stats chunks",
+      },
+      {
+        stage: "normalizing",
+        index: 8,
+        total: 8,
+        label: "Normalize replay model",
+      },
+    ],
+  );
+});
+
 test("getReplayLoadCompletion maps replay loading stages to monotonic overall progress", () => {
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "validating", progress: 0 }),
-    0.05,
+    0.04,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 0 }),
-    0.1,
+    0.08,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 0.5 }),
-    0.425,
+    0.35,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 1 }),
-    0.75,
+    0.62,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "stats-timeline", progress: 0 }),
-    0.75,
+    getReplayLoadCompletion({ stage: "building-stats", progress: 0.5 }),
+    0.66,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "stats-timeline" }),
-    0.825,
+    getReplayLoadCompletion({ stage: "serializing-replay", progress: 0.5 }),
+    0.73,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "stats-timeline", progress: 1 }),
-    0.9,
+    getReplayLoadCompletion({ stage: "serializing-stats", progress: 0.5 }),
+    0.81,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "normalizing", progress: 0 }),
-    0.9,
+    getReplayLoadCompletion({ stage: "decoding-replay", progress: 1 }),
+    0.89,
+  );
+  assertApproximatelyEqual(
+    getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }),
+    0.94,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "normalizing", progress: 0.6 }),
-    0.954,
+    0.97,
   );
 });
 
 test("getReplayLoadCompletion clamps processing progress into the expected range", () => {
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: -1 }),
-    0.1,
+    0.08,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 2 }),
-    0.75,
+    0.62,
   );
 });
 
-test("getReplayLoadPhase exposes explicit phase metadata for the modal", () => {
+test("legacy stats timeline progress maps to the newer concrete phases", () => {
   assert.deepEqual(
-    getReplayLoadPhase({ stage: "processing", progress: 0 }),
+    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.25 }),
     {
-      stage: "processing",
-      index: 2,
-      total: 4,
-      label: "Process replay frames",
+      stage: "building-stats",
+      index: 3,
+      total: 8,
+      label: "Build stats snapshots",
+    },
+  );
+  assert.deepEqual(
+    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.42 }),
+    {
+      stage: "serializing-replay",
+      index: 4,
+      total: 8,
+      label: "Serialize replay data",
+    },
+  );
+  assert.deepEqual(
+    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.75 }),
+    {
+      stage: "serializing-stats",
+      index: 5,
+      total: 8,
+      label: "Serialize stats timeline",
     },
   );
 });
 
-test("getReplayLoadPhaseStates keeps processing and stats as separate bars", () => {
+test("getReplayLoadPhaseStates marks prior detailed phases complete", () => {
+  const states = getReplayLoadPhaseStates({
+    stage: "decoding-stats",
+    processedChunks: 2,
+    totalChunks: 4,
+    progress: 0.5,
+  });
+
   assert.deepEqual(
-    getReplayLoadPhaseStates({ stage: "processing", progress: 0.25 }),
+    states.map((state) => ({
+      stage: state.stage,
+      state: state.state,
+      completion: state.completion,
+      indeterminate: state.indeterminate,
+    })),
     [
       {
         stage: "validating",
-        index: 1,
-        total: 4,
-        label: "Parse replay",
         state: "complete",
         completion: 1,
         indeterminate: false,
       },
       {
         stage: "processing",
-        index: 2,
-        total: 4,
-        label: "Process replay frames",
-        state: "active",
-        completion: 0.25,
+        state: "complete",
+        completion: 1,
         indeterminate: false,
       },
       {
-        stage: "stats-timeline",
-        index: 3,
-        total: 4,
-        label: "Build stats timeline",
-        state: "pending",
-        completion: 0,
+        stage: "building-stats",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "serializing-replay",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "serializing-stats",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "decoding-replay",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "decoding-stats",
+        state: "active",
+        completion: 0.5,
         indeterminate: false,
       },
       {
         stage: "normalizing",
-        index: 4,
-        total: 4,
-        label: "Normalize replay data",
         state: "pending",
         completion: 0,
         indeterminate: false,
@@ -118,145 +226,32 @@ test("getReplayLoadPhaseStates keeps processing and stats as separate bars", () 
   );
 });
 
-test("getReplayLoadPhaseStates keeps stats timeline indeterminate without progress", () => {
-  assert.deepEqual(
-    getReplayLoadPhaseStates({ stage: "stats-timeline" }),
-    [
-      {
-        stage: "validating",
-        index: 1,
-        total: 4,
-        label: "Parse replay",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "processing",
-        index: 2,
-        total: 4,
-        label: "Process replay frames",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "stats-timeline",
-        index: 3,
-        total: 4,
-        label: "Build stats timeline",
-        state: "active",
-        completion: 1,
-        indeterminate: true,
-      },
-      {
-        stage: "normalizing",
-        index: 4,
-        total: 4,
-        label: "Normalize replay data",
-        state: "pending",
-        completion: 0,
-        indeterminate: false,
-      },
-    ],
-  );
+test("getReplayLoadPhaseStates keeps legacy stats timeline indeterminate without progress", () => {
+  const states = getReplayLoadPhaseStates({ stage: "stats-timeline" });
+
+  assert.equal(states[2]?.stage, "building-stats");
+  assert.equal(states[2]?.state, "active");
+  assert.equal(states[2]?.completion, 1);
+  assert.equal(states[2]?.indeterminate, true);
+  assert.equal(states[3]?.state, "pending");
 });
 
-test("getReplayLoadPhaseStates shows determinate stats timeline progress", () => {
-  assert.deepEqual(
-    getReplayLoadPhaseStates({ stage: "stats-timeline", progress: 0.42 }),
-    [
-      {
-        stage: "validating",
-        index: 1,
-        total: 4,
-        label: "Parse replay",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "processing",
-        index: 2,
-        total: 4,
-        label: "Process replay frames",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "stats-timeline",
-        index: 3,
-        total: 4,
-        label: "Build stats timeline",
-        state: "active",
-        completion: 0.42,
-        indeterminate: false,
-      },
-      {
-        stage: "normalizing",
-        index: 4,
-        total: 4,
-        label: "Normalize replay data",
-        state: "pending",
-        completion: 0,
-        indeterminate: false,
-      },
-    ],
-  );
-});
-
-test("formatReplayLoadProgress shows stats timeline percentages when available", () => {
+test("formatReplayLoadProgress reports detailed stats and decode work", () => {
   assert.equal(
     formatReplayLoadProgress({ stage: "stats-timeline", progress: 0.42 }),
-    "Building stats timeline... 42%",
+    "Serializing replay data... 35%",
   );
   assert.equal(
-    formatReplayLoadProgress({ stage: "stats-timeline" }),
-    "Building stats timeline...",
+    formatReplayLoadProgress({
+      stage: "decoding-stats",
+      processedChunks: 2,
+      totalChunks: 4,
+      progress: 0.5,
+    }),
+    "Decoding stats chunks... 50% (2/4)",
   );
-});
-
-test("getReplayLoadPhaseStates shows determinate progress during normalization", () => {
-  assert.deepEqual(
-    getReplayLoadPhaseStates({ stage: "normalizing", progress: 0.6 }),
-    [
-      {
-        stage: "validating",
-        index: 1,
-        total: 4,
-        label: "Parse replay",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "processing",
-        index: 2,
-        total: 4,
-        label: "Process replay frames",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "stats-timeline",
-        index: 3,
-        total: 4,
-        label: "Build stats timeline",
-        state: "complete",
-        completion: 1,
-        indeterminate: false,
-      },
-      {
-        stage: "normalizing",
-        index: 4,
-        total: 4,
-        label: "Normalize replay data",
-        state: "active",
-        completion: 0.6,
-        indeterminate: false,
-      },
-    ],
+  assert.equal(
+    formatReplayLoadProgress({ stage: "normalizing", progress: 1 }),
+    "Normalizing replay model... 100%",
   );
 });

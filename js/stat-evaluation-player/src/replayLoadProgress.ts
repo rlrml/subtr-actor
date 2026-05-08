@@ -1,13 +1,20 @@
 export type ReplayLoadStage =
   | "validating"
   | "processing"
-  | "stats-timeline"
-  | "normalizing";
+  | "building-stats"
+  | "serializing-replay"
+  | "serializing-stats"
+  | "decoding-replay"
+  | "decoding-stats"
+  | "normalizing"
+  | "stats-timeline";
 
 export interface ReplayLoadProgress {
   stage: ReplayLoadStage;
   processedFrames?: number;
   totalFrames?: number;
+  processedChunks?: number;
+  totalChunks?: number;
   progress?: number;
 }
 
@@ -28,33 +35,65 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "validating",
     index: 1,
-    total: 4,
+    total: 8,
     label: "Parse replay",
     start: 0,
-    end: 0.1,
+    end: 0.08,
   },
   {
     stage: "processing",
     index: 2,
-    total: 4,
+    total: 8,
     label: "Process replay frames",
-    start: 0.1,
-    end: 0.75,
+    start: 0.08,
+    end: 0.62,
   },
   {
-    stage: "stats-timeline",
+    stage: "building-stats",
     index: 3,
-    total: 4,
-    label: "Build stats timeline",
-    start: 0.75,
-    end: 0.9,
+    total: 8,
+    label: "Build stats snapshots",
+    start: 0.62,
+    end: 0.7,
+  },
+  {
+    stage: "serializing-replay",
+    index: 4,
+    total: 8,
+    label: "Serialize replay data",
+    start: 0.7,
+    end: 0.76,
+  },
+  {
+    stage: "serializing-stats",
+    index: 5,
+    total: 8,
+    label: "Serialize stats timeline",
+    start: 0.76,
+    end: 0.86,
+  },
+  {
+    stage: "decoding-replay",
+    index: 6,
+    total: 8,
+    label: "Decode replay data",
+    start: 0.86,
+    end: 0.89,
+  },
+  {
+    stage: "decoding-stats",
+    index: 7,
+    total: 8,
+    label: "Decode stats chunks",
+    start: 0.89,
+    end: 0.94,
   },
   {
     stage: "normalizing",
-    index: 4,
-    total: 4,
-    label: "Normalize replay data",
-    start: 0.9,
+    index: 8,
+    total: 8,
+    label: "Normalize replay model",
+    start: 0.94,
     end: 0.99,
   },
 ];
@@ -63,8 +102,60 @@ function clampUnitInterval(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function scaleProgress(
+  value: number | undefined,
+  start: number,
+  end: number,
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return clampUnitInterval((value - start) / (end - start));
+}
+
+function normalizeReplayLoadProgress(
+  progress: ReplayLoadProgress,
+): ReplayLoadProgress {
+  if (progress.stage !== "stats-timeline") {
+    return progress;
+  }
+
+  const value = progress.progress;
+  if (value === undefined) {
+    return {
+      ...progress,
+      stage: "building-stats",
+    };
+  }
+
+  if (value < 0.35) {
+    return {
+      ...progress,
+      stage: "building-stats",
+      progress: scaleProgress(value, 0, 0.35),
+    };
+  }
+
+  if (value < 0.55) {
+    return {
+      ...progress,
+      stage: "serializing-replay",
+      progress: scaleProgress(value, 0.35, 0.55),
+    };
+  }
+
+  return {
+    ...progress,
+    stage: "serializing-stats",
+    progress: scaleProgress(value, 0.55, 0.92),
+  };
+}
+
 function getReplayLoadPhaseConfig(progress: ReplayLoadProgress) {
-  return REPLAY_LOAD_PHASES.find((phase) => phase.stage === progress.stage)!;
+  const normalizedProgress = normalizeReplayLoadProgress(progress);
+  return REPLAY_LOAD_PHASES.find((phase) =>
+    phase.stage === normalizedProgress.stage
+  )!;
 }
 
 export function listReplayLoadPhases(): ReplayLoadPhase[] {
@@ -89,7 +180,8 @@ export function getReplayLoadPhase(progress: ReplayLoadProgress): ReplayLoadPhas
 export function getReplayLoadPhaseStates(
   progress: ReplayLoadProgress,
 ): ReplayLoadPhaseState[] {
-  const currentPhase = getReplayLoadPhaseConfig(progress);
+  const normalizedProgress = normalizeReplayLoadProgress(progress);
+  const currentPhase = getReplayLoadPhaseConfig(normalizedProgress);
 
   return REPLAY_LOAD_PHASES.map(({ stage, index, total, label }) => {
     if (index < currentPhase.index) {
@@ -116,55 +208,85 @@ export function getReplayLoadPhaseStates(
       };
     }
 
-    const isDeterminate = progress.progress !== undefined;
+    const isDeterminate = normalizedProgress.progress !== undefined;
     return {
       stage,
       index,
       total,
       label,
       state: "active",
-      completion: isDeterminate ? clampUnitInterval(progress.progress ?? 0) : 1,
+      completion: isDeterminate
+        ? clampUnitInterval(normalizedProgress.progress ?? 0)
+        : 1,
       indeterminate: !isDeterminate,
     };
   });
 }
 
 export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
-  const percent = progress.progress === undefined
+  const normalizedProgress = normalizeReplayLoadProgress(progress);
+  const percent = normalizedProgress.progress === undefined
     ? null
-    : Math.round(progress.progress * 100);
+    : Math.round(normalizedProgress.progress * 100);
 
-  switch (progress.stage) {
+  switch (normalizedProgress.stage) {
     case "validating":
       return "Parsing replay...";
     case "processing":
-      if (percent !== null && progress.totalFrames !== undefined) {
-        return `Processing replay frames... ${percent}% (${progress.processedFrames ?? 0}/${progress.totalFrames})`;
+      if (percent !== null && normalizedProgress.totalFrames !== undefined) {
+        return `Processing replay frames... ${percent}% (${normalizedProgress.processedFrames ?? 0}/${normalizedProgress.totalFrames})`;
       }
       return "Processing replay frames...";
-    case "stats-timeline":
+    case "building-stats":
       if (percent !== null) {
-        return `Building stats timeline... ${percent}%`;
+        return `Building stats snapshots... ${percent}%`;
       }
-      return "Building stats timeline...";
+      return "Building stats snapshots...";
+    case "serializing-replay":
+      if (percent !== null) {
+        return `Serializing replay data... ${percent}%`;
+      }
+      return "Serializing replay data...";
+    case "serializing-stats":
+      if (percent !== null) {
+        return `Serializing stats timeline... ${percent}%`;
+      }
+      return "Serializing stats timeline...";
+    case "decoding-replay":
+      if (percent !== null) {
+        return `Decoding replay data... ${percent}%`;
+      }
+      return "Decoding replay data...";
+    case "decoding-stats":
+      if (percent !== null) {
+        if (normalizedProgress.totalChunks !== undefined) {
+          return `Decoding stats chunks... ${percent}% (${normalizedProgress.processedChunks ?? 0}/${normalizedProgress.totalChunks})`;
+        }
+        return `Decoding stats chunks... ${percent}%`;
+      }
+      return "Decoding stats chunks...";
     case "normalizing":
       if (percent !== null) {
-        return `Normalizing replay data... ${percent}%`;
+        return `Normalizing replay model... ${percent}%`;
       }
-      return "Normalizing replay data...";
+      return "Normalizing replay model...";
     default:
       return "Loading replay...";
   }
 }
 
 export function getReplayLoadCompletion(progress: ReplayLoadProgress): number {
-  if (progress.stage !== "validating" && progress.progress !== undefined) {
-    const phase = getReplayLoadPhaseConfig(progress);
+  const normalizedProgress = normalizeReplayLoadProgress(progress);
+  if (
+    normalizedProgress.stage !== "validating" &&
+    normalizedProgress.progress !== undefined
+  ) {
+    const phase = getReplayLoadPhaseConfig(normalizedProgress);
     return phase.start + (
-      clampUnitInterval(progress.progress) * (phase.end - phase.start)
+      clampUnitInterval(normalizedProgress.progress) * (phase.end - phase.start)
     );
   }
 
-  const phase = getReplayLoadPhaseConfig(progress);
+  const phase = getReplayLoadPhaseConfig(normalizedProgress);
   return phase.start + ((phase.end - phase.start) * 0.5);
 }

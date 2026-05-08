@@ -64,19 +64,25 @@ async function parseStatsTimelineParts(
   parts: TransferableStatsTimelineParts,
   onProgress?: (progress: ReplayLoadProgress) => void,
 ): Promise<StatsTimeline> {
+  onProgress?.({ stage: "decoding-stats", progress: 0 });
   const config = parseJsonBuffer<StatsTimeline["config"]>(
     decoder,
     parts.configBuffer,
   );
+  onProgress?.({ stage: "decoding-stats", progress: 0.05 });
+  await waitForNextPaint();
   const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(
     decoder,
     parts.replayMetaBuffer,
   );
+  onProgress?.({ stage: "decoding-stats", progress: 0.1 });
+  await waitForNextPaint();
   const events = parseJsonBuffer<StatsTimeline["events"]>(
     decoder,
     parts.eventsBuffer,
   );
-  onProgress?.({ stage: "stats-timeline", progress: 0.96 });
+  onProgress?.({ stage: "decoding-stats", progress: 0.15 });
+  await waitForNextPaint();
 
   const frames: StatsTimeline["frames"] = [];
   const totalChunks = parts.frameChunkBuffers.length;
@@ -84,10 +90,16 @@ async function parseStatsTimelineParts(
     const buffer = parts.frameChunkBuffers[index]!;
     frames.push(...parseJsonBuffer<StatsTimeline["frames"]>(decoder, buffer));
     onProgress?.({
-      stage: "stats-timeline",
-      progress: 0.96 + (((index + 1) / Math.max(1, totalChunks)) * 0.04),
+      stage: "decoding-stats",
+      processedChunks: index + 1,
+      totalChunks,
+      progress: 0.15 + (((index + 1) / Math.max(1, totalChunks)) * 0.85),
     });
     await waitForNextPaint();
+  }
+
+  if (totalChunks === 0) {
+    onProgress?.({ stage: "decoding-stats", progress: 1 });
   }
 
   return {
@@ -153,12 +165,12 @@ export async function loadReplayBundleInWorker(
         return;
       }
       const decoder = new TextDecoder();
-      options.onProgress?.({ stage: "stats-timeline", progress: 0.92 });
+      options.onProgress?.({ stage: "decoding-replay", progress: 0 });
       await waitForNextPaint();
       const rawReplayData = JSON.parse(
         decoder.decode(new Uint8Array(rawReplayDataBuffer)),
       ) as RawReplayFramesData;
-      options.onProgress?.({ stage: "stats-timeline", progress: 0.95 });
+      options.onProgress?.({ stage: "decoding-replay", progress: 1 });
       await waitForNextPaint();
       const statsTimeline = await parseStatsTimelineParts(
         decoder,

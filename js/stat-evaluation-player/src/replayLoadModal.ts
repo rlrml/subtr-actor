@@ -126,6 +126,14 @@ export function createReplayLoadModal(
           `${progress.processedFrames ?? 0}/${progress.totalFrames} frames`;
         return;
       }
+      if (
+        progress.stage === "decoding-stats" &&
+        progress.totalChunks !== undefined
+      ) {
+        meta.textContent =
+          `${progress.processedChunks ?? 0}/${progress.totalChunks} chunks`;
+        return;
+      }
       meta.textContent = activeFileName ? `Loading ${activeFileName}` : "";
     },
     hide() {
