@@ -1,11 +1,12 @@
 #![allow(unused_macros)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 use subtr_actor::{
-    standard_soccar_boost_pad_layout, stats, BoostCalculator, BoostPadEventKind, BoostPadSize,
-    Collector, FrameInput, LivePlayTracker, PlayerInfo, ReplayProcessor, TimeAdvance,
+    boost_amount_to_percent, standard_soccar_boost_pad_layout, stats, BoostCalculator,
+    BoostPadEventKind, BoostPadSize, Collector, FrameInput, LivePlayTracker, PlayerId, PlayerInfo,
+    ReplayProcessor, StatsTimelineCollector, TimeAdvance, BOOST_KICKOFF_START_AMOUNT,
 };
 
 macro_rules! ballchasing_fixture_test {
@@ -108,7 +109,6 @@ fn assert_inactive_inclusive_big_pad_counts_match_ballchasing(
 }
 
 #[test]
-#[ignore = "Documents the inactive-inclusive big-pad Ballchasing comparison for this fixture; currently still exposes a remaining blue-player gap."]
 fn problematic_private_duel_big_pad_counts_match_ballchasing_with_inactive_pickups() {
     let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
     let ballchasing: Value = serde_json::from_slice(
@@ -253,6 +253,263 @@ fn describe_problematic_private_duel_repeated_boost_pickup_sequences() {
             current.player,
             current.phase,
             current.pad_size,
+        );
+    }
+}
+
+#[derive(Clone)]
+struct BoostIncreaseObservation {
+    time: f32,
+    frame: usize,
+    player: String,
+    player_id: PlayerId,
+    previous_boost: f32,
+    boost: f32,
+    phase: String,
+    nearest_pad_size: Option<BoostPadSize>,
+    pickup_events: Vec<String>,
+    respawn_notes: Vec<String>,
+}
+
+#[derive(Clone)]
+struct BoostPickupEventObservation {
+    time: f32,
+    frame: usize,
+    player_id: PlayerId,
+    pad_id: String,
+    sequence: u8,
+    nearest_pad_size: Option<BoostPadSize>,
+}
+
+#[derive(Default)]
+struct BoostIncreaseReportCollector {
+    live_play_tracker: LivePlayTracker,
+    previous_time: Option<f32>,
+    previous_boost_by_player: HashMap<PlayerId, f32>,
+    pending_demo_respawns: HashSet<PlayerId>,
+    observations: Vec<BoostIncreaseObservation>,
+    pickup_events: Vec<BoostPickupEventObservation>,
+}
+
+impl Collector for BoostIncreaseReportCollector {
+    fn process_frame(
+        &mut self,
+        processor: &ReplayProcessor,
+        _frame: &boxcars::Frame,
+        frame_number: usize,
+        current_time: f32,
+    ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
+        let dt = self
+            .previous_time
+            .map(|previous_time| current_time - previous_time)
+            .unwrap_or(0.0);
+        self.previous_time = Some(current_time);
+        let input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        let gameplay = input.gameplay_state();
+        let events = input.frame_events_state();
+        let players = input.player_frame_state();
+        let live_play = self.live_play_tracker.state_parts(&gameplay, &events);
+
+        for demo in &events.demo_events {
+            self.pending_demo_respawns.insert(demo.victim.clone());
+        }
+
+        for event in &events.boost_pad_events {
+            let BoostPadEventKind::PickedUp { sequence } = event.kind else {
+                continue;
+            };
+            let Some(player_id) = &event.player else {
+                continue;
+            };
+            let player = players
+                .players
+                .iter()
+                .find(|player| &player.player_id == player_id);
+            self.pickup_events.push(BoostPickupEventObservation {
+                time: event.time,
+                frame: event.frame,
+                player_id: player_id.clone(),
+                pad_id: event.pad_id.clone(),
+                sequence,
+                nearest_pad_size: player
+                    .and_then(|player| player.position())
+                    .and_then(nearest_standard_pad_size),
+            });
+        }
+
+        for player in &players.players {
+            let Some(boost) = player.boost_amount else {
+                continue;
+            };
+            let Some(previous_boost) = self
+                .previous_boost_by_player
+                .insert(player.player_id.clone(), boost)
+            else {
+                continue;
+            };
+            let boost_delta = boost - previous_boost;
+            if boost_delta <= 1.0 {
+                continue;
+            }
+            let player_name = processor.get_player_name(&player.player_id)?;
+            let pickup_events = events
+                .boost_pad_events
+                .iter()
+                .filter(|event| event.player.as_ref() == Some(&player.player_id))
+                .map(|event| match event.kind {
+                    BoostPadEventKind::PickedUp { sequence } => {
+                        format!("{}#{}", event.pad_id, sequence)
+                    }
+                    BoostPadEventKind::Available => format!("{} available", event.pad_id),
+                })
+                .collect();
+            let mut respawn_notes = Vec::new();
+            if gameplay.kickoff_phase_active() && (boost - BOOST_KICKOFF_START_AMOUNT).abs() <= 1.0
+            {
+                respawn_notes.push("kickoff_respawn_candidate".to_string());
+            }
+            if self.pending_demo_respawns.contains(&player.player_id) && player.rigid_body.is_some()
+            {
+                respawn_notes.push("demo_respawn_candidate".to_string());
+                self.pending_demo_respawns.remove(&player.player_id);
+            }
+            self.observations.push(BoostIncreaseObservation {
+                time: current_time,
+                frame: frame_number,
+                player: player_name,
+                player_id: player.player_id.clone(),
+                previous_boost,
+                boost,
+                phase: format!("{:?}", live_play.gameplay_phase),
+                nearest_pad_size: player.position().and_then(nearest_standard_pad_size),
+                pickup_events,
+                respawn_notes,
+            });
+        }
+
+        Ok(TimeAdvance::NextFrame)
+    }
+}
+
+#[test]
+#[ignore = "Diagnostic output for boost-level increases in the problematic replay."]
+fn describe_problematic_private_duel_boost_increase_candidates() {
+    let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
+    let report = BoostIncreaseReportCollector::default()
+        .process_replay(&replay)
+        .expect("Expected replay processing to produce boost increase report");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline to process replay");
+    let mut previous_big_pad_count = None;
+    let mut big_pad_count_increments = Vec::new();
+    for frame in &timeline.frames {
+        let Some(player) = frame
+            .players
+            .iter()
+            .find(|player| player.name == "IcedSpace")
+        else {
+            continue;
+        };
+        let big_pad_count =
+            player.boost.big_pads_collected + player.boost.big_pads_collected_inactive;
+        let Some(previous_count) = previous_big_pad_count.replace(big_pad_count) else {
+            continue;
+        };
+        if big_pad_count > previous_count {
+            big_pad_count_increments.push((
+                frame.time,
+                frame.frame_number,
+                previous_count,
+                big_pad_count,
+            ));
+        }
+    }
+    eprintln!("IcedSpace inactive-inclusive big-pad count increments:");
+    for (time, frame, previous_count, current_count) in &big_pad_count_increments {
+        eprintln!("  t={time:.3} frame={frame} {previous_count}->{current_count}");
+    }
+
+    for observation in report
+        .observations
+        .iter()
+        .filter(|observation| observation.player == "IcedSpace")
+    {
+        let delta = observation.boost - observation.previous_boost;
+        if observation.nearest_pad_size != Some(BoostPadSize::Big)
+            || delta < 20.0
+            || !observation.respawn_notes.is_empty()
+        {
+            continue;
+        }
+        let pickup_events = if observation.pickup_events.is_empty() {
+            "<none>".to_string()
+        } else {
+            observation.pickup_events.join(", ")
+        };
+        let nearby_pickup_events = report
+            .pickup_events
+            .iter()
+            .filter(|event| {
+                event.player_id == observation.player_id
+                    && (event.time - observation.time).abs() <= 0.25
+            })
+            .map(|event| {
+                format!(
+                    "dt={:+.3}s frame={} {}#{} nearest={:?}",
+                    event.time - observation.time,
+                    event.frame,
+                    event.pad_id,
+                    event.sequence,
+                    event.nearest_pad_size,
+                )
+            })
+            .collect::<Vec<_>>();
+        let nearby_pickup_events = if nearby_pickup_events.is_empty() {
+            "<none>".to_string()
+        } else {
+            nearby_pickup_events.join(", ")
+        };
+        let nearby_count_increments = big_pad_count_increments
+            .iter()
+            .filter(|(time, _, _, _)| (*time - observation.time).abs() <= 0.25)
+            .map(|(time, frame, previous_count, current_count)| {
+                format!(
+                    "dt={:+.3}s frame={} {}->{}",
+                    *time - observation.time,
+                    frame,
+                    previous_count,
+                    current_count
+                )
+            })
+            .collect::<Vec<_>>();
+        let nearby_count_increments = if nearby_count_increments.is_empty() {
+            "<none>".to_string()
+        } else {
+            nearby_count_increments.join(", ")
+        };
+        let respawn_notes = if observation.respawn_notes.is_empty() {
+            "<none>".to_string()
+        } else {
+            observation.respawn_notes.join(", ")
+        };
+        eprintln!(
+            "t={:.3} frame={} player={} phase={} boost={:.1}->{:.1} \
+             delta={:.1} ({:.1}pp) nearest_size={:?} pickup_events=[{}] \
+             nearby_pickup_events=[{}] nearby_count_increments=[{}] respawn_notes=[{}]",
+            observation.time,
+            observation.frame,
+            observation.player,
+            observation.phase,
+            observation.previous_boost,
+            observation.boost,
+            delta,
+            boost_amount_to_percent(delta),
+            observation.nearest_pad_size,
+            pickup_events,
+            nearby_pickup_events,
+            nearby_count_increments,
+            respawn_notes,
         );
     }
 }

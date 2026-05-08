@@ -688,6 +688,26 @@ impl BoostCalculator {
         event_time - last_time < Self::pad_respawn_time_seconds(pad_size)
     }
 
+    fn unavailable_pad_is_recent(
+        &self,
+        pad_id: &str,
+        event_time: f32,
+        player_position: Option<glam::Vec3>,
+    ) -> bool {
+        if !self.unavailable_pads.contains(pad_id) {
+            return false;
+        }
+        let Some(last_time) = self.last_pickup_times.get(pad_id).copied() else {
+            return true;
+        };
+        let Some(pad_size) = self.known_pad_sizes.get(pad_id).copied().or_else(|| {
+            player_position.and_then(|position| self.guess_pad_size_from_position(pad_id, position))
+        }) else {
+            return true;
+        };
+        event_time - last_time < Self::pad_respawn_time_seconds(pad_size)
+    }
+
     fn boost_levels_live(live_play: bool) -> bool {
         live_play
     }
@@ -729,6 +749,9 @@ impl BoostCalculator {
             .boost_amount
             .map(|boost_amount| (boost_amount - previous_boost_amount - respawn_amount).max(0.0))
             .unwrap_or(0.0);
+        if observed_gain <= 1.0 {
+            return None;
+        }
         Some((
             capacity_limited_gain.max(observed_gain).min(nominal_gain),
             pad_size,
@@ -905,12 +928,12 @@ impl BoostCalculator {
                         else {
                             continue;
                         };
-                        let previous_boost_amount = player.last_boost_amount.unwrap_or_else(|| {
-                            self.previous_boost_amounts
-                                .get(player_id)
-                                .copied()
-                                .unwrap_or_else(|| player.boost_amount.unwrap_or(0.0))
-                        });
+                        let previous_boost_amount = self
+                            .previous_boost_amounts
+                            .get(player_id)
+                            .copied()
+                            .or(player.last_boost_amount)
+                            .unwrap_or_else(|| player.boost_amount.unwrap_or(0.0));
                         let respawn_amount = respawn_amounts_by_player
                             .get(player_id)
                             .copied()
@@ -938,17 +961,9 @@ impl BoostCalculator {
                         );
                         continue;
                     }
-                    if self.unavailable_pads.contains(&event.pad_id) {
-                        continue;
-                    }
                     let Some(player_id) = &event.player else {
                         continue;
                     };
-                    let pickup_key = (event.pad_id.clone(), player_id.clone());
-                    if self.pickup_frames.get(&pickup_key).copied() == Some(event.frame) {
-                        continue;
-                    }
-                    self.pickup_frames.insert(pickup_key, event.frame);
                     let Some(player) = players
                         .players
                         .iter()
@@ -956,6 +971,15 @@ impl BoostCalculator {
                     else {
                         continue;
                     };
+                    if self.unavailable_pad_is_recent(&event.pad_id, event.time, player.position())
+                    {
+                        continue;
+                    }
+                    let pickup_key = (event.pad_id.clone(), player_id.clone());
+                    if self.pickup_frames.get(&pickup_key).copied() == Some(event.frame) {
+                        continue;
+                    }
+                    self.pickup_frames.insert(pickup_key, event.frame);
                     if self.seen_pickup_sequence_is_recent(
                         &event.pad_id,
                         sequence,
@@ -1348,5 +1372,109 @@ mod tests {
             .expect("player stats should be recorded");
         assert_eq!(player_stats.big_pads_collected, 2);
         assert_eq!(calculator.team_zero_stats().big_pads_collected, 2);
+    }
+
+    #[test]
+    fn counts_pickup_after_respawn_without_available_event() {
+        let mut calculator = BoostCalculator::new();
+        let player_id = PlayerId::Steam(1);
+        let (pad_position, _) = standard_soccar_boost_pad_layout()
+            .iter()
+            .find(|(_, size)| *size == BoostPadSize::Big)
+            .copied()
+            .expect("standard layout should include big pads");
+        let pad_id = "missing-available-big-pad".to_string();
+        let active_gameplay = GameplayState {
+            ball_has_been_hit: Some(true),
+            ..GameplayState::default()
+        };
+
+        for (frame_number, time, sequence, previous_boost, boost_amount) in
+            [(1, 1.0, 7, 0.0, 100.0), (2, 11.2, 9, 100.0, 200.0)]
+        {
+            calculator
+                .update_parts(
+                    &FrameInfo {
+                        frame_number,
+                        time,
+                        dt: 1.0 / 30.0,
+                        seconds_remaining: None,
+                    },
+                    &active_gameplay,
+                    &PlayerFrameState {
+                        players: vec![test_player(
+                            player_id.clone(),
+                            boost_amount,
+                            previous_boost,
+                            pad_position,
+                        )],
+                    },
+                    &FrameEventsState {
+                        boost_pad_events: vec![BoostPadEvent {
+                            time,
+                            frame: frame_number,
+                            pad_id: pad_id.clone(),
+                            player: Some(player_id.clone()),
+                            kind: BoostPadEventKind::PickedUp { sequence },
+                        }],
+                        ..FrameEventsState::default()
+                    },
+                    &PlayerVerticalState::default(),
+                    true,
+                )
+                .expect("boost update should succeed");
+        }
+
+        let player_stats = calculator
+            .player_stats()
+            .get(&player_id)
+            .expect("player stats should be recorded");
+        assert_eq!(player_stats.big_pads_collected, 2);
+        assert_eq!(calculator.team_zero_stats().big_pads_collected, 2);
+    }
+
+    #[test]
+    fn skips_inactive_pickup_without_observed_boost_gain() {
+        let mut calculator = BoostCalculator::new();
+        let player_id = PlayerId::Steam(1);
+        let (pad_position, _) = standard_soccar_boost_pad_layout()
+            .iter()
+            .find(|(_, size)| *size == BoostPadSize::Big)
+            .copied()
+            .expect("standard layout should include big pads");
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 1,
+                    time: 1.0,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &GameplayState::default(),
+                &PlayerFrameState {
+                    players: vec![test_player(player_id.clone(), 100.0, 100.0, pad_position)],
+                },
+                &FrameEventsState {
+                    boost_pad_events: vec![BoostPadEvent {
+                        time: 1.0,
+                        frame: 1,
+                        pad_id: "inactive-no-gain-big-pad".to_string(),
+                        player: Some(player_id.clone()),
+                        kind: BoostPadEventKind::PickedUp { sequence: 7 },
+                    }],
+                    ..FrameEventsState::default()
+                },
+                &PlayerVerticalState::default(),
+                false,
+            )
+            .expect("boost update should succeed");
+
+        let player_stats = calculator
+            .player_stats()
+            .get(&player_id)
+            .expect("player stats should be recorded");
+        assert_eq!(player_stats.big_pads_collected_inactive, 0);
+        assert_eq!(player_stats.amount_collected_inactive, 0.0);
     }
 }
