@@ -1,10 +1,6 @@
 use std::path::Path;
-use subtr_actor::collector::replay_data::{
-    BallFrame, PlayerFrame, ReplayDataCollector, ReplayDataSupplementalData,
-};
-use subtr_actor::{
-    FlipResetTracker, ReplayProcessor, ResolvedBoostPadCollector, BOOST_KICKOFF_START_AMOUNT,
-};
+use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
+use subtr_actor::{ReplayProcessor, ResolvedBoostPadCollector, BOOST_KICKOFF_START_AMOUNT};
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -107,22 +103,14 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
 
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to build replay processor");
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut flip_reset_tracker = FlipResetTracker::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
 
     processor
-        .process_all(&mut [
-            &mut replay_data_collector,
-            &mut flip_reset_tracker,
-            &mut boost_pad_collector,
-        ])
+        .process_all(&mut [&mut replay_data_collector, &mut boost_pad_collector])
         .expect("Failed to process replay with composed collectors");
 
-    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
-
     let actual = replay_data_collector
-        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .into_replay_data_with_boost_pads(processor, boost_pad_collector.into_resolved_boost_pads())
         .expect("Failed to assemble replay data from composed collectors");
 
     assert_eq!(actual.frame_data, expected.frame_data);
@@ -145,18 +133,6 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
     assert_eq!(
         actual.dodge_refreshed_events,
         expected.dodge_refreshed_events
-    );
-    assert_eq!(
-        actual.heuristic_data.flip_reset_events,
-        expected.heuristic_data.flip_reset_events
-    );
-    assert_eq!(
-        actual.heuristic_data.post_wall_dodge_events,
-        expected.heuristic_data.post_wall_dodge_events
-    );
-    assert_eq!(
-        actual.heuristic_data.flip_reset_followup_dodge_events,
-        expected.heuristic_data.flip_reset_followup_dodge_events
     );
     assert_eq!(actual.player_stat_events, expected.player_stat_events);
     assert_eq!(actual.goal_events, expected.goal_events);

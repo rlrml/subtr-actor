@@ -1,10 +1,9 @@
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
-    collector::replay_data::{ReplayData, ReplayDataCollector, ReplayDataSupplementalData},
+    collector::replay_data::{ReplayData, ReplayDataCollector},
     collector::CallbackCollector,
-    Collector, FlipResetTracker, FrameRateDecorator, NDArrayCollector, ReplayProcessor,
-    ResolvedBoostPadCollector, StatsCollector, SubtrActorError, SubtrActorErrorVariant,
-    SubtrActorResult,
+    Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, ResolvedBoostPadCollector,
+    StatsCollector, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 
@@ -86,7 +85,6 @@ fn collect_replay_data_with_optional_progress(
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut flip_reset_tracker = FlipResetTracker::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -103,11 +101,8 @@ fn collect_replay_data_with_optional_progress(
         .transpose()
         .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
 
-    let mut collectors: Vec<&mut dyn Collector> = vec![
-        &mut replay_data_collector,
-        &mut flip_reset_tracker,
-        &mut boost_pad_collector,
-    ];
+    let mut collectors: Vec<&mut dyn Collector> =
+        vec![&mut replay_data_collector, &mut boost_pad_collector];
     if let Some(progress_collector) = progress_collector.as_mut() {
         collectors.push(progress_collector);
     }
@@ -124,10 +119,8 @@ fn collect_replay_data_with_optional_progress(
         }
     }
 
-    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
     replay_data_collector
-        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .into_replay_data_with_boost_pads(processor, boost_pad_collector.into_resolved_boost_pads())
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))
 }
 
@@ -140,7 +133,6 @@ fn collect_replay_bundle_with_optional_progress(
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut stats_collector = StatsCollector::new().capture_frames();
-    let mut flip_reset_tracker = FlipResetTracker::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -160,7 +152,6 @@ fn collect_replay_bundle_with_optional_progress(
     let mut collectors: Vec<&mut dyn Collector> = vec![
         &mut replay_data_collector,
         &mut stats_collector,
-        &mut flip_reset_tracker,
         &mut boost_pad_collector,
     ];
     if let Some(progress_collector) = progress_collector.as_mut() {
@@ -179,13 +170,11 @@ fn collect_replay_bundle_with_optional_progress(
         }
     }
 
-    let supplemental_data = ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-        .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
     let stats_timeline = stats_collector
         .into_replay_stats_timeline()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
     let replay_data = replay_data_collector
-        .into_replay_data_with_supplemental_data(processor, supplemental_data)
+        .into_replay_data_with_boost_pads(processor, boost_pad_collector.into_resolved_boost_pads())
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
     Ok((replay_data, stats_timeline))
 }

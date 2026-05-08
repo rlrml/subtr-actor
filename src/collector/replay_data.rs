@@ -41,8 +41,6 @@ use serde::Serialize;
 
 use crate::*;
 
-pub use super::replay_data_heuristics::{ReplayDataHeuristicData, ReplayDataSupplementalData};
-
 /// Represents the ball state for a single frame in a Rocket League replay.
 ///
 /// The ball can either be in an empty state (when ball syncing is disabled or
@@ -512,7 +510,6 @@ pub struct FrameData {
 /// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
 /// * `player_stat_events` - Exact shot/save/assist counter increment events
 /// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
-/// * `heuristic_data` - Heuristic or otherwise derived replay enrichments
 ///
 /// # Example
 ///
@@ -555,8 +552,6 @@ pub struct ReplayData {
     pub player_stat_events: Vec<PlayerStatEvent>,
     /// Exact goal events observed during the replay
     pub goal_events: Vec<GoalEvent>,
-    /// Heuristic or otherwise derived replay enrichments
-    pub heuristic_data: ReplayDataHeuristicData,
 }
 
 impl ReplayData {
@@ -741,28 +736,24 @@ impl ReplayDataCollector {
     /// [`ReplayProcessor::process_all`] and then decide which enrichments to
     /// merge into the final payload.
     pub fn into_replay_data(self, processor: ReplayProcessor<'_>) -> SubtrActorResult<ReplayData> {
-        self.into_replay_data_with_supplemental_data(
-            processor,
-            ReplayDataSupplementalData::default(),
-        )
+        self.into_replay_data_with_boost_pads(processor, Vec::new())
     }
 
-    pub fn into_replay_data_with_supplemental_data(
+    pub fn into_replay_data_with_boost_pads(
         self,
         processor: ReplayProcessor<'_>,
-        supplemental_data: ReplayDataSupplementalData,
+        boost_pads: Vec<ResolvedBoostPad>,
     ) -> SubtrActorResult<ReplayData> {
         let meta = processor.get_replay_meta()?;
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes,
             boost_pad_events: processor.boost_pad_events,
-            boost_pads: supplemental_data.boost_pads,
+            boost_pads,
             touch_events: processor.touch_events,
             dodge_refreshed_events: processor.dodge_refreshed_events,
             player_stat_events: processor.player_stat_events,
             goal_events: processor.goal_events,
-            heuristic_data: supplemental_data.heuristic_data,
             frame_data: self.get_frame_data(),
         })
     }
@@ -805,17 +796,12 @@ impl ReplayDataCollector {
     /// ```
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
-        let mut flip_reset_tracker = FlipResetTracker::new();
         let mut boost_pad_collector = ResolvedBoostPadCollector::new();
-        processor.process_all(&mut [
-            &mut self,
-            &mut flip_reset_tracker,
-            &mut boost_pad_collector,
-        ])?;
-        let supplemental_data =
-            ReplayDataSupplementalData::from_flip_reset_tracker(flip_reset_tracker)
-                .with_boost_pads(boost_pad_collector.into_resolved_boost_pads());
-        self.into_replay_data_with_supplemental_data(processor, supplemental_data)
+        processor.process_all(&mut [&mut self, &mut boost_pad_collector])?;
+        self.into_replay_data_with_boost_pads(
+            processor,
+            boost_pad_collector.into_resolved_boost_pads(),
+        )
     }
 
     /// Extracts player frame data for all players at the specified time.

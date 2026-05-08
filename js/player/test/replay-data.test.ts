@@ -94,11 +94,6 @@ function buildReplayData(frameCount: number, playerCount = 4): RawReplayFramesDa
     dodge_refreshed_events: [],
     player_stat_events: [],
     goal_events: [],
-    heuristic_data: {
-      flip_reset_events: [],
-      post_wall_dodge_events: [],
-      flip_reset_followup_dodge_events: [],
-    },
   };
 }
 
