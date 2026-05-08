@@ -6,6 +6,12 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.5.2 - 2026-05-08
+
+- Fix the Nix-powered GitHub Pages build metadata for the stats evaluation
+  player after the package lockfile version refresh.
+- Refresh Rust, Python, and JavaScript release metadata to `0.5.2`.
+
 ## v0.5.1 - 2026-05-08
 
 - Improve the stats evaluation player replay-loading modal with more granular,
