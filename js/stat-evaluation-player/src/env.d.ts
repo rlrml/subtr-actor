@@ -26,6 +26,20 @@ declare module "@colonelpanic8/subtr-actor" {
     rawReplayData: Uint8Array;
     statsTimeline: Uint8Array;
   };
+  export function get_replay_bundle_json_parts_with_progress(
+    data: Uint8Array,
+    callback: (progress: unknown) => void,
+    reportEveryNFrames?: number,
+    maxFrameChunkBytes?: number,
+  ): {
+    rawReplayData: Uint8Array;
+    statsTimelineParts: {
+      config: Uint8Array;
+      replayMeta: Uint8Array;
+      events: Uint8Array;
+      frameChunks: Uint8Array[];
+    };
+  };
   export function validate_replay(data: Uint8Array): unknown;
   export function get_stats_timeline(data: Uint8Array): unknown;
   export function get_stats_timeline_json(data: Uint8Array): Uint8Array;

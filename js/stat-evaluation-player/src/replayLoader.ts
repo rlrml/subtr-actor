@@ -88,7 +88,7 @@ export async function loadReplayBundleInWorker(
     type: "module",
   });
   const workerBytes = bytes.slice();
-  const reportEveryNFrames = options.reportEveryNFrames ?? 1000;
+  const reportEveryNFrames = options.reportEveryNFrames ?? 100;
 
   return new Promise<ReplayLoadBundle>((resolve, reject) => {
     let rawReplayDataBuffer: ArrayBuffer | null = null;
@@ -121,25 +121,23 @@ export async function loadReplayBundleInWorker(
         return;
       }
       const decoder = new TextDecoder();
-      options.onProgress?.({ stage: "normalizing", progress: 0.1 });
-      if (typeof requestAnimationFrame === "function") {
-        await new Promise<void>((done) => requestAnimationFrame(() => done()));
-      }
       const rawReplayData = JSON.parse(
         decoder.decode(new Uint8Array(rawReplayDataBuffer)),
       ) as RawReplayFramesData;
-      options.onProgress?.({ stage: "normalizing", progress: 0.4 });
       const statsTimeline = parseStatsTimelineParts(
         decoder,
         message.statsTimelineParts,
       );
-      options.onProgress?.({ stage: "normalizing", progress: 0.65 });
+      options.onProgress?.({ stage: "normalizing", progress: 0 });
+      if (typeof requestAnimationFrame === "function") {
+        await new Promise<void>((done) => requestAnimationFrame(() => done()));
+      }
       const replay = await normalizeReplayDataAsync(rawReplayData, {
         progressReportFrameInterval: reportEveryNFrames,
         onProgress(progress) {
           options.onProgress?.({
             stage: "normalizing",
-            progress: 0.65 + (progress * 0.35),
+            progress,
           });
         },
       });

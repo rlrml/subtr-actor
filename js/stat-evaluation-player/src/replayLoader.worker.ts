@@ -91,7 +91,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       progress: { stage: "validating", progress: 0 },
     });
 
-    const rawReplayData = subtrActor.get_replay_frames_data_json_with_progress(
+    const replayBundle = subtrActor.get_replay_bundle_json_parts_with_progress(
       bytes,
       (progress: unknown) => {
         postMessageToMain({
@@ -100,44 +100,30 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
         });
       },
       event.data.reportEveryNFrames,
+      32 * 1024 * 1024,
     );
 
     self.postMessage({
       type: "raw-replay-data",
-      rawReplayDataBuffer: rawReplayData.buffer,
-    }, [rawReplayData.buffer]);
-
-    postMessageToMain({
-      type: "progress",
-      progress: { stage: "stats-timeline", progress: 1 },
-    });
-
-    const statsTimelineParts = subtrActor.get_stats_timeline_json_parts(
-      bytes,
-      32 * 1024 * 1024,
-    );
+      rawReplayDataBuffer: replayBundle.rawReplayData.buffer,
+    }, [replayBundle.rawReplayData.buffer]);
     const frameChunkBuffers = Array.from(
-      statsTimelineParts.frameChunks,
+      replayBundle.statsTimelineParts.frameChunks,
       (chunk) => chunk.buffer,
     );
-
-    postMessageToMain({
-      type: "progress",
-      progress: { stage: "normalizing", progress: 0 },
-    });
 
     self.postMessage({
       type: "done",
       statsTimelineParts: {
-        configBuffer: statsTimelineParts.config.buffer,
-        replayMetaBuffer: statsTimelineParts.replayMeta.buffer,
-        eventsBuffer: statsTimelineParts.events.buffer,
+        configBuffer: replayBundle.statsTimelineParts.config.buffer,
+        replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
+        eventsBuffer: replayBundle.statsTimelineParts.events.buffer,
         frameChunkBuffers,
       },
     }, [
-      statsTimelineParts.config.buffer,
-      statsTimelineParts.replayMeta.buffer,
-      statsTimelineParts.events.buffer,
+      replayBundle.statsTimelineParts.config.buffer,
+      replayBundle.statsTimelineParts.replayMeta.buffer,
+      replayBundle.statsTimelineParts.events.buffer,
       ...frameChunkBuffers,
     ]);
   } catch (error: unknown) {

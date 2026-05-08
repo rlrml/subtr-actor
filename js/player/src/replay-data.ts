@@ -326,7 +326,7 @@ function createNormalizationProgressTracker(
         processedUnits: completedUnits,
         totalUnits,
       });
-      return reachedFrameInterval;
+      return true;
     }
 
     return false;

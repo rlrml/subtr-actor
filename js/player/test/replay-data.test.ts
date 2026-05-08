@@ -226,6 +226,26 @@ test("async normalization yields at configured frame progress intervals", async 
   );
 });
 
+test("async normalization yields when percent progress reports are emitted", async () => {
+  let yieldCount = 0;
+  const raw = buildReplayData(240);
+
+  const replay = await normalizeReplayDataAsync(raw, {
+    progressReportMinDelta: 0.25,
+    yieldEveryMs: Number.POSITIVE_INFINITY,
+    onProgress() {},
+    yieldToMainThread: async () => {
+      yieldCount += 1;
+    },
+  });
+
+  assert.deepEqual(replay, normalizeReplayData(raw));
+  assert.ok(
+    yieldCount >= 3,
+    "expected progress reports to give the browser paint opportunities",
+  );
+});
+
 test("replay loading text shows incremental normalization substeps", () => {
   assert.equal(
     formatReplayLoadProgress({ stage: "normalizing", progress: 0.72 }),

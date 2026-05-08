@@ -413,6 +413,40 @@ pub fn get_replay_bundle_json_with_progress(
     Ok(result.into())
 }
 
+#[wasm_bindgen]
+pub fn get_replay_bundle_json_parts_with_progress(
+    data: &[u8],
+    callback: Function,
+    report_every_n_frames: Option<usize>,
+    max_frame_chunk_bytes: Option<usize>,
+) -> Result<JsValue, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+    let (replay_data, stats_timeline) = collect_replay_bundle_with_optional_progress(
+        &replay,
+        Some((&callback, report_every_n_frames.unwrap_or(1000))),
+    )?;
+
+    let result = Object::new();
+    {
+        let replay_data_bytes = serde_json::to_vec(&replay_data)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
+        Reflect::set(
+            &result,
+            &JsValue::from_str("rawReplayData"),
+            &Uint8Array::from(replay_data_bytes.as_slice()),
+        )?;
+    }
+    drop(replay_data);
+
+    Reflect::set(
+        &result,
+        &JsValue::from_str("statsTimelineParts"),
+        &stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes)?,
+    )?;
+
+    Ok(result.into())
+}
+
 /// Get cumulative stats snapshots for each replay sample.
 #[wasm_bindgen]
 pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {

@@ -640,7 +640,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     statusReadout.textContent = "Parsing replay...";
     replayLoadModal?.show(source.name, "Parsing replay...");
     const loadedReplay = await loadReplayBundleInWorker(bytes, {
-      reportEveryNFrames: 500,
+      reportEveryNFrames: 100,
       onProgress(progress) {
         statusReadout.textContent = formatReplayLoadProgress(progress);
         replayLoadModal?.update(progress);
