@@ -77,6 +77,31 @@ fn emit_progress(
     Ok(())
 }
 
+fn emit_stage_progress(callback: &Function, stage: &str, progress: f64) -> SubtrActorResult<()> {
+    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "stage": stage,
+        "progress": progress.clamp(0.0, 1.0),
+    }))
+    .map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+            "Failed to serialize progress payload: {error}"
+        )))
+    })?;
+
+    callback.call1(&JsValue::NULL, &payload).map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+            error
+                .as_string()
+                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
+        ))
+    })?;
+    Ok(())
+}
+
+fn emit_stats_timeline_progress(callback: &Function, progress: f64) -> SubtrActorResult<()> {
+    emit_stage_progress(callback, "stats-timeline", progress)
+}
+
 fn collect_replay_data_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
@@ -168,14 +193,25 @@ fn collect_replay_bundle_with_optional_progress(
                 JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
             })?;
         }
+        emit_stats_timeline_progress(callback, 0.0)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
 
     let stats_timeline = stats_collector
         .into_replay_stats_timeline()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
+    if let Some((callback, _)) = progress {
+        emit_stats_timeline_progress(callback, 0.25)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
+
     let replay_data = replay_data_collector
         .into_replay_data_with_boost_pads(processor, boost_pad_collector.into_resolved_boost_pads())
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
+    if let Some((callback, _)) = progress {
+        emit_stats_timeline_progress(callback, 0.35)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
     Ok((replay_data, stats_timeline))
 }
 
@@ -197,21 +233,35 @@ fn set_json_bytes<T: serde::Serialize>(
 fn stats_timeline_json_parts(
     timeline: subtr_actor::ReplayStatsTimeline,
     max_frame_chunk_bytes: Option<usize>,
+    progress: Option<(&Function, usize, f64, f64)>,
 ) -> Result<JsValue, JsValue> {
     let max_frame_chunk_bytes = max_frame_chunk_bytes
         .unwrap_or(DEFAULT_STATS_TIMELINE_FRAME_CHUNK_BYTES)
         .max(1024);
     let result = Object::new();
     set_json_bytes(&result, "config", &timeline.config)?;
+    if let Some((callback, _, start, end)) = progress {
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.05))
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
     set_json_bytes(&result, "replayMeta", &timeline.replay_meta)?;
+    if let Some((callback, _, start, end)) = progress {
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.1))
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
     set_json_bytes(&result, "events", &timeline.events)?;
+    if let Some((callback, _, start, end)) = progress {
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.15))
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
 
     let frame_chunks = Array::new();
     let mut current_chunk = Vec::new();
     current_chunk.push(b'[');
     let mut current_chunk_frames = 0usize;
+    let total_frames = timeline.frames.len();
 
-    for frame in &timeline.frames {
+    for (frame_index, frame) in timeline.frames.iter().enumerate() {
         let frame_bytes = serde_json::to_vec(frame)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats frame: {e}")))?;
         let separator_bytes = usize::from(current_chunk_frames > 0);
@@ -229,6 +279,23 @@ fn stats_timeline_json_parts(
         }
         current_chunk.extend_from_slice(&frame_bytes);
         current_chunk_frames += 1;
+
+        if let Some((callback, report_every_n_frames, start, end)) = progress {
+            let processed_frames = frame_index + 1;
+            if processed_frames == total_frames
+                || processed_frames.is_multiple_of(report_every_n_frames.max(1))
+            {
+                let frame_progress = if total_frames == 0 {
+                    1.0
+                } else {
+                    processed_frames as f64 / total_frames as f64
+                };
+                let weighted_progress = start + ((end - start) * (0.15 + (frame_progress * 0.85)));
+                emit_stats_timeline_progress(callback, weighted_progress).map_err(|error| {
+                    JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
+                })?;
+            }
+        }
     }
 
     current_chunk.push(b']');
@@ -238,6 +305,10 @@ fn stats_timeline_json_parts(
         &JsValue::from_str("frameChunks"),
         &frame_chunks.into(),
     )?;
+    if let Some((callback, _, _, end)) = progress {
+        emit_stats_timeline_progress(callback, end)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    }
     Ok(result.into())
 }
 
@@ -380,6 +451,8 @@ pub fn get_replay_bundle_json_with_progress(
 
     let result = Object::new();
     {
+        emit_stats_timeline_progress(&callback, 0.4)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
         let replay_data_bytes = serde_json::to_vec(&replay_data)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
         Reflect::set(
@@ -387,10 +460,14 @@ pub fn get_replay_bundle_json_with_progress(
             &JsValue::from_str("rawReplayData"),
             &Uint8Array::from(replay_data_bytes.as_slice()),
         )?;
+        emit_stats_timeline_progress(&callback, 0.65)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
     drop(replay_data);
 
     {
+        emit_stats_timeline_progress(&callback, 0.75)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
         let stats_timeline_bytes = serde_json::to_vec(&stats_timeline)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))?;
         Reflect::set(
@@ -398,6 +475,8 @@ pub fn get_replay_bundle_json_with_progress(
             &JsValue::from_str("statsTimeline"),
             &Uint8Array::from(stats_timeline_bytes.as_slice()),
         )?;
+        emit_stats_timeline_progress(&callback, 1.0)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
     Ok(result.into())
 }
@@ -417,6 +496,8 @@ pub fn get_replay_bundle_json_parts_with_progress(
 
     let result = Object::new();
     {
+        emit_stats_timeline_progress(&callback, 0.4)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
         let replay_data_bytes = serde_json::to_vec(&replay_data)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
         Reflect::set(
@@ -424,14 +505,23 @@ pub fn get_replay_bundle_json_parts_with_progress(
             &JsValue::from_str("rawReplayData"),
             &Uint8Array::from(replay_data_bytes.as_slice()),
         )?;
+        emit_stats_timeline_progress(&callback, 0.55)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
     drop(replay_data);
 
+    let report_every_n_frames = report_every_n_frames.unwrap_or(1000);
     Reflect::set(
         &result,
         &JsValue::from_str("statsTimelineParts"),
-        &stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes)?,
+        &stats_timeline_json_parts(
+            stats_timeline,
+            max_frame_chunk_bytes,
+            Some((&callback, report_every_n_frames, 0.6, 0.9)),
+        )?,
     )?;
+    emit_stats_timeline_progress(&callback, 0.92)
+        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
 
     Ok(result.into())
 }
@@ -472,7 +562,7 @@ pub fn get_stats_timeline_json_parts(
         .get_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
-    stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes)
+    stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes, None)
 }
 
 /// Validate that a replay file can be parsed

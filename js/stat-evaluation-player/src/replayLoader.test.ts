@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  formatReplayLoadProgress,
   getReplayLoadCompletion,
   getReplayLoadPhase,
   getReplayLoadPhaseStates,
@@ -22,15 +23,23 @@ test("getReplayLoadCompletion maps replay loading stages to monotonic overall pr
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 0.5 }),
-    0.5,
+    0.425,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 1 }),
-    0.9,
+    0.75,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "stats-timeline", progress: 0 }),
-    0.1,
+    0.75,
+  );
+  assertApproximatelyEqual(
+    getReplayLoadCompletion({ stage: "stats-timeline" }),
+    0.825,
+  );
+  assertApproximatelyEqual(
+    getReplayLoadCompletion({ stage: "stats-timeline", progress: 1 }),
+    0.9,
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "normalizing", progress: 0 }),
@@ -49,7 +58,7 @@ test("getReplayLoadCompletion clamps processing progress into the expected range
   );
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "processing", progress: 2 }),
-    0.9,
+    0.75,
   );
 });
 
@@ -59,20 +68,20 @@ test("getReplayLoadPhase exposes explicit phase metadata for the modal", () => {
     {
       stage: "processing",
       index: 2,
-      total: 3,
-      label: "Process replay frames and stats",
+      total: 4,
+      label: "Process replay frames",
     },
   );
 });
 
-test("getReplayLoadPhaseStates collapses processing and stats into one bar", () => {
+test("getReplayLoadPhaseStates keeps processing and stats as separate bars", () => {
   assert.deepEqual(
     getReplayLoadPhaseStates({ stage: "processing", progress: 0.25 }),
     [
       {
         stage: "validating",
         index: 1,
-        total: 3,
+        total: 4,
         label: "Parse replay",
         state: "complete",
         completion: 1,
@@ -81,22 +90,130 @@ test("getReplayLoadPhaseStates collapses processing and stats into one bar", () 
       {
         stage: "processing",
         index: 2,
-        total: 3,
-        label: "Process replay frames and stats",
+        total: 4,
+        label: "Process replay frames",
         state: "active",
         completion: 0.25,
         indeterminate: false,
       },
       {
-        stage: "normalizing",
+        stage: "stats-timeline",
         index: 3,
-        total: 3,
+        total: 4,
+        label: "Build stats timeline",
+        state: "pending",
+        completion: 0,
+        indeterminate: false,
+      },
+      {
+        stage: "normalizing",
+        index: 4,
+        total: 4,
         label: "Normalize replay data",
         state: "pending",
         completion: 0,
         indeterminate: false,
       },
     ],
+  );
+});
+
+test("getReplayLoadPhaseStates keeps stats timeline indeterminate without progress", () => {
+  assert.deepEqual(
+    getReplayLoadPhaseStates({ stage: "stats-timeline" }),
+    [
+      {
+        stage: "validating",
+        index: 1,
+        total: 4,
+        label: "Parse replay",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "processing",
+        index: 2,
+        total: 4,
+        label: "Process replay frames",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "stats-timeline",
+        index: 3,
+        total: 4,
+        label: "Build stats timeline",
+        state: "active",
+        completion: 1,
+        indeterminate: true,
+      },
+      {
+        stage: "normalizing",
+        index: 4,
+        total: 4,
+        label: "Normalize replay data",
+        state: "pending",
+        completion: 0,
+        indeterminate: false,
+      },
+    ],
+  );
+});
+
+test("getReplayLoadPhaseStates shows determinate stats timeline progress", () => {
+  assert.deepEqual(
+    getReplayLoadPhaseStates({ stage: "stats-timeline", progress: 0.42 }),
+    [
+      {
+        stage: "validating",
+        index: 1,
+        total: 4,
+        label: "Parse replay",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "processing",
+        index: 2,
+        total: 4,
+        label: "Process replay frames",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "stats-timeline",
+        index: 3,
+        total: 4,
+        label: "Build stats timeline",
+        state: "active",
+        completion: 0.42,
+        indeterminate: false,
+      },
+      {
+        stage: "normalizing",
+        index: 4,
+        total: 4,
+        label: "Normalize replay data",
+        state: "pending",
+        completion: 0,
+        indeterminate: false,
+      },
+    ],
+  );
+});
+
+test("formatReplayLoadProgress shows stats timeline percentages when available", () => {
+  assert.equal(
+    formatReplayLoadProgress({ stage: "stats-timeline", progress: 0.42 }),
+    "Building stats timeline... 42%",
+  );
+  assert.equal(
+    formatReplayLoadProgress({ stage: "stats-timeline" }),
+    "Building stats timeline...",
   );
 });
 
@@ -107,7 +224,7 @@ test("getReplayLoadPhaseStates shows determinate progress during normalization",
       {
         stage: "validating",
         index: 1,
-        total: 3,
+        total: 4,
         label: "Parse replay",
         state: "complete",
         completion: 1,
@@ -116,16 +233,25 @@ test("getReplayLoadPhaseStates shows determinate progress during normalization",
       {
         stage: "processing",
         index: 2,
-        total: 3,
-        label: "Process replay frames and stats",
+        total: 4,
+        label: "Process replay frames",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
+        stage: "stats-timeline",
+        index: 3,
+        total: 4,
+        label: "Build stats timeline",
         state: "complete",
         completion: 1,
         indeterminate: false,
       },
       {
         stage: "normalizing",
-        index: 3,
-        total: 3,
+        index: 4,
+        total: 4,
         label: "Normalize replay data",
         state: "active",
         completion: 0.6,

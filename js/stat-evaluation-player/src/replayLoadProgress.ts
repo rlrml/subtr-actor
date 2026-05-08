@@ -28,7 +28,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "validating",
     index: 1,
-    total: 3,
+    total: 4,
     label: "Parse replay",
     start: 0,
     end: 0.1,
@@ -36,15 +36,23 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "processing",
     index: 2,
-    total: 3,
-    label: "Process replay frames and stats",
+    total: 4,
+    label: "Process replay frames",
     start: 0.1,
+    end: 0.75,
+  },
+  {
+    stage: "stats-timeline",
+    index: 3,
+    total: 4,
+    label: "Build stats timeline",
+    start: 0.75,
     end: 0.9,
   },
   {
     stage: "normalizing",
-    index: 3,
-    total: 3,
+    index: 4,
+    total: 4,
     label: "Normalize replay data",
     start: 0.9,
     end: 0.99,
@@ -56,9 +64,6 @@ function clampUnitInterval(value: number): number {
 }
 
 function getReplayLoadPhaseConfig(progress: ReplayLoadProgress) {
-  if (progress.stage === "stats-timeline") {
-    return REPLAY_LOAD_PHASES.find((phase) => phase.stage === "processing")!;
-  }
   return REPLAY_LOAD_PHASES.find((phase) => phase.stage === progress.stage)!;
 }
 
@@ -84,46 +89,6 @@ export function getReplayLoadPhase(progress: ReplayLoadProgress): ReplayLoadPhas
 export function getReplayLoadPhaseStates(
   progress: ReplayLoadProgress,
 ): ReplayLoadPhaseState[] {
-  if (progress.stage === "processing" || progress.stage === "stats-timeline") {
-    const completion = clampUnitInterval(progress.progress ?? 0);
-
-    return REPLAY_LOAD_PHASES.map(({ stage, index, total, label }) => {
-      if (stage === "validating") {
-        return {
-          stage,
-          index,
-          total,
-          label,
-          state: "complete",
-          completion: 1,
-          indeterminate: false,
-        };
-      }
-
-      if (stage === "processing") {
-        return {
-          stage,
-          index,
-          total,
-          label,
-          state: "active",
-          completion,
-          indeterminate: false,
-        };
-      }
-
-      return {
-        stage,
-        index,
-        total,
-        label,
-        state: "pending",
-        completion: 0,
-        indeterminate: false,
-      };
-    });
-  }
-
   const currentPhase = getReplayLoadPhaseConfig(progress);
 
   return REPLAY_LOAD_PHASES.map(({ stage, index, total, label }) => {
@@ -169,20 +134,19 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
     ? null
     : Math.round(progress.progress * 100);
 
-  if (progress.stage === "processing" || progress.stage === "stats-timeline") {
-    if (
-      progress.stage !== "processing" ||
-      percent === null ||
-      progress.totalFrames === undefined
-    ) {
-      return "Processing replay frames and stats...";
-    }
-    return `Processing replay frames and stats... ${percent}% (${progress.processedFrames ?? 0}/${progress.totalFrames})`;
-  }
-
   switch (progress.stage) {
     case "validating":
       return "Parsing replay...";
+    case "processing":
+      if (percent !== null && progress.totalFrames !== undefined) {
+        return `Processing replay frames... ${percent}% (${progress.processedFrames ?? 0}/${progress.totalFrames})`;
+      }
+      return "Processing replay frames...";
+    case "stats-timeline":
+      if (percent !== null) {
+        return `Building stats timeline... ${percent}%`;
+      }
+      return "Building stats timeline...";
     case "normalizing":
       if (percent !== null) {
         return `Normalizing replay data... ${percent}%`;

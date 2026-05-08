@@ -59,18 +59,50 @@ function parseJsonBuffer<T>(decoder: TextDecoder, buffer: ArrayBuffer): T {
   return JSON.parse(decoder.decode(new Uint8Array(buffer))) as T;
 }
 
-function parseStatsTimelineParts(
+async function parseStatsTimelineParts(
   decoder: TextDecoder,
   parts: TransferableStatsTimelineParts,
-): StatsTimeline {
+  onProgress?: (progress: ReplayLoadProgress) => void,
+): Promise<StatsTimeline> {
+  const config = parseJsonBuffer<StatsTimeline["config"]>(
+    decoder,
+    parts.configBuffer,
+  );
+  const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(
+    decoder,
+    parts.replayMetaBuffer,
+  );
+  const events = parseJsonBuffer<StatsTimeline["events"]>(
+    decoder,
+    parts.eventsBuffer,
+  );
+  onProgress?.({ stage: "stats-timeline", progress: 0.96 });
+
+  const frames: StatsTimeline["frames"] = [];
+  const totalChunks = parts.frameChunkBuffers.length;
+  for (let index = 0; index < totalChunks; index += 1) {
+    const buffer = parts.frameChunkBuffers[index]!;
+    frames.push(...parseJsonBuffer<StatsTimeline["frames"]>(decoder, buffer));
+    onProgress?.({
+      stage: "stats-timeline",
+      progress: 0.96 + (((index + 1) / Math.max(1, totalChunks)) * 0.04),
+    });
+    await waitForNextPaint();
+  }
+
   return {
-    config: parseJsonBuffer(decoder, parts.configBuffer),
-    replay_meta: parseJsonBuffer(decoder, parts.replayMetaBuffer),
-    events: parseJsonBuffer(decoder, parts.eventsBuffer),
-    frames: parts.frameChunkBuffers.flatMap((buffer) =>
-      parseJsonBuffer<StatsTimeline["frames"]>(decoder, buffer)
-    ),
+    config,
+    replay_meta: replayMeta,
+    events,
+    frames,
   };
+}
+
+function waitForNextPaint(): Promise<void> {
+  if (typeof requestAnimationFrame !== "function") {
+    return Promise.resolve();
+  }
+  return new Promise((done) => requestAnimationFrame(() => done()));
 }
 
 export async function loadReplayBundleInWorker(
@@ -121,17 +153,20 @@ export async function loadReplayBundleInWorker(
         return;
       }
       const decoder = new TextDecoder();
+      options.onProgress?.({ stage: "stats-timeline", progress: 0.92 });
+      await waitForNextPaint();
       const rawReplayData = JSON.parse(
         decoder.decode(new Uint8Array(rawReplayDataBuffer)),
       ) as RawReplayFramesData;
-      const statsTimeline = parseStatsTimelineParts(
+      options.onProgress?.({ stage: "stats-timeline", progress: 0.95 });
+      await waitForNextPaint();
+      const statsTimeline = await parseStatsTimelineParts(
         decoder,
         message.statsTimelineParts,
+        options.onProgress,
       );
       options.onProgress?.({ stage: "normalizing", progress: 0 });
-      if (typeof requestAnimationFrame === "function") {
-        await new Promise<void>((done) => requestAnimationFrame(() => done()));
-      }
+      await waitForNextPaint();
       const replay = await normalizeReplayDataAsync(rawReplayData, {
         progressReportFrameInterval: reportEveryNFrames,
         onProgress(progress) {
