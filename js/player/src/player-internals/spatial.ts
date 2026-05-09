@@ -265,6 +265,13 @@ export function updateAttachedCamera(options: {
     fieldScale *
     CHASE_CAMERA_HEIGHT_MULTIPLIER;
   const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4);
+  const lookDirection = forward
+    .clone()
+    .applyAxisAngle(right, pitch)
+    .normalize();
+  const chaseAnchor = basePosition
+    .clone()
+    .addScaledVector(DEFAULT_UP, height);
   const followOffset = forward
     .clone()
     .multiplyScalar(-distance)
@@ -273,7 +280,6 @@ export function updateAttachedCamera(options: {
   const playerFocusPoint = basePosition
     .clone()
     .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * fieldScale);
-  const followLookDirection = followOffset.clone().negate().normalize();
   let targetFov = cameraSettings.fov ?? 110;
 
   if (ballCamEnabled && ballPosition) {
@@ -284,18 +290,18 @@ export function updateAttachedCamera(options: {
     const ballCamDirection = (
       playerToBall.lengthSq() > 0.0001
         ? playerToBall.normalize()
-        : followLookDirection.clone()
+        : lookDirection.clone()
     )
       .multiplyScalar(BALL_CAM_DIRECTION_BLEND)
-      .addScaledVector(followLookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
+      .addScaledVector(lookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
       .normalize();
 
     desiredLookTarget
       .copy(playerFocusPoint)
       .lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
     desiredCameraPosition
-      .copy(desiredLookTarget)
-      .addScaledVector(ballCamDirection, -followOffset.length());
+      .copy(chaseAnchor)
+      .addScaledVector(ballCamDirection, -distance);
     desiredCameraPosition.z = Math.max(
       MIN_CAMERA_HEIGHT_UU * fieldScale,
       desiredCameraPosition.z,
