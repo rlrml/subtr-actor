@@ -31,7 +31,17 @@ import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
-import type { StatsFrame, StatsTimeline } from "./statsTimeline.ts";
+import type {
+  PlayerStatsSnapshot,
+  StatsFrame,
+  StatsTimeline,
+  TeamStatsSnapshot,
+} from "./statsTimeline.ts";
+import {
+  createStatRegistry,
+  type StatDefinition,
+  type StatScopeKind,
+} from "./statRegistry.ts";
 import {
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
@@ -45,6 +55,7 @@ import {
   getReplayUrlFromSearch,
 } from "./replayUrl.ts";
 import { StatMonitor } from "./statMonitor.ts";
+import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
@@ -62,6 +73,7 @@ let statMonitor: StatMonitor | null = null;
 
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
+const standalonePluginRemovers = new Map<string, () => void>();
 
 const MODULES = createStatModules({
   rerenderCurrentState() {
@@ -70,7 +82,7 @@ const MODULES = createStatModules({
     }
 
     const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
+    renderStatsWindows(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   },
   refreshTimelineRanges() {
@@ -79,7 +91,19 @@ const MODULES = createStatModules({
 });
 
 let activeModules: StatModule[] = [];
-let activeModuleIds = new Set<string>();
+let activeTimelineEventModuleIds = new Set<string>();
+let activeTimelineRangeModuleIds = new Set<string>();
+let activeRenderEffectModuleIds = new Set<string>();
+
+const RENDER_EFFECT_MODULE_IDS = new Set([
+  "ceiling-shot",
+  "fifty-fifty",
+  "pressure",
+  RELATIVE_POSITIONING_MODULE_ID,
+  "absolute-positioning",
+  "speed-flip",
+  "touch",
+]);
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -90,6 +114,12 @@ let appRoot: HTMLElement | null = null;
 let fileInput!: HTMLInputElement;
 let viewport!: HTMLDivElement;
 let emptyState!: HTMLDivElement;
+let emptyLoadReplay!: HTMLButtonElement;
+let launcherToggle!: HTMLButtonElement;
+let launcherMenu!: HTMLDivElement;
+let loadReplayAction!: HTMLButtonElement;
+let floatingWindowLayer!: HTMLDivElement;
+let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let followedPlayerOverlay!: HTMLDivElement;
 let statMonitorOverlay!: HTMLDivElement;
@@ -102,6 +132,7 @@ let cameraViewSideButton!: HTMLButtonElement;
 let cameraDistance!: HTMLInputElement;
 let cameraDistanceReadout!: HTMLElement;
 let customCameraSettings!: HTMLInputElement;
+let cameraSettingsControls!: HTMLDivElement;
 let customCameraFov!: HTMLInputElement;
 let customCameraHeight!: HTMLInputElement;
 let customCameraPitch!: HTMLInputElement;
@@ -118,7 +149,6 @@ let customCameraSwivelSpeedReadout!: HTMLElement;
 let customCameraTransitionSpeedReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
 let showFollowedPlayerOverlay!: HTMLInputElement;
-let showBoostPickupAnimation!: HTMLInputElement;
 let moduleSummaryEl!: HTMLDivElement;
 let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
@@ -129,7 +159,6 @@ let statusReadout!: HTMLElement;
 let playersReadout!: HTMLElement;
 let framesReadout!: HTMLElement;
 let eventsReadout!: HTMLElement;
-let playerStatsEl!: HTMLDivElement;
 let statMonitorSlotZero!: HTMLElement;
 let statMonitorSlotOne!: HTMLElement;
 let cameraProfileReadout!: HTMLElement;
@@ -142,8 +171,11 @@ let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
 let currentMountCleanup: (() => void) | null = null;
-let statsRenderCacheKey: string | null = null;
 let focusedPlayerOverlayCacheKey: string | null = null;
+let statRegistry: StatDefinition[] = [];
+let nextWindowZIndex = 30;
+let nextStatsWindowId = 1;
+let boostPadOverlayEnabled = false;
 
 interface ReplayInputSource {
   name: string;
@@ -151,12 +183,48 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
+type SingletonWindowId = "camera" | "playback" | "stat-monitor";
+type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
+type TeamScope = "blue" | "orange";
+
+interface SelectedStatEntry {
+  key: string;
+  statId: string;
+  targetId?: string;
+}
+
+interface StatsWindowState {
+  readonly id: string;
+  readonly kind: StatsWindowKind;
+  readonly entries: SelectedStatEntry[];
+  playerId: string | null;
+  team: TeamScope | null;
+  scopeEditing: boolean;
+  pickerOpen: boolean;
+  query: string;
+  element: HTMLElement;
+  body: HTMLElement;
+}
+
+const statsWindows = new Map<string, StatsWindowState>();
+
+function getActiveModuleIds(): Set<string> {
+  return new Set([
+    ...activeTimelineEventModuleIds,
+    ...activeTimelineRangeModuleIds,
+    ...activeRenderEffectModuleIds,
+  ]);
+}
+
 function getActiveModuleSignature(): string {
-  return activeModules.map((mod) => mod.id).join("|");
+  return [
+    `events=${[...activeTimelineEventModuleIds].sort().join(",")}`,
+    `ranges=${[...activeTimelineRangeModuleIds].sort().join(",")}`,
+    `effects=${[...activeRenderEffectModuleIds].sort().join(",")}`,
+  ].join("|");
 }
 
 function clearRenderCaches(): void {
-  statsRenderCacheKey = null;
   focusedPlayerOverlayCacheKey = null;
 }
 
@@ -180,6 +248,7 @@ function setupActiveModules(): void {
   const ctx = getModuleContext();
   if (!ctx) return;
 
+  const activeModuleIds = getActiveModuleIds();
   activeModules = MODULES.filter((mod) => activeModuleIds.has(mod.id));
   for (const mod of activeModules) {
     mod.setup(ctx);
@@ -187,7 +256,9 @@ function setupActiveModules(): void {
 
   removeRenderHook = ctx.player.onBeforeRender((info) => {
     for (const mod of activeModules) {
-      mod.onBeforeRender(info);
+      if (activeRenderEffectModuleIds.has(mod.id)) {
+        mod.onBeforeRender(info);
+      }
     }
   });
 
@@ -209,11 +280,20 @@ function teardownActiveModules(): void {
   clearRenderCaches();
 }
 
-function toggleModule(id: string, enabled: boolean): void {
+function toggleCapability(
+  id: string,
+  kind: "events" | "ranges" | "effects",
+  enabled: boolean,
+): void {
+  const activeIds = kind === "events"
+    ? activeTimelineEventModuleIds
+    : kind === "ranges"
+      ? activeTimelineRangeModuleIds
+      : activeRenderEffectModuleIds;
   if (enabled) {
-    activeModuleIds.add(id);
+    activeIds.add(id);
   } else {
-    activeModuleIds.delete(id);
+    activeIds.delete(id);
   }
 
   setupActiveModules();
@@ -221,7 +301,7 @@ function toggleModule(id: string, enabled: boolean): void {
   renderModuleSettings();
   if (replayPlayer) {
     const state = replayPlayer.getState();
-    renderStats(state.frameIndex);
+    renderStatsWindows(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   }
   renderTimelineEventCount();
@@ -241,6 +321,33 @@ function clearTimelineRangeSources(): void {
   timelineRangeSourceRemovers.clear();
 }
 
+function clearStandalonePlugins(): void {
+  for (const removePlugin of standalonePluginRemovers.values()) {
+    removePlugin();
+  }
+  standalonePluginRemovers.clear();
+}
+
+function syncBoostPadOverlayPlugin(): void {
+  standalonePluginRemovers.get("boost-pad-overlay")?.();
+  standalonePluginRemovers.delete("boost-pad-overlay");
+
+  if (!replayPlayer || !boostPadOverlayEnabled) {
+    return;
+  }
+
+  standalonePluginRemovers.set(
+    "boost-pad-overlay",
+    replayPlayer.addPlugin(createBoostPadOverlayPlugin()),
+  );
+}
+
+function toggleBoostPadOverlay(): void {
+  boostPadOverlayEnabled = !boostPadOverlayEnabled;
+  syncBoostPadOverlayPlugin();
+  renderModuleSummary();
+}
+
 function syncTimelineEvents(): void {
   clearTimelineEventSources();
 
@@ -250,6 +357,9 @@ function syncTimelineEvents(): void {
   }
 
   for (const mod of activeModules) {
+    if (!activeTimelineEventModuleIds.has(mod.id)) {
+      continue;
+    }
     const events = mod.getTimelineEvents?.(ctx);
     if (!events || events.length === 0) {
       continue;
@@ -270,7 +380,7 @@ function syncTimelineRanges(): void {
   }
 
   for (const mod of activeModules) {
-    if (!mod.getTimelineRanges) {
+    if (!activeTimelineRangeModuleIds.has(mod.id) || !mod.getTimelineRanges) {
       continue;
     }
 
@@ -290,7 +400,7 @@ function renderTimelineEventCount(): void {
   }
 
   eventsReadout.textContent = `${countEnabledTimelineEvents(
-    activeModuleIds,
+    activeTimelineEventModuleIds,
     replayPlayer.replay,
     statsTimeline,
   )}`;
@@ -308,29 +418,197 @@ function mustElement<T extends HTMLElement>(
   return element as T;
 }
 
+function getElementWindowId(element: HTMLElement): string | null {
+  return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ??
+    null;
+}
+
+function bringWindowToFront(windowEl: HTMLElement): void {
+  windowEl.style.zIndex = `${nextWindowZIndex++}`;
+}
+
+function showWindow(id: SingletonWindowId): void {
+  const windowEl = mustElement<HTMLElement>(
+    appRoot ?? document,
+    `[data-window-id="${id}"]`,
+  );
+  windowEl.hidden = false;
+  bringWindowToFront(windowEl);
+}
+
+function toggleWindow(id: SingletonWindowId): void {
+  const windowEl = mustElement<HTMLElement>(
+    appRoot ?? document,
+    `[data-window-id="${id}"]`,
+  );
+  windowEl.hidden = !windowEl.hidden;
+  if (!windowEl.hidden) {
+    bringWindowToFront(windowEl);
+  }
+}
+
+function hideWindow(id: string): void {
+  const windowEl = mustElement<HTMLElement>(
+    appRoot ?? document,
+    `[data-window-id="${id}"]`,
+  );
+  windowEl.hidden = true;
+}
+
+function setLauncherOpen(open: boolean): void {
+  launcherMenu.hidden = !open;
+  launcherToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function openReplayFilePicker(): void {
+  fileInput.click();
+  setLauncherOpen(false);
+}
+
+function isInteractiveDragTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(
+    "button, input, select, textarea, option, label, a, [data-no-drag]",
+  ));
+}
+
+function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
+  root.addEventListener("pointerdown", (event) => {
+    if (!(event.target instanceof HTMLElement) || isInteractiveDragTarget(event.target)) {
+      return;
+    }
+
+    const windowEl = event.target.closest<HTMLElement>("[data-window-id]");
+    if (!windowEl || windowEl.hidden) {
+      return;
+    }
+
+    bringWindowToFront(windowEl);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const rect = windowEl.getBoundingClientRect();
+    const pointerId = event.pointerId;
+
+    windowEl.setPointerCapture(pointerId);
+    event.preventDefault();
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const nextX = Math.max(
+        8,
+        Math.min(window.innerWidth - 120, rect.left + moveEvent.clientX - startX),
+      );
+      const nextY = Math.max(
+        8,
+        Math.min(window.innerHeight - 100, rect.top + moveEvent.clientY - startY),
+      );
+      windowEl.style.setProperty("--window-x", `${nextX}px`);
+      windowEl.style.setProperty("--window-y", `${nextY}px`);
+    };
+
+    const onPointerUp = () => {
+      windowEl.releasePointerCapture(pointerId);
+      windowEl.removeEventListener("pointermove", onPointerMove);
+      windowEl.removeEventListener("pointerup", onPointerUp);
+      windowEl.removeEventListener("pointercancel", onPointerUp);
+    };
+
+    windowEl.addEventListener("pointermove", onPointerMove);
+    windowEl.addEventListener("pointerup", onPointerUp);
+    windowEl.addEventListener("pointercancel", onPointerUp);
+  }, { signal });
+}
+
 function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
 
   for (const mod of MODULES) {
-    const active = activeModuleIds.has(mod.id);
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "module-summary-item";
-    item.dataset.active = active ? "true" : "false";
-    item.setAttribute("aria-pressed", active ? "true" : "false");
-    item.addEventListener("click", () => {
-      toggleModule(mod.id, !activeModuleIds.has(mod.id));
-    });
+    const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
+    if (!mod.getTimelineEvents && !mod.getTimelineRanges && !hasRenderEffect) {
+      continue;
+    }
 
-    const name = document.createElement("span");
-    name.textContent = mod.label;
-
-    const state = document.createElement("strong");
-    state.textContent = active ? "On" : "Off";
-
-    item.append(name, state);
-    moduleSummaryEl.append(item);
+    if (mod.getTimelineEvents) {
+      moduleSummaryEl.append(renderCapabilityToggle(
+        mod.id,
+        `${mod.label} Events`,
+        "events",
+      ));
+    }
+    if (mod.getTimelineRanges) {
+      moduleSummaryEl.append(renderCapabilityToggle(
+        mod.id,
+        `${mod.label} Ranges`,
+        "ranges",
+      ));
+    }
+    if (hasRenderEffect) {
+      moduleSummaryEl.append(renderCapabilityToggle(
+        mod.id,
+        `${mod.label} Effect`,
+        "effects",
+      ));
+    }
   }
+
+  const boostAnimationActive = replayPlayer?.getState().boostPickupAnimationEnabled ?? false;
+  const boostAnimation = document.createElement("button");
+  boostAnimation.type = "button";
+  boostAnimation.className = "module-summary-item";
+  boostAnimation.dataset.active = boostAnimationActive ? "true" : "false";
+  boostAnimation.setAttribute("aria-pressed", boostAnimationActive ? "true" : "false");
+  boostAnimation.addEventListener("click", () => {
+    const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
+    replayPlayer?.setBoostPickupAnimationEnabled(next);
+    renderModuleSummary();
+  });
+  const boostName = document.createElement("span");
+  boostName.textContent = "Boost pickup animation Effect";
+  const boostState = document.createElement("strong");
+  boostState.textContent = boostAnimationActive ? "On" : "Off";
+  boostAnimation.append(boostName, boostState);
+  moduleSummaryEl.append(boostAnimation);
+
+  const boostPadOverlay = document.createElement("button");
+  boostPadOverlay.type = "button";
+  boostPadOverlay.className = "module-summary-item";
+  boostPadOverlay.dataset.active = boostPadOverlayEnabled ? "true" : "false";
+  boostPadOverlay.setAttribute("aria-pressed", boostPadOverlayEnabled ? "true" : "false");
+  boostPadOverlay.addEventListener("click", toggleBoostPadOverlay);
+  const boostPadName = document.createElement("span");
+  boostPadName.textContent = "Boost pad overlay Effect";
+  const boostPadState = document.createElement("strong");
+  boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
+  boostPadOverlay.append(boostPadName, boostPadState);
+  moduleSummaryEl.append(boostPadOverlay);
+}
+
+function renderCapabilityToggle(
+  moduleId: string,
+  label: string,
+  kind: "events" | "ranges" | "effects",
+): HTMLButtonElement {
+  const activeIds = kind === "events"
+    ? activeTimelineEventModuleIds
+    : kind === "ranges"
+      ? activeTimelineRangeModuleIds
+      : activeRenderEffectModuleIds;
+  const active = activeIds.has(moduleId);
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "module-summary-item";
+  item.dataset.active = active ? "true" : "false";
+  item.setAttribute("aria-pressed", active ? "true" : "false");
+  item.addEventListener("click", () => {
+    toggleCapability(moduleId, kind, !activeIds.has(moduleId));
+  });
+
+  const name = document.createElement("span");
+  name.textContent = label;
+
+  const state = document.createElement("strong");
+  state.textContent = active ? "On" : "Off";
+
+  item.append(name, state);
+  return item;
 }
 
 function renderModuleSettings(): void {
@@ -348,6 +626,577 @@ function renderModuleSettings(): void {
 
   moduleSettingsEl.hidden = false;
   moduleSettingsEl.append(...panels);
+}
+
+function getStatById(statId: string): StatDefinition | null {
+  return statRegistry.find((definition) => definition.id === statId) ?? null;
+}
+
+function getCurrentStatsFrame(frameIndex: number): StatsFrame | null {
+  return statsFrameLookup
+    ? getStatsFrameForReplayFrame(statsFrameLookup, frameIndex)
+    : null;
+}
+
+function getTeamSnapshot(
+  frame: StatsFrame,
+  team: TeamScope,
+): TeamStatsSnapshot | null {
+  return team === "blue" ? frame.team_zero ?? null : frame.team_one ?? null;
+}
+
+function getTeamLabel(team: TeamScope): string {
+  return team === "blue" ? "Blue" : "Orange";
+}
+
+function getPlayerLabel(playerId: string | null): string {
+  if (!playerId || !replayPlayer) {
+    return "Select player";
+  }
+  return replayPlayer.replay.players.find((player) => player.id === playerId)
+    ?.name ?? "Unknown player";
+}
+
+function getStatsWindowTitle(kind: StatsWindowKind): string {
+  switch (kind) {
+    case "player":
+      return "Player stats";
+    case "team":
+      return "Team stats";
+    case "all-players":
+      return "All players stats";
+    case "all-teams":
+      return "All teams stats";
+    case "ad-hoc":
+      return "Ad hoc stats";
+  }
+}
+
+function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
+  switch (kind) {
+    case "player":
+    case "all-players":
+      return "player";
+    case "team":
+    case "all-teams":
+      return "team";
+    case "ad-hoc":
+      return null;
+  }
+}
+
+function getStatsWindowDefaultPosition(): { x: number; y: number } {
+  const offset = statsWindows.size * 18;
+  return {
+    x: Math.max(12, Math.min(window.innerWidth - 360, 96 + offset)),
+    y: Math.max(64, Math.min(window.innerHeight - 240, 96 + offset)),
+  };
+}
+
+function renderStatsWindows(frameIndex = replayPlayer?.getState().frameIndex ?? 0): void {
+  for (const statsWindow of statsWindows.values()) {
+    renderStatsWindow(statsWindow, frameIndex);
+  }
+}
+
+function createStatsWindow(kind: StatsWindowKind): void {
+  const id = `stats-${nextStatsWindowId++}`;
+  const { x, y } = getStatsWindowDefaultPosition();
+  const element = document.createElement("section");
+  element.className = "stats-window";
+  element.dataset.windowId = id;
+  element.style.setProperty("--window-x", `${x}px`);
+  element.style.setProperty("--window-y", `${y}px`);
+
+  const header = document.createElement("header");
+  header.className = "stats-window-header";
+
+  const titleWrap = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "panel-eyebrow";
+  eyebrow.textContent = "Stats";
+  const title = document.createElement("h2");
+  title.textContent = getStatsWindowTitle(kind);
+  titleWrap.append(eyebrow, title);
+
+  const actions = document.createElement("div");
+  actions.className = "stats-window-actions";
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "stats-window-action";
+  addButton.textContent = "Add";
+  const hideButton = document.createElement("button");
+  hideButton.type = "button";
+  hideButton.className = "stats-window-action";
+  hideButton.textContent = "Hide";
+  actions.append(addButton, hideButton);
+  header.append(titleWrap, actions);
+
+  const body = document.createElement("div");
+  body.className = "stats-window-body";
+  element.append(header, body);
+  statsWindowLayer.append(element);
+
+  const state: StatsWindowState = {
+    id,
+    kind,
+    entries: [],
+    playerId: replayPlayer?.replay.players[0]?.id ?? null,
+    team: "blue",
+    scopeEditing: kind === "player" || kind === "team",
+    pickerOpen: false,
+    query: "",
+    element,
+    body,
+  };
+
+  addButton.addEventListener("click", () => {
+    state.pickerOpen = !state.pickerOpen;
+    renderStatsWindow(state);
+  });
+  hideButton.addEventListener("click", () => {
+    element.hidden = true;
+  });
+
+  statsWindows.set(id, state);
+  bringWindowToFront(element);
+  setLauncherOpen(false);
+  renderStatsWindow(state);
+}
+
+function renderStatsWindow(
+  statsWindow: StatsWindowState,
+  frameIndex = replayPlayer?.getState().frameIndex ?? 0,
+): void {
+  statsWindow.body.replaceChildren();
+
+  renderStatsWindowScope(statsWindow);
+  renderStatsWindowPicker(statsWindow);
+  renderStatsWindowEntries(statsWindow, frameIndex);
+}
+
+function renderStatsWindowScope(statsWindow: StatsWindowState): void {
+  if (statsWindow.kind !== "player" && statsWindow.kind !== "team") {
+    return;
+  }
+
+  const row = document.createElement("div");
+  row.className = "stats-window-scope-row";
+
+  if (!statsWindow.scopeEditing) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "stats-window-scope-chip";
+    chip.textContent = statsWindow.kind === "player"
+      ? getPlayerLabel(statsWindow.playerId)
+      : getTeamLabel(statsWindow.team ?? "blue");
+    chip.addEventListener("click", () => {
+      statsWindow.scopeEditing = true;
+      renderStatsWindow(statsWindow);
+    });
+    row.append(chip);
+    statsWindow.body.append(row);
+    return;
+  }
+
+  const select = document.createElement("select");
+  if (statsWindow.kind === "player") {
+    for (const player of replayPlayer?.replay.players ?? []) {
+      select.append(
+        new Option(
+          `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
+          player.id,
+          player.id === statsWindow.playerId,
+          player.id === statsWindow.playerId,
+        ),
+      );
+    }
+    select.value = statsWindow.playerId ?? "";
+    select.addEventListener("change", () => {
+      statsWindow.playerId = select.value || null;
+      statsWindow.scopeEditing = false;
+      renderStatsWindow(statsWindow);
+    });
+  } else {
+    select.append(
+      new Option("Blue", "blue", statsWindow.team === "blue", statsWindow.team === "blue"),
+      new Option(
+        "Orange",
+        "orange",
+        statsWindow.team === "orange",
+        statsWindow.team === "orange",
+      ),
+    );
+    select.value = statsWindow.team ?? "blue";
+    select.addEventListener("change", () => {
+      statsWindow.team = select.value === "orange" ? "orange" : "blue";
+      statsWindow.scopeEditing = false;
+      renderStatsWindow(statsWindow);
+    });
+  }
+
+  const done = document.createElement("button");
+  done.type = "button";
+  done.textContent = "Set";
+  done.addEventListener("click", () => {
+    statsWindow.scopeEditing = false;
+    renderStatsWindow(statsWindow);
+  });
+  row.append(select, done);
+  statsWindow.body.append(row);
+}
+
+function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
+  const picker = document.createElement("div");
+  picker.className = "stats-window-picker";
+  picker.hidden = !statsWindow.pickerOpen;
+  if (picker.hidden) {
+    statsWindow.body.append(picker);
+    return;
+  }
+
+  const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
+  const queryInput = document.createElement("input");
+  queryInput.type = "search";
+  queryInput.placeholder = "Search stats";
+  queryInput.value = statsWindow.query;
+  queryInput.addEventListener("input", () => {
+    statsWindow.query = queryInput.value;
+    renderStatsWindow(statsWindow);
+  });
+
+  const list = document.createElement("div");
+  list.className = "stats-window-picker-list";
+  const query = statsWindow.query.trim().toLowerCase();
+  const definitions = statRegistry.filter((definition) => {
+    if (allowedScope && definition.scope !== allowedScope) {
+      return false;
+    }
+    return query === "" ||
+      definition.label.toLowerCase().includes(query) ||
+      definition.id.toLowerCase().includes(query);
+  });
+
+  const groupByCategory = new Map<string, StatDefinition[]>();
+  for (const definition of definitions) {
+    const group = groupByCategory.get(definition.category) ?? [];
+    group.push(definition);
+    groupByCategory.set(definition.category, group);
+  }
+
+  for (const [category, group] of groupByCategory) {
+    if (group.length < 2) continue;
+    const addGroup = document.createElement("button");
+    addGroup.type = "button";
+    addGroup.className = "stats-window-picker-item";
+    addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;
+    addGroup.addEventListener("click", () => {
+      for (const definition of group) {
+        addStatToWindow(statsWindow, definition);
+      }
+      renderStatsWindow(statsWindow);
+    });
+    list.append(addGroup);
+  }
+
+  for (const definition of definitions) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "stats-window-picker-item";
+    item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;
+    item.disabled = statsWindow.kind !== "ad-hoc" &&
+      statsWindow.entries.some((entry) => entry.statId === definition.id);
+    item.addEventListener("click", () => {
+      addStatToWindow(statsWindow, definition);
+      renderStatsWindow(statsWindow);
+    });
+    list.append(item);
+  }
+
+  if (definitions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stat-window-empty";
+    empty.textContent = statRegistry.length === 0
+      ? "Load a replay before adding stats."
+      : "No matching stats.";
+    list.append(empty);
+  }
+
+  picker.append(queryInput, list);
+  statsWindow.body.append(picker);
+}
+
+function addStatToWindow(
+  statsWindow: StatsWindowState,
+  definition: StatDefinition,
+): void {
+  const targetId = statsWindow.kind === "ad-hoc"
+    ? getDefaultAdHocTargetId(definition)
+    : undefined;
+  if (statsWindow.entries.some((entry) =>
+    entry.statId === definition.id && entry.targetId === targetId
+  )) {
+    return;
+  }
+  statsWindow.entries.push({
+    key: `${statsWindow.id}:${definition.id}:${targetId ?? "scope"}`,
+    statId: definition.id,
+    targetId,
+  });
+}
+
+function getDefaultAdHocTargetId(definition: StatDefinition): string {
+  if (definition.scope === "player") {
+    return replayPlayer?.replay.players[0]?.id ?? "";
+  }
+  return "blue";
+}
+
+function removeStatFromWindow(statsWindow: StatsWindowState, entryKey: string): void {
+  const index = statsWindow.entries.findIndex((entry) => entry.key === entryKey);
+  if (index >= 0) {
+    statsWindow.entries.splice(index, 1);
+  }
+}
+
+function renderStatsWindowEntries(
+  statsWindow: StatsWindowState,
+  frameIndex: number,
+): void {
+  const frame = getCurrentStatsFrame(frameIndex);
+  const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
+  const entries = statsWindow.entries
+    .map((entry) => ({ entry, definition: getStatById(entry.statId) }))
+    .filter((item): item is { entry: SelectedStatEntry; definition: StatDefinition } =>
+      item.definition !== null &&
+      (!allowedScope || item.definition.scope === allowedScope)
+    );
+
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stat-window-empty";
+    empty.textContent = "No stats added.";
+    statsWindow.body.append(empty);
+    return;
+  }
+
+  if (!frame) {
+    const empty = document.createElement("p");
+    empty.className = "stat-window-empty";
+    empty.textContent = "Load a replay to show stats.";
+    statsWindow.body.append(empty);
+    return;
+  }
+
+  if (statsWindow.kind === "all-players") {
+    renderAllPlayersStats(statsWindow, frame, entries);
+    return;
+  }
+  if (statsWindow.kind === "all-teams") {
+    renderAllTeamsStats(statsWindow, frame, entries);
+    return;
+  }
+  if (statsWindow.kind === "player") {
+    const player = statsWindow.playerId
+      ? frame.players.find((candidate) =>
+        playerIdToString(candidate.player_id) === statsWindow.playerId
+      ) ?? null
+      : null;
+    renderScopedStatList(statsWindow, player, entries);
+    return;
+  }
+  if (statsWindow.kind === "team") {
+    renderScopedStatList(
+      statsWindow,
+      getTeamSnapshot(frame, statsWindow.team ?? "blue"),
+      entries,
+    );
+    return;
+  }
+  if (statsWindow.kind === "ad-hoc") {
+    renderAdHocStats(statsWindow, frame, entries);
+  }
+}
+
+function renderScopedStatList(
+  statsWindow: StatsWindowState,
+  target: PlayerStatsSnapshot | TeamStatsSnapshot | null,
+  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
+): void {
+  const list = document.createElement("div");
+  list.className = "stats-window-stat-list";
+  for (const { entry, definition } of entries) {
+    list.append(renderStatRow(
+      statsWindow,
+      entry,
+      definition,
+      target ? definition.format(definition.read(target)) : "--",
+    ));
+  }
+  statsWindow.body.append(list);
+}
+
+function renderAllPlayersStats(
+  statsWindow: StatsWindowState,
+  frame: StatsFrame,
+  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
+): void {
+  const list = document.createElement("div");
+  list.className = "stats-window-entity-list";
+  for (const player of frame.players) {
+    const section = document.createElement("section");
+    section.className = "stats-window-entity";
+    const title = document.createElement("h3");
+    title.className = "stats-window-entity-title";
+    title.textContent = player.name;
+    section.append(title);
+    for (const { entry, definition } of entries) {
+      section.append(renderStatRow(
+        statsWindow,
+        entry,
+        definition,
+        definition.format(definition.read(player)),
+      ));
+    }
+    list.append(section);
+  }
+  statsWindow.body.append(list);
+}
+
+function renderAllTeamsStats(
+  statsWindow: StatsWindowState,
+  frame: StatsFrame,
+  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
+): void {
+  const list = document.createElement("div");
+  list.className = "stats-window-entity-list";
+  for (const team of ["blue", "orange"] as const) {
+    const snapshot = getTeamSnapshot(frame, team);
+    const section = document.createElement("section");
+    section.className = "stats-window-entity";
+    const title = document.createElement("h3");
+    title.className = "stats-window-entity-title";
+    title.textContent = getTeamLabel(team);
+    section.append(title);
+    for (const { entry, definition } of entries) {
+      section.append(renderStatRow(
+        statsWindow,
+        entry,
+        definition,
+        snapshot ? definition.format(definition.read(snapshot)) : "--",
+      ));
+    }
+    list.append(section);
+  }
+  statsWindow.body.append(list);
+}
+
+function renderAdHocStats(
+  statsWindow: StatsWindowState,
+  frame: StatsFrame,
+  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
+): void {
+  const list = document.createElement("div");
+  list.className = "stats-window-stat-list";
+  for (const { entry, definition } of entries) {
+    const target = getAdHocTarget(frame, definition, entry.targetId);
+    list.append(renderStatRow(
+      statsWindow,
+      entry,
+      definition,
+      target ? definition.format(definition.read(target)) : "--",
+    ));
+  }
+  statsWindow.body.append(list);
+}
+
+function getAdHocTarget(
+  frame: StatsFrame,
+  definition: StatDefinition,
+  targetId: string | undefined,
+): PlayerStatsSnapshot | TeamStatsSnapshot | null {
+  if (definition.scope === "player") {
+    return frame.players.find((player) =>
+      playerIdToString(player.player_id) === targetId
+    ) ?? frame.players[0] ?? null;
+  }
+  return getTeamSnapshot(frame, targetId === "orange" ? "orange" : "blue");
+}
+
+function renderStatRow(
+  statsWindow: StatsWindowState,
+  entry: SelectedStatEntry,
+  definition: StatDefinition,
+  value: string,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "stats-window-stat-row";
+  const name = document.createElement("span");
+  name.className = "stats-window-stat-name";
+  name.textContent = definition.label;
+  if (statsWindow.kind === "ad-hoc") {
+    const targetSelect = document.createElement("select");
+    targetSelect.className = "stats-window-stat-target";
+    if (definition.scope === "player") {
+      for (const player of replayPlayer?.replay.players ?? []) {
+        targetSelect.append(
+          new Option(
+            player.name,
+            player.id,
+            player.id === entry.targetId,
+            player.id === entry.targetId,
+          ),
+        );
+      }
+    } else {
+      targetSelect.append(
+        new Option("Blue", "blue", entry.targetId === "blue", entry.targetId === "blue"),
+        new Option(
+          "Orange",
+          "orange",
+          entry.targetId === "orange",
+          entry.targetId === "orange",
+        ),
+      );
+    }
+    targetSelect.value = entry.targetId ?? "";
+    targetSelect.addEventListener("change", () => {
+      const nextTargetId = targetSelect.value;
+      if (statsWindow.entries.some((candidate) =>
+        candidate !== entry &&
+        candidate.statId === entry.statId &&
+        candidate.targetId === nextTargetId
+      )) {
+        renderStatsWindow(statsWindow);
+        return;
+      }
+      const index = statsWindow.entries.findIndex((candidate) =>
+        candidate.key === entry.key
+      );
+      if (index >= 0) {
+        statsWindow.entries[index] = {
+          key: `${statsWindow.id}:${entry.statId}:${nextTargetId}`,
+          statId: entry.statId,
+          targetId: nextTargetId,
+        };
+      }
+      renderStatsWindow(statsWindow);
+    });
+    name.append(" ", targetSelect);
+  }
+  const valueEl = document.createElement("span");
+  valueEl.className = "stats-window-stat-value";
+  valueEl.textContent = value;
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "stats-window-stat-remove";
+  remove.textContent = "x";
+  remove.addEventListener("click", () => {
+    removeStatFromWindow(statsWindow, entry.key);
+    renderStatsWindow(statsWindow);
+  });
+  row.append(name, valueEl, remove);
+  return row;
 }
 
 function formatSetting(
@@ -407,6 +1256,7 @@ function readCustomCameraSettings(): CameraSettings {
 }
 
 function setCameraSettingControlsEnabled(enabled: boolean): void {
+  cameraSettingsControls.hidden = !customCameraSettings.checked;
   customCameraFov.disabled = !enabled;
   customCameraHeight.disabled = !enabled;
   customCameraPitch.disabled = !enabled;
@@ -451,6 +1301,8 @@ function setTransportEnabled(enabled: boolean): void {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
   attachedPlayer.disabled = !enabled;
+  skipPostGoalTransitions.disabled = !enabled;
+  skipKickoffs.disabled = !enabled;
   syncCameraModeButtons(enabled ? replayPlayer?.getState() : undefined);
 }
 
@@ -557,32 +1409,6 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
   );
 }
 
-function renderStats(frameIndex: number): void {
-  const ctx = getModuleContext();
-  if (!ctx) return;
-
-  const cacheKey = `${frameIndex}:${getActiveModuleSignature()}`;
-  if (statsRenderCacheKey === cacheKey) {
-    return;
-  }
-
-  const sections = activeModules
-    .map((mod) => {
-      const html = mod.renderStats(frameIndex, ctx);
-      if (!html) return "";
-      return `<section class="stat-module-section">
-        <div class="stat-module-label">${mod.label}</div>
-        <div class="player-stats-grid">${html}</div>
-      </section>`;
-    })
-    .filter(Boolean);
-
-  playerStatsEl.innerHTML = sections.length > 0
-    ? sections.join("")
-    : "No stat modules active.";
-  statsRenderCacheKey = cacheKey;
-}
-
 function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   const ctx = getModuleContext();
   if (!ctx || !state || !showFollowedPlayerOverlay.checked) {
@@ -608,7 +1434,9 @@ function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
     return;
   }
 
-  const showRoleIndicator = activeModuleIds.has(RELATIVE_POSITIONING_MODULE_ID);
+  const showRoleIndicator = activeRenderEffectModuleIds.has(
+    RELATIVE_POSITIONING_MODULE_ID,
+  );
   const role = showRoleIndicator
     ? getCurrentRole(ctx.replay, attachedPlayerId, state.frameIndex)
     : null;
@@ -675,9 +1503,9 @@ function renderSnapshot(state: ReplayPlayerState): void {
   cameraDistance.value = `${state.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
   customCameraSettings.checked = state.customCameraSettings !== null;
+  cameraSettingsControls.hidden = !customCameraSettings.checked;
   syncCustomCameraSettingControls(getEffectiveCameraSettings(state));
   ballCam.checked = state.ballCamEnabled;
-  showBoostPickupAnimation.checked = state.boostPickupAnimationEnabled;
   attachedPlayer.value = state.attachedPlayerId ?? "";
   skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = state.skipKickoffsEnabled;
@@ -685,7 +1513,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
 
   syncCameraControlAvailability(state);
   renderCameraProfile(state);
-  renderStats(state.frameIndex);
+  renderStatsWindows(state.frameIndex);
   renderFocusedPlayerOverlay(state);
   statMonitor?.renderFrame(
     statsFrameLookup
@@ -753,10 +1581,12 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
+  statRegistry = [];
   statMonitor?.setStatsTimeline(null);
   statMonitor?.renderFrame(null);
   clearTimelineEventSources();
   clearTimelineRangeSources();
+  clearStandalonePlugins();
   clearRenderCaches();
   renderTimelineEventCount();
   renderModuleSettings();
@@ -775,11 +1605,12 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     const { replay } = loadedReplay;
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
+    statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
     statMonitor?.setStatsTimeline(statsTimeline);
 
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>
-        filterReplayTimelineEvents(context.replay, activeModuleIds),
+        filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
     });
 
     replayPlayer = new ReplayPlayer(viewport, replay, {
@@ -787,18 +1618,18 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
       initialCustomCameraSettings: null,
       initialAttachedPlayerId: null,
       initialBallCamEnabled: false,
-      initialBoostPickupAnimationEnabled: showBoostPickupAnimation.checked,
+      initialBoostPickupAnimationEnabled: false,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
       plugins: [
         createBallchasingOverlayPlugin(),
-        createBoostPadOverlayPlugin(),
         createBoostPickupAnimationPlugin({
           includePickup: includeBoostPickupAnimationPickup,
         }),
         timelineOverlay,
       ],
     });
+    syncBoostPadOverlayPlugin();
 
     setupActiveModules();
     unsubscribe = replayPlayer.subscribe(renderSnapshot);
@@ -813,6 +1644,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     setTransportEnabled(true);
     syncCameraControlAvailability(replayPlayer.getState());
     renderSnapshot(replayPlayer.getState());
+    renderStatsWindows(replayPlayer.getState().frameIndex);
     renderModuleSettings();
     replayLoadModal?.hide();
   } catch (error) {
@@ -865,6 +1697,12 @@ export function mountStatEvaluationPlayer(
   fileInput = mustElement<HTMLInputElement>(root, "#replay-file");
   viewport = mustElement<HTMLDivElement>(root, "#viewport");
   emptyState = mustElement<HTMLDivElement>(root, "#empty-state");
+  emptyLoadReplay = mustElement<HTMLButtonElement>(root, "#empty-load-replay");
+  launcherToggle = mustElement<HTMLButtonElement>(root, "#launcher-toggle");
+  launcherMenu = mustElement<HTMLDivElement>(root, "#launcher-menu");
+  loadReplayAction = mustElement<HTMLButtonElement>(root, "#load-replay-action");
+  floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
+  statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
   followedPlayerOverlay = mustElement<HTMLDivElement>(
     root,
@@ -897,6 +1735,10 @@ export function mountStatEvaluationPlayer(
   customCameraSettings = mustElement<HTMLInputElement>(
     root,
     "#custom-camera-settings",
+  );
+  cameraSettingsControls = mustElement<HTMLDivElement>(
+    root,
+    "#camera-settings-controls",
   );
   customCameraFov = mustElement<HTMLInputElement>(root, "#custom-camera-fov");
   customCameraHeight = mustElement<HTMLInputElement>(
@@ -953,10 +1795,6 @@ export function mountStatEvaluationPlayer(
     root,
     "#show-followed-player-overlay",
   );
-  showBoostPickupAnimation = mustElement<HTMLInputElement>(
-    root,
-    "#show-boost-pickup-animation",
-  );
   moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
   moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
@@ -970,7 +1808,6 @@ export function mountStatEvaluationPlayer(
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
-  playerStatsEl = mustElement<HTMLDivElement>(root, "#player-stats");
   statMonitorSlotZero = mustElement<HTMLElement>(root, "#stat-monitor-slot-0");
   statMonitorSlotOne = mustElement<HTMLElement>(root, "#stat-monitor-slot-1");
   cameraProfileReadout = mustElement<HTMLElement>(
@@ -999,6 +1836,8 @@ export function mountStatEvaluationPlayer(
   );
 
   const listeners = new AbortController();
+  installWindowDragging(floatingWindowLayer, listeners.signal);
+  installWindowDragging(statsWindowLayer, listeners.signal);
   const cleanup = () => {
     listeners.abort();
     unsubscribe?.();
@@ -1009,15 +1848,23 @@ export function mountStatEvaluationPlayer(
     timelineOverlay = null;
     statsTimeline = null;
     statsFrameLookup = null;
+    statRegistry = [];
+    statsWindows.clear();
     statMonitor?.destroy();
     statMonitor = null;
     clearTimelineEventSources();
     clearTimelineRangeSources();
+    clearStandalonePlugins();
     clearRenderCaches();
     activeModules = [];
     replayLoadModal?.destroy();
     replayLoadModal = null;
-    activeModuleIds = new Set<string>();
+    activeTimelineEventModuleIds = new Set<string>();
+    activeTimelineRangeModuleIds = new Set<string>();
+    activeRenderEffectModuleIds = new Set<string>();
+    boostPadOverlayEnabled = false;
+    nextStatsWindowId = 1;
+    nextWindowZIndex = 30;
     removeRenderHook = null;
     if (appRoot === root) {
       appRoot = null;
@@ -1028,6 +1875,51 @@ export function mountStatEvaluationPlayer(
     }
   };
   currentMountCleanup = cleanup;
+
+  launcherToggle.addEventListener("click", () => {
+    setLauncherOpen(launcherMenu.hidden);
+  }, { signal: listeners.signal });
+
+  root.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    if (!event.target.closest(".top-chrome")) {
+      setLauncherOpen(false);
+    }
+  }, { signal: listeners.signal });
+
+  loadReplayAction.addEventListener("click", openReplayFilePicker, {
+    signal: listeners.signal,
+  });
+  emptyLoadReplay.addEventListener("click", openReplayFilePicker, {
+    signal: listeners.signal,
+  });
+
+  root.querySelectorAll<HTMLElement>("[data-window-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.windowToggle as SingletonWindowId | undefined;
+      if (id) {
+        toggleWindow(id);
+        setLauncherOpen(false);
+      }
+    }, { signal: listeners.signal });
+  });
+
+  root.querySelectorAll<HTMLElement>("[data-window-hide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.windowHide ?? getElementWindowId(button);
+      if (id) {
+        hideWindow(id);
+      }
+    }, { signal: listeners.signal });
+  });
+
+  root.querySelectorAll<HTMLElement>("[data-create-stats-window]").forEach((button) => {
+    button.addEventListener("click", () => {
+      createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);
+    }, { signal: listeners.signal });
+  });
 
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files?.[0];
@@ -1055,6 +1947,7 @@ export function mountStatEvaluationPlayer(
   }, { signal: listeners.signal });
 
   customCameraSettings.addEventListener("change", () => {
+    cameraSettingsControls.hidden = !customCameraSettings.checked;
     replayPlayer?.setCustomCameraSettings(
       customCameraSettings.checked ? readCustomCameraSettings() : null,
     );
@@ -1102,12 +1995,6 @@ export function mountStatEvaluationPlayer(
 
   showFollowedPlayerOverlay.addEventListener("change", () => {
     renderFocusedPlayerOverlay(replayPlayer?.getState());
-  }, { signal: listeners.signal });
-
-  showBoostPickupAnimation.addEventListener("change", () => {
-    replayPlayer?.setBoostPickupAnimationEnabled(
-      showBoostPickupAnimation.checked,
-    );
   }, { signal: listeners.signal });
 
   skipPostGoalTransitions.addEventListener("change", () => {

@@ -142,25 +142,28 @@ function ensureStyles(): void {
 
     .sap-bc-team-hud {
       position: absolute;
-      top: 5.4rem;
+      top: 0.7rem;
       display: flex;
-      flex-direction: column;
-      gap: 0.7rem;
-      padding: 0.8rem 0.9rem;
-      border-radius: 0.9rem;
+      gap: 0.35rem;
+      padding: 0.35rem 0.42rem;
+      border-radius: 999px;
       background: rgba(9, 14, 21, 0.52);
       backdrop-filter: blur(8px);
       box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
     }
 
     .sap-bc-team-hud-blue {
-      left: 0.7rem;
-      border-left: 4px solid ${TEAM_BLUE};
+      right: calc(50% + 0.35rem);
+      flex-direction: row;
+      justify-content: flex-end;
+      border-bottom: 2px solid ${TEAM_BLUE};
     }
 
     .sap-bc-team-hud-orange {
-      right: 0.7rem;
-      border-right: 4px solid ${TEAM_ORANGE};
+      left: calc(50% + 0.35rem);
+      flex-direction: row;
+      justify-content: flex-start;
+      border-bottom: 2px solid ${TEAM_ORANGE};
     }
 
     .sap-bc-hud-player {
@@ -169,18 +172,14 @@ function ensureStyles(): void {
       gap: 0.25rem;
     }
 
-    .sap-bc-team-hud-orange .sap-bc-hud-player {
-      align-items: flex-end;
-    }
-
     .sap-bc-hud-boost-bar {
       position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 8.25rem;
-      max-width: 12rem;
-      min-height: 1.2rem;
+      min-width: 5.9rem;
+      max-width: 8rem;
+      min-height: 1.05rem;
       border-radius: 999px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.26);
@@ -214,7 +213,7 @@ function ensureStyles(): void {
       text-overflow: ellipsis;
       padding: 0.14rem 0.65rem;
       color: #ffffff;
-      font-size: 0.72rem;
+      font-size: 0.64rem;
       font-weight: 700;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
       white-space: nowrap;
@@ -244,7 +243,7 @@ function ensureStyles(): void {
 
     @media (max-width: 900px) {
       .sap-bc-team-hud {
-        display: none;
+        top: 3.25rem;
       }
     }
 
