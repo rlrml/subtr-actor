@@ -2,14 +2,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
   return `
   <main class="shell">
     <section class="hero">
-      <div>
-        <p class="eyebrow">subtr-actor / stats replay viewer</p>
-        <h1>Stat Evaluation Player</h1>
-        <p class="lede">
-          Compare stat modules against the in-replay camera view, switch to any
-          player's camera profile, and scrub with the shared timeline plugin.
-        </p>
-      </div>
       <label class="file-picker">
         <span>Choose replay</span>
         <input id="replay-file" type="file" accept=".replay" />
