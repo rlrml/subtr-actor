@@ -6,6 +6,7 @@ import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import { createBoostPickupFilterController } from "../boostPickupFilters.ts";
+import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
@@ -77,10 +78,13 @@ function boostPickupAuditCountsForPlayer(
   return counts;
 }
 
-export function createBoostModule(runtime: StatModuleRuntime): StatModule {
-  const pickupFilters = createBoostPickupFilterController({
+export function createBoostModule(
+  runtime: StatModuleRuntime,
+  pickupFilters: BoostPickupFilterController = createBoostPickupFilterController({
     refreshTimelineRanges: runtime.refreshTimelineRanges,
-  });
+    rerenderCurrentState: runtime.rerenderCurrentState,
+  }),
+): StatModule {
 
   return {
     id: "boost",

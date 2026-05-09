@@ -22,6 +22,7 @@ interface BoostPickupFilterContext {
 
 interface BoostPickupFilterRuntime {
   refreshTimelineRanges?(): void;
+  rerenderCurrentState?(): void;
 }
 
 interface BoostPickupFilterRenderOptions {
@@ -158,6 +159,7 @@ export function createBoostPickupFilterController(
         }
         syncSettingsUi(lastReplay);
         runtime.refreshTimelineRanges?.();
+        runtime.rerenderCurrentState?.();
       });
 
       const optionText = document.createElement("span");
@@ -213,6 +215,7 @@ export function createBoostPickupFilterController(
         }
         syncSettingsUi(replay);
         runtime.refreshTimelineRanges?.();
+        runtime.rerenderCurrentState?.();
       });
 
       const optionText = document.createElement("span");

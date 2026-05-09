@@ -75,6 +75,20 @@ const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
 const standalonePluginRemovers = new Map<string, () => void>();
 
+const boostPickupFilters = createBoostPickupFilterController({
+  refreshTimelineRanges() {
+    syncTimelineRanges();
+  },
+  rerenderCurrentState() {
+    if (!replayPlayer) {
+      return;
+    }
+    replayPlayer.setBoostPickupAnimationEnabled(
+      replayPlayer.getState().boostPickupAnimationEnabled,
+    );
+  },
+});
+
 const MODULES = createStatModules({
   rerenderCurrentState() {
     if (!replayPlayer) {
@@ -87,11 +101,8 @@ const MODULES = createStatModules({
   refreshTimelineRanges() {
     syncTimelineRanges();
   },
-});
-const boostPickupFilters = createBoostPickupFilterController({
-  refreshTimelineRanges() {
-    syncTimelineRanges();
-  },
+}, {
+  boostPickupFilters,
 });
 
 let activeModules: StatModule[] = [];
@@ -123,6 +134,7 @@ let launcherToggle!: HTMLButtonElement;
 let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
+let boostPickupFiltersWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let playbackRate!: HTMLSelectElement;
@@ -193,7 +205,7 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
-type SingletonWindowId = "camera" | "playback" | "recording";
+type SingletonWindowId = "camera" | "playback" | "recording" | "boost-pickups";
 type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
 type TeamScope = "blue" | "orange";
 type ModuleCapabilityKind = "events" | "ranges" | "effects";
@@ -217,10 +229,6 @@ interface StatsWindowState {
 }
 
 const statsWindows = new Map<string, StatsWindowState>();
-
-function boostPickupAnimationEnabled(): boolean {
-  return replayPlayer?.getState().boostPickupAnimationEnabled ?? false;
-}
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
@@ -698,22 +706,32 @@ function renderModuleSettings(): void {
 
   const ctx = getModuleContext();
   const panels = activeModules
+    .filter((mod) => mod.id !== "boost")
     .map((mod) => mod.renderSettings?.(ctx) ?? null)
     .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
-  if (boostPickupAnimationEnabled()) {
-    panels.push(boostPickupFilters.renderSettings(ctx, {
-      eyebrow: "Field overlay",
-      title: "Boost pickup field overlay",
-    }));
-  }
 
   if (panels.length === 0) {
     moduleSettingsEl.hidden = true;
+    renderBoostPickupFiltersWindow();
     return;
   }
 
   moduleSettingsEl.hidden = false;
   moduleSettingsEl.append(...panels);
+  renderBoostPickupFiltersWindow();
+}
+
+function renderBoostPickupFiltersWindow(): void {
+  if (!boostPickupFiltersWindowBody) {
+    return;
+  }
+
+  const ctx = getModuleContext();
+  const panel = boostPickupFilters.renderSettings(ctx, {
+    eyebrow: "Timeline / Field overlay",
+    title: "Boost pickup filters",
+  });
+  boostPickupFiltersWindowBody.replaceChildren(panel);
 }
 
 function getStatById(statId: string): StatDefinition | null {
@@ -1896,6 +1914,10 @@ export function mountStatEvaluationPlayer(
   launcherMenu = mustElement<HTMLDivElement>(root, "#launcher-menu");
   loadReplayAction = mustElement<HTMLButtonElement>(root, "#load-replay-action");
   floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
+  boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
+    root,
+    "#boost-pickup-filters-window-body",
+  );
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");

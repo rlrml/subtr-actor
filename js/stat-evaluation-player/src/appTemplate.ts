@@ -24,6 +24,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-window-toggle="camera">Camera</button>
               <button type="button" data-window-toggle="playback">Playback</button>
               <button type="button" data-window-toggle="recording">Recording</button>
+              <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
@@ -334,6 +335,24 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 <dd id="recording-type">WebM</dd>
               </div>
             </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-boost-pickups"
+            data-window-id="boost-pickups"
+            hidden
+            style="--window-x: 1rem; --window-y: 16rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <p class="panel-eyebrow">Boost pickups</p>
+                <h2>Filters</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="boost-pickups">
+                Hide
+              </button>
+            </header>
+            <div id="boost-pickup-filters-window-body"></div>
           </section>
         </div>
 

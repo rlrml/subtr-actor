@@ -23,6 +23,8 @@ import {
   createAbsolutePositioningModule,
   createRelativePositioningModule,
 } from "./positioningModules.ts";
+import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
+
 export {
   hasBoostPickupAnimationTimelineMatch,
 } from "../boostPickupFilters.ts";
@@ -40,7 +42,10 @@ export type {
   StatModuleRuntime,
 } from "./types.ts";
 
-export function createStatModules(runtime: import("./types.ts").StatModuleRuntime) {
+export function createStatModules(
+  runtime: import("./types.ts").StatModuleRuntime,
+  options: { boostPickupFilters?: BoostPickupFilterController } = {},
+) {
   return [
     createCoreModule(),
     createBackboardModule(),
@@ -56,7 +61,7 @@ export function createStatModules(runtime: import("./types.ts").StatModuleRuntim
     createTouchModule(runtime),
     createMustyFlickModule(),
     createDodgeResetModule(),
-    createBoostModule(runtime),
+    createBoostModule(runtime, options.boostPickupFilters),
     createBallCarryModule(),
     createMovementModule(runtime),
     createPowerslideModule(),
