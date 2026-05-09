@@ -3,11 +3,14 @@ import {
   createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
   createBoostPickupAnimationPlugin,
+  createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
   ReplayPlayer,
 } from "subtr-actor-player";
 import type {
   BoostPickupAnimationPickup,
+  CanvasRecorderPlugin,
+  CanvasRecorderStatus,
   CameraSettings,
   ReplayCameraViewMode,
   ReplayPlayerState,
@@ -65,6 +68,7 @@ const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
 
 let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
+let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
@@ -171,6 +175,17 @@ let cameraStiffnessReadout!: HTMLElement;
 let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
+let recordingFps!: HTMLInputElement;
+let recordingPlaybackRate!: HTMLSelectElement;
+let recordingStart!: HTMLButtonElement;
+let recordingFullReplay!: HTMLButtonElement;
+let recordingStop!: HTMLButtonElement;
+let recordingDownload!: HTMLButtonElement;
+let recordingClear!: HTMLButtonElement;
+let recordingStatus!: HTMLElement;
+let recordingElapsed!: HTMLElement;
+let recordingSize!: HTMLElement;
+let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let focusedPlayerOverlayCacheKey: string | null = null;
 let statRegistry: StatDefinition[] = [];
@@ -178,6 +193,7 @@ let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
 let showFollowedPlayerOverlayEnabled = false;
 let boostPadOverlayEnabled = true;
+let loadedReplayName: string | null = null;
 
 interface ReplayInputSource {
   name: string;
@@ -185,7 +201,7 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
-type SingletonWindowId = "camera" | "playback";
+type SingletonWindowId = "camera" | "playback" | "recording";
 type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
 type TeamScope = "blue" | "orange";
 type ModuleCapabilityKind = "events" | "ranges" | "effects";
@@ -995,7 +1011,7 @@ function renderStatsWindowAddControl(statsWindow: StatsWindowState): void {
   button.title = "Add stat";
   button.setAttribute("aria-label", "Add stat");
   button.setAttribute("aria-expanded", String(statsWindow.pickerOpen));
-  button.addEventListener("click", () => {
+  activateButton(button, () => {
     statsWindow.pickerOpen = !statsWindow.pickerOpen;
     renderStatsWindow(statsWindow);
   });
@@ -1010,6 +1026,27 @@ function renderStatsWindowAddControl(statsWindow: StatsWindowState): void {
   toolbar.className = "stats-window-toolbar";
   toolbar.append(button);
   statsWindow.body.append(toolbar);
+}
+
+function activateButton(button: HTMLButtonElement, callback: () => void): void {
+  let pointerActivated = false;
+  button.addEventListener("pointerdown", (event) => {
+    if (button.disabled) {
+      return;
+    }
+    pointerActivated = true;
+    event.preventDefault();
+    callback();
+  });
+  button.addEventListener("click", () => {
+    if (pointerActivated) {
+      pointerActivated = false;
+      return;
+    }
+    if (!button.disabled) {
+      callback();
+    }
+  });
 }
 
 function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
@@ -1069,7 +1106,7 @@ function renderStatsWindowPickerList(
     addGroup.type = "button";
     addGroup.className = "stats-window-picker-item";
     addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;
-    addGroup.addEventListener("click", () => {
+    activateButton(addGroup, () => {
       for (const definition of group) {
         addStatToWindow(statsWindow, definition);
       }
@@ -1085,7 +1122,7 @@ function renderStatsWindowPickerList(
     item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;
     item.disabled = statsWindow.kind !== "ad-hoc" &&
       statsWindow.entries.some((entry) => entry.statId === definition.id);
-    item.addEventListener("click", () => {
+    activateButton(item, () => {
       addStatToWindow(statsWindow, definition);
       renderStatsWindow(statsWindow);
     });
@@ -1545,6 +1582,88 @@ function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
   }
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) {
+    return "--";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const precision = unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function recordingLabel(status: CanvasRecorderStatus | null): string {
+  if (!status) {
+    return "No replay";
+  }
+  if (status.error) {
+    return status.error;
+  }
+  switch (status.state) {
+    case "idle":
+      return "Idle";
+    case "recording":
+      return "Recording";
+    case "stopping":
+      return "Stopping";
+    case "ready":
+      return "Ready";
+    case "error":
+      return "Error";
+  }
+}
+
+function getRecordingOptions(): { fps: number; playbackRate: number } {
+  const fps = Number(recordingFps.value);
+  const playbackRate = Number(recordingPlaybackRate.value);
+  return {
+    fps: Number.isFinite(fps) ? Math.max(1, Math.min(120, Math.trunc(fps))) : 60,
+    playbackRate: Number.isFinite(playbackRate) ? Math.max(0.1, playbackRate) : 1,
+  };
+}
+
+function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
+  const hasRecorder = canvasRecorder !== null && replayPlayer !== null;
+  const state = status?.state ?? "idle";
+  const isRecording = state === "recording" || state === "stopping";
+  const hasRecording = (canvasRecorder?.getRecording() ?? null) !== null;
+
+  recordingStatus.textContent = recordingLabel(status);
+  recordingElapsed.textContent = `${(status?.elapsedSeconds ?? 0).toFixed(1)}s`;
+  recordingSize.textContent = formatBytes(status?.sizeBytes ?? 0);
+  recordingType.textContent = status?.mimeType || "WebM";
+  recordingStart.disabled = !hasRecorder || isRecording;
+  recordingFullReplay.disabled = !hasRecorder || isRecording;
+  recordingStop.disabled = !hasRecorder || !isRecording;
+  recordingDownload.disabled = !hasRecording || isRecording;
+  recordingClear.disabled = !hasRecording || isRecording;
+  recordingFps.disabled = isRecording;
+  recordingPlaybackRate.disabled = isRecording;
+}
+
+function recordingFileName(): string {
+  const source = loadedReplayName?.replace(/\.replay$/i, "") || "replay";
+  const safeSource = source.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `${safeSource || "replay"}-${timestamp}.webm`;
+}
+
+function downloadRecording(blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = recordingFileName();
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function renderCameraProfile(state?: ReplayPlayerState): void {
   const attachedPlayerId = state?.attachedPlayerId ?? null;
   if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {
@@ -1751,6 +1870,8 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   teardownActiveModules();
   replayPlayer?.destroy();
   replayPlayer = null;
+  canvasRecorder = null;
+  loadedReplayName = null;
   timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
@@ -1761,6 +1882,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   clearRenderCaches();
   renderTimelineEventCount();
   renderModuleSettings();
+  syncRecordingWindow();
 
   try {
     const bytes = await source.readBytes();
@@ -1777,10 +1899,15 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
+
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>
         filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
     });
+    const recorder = createCanvasRecorderPlugin({
+      onStatusChange: syncRecordingWindow,
+    });
+    canvasRecorder = recorder;
 
     replayPlayer = new ReplayPlayer(viewport, replay, {
       initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
@@ -1795,6 +1922,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
         createBoostPickupAnimationPlugin({
           includePickup: includeBoostPickupAnimationPickup,
         }),
+        recorder,
         timelineOverlay,
       ],
     });
@@ -1806,6 +1934,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     populateAttachedPlayerOptions(replay.players);
     emptyState.hidden = true;
     statusReadout.textContent = `Loaded ${source.name}`;
+    loadedReplayName = source.name;
     playersReadout.textContent = replay.players.map((player) => player.name)
       .join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
@@ -1815,9 +1944,14 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     renderSnapshot(replayPlayer.getState());
     renderStatsWindows(replayPlayer.getState().frameIndex);
     renderModuleSettings();
+    syncRecordingWindow();
     replayLoadModal?.hide();
   } catch (error) {
     replayLoadModal?.hide();
+    replayPlayer?.destroy();
+    replayPlayer = null;
+    canvasRecorder = null;
+    syncRecordingWindow();
     throw error;
   } finally {
     fileInput.disabled = false;
@@ -1993,6 +2127,27 @@ export function mountStatEvaluationPlayer(
     "#skip-post-goal-transitions",
   );
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
+  recordingFps = mustElement<HTMLInputElement>(root, "#recording-fps");
+  recordingPlaybackRate = mustElement<HTMLSelectElement>(
+    root,
+    "#recording-playback-rate",
+  );
+  recordingStart = mustElement<HTMLButtonElement>(root, "#recording-start");
+  recordingFullReplay = mustElement<HTMLButtonElement>(
+    root,
+    "#recording-full-replay",
+  );
+  recordingStop = mustElement<HTMLButtonElement>(root, "#recording-stop");
+  recordingDownload = mustElement<HTMLButtonElement>(
+    root,
+    "#recording-download",
+  );
+  recordingClear = mustElement<HTMLButtonElement>(root, "#recording-clear");
+  recordingStatus = mustElement<HTMLElement>(root, "#recording-status");
+  recordingElapsed = mustElement<HTMLElement>(root, "#recording-elapsed");
+  recordingSize = mustElement<HTMLElement>(root, "#recording-size");
+  recordingType = mustElement<HTMLElement>(root, "#recording-type");
+
   const listeners = new AbortController();
   installWindowDragging(floatingWindowLayer, listeners.signal);
   installWindowDragging(statsWindowLayer, listeners.signal);
@@ -2003,6 +2158,7 @@ export function mountStatEvaluationPlayer(
     teardownActiveModules();
     replayPlayer?.destroy();
     replayPlayer = null;
+    canvasRecorder = null;
     timelineOverlay = null;
     statsTimeline = null;
     statsFrameLookup = null;
@@ -2019,6 +2175,7 @@ export function mountStatEvaluationPlayer(
     activeTimelineRangeModuleIds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
     boostPadOverlayEnabled = true;
+    loadedReplayName = null;
     nextStatsWindowId = 1;
     nextWindowZIndex = 30;
     removeRenderHook = null;
@@ -2098,6 +2255,68 @@ export function mountStatEvaluationPlayer(
     replayPlayer?.setPlaybackRate(Number(playbackRate.value));
   }, { signal: listeners.signal });
 
+  recordingStart.addEventListener("click", () => {
+    if (!canvasRecorder) {
+      return;
+    }
+    try {
+      const { fps } = getRecordingOptions();
+      canvasRecorder.start({ fps });
+      syncRecordingWindow();
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      statusReadout.textContent = error instanceof Error
+        ? error.message
+        : "Failed to start recording";
+      syncRecordingWindow(canvasRecorder.getStatus());
+    }
+  }, { signal: listeners.signal });
+
+  recordingFullReplay.addEventListener("click", () => {
+    if (!canvasRecorder) {
+      return;
+    }
+    const { fps, playbackRate } = getRecordingOptions();
+    void canvasRecorder.recordFullReplay({
+      fps,
+      playbackRate,
+      restorePlaybackState: true,
+    }).catch((error) => {
+      console.error("Failed to record replay:", error);
+      statusReadout.textContent = error instanceof Error
+        ? error.message
+        : "Failed to record replay";
+      syncRecordingWindow(canvasRecorder?.getStatus() ?? null);
+    });
+    syncRecordingWindow();
+  }, { signal: listeners.signal });
+
+  recordingStop.addEventListener("click", () => {
+    void canvasRecorder?.stop().catch((error) => {
+      console.error("Failed to stop recording:", error);
+      statusReadout.textContent = error instanceof Error
+        ? error.message
+        : "Failed to stop recording";
+    });
+    syncRecordingWindow();
+  }, { signal: listeners.signal });
+
+  recordingDownload.addEventListener("click", () => {
+    const blob = canvasRecorder?.getRecording();
+    if (blob) {
+      downloadRecording(blob);
+    }
+  }, { signal: listeners.signal });
+
+  recordingClear.addEventListener("click", () => {
+    try {
+      canvasRecorder?.clear();
+      syncRecordingWindow();
+    } catch (error) {
+      console.error("Failed to clear recording:", error);
+    }
+  }, { signal: listeners.signal });
+
   cameraDistance.addEventListener("input", () => {
     replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
   }, { signal: listeners.signal });
@@ -2169,6 +2388,7 @@ export function mountStatEvaluationPlayer(
   renderModuleSettings();
   renderCameraProfile();
   syncCameraModeButtons();
+  syncRecordingWindow();
   renderTimelineEventCount();
   loadReplayFromLocation(listeners.signal);
 

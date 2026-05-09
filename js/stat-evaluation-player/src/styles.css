@@ -230,7 +230,8 @@ input {
   width: min(26rem, calc(100vw - 1.6rem));
 }
 
-.floating-window-playback {
+.floating-window-playback,
+.floating-window-recording {
   --window-x: calc(100vw - 27rem);
   width: min(26rem, calc(100vw - 1.6rem));
 }
@@ -836,6 +837,12 @@ input {
   flex: 1 1 auto;
 }
 
+.recording-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-gap-sm);
+}
+
 .camera-presets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1117,6 +1124,7 @@ input[type="range"] {
     left: 1rem;
     width: min(22rem, calc(100% - 2rem));
   }
+
 }
 
 @media (max-width: 560px) {
@@ -1144,4 +1152,5 @@ input[type="range"] {
   .followed-player-overlay-card {
     width: 100%;
   }
+
 }

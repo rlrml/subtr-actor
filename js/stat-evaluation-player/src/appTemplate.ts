@@ -4,11 +4,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
     <section class="workspace">
       <div class="viewport-panel">
         <div id="viewport" class="viewport"></div>
-        <div
-          id="followed-player-overlay"
-          class="followed-player-overlay"
-          hidden
-        ></div>
         <div class="top-chrome">
           <button
             id="launcher-toggle"
@@ -28,6 +23,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <h2>Windows</h2>
               <button type="button" data-window-toggle="camera">Camera</button>
               <button type="button" data-window-toggle="playback">Playback</button>
+              <button type="button" data-window-toggle="recording">Recording</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
@@ -36,16 +32,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             </section>
             <section class="launcher-section">
               <h2>Timelines / overlays</h2>
-              <button
-                id="show-followed-player-overlay"
-                type="button"
-                class="module-summary-item"
-                data-active="false"
-                aria-pressed="false"
-              >
-                <span>Followed player stats HUD</span>
-                <strong>Off</strong>
-              </button>
               <div class="module-groups" id="module-summary"></div>
               <div id="module-settings" class="module-settings" hidden></div>
             </section>
@@ -287,6 +273,65 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <div>
                 <dt>Status</dt>
                 <dd id="playback-status-readout">Stopped</dd>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-recording"
+            data-window-id="recording"
+            hidden
+            style="--window-x: calc(100vw - 28rem); --window-y: 24rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <p class="panel-eyebrow">Capture</p>
+                <h2>Recording</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="recording">
+                Hide
+              </button>
+            </header>
+            <div class="recording-controls">
+              <label>
+                <span class="label">FPS</span>
+                <input id="recording-fps" type="number" min="1" max="120" step="1" value="60" />
+              </label>
+              <label>
+                <span class="label">Playback rate</span>
+                <select id="recording-playback-rate">
+                  <option value="0.5">0.5x</option>
+                  <option value="1" selected>1.0x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2.0x</option>
+                </select>
+              </label>
+            </div>
+            <div class="transport-row">
+              <button id="recording-start" type="button" disabled>Start</button>
+              <button id="recording-full-replay" type="button" disabled>Full replay</button>
+              <button id="recording-stop" type="button" disabled>Stop</button>
+            </div>
+            <div class="transport-row">
+              <button id="recording-download" type="button" disabled>Download</button>
+              <button id="recording-clear" type="button" disabled>Clear</button>
+            </div>
+            <div class="detail-grid">
+              <div>
+                <dt>Status</dt>
+                <dd id="recording-status">Idle</dd>
+              </div>
+              <div>
+                <dt>Elapsed</dt>
+                <dd id="recording-elapsed">0.0s</dd>
+              </div>
+              <div>
+                <dt>Size</dt>
+                <dd id="recording-size">--</dd>
+              </div>
+              <div>
+                <dt>Type</dt>
+                <dd id="recording-type">WebM</dd>
               </div>
             </div>
           </section>

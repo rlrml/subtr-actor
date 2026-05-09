@@ -9,6 +9,16 @@ export type {
   BoostPickupAnimationPickup,
   BoostPickupAnimationPluginOptions,
 } from "./boost-pickup-animation";
+export { createCanvasRecorderPlugin } from "./canvas-recorder";
+export type {
+  CanvasRecorderPlugin,
+  CanvasRecorderPluginOptions,
+  CanvasRecorderRangeOptions,
+  CanvasRecorderStartOptions,
+  CanvasRecorderState,
+  CanvasRecorderStatus,
+  CanvasRecorderStatusListener,
+} from "./canvas-recorder";
 export { createTimelineOverlayPlugin } from "./timeline-overlay";
 export type {
   TimelineOverlayPlugin,
