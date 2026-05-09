@@ -206,7 +206,6 @@ interface StatsWindowState {
   readonly entries: SelectedStatEntry[];
   playerId: string | null;
   team: TeamScope | null;
-  scopeEditing: boolean;
   pickerOpen: boolean;
   query: string;
   element: HTMLElement;
@@ -732,6 +731,37 @@ function getPlayerLabel(playerId: string | null): string {
     ?.name ?? "Unknown player";
 }
 
+function getPlayerTeamClass(playerId: string | null | undefined): string | null {
+  const player = replayPlayer?.replay.players.find((candidate) =>
+    candidate.id === playerId
+  );
+  return player ? getTeamClass(player.isTeamZero) : null;
+}
+
+function getTeamScopeClass(team: TeamScope): string {
+  return getTeamClass(team === "blue");
+}
+
+function getStatsWindowScopeTeamClass(statsWindow: StatsWindowState): string | null {
+  if (statsWindow.kind === "player") {
+    return getPlayerTeamClass(statsWindow.playerId);
+  }
+  if (statsWindow.kind === "team") {
+    return getTeamScopeClass(statsWindow.team ?? "blue");
+  }
+  return null;
+}
+
+function getStatTargetTeamClass(
+  definition: StatDefinition,
+  targetId: string | undefined,
+): string | null {
+  if (definition.scope === "player") {
+    return getPlayerTeamClass(targetId);
+  }
+  return getTeamScopeClass(targetId === "orange" ? "orange" : "blue");
+}
+
 function getStatsWindowTitle(kind: StatsWindowKind): string {
   switch (kind) {
     case "player":
@@ -745,6 +775,10 @@ function getStatsWindowTitle(kind: StatsWindowKind): string {
     case "ad-hoc":
       return "Ad hoc stats";
   }
+}
+
+function hasStatsWindowScopeSelector(kind: StatsWindowKind): boolean {
+  return kind === "player" || kind === "team";
 }
 
 function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
@@ -796,26 +830,21 @@ function createStatsWindow(kind: StatsWindowKind): void {
   const header = document.createElement("header");
   header.className = "stats-window-header";
 
-  const titleWrap = document.createElement("div");
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "panel-eyebrow";
-  eyebrow.textContent = "Stats";
-  const title = document.createElement("h2");
-  title.textContent = getStatsWindowTitle(kind);
-  titleWrap.append(eyebrow, title);
-
   const actions = document.createElement("div");
   actions.className = "stats-window-actions";
-  const addButton = document.createElement("button");
-  addButton.type = "button";
-  addButton.className = "stats-window-action";
-  addButton.textContent = "Add";
   const hideButton = document.createElement("button");
   hideButton.type = "button";
   hideButton.className = "stats-window-action";
   hideButton.textContent = "Hide";
-  actions.append(addButton, hideButton);
-  header.append(titleWrap, actions);
+  actions.append(hideButton);
+  if (hasStatsWindowScopeSelector(kind)) {
+    header.classList.add("stats-window-header-actions-only");
+    header.append(actions);
+  } else {
+    const title = document.createElement("h2");
+    title.textContent = getStatsWindowTitle(kind);
+    header.append(title, actions);
+  }
 
   const body = document.createElement("div");
   body.className = "stats-window-body";
@@ -828,17 +857,12 @@ function createStatsWindow(kind: StatsWindowKind): void {
     entries: [],
     playerId: replayPlayer?.replay.players[0]?.id ?? null,
     team: "blue",
-    scopeEditing: kind === "player" || kind === "team",
     pickerOpen: false,
     query: "",
     element,
     body,
   };
 
-  addButton.addEventListener("click", () => {
-    state.pickerOpen = !state.pickerOpen;
-    renderStatsWindow(state);
-  });
   hideButton.addEventListener("click", () => {
     element.hidden = true;
   });
@@ -863,6 +887,7 @@ function renderStatsWindow(
   statsWindow.body.replaceChildren();
 
   renderStatsWindowScope(statsWindow);
+  renderStatsWindowAddControl(statsWindow);
   renderStatsWindowPicker(statsWindow);
   renderStatsWindowEntries(statsWindow, frameIndex);
 
@@ -893,23 +918,16 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
   const row = document.createElement("div");
   row.className = "stats-window-scope-row";
 
-  if (!statsWindow.scopeEditing) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "stats-window-scope-chip";
-    chip.textContent = statsWindow.kind === "player"
-      ? getPlayerLabel(statsWindow.playerId)
-      : getTeamLabel(statsWindow.team ?? "blue");
-    chip.addEventListener("click", () => {
-      statsWindow.scopeEditing = true;
-      renderStatsWindow(statsWindow);
-    });
-    row.append(chip);
-    statsWindow.body.append(row);
-    return;
-  }
-
   const select = document.createElement("select");
+  select.className = "stats-window-scope-select";
+  const teamClass = getStatsWindowScopeTeamClass(statsWindow);
+  if (teamClass) {
+    select.classList.add(teamClass);
+  }
+  select.setAttribute(
+    "aria-label",
+    statsWindow.kind === "player" ? "Player stats target" : "Team stats target",
+  );
   if (statsWindow.kind === "player") {
     for (const player of replayPlayer?.replay.players ?? []) {
       select.append(
@@ -924,7 +942,6 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
     select.value = statsWindow.playerId ?? "";
     select.addEventListener("change", () => {
       statsWindow.playerId = select.value || null;
-      statsWindow.scopeEditing = false;
       renderStatsWindow(statsWindow);
     });
   } else {
@@ -940,20 +957,37 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
     select.value = statsWindow.team ?? "blue";
     select.addEventListener("change", () => {
       statsWindow.team = select.value === "orange" ? "orange" : "blue";
-      statsWindow.scopeEditing = false;
       renderStatsWindow(statsWindow);
     });
   }
 
-  const done = document.createElement("button");
-  done.type = "button";
-  done.textContent = "Set";
-  done.addEventListener("click", () => {
-    statsWindow.scopeEditing = false;
+  row.append(select);
+  statsWindow.body.append(row);
+}
+
+function renderStatsWindowAddControl(statsWindow: StatsWindowState): void {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "stats-window-add-button";
+  button.textContent = "+";
+  button.title = "Add stat";
+  button.setAttribute("aria-label", "Add stat");
+  button.setAttribute("aria-expanded", String(statsWindow.pickerOpen));
+  button.addEventListener("click", () => {
+    statsWindow.pickerOpen = !statsWindow.pickerOpen;
     renderStatsWindow(statsWindow);
   });
-  row.append(select, done);
-  statsWindow.body.append(row);
+
+  if (hasStatsWindowScopeSelector(statsWindow.kind)) {
+    const scopeRow = statsWindow.body.querySelector(".stats-window-scope-row");
+    scopeRow?.append(button);
+    return;
+  }
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "stats-window-toolbar";
+  toolbar.append(button);
+  statsWindow.body.append(toolbar);
 }
 
 function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
@@ -1165,7 +1199,7 @@ function renderAllPlayersStats(
   list.className = "stats-window-entity-list";
   for (const player of frame.players) {
     const section = document.createElement("section");
-    section.className = "stats-window-entity";
+    section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;
     const title = document.createElement("h3");
     title.className = "stats-window-entity-title";
     title.textContent = player.name;
@@ -1193,7 +1227,7 @@ function renderAllTeamsStats(
   for (const team of ["blue", "orange"] as const) {
     const snapshot = getTeamSnapshot(frame, team);
     const section = document.createElement("section");
-    section.className = "stats-window-entity";
+    section.className = `stats-window-entity ${getTeamScopeClass(team)}`;
     const title = document.createElement("h3");
     title.className = "stats-window-entity-title";
     title.textContent = getTeamLabel(team);
@@ -1257,6 +1291,10 @@ function renderStatRow(
   if (statsWindow.kind === "ad-hoc") {
     const targetSelect = document.createElement("select");
     targetSelect.className = "stats-window-stat-target";
+    const teamClass = getStatTargetTeamClass(definition, entry.targetId);
+    if (teamClass) {
+      targetSelect.classList.add(teamClass);
+    }
     if (definition.scope === "player") {
       for (const player of replayPlayer?.replay.players ?? []) {
         targetSelect.append(

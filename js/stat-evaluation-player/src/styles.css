@@ -183,6 +183,16 @@ input {
   white-space: nowrap;
 }
 
+.team-blue {
+  --team-accent: var(--blue);
+  --team-soft: var(--blue-soft);
+}
+
+.team-orange {
+  --team-accent: var(--orange);
+  --team-soft: var(--orange-soft);
+}
+
 .floating-window-layer,
 .stats-window-layer {
   position: absolute;
@@ -233,6 +243,10 @@ input {
   justify-content: space-between;
   gap: var(--ui-gap-md);
   cursor: grab;
+}
+
+.stats-window-header-actions-only {
+  justify-content: end;
 }
 
 .floating-window:active .floating-window-header,
@@ -747,12 +761,34 @@ input {
   flex-wrap: wrap;
 }
 
-.stats-window-scope-chip {
-  width: auto;
-  padding: var(--ui-control-padding-block) var(--ui-control-padding-inline);
-  border-radius: var(--ui-radius-pill);
-  color: #dceafb;
-  font-size: var(--ui-control-font-size);
+.stats-window-toolbar {
+  justify-content: end;
+}
+
+.stats-window-scope-select {
+  min-width: min(100%, 13rem);
+}
+
+.stats-window-add-button {
+  width: var(--ui-control-height);
+  min-width: var(--ui-control-height);
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stats-window-add-button[aria-expanded="true"] {
+  border-color: var(--ui-border-hover);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stats-window-scope-select.team-blue,
+.stats-window-scope-select.team-orange,
+.stats-window-stat-target.team-blue,
+.stats-window-stat-target.team-orange {
+  border-color: var(--team-accent);
+  box-shadow: inset 0.22rem 0 0 var(--team-accent);
 }
 
 .stats-window-picker {
@@ -808,6 +844,14 @@ input {
 .stats-window-entity {
   display: grid;
   gap: var(--ui-gap-xs);
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.stats-window-entity.team-blue,
+.stats-window-entity.team-orange {
+  border-left-color: var(--team-accent);
+  background: linear-gradient(90deg, var(--team-soft), transparent 70%);
 }
 
 .stats-window-entity-title {
