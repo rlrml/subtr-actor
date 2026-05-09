@@ -23,6 +23,7 @@ interface BoostPickupFilterContext {
 interface BoostPickupFilterRuntime {
   refreshTimelineRanges?(): void;
   rerenderCurrentState?(): void;
+  requestConfigSync?(): void;
 }
 
 interface BoostPickupFilterRenderOptions {
@@ -32,12 +33,22 @@ interface BoostPickupFilterRenderOptions {
 export interface BoostPickupFilterController {
   setup(ctx: BoostPickupFilterContext): void;
   teardown(): void;
+  getConfig(): BoostPickupFilterConfig;
+  applyConfig(config: unknown): void;
   getTimelineRangeOptions(): BoostPickupTimelineRangeOptions;
   includePickup(pickup: BoostPickupAnimationPickup): boolean;
   renderSettings(
     ctx: BoostPickupFilterContext | null,
     options: BoostPickupFilterRenderOptions,
   ): HTMLElement;
+}
+
+export interface BoostPickupFilterConfig {
+  readonly padTypes: BoostPickupPadType[];
+  readonly comparisons: BoostPickupComparison[];
+  readonly activities: BoostPickupActivity[];
+  readonly fieldHalves: BoostPickupFieldHalf[];
+  readonly playerIds: string[] | null;
 }
 
 const BOOST_PICKUP_PAD_TYPE_OPTIONS = [
@@ -124,6 +135,7 @@ export function createBoostPickupFilterController(
     BOOST_PICKUP_FIELD_HALF_OPTIONS.map((option) => option.value),
   );
   let activePlayerIds: Set<string> | null = null;
+  let preserveConfiguredPlayerIdsForNextReplay = false;
 
   function createFilterGroup<T extends string>(
     title: string,
@@ -158,6 +170,7 @@ export function createBoostPickupFilterController(
         syncSettingsUi(lastReplay);
         runtime.refreshTimelineRanges?.();
         runtime.rerenderCurrentState?.();
+        runtime.requestConfigSync?.();
       });
 
       const optionText = document.createElement("span");
@@ -218,6 +231,7 @@ export function createBoostPickupFilterController(
         syncSettingsUi(replay);
         runtime.refreshTimelineRanges?.();
         runtime.rerenderCurrentState?.();
+        runtime.requestConfigSync?.();
       });
 
       const optionText = document.createElement("span");
@@ -325,17 +339,84 @@ export function createBoostPickupFilterController(
       activeFieldHalves.has(matchedEvent.field_half);
   }
 
+  function setActiveValues<T extends string>(
+    activeValues: Set<T>,
+    options: Array<BoostPickupFilterOption<T>>,
+    values: unknown,
+  ): void {
+    activeValues.clear();
+    if (!Array.isArray(values)) {
+      for (const option of options) {
+        activeValues.add(option.value);
+      }
+      return;
+    }
+
+    const allowed = new Set(options.map((option) => option.value));
+    for (const value of values) {
+      if (typeof value === "string" && allowed.has(value as T)) {
+        activeValues.add(value as T);
+      }
+    }
+  }
+
+  function getConfig(): BoostPickupFilterConfig {
+    return {
+      padTypes: [...activePadTypes],
+      comparisons: [...activeComparisons],
+      activities: [...activeActivities],
+      fieldHalves: [...activeFieldHalves],
+      playerIds: activePlayerIds ? [...activePlayerIds] : null,
+    };
+  }
+
+  function applyConfig(config: unknown): void {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return;
+    }
+    const record = config as Record<string, unknown>;
+    setActiveValues(activePadTypes, BOOST_PICKUP_PAD_TYPE_OPTIONS, record.padTypes);
+    setActiveValues(
+      activeComparisons,
+      BOOST_PICKUP_COMPARISON_OPTIONS,
+      record.comparisons,
+    );
+    setActiveValues(activeActivities, BOOST_PICKUP_ACTIVITY_OPTIONS, record.activities);
+    setActiveValues(
+      activeFieldHalves,
+      BOOST_PICKUP_FIELD_HALF_OPTIONS,
+      record.fieldHalves,
+    );
+    activePlayerIds = Array.isArray(record.playerIds)
+      ? new Set(record.playerIds.filter((id): id is string => typeof id === "string"))
+      : null;
+    preserveConfiguredPlayerIdsForNextReplay = lastReplay === null &&
+      activePlayerIds !== null;
+    syncSettingsUi(lastReplay);
+    runtime.refreshTimelineRanges?.();
+    runtime.rerenderCurrentState?.();
+    runtime.requestConfigSync?.();
+  }
+
   return {
     setup(ctx) {
       if (lastReplay !== ctx.replay) {
         lastReplay = ctx.replay;
-        activePlayerIds = null;
+        if (preserveConfiguredPlayerIdsForNextReplay) {
+          preserveConfiguredPlayerIdsForNextReplay = false;
+        } else {
+          activePlayerIds = null;
+        }
       }
       lastStatsTimeline = ctx.statsTimeline;
       syncSettingsUi(ctx.replay);
     },
 
     teardown() {},
+
+    getConfig,
+
+    applyConfig,
 
     getTimelineRangeOptions() {
       const options: BoostPickupTimelineRangeOptions = {

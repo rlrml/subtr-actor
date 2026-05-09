@@ -46,6 +46,28 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
       return buildPossessionTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
+    getConfig() {
+      return {
+        breakdownClasses: getActiveBreakdownClasses(),
+      };
+    },
+
+    applyConfig(config) {
+      activeBreakdownClasses.clear();
+      if (config && typeof config === "object" && !Array.isArray(config)) {
+        const classes = (config as Record<string, unknown>).breakdownClasses;
+        if (Array.isArray(classes)) {
+          for (const className of classes) {
+            if (orderedBreakdownClasses.includes(className as PossessionBreakdownClass)) {
+              activeBreakdownClasses.add(className as PossessionBreakdownClass);
+            }
+          }
+        }
+      }
+      syncPossessionSettingsUi();
+      runtime.rerenderCurrentState();
+    },
+
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
         ctx.statsFrameLookup,
@@ -121,6 +143,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
           }
           syncPossessionSettingsUi();
           runtime.rerenderCurrentState();
+          runtime.requestConfigSync?.();
         });
 
         const optionText = document.createElement("span");
@@ -142,6 +165,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
           }
           syncPossessionSettingsUi();
           runtime.rerenderCurrentState();
+          runtime.requestConfigSync?.();
         });
 
         const thirdOptionText = document.createElement("span");
