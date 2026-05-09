@@ -22,11 +22,8 @@ import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import {
   createStatModules,
-  getCurrentRole,
-  getStatsPlayerSnapshot,
   getTeamClass,
   RELATIVE_POSITIONING_MODULE_ID,
-  ROLE_LABELS,
 } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
@@ -86,7 +83,6 @@ const MODULES = createStatModules({
 
     const state = replayPlayer.getState();
     renderStatsWindows(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
   },
   refreshTimelineRanges() {
     syncTimelineRanges();
@@ -129,7 +125,6 @@ let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
-let followedPlayerOverlay!: HTMLDivElement;
 let playbackRate!: HTMLSelectElement;
 let attachedPlayer!: HTMLSelectElement;
 let cameraViewFreeButton!: HTMLButtonElement;
@@ -155,7 +150,6 @@ let customCameraStiffnessReadout!: HTMLElement;
 let customCameraSwivelSpeedReadout!: HTMLElement;
 let customCameraTransitionSpeedReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
-let showFollowedPlayerOverlay!: HTMLButtonElement;
 let moduleSummaryEl!: HTMLDivElement;
 let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
@@ -187,11 +181,9 @@ let recordingElapsed!: HTMLElement;
 let recordingSize!: HTMLElement;
 let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
-let focusedPlayerOverlayCacheKey: string | null = null;
 let statRegistry: StatDefinition[] = [];
 let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
-let showFollowedPlayerOverlayEnabled = false;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 
@@ -255,7 +247,6 @@ function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
 }
 
 function clearRenderCaches(): void {
-  focusedPlayerOverlayCacheKey = null;
 }
 
 function getModuleContext(): StatModuleContext | null {
@@ -330,7 +321,6 @@ function toggleCapability(
   if (replayPlayer) {
     const state = replayPlayer.getState();
     renderStatsWindows(state.frameIndex);
-    renderFocusedPlayerOverlay(state);
   }
   renderTimelineEventCount();
 }
@@ -675,20 +665,6 @@ function getCapabilityLabel(
   }
 
   return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
-}
-
-function syncFollowedPlayerOverlayToggle(): void {
-  showFollowedPlayerOverlay.dataset.active = showFollowedPlayerOverlayEnabled
-    ? "true"
-    : "false";
-  showFollowedPlayerOverlay.setAttribute(
-    "aria-pressed",
-    showFollowedPlayerOverlayEnabled ? "true" : "false",
-  );
-  const state = showFollowedPlayerOverlay.querySelector("strong");
-  if (state) {
-    state.textContent = showFollowedPlayerOverlayEnabled ? "On" : "Off";
-  }
 }
 
 function renderCapabilityToggle(
@@ -1708,90 +1684,6 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
   );
 }
 
-function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
-  const ctx = getModuleContext();
-  if (!ctx || !state || !showFollowedPlayerOverlayEnabled) {
-    followedPlayerOverlay.hidden = true;
-    followedPlayerOverlay.innerHTML = "";
-    focusedPlayerOverlayCacheKey = "hidden";
-    return;
-  }
-
-  const attachedPlayerId = state.attachedPlayerId;
-  if (!attachedPlayerId) {
-    followedPlayerOverlay.hidden = true;
-    followedPlayerOverlay.innerHTML = "";
-    focusedPlayerOverlayCacheKey = "hidden";
-    return;
-  }
-
-  const player = getStatsPlayerSnapshot(ctx, state.frameIndex, attachedPlayerId);
-  if (!player) {
-    followedPlayerOverlay.hidden = true;
-    followedPlayerOverlay.innerHTML = "";
-    focusedPlayerOverlayCacheKey = "hidden";
-    return;
-  }
-
-  const showRoleIndicator = activeRenderEffectModuleIds.has(
-    RELATIVE_POSITIONING_MODULE_ID,
-  );
-  const role = showRoleIndicator
-    ? getCurrentRole(ctx.replay, attachedPlayerId, state.frameIndex)
-    : null;
-  const cacheKey = [
-    state.frameIndex,
-    attachedPlayerId,
-    getActiveModuleSignature(),
-    showRoleIndicator ? role ?? "none" : "off",
-  ].join(":");
-  if (focusedPlayerOverlayCacheKey === cacheKey) {
-    followedPlayerOverlay.hidden = false;
-    return;
-  }
-
-  const sections = activeModules.map((mod) => {
-    const body = mod.renderFocusedPlayerStats(
-      attachedPlayerId,
-      state.frameIndex,
-      ctx,
-    );
-    if (!body) return "";
-
-    return `<section class="focused-player-module">
-      <div class="focused-player-module-label">${mod.label}</div>
-      <div class="focused-player-module-body">${body}</div>
-    </section>`;
-  }).filter(Boolean);
-
-  if (sections.length === 0) {
-    followedPlayerOverlay.hidden = true;
-    followedPlayerOverlay.innerHTML = "";
-    focusedPlayerOverlayCacheKey = "hidden";
-    return;
-  }
-
-  followedPlayerOverlay.innerHTML = `
-    <div class="followed-player-overlay-card ${getTeamClass(player.is_team_0)}">
-      <div class="followed-player-overlay-header">
-        <div class="followed-player-overlay-title">
-          <p class="followed-player-overlay-eyebrow">Follow cam</p>
-          <div class="followed-player-overlay-name-row">
-            <span class="player-name">${player.name}</span>
-            ${role ? `<span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>` : ""}
-          </div>
-        </div>
-        <strong class="followed-player-overlay-team">
-          ${player.is_team_0 ? "Blue" : "Orange"}
-        </strong>
-      </div>
-      <div class="followed-player-overlay-body">${sections.join("")}</div>
-    </div>
-  `;
-  followedPlayerOverlay.hidden = false;
-  focusedPlayerOverlayCacheKey = cacheKey;
-}
-
 function renderSnapshot(state: ReplayPlayerState): void {
   timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${state.frameIndex}`;
@@ -1813,7 +1705,6 @@ function renderSnapshot(state: ReplayPlayerState): void {
   syncCameraControlAvailability(state);
   renderCameraProfile(state);
   renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
-  renderFocusedPlayerOverlay(state);
 }
 
 function includeBoostPickupAnimationPickup(
@@ -2007,10 +1898,6 @@ export function mountStatEvaluationPlayer(
   floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
-  followedPlayerOverlay = mustElement<HTMLDivElement>(
-    root,
-    "#followed-player-overlay",
-  );
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
   cameraViewFreeButton = mustElement<HTMLButtonElement>(
@@ -2090,10 +1977,6 @@ export function mountStatEvaluationPlayer(
     "#custom-camera-transition-speed-readout",
   );
   ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
-  showFollowedPlayerOverlay = mustElement<HTMLButtonElement>(
-    root,
-    "#show-followed-player-overlay",
-  );
   moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
   moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
@@ -2366,12 +2249,6 @@ export function mountStatEvaluationPlayer(
 
   ballCam.addEventListener("change", () => {
     replayPlayer?.setBallCamEnabled(ballCam.checked);
-  }, { signal: listeners.signal });
-
-  showFollowedPlayerOverlay.addEventListener("click", () => {
-    showFollowedPlayerOverlayEnabled = !showFollowedPlayerOverlayEnabled;
-    syncFollowedPlayerOverlayToggle();
-    renderFocusedPlayerOverlay(replayPlayer?.getState());
   }, { signal: listeners.signal });
 
   skipPostGoalTransitions.addEventListener("change", () => {

@@ -403,99 +403,6 @@ input {
   font-size: 0.92rem;
 }
 
-.followed-player-overlay {
-  position: absolute;
-  top: 1.25rem;
-  left: 1.25rem;
-  z-index: 2;
-  width: min(24rem, calc(100% - 2.5rem));
-  pointer-events: none;
-}
-
-.followed-player-overlay-card {
-  padding: 0.9rem 1rem;
-  border-radius: 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(4, 12, 18, 0.86);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(10px);
-}
-
-.followed-player-overlay-card.team-blue {
-  border-color: rgba(75, 148, 255, 0.3);
-  background: linear-gradient(180deg, rgba(19, 50, 89, 0.92), rgba(7, 16, 24, 0.9));
-}
-
-.followed-player-overlay-card.team-orange {
-  border-color: rgba(243, 154, 55, 0.3);
-  background: linear-gradient(180deg, rgba(87, 46, 8, 0.92), rgba(7, 16, 24, 0.9));
-}
-
-.followed-player-overlay-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 0.75rem;
-}
-
-.followed-player-overlay-title {
-  min-width: 0;
-}
-
-.followed-player-overlay-eyebrow {
-  margin: 0 0 0.35rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #87afd4;
-}
-
-.followed-player-overlay-name-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
-.followed-player-overlay-team {
-  padding: 0.22rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.followed-player-overlay-body {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 0.8rem;
-}
-
-.focused-player-module {
-  display: grid;
-  gap: 0.38rem;
-}
-
-.focused-player-module-label {
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #9eb4c6;
-}
-
-.focused-player-module-body {
-  display: grid;
-  gap: 0.05rem;
-}
-
-.focused-player-module-body .stat-row {
-  font-size: 0.76rem;
-  padding: 0.08rem 0;
-}
-
 .empty-state {
   position: absolute;
   left: 50%;
@@ -1119,12 +1026,6 @@ input[type="range"] {
     min-height: 100dvh;
   }
 
-  .followed-player-overlay {
-    top: 1rem;
-    left: 1rem;
-    width: min(22rem, calc(100% - 2rem));
-  }
-
 }
 
 @media (max-width: 560px) {
@@ -1141,16 +1042,6 @@ input[type="range"] {
     left: 0.55rem;
     right: 0.55rem;
     width: auto;
-  }
-
-  .followed-player-overlay {
-    position: static;
-    width: 100%;
-    padding: 1rem 1rem 0;
-  }
-
-  .followed-player-overlay-card {
-    width: 100%;
   }
 
 }
