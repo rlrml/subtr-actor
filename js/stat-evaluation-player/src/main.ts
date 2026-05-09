@@ -55,7 +55,6 @@ import {
   getReplayFileNameFromUrl,
   getReplayUrlFromSearch,
 } from "./replayUrl.ts";
-import { StatMonitor } from "./statMonitor.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
@@ -70,7 +69,6 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 let removeRenderHook: (() => void) | null = null;
-let statMonitor: StatMonitor | null = null;
 
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
@@ -128,7 +126,6 @@ let floatingWindowLayer!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let followedPlayerOverlay!: HTMLDivElement;
-let statMonitorOverlay!: HTMLDivElement;
 let playbackRate!: HTMLSelectElement;
 let attachedPlayer!: HTMLSelectElement;
 let cameraViewFreeButton!: HTMLButtonElement;
@@ -165,8 +162,6 @@ let statusReadout!: HTMLElement;
 let playersReadout!: HTMLElement;
 let framesReadout!: HTMLElement;
 let eventsReadout!: HTMLElement;
-let statMonitorSlotZero!: HTMLElement;
-let statMonitorSlotOne!: HTMLElement;
 let cameraProfileReadout!: HTMLElement;
 let cameraFovReadout!: HTMLElement;
 let cameraHeightReadout!: HTMLElement;
@@ -190,7 +185,7 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
-type SingletonWindowId = "camera" | "playback" | "stat-monitor";
+type SingletonWindowId = "camera" | "playback";
 type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
 type TeamScope = "blue" | "orange";
 type ModuleCapabilityKind = "events" | "ranges" | "effects";
@@ -1700,11 +1695,6 @@ function renderSnapshot(state: ReplayPlayerState): void {
   renderCameraProfile(state);
   renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
   renderFocusedPlayerOverlay(state);
-  statMonitor?.renderFrame(
-    statsFrameLookup
-      ? getStatsFrameForReplayFrame(statsFrameLookup, state.frameIndex)
-      : null,
-  );
 }
 
 function includeBoostPickupAnimationPickup(
@@ -1765,8 +1755,6 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   statsTimeline = null;
   statsFrameLookup = null;
   statRegistry = [];
-  statMonitor?.setStatsTimeline(null);
-  statMonitor?.renderFrame(null);
   clearTimelineEventSources();
   clearTimelineRangeSources();
   clearStandalonePlugins();
@@ -1789,8 +1777,6 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
-    statMonitor?.setStatsTimeline(statsTimeline);
-
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>
         filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
@@ -1891,10 +1877,6 @@ export function mountStatEvaluationPlayer(
     root,
     "#followed-player-overlay",
   );
-  statMonitorOverlay = mustElement<HTMLDivElement>(
-    root,
-    "#stat-monitor-overlay",
-  );
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
   cameraViewFreeButton = mustElement<HTMLButtonElement>(
@@ -1991,8 +1973,6 @@ export function mountStatEvaluationPlayer(
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
-  statMonitorSlotZero = mustElement<HTMLElement>(root, "#stat-monitor-slot-0");
-  statMonitorSlotOne = mustElement<HTMLElement>(root, "#stat-monitor-slot-1");
   cameraProfileReadout = mustElement<HTMLElement>(
     root,
     "#camera-profile-readout",
@@ -2013,11 +1993,6 @@ export function mountStatEvaluationPlayer(
     "#skip-post-goal-transitions",
   );
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
-  statMonitor = new StatMonitor(
-    [statMonitorSlotZero, statMonitorSlotOne],
-    statMonitorOverlay,
-  );
-
   const listeners = new AbortController();
   installWindowDragging(floatingWindowLayer, listeners.signal);
   installWindowDragging(statsWindowLayer, listeners.signal);
@@ -2033,8 +2008,6 @@ export function mountStatEvaluationPlayer(
     statsFrameLookup = null;
     statRegistry = [];
     statsWindows.clear();
-    statMonitor?.destroy();
-    statMonitor = null;
     clearTimelineEventSources();
     clearTimelineRangeSources();
     clearStandalonePlugins();

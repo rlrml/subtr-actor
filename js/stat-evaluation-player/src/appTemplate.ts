@@ -9,12 +9,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           class="followed-player-overlay"
           hidden
         ></div>
-        <div
-          id="stat-monitor-overlay"
-          class="stat-monitor-overlay"
-          hidden
-        ></div>
-
         <div class="top-chrome">
           <button
             id="launcher-toggle"
@@ -34,7 +28,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <h2>Windows</h2>
               <button type="button" data-window-toggle="camera">Camera</button>
               <button type="button" data-window-toggle="playback">Playback</button>
-              <button type="button" data-window-toggle="stat-monitor">Stat watch</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
@@ -295,27 +288,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 <dt>Status</dt>
                 <dd id="playback-status-readout">Stopped</dd>
               </div>
-            </div>
-          </section>
-
-          <section
-            class="floating-window floating-window-stat-monitor"
-            data-window-id="stat-monitor"
-            hidden
-            style="--window-x: calc(100vw - 28rem); --window-y: 24rem;"
-          >
-            <header class="floating-window-header">
-              <div>
-                <p class="panel-eyebrow">Monitor</p>
-                <h2>Stat watch</h2>
-              </div>
-              <button class="floating-window-hide" type="button" data-window-hide="stat-monitor">
-                Hide
-              </button>
-            </header>
-            <div class="stat-monitor-slots">
-              <div id="stat-monitor-slot-0"></div>
-              <div id="stat-monitor-slot-1"></div>
             </div>
           </section>
         </div>
