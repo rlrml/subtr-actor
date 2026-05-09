@@ -117,7 +117,7 @@ app.innerHTML = `
           </label>
           <label class="toggle">
             <input id="skip-kickoffs" type="checkbox" />
-            <span>Skip kickoffs</span>
+            <span>Skip kickoff countdowns</span>
           </label>
           <div class="stat-grid">
             <div>

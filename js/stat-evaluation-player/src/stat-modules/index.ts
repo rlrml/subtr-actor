@@ -18,7 +18,6 @@ import {
   createPowerslideModule,
   createSpeedFlipModule,
   createTouchModule,
-  hasBoostPickupAnimationTimelineMatch,
 } from "./playerModules.ts";
 import {
   createAbsolutePositioningModule,
@@ -26,7 +25,7 @@ import {
 } from "./positioningModules.ts";
 export {
   hasBoostPickupAnimationTimelineMatch,
-} from "./playerModules.ts";
+} from "../boostPickupFilters.ts";
 export {
   getCurrentRole,
   getStatsPlayerSnapshot,

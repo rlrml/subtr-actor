@@ -22,11 +22,11 @@ import {
   getCurrentRole,
   getStatsPlayerSnapshot,
   getTeamClass,
-  hasBoostPickupAnimationTimelineMatch,
   RELATIVE_POSITIONING_MODULE_ID,
   ROLE_LABELS,
 } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
+import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
@@ -42,6 +42,7 @@ import {
   type StatDefinition,
   type StatScopeKind,
 } from "./statRegistry.ts";
+import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import {
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
@@ -85,6 +86,11 @@ const MODULES = createStatModules({
     renderStatsWindows(state.frameIndex);
     renderFocusedPlayerOverlay(state);
   },
+  refreshTimelineRanges() {
+    syncTimelineRanges();
+  },
+});
+const boostPickupFilters = createBoostPickupFilterController({
   refreshTimelineRanges() {
     syncTimelineRanges();
   },
@@ -176,7 +182,7 @@ let statRegistry: StatDefinition[] = [];
 let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
 let showFollowedPlayerOverlayEnabled = false;
-let boostPadOverlayEnabled = false;
+let boostPadOverlayEnabled = true;
 
 interface ReplayInputSource {
   name: string;
@@ -208,6 +214,10 @@ interface StatsWindowState {
 }
 
 const statsWindows = new Map<string, StatsWindowState>();
+
+function boostPickupAnimationEnabled(): boolean {
+  return replayPlayer?.getState().boostPickupAnimationEnabled ?? false;
+}
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
@@ -251,6 +261,8 @@ function setupActiveModules(): void {
 
   const activeModuleIds = getActiveModuleIds();
   activeModules = MODULES.filter((mod) => activeModuleIds.has(mod.id));
+  boostPickupFilters.setup(ctx);
+
   for (const mod of activeModules) {
     mod.setup(ctx);
   }
@@ -530,21 +542,21 @@ function renderModuleSummary(): void {
     if (mod.getTimelineEvents) {
       moduleSummaryEl.append(renderCapabilityToggle(
         mod.id,
-        `${mod.label} Events`,
+        getCapabilityLabel(mod, "events"),
         "events",
       ));
     }
     if (mod.getTimelineRanges) {
       moduleSummaryEl.append(renderCapabilityToggle(
         mod.id,
-        `${mod.label} Ranges`,
+        getCapabilityLabel(mod, "ranges"),
         "ranges",
       ));
     }
     if (hasRenderEffect) {
       moduleSummaryEl.append(renderCapabilityToggle(
         mod.id,
-        `${mod.label} Effect`,
+        getCapabilityLabel(mod, "effects"),
         "effects",
       ));
     }
@@ -559,10 +571,12 @@ function renderModuleSummary(): void {
   boostAnimation.addEventListener("click", () => {
     const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
     replayPlayer?.setBoostPickupAnimationEnabled(next);
+    setupActiveModules();
     renderModuleSummary();
+    renderModuleSettings();
   });
   const boostName = document.createElement("span");
-  boostName.textContent = "Boost pickup animation Effect";
+  boostName.textContent = "Boost pickup field overlay";
   const boostState = document.createElement("strong");
   boostState.textContent = boostAnimationActive ? "On" : "Off";
   boostAnimation.append(boostName, boostState);
@@ -575,11 +589,51 @@ function renderModuleSummary(): void {
   boostPadOverlay.setAttribute("aria-pressed", boostPadOverlayEnabled ? "true" : "false");
   boostPadOverlay.addEventListener("click", toggleBoostPadOverlay);
   const boostPadName = document.createElement("span");
-  boostPadName.textContent = "Boost pad overlay Effect";
+  boostPadName.textContent = "Boost pads field overlay";
   const boostPadState = document.createElement("strong");
   boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
   boostPadOverlay.append(boostPadName, boostPadState);
   moduleSummaryEl.append(boostPadOverlay);
+}
+
+function getCapabilityLabel(
+  mod: StatModule,
+  kind: "events" | "ranges" | "effects",
+): string {
+  const timelineLabels: Record<string, string> = {
+    "absolute-positioning:ranges": "Position zones timeline bands",
+    "backboard:events": "Backboard timeline markers",
+    "ball-carry:events": "Ball carry timeline markers",
+    "boost:ranges": "Boost pickup timeline",
+    "ceiling-shot:events": "Ceiling shot timeline markers",
+    "demo:events": "Demo timeline markers",
+    "dodge-reset:events": "Dodge reset timeline markers",
+    "double-tap:events": "Double tap timeline markers",
+    "fifty-fifty:events": "50/50 timeline markers",
+    "musty-flick:events": "Musty flick timeline markers",
+    "possession:ranges": "Possession timeline bands",
+    "powerslide:events": "Powerslide timeline markers",
+    "pressure:ranges": "Half control timeline bands",
+    "rush:events": "Rush timeline markers",
+    "rush:ranges": "Rush timeline bands",
+    "speed-flip:events": "Speed flip timeline markers",
+    "touch:events": "Touch timeline markers",
+  };
+  const fieldOverlayLabels: Record<string, string> = {
+    "absolute-positioning": "Position zones field overlay",
+    "ceiling-shot": "Ceiling shot field overlay",
+    "fifty-fifty": "50/50 field overlay",
+    pressure: "Half control field overlay",
+    "relative-positioning": "Player role field overlay",
+    "speed-flip": "Speed flip field overlay",
+    touch: "Touch field overlay",
+  };
+
+  if (kind === "effects") {
+    return fieldOverlayLabels[mod.id] ?? `${mod.label} field overlay`;
+  }
+
+  return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
 }
 
 function syncFollowedPlayerOverlayToggle(): void {
@@ -633,6 +687,12 @@ function renderModuleSettings(): void {
   const panels = activeModules
     .map((mod) => mod.renderSettings?.(ctx) ?? null)
     .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
+  if (boostPickupAnimationEnabled()) {
+    panels.push(boostPickupFilters.renderSettings(ctx, {
+      eyebrow: "Field overlay",
+      title: "Boost pickup field overlay",
+    }));
+  }
 
   if (panels.length === 0) {
     moduleSettingsEl.hidden = true;
@@ -783,11 +843,36 @@ function renderStatsWindow(
   statsWindow: StatsWindowState,
   frameIndex = replayPlayer?.getState().frameIndex ?? 0,
 ): void {
+  const activeElement = document.activeElement;
+  const searchFocused = activeElement instanceof HTMLInputElement &&
+    activeElement.dataset.statsWindowSearch === statsWindow.id;
+  const searchSelectionStart = searchFocused ? activeElement.selectionStart : null;
+  const searchSelectionEnd = searchFocused ? activeElement.selectionEnd : null;
+  const searchSelectionDirection = searchFocused ? activeElement.selectionDirection : null;
+
   statsWindow.body.replaceChildren();
 
   renderStatsWindowScope(statsWindow);
   renderStatsWindowPicker(statsWindow);
   renderStatsWindowEntries(statsWindow, frameIndex);
+
+  if (searchFocused) {
+    const searchInput = statsWindow.body.querySelector<HTMLInputElement>(
+      `input[data-stats-window-search="${statsWindow.id}"]`,
+    );
+    searchInput?.focus({ preventScroll: true });
+    if (
+      searchInput &&
+      searchSelectionStart !== null &&
+      searchSelectionEnd !== null
+    ) {
+      searchInput.setSelectionRange(
+        searchSelectionStart,
+        searchSelectionEnd,
+        searchSelectionDirection ?? "none",
+      );
+    }
+  }
 }
 
 function renderStatsWindowScope(statsWindow: StatsWindowState): void {
@@ -875,22 +960,35 @@ function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
   queryInput.type = "search";
   queryInput.placeholder = "Search stats";
   queryInput.value = statsWindow.query;
-  queryInput.addEventListener("input", () => {
-    statsWindow.query = queryInput.value;
-    renderStatsWindow(statsWindow);
-  });
+  queryInput.dataset.statsWindowSearch = statsWindow.id;
 
   const list = document.createElement("div");
   list.className = "stats-window-picker-list";
-  const query = statsWindow.query.trim().toLowerCase();
-  const definitions = statRegistry.filter((definition) => {
-    if (allowedScope && definition.scope !== allowedScope) {
-      return false;
-    }
-    return query === "" ||
-      definition.label.toLowerCase().includes(query) ||
-      definition.id.toLowerCase().includes(query);
+  queryInput.addEventListener("input", () => {
+    statsWindow.query = queryInput.value;
+    renderStatsWindowPickerList(statsWindow, list, allowedScope);
   });
+
+  renderStatsWindowPickerList(statsWindow, list, allowedScope);
+
+  picker.append(queryInput, list);
+  statsWindow.body.append(picker);
+}
+
+function renderStatsWindowPickerList(
+  statsWindow: StatsWindowState,
+  list: HTMLElement,
+  allowedScope: StatScopeKind | null,
+): void {
+  list.replaceChildren();
+
+  const scopeDefinitions = allowedScope
+    ? statRegistry.filter((definition) => definition.scope === allowedScope)
+    : statRegistry;
+  const definitions = getStatDefinitionSearchMatches(
+    scopeDefinitions,
+    statsWindow.query,
+  );
 
   const groupByCategory = new Map<string, StatDefinition[]>();
   for (const definition of definitions) {
@@ -936,9 +1034,6 @@ function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
       : "No matching stats.";
     list.append(empty);
   }
-
-  picker.append(queryInput, list);
-  statsWindow.body.append(picker);
 }
 
 function addStatToWindow(
@@ -1540,9 +1635,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
 function includeBoostPickupAnimationPickup(
   pickup: BoostPickupAnimationPickup,
 ): boolean {
-  const boostModule = activeModules.find((mod) => mod.id === "boost");
-  return boostModule?.includeBoostPickupAnimationPickup?.(pickup) ??
-    hasBoostPickupAnimationTimelineMatch(pickup, statsTimeline);
+  return boostPickupFilters.includePickup(pickup);
 }
 
 function createFileReplaySource(file: File): ReplayInputSource {
@@ -1877,7 +1970,7 @@ export function mountStatEvaluationPlayer(
     activeTimelineEventModuleIds = new Set<string>();
     activeTimelineRangeModuleIds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
-    boostPadOverlayEnabled = false;
+    boostPadOverlayEnabled = true;
     nextStatsWindowId = 1;
     nextWindowZIndex = 30;
     removeRenderHook = null;

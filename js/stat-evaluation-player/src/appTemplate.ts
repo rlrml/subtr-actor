@@ -42,7 +42,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-create-stats-window="ad-hoc">New ad hoc stats</button>
             </section>
             <section class="launcher-section">
-              <h2>Layers / Effects</h2>
+              <h2>Timelines / overlays</h2>
               <button
                 id="show-followed-player-overlay"
                 type="button"
@@ -50,7 +50,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 data-active="false"
                 aria-pressed="false"
               >
-                <span>Followed-player HUD</span>
+                <span>Followed player stats HUD</span>
                 <strong>Off</strong>
               </button>
               <div class="module-list" id="module-summary"></div>
@@ -276,7 +276,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             </label>
             <label class="toggle">
               <input id="skip-kickoffs" type="checkbox" />
-              <span>Skip kickoffs</span>
+              <span>Skip kickoff countdowns</span>
             </label>
             <div class="detail-grid">
               <div>
