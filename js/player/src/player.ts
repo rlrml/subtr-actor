@@ -6,6 +6,7 @@ import {
   computeTimelineSegments,
   getFrameWindow,
   getKickoffCountdownMetadata,
+  getReplayPlaybackEndTime,
   inferKickoffGameState,
   inferLiveGameState,
   isKickoffFrame,
@@ -302,7 +303,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   seek(time: number): void {
-    this.currentTime = THREE.MathUtils.clamp(time, 0, this.replay.duration);
+    this.currentTime = THREE.MathUtils.clamp(time, 0, this.getPlaybackEndTime());
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
     if (this.playing) {
@@ -396,7 +397,7 @@ export class ReplayPlayer extends EventTarget {
       this.currentTime = THREE.MathUtils.clamp(
         nextState.currentTime,
         0,
-        this.replay.duration
+        this.getPlaybackEndTime()
       );
     }
     if (nextState.playing !== undefined && nextState.playing !== this.playing) {
@@ -490,6 +491,13 @@ export class ReplayPlayer extends EventTarget {
       this.getTimelineDuration(),
       this.getTimelineSegments(),
       timelineTime,
+    );
+  }
+
+  private getPlaybackEndTime(): number {
+    return getReplayPlaybackEndTime(
+      this.replay.duration,
+      this.getTimelineSegments(),
     );
   }
 
@@ -594,7 +602,7 @@ export class ReplayPlayer extends EventTarget {
     const nextTime = THREE.MathUtils.clamp(
       this.playbackStartedTime + elapsedSeconds * this.speed,
       0,
-      this.replay.duration
+      this.getPlaybackEndTime()
     );
     const timeChanged = nextTime !== this.currentTime;
     this.currentTime = nextTime;
@@ -612,7 +620,7 @@ export class ReplayPlayer extends EventTarget {
       shouldEmitChange = this.syncPlaybackClock(now);
       shouldEmitChange = this.skipPostGoalTransitionIfNeeded(now) || shouldEmitChange;
       shouldEmitChange = this.skipPastKickoffIfNeeded(now) || shouldEmitChange;
-      if (this.currentTime >= this.replay.duration) {
+      if (this.currentTime >= this.getPlaybackEndTime()) {
         this.playing = false;
         shouldEmitChange = true;
       }
@@ -873,7 +881,34 @@ export class ReplayPlayer extends EventTarget {
           this.kickoffGameState,
         )
     );
-    if (!nextFrame || nextFrame.time === this.currentTime) {
+    if (!nextFrame) {
+      let startIndex = frameIndex;
+      while (
+        startIndex > 0 &&
+        isPostGoalTransitionFrame(
+          this.replay,
+          this.replay.frames[startIndex - 1],
+          startIndex - 1,
+          this.liveGameState,
+          this.kickoffGameState,
+        )
+      ) {
+        startIndex -= 1;
+      }
+
+      const transitionStartTime = this.replay.frames[startIndex]?.time;
+      if (transitionStartTime === undefined || transitionStartTime === this.currentTime) {
+        return false;
+      }
+
+      this.currentTime = transitionStartTime;
+      if (this.playing) {
+        this.reanchorPlaybackClock(now);
+      }
+      return true;
+    }
+
+    if (nextFrame.time === this.currentTime) {
       return false;
     }
 

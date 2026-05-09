@@ -28,6 +28,7 @@ import type { BoostPickupFieldHalf } from "../generated/BoostPickupFieldHalf.ts"
 import type { BoostPickupPadType } from "../generated/BoostPickupPadType.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot, StatsTimeline } from "../statsTimeline.ts";
+import type { BoostPickupComparisonEvent } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
@@ -83,6 +84,39 @@ function boostPickupAuditCountsForPlayer(
   }
 
   return counts;
+}
+
+export function getBoostPickupAnimationTimelineMatch(
+  pickup: BoostPickupAnimationPickup,
+  timeline: StatsTimeline | null,
+): BoostPickupComparisonEvent | null {
+  const comparisonEvents = timeline?.events.boost_pickups ?? [];
+  if (comparisonEvents.length === 0) {
+    return null;
+  }
+
+  return comparisonEvents.find((event) => {
+    const playerId = playerIdToString(event.player_id);
+    const reportedFrame = event.reported_frame ?? event.frame;
+    return (
+      playerId === pickup.player.id &&
+      event.comparison !== "missed" &&
+      reportedFrame === pickup.event.frame &&
+      isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
+    );
+  }) ?? null;
+}
+
+export function hasBoostPickupAnimationTimelineMatch(
+  pickup: BoostPickupAnimationPickup,
+  timeline: StatsTimeline | null,
+): boolean {
+  const comparisonEvents = timeline?.events.boost_pickups ?? [];
+  if (comparisonEvents.length === 0) {
+    return true;
+  }
+
+  return getBoostPickupAnimationTimelineMatch(pickup, timeline) !== null;
 }
 
 type BoostPickupFilterOption<T extends string> = {
@@ -433,24 +467,17 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
       return false;
     }
 
-    const comparisonEvents = lastStatsTimeline?.events.boost_pickups ?? [];
-    if (comparisonEvents.length === 0) {
+    if ((lastStatsTimeline?.events.boost_pickups ?? []).length === 0) {
       return activePadTypes.has(pickup.pad.size) &&
         activeComparisons.has("both") &&
         activeActivities.has("unknown") &&
         activeFieldHalves.has("unknown");
     }
 
-    const matchedEvent = comparisonEvents.find((event) => {
-      const playerId = playerIdToString(event.player_id);
-      const reportedFrame = event.reported_frame ?? event.frame;
-      return (
-        playerId === pickup.player.id &&
-        event.comparison !== "missed" &&
-        reportedFrame === pickup.event.frame &&
-        isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
-      );
-    });
+    const matchedEvent = getBoostPickupAnimationTimelineMatch(
+      pickup,
+      lastStatsTimeline,
+    );
     if (!matchedEvent) {
       return false;
     }
@@ -460,13 +487,13 @@ export function createBoostModule(runtime: StatModuleRuntime): StatModule {
       activeActivities.has(matchedEvent.activity) &&
       activeFieldHalves.has(matchedEvent.field_half);
   }
+}
 
-  function isBoostPickupPadTypeCompatible(
-    padType: BoostPickupPadType,
-    padSize: "big" | "small",
-  ): boolean {
-    return padType === padSize || padType === "ambiguous";
-  }
+function isBoostPickupPadTypeCompatible(
+  padType: BoostPickupPadType,
+  padSize: "big" | "small",
+): boolean {
+  return padType === padSize || padType === "ambiguous";
 }
 
 export function createCoreModule(): StatModule {

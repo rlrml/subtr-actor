@@ -18,11 +18,15 @@ import {
   createPowerslideModule,
   createSpeedFlipModule,
   createTouchModule,
+  hasBoostPickupAnimationTimelineMatch,
 } from "./playerModules.ts";
 import {
   createAbsolutePositioningModule,
   createRelativePositioningModule,
 } from "./positioningModules.ts";
+export {
+  hasBoostPickupAnimationTimelineMatch,
+} from "./playerModules.ts";
 export {
   getCurrentRole,
   getStatsPlayerSnapshot,

@@ -871,41 +871,50 @@ impl BoostCalculator {
         }
     }
 
-    fn classify_boost_increase_reason(
+    fn classify_boost_increase_reasons(
         previous_boost: f32,
         boost: f32,
         kickoff_phase_active: bool,
         demo_respawn_supported: bool,
-    ) -> BoostIncreaseReason {
+    ) -> Vec<BoostIncreaseReason> {
         const TOLERANCE: f32 = 1.0;
         let delta = boost - previous_boost;
         if delta <= TOLERANCE {
-            return BoostIncreaseReason::Unknown;
+            return vec![BoostIncreaseReason::Unknown];
         }
 
         let is_respawn_value = (boost - BOOST_KICKOFF_START_AMOUNT).abs() <= TOLERANCE;
         if demo_respawn_supported && is_respawn_value {
-            return BoostIncreaseReason::DemoRespawn;
+            return vec![BoostIncreaseReason::DemoRespawn];
         }
         if kickoff_phase_active && is_respawn_value {
-            return BoostIncreaseReason::KickoffRespawn;
+            return vec![BoostIncreaseReason::KickoffRespawn];
         }
         if is_respawn_value {
-            return BoostIncreaseReason::Respawn;
+            return vec![BoostIncreaseReason::Respawn];
         }
 
         let small_pad_floor = SMALL_PAD_AMOUNT_RAW - 3.0;
         let big_pad_floor = SMALL_PAD_AMOUNT_RAW + 5.0;
+        if boost < BOOST_FULL_BAND_MIN_RAW && delta >= small_pad_floor {
+            const SMALL_PICKUP_COUNT_TOLERANCE: f32 = 3.0;
+            let inferred_small_pickups = ((delta - SMALL_PICKUP_COUNT_TOLERANCE)
+                / SMALL_PAD_AMOUNT_RAW)
+                .ceil()
+                .max(1.0) as usize;
+            return vec![BoostIncreaseReason::SmallPad; inferred_small_pickups];
+        }
+
         if delta > big_pad_floor {
-            return BoostIncreaseReason::BigPad;
+            return vec![BoostIncreaseReason::BigPad];
         }
         if boost >= BOOST_MAX_AMOUNT - TOLERANCE {
-            return BoostIncreaseReason::AmbiguousPad;
+            return vec![BoostIncreaseReason::AmbiguousPad];
         }
         if delta >= small_pad_floor {
-            return BoostIncreaseReason::SmallPad;
+            return vec![BoostIncreaseReason::SmallPad];
         }
-        BoostIncreaseReason::Unknown
+        vec![BoostIncreaseReason::Unknown]
     }
 
     fn emit_pickup_comparison_event(
@@ -1135,27 +1144,29 @@ impl BoostCalculator {
             let demo_respawn_supported = self.pending_demo_respawns.contains(&player.player_id)
                 && player.rigid_body.is_some();
             if let Some(previous_sample_boost_amount) = previous_sample_boost_amount {
-                let reason = Self::classify_boost_increase_reason(
+                let reasons = Self::classify_boost_increase_reasons(
                     previous_sample_boost_amount,
                     boost_amount,
                     kickoff_phase_active,
                     demo_respawn_supported,
                 );
-                if let Ok(pad_type) = BoostPickupPadType::try_from(reason) {
-                    self.record_inferred_pickup(PendingBoostPickupEvent {
-                        frame: frame.frame_number,
-                        time: frame.time,
-                        player_id: player.player_id.clone(),
-                        is_team_0: player.is_team_0,
-                        pad_type,
-                        field_half: Self::field_half_from_position(
-                            player.is_team_0,
-                            player.position(),
-                        ),
-                        activity: Self::activity_label(live_play),
-                        boost_before: Some(previous_sample_boost_amount),
-                        boost_after: Some(boost_amount),
-                    });
+                for reason in reasons {
+                    if let Ok(pad_type) = BoostPickupPadType::try_from(reason) {
+                        self.record_inferred_pickup(PendingBoostPickupEvent {
+                            frame: frame.frame_number,
+                            time: frame.time,
+                            player_id: player.player_id.clone(),
+                            is_team_0: player.is_team_0,
+                            pad_type,
+                            field_half: Self::field_half_from_position(
+                                player.is_team_0,
+                                player.position(),
+                            ),
+                            activity: Self::activity_label(live_play),
+                            boost_before: Some(previous_sample_boost_amount),
+                            boost_after: Some(boost_amount),
+                        });
+                    }
                 }
             }
             if track_boost_levels {
@@ -1855,6 +1866,7 @@ mod tests {
         let big_player = PlayerId::Steam(2);
         let ambiguous_player = PlayerId::Steam(3);
         let respawn_player = PlayerId::Steam(4);
+        let two_small_player = PlayerId::Steam(5);
         let position = glam::Vec3::ZERO;
         let active_gameplay = GameplayState {
             ball_has_been_hit: Some(true),
@@ -1876,6 +1888,12 @@ mod tests {
                         test_player(big_player.clone(), 10.0, 10.0, position),
                         test_player(ambiguous_player.clone(), 230.0, 230.0, position),
                         test_player(respawn_player.clone(), 0.0, 0.0, position),
+                        test_player(
+                            two_small_player.clone(),
+                            BOOST_KICKOFF_START_AMOUNT,
+                            BOOST_KICKOFF_START_AMOUNT,
+                            position,
+                        ),
                     ],
                 },
                 &FrameEventsState::default(),
@@ -1901,12 +1919,18 @@ mod tests {
                             10.0,
                             position,
                         ),
-                        test_player(big_player.clone(), 100.0, 10.0, position),
+                        test_player(big_player.clone(), BOOST_MAX_AMOUNT, 10.0, position),
                         test_player(ambiguous_player.clone(), BOOST_MAX_AMOUNT, 230.0, position),
                         test_player(
                             respawn_player.clone(),
                             BOOST_KICKOFF_START_AMOUNT,
                             0.0,
+                            position,
+                        ),
+                        test_player(
+                            two_small_player.clone(),
+                            BOOST_KICKOFF_START_AMOUNT + 2.0 * SMALL_PAD_AMOUNT_RAW,
+                            BOOST_KICKOFF_START_AMOUNT,
                             position,
                         ),
                     ],
@@ -1921,7 +1945,7 @@ mod tests {
             .finish_calculation()
             .expect("pending inferred pickups should flush");
         let events = calculator.pickup_comparison_events();
-        assert_eq!(events.len(), 3);
+        assert_eq!(events.len(), 5);
         assert!(events
             .iter()
             .all(|event| event.comparison == BoostPickupComparison::Missed));
@@ -1937,7 +1961,7 @@ mod tests {
                 .iter()
                 .filter(|event| event.pad_type == BoostPickupPadType::Small)
                 .count(),
-            1
+            3
         );
         assert_eq!(
             events
@@ -1947,5 +1971,95 @@ mod tests {
             1
         );
         assert!(events.iter().all(|event| event.player_id != respawn_player));
+    }
+
+    #[test]
+    fn matches_two_small_pickups_from_one_observed_boost_increase() {
+        let mut calculator = BoostCalculator::new();
+        let player_id = PlayerId::Steam(1);
+        let (pad_position, _) = standard_soccar_boost_pad_layout()
+            .iter()
+            .find(|(_, size)| *size == BoostPadSize::Small)
+            .copied()
+            .expect("standard layout should include small pads");
+        let active_gameplay = GameplayState {
+            ball_has_been_hit: Some(true),
+            ..GameplayState::default()
+        };
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 1,
+                    time: 1.0,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(
+                        player_id.clone(),
+                        BOOST_KICKOFF_START_AMOUNT,
+                        BOOST_KICKOFF_START_AMOUNT,
+                        pad_position,
+                    )],
+                },
+                &FrameEventsState::default(),
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("first boost update should succeed");
+
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number: 2,
+                    time: 1.1,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(
+                        player_id.clone(),
+                        BOOST_KICKOFF_START_AMOUNT + 2.0 * SMALL_PAD_AMOUNT_RAW,
+                        BOOST_KICKOFF_START_AMOUNT,
+                        pad_position,
+                    )],
+                },
+                &FrameEventsState {
+                    boost_pad_events: vec![
+                        BoostPadEvent {
+                            time: 1.1,
+                            frame: 2,
+                            pad_id: "small-pad-one".to_string(),
+                            player: Some(player_id.clone()),
+                            kind: BoostPadEventKind::PickedUp { sequence: 1 },
+                        },
+                        BoostPadEvent {
+                            time: 1.1,
+                            frame: 2,
+                            pad_id: "small-pad-two".to_string(),
+                            player: Some(player_id.clone()),
+                            kind: BoostPadEventKind::PickedUp { sequence: 1 },
+                        },
+                    ],
+                    ..FrameEventsState::default()
+                },
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("second boost update should succeed");
+
+        calculator
+            .finish_calculation()
+            .expect("pickup comparisons should flush");
+
+        let events = calculator.pickup_comparison_events();
+        assert_eq!(events.len(), 2);
+        assert!(events.iter().all(|event| {
+            event.comparison == BoostPickupComparison::Both
+                && event.pad_type == BoostPickupPadType::Small
+        }));
     }
 }

@@ -266,6 +266,18 @@ export function projectTimelineTimeToReplay(
   );
 }
 
+export function getReplayPlaybackEndTime(
+  replayDuration: number,
+  segments: ReplayPlayerTimelineSegment[],
+): number {
+  const finalSegment = segments.at(-1);
+  if (!finalSegment || finalSegment.endTime < replayDuration) {
+    return replayDuration;
+  }
+
+  return THREE.MathUtils.clamp(finalSegment.startTime, 0, replayDuration);
+}
+
 export function getKickoffCountdownMetadata(
   replay: ReplayModel,
   frameIndex: number,

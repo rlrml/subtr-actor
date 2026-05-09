@@ -3,6 +3,7 @@ export {
   getCurrentRole,
   getStatsPlayerSnapshot,
   getTeamClass,
+  hasBoostPickupAnimationTimelineMatch,
   RELATIVE_POSITIONING_MODULE_ID,
   ROLE_LABELS,
 } from "./stat-modules/index.ts";

@@ -22,6 +22,7 @@ import {
   getCurrentRole,
   getStatsPlayerSnapshot,
   getTeamClass,
+  hasBoostPickupAnimationTimelineMatch,
   RELATIVE_POSITIONING_MODULE_ID,
   ROLE_LABELS,
 } from "./statModules.ts";
@@ -697,7 +698,8 @@ function includeBoostPickupAnimationPickup(
   pickup: BoostPickupAnimationPickup,
 ): boolean {
   const boostModule = activeModules.find((mod) => mod.id === "boost");
-  return boostModule?.includeBoostPickupAnimationPickup?.(pickup) ?? true;
+  return boostModule?.includeBoostPickupAnimationPickup?.(pickup) ??
+    hasBoostPickupAnimationTimelineMatch(pickup, statsTimeline);
 }
 
 function createFileReplaySource(file: File): ReplayInputSource {
