@@ -5,29 +5,15 @@ function normalizeStatSearchText(value: string): string {
     .trim();
 }
 
-function scoreFuzzyToken(text: string, token: string): number | null {
-  let position = 0;
-  let firstMatch = -1;
-  let spread = 0;
-  for (const character of token) {
-    const next = text.indexOf(character, position);
-    if (next < 0) {
-      return null;
-    }
-    if (firstMatch < 0) {
-      firstMatch = next;
-    }
-    spread += next - position;
-    position = next + 1;
-  }
-  return firstMatch + spread;
+function getStatSearchTokens(query: string): string[] {
+  return normalizeStatSearchText(query).split(" ").filter(Boolean);
 }
 
 export function scoreStatDefinitionSearchMatch(
   definition: StatDefinition,
   query: string,
 ): number | null {
-  const tokens = normalizeStatSearchText(query).split(" ").filter(Boolean);
+  const tokens = getStatSearchTokens(query);
   if (tokens.length === 0) {
     return 0;
   }
@@ -43,16 +29,10 @@ export function scoreStatDefinitionSearchMatch(
   let total = 0;
   for (const token of tokens) {
     const index = searchText.indexOf(token);
-    if (index >= 0) {
-      total += index;
-      continue;
-    }
-
-    const fuzzyScore = scoreFuzzyToken(searchText, token);
-    if (fuzzyScore === null) {
+    if (index < 0) {
       return null;
     }
-    total += fuzzyScore + 80;
+    total += index;
   }
 
   return total + searchText.length / 1000;

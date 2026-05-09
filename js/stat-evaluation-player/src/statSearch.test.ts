@@ -31,7 +31,7 @@ test("stat definition search treats space-separated terms as independent filters
   );
 });
 
-test("stat definition search applies fuzzy matching independently per term", () => {
+test("stat definition search requires the typed string for each term", () => {
   const definitions = [
     stat("player:boost.amount_collected", "boost.amount_collected", "boost"),
     stat("player:boost.amount_used_while_airborne", "boost.amount_used_while_airborne", "boost"),
@@ -39,6 +39,12 @@ test("stat definition search applies fuzzy matching independently per term", () 
 
   assert.deepEqual(
     getStatDefinitionSearchMatches(definitions, "bst air usd").map((definition) =>
+      definition.id
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getStatDefinitionSearchMatches(definitions, "boost air used").map((definition) =>
       definition.id
     ),
     ["player:boost.amount_used_while_airborne"],
