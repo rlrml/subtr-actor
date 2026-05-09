@@ -43,10 +43,16 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             </section>
             <section class="launcher-section">
               <h2>Layers / Effects</h2>
-              <label class="toggle">
-                <input id="show-followed-player-overlay" type="checkbox" />
+              <button
+                id="show-followed-player-overlay"
+                type="button"
+                class="module-summary-item"
+                data-active="false"
+                aria-pressed="false"
+              >
                 <span>Followed-player HUD</span>
-              </label>
+                <strong>Off</strong>
+              </button>
               <div class="module-list" id="module-summary"></div>
               <div id="module-settings" class="module-settings" hidden></div>
             </section>
@@ -57,7 +63,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           <section
             class="floating-window floating-window-camera"
             data-window-id="camera"
-            style="--window-x: calc(100vw - 28rem); --window-y: 4.25rem;"
+            style="--window-x: 1rem; --window-y: 4.25rem;"
           >
             <header class="floating-window-header">
               <div>
@@ -243,7 +249,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           <section
             class="floating-window floating-window-playback"
             data-window-id="playback"
-            style="--window-x: calc(100vw - 28rem); --window-y: 24rem;"
+            style="--window-x: calc(100vw - 28rem); --window-y: 4.25rem;"
           >
             <header class="floating-window-header">
               <div>

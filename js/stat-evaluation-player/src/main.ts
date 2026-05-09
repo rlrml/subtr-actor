@@ -148,7 +148,7 @@ let customCameraStiffnessReadout!: HTMLElement;
 let customCameraSwivelSpeedReadout!: HTMLElement;
 let customCameraTransitionSpeedReadout!: HTMLElement;
 let ballCam!: HTMLInputElement;
-let showFollowedPlayerOverlay!: HTMLInputElement;
+let showFollowedPlayerOverlay!: HTMLButtonElement;
 let moduleSummaryEl!: HTMLDivElement;
 let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
@@ -175,6 +175,7 @@ let focusedPlayerOverlayCacheKey: string | null = null;
 let statRegistry: StatDefinition[] = [];
 let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
+let showFollowedPlayerOverlayEnabled = false;
 let boostPadOverlayEnabled = false;
 
 interface ReplayInputSource {
@@ -579,6 +580,20 @@ function renderModuleSummary(): void {
   boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
   boostPadOverlay.append(boostPadName, boostPadState);
   moduleSummaryEl.append(boostPadOverlay);
+}
+
+function syncFollowedPlayerOverlayToggle(): void {
+  showFollowedPlayerOverlay.dataset.active = showFollowedPlayerOverlayEnabled
+    ? "true"
+    : "false";
+  showFollowedPlayerOverlay.setAttribute(
+    "aria-pressed",
+    showFollowedPlayerOverlayEnabled ? "true" : "false",
+  );
+  const state = showFollowedPlayerOverlay.querySelector("strong");
+  if (state) {
+    state.textContent = showFollowedPlayerOverlayEnabled ? "On" : "Off";
+  }
 }
 
 function renderCapabilityToggle(
@@ -1411,7 +1426,7 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
 
 function renderFocusedPlayerOverlay(state?: ReplayPlayerState): void {
   const ctx = getModuleContext();
-  if (!ctx || !state || !showFollowedPlayerOverlay.checked) {
+  if (!ctx || !state || !showFollowedPlayerOverlayEnabled) {
     followedPlayerOverlay.hidden = true;
     followedPlayerOverlay.innerHTML = "";
     focusedPlayerOverlayCacheKey = "hidden";
@@ -1791,7 +1806,7 @@ export function mountStatEvaluationPlayer(
     "#custom-camera-transition-speed-readout",
   );
   ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
-  showFollowedPlayerOverlay = mustElement<HTMLInputElement>(
+  showFollowedPlayerOverlay = mustElement<HTMLButtonElement>(
     root,
     "#show-followed-player-overlay",
   );
@@ -1993,7 +2008,9 @@ export function mountStatEvaluationPlayer(
     replayPlayer?.setBallCamEnabled(ballCam.checked);
   }, { signal: listeners.signal });
 
-  showFollowedPlayerOverlay.addEventListener("change", () => {
+  showFollowedPlayerOverlay.addEventListener("click", () => {
+    showFollowedPlayerOverlayEnabled = !showFollowedPlayerOverlayEnabled;
+    syncFollowedPlayerOverlayToggle();
     renderFocusedPlayerOverlay(replayPlayer?.getState());
   }, { signal: listeners.signal });
 
