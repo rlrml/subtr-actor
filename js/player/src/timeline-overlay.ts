@@ -2,6 +2,7 @@ import type {
   ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerPluginStateContext,
+  ReplayPlayerTimelineProjection,
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,
@@ -62,6 +63,7 @@ const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>([
 ]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
 const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
+const COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS = 0.01;
 
 function ensureStyles(): void {
   if (document.getElementById(STYLE_ID)) {
@@ -677,6 +679,35 @@ function markerLeftPercent(
   return `${(timelineTime / Math.max(duration, 0.0001)) * 100}%`;
 }
 
+export function projectedRangeTimelineBounds(
+  startProjection: ReplayPlayerTimelineProjection,
+  endProjection: ReplayPlayerTimelineProjection,
+  duration: number,
+): { startTimelineTime: number; endTimelineTime: number } {
+  let startTimelineTime = startProjection.timelineTime;
+  let endTimelineTime = endProjection.timelineTime;
+
+  if (
+    endTimelineTime <= startTimelineTime &&
+    (startProjection.hiddenBySkip || endProjection.hiddenBySkip)
+  ) {
+    if (startTimelineTime >= duration) {
+      startTimelineTime = Math.max(
+        0,
+        duration - COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS,
+      );
+      endTimelineTime = duration;
+    } else {
+      endTimelineTime = Math.min(
+        duration,
+        startTimelineTime + COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS,
+      );
+    }
+  }
+
+  return { startTimelineTime, endTimelineTime };
+}
+
 export function createTimelineOverlayPlugin(
   options: TimelineOverlayPluginOptions = {}
 ): TimelineOverlayPlugin {
@@ -894,6 +925,8 @@ export function createTimelineOverlayPlugin(
         const endProjection = context.player.projectReplayTimeToTimeline(
           range.endTime
         );
+        const { startTimelineTime, endTimelineTime } =
+          projectedRangeTimelineBounds(startProjection, endProjection, duration);
         const segment = document.createElement("div");
         segment.className = "sap-tl-range-segment";
         if (range.className) {
@@ -902,17 +935,17 @@ export function createTimelineOverlayPlugin(
         segment.style.background = rangeAccent(range);
         segment.title = range.label ?? lane.label;
         segment.dataset.active = "false";
-        segment.style.left = markerLeftPercent(startProjection.timelineTime, duration);
+        segment.style.left = markerLeftPercent(startTimelineTime, duration);
         segment.style.width = markerLeftPercent(
-          Math.max(0, endProjection.timelineTime - startProjection.timelineTime),
+          Math.max(0, endTimelineTime - startTimelineTime),
           duration,
         );
         track.append(segment);
         rangeElements.push({
           range,
           element: segment,
-          startTimelineTime: startProjection.timelineTime,
-          endTimelineTime: endProjection.timelineTime,
+          startTimelineTime,
+          endTimelineTime,
         });
       }
 
