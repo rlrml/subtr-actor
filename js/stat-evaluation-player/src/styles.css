@@ -1056,6 +1056,25 @@ input[type="range"] {
   overflow-wrap: anywhere;
 }
 
+.module-groups {
+  display: grid;
+  gap: var(--ui-gap-md);
+}
+
+.module-summary-group {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.module-summary-group h3 {
+  margin: 0;
+  color: #87afd4;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .module-list {
   display: flex;
   flex-wrap: wrap;

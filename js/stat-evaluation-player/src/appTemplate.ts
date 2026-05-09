@@ -53,7 +53,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 <span>Followed player stats HUD</span>
                 <strong>Off</strong>
               </button>
-              <div class="module-list" id="module-summary"></div>
+              <div class="module-groups" id="module-summary"></div>
               <div id="module-settings" class="module-settings" hidden></div>
             </section>
           </div>

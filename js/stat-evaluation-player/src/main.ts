@@ -193,6 +193,7 @@ interface ReplayInputSource {
 type SingletonWindowId = "camera" | "playback" | "stat-monitor";
 type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
 type TeamScope = "blue" | "orange";
+type ModuleCapabilityKind = "events" | "ranges" | "effects";
 
 interface SelectedStatEntry {
   key: string;
@@ -232,6 +233,14 @@ function getActiveModuleSignature(): string {
     `ranges=${[...activeTimelineRangeModuleIds].sort().join(",")}`,
     `effects=${[...activeRenderEffectModuleIds].sort().join(",")}`,
   ].join("|");
+}
+
+function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
+  return kind === "events"
+    ? activeTimelineEventModuleIds
+    : kind === "ranges"
+      ? activeTimelineRangeModuleIds
+      : activeRenderEffectModuleIds;
 }
 
 function clearRenderCaches(): void {
@@ -294,14 +303,10 @@ function teardownActiveModules(): void {
 
 function toggleCapability(
   id: string,
-  kind: "events" | "ranges" | "effects",
+  kind: ModuleCapabilityKind,
   enabled: boolean,
 ): void {
-  const activeIds = kind === "events"
-    ? activeTimelineEventModuleIds
-    : kind === "ranges"
-      ? activeTimelineRangeModuleIds
-      : activeRenderEffectModuleIds;
+  const activeIds = getActiveCapabilityIds(kind);
   if (enabled) {
     activeIds.add(id);
   } else {
@@ -532,6 +537,9 @@ function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
 function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
 
+  const timelineToggles: HTMLButtonElement[] = [];
+  const fieldOverlayToggles: HTMLButtonElement[] = [];
+
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
     if (!mod.getTimelineEvents && !mod.getTimelineRanges && !hasRenderEffect) {
@@ -539,21 +547,21 @@ function renderModuleSummary(): void {
     }
 
     if (mod.getTimelineEvents) {
-      moduleSummaryEl.append(renderCapabilityToggle(
+      timelineToggles.push(renderCapabilityToggle(
         mod.id,
         getCapabilityLabel(mod, "events"),
         "events",
       ));
     }
     if (mod.getTimelineRanges) {
-      moduleSummaryEl.append(renderCapabilityToggle(
+      timelineToggles.push(renderCapabilityToggle(
         mod.id,
         getCapabilityLabel(mod, "ranges"),
         "ranges",
       ));
     }
     if (hasRenderEffect) {
-      moduleSummaryEl.append(renderCapabilityToggle(
+      fieldOverlayToggles.push(renderCapabilityToggle(
         mod.id,
         getCapabilityLabel(mod, "effects"),
         "effects",
@@ -579,7 +587,7 @@ function renderModuleSummary(): void {
   const boostState = document.createElement("strong");
   boostState.textContent = boostAnimationActive ? "On" : "Off";
   boostAnimation.append(boostName, boostState);
-  moduleSummaryEl.append(boostAnimation);
+  fieldOverlayToggles.push(boostAnimation);
 
   const boostPadOverlay = document.createElement("button");
   boostPadOverlay.type = "button";
@@ -592,12 +600,35 @@ function renderModuleSummary(): void {
   const boostPadState = document.createElement("strong");
   boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
   boostPadOverlay.append(boostPadName, boostPadState);
-  moduleSummaryEl.append(boostPadOverlay);
+  fieldOverlayToggles.push(boostPadOverlay);
+
+  moduleSummaryEl.append(
+    renderModuleSummaryGroup("Timeline effects", timelineToggles),
+    renderModuleSummaryGroup("Field overlays", fieldOverlayToggles),
+  );
+}
+
+function renderModuleSummaryGroup(
+  title: string,
+  items: HTMLButtonElement[],
+): HTMLElement {
+  const group = document.createElement("section");
+  group.className = "module-summary-group";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  const list = document.createElement("div");
+  list.className = "module-list";
+  list.append(...items);
+
+  group.append(heading, list);
+  return group;
 }
 
 function getCapabilityLabel(
   mod: StatModule,
-  kind: "events" | "ranges" | "effects",
+  kind: ModuleCapabilityKind,
 ): string {
   const timelineLabels: Record<string, string> = {
     "absolute-positioning:ranges": "Position zones timeline bands",
@@ -652,13 +683,9 @@ function syncFollowedPlayerOverlayToggle(): void {
 function renderCapabilityToggle(
   moduleId: string,
   label: string,
-  kind: "events" | "ranges" | "effects",
+  kind: ModuleCapabilityKind,
 ): HTMLButtonElement {
-  const activeIds = kind === "events"
-    ? activeTimelineEventModuleIds
-    : kind === "ranges"
-      ? activeTimelineRangeModuleIds
-      : activeRenderEffectModuleIds;
+  const activeIds = getActiveCapabilityIds(kind);
   const active = activeIds.has(moduleId);
   const item = document.createElement("button");
   item.type = "button";
