@@ -13,6 +13,7 @@ import type {
   CanvasRecorderStatus,
   CameraSettings,
   ReplayCameraViewMode,
+  ReplayFreeCameraPreset,
   ReplayPlayerState,
   ReplayPlayerTrack,
   TimelineOverlayPlugin,
@@ -31,6 +32,11 @@ import {
   createStatsFrameLookup,
   getStatsFrameForReplayFrame,
 } from "./statsTimeline.ts";
+import {
+  applyConfigAdapterSnapshot,
+  getConfigAdapterSnapshot,
+  type StatsPlayerConfigAdapter,
+} from "./configAdapters.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -55,6 +61,23 @@ import {
   getReplayFileNameFromUrl,
   getReplayUrlFromSearch,
 } from "./replayUrl.ts";
+import {
+  getStatsPlayerConfigFromLocation,
+  mapWindowPlacementToViewport,
+  setStatsPlayerConfigOnUrl,
+  STATS_PLAYER_CONFIG_VERSION,
+  type ConfigViewportSize,
+  type PlayerCameraConfig,
+  type PlayerPlaybackConfig,
+  type RecordingConfig,
+  type SingletonWindowConfig,
+  type SingletonWindowId,
+  type StatsPlayerConfig,
+  type StatsWindowConfig,
+  type StatsWindowKind,
+  type TeamScope,
+  type WindowPlacementConfig,
+} from "./playerConfig.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
@@ -87,6 +110,9 @@ const boostPickupFilters = createBoostPickupFilterController({
       replayPlayer.getState().boostPickupAnimationEnabled,
     );
   },
+  requestConfigSync() {
+    scheduleConfigUrlUpdate();
+  },
 });
 
 const MODULES = createStatModules({
@@ -100,6 +126,9 @@ const MODULES = createStatModules({
   },
   refreshTimelineRanges() {
     syncTimelineRanges();
+  },
+  requestConfigSync() {
+    scheduleConfigUrlUpdate();
   },
 }, {
   boostPickupFilters,
@@ -198,6 +227,10 @@ let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
+let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
+let initialUrlConfig: StatsPlayerConfig | null = null;
+let isApplyingConfig = false;
+let configUrlUpdateTimer: number | null = null;
 
 interface ReplayInputSource {
   name: string;
@@ -205,10 +238,13 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
-type SingletonWindowId = "camera" | "playback" | "recording" | "boost-pickups";
-type StatsWindowKind = "player" | "team" | "all-players" | "all-teams" | "ad-hoc";
-type TeamScope = "blue" | "orange";
 type ModuleCapabilityKind = "events" | "ranges" | "effects";
+const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
+  "camera",
+  "playback",
+  "recording",
+  "boost-pickups",
+];
 
 interface SelectedStatEntry {
   key: string;
@@ -331,6 +367,7 @@ function toggleCapability(
     renderStatsWindows(state.frameIndex);
   }
   renderTimelineEventCount();
+  scheduleConfigUrlUpdate();
 }
 
 function clearTimelineEventSources(): void {
@@ -372,6 +409,7 @@ function toggleBoostPadOverlay(): void {
   boostPadOverlayEnabled = !boostPadOverlayEnabled;
   syncBoostPadOverlayPlugin();
   renderModuleSummary();
+  scheduleConfigUrlUpdate();
 }
 
 function syncTimelineEvents(): void {
@@ -449,6 +487,253 @@ function getElementWindowId(element: HTMLElement): string | null {
     null;
 }
 
+function getCurrentViewportSize(): ConfigViewportSize {
+  return {
+    width: Math.max(1, window.innerWidth),
+    height: Math.max(1, window.innerHeight),
+  };
+}
+
+function readWindowCoordinate(windowEl: HTMLElement, propertyName: string): number {
+  const inlineValue = windowEl.style.getPropertyValue(propertyName).trim();
+  const computedValue = getComputedStyle(windowEl).getPropertyValue(propertyName).trim();
+  const rawValue = inlineValue || computedValue;
+  const parsed = Number.parseFloat(rawValue);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  const rect = windowEl.getBoundingClientRect();
+  return propertyName === "--window-y" ? rect.top : rect.left;
+}
+
+function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
+  const zIndex = Number.parseInt(windowEl.style.zIndex, 10);
+  return {
+    x: readWindowCoordinate(windowEl, "--window-x"),
+    y: readWindowCoordinate(windowEl, "--window-y"),
+    viewport: getCurrentViewportSize(),
+    zIndex: Number.isFinite(zIndex) ? zIndex : undefined,
+    visible: !windowEl.hidden,
+  };
+}
+
+function applyWindowPlacement(
+  windowEl: HTMLElement,
+  placement: WindowPlacementConfig,
+): void {
+  const mapped = mapWindowPlacementToViewport(
+    placement,
+    getCurrentViewportSize(),
+  );
+  windowEl.style.setProperty("--window-x", `${mapped.x}px`);
+  windowEl.style.setProperty("--window-y", `${mapped.y}px`);
+  windowEl.hidden = !placement.visible;
+  if (placement.zIndex !== undefined) {
+    windowEl.style.zIndex = `${placement.zIndex}`;
+    nextWindowZIndex = Math.max(nextWindowZIndex, placement.zIndex + 1);
+  }
+}
+
+function getSingletonWindowConfigs(): SingletonWindowConfig[] {
+  const configs: SingletonWindowConfig[] = [];
+  const root = appRoot ?? document;
+  for (const id of SINGLETON_WINDOW_IDS) {
+    const element = root.querySelector<HTMLElement>(`[data-window-id="${id}"]`);
+    if (element) {
+      configs.push({
+        id,
+        placement: readWindowPlacement(element),
+      });
+    }
+  }
+  return configs;
+}
+
+function getConfigAdapters(): StatsPlayerConfigAdapter[] {
+  return MODULES
+    .filter((mod) => mod.getConfig || mod.applyConfig)
+    .map((mod) => {
+      const adapter: StatsPlayerConfigAdapter = {
+        id: mod.id,
+      };
+      if (mod.id === "boost") {
+        adapter.aliases = ["boost-pickup-animation"];
+      }
+      if (mod.getConfig) {
+        adapter.getConfig = () => mod.getConfig?.();
+      }
+      if (mod.applyConfig) {
+        adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
+      }
+      return adapter;
+    });
+}
+
+function getModuleConfigSnapshot(): Record<string, unknown> {
+  return getConfigAdapterSnapshot(getConfigAdapters());
+}
+
+function applyModuleConfigSnapshot(configs: Record<string, unknown>): void {
+  applyConfigAdapterSnapshot(getConfigAdapters(), configs);
+}
+
+function getStatsWindowConfig(statsWindow: StatsWindowState): StatsWindowConfig {
+  return {
+    id: statsWindow.id,
+    kind: statsWindow.kind,
+    placement: readWindowPlacement(statsWindow.element),
+    playerId: statsWindow.playerId,
+    team: statsWindow.team,
+    entries: statsWindow.entries.map((entry) => ({
+      statId: entry.statId,
+      targetId: entry.targetId,
+    })),
+  };
+}
+
+function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
+  const state = replayPlayer?.getState();
+  return {
+    currentTime: state?.currentTime,
+    rate: state?.speed ?? Number(playbackRate?.value ?? 1),
+    skipPostGoalTransitions: replayPlayer
+      ? state?.skipPostGoalTransitionsEnabled
+      : skipPostGoalTransitions.checked,
+    skipKickoffs: replayPlayer ? state?.skipKickoffsEnabled : skipKickoffs.checked,
+  };
+}
+
+function getCameraConfigSnapshot(): PlayerCameraConfig {
+  const state = replayPlayer?.getState();
+  return {
+    mode: state?.cameraViewMode,
+    freePreset: lastFreeCameraPreset,
+    attachedPlayerId: state?.attachedPlayerId,
+    distanceScale: state?.cameraDistanceScale,
+    ballCam: state?.ballCamEnabled,
+    customSettings: state?.customCameraSettings,
+  };
+}
+
+function getRecordingConfigSnapshot(): RecordingConfig {
+  return {
+    fps: Number(recordingFps?.value),
+    playbackRate: Number(recordingPlaybackRate?.value),
+  };
+}
+
+function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
+  return {
+    version: STATS_PLAYER_CONFIG_VERSION,
+    playback: getPlaybackConfigSnapshot(),
+    camera: getCameraConfigSnapshot(),
+    overlays: {
+      timelineEvents: [...activeTimelineEventModuleIds],
+      timelineRanges: [...activeTimelineRangeModuleIds],
+      renderEffects: [...activeRenderEffectModuleIds],
+      followedPlayerHud: false,
+      boostPads: boostPadOverlayEnabled,
+      boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
+    },
+    recording: getRecordingConfigSnapshot(),
+    singletonWindows: getSingletonWindowConfigs(),
+    statsWindows: [...statsWindows.values()].map(getStatsWindowConfig),
+    moduleConfigs: getModuleConfigSnapshot(),
+  };
+}
+
+function scheduleConfigUrlUpdate(): void {
+  if (isApplyingConfig) {
+    return;
+  }
+  if (configUrlUpdateTimer !== null) {
+    window.clearTimeout(configUrlUpdateTimer);
+  }
+  configUrlUpdateTimer = window.setTimeout(() => {
+    configUrlUpdateTimer = null;
+    const nextUrl = setStatsPlayerConfigOnUrl(
+      new URL(window.location.href),
+      getStatsPlayerConfigSnapshot(),
+    );
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, 150);
+}
+
+function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
+  const root = appRoot ?? document;
+  for (const windowConfig of config.singletonWindows) {
+    const element = root.querySelector<HTMLElement>(
+      `[data-window-id="${windowConfig.id}"]`,
+    );
+    if (element) {
+      applyWindowPlacement(element, windowConfig.placement);
+    }
+  }
+}
+
+function applyConfigToStaticControls(config: StatsPlayerConfig): void {
+  activeTimelineEventModuleIds = new Set(config.overlays.timelineEvents);
+  activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
+  activeRenderEffectModuleIds = new Set(config.overlays.renderEffects);
+  boostPadOverlayEnabled = config.overlays.boostPads;
+  skipPostGoalTransitions.checked =
+    config.playback.skipPostGoalTransitions ?? skipPostGoalTransitions.checked;
+  skipKickoffs.checked = config.playback.skipKickoffs ?? skipKickoffs.checked;
+  if (config.playback.rate !== undefined) {
+    playbackRate.value = `${config.playback.rate}`;
+  }
+  if (config.recording.fps !== undefined) {
+    recordingFps.value = `${config.recording.fps}`;
+  }
+  if (config.recording.playbackRate !== undefined) {
+    recordingPlaybackRate.value = `${config.recording.playbackRate}`;
+  }
+  applyModuleConfigSnapshot(config.moduleConfigs);
+  applyConfigToExistingWindows(config);
+  replaceStatsWindowsFromConfig(config.statsWindows);
+  renderModuleSummary();
+  renderModuleSettings();
+  renderTimelineEventCount();
+}
+
+function getReplayPlayerStatePatchFromConfig(
+  playback: PlayerPlaybackConfig,
+  camera: PlayerCameraConfig,
+  config: StatsPlayerConfig,
+): Parameters<ReplayPlayer["setState"]>[0] {
+  return {
+    currentTime: playback.currentTime,
+    speed: playback.rate,
+    cameraDistanceScale: camera.distanceScale,
+    customCameraSettings: camera.customSettings,
+    cameraViewMode: camera.mode,
+    attachedPlayerId: camera.attachedPlayerId,
+    ballCamEnabled: camera.ballCam,
+    boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
+    skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
+    skipKickoffsEnabled: playback.skipKickoffs,
+  };
+}
+
+function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
+  if (!replayPlayer) {
+    return;
+  }
+  replayPlayer.setState(
+    getReplayPlayerStatePatchFromConfig(config.playback, config.camera, config),
+  );
+  lastFreeCameraPreset = config.camera.freePreset ?? null;
+  if (config.camera.mode === "free" && config.camera.freePreset) {
+    replayPlayer.setFreeCameraPreset(config.camera.freePreset);
+  }
+  syncBoostPadOverlayPlugin();
+  setupActiveModules();
+  renderModuleSummary();
+  renderModuleSettings();
+  renderStatsWindows(replayPlayer.getState().frameIndex);
+}
+
 function bringWindowToFront(windowEl: HTMLElement): void {
   windowEl.style.zIndex = `${nextWindowZIndex++}`;
 }
@@ -460,6 +745,7 @@ function showWindow(id: SingletonWindowId): void {
   );
   windowEl.hidden = false;
   bringWindowToFront(windowEl);
+  scheduleConfigUrlUpdate();
 }
 
 function toggleWindow(id: SingletonWindowId): void {
@@ -471,6 +757,7 @@ function toggleWindow(id: SingletonWindowId): void {
   if (!windowEl.hidden) {
     bringWindowToFront(windowEl);
   }
+  scheduleConfigUrlUpdate();
 }
 
 function hideWindow(id: string): void {
@@ -479,6 +766,7 @@ function hideWindow(id: string): void {
     `[data-window-id="${id}"]`,
   );
   windowEl.hidden = true;
+  scheduleConfigUrlUpdate();
 }
 
 function setLauncherOpen(open: boolean): void {
@@ -536,6 +824,7 @@ function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
       windowEl.removeEventListener("pointermove", onPointerMove);
       windowEl.removeEventListener("pointerup", onPointerUp);
       windowEl.removeEventListener("pointercancel", onPointerUp);
+      scheduleConfigUrlUpdate();
     };
 
     windowEl.addEventListener("pointermove", onPointerMove);
@@ -591,6 +880,7 @@ function renderModuleSummary(): void {
     setupActiveModules();
     renderModuleSummary();
     renderModuleSettings();
+    scheduleConfigUrlUpdate();
   });
   const boostName = document.createElement("span");
   boostName.textContent = "Boost pickup animation";
@@ -850,14 +1140,24 @@ function renderStatsWindows(
   }
 }
 
-function createStatsWindow(kind: StatsWindowKind): void {
-  const id = `stats-${nextStatsWindowId++}`;
+function createStatsWindow(
+  kind: StatsWindowKind,
+  config?: StatsWindowConfig,
+): StatsWindowState {
+  const id = config?.id ?? `stats-${nextStatsWindowId++}`;
+  const idNumber = Number.parseInt(id.replace(/^stats-/, ""), 10);
+  if (Number.isFinite(idNumber)) {
+    nextStatsWindowId = Math.max(nextStatsWindowId, idNumber + 1);
+  }
   const { x, y } = getStatsWindowDefaultPosition();
   const element = document.createElement("section");
   element.className = "stats-window";
   element.dataset.windowId = id;
   element.style.setProperty("--window-x", `${x}px`);
   element.style.setProperty("--window-y", `${y}px`);
+  if (config) {
+    applyWindowPlacement(element, config.placement);
+  }
 
   const header = document.createElement("header");
   header.className = "stats-window-header";
@@ -886,9 +1186,13 @@ function createStatsWindow(kind: StatsWindowKind): void {
   const state: StatsWindowState = {
     id,
     kind,
-    entries: [],
-    playerId: replayPlayer?.replay.players[0]?.id ?? null,
-    team: "blue",
+    entries: config?.entries.map((entry) => ({
+      key: `${id}:${entry.statId}:${entry.targetId ?? "scope"}`,
+      statId: entry.statId,
+      targetId: entry.targetId,
+    })) ?? [],
+    playerId: config?.playerId ?? replayPlayer?.replay.players[0]?.id ?? null,
+    team: config?.team ?? "blue",
     pickerOpen: false,
     query: "",
     element,
@@ -897,12 +1201,28 @@ function createStatsWindow(kind: StatsWindowKind): void {
 
   hideButton.addEventListener("click", () => {
     element.hidden = true;
+    scheduleConfigUrlUpdate();
   });
 
   statsWindows.set(id, state);
-  bringWindowToFront(element);
+  if (!config) {
+    bringWindowToFront(element);
+  }
   setLauncherOpen(false);
   renderStatsWindow(state);
+  scheduleConfigUrlUpdate();
+  return state;
+}
+
+function replaceStatsWindowsFromConfig(configs: readonly StatsWindowConfig[]): void {
+  for (const statsWindow of statsWindows.values()) {
+    statsWindow.element.remove();
+  }
+  statsWindows.clear();
+  nextStatsWindowId = 1;
+  for (const config of configs) {
+    createStatsWindow(config.kind, config);
+  }
 }
 
 function renderStatsWindow(
@@ -975,6 +1295,7 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
     select.addEventListener("change", () => {
       statsWindow.playerId = select.value || null;
       renderStatsWindow(statsWindow);
+      scheduleConfigUrlUpdate();
     });
   } else {
     select.append(
@@ -990,6 +1311,7 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
     select.addEventListener("change", () => {
       statsWindow.team = select.value === "orange" ? "orange" : "blue";
       renderStatsWindow(statsWindow);
+      scheduleConfigUrlUpdate();
     });
   }
 
@@ -1105,6 +1427,7 @@ function renderStatsWindowPickerList(
         addStatToWindow(statsWindow, definition);
       }
       renderStatsWindow(statsWindow);
+      scheduleConfigUrlUpdate();
     });
     list.append(addGroup);
   }
@@ -1119,6 +1442,7 @@ function renderStatsWindowPickerList(
     activateButton(item, () => {
       addStatToWindow(statsWindow, definition);
       renderStatsWindow(statsWindow);
+      scheduleConfigUrlUpdate();
     });
     list.append(item);
   }
@@ -1392,6 +1716,7 @@ function renderStatRow(
         };
       }
       renderStatsWindow(statsWindow);
+      scheduleConfigUrlUpdate();
     });
     name.append(" ", targetSelect);
   }
@@ -1405,6 +1730,7 @@ function renderStatRow(
   remove.addEventListener("click", () => {
     removeStatFromWindow(statsWindow, entry.key);
     renderStatsWindow(statsWindow);
+    scheduleConfigUrlUpdate();
   });
   row.append(name, valueEl, remove);
   return row;
@@ -1817,13 +2143,18 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
       onStatusChange: syncRecordingWindow,
     });
     canvasRecorder = recorder;
+    const config = initialUrlConfig;
 
     replayPlayer = new ReplayPlayer(viewport, replay, {
-      initialCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
-      initialCustomCameraSettings: null,
-      initialAttachedPlayerId: null,
-      initialBallCamEnabled: false,
-      initialBoostPickupAnimationEnabled: false,
+      initialPlaybackRate: config?.playback.rate,
+      initialCameraDistanceScale:
+        config?.camera.distanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
+      initialCustomCameraSettings: config?.camera.customSettings ?? null,
+      initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
+      initialCameraViewMode: config?.camera.mode,
+      initialBallCamEnabled: config?.camera.ballCam ?? false,
+      initialBoostPickupAnimationEnabled:
+        config?.overlays.boostPickupAnimation ?? false,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
       plugins: [
@@ -1839,6 +2170,14 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 
     setupActiveModules();
     unsubscribe = replayPlayer.subscribe(renderSnapshot);
+    if (config) {
+      isApplyingConfig = true;
+      try {
+        applyConfigToReplayPlayer(config);
+      } finally {
+        isApplyingConfig = false;
+      }
+    }
 
     populateAttachedPlayerOptions(replay.players);
     emptyState.hidden = true;
@@ -2053,6 +2392,16 @@ export function mountStatEvaluationPlayer(
   recordingSize = mustElement<HTMLElement>(root, "#recording-size");
   recordingType = mustElement<HTMLElement>(root, "#recording-type");
 
+  try {
+    initialUrlConfig = getStatsPlayerConfigFromLocation(window.location);
+  } catch (error) {
+    console.error("Invalid stats player config:", error);
+    statusReadout.textContent = error instanceof Error
+      ? error.message
+      : "Invalid stats player config";
+    initialUrlConfig = null;
+  }
+
   const listeners = new AbortController();
   installWindowDragging(floatingWindowLayer, listeners.signal);
   installWindowDragging(statsWindowLayer, listeners.signal);
@@ -2081,6 +2430,13 @@ export function mountStatEvaluationPlayer(
     activeRenderEffectModuleIds = new Set<string>();
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
+    lastFreeCameraPreset = null;
+    initialUrlConfig = null;
+    if (configUrlUpdateTimer !== null) {
+      window.clearTimeout(configUrlUpdateTimer);
+      configUrlUpdateTimer = null;
+    }
+    isApplyingConfig = false;
     nextStatsWindowId = 1;
     nextWindowZIndex = 30;
     removeRenderHook = null;
@@ -2093,6 +2449,15 @@ export function mountStatEvaluationPlayer(
     }
   };
   currentMountCleanup = cleanup;
+
+  if (initialUrlConfig) {
+    isApplyingConfig = true;
+    try {
+      applyConfigToStaticControls(initialUrlConfig);
+    } finally {
+      isApplyingConfig = false;
+    }
+  }
 
   launcherToggle.addEventListener("click", () => {
     setLauncherOpen(launcherMenu.hidden);
@@ -2154,10 +2519,12 @@ export function mountStatEvaluationPlayer(
 
   togglePlayback.addEventListener("click", () => {
     replayPlayer?.togglePlayback();
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   playbackRate.addEventListener("change", () => {
     replayPlayer?.setPlaybackRate(Number(playbackRate.value));
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   recordingStart.addEventListener("click", () => {
@@ -2222,8 +2589,16 @@ export function mountStatEvaluationPlayer(
     }
   }, { signal: listeners.signal });
 
+  recordingFps.addEventListener("change", scheduleConfigUrlUpdate, {
+    signal: listeners.signal,
+  });
+  recordingPlaybackRate.addEventListener("change", scheduleConfigUrlUpdate, {
+    signal: listeners.signal,
+  });
+
   cameraDistance.addEventListener("input", () => {
     replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   customCameraSettings.addEventListener("change", () => {
@@ -2231,6 +2606,7 @@ export function mountStatEvaluationPlayer(
     replayPlayer?.setCustomCameraSettings(
       customCameraSettings.checked ? readCustomCameraSettings() : null,
     );
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   for (const input of [
@@ -2246,41 +2622,55 @@ export function mountStatEvaluationPlayer(
       const settings = readCustomCameraSettings();
       syncCustomCameraSettingControls(settings);
       replayPlayer?.setCustomCameraSettings(settings);
+      scheduleConfigUrlUpdate();
     }, { signal: listeners.signal });
   }
 
   attachedPlayer.addEventListener("change", () => {
     replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
+    lastFreeCameraPreset = null;
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   cameraViewFreeButton.addEventListener("click", () => {
     replayPlayer?.setCameraViewMode("free");
+    lastFreeCameraPreset = null;
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   cameraViewFollowButton.addEventListener("click", () => {
     replayPlayer?.setCameraViewMode("follow");
+    lastFreeCameraPreset = null;
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   cameraViewOverheadButton.addEventListener("click", () => {
     replayPlayer?.setFreeCameraPreset("overhead");
+    lastFreeCameraPreset = "overhead";
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   cameraViewSideButton.addEventListener("click", () => {
     replayPlayer?.setFreeCameraPreset("side");
+    lastFreeCameraPreset = "side";
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   ballCam.addEventListener("change", () => {
     replayPlayer?.setBallCamEnabled(ballCam.checked);
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   skipPostGoalTransitions.addEventListener("change", () => {
     replayPlayer?.setSkipPostGoalTransitionsEnabled(
       skipPostGoalTransitions.checked,
     );
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   skipKickoffs.addEventListener("change", () => {
     replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
+    scheduleConfigUrlUpdate();
   }, { signal: listeners.signal });
 
   renderModuleSummary();

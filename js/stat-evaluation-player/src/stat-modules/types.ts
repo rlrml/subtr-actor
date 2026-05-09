@@ -30,6 +30,8 @@ export interface StatModule {
   onBeforeRender(info: FrameRenderInfo): void;
   getTimelineEvents?(ctx: StatModuleContext): ReplayTimelineEvent[];
   getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
+  getConfig?(): unknown;
+  applyConfig?(config: unknown): void;
   includeBoostPickupAnimationPickup?(
     pickup: BoostPickupAnimationPickup,
   ): boolean;
@@ -45,6 +47,7 @@ export interface StatModule {
 export interface StatModuleRuntime {
   rerenderCurrentState(): void;
   refreshTimelineRanges?(): void;
+  requestConfigSync?(): void;
 }
 
 const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;

@@ -108,6 +108,14 @@ export function createBoostModule(
       );
     },
 
+    getConfig() {
+      return pickupFilters.getConfig();
+    },
+
+    applyConfig(config) {
+      pickupFilters.applyConfig(config);
+    },
+
     includeBoostPickupAnimationPickup(pickup) {
       return pickupFilters.includePickup(pickup);
     },
@@ -363,6 +371,7 @@ export function createSpeedFlipModule(): StatModule {
 
 export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlay: TouchEventOverlay | null = null;
+  let decaySeconds = 5;
   let settingsEl: HTMLDivElement | null = null;
   let decayReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
@@ -383,6 +392,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         ctx.replay,
         ctx.statsTimeline,
       );
+      overlay.setDecaySeconds(decaySeconds);
       syncTouchSettingsUi();
     },
 
@@ -397,6 +407,34 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
 
     getTimelineEvents(ctx) {
       return buildTouchTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    getConfig() {
+      return {
+        decaySeconds,
+        breakdownClasses: getActiveBreakdownClasses(),
+      };
+    },
+
+    applyConfig(config) {
+      if (config && typeof config === "object" && !Array.isArray(config)) {
+        const record = config as Record<string, unknown>;
+        if (typeof record.decaySeconds === "number" &&
+          Number.isFinite(record.decaySeconds)) {
+          decaySeconds = Math.max(1, Math.min(10, record.decaySeconds));
+          overlay?.setDecaySeconds(decaySeconds);
+        }
+        activeBreakdownClasses.clear();
+        if (Array.isArray(record.breakdownClasses)) {
+          for (const className of record.breakdownClasses) {
+            if (orderedBreakdownClasses.includes(className as TouchBreakdownClass)) {
+              activeBreakdownClasses.add(className as TouchBreakdownClass);
+            }
+          }
+        }
+      }
+      syncTouchSettingsUi();
+      runtime.rerenderCurrentState();
     },
 
     renderStats(frameIndex, ctx) {
@@ -457,11 +495,15 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         input.min = "1";
         input.max = "10";
         input.step = "0.5";
-        input.value = `${overlay?.getDecaySeconds() ?? 5}`;
+        input.value = `${decaySeconds}`;
         input.addEventListener("input", () => {
           const nextValue = Number(input.value);
-          overlay?.setDecaySeconds(nextValue);
-          syncTouchSettingsUi(nextValue);
+          decaySeconds = Number.isFinite(nextValue)
+            ? Math.max(1, Math.min(10, nextValue))
+            : decaySeconds;
+          overlay?.setDecaySeconds(decaySeconds);
+          syncTouchSettingsUi(decaySeconds);
+          runtime.requestConfigSync?.();
         });
 
         label.append(labelText, input);
@@ -504,6 +546,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
             }
             syncTouchSettingsUi();
             runtime.rerenderCurrentState();
+            runtime.requestConfigSync?.();
           });
 
           const optionText = document.createElement("span");
@@ -526,7 +569,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
       return;
     }
 
-    const value = nextValue ?? overlay?.getDecaySeconds() ?? 5;
+    const value = nextValue ?? decaySeconds;
     const input = settingsEl.querySelector("input");
     if (input instanceof HTMLInputElement) {
       input.value = `${value}`;
@@ -581,6 +624,28 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
     teardown() {},
 
     onBeforeRender() {},
+
+    getConfig() {
+      return {
+        breakdownClasses: getActiveBreakdownClasses(),
+      };
+    },
+
+    applyConfig(config) {
+      activeBreakdownClasses.clear();
+      if (config && typeof config === "object" && !Array.isArray(config)) {
+        const classes = (config as Record<string, unknown>).breakdownClasses;
+        if (Array.isArray(classes)) {
+          for (const className of classes) {
+            if (orderedBreakdownClasses.includes(className as MovementBreakdownClass)) {
+              activeBreakdownClasses.add(className as MovementBreakdownClass);
+            }
+          }
+        }
+      }
+      syncMovementSettingsUi();
+      runtime.rerenderCurrentState();
+    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(
@@ -651,6 +716,7 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
             }
             syncMovementSettingsUi();
             runtime.rerenderCurrentState();
+            runtime.requestConfigSync?.();
           });
 
           const optionText = document.createElement("span");
