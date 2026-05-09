@@ -768,8 +768,18 @@ function getStatsWindowDefaultPosition(): { x: number; y: number } {
   };
 }
 
-function renderStatsWindows(frameIndex = replayPlayer?.getState().frameIndex ?? 0): void {
+function renderStatsWindows(
+  frameIndex = replayPlayer?.getState().frameIndex ?? 0,
+  options: { preserveOpenPickers?: boolean } = {},
+): void {
   for (const statsWindow of statsWindows.values()) {
+    if (
+      options.preserveOpenPickers &&
+      (statsWindow.pickerOpen ||
+        statsWindow.element.contains(document.activeElement))
+    ) {
+      continue;
+    }
     renderStatsWindow(statsWindow, frameIndex);
   }
 }
@@ -1623,7 +1633,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
 
   syncCameraControlAvailability(state);
   renderCameraProfile(state);
-  renderStatsWindows(state.frameIndex);
+  renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
   renderFocusedPlayerOverlay(state);
   statMonitor?.renderFrame(
     statsFrameLookup
