@@ -52,6 +52,17 @@ Problematic comparison fixture extracted from `problematic-replays.zip` on
   - playlist: `private`
   - note: 1v1 fixture reported for Ballchasing boost/stat comparison discrepancies
 
+RLCS comparison fixture downloaded from Ballchasing on 2026-05-10:
+
+- `rlcs-2025-worlds-grand-final-flcn-nrg-g5`
+  - replay id: `b847c311-643d-4726-ab39-646a91a72b17`
+  - title: `WORLDS P-I FLCN vs NRG G5 2025-09-14.19.39`
+  - playlist: `private`
+  - teams: `TEAM FALCONS` 2 - 3 `NRG ESPORTS`
+  - uploader: `RLCS Referee`
+  - note: 2025 RLCS World Championship grand final game 5 fixture used for
+    subtr-actor versus Ballchasing boost-stat comparison
+
 Post-EAC fixtures were downloaded from public Ballchasing replay pages on
 2026-04-29. The local Ballchasing API token was invalid at the time, so these
 fixtures include replay files and source ids but not API stats JSON.
