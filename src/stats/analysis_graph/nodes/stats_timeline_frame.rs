@@ -152,8 +152,7 @@ impl StatsTimelineFrameNode {
                 .player_stats()
                 .get(player_id)
                 .cloned()
-                .unwrap_or_default()
-                .with_complete_labeled_touch_counts(),
+                .unwrap_or_default(),
             musty_flick: ctx
                 .get::<MustyFlickCalculator>()?
                 .player_stats()
@@ -183,8 +182,7 @@ impl StatsTimelineFrameNode {
                 .player_stats()
                 .get(player_id)
                 .cloned()
-                .unwrap_or_default()
-                .with_complete_labeled_tracked_time(),
+                .unwrap_or_default(),
             positioning: ctx
                 .get::<PositioningCalculator>()?
                 .player_stats()
