@@ -125,11 +125,52 @@ input {
 }
 
 .launcher-toggle {
-  min-width: 4.2rem;
+  width: 2.65rem;
+  min-width: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-color: transparent;
+  border-radius: var(--ui-radius-md);
+  background: rgba(5, 14, 22, 0.68);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.launcher-toggle:hover,
+.launcher-toggle[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(8, 24, 36, 0.82);
+}
+
+.launcher-toggle-bars,
+.launcher-toggle-bars::before,
+.launcher-toggle-bars::after {
+  display: block;
+  width: 1.18rem;
+  height: 0.12rem;
   border-radius: var(--ui-radius-pill);
-  background: rgba(5, 14, 22, 0.82);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
+  background: #edf5fa;
+}
+
+.launcher-toggle-bars {
+  position: relative;
+}
+
+.launcher-toggle-bars::before,
+.launcher-toggle-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.launcher-toggle-bars::before {
+  top: -0.38rem;
+}
+
+.launcher-toggle-bars::after {
+  top: 0.38rem;
 }
 
 .launcher-menu {

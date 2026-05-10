@@ -483,6 +483,7 @@ function hideWindow(id: string): void {
 
 function setLauncherOpen(open: boolean): void {
   launcherMenu.hidden = !open;
+  launcherToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
   launcherToggle.setAttribute("aria-expanded", open ? "true" : "false");
 }
 

@@ -9,10 +9,11 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             id="launcher-toggle"
             class="launcher-toggle"
             type="button"
+            aria-label="Open menu"
             aria-expanded="false"
             aria-controls="launcher-menu"
           >
-            Menu
+            <span class="launcher-toggle-bars" aria-hidden="true"></span>
           </button>
           <div id="launcher-menu" class="launcher-menu" hidden>
             <section class="launcher-section">
