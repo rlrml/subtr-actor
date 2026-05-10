@@ -8,11 +8,11 @@ import {
   zoneBoundaryOverlayManager,
 } from "./renderers.ts";
 import {
-  getCurrentRole,
+  DEPTH_ROLE_LABELS,
+  getCurrentDepthRole,
   getStatsPlayerSnapshot,
   RELATIVE_POSITIONING_MODULE_ID,
   renderPlayerCard,
-  ROLE_LABELS,
   type StatModule,
 } from "./types.ts";
 
@@ -50,16 +50,17 @@ export function createRelativePositioningModule(): StatModule {
       if (!statsFrame) return "";
 
       return statsFrame.players.map((player) => {
-        const role = getCurrentRole(
+        const depthRole = getCurrentDepthRole(
           ctx.replay,
           playerIdToString(player.player_id),
           frameIndex,
         );
+        const depthLabel = DEPTH_ROLE_LABELS[depthRole];
         return renderPlayerCard(
           player.name,
           player.is_team_0,
           renderRelativePositioningStats(player.positioning),
-          `<span class="role-indicator role-${role}">${ROLE_LABELS[role]}</span>`,
+          `<span class="depth-indicator depth-${depthRole}" title="Team Depth: ${depthLabel}" aria-label="Team Depth: ${depthLabel}">${depthLabel}</span>`,
         );
       }).join("");
     },

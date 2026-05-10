@@ -1,5 +1,7 @@
 export {
   createStatModules,
+  DEPTH_ROLE_LABELS,
+  getCurrentDepthRole,
   getCurrentRole,
   getStatsPlayerSnapshot,
   getTeamClass,
@@ -9,6 +11,7 @@ export {
 } from "./stat-modules/index.ts";
 
 export type {
+  DepthRole,
   Role,
   StatModule,
   StatModuleContext,

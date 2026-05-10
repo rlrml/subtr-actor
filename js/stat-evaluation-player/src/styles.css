@@ -558,7 +558,8 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
-.role-indicator {
+.role-indicator,
+.depth-indicator {
   flex-shrink: 0;
   padding: 0.18rem 0.45rem;
   border-radius: 999px;
@@ -568,22 +569,26 @@ input {
   text-transform: uppercase;
 }
 
-.role-back {
+.role-back,
+.depth-last {
   background: rgba(234, 85, 85, 0.18);
   color: #ff9b9b;
 }
 
-.role-forward {
+.role-forward,
+.depth-upfield {
   background: rgba(74, 198, 118, 0.18);
   color: #9ce5a8;
 }
 
-.role-other {
+.role-other,
+.depth-level {
   background: rgba(132, 149, 168, 0.18);
   color: #c0cbd6;
 }
 
-.role-mid {
+.role-mid,
+.depth-mid {
   background: rgba(243, 154, 55, 0.18);
   color: #ffc680;
 }

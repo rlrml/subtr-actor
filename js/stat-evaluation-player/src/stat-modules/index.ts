@@ -29,6 +29,8 @@ export {
   hasBoostPickupAnimationTimelineMatch,
 } from "../boostPickupFilters.ts";
 export {
+  DEPTH_ROLE_LABELS,
+  getCurrentDepthRole,
   getCurrentRole,
   getStatsPlayerSnapshot,
   getTeamClass,
@@ -36,6 +38,7 @@ export {
   ROLE_LABELS,
 } from "./types.ts";
 export type {
+  DepthRole,
   Role,
   StatModule,
   StatModuleContext,

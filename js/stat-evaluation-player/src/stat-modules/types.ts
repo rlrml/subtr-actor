@@ -51,14 +51,17 @@ const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;
 
 export const RELATIVE_POSITIONING_MODULE_ID = "relative-positioning";
 
-export type Role = "back" | "forward" | "other" | "mid";
+export type DepthRole = "last" | "upfield" | "level" | "mid";
 
-export const ROLE_LABELS: Record<Role, string> = {
-  back: "Back",
-  forward: "Fwd",
-  other: "Other",
+export const DEPTH_ROLE_LABELS: Record<DepthRole, string> = {
+  last: "Last",
+  upfield: "Upfield",
+  level: "Level",
   mid: "Mid",
 };
+
+export type Role = DepthRole;
+export const ROLE_LABELS = DEPTH_ROLE_LABELS;
 
 export function getTeamClass(isTeamZero: boolean): string {
   return isTeamZero ? "team-blue" : "team-orange";
@@ -125,11 +128,11 @@ export function getStatsPlayerSnapshot(
   ) ?? null;
 }
 
-export function getCurrentRole(
+export function getCurrentDepthRole(
   replay: ReplayModel,
   playerId: string,
   frameIndex: number,
-): Role {
+): DepthRole {
   const player = replay.players.find((candidate) => candidate.id === playerId);
   if (!player) return "mid";
 
@@ -163,12 +166,14 @@ export function getCurrentRole(
   const maxY = Math.max(...allYs);
   const spread = maxY - minY;
 
-  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "other";
+  if (spread <= MOST_BACK_FORWARD_THRESHOLD_Y) return "level";
 
   const nearBack = normalizedY - minY <= MOST_BACK_FORWARD_THRESHOLD_Y;
   const nearFront = maxY - normalizedY <= MOST_BACK_FORWARD_THRESHOLD_Y;
 
-  if (nearBack && !nearFront) return "back";
-  if (nearFront && !nearBack) return "forward";
+  if (nearBack && !nearFront) return "last";
+  if (nearFront && !nearBack) return "upfield";
   return "mid";
 }
+
+export const getCurrentRole = getCurrentDepthRole;
