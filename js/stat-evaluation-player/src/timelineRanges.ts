@@ -283,8 +283,6 @@ function buildReplayBoostPickupTimelineRanges(
   const enabledPadTypes = padTypesFromOptions(options);
   const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? [
     "both",
-    "ghost",
-    "missed",
   ]);
   const enabledActivities = new Set<BoostPickupActivity>(options.activities ?? [
     "active",
@@ -398,7 +396,7 @@ function formatBoostPickupPadType(padType: BoostPickupPadType): string {
 
 function formatBoostPickupComparison(comparison: BoostPickupComparison): string {
   return {
-    both: "matched",
+    both: "counted",
     ghost: "ghost",
     missed: "missed",
   }[comparison];
@@ -434,8 +432,6 @@ export function buildBoostPickupTimelineRanges(
   const enabledPadTypes = padTypesFromOptions(options);
   const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? [
     "both",
-    "ghost",
-    "missed",
   ]);
   const enabledActivities = new Set<BoostPickupActivity>(options.activities ?? [
     "active",

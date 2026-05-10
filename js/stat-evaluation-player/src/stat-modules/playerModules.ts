@@ -20,8 +20,6 @@ import {
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
-import type { PlayerStatsSnapshot, StatsTimeline } from "../statsTimeline.ts";
-import { playerIdToString } from "../touchOverlay.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
   renderBackboardStats,
@@ -35,7 +33,6 @@ import {
   renderMustyFlickStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
-  type BoostPickupAuditCounts,
 } from "./renderers.ts";
 import {
   getStatsPlayerSnapshot,
@@ -43,40 +40,6 @@ import {
   type StatModule,
   type StatModuleRuntime,
 } from "./types.ts";
-
-function boostPickupAuditCountsForPlayer(
-  timeline: StatsTimeline,
-  player: PlayerStatsSnapshot,
-  frameNumber: number,
-): BoostPickupAuditCounts {
-  const playerId = playerIdToString(player.player_id);
-  const counts: BoostPickupAuditCounts = {
-    both: 0,
-    ghost: 0,
-    missed: 0,
-    inferredBig: 0,
-    inferredSmall: 0,
-    inferredAmbiguous: 0,
-  };
-
-  for (const event of timeline.events.boost_pickups) {
-    if (event.frame > frameNumber || playerIdToString(event.player_id) !== playerId) {
-      continue;
-    }
-    counts[event.comparison] += 1;
-    if (event.comparison === "both" || event.comparison === "missed") {
-      if (event.pad_type === "big") {
-        counts.inferredBig += 1;
-      } else if (event.pad_type === "small") {
-        counts.inferredSmall += 1;
-      } else {
-        counts.inferredAmbiguous += 1;
-      }
-    }
-  }
-
-  return counts;
-}
 
 export function createBoostModule(
   runtime: StatModuleRuntime,
@@ -122,10 +85,7 @@ export function createBoostModule(
       return statsFrame.players.map((player) => renderPlayerCard(
         player.name,
         player.is_team_0,
-        renderBoostStats(
-          player.boost,
-          boostPickupAuditCountsForPlayer(ctx.statsTimeline, player, statsFrame.frame_number),
-        ),
+        renderBoostStats(player.boost),
       )).join("");
     },
 
@@ -137,12 +97,7 @@ export function createBoostModule(
         frameIndex,
       );
 
-      return renderBoostStats(
-        player.boost,
-        statsFrame
-          ? boostPickupAuditCountsForPlayer(ctx.statsTimeline, player, statsFrame.frame_number)
-          : undefined,
-      );
+      return renderBoostStats(player.boost);
     },
 
     renderSettings(ctx) {

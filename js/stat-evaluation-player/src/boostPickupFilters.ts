@@ -47,9 +47,7 @@ const BOOST_PICKUP_PAD_TYPE_OPTIONS = [
 ] satisfies Array<BoostPickupFilterOption<BoostPickupPadType>>;
 
 const BOOST_PICKUP_COMPARISON_OPTIONS = [
-  { value: "both", label: "Matched pickups" },
-  { value: "ghost", label: "Ghost pickups" },
-  { value: "missed", label: "Missed pickups" },
+  { value: "both", label: "Pickup events" },
 ] satisfies Array<BoostPickupFilterOption<BoostPickupComparison>>;
 
 const BOOST_PICKUP_ACTIVITY_OPTIONS = [
@@ -85,7 +83,7 @@ export function getBoostPickupAnimationTimelineMatch(
     const reportedFrame = event.reported_frame ?? event.frame;
     return (
       playerId === pickup.player.id &&
-      event.comparison !== "missed" &&
+      event.comparison === "both" &&
       reportedFrame === pickup.event.frame &&
       isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
     );
@@ -374,12 +372,6 @@ export function createBoostPickupFilterController(
             BOOST_PICKUP_PAD_TYPE_OPTIONS,
             activePadTypes,
             "pad-type",
-          ),
-          createFilterGroup(
-            "Pickup label",
-            BOOST_PICKUP_COMPARISON_OPTIONS,
-            activeComparisons,
-            "comparison",
           ),
           createFilterGroup(
             "Activity",
