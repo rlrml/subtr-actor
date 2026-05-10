@@ -193,7 +193,7 @@ let recordingElapsed!: HTMLElement;
 let recordingSize!: HTMLElement;
 let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
-let statRegistry: StatDefinition[] = [];
+let statRegistry: StatDefinition[] = createStatRegistry(null);
 let nextWindowZIndex = 30;
 let nextStatsWindowId = 1;
 let boostPadOverlayEnabled = true;
@@ -1127,7 +1127,7 @@ function renderStatsWindowPickerList(
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
     empty.textContent = statRegistry.length === 0
-      ? "Load a replay before adding stats."
+      ? "No stats available."
       : "No matching stats.";
     list.append(empty);
   }
@@ -1784,7 +1784,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   timelineOverlay = null;
   statsTimeline = null;
   statsFrameLookup = null;
-  statRegistry = [];
+  statRegistry = createStatRegistry(null);
   clearTimelineEventSources();
   clearTimelineRangeSources();
   clearStandalonePlugins();
@@ -2067,7 +2067,7 @@ export function mountStatEvaluationPlayer(
     timelineOverlay = null;
     statsTimeline = null;
     statsFrameLookup = null;
-    statRegistry = [];
+    statRegistry = createStatRegistry(null);
     statsWindows.clear();
     clearTimelineEventSources();
     clearTimelineRangeSources();

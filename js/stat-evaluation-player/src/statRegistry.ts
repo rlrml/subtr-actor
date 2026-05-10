@@ -3,6 +3,10 @@ import type {
   StatsFrame,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
+import {
+  createPlayerStatsSnapshot,
+  createTeamStatsSnapshot,
+} from "./statsSnapshotFactories.ts";
 
 export type StatScopeKind = "player" | "team";
 
@@ -112,23 +116,37 @@ function uniqueDefinitions(definitions: StatDefinition[]): StatDefinition[] {
   });
 }
 
-export function createStatRegistry(frame: StatsFrame | null): StatDefinition[] {
-  if (!frame) {
-    return [];
-  }
-
+function createStatRegistryForTargets(
+  player: PlayerStatsSnapshot | null,
+  team: TeamStatsSnapshot | null,
+): StatDefinition[] {
   const definitions: StatDefinition[] = [];
-  const player = frame.players[0];
   if (player) {
     collectStatDefinitions(player, "player", [], definitions);
   }
-  if (frame.team_zero) {
-    collectStatDefinitions(frame.team_zero, "team", [], definitions);
-  } else if (frame.team_one) {
-    collectStatDefinitions(frame.team_one, "team", [], definitions);
+  if (team) {
+    collectStatDefinitions(team, "team", [], definitions);
   }
 
   return uniqueDefinitions(definitions).sort((left, right) =>
     left.label.localeCompare(right.label)
+  );
+}
+
+export function createDefaultStatRegistry(): StatDefinition[] {
+  return createStatRegistryForTargets(
+    createPlayerStatsSnapshot(),
+    createTeamStatsSnapshot(),
+  );
+}
+
+export function createStatRegistry(frame: StatsFrame | null): StatDefinition[] {
+  if (!frame) {
+    return createDefaultStatRegistry();
+  }
+
+  return createStatRegistryForTargets(
+    frame.players[0] ?? createPlayerStatsSnapshot(),
+    frame.team_zero ?? frame.team_one ?? createTeamStatsSnapshot(),
   );
 }
