@@ -118,7 +118,7 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
     let duplicate_pad_id = "VehiclePickup_Boost_TA_38";
     assert!(accepted_for_iced_space.iter().any(|pickup| {
         pickup.frame == 1960
-            && (pickup.time - 79.389732).abs() < 0.00001
+            && (pickup.time - 79.389_73).abs() < 0.00001
             && pickup.pad_id == duplicate_pad_id
             && pickup.sequence == 5
     }));
@@ -132,7 +132,7 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
         "frame 1996 should retain the real pickup and suppress the duplicate reported pad"
     );
     assert!(frame_1996_pickups.iter().any(|pickup| {
-        (pickup.time - 80.636200).abs() < 0.00001
+        (pickup.time - 80.636_2).abs() < 0.00001
             && pickup.pad_id == "VehiclePickup_Boost_TA_23"
             && pickup.sequence == 5
     }));
