@@ -67,7 +67,7 @@ impl StatsTimelineCollector {
             })
     }
 
-    fn into_timeline_result(self) -> SubtrActorResult<ReplayStatsTimeline> {
+    pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         let replay_meta = self
             .replay_meta
             .clone()
@@ -99,11 +99,11 @@ impl StatsTimelineCollector {
     ) -> SubtrActorResult<ReplayStatsTimeline> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
-        self.into_timeline_result()
+        self.into_replay_stats_timeline()
     }
 
     pub fn into_timeline(self) -> ReplayStatsTimeline {
-        self.into_timeline_result()
+        self.into_replay_stats_timeline()
             .expect("analysis-node timeline collector should build typed stats frames")
     }
 }

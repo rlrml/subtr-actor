@@ -3,7 +3,8 @@ use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector},
     collector::CallbackCollector,
     Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, ResolvedBoostPadCollector,
-    StatsCollector, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    StatsCollector, StatsTimelineCollector, SubtrActorError, SubtrActorErrorVariant,
+    SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
 
@@ -102,14 +103,6 @@ fn emit_stats_timeline_progress(callback: &Function, progress: f64) -> SubtrActo
     emit_stage_progress(callback, "stats-timeline", progress)
 }
 
-fn emit_building_stats_progress(
-    callback: &Function,
-    processed_frames: usize,
-    total_frames: usize,
-) -> SubtrActorResult<()> {
-    emit_progress(callback, "building-stats", processed_frames, total_frames)
-}
-
 fn collect_replay_data_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
@@ -165,7 +158,7 @@ fn collect_replay_bundle_with_optional_progress(
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut stats_collector = StatsCollector::new().capture_frames();
+    let mut stats_collector = StatsTimelineCollector::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -205,22 +198,13 @@ fn collect_replay_bundle_with_optional_progress(
             .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
 
-    let stats_timeline = match progress {
-        Some((callback, frame_interval)) => {
-            stats_collector
-                .into_snapshot_data()
-                .and_then(|snapshot_data| {
-                    snapshot_data.into_stats_timeline_with_progress(
-                        frame_interval,
-                        |processed_frames, total_frames| {
-                            emit_building_stats_progress(callback, processed_frames, total_frames)
-                        },
-                    )
-                })
-        }
-        None => stats_collector.into_replay_stats_timeline(),
+    let stats_timeline = stats_collector
+        .into_replay_stats_timeline()
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
+    if let Some((callback, _)) = progress {
+        emit_stage_progress(callback, "building-stats", 1.0)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
-    .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
 
     let replay_data = replay_data_collector
         .into_replay_data_with_boost_pads(processor, boost_pad_collector.into_resolved_boost_pads())
