@@ -85,8 +85,8 @@ function ensureStyles(): void {
     .sap-tl-shell {
       --sap-tl-thumb-size: 1.35rem;
       --sap-tl-track-height: 0.6rem;
-      --sap-tl-gutter-width: clamp(4.5rem, 10vw, 6.75rem);
-      --sap-tl-gutter-gap: 0.7rem;
+      --sap-tl-gutter-width: 2.25rem;
+      --sap-tl-gutter-gap: 0.55rem;
       --sap-tl-marker-offset: 1.05rem;
       position: absolute;
       left: 0.8rem;
@@ -156,9 +156,16 @@ function ensureStyles(): void {
     }
 
     .sap-tl-track-toggle {
-      width: 100%;
+      width: 2.15rem;
+      min-width: 2.15rem;
+      min-height: 2.15rem;
+      padding: 0;
+      gap: 0;
+    }
+
+    .sap-tl-toggle-label {
+      display: none;
       min-width: 0;
-      padding-inline: 0.55rem;
     }
 
     .sap-tl-toggle:hover {
@@ -1066,6 +1073,7 @@ export function createTimelineOverlayPlugin(
       toggleButtonIcon.setAttribute("aria-hidden", "true");
       toggleButtonIcon.textContent = ">";
       toggleButtonLabel = document.createElement("span");
+      toggleButtonLabel.className = "sap-tl-toggle-label";
       toggleButtonLabel.textContent = "Play";
       toggleButton.append(toggleButtonIcon, toggleButtonLabel);
       toggleButton.addEventListener("click", () => {
