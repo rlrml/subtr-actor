@@ -6,6 +6,17 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+- Add shareable stats player URL configuration.
+- Move boost pickup filters into the stats-player window controls and allow
+  stat selection before a replay is loaded.
+- Refine player and stats-player controls, including the launcher menu,
+  compact timeline controls, visualization controls, and boost pad glow assets.
+- Stop emitting stale or ghost boost pickup events.
+- Rename positioning role badges to depth and remove Rush timeline event
+  markers.
+- Require release metadata checks to verify that the current version has a
+  matching changelog entry before release automation runs.
+
 ## v0.6.0 - 2026-05-09
 
 - Rework the stats evaluation player into a compact movable-window UI with
@@ -60,6 +71,29 @@ README, or refactor-only commit.
   links and compressed `r=` replay URL links.
 - Improve stats replay loading progress and fixture handling in the viewer.
 - Refresh Rust, Python, and JavaScript release metadata to `0.4.0`.
+
+## v0.3.1 - 2026-03-20
+
+- Add backboard hit and double-tap stats to the stats pipeline and player UI.
+- Detect speed flips outside kickoff windows and reset speed-flip reducer state
+  outside live play.
+- Fix stats-player positioning metrics so they derive from accumulated stats.
+- Make JavaScript WASM package preparation idempotent and install Node.js in
+  GitHub Actions.
+- Refresh Rust, Python, and JavaScript release metadata to `0.3.1`.
+
+## v0.3.0 - 2026-03-19
+
+- Add musty flick, speed flip, Rush event, positioning range, and half-control
+  stats and timeline visualizations.
+- Unify shared stats summary cards and split large player and stats-player
+  modules for maintainability.
+- Bundle replay-loading progress with stats data and cache timeline projections
+  and stat renders for faster stats-player updates.
+- Fix kickoff boost average gating, initial boost state initialization, and
+  replay-start timeline control placement.
+- Move WASM builds to npm-managed `wasm-pack` and refresh release metadata to
+  `0.3.0`.
 
 ## v0.2.3 - 2026-03-19
 
@@ -161,6 +195,10 @@ README, or refactor-only commit.
 - Support the newer `ReplicatedBoost` replay format.
 - Allow spectator and non-playing actors by relaxing unconditional player-set checks.
 - Add CI workflow support for the newer release/binding flow.
+
+## v0.1.5 - 2023-06-17
+
+- Refresh release metadata for macro fixes in the early exported macro support.
 
 ## v0.1.4 / v0.1.3 / v0.1.2 - 2023-06
 
