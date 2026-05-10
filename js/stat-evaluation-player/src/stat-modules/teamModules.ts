@@ -6,7 +6,7 @@ import type { PossessionBreakdownClass } from "../possessionFormatting.ts";
 import { renderPressureStats } from "../pressureFormatting.ts";
 import { renderRushStats } from "../rushFormatting.ts";
 import { FiftyFiftyOverlay } from "../fiftyFiftyOverlay.ts";
-import { buildFiftyFiftyTimelineEvents, buildRushTimelineEvents } from "../timelineMarkers.ts";
+import { buildFiftyFiftyTimelineEvents } from "../timelineMarkers.ts";
 import {
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
@@ -331,10 +331,6 @@ export function createRushModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildRushTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
 
     getTimelineRanges(ctx) {
       return buildRushTimelineRanges(ctx.statsTimeline, ctx.replay);

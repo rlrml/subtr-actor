@@ -11,7 +11,6 @@ import {
   buildFiftyFiftyTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
-  buildRushTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   countEnabledTimelineEvents,
@@ -93,149 +92,6 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
       shortLabel: "50",
       isTeamZero: true,
       color: "#3b82f6",
-    },
-  ]);
-});
-
-test("buildRushTimelineEvents anchors rush markers to serialized rush event starts", () => {
-  const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-      { time: 3.5 },
-    ],
-  } as ReplayModel;
-
-  const statsTimeline = createLegacyStatsTimeline({
-    rush_events: [
-      {
-        start_time: 1.1,
-        start_frame: 1,
-        end_time: 1.9,
-        end_frame: 2,
-        is_team_0: true,
-        attackers: 2,
-        defenders: 1,
-      },
-      {
-        start_time: 2.1,
-        start_frame: 2,
-        end_time: 2.8,
-        end_frame: 3,
-        is_team_0: false,
-        attackers: 3,
-        defenders: 2,
-      },
-    ],
-    frames: [
-      {
-        frame_number: 1,
-        time: 1,
-        dt: 1,
-        team_zero: {
-          rush: {
-            count: 1,
-            two_v_one_count: 1,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 0,
-            three_v_three_count: 0,
-          },
-        },
-        team_one: {
-          rush: {
-            count: 0,
-            two_v_one_count: 0,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 0,
-            three_v_three_count: 0,
-          },
-        },
-        players: [],
-      },
-      {
-        frame_number: 2,
-        time: 2,
-        dt: 1,
-        team_zero: {
-          rush: {
-            count: 1,
-            two_v_one_count: 1,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 0,
-            three_v_three_count: 0,
-          },
-        },
-        team_one: {
-          rush: {
-            count: 1,
-            two_v_one_count: 0,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 1,
-            three_v_three_count: 0,
-          },
-        },
-        players: [],
-      },
-      {
-        frame_number: 3,
-        time: 3,
-        dt: 1,
-        team_zero: {
-          rush: {
-            count: 1,
-            two_v_one_count: 1,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 0,
-            three_v_three_count: 0,
-          },
-        },
-        team_one: {
-          rush: {
-            count: 1,
-            two_v_one_count: 0,
-            two_v_two_count: 0,
-            two_v_three_count: 0,
-            three_v_one_count: 0,
-            three_v_two_count: 1,
-            three_v_three_count: 0,
-          },
-        },
-        players: [],
-      },
-    ],
-  });
-
-  assert.deepEqual(buildRushTimelineEvents(statsTimeline, replay), [
-    {
-      id: "rush:1:team_zero:0:2v1",
-      time: 1.5,
-      frame: 1,
-      kind: "rush",
-      label: "Blue rush 2v1",
-      shortLabel: "2v1",
-      isTeamZero: true,
-      color: "#3b82f6",
-    },
-    {
-      id: "rush:2:team_one:0:3v2",
-      time: 2.25,
-      frame: 2,
-      kind: "rush",
-      label: "Orange rush 3v2",
-      shortLabel: "3v2",
-      isTeamZero: false,
-      color: "#f59e0b",
     },
   ]);
 });
@@ -913,7 +769,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   );
   assert.equal(
     countEnabledTimelineEvents(["core", "fifty-fifty", "rush"], replay, statsTimeline),
-    4,
+    3,
   );
   assert.equal(
     countEnabledTimelineEvents(
@@ -921,7 +777,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    5,
+    4,
   );
   assert.equal(
     countEnabledTimelineEvents(
@@ -929,7 +785,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    6,
+    5,
   );
   assert.equal(
     countEnabledTimelineEvents(
@@ -950,6 +806,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    13,
+    12,
   );
 });

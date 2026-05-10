@@ -641,7 +641,7 @@ function getCapabilityLabel(
   kind: ModuleCapabilityKind,
 ): string {
   const timelineLabels: Record<string, string> = {
-    "absolute-positioning:ranges": "Position zones timeline bands",
+    "absolute-positioning:ranges": "Position zones",
     "backboard:events": "Backboard",
     "ball-carry:events": "Ball carry",
     "boost:ranges": "Boost pickup timeline",
@@ -651,11 +651,10 @@ function getCapabilityLabel(
     "double-tap:events": "Double tap",
     "fifty-fifty:events": "50/50",
     "musty-flick:events": "Musty flick",
-    "possession:ranges": "Possession timeline bands",
+    "possession:ranges": "Possession",
     "powerslide:events": "Powerslide",
-    "pressure:ranges": "Half control timeline bands",
-    "rush:events": "Rush",
-    "rush:ranges": "Rush timeline bands",
+    "pressure:ranges": "Half control",
+    "rush:ranges": "Rush",
     "speed-flip:events": "Speed flip",
     "touch:events": "Touch",
   };
