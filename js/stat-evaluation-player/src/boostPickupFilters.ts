@@ -26,8 +26,7 @@ interface BoostPickupFilterRuntime {
 }
 
 interface BoostPickupFilterRenderOptions {
-  eyebrow: string;
-  title: string;
+  showHeader?: boolean;
 }
 
 export interface BoostPickupFilterController {
@@ -110,6 +109,7 @@ export function createBoostPickupFilterController(
 ): BoostPickupFilterController {
   let settingsEl: HTMLDivElement | null = null;
   let pickupReadoutEl: HTMLElement | null = null;
+  let playerGroupEl: HTMLDivElement | null = null;
   let playerOptionsEl: HTMLDivElement | null = null;
   let lastReplay: ReplayModel | null = null;
   let lastStatsTimeline: StatsTimeline | null = null;
@@ -134,14 +134,14 @@ export function createBoostPickupFilterController(
     filterKey: string,
   ): HTMLDivElement {
     const group = document.createElement("div");
-    group.className = "module-settings-subgroup";
+    group.className = "boost-pickup-filter-group";
 
     const groupTitle = document.createElement("p");
     groupTitle.className = "module-settings-group-title";
     groupTitle.textContent = title;
 
     const groupOptions = document.createElement("div");
-    groupOptions.className = "module-settings-options";
+    groupOptions.className = "boost-pickup-filter-options";
 
     for (const option of optionSpecs) {
       const optionLabel = document.createElement("label");
@@ -174,14 +174,15 @@ export function createBoostPickupFilterController(
 
   function createPlayerFilterGroup(): HTMLDivElement {
     const group = document.createElement("div");
-    group.className = "module-settings-subgroup";
+    group.className = "boost-pickup-filter-group boost-pickup-filter-group-wide";
+    playerGroupEl = group;
 
     const groupTitle = document.createElement("p");
     groupTitle.className = "module-settings-group-title";
     groupTitle.textContent = "Player";
 
     playerOptionsEl = document.createElement("div");
-    playerOptionsEl.className = "module-settings-options";
+    playerOptionsEl.className = "boost-pickup-filter-options";
 
     group.append(groupTitle, playerOptionsEl);
     return group;
@@ -193,6 +194,9 @@ export function createBoostPickupFilterController(
     }
 
     playerOptionsEl.replaceChildren();
+    if (playerGroupEl) {
+      playerGroupEl.hidden = !replay || replay.players.length === 0;
+    }
     if (!replay) {
       return;
     }
@@ -353,25 +357,18 @@ export function createBoostPickupFilterController(
     renderSettings(ctx, options) {
       if (!settingsEl) {
         settingsEl = document.createElement("div");
-        settingsEl.className = "module-settings-card";
+        settingsEl.className = "boost-pickup-filter-panel";
 
         const header = document.createElement("div");
-        header.className = "module-settings-header";
-
-        const text = document.createElement("div");
-        const eyebrow = document.createElement("p");
-        eyebrow.className = "module-settings-eyebrow";
-        eyebrow.textContent = options.eyebrow;
-        const title = document.createElement("h3");
-        title.textContent = options.title;
-        text.append(eyebrow, title);
+        header.className = "boost-pickup-filter-summary";
 
         pickupReadoutEl = document.createElement("strong");
         pickupReadoutEl.className = "metric-readout";
-        header.append(text, pickupReadoutEl);
+        header.append(pickupReadoutEl);
 
-        settingsEl.append(
-          header,
+        const grid = document.createElement("div");
+        grid.className = "boost-pickup-filter-grid";
+        grid.append(
           createFilterGroup(
             "Pad type",
             BOOST_PICKUP_PAD_TYPE_OPTIONS,
@@ -398,6 +395,11 @@ export function createBoostPickupFilterController(
           ),
           createPlayerFilterGroup(),
         );
+
+        if (options.showHeader ?? false) {
+          settingsEl.append(header);
+        }
+        settingsEl.append(grid);
       }
 
       rebuildPlayerOptions(ctx?.replay ?? null);

@@ -147,8 +147,7 @@ export function createBoostModule(
 
     renderSettings(ctx) {
       return pickupFilters.renderSettings(ctx, {
-        eyebrow: "Timeline",
-        title: "Boost pickup timeline",
+        showHeader: true,
       });
     },
   };

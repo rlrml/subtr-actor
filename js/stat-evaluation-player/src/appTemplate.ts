@@ -32,11 +32,8 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-create-stats-window="all-teams">New all teams stats</button>
               <button type="button" data-create-stats-window="ad-hoc">New ad hoc stats</button>
             </section>
-            <section class="launcher-section">
-              <h2>Timelines / overlays</h2>
-              <div class="module-groups" id="module-summary"></div>
-              <div id="module-settings" class="module-settings" hidden></div>
-            </section>
+            <div class="module-groups" id="module-summary"></div>
+            <div id="module-settings" class="module-settings" hidden></div>
           </div>
         </div>
 
@@ -48,8 +45,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           >
             <header class="floating-window-header">
               <div>
-                <p class="panel-eyebrow">Camera</p>
-                <h2>Replay camera</h2>
+                <h2>Camera</h2>
               </div>
               <button class="floating-window-hide" type="button" data-window-hide="camera">
                 Hide
@@ -230,11 +226,11 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           <section
             class="floating-window floating-window-playback"
             data-window-id="playback"
-            style="--window-x: calc(100vw - 28rem); --window-y: 4.25rem;"
+            hidden
+            style="--window-x: calc(100vw - 23rem); --window-y: 4.25rem;"
           >
             <header class="floating-window-header">
               <div>
-                <p class="panel-eyebrow">Transport</p>
                 <h2>Playback</h2>
               </div>
               <button class="floating-window-hide" type="button" data-window-hide="playback">
@@ -287,7 +283,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           >
             <header class="floating-window-header">
               <div>
-                <p class="panel-eyebrow">Capture</p>
                 <h2>Recording</h2>
               </div>
               <button class="floating-window-hide" type="button" data-window-hide="recording">
@@ -346,8 +341,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           >
             <header class="floating-window-header">
               <div>
-                <p class="panel-eyebrow">Boost pickups</p>
-                <h2>Filters</h2>
+                <h2>Boost pickup filters</h2>
               </div>
               <button class="floating-window-hide" type="button" data-window-hide="boost-pickups">
                 Hide

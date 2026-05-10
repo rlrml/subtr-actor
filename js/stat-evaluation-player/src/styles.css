@@ -73,14 +73,6 @@ input {
   min-height: 0;
 }
 
-.panel-eyebrow {
-  margin: 0 0 0.25rem;
-  font-size: 0.64rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #87afd4;
-}
-
 .panel h2,
 .stats-panel h2 {
   margin: 0;
@@ -271,10 +263,18 @@ input {
   width: min(26rem, calc(100vw - 1.6rem));
 }
 
-.floating-window-playback,
 .floating-window-recording {
   --window-x: calc(100vw - 27rem);
   width: min(26rem, calc(100vw - 1.6rem));
+}
+
+.floating-window-playback {
+  --window-x: calc(100vw - 23rem);
+  width: min(21rem, calc(100vw - 1.6rem));
+}
+
+.floating-window-boost-pickups {
+  width: min(34rem, calc(100vw - 1.6rem));
 }
 
 .floating-window-header,
@@ -298,7 +298,11 @@ input {
 .floating-window-header h2,
 .stats-window-header h2 {
   margin: 0;
-  font-size: 0.9rem;
+  color: #87afd4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .floating-window-hide,
@@ -999,6 +1003,48 @@ input[type="range"] {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #87afd4;
+}
+
+.boost-pickup-filter-panel {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.boost-pickup-filter-summary {
+  display: flex;
+  justify-content: end;
+}
+
+.boost-pickup-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.boost-pickup-filter-group {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.boost-pickup-filter-group[hidden] {
+  display: none;
+}
+
+.boost-pickup-filter-group-wide {
+  grid-column: 1 / -1;
+}
+
+.boost-pickup-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  min-width: 0;
+}
+
+.boost-pickup-filter-options .toggle {
+  min-width: 0;
 }
 
 .module-summary-item {

@@ -548,7 +548,7 @@ function renderModuleSummary(): void {
   moduleSummaryEl.replaceChildren();
 
   const timelineToggles: HTMLButtonElement[] = [];
-  const fieldOverlayToggles: HTMLButtonElement[] = [];
+  const inGameVisualizationToggles: HTMLButtonElement[] = [];
 
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -571,7 +571,7 @@ function renderModuleSummary(): void {
       ));
     }
     if (hasRenderEffect) {
-      fieldOverlayToggles.push(renderCapabilityToggle(
+      inGameVisualizationToggles.push(renderCapabilityToggle(
         mod.id,
         getCapabilityLabel(mod, "effects"),
         "effects",
@@ -593,11 +593,11 @@ function renderModuleSummary(): void {
     renderModuleSettings();
   });
   const boostName = document.createElement("span");
-  boostName.textContent = "Boost pickup field overlay";
+  boostName.textContent = "Boost pickup animation";
   const boostState = document.createElement("strong");
   boostState.textContent = boostAnimationActive ? "On" : "Off";
   boostAnimation.append(boostName, boostState);
-  fieldOverlayToggles.push(boostAnimation);
+  inGameVisualizationToggles.push(boostAnimation);
 
   const boostPadOverlay = document.createElement("button");
   boostPadOverlay.type = "button";
@@ -606,15 +606,15 @@ function renderModuleSummary(): void {
   boostPadOverlay.setAttribute("aria-pressed", boostPadOverlayEnabled ? "true" : "false");
   boostPadOverlay.addEventListener("click", toggleBoostPadOverlay);
   const boostPadName = document.createElement("span");
-  boostPadName.textContent = "Boost pads field overlay";
+  boostPadName.textContent = "Boost pad locations";
   const boostPadState = document.createElement("strong");
   boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
   boostPadOverlay.append(boostPadName, boostPadState);
-  fieldOverlayToggles.push(boostPadOverlay);
+  inGameVisualizationToggles.push(boostPadOverlay);
 
   moduleSummaryEl.append(
-    renderModuleSummaryGroup("Timeline effects", timelineToggles),
-    renderModuleSummaryGroup("Field overlays", fieldOverlayToggles),
+    renderModuleSummaryGroup("Timeline visualizations", timelineToggles),
+    renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles),
   );
 }
 
@@ -642,35 +642,35 @@ function getCapabilityLabel(
 ): string {
   const timelineLabels: Record<string, string> = {
     "absolute-positioning:ranges": "Position zones timeline bands",
-    "backboard:events": "Backboard timeline markers",
-    "ball-carry:events": "Ball carry timeline markers",
+    "backboard:events": "Backboard",
+    "ball-carry:events": "Ball carry",
     "boost:ranges": "Boost pickup timeline",
-    "ceiling-shot:events": "Ceiling shot timeline markers",
-    "demo:events": "Demo timeline markers",
-    "dodge-reset:events": "Dodge reset timeline markers",
-    "double-tap:events": "Double tap timeline markers",
-    "fifty-fifty:events": "50/50 timeline markers",
-    "musty-flick:events": "Musty flick timeline markers",
+    "ceiling-shot:events": "Ceiling shot",
+    "demo:events": "Demo",
+    "dodge-reset:events": "Dodge reset",
+    "double-tap:events": "Double tap",
+    "fifty-fifty:events": "50/50",
+    "musty-flick:events": "Musty flick",
     "possession:ranges": "Possession timeline bands",
-    "powerslide:events": "Powerslide timeline markers",
+    "powerslide:events": "Powerslide",
     "pressure:ranges": "Half control timeline bands",
-    "rush:events": "Rush timeline markers",
+    "rush:events": "Rush",
     "rush:ranges": "Rush timeline bands",
-    "speed-flip:events": "Speed flip timeline markers",
-    "touch:events": "Touch timeline markers",
+    "speed-flip:events": "Speed flip",
+    "touch:events": "Touch",
   };
-  const fieldOverlayLabels: Record<string, string> = {
-    "absolute-positioning": "Position zones field overlay",
-    "ceiling-shot": "Ceiling shot field overlay",
-    "fifty-fifty": "50/50 field overlay",
-    pressure: "Half control field overlay",
-    "relative-positioning": "Player role field overlay",
-    "speed-flip": "Speed flip field overlay",
-    touch: "Touch field overlay",
+  const inGameVisualizationLabels: Record<string, string> = {
+    "absolute-positioning": "Position zones",
+    "ceiling-shot": "Ceiling shot labels",
+    "fifty-fifty": "50/50 labels",
+    pressure: "Half control",
+    "relative-positioning": "Player roles",
+    "speed-flip": "Speed flip labels",
+    touch: "Touch labels",
   };
 
   if (kind === "effects") {
-    return fieldOverlayLabels[mod.id] ?? `${mod.label} field overlay`;
+    return inGameVisualizationLabels[mod.id] ?? mod.label;
   }
 
   return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
@@ -729,8 +729,7 @@ function renderBoostPickupFiltersWindow(): void {
 
   const ctx = getModuleContext();
   const panel = boostPickupFilters.renderSettings(ctx, {
-    eyebrow: "Timeline / Field overlay",
-    title: "Boost pickup filters",
+    showHeader: false,
   });
   boostPickupFiltersWindowBody.replaceChildren(panel);
 }
