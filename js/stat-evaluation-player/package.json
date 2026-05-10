@@ -34,6 +34,7 @@
     "check": "../scripts/with-clean-npm-env.sh node --run=verify:stats-types && tsc --noEmit",
     "check:tsc": "tsc --noEmit",
     "test": "tsx --tsconfig tsconfig.test.json --test src/*.test.ts",
+    "bench:load": "node ./scripts/benchmark-replay-load.mjs",
     "build:types": "tsc --project tsconfig.build.json",
     "build": "../scripts/with-clean-npm-env.sh node --run=build:bindings && ../scripts/with-clean-npm-env.sh node --run=build:player && ../scripts/with-clean-npm-env.sh node --run=check && vite build && ../scripts/with-clean-npm-env.sh node --run=build:types",
     "build:site": "../scripts/with-clean-npm-env.sh node --run=check:tsc && vite build --mode site",

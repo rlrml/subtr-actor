@@ -349,8 +349,8 @@ function createNormalizationProgressTracker(
         return false;
       }
       completedUnits = Math.min(totalUnits, completedUnits + units);
-      const shouldYieldForReport = maybeReport();
-      return shouldYield(shouldYieldForReport);
+      maybeReport();
+      return shouldYield();
     },
     advanceFrame(units = 1) {
       if (units <= 0) {
@@ -358,8 +358,8 @@ function createNormalizationProgressTracker(
       }
       completedFrameUnits = Math.min(totalFrameUnits, completedFrameUnits + units);
       completedUnits = Math.min(totalUnits, completedUnits + units);
-      const shouldYieldForReport = maybeReport();
-      return shouldYield(shouldYieldForReport);
+      maybeReport();
+      return shouldYield();
     },
     finish() {
       completedUnits = totalUnits;
