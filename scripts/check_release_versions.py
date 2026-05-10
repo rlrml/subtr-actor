@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+CHANGELOG = ROOT / "docs" / "CHANGELOG.md"
 
 
 def load_toml(path: str) -> dict:
@@ -28,6 +29,16 @@ def load_lock_versions() -> dict[str, str]:
         if name in {"subtr-actor", "subtr-actor-py", "rl-replay-subtr-actor"}:
             packages[name] = version
     return packages
+
+
+def changelog_has_release_entry(version: str) -> bool:
+    normalized = version.removeprefix("v")
+    text = CHANGELOG.read_text()
+    heading_pattern = re.compile(
+        rf"^## v{re.escape(normalized)}(?:\s+-\s+.+)?$",
+        re.MULTILINE,
+    )
+    return heading_pattern.search(text) is not None
 
 
 def main() -> int:
@@ -65,6 +76,13 @@ def main() -> int:
         print("Release version metadata is inconsistent.", file=sys.stderr)
         for mismatch in mismatches:
             print(f"- {mismatch}", file=sys.stderr)
+        return 1
+
+    if not changelog_has_release_entry(expected):
+        print(
+            f"docs/CHANGELOG.md is missing a release section for v{expected}.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Release version metadata is consistent at {expected}.")

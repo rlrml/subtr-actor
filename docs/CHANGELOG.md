@@ -6,6 +6,19 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.0 - 2026-05-09
+
+- Rework the stats evaluation player into a compact movable-window UI with
+  cleaner overlay controls, grouped timeline effect toggles, editable stats
+  windows during playback, and literal-token stat picker search.
+- Add configurable follow camera behavior and a reusable canvas recording
+  plugin for replay viewport capture.
+- Improve boost pickup analysis and visualization, including corrected counts
+  near final goals, filterable boost pickup count animation, and visible
+  skipped timeline ranges.
+- Report progress while building stats snapshots.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.0`.
+
 ## v0.5.3 - 2026-05-08
 
 - Fix the stats evaluation player npm smoke-install fixture so it includes the
