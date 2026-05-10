@@ -6,6 +6,17 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.2 - 2026-05-10
+
+- Improve stats timeline bundle performance by building typed stats timeline
+  data directly in the WASM replay bundle.
+- Keep player replay normalization from forcing extra progress-yield work.
+- Reduce stats timeline payload size by omitting zero-valued labeled timeline
+  buckets while preserving semantic comparisons in Rust coverage.
+- Make the web package build repeatable and address CI clippy, Pages build, and
+  sparse-breakdown test failures from the release candidate path.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.2`.
+
 ## v0.6.1 - 2026-05-10
 
 - Add shareable stats player URL configuration.
