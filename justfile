@@ -21,6 +21,10 @@ build-python:
 build-js:
     npm --prefix js exec wasm-pack -- build --target bundler
 
+# Run the stats evaluation player dev server
+dev-stats:
+    cd js/stat-evaluation-player && npm run dev
+
 # Run tests
 test:
     {{nix_develop}} cargo test
