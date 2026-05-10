@@ -61,14 +61,14 @@ function padLightCenterZ(pad: ReplayBoostPad): number {
   if (pad.size === "big") {
     return padOrbCenterZ(pad);
   }
-  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(5);
+  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(1.2);
 }
 
 function padGlowCenterZ(pad: ReplayBoostPad): number {
   if (pad.size === "big") {
     return padOrbCenterZ(pad);
   }
-  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(6);
+  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(0.8);
 }
 
 function padColor(pad: ReplayBoostPad): number {
