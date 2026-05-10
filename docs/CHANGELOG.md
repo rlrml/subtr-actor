@@ -6,6 +6,8 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.1 - 2026-05-10
+
 - Add shareable stats player URL configuration.
 - Move boost pickup filters into the stats-player window controls and allow
   stat selection before a replay is loaded.
@@ -16,6 +18,9 @@ README, or refactor-only commit.
   markers.
 - Require release metadata checks to verify that the current version has a
   matching changelog entry before release automation runs.
+- Add the 2025 RLCS Worlds grand final Team Falcons vs NRG game 5 replay and
+  Ballchasing metadata as a comparison fixture.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.1`.
 
 ## v0.6.0 - 2026-05-09
 
