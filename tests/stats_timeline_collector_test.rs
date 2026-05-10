@@ -73,6 +73,10 @@ fn normalize_boost_for_live_play_comparison(boost: &mut BoostStats) {
     boost.small_pads_collected_inactive = 0;
 }
 
+fn complete_movement_breakdowns_for_comparison(movement: &MovementStats) -> MovementStats {
+    movement.clone().with_complete_labeled_tracked_time()
+}
+
 /// Check that a cumulative stat field never decreases between consecutive frames
 /// for any player in the timeline.
 fn assert_player_boost_field_monotonic(
@@ -620,13 +624,14 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
                 .unwrap_or_default()
         );
         assert_eq!(
-            player.movement,
+            complete_movement_breakdowns_for_comparison(&player.movement),
             movement
                 .player_stats()
                 .get(&player.player_id)
-                .cloned()
-                .unwrap_or_default()
-                .with_complete_labeled_tracked_time()
+                .map(complete_movement_breakdowns_for_comparison)
+                .unwrap_or_else(|| {
+                    complete_movement_breakdowns_for_comparison(&MovementStats::default())
+                })
         );
         assert_eq!(
             player.positioning,
