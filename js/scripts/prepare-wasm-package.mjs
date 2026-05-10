@@ -8,7 +8,18 @@ const sourcePackagePath = path.resolve(jsDir, "package.json");
 const generatedPackagePath = path.resolve(jsDir, "pkg", "package.json");
 
 const sourcePackage = JSON.parse(await readFile(sourcePackagePath, "utf8"));
-const generatedPackage = JSON.parse(await readFile(generatedPackagePath, "utf8"));
+async function readGeneratedPackage() {
+  try {
+    return JSON.parse(await readFile(generatedPackagePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+const generatedPackage = await readGeneratedPackage();
 
 // wasm-pack re-reads pkg/package.json on subsequent builds and expects a few
 // metadata fields in the string forms it writes itself. Normalize the fields
@@ -17,6 +28,7 @@ delete generatedPackage.collaborators;
 generatedPackage.name = sourcePackage.name;
 generatedPackage.version = sourcePackage.version;
 generatedPackage.description = sourcePackage.description;
+generatedPackage.type = "module";
 generatedPackage.repository =
   typeof sourcePackage.repository === "string"
     ? sourcePackage.repository
@@ -24,6 +36,14 @@ generatedPackage.repository =
 generatedPackage.keywords = sourcePackage.keywords;
 generatedPackage.author = sourcePackage.author;
 generatedPackage.license = sourcePackage.license;
+generatedPackage.files = [
+  "rl_replay_subtr_actor_bg.wasm",
+  "rl_replay_subtr_actor.js",
+  "rl_replay_subtr_actor.d.ts",
+];
+generatedPackage.main = "rl_replay_subtr_actor.js";
+generatedPackage.types = "rl_replay_subtr_actor.d.ts";
+generatedPackage.sideEffects = ["./snippets/*"];
 generatedPackage.publishConfig = { access: "public" };
 
 await writeFile(

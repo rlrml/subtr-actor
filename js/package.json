@@ -5,7 +5,7 @@
   "main": "pkg/rl_replay_subtr_actor.js",
   "types": "pkg/rl_replay_subtr_actor.d.ts",
   "scripts": {
-    "build": "npm exec -- wasm-pack build --target web --out-dir pkg && node ./scripts/prepare-wasm-package.mjs",
+    "build": "npm exec -- wasm-pack build --target web --out-dir pkg --no-pack && node ./scripts/prepare-wasm-package.mjs",
     "build:nodejs": "npm exec -- wasm-pack build --target nodejs --out-dir pkg-node",
     "build:bundler": "npm exec -- wasm-pack build --target bundler --out-dir pkg-bundler",
     "test": "npm exec -- wasm-pack test --headless --firefox",
