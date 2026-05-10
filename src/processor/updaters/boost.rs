@@ -1,5 +1,10 @@
 use super::*;
 
+// Replay pickup sequence values are not globally unique; a pad can reuse the
+// same sequence value after a real respawn. Keep this bounded by the minimum
+// pad respawn time so we suppress only impossible stale replication repeats.
+const MIN_BOOST_PAD_RESPAWN_SECONDS: f32 = 4.0;
+
 impl<'a> ReplayProcessor<'a> {
     /// Updates derived boost amounts for each boost component actor in the current frame.
     pub(crate) fn update_boost_amounts(
@@ -176,6 +181,20 @@ impl<'a> ReplayProcessor<'a> {
             .unwrap_or(false)
     }
 
+    fn boost_pad_pickup_sequence_is_recent(
+        &self,
+        pad_id: &str,
+        sequence: u8,
+        event_time: f32,
+    ) -> bool {
+        self.boost_pad_pickup_sequence_times
+            .get(&(pad_id.to_owned(), sequence))
+            .is_some_and(|last_time| {
+                let elapsed = event_time - *last_time;
+                (0.0..MIN_BOOST_PAD_RESPAWN_SECONDS).contains(&elapsed)
+            })
+    }
+
     fn get_actor_instance_name(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<String> {
         let state = self.get_actor_state_or_recently_deleted(actor_id)?;
         if let Some(name_id) = state.name_id {
@@ -265,6 +284,16 @@ impl<'a> ReplayProcessor<'a> {
             }) else {
                 continue;
             };
+
+            if let BoostPadEventKind::PickedUp { sequence } = event.kind {
+                // The same pad/sequence can be legitimate later in the match
+                // after the pad respawns, so this check must stay time-bounded.
+                if self.boost_pad_pickup_sequence_is_recent(&event.pad_id, sequence, event.time) {
+                    continue;
+                }
+                self.boost_pad_pickup_sequence_times
+                    .insert((event.pad_id.clone(), sequence), event.time);
+            }
 
             self.current_frame_boost_pad_events.push(event.clone());
             self.boost_pad_events.push(event);
