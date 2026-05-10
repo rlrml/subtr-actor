@@ -113,7 +113,6 @@
 //! println!("rush events: {}", timeline.events.rush.len());
 //! ```
 
-pub mod ballchasing;
 pub mod collector;
 pub mod constants;
 pub mod error;

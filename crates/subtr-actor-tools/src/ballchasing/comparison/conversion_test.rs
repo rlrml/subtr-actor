@@ -2,7 +2,11 @@ use super::{
     build_actual_comparable_stats, compute_comparable_stats, raw_boost_amount_as_comparable_units,
     ComputedComparableStats,
 };
-use crate::*;
+use subtr_actor::*;
+
+fn workspace_asset_path(path: &str) -> String {
+    format!("{}/../../assets/{path}", env!("CARGO_MANIFEST_DIR"))
+}
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
@@ -64,7 +68,7 @@ fn test_raw_boost_amount_conversion_matches_percent_scale() {
 
 #[test]
 fn comparable_stats_collector_matches_reference_bundle() {
-    let replay = parse_replay("assets/new_boost_format.replay");
+    let replay = parse_replay(&workspace_asset_path("new_boost_format.replay"));
     let combined_start = std::time::Instant::now();
     let combined =
         compute_comparable_stats(&replay).expect("combined comparable stats should succeed");

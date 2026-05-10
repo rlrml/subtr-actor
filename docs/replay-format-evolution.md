@@ -177,7 +177,7 @@ The main practical rule is: normalize by semantic field, not by Rust type.
 
 The local probe binary is:
 
-`cargo run --bin replay_probe -- <metadata|plausibility|legacy-rotation|demolition|vector-ranges> <replay-path>`
+`cargo run -p subtr-actor-tools --bin replay_probe -- <metadata|plausibility|legacy-rotation|demolition|vector-ranges> <replay-path>`
 
 The useful checks are:
 

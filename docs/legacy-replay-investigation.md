@@ -5,7 +5,7 @@ normalization rules.
 
 The local probe entrypoint for these experiments is:
 
-`cargo run --bin replay_probe -- <metadata|plausibility|legacy-rotation|demolition|vector-ranges> <replay-path>`
+`cargo run -p subtr-actor-tools --bin replay_probe -- <metadata|plausibility|legacy-rotation|demolition|vector-ranges> <replay-path>`
 
 ### Version fields
 

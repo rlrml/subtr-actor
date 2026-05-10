@@ -1147,7 +1147,6 @@ dependencies = [
  "log",
  "ndarray",
  "paste",
- "reqwest",
  "serde",
  "serde_json",
  "thiserror",
@@ -1161,6 +1160,21 @@ dependencies = [
  "boxcars",
  "numpy",
  "pyo3",
+ "serde_json",
+ "subtr-actor",
+]
+
+[[package]]
+name = "subtr-actor-tools"
+version = "0.6.2"
+dependencies = [
+ "anyhow",
+ "boxcars",
+ "float-ord",
+ "glam",
+ "ndarray",
+ "reqwest",
+ "serde",
  "serde_json",
  "subtr-actor",
 ]

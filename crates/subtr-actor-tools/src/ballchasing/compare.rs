@@ -9,7 +9,7 @@ use super::comparison::{
     MatchConfig, StatMatcher,
 };
 use super::report::BallchasingComparisonReport;
-use crate::*;
+use subtr_actor::*;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct BallchasingComparableStats {

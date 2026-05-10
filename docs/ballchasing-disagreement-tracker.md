@@ -14,8 +14,8 @@ This is not a proof that Ballchasing is correct. It is a debugging map:
 
 Current notes are based on:
 
-- the shared comparison code in [`src/ballchasing.rs`](src/ballchasing.rs)
-- recent live comparisons run with [`src/bin/ballchasing_compare.rs`](src/bin/ballchasing_compare.rs)
+- the shared comparison code in [`crates/subtr-actor-tools/src/ballchasing/`](../crates/subtr-actor-tools/src/ballchasing/)
+- recent live comparisons run with [`crates/subtr-actor-tools/src/bin/ballchasing_compare.rs`](../crates/subtr-actor-tools/src/bin/ballchasing_compare.rs)
 - a small sample of 4 recent ranked-doubles replays from Ballchasing
 
 Sample replay ids used for the qualitative mismatch patterns below:
@@ -35,7 +35,7 @@ These are the important places where we are making an explicit semantic choice.
 | --- | --- | --- | --- |
 | Live-play gating | Exclude kickoff countdown and goal-scored replay states from time-based stats | `LivePlayState` / `LivePlayNode` | No |
 | Boost pickup gating | Ignore non-live `PickedUp` events by default; configurable opt-in exists | `BoostCalculatorConfig` | No |
-| Boost scale | Comparison normalizes raw replay boost `0..255` into Ballchasing-style `0..100` units | [`src/ballchasing.rs`](src/ballchasing.rs) | Ballchasing appears to use `0..100`-style reporting |
+| Boost scale | Comparison normalizes raw replay boost `0..255` into Ballchasing-style `0..100` units | [`crates/subtr-actor-tools/src/ballchasing/`](../crates/subtr-actor-tools/src/ballchasing/) | Ballchasing appears to use `0..100`-style reporting |
 | Small pad amount | `12%` of full boost | [`SMALL_PAD_AMOUNT_RAW`](src/stats.rs) | Probably yes |
 | Pad size inference | Infer size from observed respawn cadence using `>= 7s` => big | `BoostCalculator` | Unknown |
 | Canonical pad matching radius | Match standard soccar pads within `400uu` | [`STANDARD_PAD_MATCH_RADIUS`](src/stats.rs) | Unknown |

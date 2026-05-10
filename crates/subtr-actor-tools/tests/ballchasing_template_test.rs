@@ -14,9 +14,9 @@ macro_rules! ballchasing_fixture_test {
         #[test]
         #[ignore = "Ballchasing fixtures are opt-in and should be enabled fixture-by-fixture"]
         fn $test_name() {
-            let report = subtr_actor::ballchasing::compare_fixture_directory(
-                std::path::Path::new(concat!("assets/", $fixture_dir)),
-                &subtr_actor::ballchasing::recommended_match_config(),
+            let report = subtr_actor_tools::ballchasing::compare_fixture_directory(
+                &asset_path($fixture_dir),
+                &subtr_actor_tools::ballchasing::recommended_match_config(),
             )
             .expect("Failed to compare Ballchasing fixture");
             report.assert_matches();
@@ -39,13 +39,21 @@ ballchasing_fixture_test!(
     "recent-ranked-standard-2026-03-10-b"
 );
 
+fn asset_path(path: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../assets")
+        .join(path)
+}
+
 fn parse_replay(path: &str) -> boxcars::Replay {
-    let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
+    let path = asset_path(path);
+    let data = std::fs::read(&path)
+        .unwrap_or_else(|_| panic!("Failed to read replay file: {}", path.display()));
     boxcars::ParserBuilder::new(&data)
         .must_parse_network_data()
         .always_check_crc()
         .parse()
-        .unwrap_or_else(|_| panic!("Failed to parse replay file: {path}"))
+        .unwrap_or_else(|_| panic!("Failed to parse replay file: {}", path.display()))
 }
 
 fn json_u32(value: &Value, path: &str) -> u32 {
@@ -147,10 +155,12 @@ fn assert_inactive_inclusive_big_pad_counts_match_ballchasing(
 
 #[test]
 fn problematic_private_duel_big_pad_counts_match_ballchasing_with_inactive_pickups() {
-    let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
+    let replay = parse_replay("problematic-private-duel-2026-03-20.replay");
     let ballchasing: Value = serde_json::from_slice(
-        &std::fs::read("assets/problematic-private-duel-2026-03-20.ballchasing.json")
-            .expect("Failed to read Ballchasing JSON fixture"),
+        &std::fs::read(asset_path(
+            "problematic-private-duel-2026-03-20.ballchasing.json",
+        ))
+        .expect("Failed to read Ballchasing JSON fixture"),
     )
     .expect("Failed to parse Ballchasing JSON fixture");
     let replay_meta = ReplayProcessor::new(&replay)
@@ -187,9 +197,9 @@ fn describe_ballchasing_fixture_team_pad_count_deltas_with_inactive_pickups() {
         "recent-ranked-standard-2026-03-10-a",
         "recent-ranked-standard-2026-03-10-b",
     ] {
-        let replay = parse_replay(&format!("assets/{fixture_name}.replay"));
+        let replay = parse_replay(&format!("{fixture_name}.replay"));
         let ballchasing: Value = serde_json::from_slice(
-            &std::fs::read(format!("assets/{fixture_name}.ballchasing.json"))
+            &std::fs::read(asset_path(&format!("{fixture_name}.ballchasing.json")))
                 .unwrap_or_else(|_| panic!("Failed to read Ballchasing JSON for {fixture_name}")),
         )
         .unwrap_or_else(|_| panic!("Failed to parse Ballchasing JSON for {fixture_name}"));
@@ -302,7 +312,7 @@ impl Collector for PickupSequenceReportCollector {
 #[test]
 #[ignore = "Diagnostic output for repeated boost pickup (pad_id, sequence) keys in the problematic replay."]
 fn describe_problematic_private_duel_repeated_boost_pickup_sequences() {
-    let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
+    let replay = parse_replay("problematic-private-duel-2026-03-20.replay");
     let report = PickupSequenceReportCollector::default()
         .process_replay(&replay)
         .expect("Expected replay processing to produce sequence report");
@@ -468,7 +478,7 @@ impl Collector for BoostIncreaseReportCollector {
 #[test]
 #[ignore = "Diagnostic output for boost-level increases in the problematic replay."]
 fn describe_problematic_private_duel_boost_increase_candidates() {
-    let replay = parse_replay("assets/problematic-private-duel-2026-03-20.replay");
+    let replay = parse_replay("problematic-private-duel-2026-03-20.replay");
     let report = BoostIncreaseReportCollector::default()
         .process_replay(&replay)
         .expect("Expected replay processing to produce boost increase report");

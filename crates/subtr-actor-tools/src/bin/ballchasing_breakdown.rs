@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde::Serialize;
 use serde_json::Value;
-use subtr_actor::ballchasing::{
+use subtr_actor_tools::ballchasing::{
     compare_replay_against_ballchasing_json_with_breakdown, recommended_match_config,
 };
 
