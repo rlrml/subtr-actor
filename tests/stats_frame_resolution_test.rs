@@ -1,6 +1,9 @@
 mod common;
 
-use subtr_actor::{StatsCollector, StatsFrameResolution, StatsTimelineCollector};
+use subtr_actor::{
+    PlayerStatsSnapshot, ReplayStatsTimeline, StatsCollector, StatsFrameResolution,
+    StatsTimelineCollector,
+};
 
 #[test]
 fn stats_collector_default_resolution_matches_every_frame() {
@@ -31,10 +34,11 @@ fn stats_collector_and_timeline_collector_match_at_sampled_resolution() {
         .with_frame_resolution(resolution)
         .get_replay_stats_timeline(&replay)
         .expect("sampled stats collector timeline should build");
-    let sampled_timeline_collector = StatsTimelineCollector::new()
+    let mut sampled_timeline_collector = StatsTimelineCollector::new()
         .with_frame_resolution(resolution)
         .get_replay_data(&replay)
         .expect("sampled stats timeline collector should build");
+    complete_sparse_player_breakdowns(&mut sampled_timeline_collector);
 
     common::assert_replay_stats_timeline_eq(
         &sampled_collector_timeline,
@@ -86,4 +90,17 @@ fn stats_collector_and_timeline_collector_match_at_sampled_resolution() {
             expected_dt,
         );
     }
+}
+
+fn complete_sparse_player_breakdowns(timeline: &mut ReplayStatsTimeline) {
+    for frame in &mut timeline.frames {
+        for player in &mut frame.players {
+            complete_player_breakdowns(player);
+        }
+    }
+}
+
+fn complete_player_breakdowns(player: &mut PlayerStatsSnapshot) {
+    player.touch = player.touch.clone().with_complete_labeled_touch_counts();
+    player.movement = player.movement.clone().with_complete_labeled_tracked_time();
 }
