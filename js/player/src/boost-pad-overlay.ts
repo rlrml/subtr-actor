@@ -57,10 +57,6 @@ function padOrbCenterZ(pad: ReplayBoostPad): number {
   );
 }
 
-function padSmallLightBeamHeight(): number {
-  return scaledPadDimension(105);
-}
-
 function padLightCenterZ(pad: ReplayBoostPad): number {
   if (pad.size === "big") {
     return padOrbCenterZ(pad);
@@ -72,11 +68,7 @@ function padGlowCenterZ(pad: ReplayBoostPad): number {
   if (pad.size === "big") {
     return padOrbCenterZ(pad);
   }
-  return (
-    PAD_SURFACE_Z_OFFSET +
-    scaledPadDimension(4) +
-    padSmallLightBeamHeight() / 2
-  );
+  return PAD_SURFACE_Z_OFFSET + scaledPadDimension(6);
 }
 
 function padColor(pad: ReplayBoostPad): number {
@@ -173,13 +165,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
   const glow = new THREE.Mesh(
     isBigPad
       ? new THREE.SphereGeometry(orbRadius * 1.36, 32, 14)
-      : new THREE.ConeGeometry(
-          orbRadius * 0.82,
-          padSmallLightBeamHeight(),
-          28,
-          1,
-          true
-        ),
+      : new THREE.CircleGeometry(orbRadius * 1.35, 28),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -190,9 +176,6 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
     })
   );
   glow.position.z = padGlowCenterZ(pad);
-  if (!isBigPad) {
-    glow.rotation.x = Math.PI / 2;
-  }
   glow.renderOrder = 24;
   glow.frustumCulled = false;
   group.add(glow);
