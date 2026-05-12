@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
+      "subtr-actor-player": ["../player/src/lib.ts"],
+      "subtr-actor-player/generated/*": ["../player/src/generated/*"],
+      "three": ["../stat-evaluation-player/node_modules/@types/three/index.d.ts"],
+      "three/examples/jsm/*": ["../stat-evaluation-player/node_modules/@types/three/examples/jsm/*"]
+    },
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

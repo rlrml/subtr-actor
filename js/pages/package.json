@@ -1,0 +1,21 @@
+{
+  "name": "subtr-actor-pages",
+  "version": "0.6.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "../stat-evaluation-player/node_modules/.bin/tsc --noEmit",
+    "build": "../scripts/with-clean-npm-env.sh node --run=check && ../stat-evaluation-player/node_modules/.bin/vite build",
+    "dev": "../stat-evaluation-player/node_modules/.bin/vite"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/three": "^0.180.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vite-plugin-wasm": "^3.6.0"
+  }
+}

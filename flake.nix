@@ -108,7 +108,7 @@
           dontCargoInstall = true;
         };
         packages.js-stats-player-pages = pkgs.buildNpmPackage rec {
-          pname = "subtr-actor-js-stats-player-pages";
+          pname = "subtr-actor-js-pages";
           version = "0.6.2";
           src = ./.;
           npmRoot = "js/stat-evaluation-player";
@@ -127,6 +127,9 @@
             pushd js/stat-evaluation-player
             npm run build:site
             popd
+            pushd js/pages
+            ../scripts/with-clean-npm-env.sh npm run build
+            popd
             runHook postBuild
           '';
 
@@ -134,6 +137,8 @@
             runHook preInstall
             mkdir -p $out
             cp -r js/stat-evaluation-player/dist/. $out/
+            mkdir -p $out/stats
+            cp -r js/pages/dist/. $out/stats/
             runHook postInstall
           '';
         };
