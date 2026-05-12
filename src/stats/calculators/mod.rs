@@ -68,6 +68,8 @@ pub mod touch;
 pub use touch::*;
 pub mod touch_state;
 pub use touch_state::*;
+pub mod whiff;
+pub use whiff::*;
 
 fn interval_fraction_in_scalar_range(start: f32, end: f32, min_value: f32, max_value: f32) -> f32 {
     if (end - start).abs() <= f32::EPSILON {

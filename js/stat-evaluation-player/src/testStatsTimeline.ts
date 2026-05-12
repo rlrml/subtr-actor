@@ -25,6 +25,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     fifty_fifty: [],
     rush: [],
     speed_flip: [],
+    whiff: [],
     boost_pickups: [],
   }, overrides);
 }
@@ -33,6 +34,12 @@ export function createTouchStats(
   overrides?: DeepPartial<PlayerStatsSnapshot["touch"]>,
 ): PlayerStatsSnapshot["touch"] {
   return createPlayerStatsSnapshot({ touch: overrides }).touch;
+}
+
+export function createWhiffStats(
+  overrides?: DeepPartial<PlayerStatsSnapshot["whiff"]>,
+): PlayerStatsSnapshot["whiff"] {
+  return createPlayerStatsSnapshot({ whiff: overrides }).whiff;
 }
 
 export function createPositioningStats(
@@ -95,6 +102,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
   fifty_fifty_events?: StatsEvents["fifty_fifty"];
   rush_events?: StatsEvents["rush"];
   speed_flip_events?: StatsEvents["speed_flip"];
+  whiff_events?: StatsEvents["whiff"];
   boost_pickups?: StatsEvents["boost_pickups"];
 } = {}): StatsTimeline {
   return createStatsTimeline({
@@ -108,6 +116,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
+      whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
     },
   });

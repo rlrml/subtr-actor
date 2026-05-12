@@ -40,6 +40,7 @@ pub struct ReplayStatsTimelineEvents {
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
+    pub whiff: Vec<WhiffEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
 }
 
@@ -89,6 +90,7 @@ pub struct PlayerStatsSnapshot {
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
     pub touch: TouchStats,
+    pub whiff: WhiffStats,
     pub musty_flick: MustyFlickStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,

@@ -6,7 +6,7 @@ use crate::stats::calculators::{
     GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
     PlayerFrameState, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
     PossessionState, PowerslideCalculator, PressureCalculator, RushCalculator, SpeedFlipCalculator,
-    TouchCalculator, TouchState,
+    TouchCalculator, TouchState, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -41,6 +41,7 @@ pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
 pub(crate) mod touch;
 pub(crate) mod touch_state;
+pub(crate) mod whiff;
 
 #[allow(unused_imports)]
 pub use backboard::BackboardNode;
@@ -106,6 +107,8 @@ pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
+#[allow(unused_imports)]
+pub use whiff::WhiffNode;
 
 pub(crate) type NodeDependencies = Vec<AnalysisDependency>;
 
@@ -197,6 +200,10 @@ pub(crate) fn rush_dependency() -> AnalysisDependency {
 
 pub(crate) fn touch_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<TouchCalculator>(touch::boxed_default)
+}
+
+pub(crate) fn whiff_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<WhiffCalculator>(whiff::boxed_default)
 }
 
 pub(crate) fn speed_flip_dependency() -> AnalysisDependency {

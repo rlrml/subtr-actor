@@ -224,6 +224,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "pressure",
         "rush",
         "touch",
+        "whiff",
         "speed_flip",
         "musty_flick",
         "dodge_reset",
@@ -317,6 +318,13 @@ pub(crate) fn builtin_module_json(
             let calculator = graph_state::<TouchCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
+            })
+        }
+        "whiff" => {
+            let calculator = graph_state::<WhiffCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
             })
         }
         "speed_flip" => {
@@ -478,6 +486,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 .collect();
             serialize_to_json_value(&OwnedPlayerStatsExport { player_stats })?
         }
+        "whiff" => {
+            let calculator = graph_state::<WhiffCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "speed_flip" => {
             let calculator = graph_state::<SpeedFlipCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -587,8 +601,8 @@ pub(crate) fn builtin_snapshot_config_json(
             }))?)
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession"
-        | "touch" | "speed_flip" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
-        | "movement" | "powerslide" | "demo" => None,
+        | "touch" | "whiff" | "speed_flip" | "musty_flick" | "dodge_reset" | "ball_carry"
+        | "boost" | "movement" | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

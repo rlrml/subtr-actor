@@ -181,6 +181,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_speed_flip_event,
             )?,
+            whiff: self.module_player_events("whiff", "events", parse_whiff_event)?,
             boost_pickups: self.module_player_events(
                 "boost",
                 "events",
@@ -215,6 +216,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "speed_flip".to_owned(),
             Value::Array(self.module_array("speed_flip", "events")),
+        );
+        events.insert(
+            "whiff".to_owned(),
+            Value::Array(self.module_array("whiff", "events")),
         );
         events.insert(
             "boost_pickups".to_owned(),
@@ -495,6 +500,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             } else {
                 self.frame_player_stat_or_default_typed_by_key(frame, "touch", &player_key)?
             },
+            whiff: self.frame_player_stat_or_default_typed_by_key(frame, "whiff", &player_key)?,
             musty_flick: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "musty_flick",
@@ -696,6 +702,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     default_json_value::<TouchStats>()
                 },
             )?,
+        );
+        player_value.insert(
+            "whiff".to_owned(),
+            self.frame_player_stat_or_default_by_key::<WhiffStats>(frame, "whiff", &player_key)?,
         );
         player_value.insert(
             "musty_flick".to_owned(),
@@ -1084,6 +1094,21 @@ fn parse_speed_flip_event(value: &Value) -> SubtrActorResult<SpeedFlipEvent> {
         cancel_score: json_required_f32(object, "cancel_score")?,
         speed_score: json_required_f32(object, "speed_score")?,
         confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
+    let object = json_object(value, "whiff event")?;
+    Ok(WhiffEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        closest_approach_distance: json_required_f32(object, "closest_approach_distance")?,
+        forward_alignment: json_required_f32(object, "forward_alignment")?,
+        approach_speed: json_required_f32(object, "approach_speed")?,
+        dodge_active: json_required_bool(object, "dodge_active")?,
+        aerial: json_required_bool(object, "aerial")?,
     })
 }
 

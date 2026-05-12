@@ -32,6 +32,7 @@ impl_analysis_node! {
         fifty_fifty_dependency(),
         rush_dependency(),
         speed_flip_dependency(),
+        whiff_dependency(),
         boost_dependency(),
     ],
     inputs = {
@@ -43,6 +44,7 @@ impl_analysis_node! {
         fifty_fifty: FiftyFiftyCalculator,
         rush: RushCalculator,
         speed_flip: SpeedFlipCalculator,
+        whiff: WhiffCalculator,
         boost: BoostCalculator,
     },
     evaluate = |node| {
@@ -58,6 +60,7 @@ impl_analysis_node! {
             fifty_fifty: fifty_fifty.events().to_vec(),
             rush: rush.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
+            whiff: whiff.events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
         };
         Ok(())

@@ -17,6 +17,7 @@ import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsTimelineConfig } from "./generated/StatsTimelineConfig.ts";
 import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generated/TeamStatsSnapshot.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
+import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 
 export type StatsTimeline = ReplayStatsTimeline;
 export type StatsFrame = ReplayStatsFrame;
@@ -38,6 +39,7 @@ export type {
   StatLabel,
   StatsTimelineConfig,
   TimelineEvent,
+  WhiffEvent,
   BoostPickupComparisonEvent,
 };
 

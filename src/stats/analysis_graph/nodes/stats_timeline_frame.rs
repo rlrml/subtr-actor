@@ -153,6 +153,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            whiff: ctx
+                .get::<WhiffCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             musty_flick: ctx
                 .get::<MustyFlickCalculator>()?
                 .player_stats()
@@ -237,6 +243,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             pressure_dependency(),
             rush_dependency(),
             touch_dependency(),
+            whiff_dependency(),
             speed_flip_dependency(),
             musty_flick_dependency(),
             dodge_reset_dependency(),

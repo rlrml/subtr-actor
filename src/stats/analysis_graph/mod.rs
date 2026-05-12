@@ -35,6 +35,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "pressure" => Some(nodes::pressure::boxed_default()),
         "rush" => Some(nodes::rush::boxed_default()),
         "touch" => Some(nodes::touch::boxed_default()),
+        "whiff" => Some(nodes::whiff::boxed_default()),
         "speed_flip" => Some(nodes::speed_flip::boxed_default()),
         "musty_flick" => Some(nodes::musty_flick::boxed_default()),
         "dodge_reset" => Some(nodes::dodge_reset::boxed_default()),
@@ -110,6 +111,7 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::settings::boxed_default(),
         nodes::speed_flip::boxed_default(),
         nodes::touch::boxed_default(),
+        nodes::whiff::boxed_default(),
     ]
 }
 
