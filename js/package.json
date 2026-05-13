@@ -5,10 +5,10 @@
   "main": "pkg/rl_replay_subtr_actor.js",
   "types": "pkg/rl_replay_subtr_actor.d.ts",
   "scripts": {
-    "build": "npm exec -- wasm-pack build --target web --out-dir pkg --no-pack && node ./scripts/prepare-wasm-package.mjs",
-    "build:nodejs": "npm exec -- wasm-pack build --target nodejs --out-dir pkg-node",
-    "build:bundler": "npm exec -- wasm-pack build --target bundler --out-dir pkg-bundler",
-    "test": "npm exec -- wasm-pack test --headless --firefox",
+    "build": "wasm-pack build --target web --out-dir pkg --no-pack && node ./scripts/prepare-wasm-package.mjs",
+    "build:nodejs": "wasm-pack build --target nodejs --out-dir pkg-node",
+    "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
+    "test": "wasm-pack test --headless --firefox",
     "pack": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm pack pkg/",
     "publish": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm publish pkg/",
     "prepublishOnly": "./scripts/with-clean-npm-env.sh node --run=build"
