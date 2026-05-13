@@ -167,6 +167,7 @@ async function main() {
         "    fifty_fifty: [],",
         "    rush: [],",
         "    speed_flip: [],",
+        "    whiff: [],",
         "    boost_pickups: [],",
         "  },",
         "  frames: [],",

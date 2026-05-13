@@ -28,9 +28,6 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Install Binaryen
-        run: sudo apt-get update && sudo apt-get install -y binaryen
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

@@ -7,6 +7,9 @@ license.workspace = true
 description = "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis"
 repository = "https://github.com/rlrml/subtr-actor"
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
 [lib]
 crate-type = ["cdylib"]
 
@@ -21,7 +24,7 @@ boxcars.workspace = true
 
 [dependencies.subtr-actor]
 path = ".."
-version = "0.6.4"
+version = "0.6.5"
 
 [dependencies.web-sys]
 version = "0.3.85"

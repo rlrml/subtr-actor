@@ -6,6 +6,14 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.5 - 2026-05-13
+
+- Disable `wasm-opt` for JavaScript WASM release builds to avoid CI runtime
+  failures when initializing the generated externref table.
+- Fix the packed stats-player smoke test fixture to include `whiff` timeline
+  events.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.5`.
+
 ## v0.6.4 - 2026-05-13
 
 - Fix JavaScript CI and release builds by using the installed `wasm-pack`
