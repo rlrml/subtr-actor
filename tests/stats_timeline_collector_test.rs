@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use subtr_actor::*;
 
 fn parse_replay(path: &str) -> boxcars::Replay {
@@ -27,6 +29,14 @@ fn player_snapshot_by_name<'a>(
                 frame.frame_number, frame.time
             )
         })
+}
+
+fn player_names(frame: &ReplayStatsFrame) -> HashSet<&str> {
+    frame
+        .players
+        .iter()
+        .map(|player| player.name.as_str())
+        .collect()
 }
 
 fn normalized_team_stats_for_live_play_comparison(
@@ -793,6 +803,32 @@ fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
         .map(normalized_player_stats_for_live_play_comparison)
         .collect();
     assert_eq!(normalized_last_players, normalized_first_players);
+}
+
+#[test]
+fn test_stats_timeline_old_replay_with_substitutions_discovers_late_players() {
+    let replay = parse_replay("assets/old-ballchasing-midfield-car.replay");
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("Expected stats timeline data");
+    let final_frame = timeline.frames.last().expect("Expected timeline frames");
+    let names = player_names(final_frame);
+
+    for expected_name in [
+        "CritRomney",
+        "DatLilBabyG",
+        "b_corner",
+        "Raptor_Attacks_",
+        "jboy42069",
+        "remrocker29",
+        "a093q262",
+        "Q-money219",
+    ] {
+        assert!(
+            names.contains(expected_name),
+            "Expected final stats timeline frame to include late player {expected_name}, got {names:?}"
+        );
+    }
 }
 
 #[test]

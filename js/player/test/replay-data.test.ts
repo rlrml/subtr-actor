@@ -200,6 +200,56 @@ test("async normalization can yield without a progress callback", async () => {
   assert.ok(yieldCount > 1, "expected async normalization to yield headlessly");
 });
 
+test("normalization keeps PlayStation players with duplicate online ids distinct", () => {
+  const firstId = {
+    PlayStation: {
+      online_id: "1",
+      name: "Raptor_Attacks_",
+      unknown1: [98, 51, 117, 115, 112, 115, 52, 0],
+    },
+  };
+  const secondId = {
+    PlayStation: {
+      online_id: "1",
+      name: "remrocker29",
+      unknown1: [97, 51, 117, 115, 112, 115, 52, 0],
+    },
+  };
+  const raw = buildReplayData(2, 0);
+  raw.meta.team_zero = [
+    { remote_id: firstId, stats: null, name: "Raptor_Attacks_" },
+  ];
+  raw.meta.team_one = [
+    { remote_id: secondId, stats: null, name: "remrocker29" },
+  ];
+  raw.frame_data.players = [
+    [
+      firstId,
+      {
+        frames: [
+          playerFrame("Raptor_Attacks_", 0),
+          playerFrame("Raptor_Attacks_", 1),
+        ],
+      },
+    ],
+    [
+      secondId,
+      {
+        frames: [playerFrame("remrocker29", 0), playerFrame("remrocker29", 1)],
+      },
+    ],
+  ];
+
+  const replay = normalizeReplayData(raw);
+
+  assert.equal(replay.players.length, 2);
+  assert.notEqual(replay.players[0]!.id, replay.players[1]!.id);
+  assert.deepEqual(
+    replay.players.map((player) => player.name),
+    ["Raptor_Attacks_", "remrocker29"],
+  );
+});
+
 test("async normalization yields at configured frame progress intervals", async () => {
   let yieldCount = 0;
   const raw = buildReplayData(24);

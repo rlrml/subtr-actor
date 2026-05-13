@@ -6,7 +6,7 @@ use crate::*;
 pub struct AnalysisNodeCollector {
     graph: AnalysisGraph,
     last_sample_time: Option<f32>,
-    replay_meta_initialized: bool,
+    last_replay_meta_player_count: Option<usize>,
     last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
@@ -21,7 +21,7 @@ impl AnalysisNodeCollector {
         Self {
             graph,
             last_sample_time: None,
-            replay_meta_initialized: false,
+            last_replay_meta_player_count: None,
             last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
@@ -51,9 +51,10 @@ impl Collector for AnalysisNodeCollector {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        if !self.replay_meta_initialized {
+        let player_count = processor.player_count();
+        if self.last_replay_meta_player_count != Some(player_count) {
             self.graph.on_replay_meta(&processor.get_replay_meta()?)?;
-            self.replay_meta_initialized = true;
+            self.last_replay_meta_player_count = Some(player_count);
         }
 
         let dt = self

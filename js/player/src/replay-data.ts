@@ -90,11 +90,8 @@ function playerIdToString(playerId: RawPlayerId): string {
     return `${kind}:${value}`;
   }
 
-  if (value && typeof value === "object" && "online_id" in value) {
-    const onlineId = value.online_id;
-    if (typeof onlineId === "string" || typeof onlineId === "number") {
-      return `${kind}:${onlineId}`;
-    }
+  if (value && typeof value === "object") {
+    return `${kind}:${JSON.stringify(value)}`;
   }
 
   return `${kind}:${JSON.stringify(value)}`;

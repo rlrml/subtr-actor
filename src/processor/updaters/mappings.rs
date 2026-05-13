@@ -185,6 +185,8 @@ impl<'a> ReplayProcessor<'a> {
             }
         }
 
+        self.sync_player_order_from_known_mappings();
+
         Ok(())
     }
 

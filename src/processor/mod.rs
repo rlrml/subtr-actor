@@ -430,6 +430,26 @@ impl<'a> ReplayProcessor<'a> {
         self.rigid_body_velocity_normalization_factor
     }
 
+    fn sync_player_order_from_known_mappings(&mut self) {
+        let player_ids: Vec<_> = self.player_to_actor_id.keys().cloned().collect();
+        for player_id in player_ids {
+            let already_ordered =
+                self.team_zero.contains(&player_id) || self.team_one.contains(&player_id);
+            if already_ordered {
+                continue;
+            }
+
+            let Ok(is_team_0) = self.get_player_is_team_0(&player_id) else {
+                continue;
+            };
+            if is_team_0 {
+                self.team_zero.push(player_id);
+            } else {
+                self.team_one.push(player_id);
+            }
+        }
+    }
+
     fn normalize_vector_by_factor(
         &self,
         vector: boxcars::Vector3f,

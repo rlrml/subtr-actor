@@ -157,6 +157,7 @@ impl<'a> ReplayProcessor<'a> {
                         })
                     })
                 })
+                .or_else(|| remote_id_display_name(player_id))
                 .unwrap_or_else(|| format!("{player_id:?}"));
             Ok(PlayerInfo {
                 name,
@@ -173,5 +174,12 @@ impl<'a> ReplayProcessor<'a> {
             team_one: team_one?,
             all_headers: self.replay.properties.clone(),
         })
+    }
+}
+
+fn remote_id_display_name(player_id: &PlayerId) -> Option<String> {
+    match player_id {
+        boxcars::RemoteId::PlayStation(id) if !id.name.is_empty() => Some(id.name.clone()),
+        _ => None,
     }
 }

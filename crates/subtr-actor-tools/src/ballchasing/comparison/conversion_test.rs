@@ -1,6 +1,6 @@
 use super::{
-    build_actual_comparable_stats, compute_comparable_stats, raw_boost_amount_as_comparable_units,
-    ComputedComparableStats,
+    build_actual_comparable_stats, collect_final_replay_meta, compute_comparable_stats,
+    raw_boost_amount_as_comparable_units, ComputedComparableStats,
 };
 use subtr_actor::*;
 
@@ -20,7 +20,7 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 fn compute_comparable_stats_reference(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
-    let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
+    let replay_meta = collect_final_replay_meta(replay)?;
     let graph = stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
         replay,
         [

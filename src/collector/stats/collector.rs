@@ -236,6 +236,7 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     modules: BuiltinModuleSelection,
     graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
+    last_replay_meta_player_count: Option<usize>,
     frame_transform: F,
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
@@ -334,6 +335,7 @@ impl<T, F> StatsCollector<T, F> {
             graph: modules.graph()?,
             modules,
             replay_meta: None,
+            last_replay_meta_player_count: None,
             frame_transform,
             captured_frames: None,
             sample_mode: SampleMode::Aggregate,
@@ -359,6 +361,7 @@ impl<T, F> StatsCollector<T, F> {
             modules,
             graph,
             replay_meta,
+            last_replay_meta_player_count,
             captured_frames,
             sample_mode,
             last_sample_time,
@@ -374,6 +377,7 @@ impl<T, F> StatsCollector<T, F> {
             modules,
             graph,
             replay_meta,
+            last_replay_meta_player_count,
             frame_transform,
             captured_frames: captured_frames.map(|_| Vec::new()),
             sample_mode,
@@ -482,6 +486,19 @@ impl<T, F> StatsCollector<T, F> {
         }
         Ok(())
     }
+
+    fn refresh_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        let player_count = processor.player_count();
+        if self.last_replay_meta_player_count == Some(player_count) {
+            return Ok(());
+        }
+
+        let replay_meta = processor.get_replay_meta()?;
+        self.graph.on_replay_meta(&replay_meta)?;
+        self.replay_meta = Some(replay_meta);
+        self.last_replay_meta_player_count = Some(player_count);
+        Ok(())
+    }
 }
 
 impl<T, F> Collector for StatsCollector<T, F>
@@ -495,11 +512,7 @@ where
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        if self.replay_meta.is_none() {
-            let replay_meta = processor.get_replay_meta()?;
-            self.graph.on_replay_meta(&replay_meta)?;
-            self.replay_meta = Some(replay_meta);
-        }
+        self.refresh_replay_meta(processor)?;
 
         let dt = self
             .last_sample_time

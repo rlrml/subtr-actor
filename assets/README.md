@@ -63,6 +63,17 @@ RLCS comparison fixture downloaded from Ballchasing on 2026-05-10:
   - note: 2025 RLCS World Championship grand final game 5 fixture used for
     subtr-actor versus Ballchasing boost-stat comparison
 
+Legacy substitution fixture downloaded from Ballchasing on 2026-05-12:
+
+- `old-ballchasing-midfield-car`
+  - replay id: `dd11ccef-8988-42d0-9795-6e18988dde58`
+  - title: `Jed Reks Noobz`
+  - date: `2016-09-01T19:39:00Z`
+  - playlist: `private`
+  - note: 2016 `net_version=None` replay with mid-match player substitutions
+    and duplicate PlayStation `online_id` values. Used for late-player
+    discovery and replay-player ID collision regressions.
+
 Post-EAC fixtures were downloaded from public Ballchasing replay pages on
 2026-04-29. The local Ballchasing API token was invalid at the time, so these
 fixtures include replay files and source ids but not API stats JSON.

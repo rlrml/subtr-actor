@@ -214,6 +214,51 @@ fn test_legacy_replay_player_positions_are_normalized_to_field_units() {
 }
 
 #[test]
+fn test_old_replay_with_substitutions_discovers_late_players() {
+    let replay = parse_replay("assets/old-ballchasing-midfield-car.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to get replay data for old substitution replay");
+
+    let names: HashSet<_> = replay_data
+        .meta
+        .player_order()
+        .map(|player| player.name.as_str())
+        .collect();
+    for expected_name in [
+        "CritRomney",
+        "DatLilBabyG",
+        "b_corner",
+        "Raptor_Attacks_",
+        "jboy42069",
+        "remrocker29",
+        "a093q262",
+        "Q-money219",
+    ] {
+        assert!(
+            names.contains(expected_name),
+            "Expected replay metadata to include late player {expected_name}, got {names:?}"
+        );
+    }
+
+    assert_eq!(
+        replay_data.meta.player_count(),
+        replay_data.frame_data.players.len(),
+        "Expected frame data to include one player series per metadata player"
+    );
+    assert!(
+        replay_data
+            .frame_data
+            .players
+            .iter()
+            .all(|(_, player_data)| player_data.frames().iter().any(|frame| {
+                matches!(frame, PlayerFrame::Data { rigid_body, .. } if !rigid_body.sleeping)
+            })),
+        "Expected every discovered player to have at least one non-empty frame"
+    );
+}
+
+#[test]
 fn test_modern_replay_player_positions_are_not_overscaled() {
     let replay = parse_replay("assets/old_boost_format.replay");
     let replay_data = ReplayDataCollector::new()

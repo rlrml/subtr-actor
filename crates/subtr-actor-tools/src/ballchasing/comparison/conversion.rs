@@ -297,10 +297,39 @@ pub(crate) struct ComputedComparableStats {
     pub(super) powerslide: PowerslideCalculator,
 }
 
+#[derive(Default)]
+struct ReplayMetaCollector {
+    replay_meta: Option<ReplayMeta>,
+}
+
+impl Collector for ReplayMetaCollector {
+    fn process_frame(
+        &mut self,
+        _processor: &ReplayProcessor,
+        _frame: &boxcars::Frame,
+        _frame_number: usize,
+        _current_time: f32,
+    ) -> SubtrActorResult<TimeAdvance> {
+        Ok(TimeAdvance::NextFrame)
+    }
+
+    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+        self.replay_meta = Some(processor.get_replay_meta()?);
+        Ok(())
+    }
+}
+
+fn collect_final_replay_meta(replay: &boxcars::Replay) -> SubtrActorResult<ReplayMeta> {
+    ReplayMetaCollector::default()
+        .process_replay(replay)?
+        .replay_meta
+        .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))
+}
+
 pub(crate) fn compute_comparable_stats(
     replay: &boxcars::Replay,
 ) -> SubtrActorResult<ComputedComparableStats> {
-    let replay_meta = ReplayProcessor::new(replay)?.get_replay_meta()?;
+    let replay_meta = collect_final_replay_meta(replay)?;
     let graph = subtr_actor::stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
         replay,
         [

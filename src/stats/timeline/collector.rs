@@ -17,6 +17,7 @@ pub fn build_timeline_graph() -> AnalysisGraph {
 pub struct StatsTimelineCollector {
     graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
+    last_replay_meta_player_count: Option<usize>,
     frames: Vec<ReplayStatsFrame>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
@@ -34,6 +35,7 @@ impl StatsTimelineCollector {
         Self {
             graph,
             replay_meta: None,
+            last_replay_meta_player_count: None,
             frames: Vec::new(),
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
@@ -116,10 +118,12 @@ impl Collector for StatsTimelineCollector {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        if self.replay_meta.is_none() {
+        let player_count = processor.player_count();
+        if self.last_replay_meta_player_count != Some(player_count) {
             let replay_meta = processor.get_replay_meta()?;
             self.graph.on_replay_meta(&replay_meta)?;
             self.replay_meta = Some(replay_meta);
+            self.last_replay_meta_player_count = Some(player_count);
         }
 
         let dt = self
