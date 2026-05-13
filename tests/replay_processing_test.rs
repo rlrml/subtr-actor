@@ -267,6 +267,23 @@ fn test_old_replay_with_substitutions_discovers_late_players() {
             })),
         "Expected replay data export to preserve sleeping player positions"
     );
+
+    let early_positioned_players = replay_data
+        .frame_data
+        .players
+        .iter()
+        .filter(|(_, player_data)| {
+            player_data
+                .frames()
+                .iter()
+                .take(10)
+                .any(|frame| matches!(frame, PlayerFrame::Data { .. }))
+        })
+        .count();
+    assert!(
+        early_positioned_players >= 6,
+        "Expected bootstrap player/car mappings to expose the starting roster early, got {early_positioned_players}"
+    );
 }
 
 #[test]

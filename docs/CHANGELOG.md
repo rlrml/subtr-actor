@@ -7,8 +7,9 @@ README, or refactor-only commit.
 ## Unreleased
 
 - Keep old replay player cars visible through bounded gaps in exported player
-  frame data by preserving sleeping player positions and carrying normalized
-  player samples across short unavailable spans.
+  frame data by preserving bootstrapped player/car mappings and sleeping player
+  positions, then carrying normalized player samples across short unavailable
+  spans.
 
 ## v0.6.5 - 2026-05-13
 

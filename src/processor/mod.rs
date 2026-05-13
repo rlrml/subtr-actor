@@ -650,14 +650,9 @@ impl<'a> ReplayProcessor<'a> {
     /// Reset the state of the [`ReplayProcessor`].
     pub fn reset(&mut self) {
         self.ball_actor_id = None;
-        self.player_to_car = HashMap::new();
-        self.player_to_team = HashMap::new();
-        self.player_to_actor_id = HashMap::new();
-        self.car_to_player = HashMap::new();
-        self.car_to_boost = HashMap::new();
-        self.car_to_jump = HashMap::new();
-        self.car_to_double_jump = HashMap::new();
-        self.car_to_dodge = HashMap::new();
+        // Keep bootstrapped player/car mappings. Some old replays expose
+        // player identity late during bootstrap, but the actor ids are already
+        // valid for earlier frames once frame processing restarts.
         self.actor_state = ActorStateModeler::new();
         self.boost_pad_events = Vec::new();
         self.current_frame_boost_pad_events = Vec::new();
