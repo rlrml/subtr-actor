@@ -33,6 +33,7 @@ the clearer replay-format fixture names.
 
 | Fixture | Replay version | BuildVersion | Rigid-body rule | Format signal | Raw | Viewer |
 | --- | --- | --- | --- | --- | --- | --- |
+| `old-ballchasing-midfield-car.replay` | `868.12`, `net_version = None` | `160705.43783.134970` | Legacy vectors and legacy rotation | Old online replay where player identity appears through later reservation and party-leader mappings; useful for checking roster synchronization and PlayStation identity collisions. | [raw][raw-2016-07-online-substitution] | [viewer][viewer-2016-07-online-substitution] |
 | `replay-format-2016-07-21-v868-12-net-none-lan.replay` | `868.12`, `net_version = None` | `160721.58730.135786` | Legacy vectors and legacy rotation | Old LAN-style replay with no `GameEvent_Soccar` archetype; useful for checking metadata fallback plus legacy player and ball positions. | [raw][raw-2016-07-lan] | [viewer][viewer-2016-07-lan] |
 | `replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay` | `868.14`, `net_version = None` | `161109.39595.145160` | Legacy vectors and legacy rotation | Older RLCS LAN replay with no net version; exercises legacy rigid-body position scaling and 3v3 stats/touch extraction. | [raw][raw-2016-11-rlcs] | [viewer][viewer-2016-11-rlcs] |
 | `replay-format-2017-03-16-v868-17-net-none-online.replay` | `868.17`, `net_version = None` | `170316.47017.154572` | Legacy vectors and legacy rotation | Later no-net online replay; keeps the old-era coverage from being only 2016 LAN-style samples. | [raw][raw-2017-03-net-none] | [viewer][viewer-2017-03-net-none] |
@@ -55,6 +56,8 @@ Known coverage gaps:
   `net_version` value such as `0`, `1`, `3`, `4`, `6`, `8`, or `9`. Add those
   if a parser behavior or public output depends on them.
 
+[raw-2016-07-online-substitution]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/old-ballchasing-midfield-car.replay
+[viewer-2016-07-online-substitution]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/old-ballchasing-midfield-car.replay
 [raw-2016-07-lan]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-07-21-v868-12-net-none-lan.replay
 [viewer-2016-07-lan]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-07-21-v868-12-net-none-lan.replay
 [raw-2016-11-rlcs]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay
@@ -84,6 +87,26 @@ Use these links to visually check that cars and ball fit normal Rocket League
 field dimensions, rotations track plausible car orientation, and replay events
 line up with visible play. Legacy fixtures should appear in field units after
 normalization, while modern fixtures should not be multiplied by `100`.
+
+## Player identity and substitutions
+
+Older online replays can expose usable player identity after initial bootstrap.
+In `assets/old-ballchasing-midfield-car.replay`, some player records become
+known through later reservation and party-leader mappings instead of appearing
+as complete player actors at startup. Treating the bootstrap player list as
+final can leave a placeholder player/car at the field origin and can keep stats
+timeline or comparison metadata stale.
+
+Compatibility rule:
+
+- Keep player and car mappings synchronized as new reservation, party-leader,
+  and `PlayerReplicationInfo` relationships are observed.
+- Refresh exported player metadata after those mappings change; collectors that
+  snapshot metadata once at startup can report stale rosters even when frame
+  state is later correct.
+- Do not collapse old PlayStation players by `online_id` alone. Old replays can
+  contain repeated sentinel-like IDs, so identity keys need enough context to
+  remain distinct.
 
 ## Rigid-body state
 
@@ -205,6 +228,8 @@ High confidence:
 - `net_version`, not just `major_version` / `minor_version`, must drive these
   rules.
 - `Vector3f` fields cannot be normalized uniformly by type.
+- Old replay player identity cannot be considered complete at bootstrap; late
+  mappings must update processor and collector metadata.
 
 Medium confidence:
 

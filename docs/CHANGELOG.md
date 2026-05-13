@@ -6,6 +6,17 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.3 - 2026-05-13
+
+- Fix older replay player substitution handling so late reservation and
+  party-leader mappings update player rosters, stats timeline metadata, and
+  Ballchasing comparison output instead of leaving placeholder cars at midfield.
+- Add a 2016 Ballchasing replay fixture and regression coverage for old replay
+  substitutions and PlayStation-style player identity collisions.
+- Document the legacy player-identity compatibility behavior discovered from
+  the old replay investigation.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.3`.
+
 ## v0.6.2 - 2026-05-10
 
 - Improve stats timeline bundle performance by building typed stats timeline
