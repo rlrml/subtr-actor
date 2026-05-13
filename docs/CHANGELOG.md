@@ -4,12 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
-## Unreleased
+## v0.6.6 - 2026-05-13
 
 - Keep old replay player cars visible through bounded gaps in exported player
   frame data by preserving bootstrapped player/car mappings and sleeping player
   positions, then carrying normalized player samples across short unavailable
   spans.
+- Add whiff timeline visualization support in the stats player.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.6`.
 
 ## v0.6.5 - 2026-05-13
 
