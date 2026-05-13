@@ -6,6 +6,14 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.6.4 - 2026-05-13
+
+- Fix JavaScript CI and release builds by using the installed `wasm-pack`
+  binary and installing Binaryen for `wasm-opt`.
+- Refresh the GitHub Pages Nix package metadata and npm dependency hash for
+  the current release.
+- Refresh Rust, Python, and JavaScript release metadata to `0.6.4`.
+
 ## v0.6.3 - 2026-05-13
 
 - Fix older replay player substitution handling so late reservation and
