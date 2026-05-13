@@ -6,6 +6,10 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+- Keep old replay player cars visible through bounded gaps in exported player
+  frame data by preserving sleeping player positions and carrying normalized
+  player samples across short unavailable spans.
+
 ## v0.6.5 - 2026-05-13
 
 - Disable `wasm-opt` for JavaScript WASM release builds to avoid CI runtime

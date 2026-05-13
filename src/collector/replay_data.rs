@@ -116,12 +116,12 @@ impl BallFrame {
 ///
 /// # Variants
 ///
-/// - [`Empty`](PlayerFrame::Empty) - Indicates the player is inactive or sleeping
+/// - [`Empty`](PlayerFrame::Empty) - Indicates the player state is unavailable
 /// - [`Data`](PlayerFrame::Data) - Contains the player's complete state information
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub enum PlayerFrame {
-    /// Empty frame indicating the player is inactive or sleeping
+    /// Empty frame indicating the player state is unavailable
     Empty,
     /// Frame containing the player's complete state data
     Data {
@@ -163,9 +163,8 @@ impl PlayerFrame {
     ///
     /// # Returns
     ///
-    /// Returns a [`SubtrActorResult`] containing a [`PlayerFrame`] which will be:
-    /// - [`Empty`](PlayerFrame::Empty) if the player's rigid body is in a sleeping state
-    /// - [`Data`](PlayerFrame::Data) containing the player's complete state information
+    /// Returns a [`SubtrActorResult`] containing a [`PlayerFrame::Data`] value
+    /// with the player's complete state information.
     ///
     /// # Errors
     ///
@@ -180,10 +179,6 @@ impl PlayerFrame {
     ) -> SubtrActorResult<Self> {
         let rigid_body =
             processor.get_interpolated_player_rigid_body(player_id, current_time, 0.0)?;
-
-        if rigid_body.sleeping {
-            return Ok(PlayerFrame::Empty);
-        }
 
         let boost_amount = processor.get_player_boost_level(player_id)?;
         let boost_active = processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1;
@@ -231,8 +226,10 @@ impl PlayerFrame {
     ///
     /// # Returns
     ///
-    /// Returns [`Empty`](PlayerFrame::Empty) if the rigid body is sleeping,
-    /// otherwise returns [`Data`](PlayerFrame::Data) with all provided information.
+    /// Returns [`Data`](PlayerFrame::Data) with all provided information, even
+    /// when the rigid body is sleeping, so stationary kickoff and reset frames
+    /// still retain the player's position for downstream consumers such as the
+    /// JS player.
     #[allow(clippy::too_many_arguments)]
     fn from_data(
         rigid_body: boxcars::RigidBody,
@@ -246,21 +243,17 @@ impl PlayerFrame {
         team: Option<i32>,
         is_team_0: Option<bool>,
     ) -> Self {
-        if rigid_body.sleeping {
-            Self::Empty
-        } else {
-            Self::Data {
-                rigid_body,
-                boost_amount,
-                boost_active,
-                powerslide_active,
-                jump_active,
-                double_jump_active,
-                dodge_active,
-                player_name,
-                team,
-                is_team_0,
-            }
+        Self::Data {
+            rigid_body,
+            boost_amount,
+            boost_active,
+            powerslide_active,
+            jump_active,
+            double_jump_active,
+            dodge_active,
+            player_name,
+            team,
+            is_team_0,
         }
     }
 }

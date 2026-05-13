@@ -256,6 +256,17 @@ fn test_old_replay_with_substitutions_discovers_late_players() {
             })),
         "Expected every discovered player to have at least one non-empty frame"
     );
+
+    assert!(
+        replay_data
+            .frame_data
+            .players
+            .iter()
+            .any(|(_, player_data)| player_data.frames().iter().any(|frame| {
+                matches!(frame, PlayerFrame::Data { rigid_body, .. } if rigid_body.sleeping)
+            })),
+        "Expected replay data export to preserve sleeping player positions"
+    );
 }
 
 #[test]

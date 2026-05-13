@@ -224,6 +224,44 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   };
 }
 
+function hasPlayerPosition(sample: PlayerSample): boolean {
+  return sample.position !== null;
+}
+
+function carriedPlayerSample(sample: PlayerSample): PlayerSample {
+  return {
+    ...sample,
+    linearVelocity: null,
+    angularVelocity: null,
+    boostActive: false,
+    powerslideActive: false,
+    jumpActive: false,
+    doubleJumpActive: false,
+    dodgeActive: false,
+  };
+}
+
+function fillBoundedPlayerSampleGaps(frames: PlayerSample[]): void {
+  let lastPositionedFrame: PlayerSample | null = null;
+  let gapStart: number | null = null;
+
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index]!;
+    if (hasPlayerPosition(frame)) {
+      if (gapStart !== null && lastPositionedFrame) {
+        const carriedFrame = carriedPlayerSample(lastPositionedFrame);
+        for (let gapIndex = gapStart; gapIndex < index; gapIndex += 1) {
+          frames[gapIndex] = carriedFrame;
+        }
+      }
+      lastPositionedFrame = frame;
+      gapStart = null;
+    } else if (lastPositionedFrame && gapStart === null) {
+      gapStart = index;
+    }
+  }
+}
+
 function currentTimeMs(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
@@ -346,8 +384,8 @@ function createNormalizationProgressTracker(
         return false;
       }
       completedUnits = Math.min(totalUnits, completedUnits + units);
-      maybeReport();
-      return shouldYield();
+      const reported = maybeReport();
+      return shouldYield(reported);
     },
     advanceFrame(units = 1) {
       if (units <= 0) {
@@ -355,8 +393,8 @@ function createNormalizationProgressTracker(
       }
       completedFrameUnits = Math.min(totalFrameUnits, completedFrameUnits + units);
       completedUnits = Math.min(totalUnits, completedUnits + units);
-      maybeReport();
-      return shouldYield();
+      const reported = maybeReport();
+      return shouldYield(reported);
     },
     finish() {
       completedUnits = totalUnits;
@@ -589,6 +627,7 @@ function buildPlayerTracks(
       processedPlayerFrames += 1;
       progressTracker?.advanceFrame();
     }
+    fillBoundedPlayerSampleGaps(frames);
 
     const playerIdString = playerIdToString(playerId);
     const name =
@@ -639,6 +678,7 @@ async function buildPlayerTracksAsync(
         await progressTracker.yieldToMainThread();
       }
     }
+    fillBoundedPlayerSampleGaps(frames);
 
     const playerIdString = playerIdToString(playerId);
     const name =

@@ -9,7 +9,7 @@ import type { RigidBodyTs } from "./RigidBodyTs.ts";
  *
  * # Variants
  *
- * - [`Empty`](PlayerFrame::Empty) - Indicates the player is inactive or sleeping
+ * - [`Empty`](PlayerFrame::Empty) - Indicates the player state is unavailable
  * - [`Data`](PlayerFrame::Data) - Contains the player's complete state information
  */
 export type PlayerFrame = "Empty" | { "Data": {

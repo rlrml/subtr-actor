@@ -142,3 +142,76 @@ test("async replay normalization matches sync output and can yield progress", as
     );
   }
 });
+
+test("replay normalization carries bounded player frame gaps", () => {
+  const gapReplayData: RawReplayFramesData = {
+    ...replayData,
+    frame_data: {
+      metadata_frames: [
+        {
+          time: 10,
+          seconds_remaining: 300,
+          replicated_game_state_name: 0,
+          replicated_game_state_time_remaining: 0,
+        },
+        {
+          time: 10.1,
+          seconds_remaining: 299.9,
+          replicated_game_state_name: 0,
+          replicated_game_state_time_remaining: 0,
+        },
+        {
+          time: 10.2,
+          seconds_remaining: 299.8,
+          replicated_game_state_name: 0,
+          replicated_game_state_time_remaining: 0,
+        },
+        {
+          time: 10.3,
+          seconds_remaining: 299.7,
+          replicated_game_state_name: 0,
+          replicated_game_state_time_remaining: 0,
+        },
+        {
+          time: 10.4,
+          seconds_remaining: 299.6,
+          replicated_game_state_name: 0,
+          replicated_game_state_time_remaining: 0,
+        },
+      ],
+      ball_data: {
+        frames: [
+          ballFrame(0),
+          ballFrame(100),
+          ballFrame(200),
+          ballFrame(300),
+          ballFrame(400),
+        ],
+      },
+      players: [
+        [
+          { Steam: "blue-player" },
+          {
+            frames: [
+              playerFrame("Blue", 0),
+              "Empty",
+              "Empty",
+              playerFrame("Blue", 30),
+              "Empty",
+            ],
+          },
+        ],
+      ],
+    },
+  };
+
+  const replay = normalizeReplayData(gapReplayData);
+  const frames = replay.players[0]!.frames;
+
+  assert.deepEqual(frames[1]!.position, frames[0]!.position);
+  assert.deepEqual(frames[2]!.position, frames[0]!.position);
+  assert.equal(frames[1]!.boostActive, false);
+  assert.equal(frames[2]!.boostActive, false);
+  assert.deepEqual(frames[3]!.position, { x: 30, y: 0, z: 17 });
+  assert.equal(frames[4]!.position, null);
+});
