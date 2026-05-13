@@ -346,6 +346,54 @@ export function buildSpeedFlipTimelineEvents(
   });
 }
 
+function getWhiffShortLabel(
+  event: StatsTimeline["events"]["whiff"][number],
+): string {
+  if (event.dodge_active) {
+    return "DW";
+  }
+  if (event.aerial) {
+    return "AW";
+  }
+  return "W";
+}
+
+function getWhiffKindLabel(
+  event: StatsTimeline["events"]["whiff"][number],
+): string {
+  const labels = [event.aerial ? "aerial" : "grounded"];
+  if (event.dodge_active) {
+    labels.push("dodge");
+  }
+  return labels.join(" ");
+}
+
+export function buildWhiffTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.whiff.map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const closestApproach = Math.round(event.closest_approach_distance);
+    const approachSpeed = Math.round(event.approach_speed);
+
+    return {
+      id: `whiff:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "whiff",
+      label: `${playerName} ${getWhiffKindLabel(event)} whiff | ${closestApproach}uu closest, ${approachSpeed}uu/s`,
+      shortLabel: getWhiffShortLabel(event),
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 export function countEnabledTimelineEvents(
   activeModuleIds: Iterable<string>,
   replay: ReplayModel,
@@ -392,6 +440,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("speed-flip")) {
     count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("whiff")) {
+    count += buildWhiffTimelineEvents(statsTimeline, replay).length;
   }
 
   return count;

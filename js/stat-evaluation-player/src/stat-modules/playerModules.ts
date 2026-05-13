@@ -17,6 +17,7 @@ import {
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
+  buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
@@ -33,6 +34,7 @@ import {
   renderMustyFlickStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
+  renderWhiffStats,
 } from "./renderers.ts";
 import {
   getStatsPlayerSnapshot,
@@ -557,6 +559,18 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
       activeBreakdownClasses.has(className)
     );
   }
+}
+
+export function createWhiffModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "whiff",
+    label: "Whiff",
+    select: (player) => player.whiff,
+    render: (whiff) => renderWhiffStats(whiff),
+    getTimelineEvents(ctx) {
+      return buildWhiffTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+  });
 }
 
 export function createMovementModule(runtime: StatModuleRuntime): StatModule {

@@ -13,6 +13,7 @@ import {
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
+  buildWhiffTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
   getReplayTimelineEventKinds,
@@ -585,6 +586,52 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
   ]);
 });
 
+test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    whiff_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        closest_approach_distance: 128.4,
+        forward_alignment: 0.72,
+        approach_speed: 1310.6,
+        dodge_active: true,
+        aerial: true,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildWhiffTimelineEvents(statsTimeline, replay), [
+    {
+      id: "whiff:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "whiff",
+      label: "Blue aerial dodge whiff | 128uu closest, 1311uu/s",
+      shortLabel: "DW",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [
@@ -683,6 +730,19 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         cancel_score: 0.82,
         speed_score: 0.79,
         confidence: 0.88,
+      },
+    ],
+    whiff_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        closest_approach_distance: 126,
+        forward_alignment: 0.7,
+        approach_speed: 1280,
+        dodge_active: false,
+        aerial: false,
       },
     ],
     frames: [
@@ -802,10 +862,11 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "ball-carry",
         "powerslide",
         "speed-flip",
+        "whiff",
       ],
       replay,
       statsTimeline,
     ),
-    12,
+    13,
   );
 });

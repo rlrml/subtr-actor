@@ -322,6 +322,24 @@ export function renderPowerslideStats(
   `;
 }
 
+export function renderWhiffStats(
+  whiff: PlayerStatsSnapshot["whiff"] | undefined,
+): string {
+  const averageClosestApproach = whiff && whiff.whiff_count > 0
+    ? whiff.cumulative_closest_approach_distance / whiff.whiff_count
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Whiffs</span><span class="value">${formatInteger(whiff?.whiff_count)}</span></div>
+    <div class="stat-row"><span class="label">Grounded</span><span class="value">${formatInteger(whiff?.grounded_whiff_count)}</span></div>
+    <div class="stat-row"><span class="label">Aerial</span><span class="value">${formatInteger(whiff?.aerial_whiff_count)}</span></div>
+    <div class="stat-row"><span class="label">Dodge</span><span class="value">${formatInteger(whiff?.dodge_whiff_count)}</span></div>
+    <div class="stat-row"><span class="label">Last closest</span><span class="value">${formatNumber(asNumber(whiff?.last_closest_approach_distance), 0)}</span></div>
+    <div class="stat-row"><span class="label">Best closest</span><span class="value">${formatNumber(asNumber(whiff?.best_closest_approach_distance), 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg closest</span><span class="value">${formatNumber(averageClosestApproach, 0)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(whiff?.time_since_last_whiff), 2, "s")}</span></div>
+  `;
+}
+
 export function renderDemoStats(demo: PlayerStatsSnapshot["demo"] | undefined): string {
   return `
     <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(demo?.demos_inflicted)}</span></div>

@@ -18,6 +18,7 @@ import {
   createPowerslideModule,
   createSpeedFlipModule,
   createTouchModule,
+  createWhiffModule,
 } from "./playerModules.ts";
 import {
   createAbsolutePositioningModule,
@@ -62,6 +63,7 @@ export function createStatModules(
     createAbsolutePositioningModule(),
     createSpeedFlipModule(),
     createTouchModule(runtime),
+    createWhiffModule(),
     createMustyFlickModule(),
     createDodgeResetModule(),
     createBoostModule(runtime, options.boostPickupFilters),

@@ -5,6 +5,7 @@ import {
   renderBoostStats,
   renderAbsolutePositioningStats,
   renderRelativePositioningStats,
+  renderWhiffStats,
 } from "./stat-modules/renderers.ts";
 import {
   createPlayerStatsSnapshot,
@@ -118,4 +119,30 @@ test("boost renderer shows tracked-time shares for all boost time buckets", () =
   assert.doesNotMatch(html, /Inferred .*pads/s);
   assert.doesNotMatch(html, /Ghost pickups/s);
   assert.doesNotMatch(html, /Missed pickups/s);
+});
+
+test("whiff renderer shows counts and derives average closest approach", () => {
+  const whiff = createPlayerStatsSnapshot({
+    whiff: {
+      whiff_count: 2,
+      grounded_whiff_count: 1,
+      aerial_whiff_count: 1,
+      dodge_whiff_count: 1,
+      last_closest_approach_distance: 96,
+      best_closest_approach_distance: 72,
+      cumulative_closest_approach_distance: 200,
+      time_since_last_whiff: 1.25,
+    },
+  }).whiff;
+
+  const html = renderWhiffStats(whiff);
+
+  assert.match(html, /Whiffs.*2/s);
+  assert.match(html, /Grounded.*1/s);
+  assert.match(html, /Aerial.*1/s);
+  assert.match(html, /Dodge.*1/s);
+  assert.match(html, /Last closest.*96/s);
+  assert.match(html, /Best closest.*72/s);
+  assert.match(html, /Avg closest.*100/s);
+  assert.match(html, /Since last.*1\.25s/s);
 });
