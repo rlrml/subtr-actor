@@ -55,6 +55,14 @@ const CHART_COLORS = [
   "#ffa657",
 ];
 
+const BOOST_TANK_COLORS = {
+  zero: "#ff7b72",
+  low: "#f39a37",
+  midLow: "#f2cc60",
+  midHigh: "#65d6ad",
+  high: "#58a6ff",
+} as const;
+
 const PAGES: readonly { id: ReportPageId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "boost", label: "Boost" },
@@ -558,14 +566,14 @@ function renderBoostPage(
         finalFrame.players.map((player, index) => ({
           label: player.name || `Player ${index + 1}`,
           segments: [
-            { label: "0", value: player.boost.time_zero_boost, color: "#ff7b72" },
-            { label: "0-25", value: player.boost.time_boost_0_25, color: "#f39a37" },
-            { label: "25-50", value: player.boost.time_boost_25_50, color: "#f2cc60" },
-            { label: "50-75", value: player.boost.time_boost_50_75, color: "#65d6ad" },
+            { label: "0", value: player.boost.time_zero_boost, color: BOOST_TANK_COLORS.zero },
+            { label: "0-25", value: player.boost.time_boost_0_25, color: BOOST_TANK_COLORS.low },
+            { label: "25-50", value: player.boost.time_boost_25_50, color: BOOST_TANK_COLORS.midLow },
+            { label: "50-75", value: player.boost.time_boost_50_75, color: BOOST_TANK_COLORS.midHigh },
             {
               label: "75-100",
               value: player.boost.time_boost_75_100 + player.boost.time_hundred_boost,
-              color: CHART_COLORS[index % CHART_COLORS.length]!,
+              color: BOOST_TANK_COLORS.high,
             },
           ],
         })),
