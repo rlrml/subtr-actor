@@ -77,7 +77,7 @@ const OVERVIEW_CHARTS: ChartSpec[] = [
   { statId: "player:touch.touch_count", kind: "bar", title: "Touches by player" },
   { statId: "team:core.shots", kind: "pie", title: "Shot share" },
   { statId: "team:possession.possession_time", kind: "pie", title: "Possession share" },
-  { statId: "team:pressure.offensive_pressure_time", kind: "pie", title: "Pressure share" },
+  { statId: "team:pressure.offensive_pressure_time", kind: "bar", title: "Offensive pressure" },
 ];
 
 const INVOLVEMENT_CHARTS: ChartSpec[] = [
