@@ -132,6 +132,10 @@ function formatStatLabel(definition: StatDefinition): string {
   return definition.path.slice(1).join(".") || definition.label;
 }
 
+function isStatsReportDefinitionVisible(definition: StatDefinition): boolean {
+  return !definition.path.includes("entries");
+}
+
 function renderStatsTable(
   key: string,
   definitions: StatDefinition[],
@@ -326,7 +330,7 @@ function renderReport(root: HTMLElement, state: ReportState): void {
     return;
   }
 
-  const definitions = createStatRegistry(finalFrame);
+  const definitions = createStatRegistry(finalFrame).filter(isStatsReportDefinitionVisible);
   const grouped = groupDefinitions(definitions);
   const main = el("main", { className: "stats-report" });
   main.append(createHeader());
