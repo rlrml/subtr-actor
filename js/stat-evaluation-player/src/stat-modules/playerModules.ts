@@ -38,6 +38,7 @@ import {
 } from "./renderers.ts";
 import {
   getStatsPlayerSnapshot,
+  renderGroupedPlayerCards,
   renderPlayerCard,
   type StatModule,
   type StatModuleRuntime,
@@ -92,11 +93,11 @@ export function createBoostModule(
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderBoostStats(player.boost),
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -175,14 +176,14 @@ export function createCeilingShotModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderCeilingShotStats(player.ceiling_shot),
         player.ceiling_shot?.is_last_ceiling_shot
           ? '<span class="role-indicator role-forward">Last Ceiling Shot</span>'
           : "",
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -252,14 +253,14 @@ export function createMustyFlickModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderMustyFlickStats(player.musty_flick),
         player.musty_flick?.is_last_musty
           ? '<span class="role-indicator role-forward">Last Musty</span>'
           : "",
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -307,14 +308,14 @@ export function createSpeedFlipModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderSpeedFlipStats(player.speed_flip),
         player.speed_flip?.is_last_speed_flip
           ? '<span class="role-indicator role-forward">Last Speed Flip</span>'
           : "",
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -401,7 +402,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderTouchStats(player.touch, {
@@ -410,7 +411,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         player.touch?.is_last_touch
           ? '<span class="role-indicator role-forward">Last Touch</span>'
           : "",
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -623,13 +624,13 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderMovementStats(player.movement, {
           breakdownClasses: getActiveBreakdownClasses(),
         }),
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {

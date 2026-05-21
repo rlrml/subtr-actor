@@ -107,6 +107,33 @@ export function renderPlayerCard(
   });
 }
 
+export function renderGroupedPlayerCards(
+  players: readonly PlayerStatsSnapshot[],
+  renderPlayer: (player: PlayerStatsSnapshot) => string,
+): string {
+  return `<div class="player-team-stack">${
+    ([true, false] as const).map((isTeamZero) => {
+      const teamPlayers = players.filter((player) =>
+        player.is_team_0 === isTeamZero
+      );
+      if (teamPlayers.length === 0) {
+        return "";
+      }
+
+      const teamName = isTeamZero ? "Blue" : "Orange";
+      return `<section class="player-team-group ${getTeamClass(isTeamZero)}">
+        <div class="player-team-header">
+          <h3>${teamName} team</h3>
+          <span>${teamPlayers.length} player${teamPlayers.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="player-stats-grid">
+          ${teamPlayers.map(renderPlayer).join("")}
+        </div>
+      </section>`;
+    }).join("")
+  }</div>`;
+}
+
 export function renderSharedCard(
   name: string,
   bodyHtml: string,

@@ -12,6 +12,7 @@ import {
   getCurrentDepthRole,
   getStatsPlayerSnapshot,
   RELATIVE_POSITIONING_MODULE_ID,
+  renderGroupedPlayerCards,
   renderPlayerCard,
   type StatModule,
 } from "./types.ts";
@@ -49,7 +50,7 @@ export function createRelativePositioningModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => {
+      return renderGroupedPlayerCards(statsFrame.players, (player) => {
         const depthRole = getCurrentDepthRole(
           ctx.replay,
           playerIdToString(player.player_id),
@@ -62,7 +63,7 @@ export function createRelativePositioningModule(): StatModule {
           renderRelativePositioningStats(player.positioning),
           `<span class="depth-indicator depth-${depthRole}" title="Team Depth: ${depthLabel}" aria-label="Team Depth: ${depthLabel}">${depthLabel}</span>`,
         );
-      }).join("");
+      });
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -100,11 +101,11 @@ export function createAbsolutePositioningModule(): StatModule {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderAbsolutePositioningStats(player.positioning),
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {

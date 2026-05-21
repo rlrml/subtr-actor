@@ -1063,6 +1063,35 @@ function getTeamScopeClass(team: TeamScope): string {
   return getTeamClass(team === "blue");
 }
 
+function appendGroupedPlayerOptions(
+  select: HTMLSelectElement,
+  selectedPlayerId: string | null | undefined,
+): void {
+  const players = replayPlayer?.replay.players ?? [];
+  for (const team of ["blue", "orange"] as const) {
+    const teamPlayers = players.filter((player) =>
+      player.isTeamZero === (team === "blue")
+    );
+    if (teamPlayers.length === 0) {
+      continue;
+    }
+
+    const group = document.createElement("optgroup");
+    group.label = `${getTeamLabel(team)} team`;
+    for (const player of teamPlayers) {
+      group.append(
+        new Option(
+          player.name,
+          player.id,
+          player.id === selectedPlayerId,
+          player.id === selectedPlayerId,
+        ),
+      );
+    }
+    select.append(group);
+  }
+}
+
 function getStatsWindowScopeTeamClass(statsWindow: StatsWindowState): string | null {
   if (statsWindow.kind === "player") {
     return getPlayerTeamClass(statsWindow.playerId);
@@ -1280,16 +1309,7 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
     statsWindow.kind === "player" ? "Player stats target" : "Team stats target",
   );
   if (statsWindow.kind === "player") {
-    for (const player of replayPlayer?.replay.players ?? []) {
-      select.append(
-        new Option(
-          `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
-          player.id,
-          player.id === statsWindow.playerId,
-          player.id === statsWindow.playerId,
-        ),
-      );
-    }
+    appendGroupedPlayerOptions(select, statsWindow.playerId);
     select.value = statsWindow.playerId ?? "";
     select.addEventListener("change", () => {
       statsWindow.playerId = select.value || null;
@@ -1572,23 +1592,48 @@ function renderAllPlayersStats(
   entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
 ): void {
   const list = document.createElement("div");
-  list.className = "stats-window-entity-list";
-  for (const player of frame.players) {
-    const section = document.createElement("section");
-    section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;
-    const title = document.createElement("h3");
-    title.className = "stats-window-entity-title";
-    title.textContent = player.name;
-    section.append(title);
-    for (const { entry, definition } of entries) {
-      section.append(renderStatRow(
-        statsWindow,
-        entry,
-        definition,
-        definition.format(definition.read(player)),
-      ));
+  list.className = "stats-window-team-list";
+  for (const team of ["blue", "orange"] as const) {
+    const players = frame.players.filter((player) =>
+      player.is_team_0 === (team === "blue")
+    );
+    if (players.length === 0) {
+      continue;
     }
-    list.append(section);
+
+    const teamSection = document.createElement("section");
+    teamSection.className = `stats-window-team-group ${getTeamScopeClass(team)}`;
+
+    const teamHeader = document.createElement("header");
+    teamHeader.className = "stats-window-team-header";
+    const teamTitle = document.createElement("h3");
+    teamTitle.textContent = `${getTeamLabel(team)} team`;
+    const teamMeta = document.createElement("span");
+    teamMeta.textContent = `${players.length} player${players.length === 1 ? "" : "s"}`;
+    teamHeader.append(teamTitle, teamMeta);
+    teamSection.append(teamHeader);
+
+    const playerList = document.createElement("div");
+    playerList.className = "stats-window-entity-list";
+    for (const player of players) {
+      const section = document.createElement("section");
+      section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;
+      const title = document.createElement("h4");
+      title.className = "stats-window-entity-title";
+      title.textContent = player.name;
+      section.append(title);
+      for (const { entry, definition } of entries) {
+        section.append(renderStatRow(
+          statsWindow,
+          entry,
+          definition,
+          definition.format(definition.read(player)),
+        ));
+      }
+      playerList.append(section);
+    }
+    teamSection.append(playerList);
+    list.append(teamSection);
   }
   statsWindow.body.append(list);
 }
@@ -1672,16 +1717,7 @@ function renderStatRow(
       targetSelect.classList.add(teamClass);
     }
     if (definition.scope === "player") {
-      for (const player of replayPlayer?.replay.players ?? []) {
-        targetSelect.append(
-          new Option(
-            player.name,
-            player.id,
-            player.id === entry.targetId,
-            player.id === entry.targetId,
-          ),
-        );
-      }
+      appendGroupedPlayerOptions(targetSelect, entry.targetId);
     } else {
       targetSelect.append(
         new Option("Blue", "blue", entry.targetId === "blue", entry.targetId === "blue"),

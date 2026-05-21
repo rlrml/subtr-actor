@@ -3,6 +3,7 @@ import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot } from "../statsTimeline.ts";
 import {
   getStatsPlayerSnapshot,
+  renderGroupedPlayerCards,
   renderPlayerCard,
   type StatModuleContext,
   type StatModule,
@@ -34,11 +35,11 @@ export function createPlayerStatsModule<T>(options: {
       );
       if (!statsFrame) return "";
 
-      return statsFrame.players.map((player) => renderPlayerCard(
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         options.render(options.select(player), player),
-      )).join("");
+      ));
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {

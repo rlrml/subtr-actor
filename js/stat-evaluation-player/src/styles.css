@@ -491,6 +491,49 @@ input {
   gap: 0.9rem;
 }
 
+.player-team-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.player-team-group {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-radius-md);
+  background:
+    linear-gradient(180deg, var(--team-soft), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.player-team-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-md);
+  padding-bottom: 0.42rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--team-accent) 36%, transparent);
+}
+
+.player-team-header h3 {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-team-header span {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--team-accent) 62%, #edf5fa);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .player-stats-grid {
   display: flex;
   gap: 0.7rem;
@@ -705,9 +748,48 @@ input {
 }
 
 .stats-window-stat-list,
-.stats-window-entity-list {
+.stats-window-entity-list,
+.stats-window-team-list {
   display: grid;
   gap: var(--ui-gap-sm);
+}
+
+.stats-window-team-group {
+  display: grid;
+  gap: var(--ui-gap-sm);
+  padding: 0.48rem 0.5rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-radius-md);
+  background:
+    linear-gradient(180deg, var(--team-soft), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.stats-window-team-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-md);
+  padding-bottom: 0.34rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--team-accent) 36%, transparent);
+}
+
+.stats-window-team-header h3 {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-window-team-header span {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--team-accent) 62%, #edf5fa);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .stats-window-entity {

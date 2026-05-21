@@ -15,6 +15,7 @@ import {
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import {
   getStatsPlayerSnapshot,
+  renderGroupedPlayerCards,
   renderPlayerCard,
   renderSharedCard,
   type StatModule,
@@ -258,11 +259,11 @@ export function createFiftyFiftyModule(): StatModule {
         }),
       );
 
-      const players = statsFrame.players.map((player) => renderPlayerCard(
+      const players = renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
         player.name,
         player.is_team_0,
         renderPlayerFiftyFiftyStats(player.fifty_fifty),
-      )).join("");
+      ));
 
       return summary + players;
     },
