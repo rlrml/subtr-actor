@@ -4,6 +4,15 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.2 - 2026-05-22
+
+- Keep JavaScript release builds green when npm credentials are unavailable by
+  still building and smoke-testing packages while skipping publish steps with an
+  explicit warning.
+- Make the GitHub Pages Nix build tolerate transient binary-cache substitute
+  download failures by allowing source fallback.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.2`.
+
 ## v0.7.1 - 2026-05-22
 
 - Fix CI on Rust 1.95 by simplifying the whiff-attempt boolean expression that
