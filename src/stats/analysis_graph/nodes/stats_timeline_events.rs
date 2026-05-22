@@ -54,6 +54,7 @@ impl_analysis_node! {
 
         node.state.events = ReplayStatsTimelineEvents {
             timeline,
+            goal_context: match_stats.goal_context_events().to_vec(),
             backboard: backboard.events().to_vec(),
             ceiling_shot: ceiling_shot.events().to_vec(),
             double_tap: double_tap.events().to_vec(),

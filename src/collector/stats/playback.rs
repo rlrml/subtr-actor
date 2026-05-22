@@ -159,6 +159,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
+            goal_context: self.module_player_events(
+                "core",
+                "goal_context",
+                parse_goal_context_event,
+            )?,
             backboard: self.module_player_events("backboard", "events", parse_backboard_event)?,
             ceiling_shot: self.module_player_events(
                 "ceiling_shot",
@@ -1014,6 +1019,56 @@ fn parse_timeline_event(value: &Value) -> SubtrActorResult<TimelineEvent> {
     })
 }
 
+fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent> {
+    let object = json_object(value, "goal context event")?;
+    Ok(GoalContextEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
+        scorer: json_optional_remote_id(object.get("scorer"))?,
+        scoring_team_most_back_player: json_optional_remote_id(
+            object.get("scoring_team_most_back_player"),
+        )?,
+        defending_team_most_back_player: json_optional_remote_id(
+            object.get("defending_team_most_back_player"),
+        )?,
+        ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
+        scorer_last_touch: match object.get("scorer_last_touch") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(parse_goal_touch_context(value)?),
+        },
+        players: json_required_array(object, "players")?
+            .iter()
+            .map(parse_goal_player_context)
+            .collect::<SubtrActorResult<Vec<_>>>()?,
+    })
+}
+
+fn parse_goal_player_context(value: &Value) -> SubtrActorResult<GoalPlayerContext> {
+    let object = json_object(value, "goal player context")?;
+    Ok(GoalPlayerContext {
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        position: json_optional_goal_context_position(object.get("position"))?,
+        boost_amount: json_optional_f32(object.get("boost_amount"))?,
+        average_boost_in_leadup: json_optional_f32(object.get("average_boost_in_leadup"))?,
+        min_boost_in_leadup: json_optional_f32(object.get("min_boost_in_leadup"))?,
+        is_most_back: json_required_bool(object, "is_most_back")?,
+    })
+}
+
+fn parse_goal_touch_context(value: &Value) -> SubtrActorResult<GoalTouchContext> {
+    let object = json_object(value, "goal touch context")?;
+    Ok(GoalTouchContext {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
+        player_position: json_optional_goal_context_position(object.get("player_position"))?,
+    })
+}
+
 fn parse_backboard_event(value: &Value) -> SubtrActorResult<BackboardBounceEvent> {
     let object = json_object(value, "backboard event")?;
     Ok(BackboardBounceEvent {
@@ -1156,6 +1211,19 @@ fn json_required_value<'a>(
     })
 }
 
+fn json_required_array<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<&'a Vec<Value>> {
+    json_required_value(object, field)?
+        .as_array()
+        .ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}' to be an array"
+            )))
+        })
+}
+
 fn json_f32(value: &Value) -> Option<f32> {
     value.as_f64().map(|number| number as f32)
 }
@@ -1224,6 +1292,24 @@ fn json_optional_usize(value: Option<&Value>) -> SubtrActorResult<Option<usize>>
                     "Expected optional JSON value to be an unsigned integer".to_owned(),
                 ))
             }),
+    }
+}
+
+fn json_goal_context_position(value: &Value) -> SubtrActorResult<GoalContextPosition> {
+    let object = json_object(value, "goal context position")?;
+    Ok(GoalContextPosition {
+        x: json_required_f32(object, "x")?,
+        y: json_required_f32(object, "y")?,
+        z: json_required_f32(object, "z")?,
+    })
+}
+
+fn json_optional_goal_context_position(
+    value: Option<&Value>,
+) -> SubtrActorResult<Option<GoalContextPosition>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => json_goal_context_position(value).map(Some),
     }
 }
 

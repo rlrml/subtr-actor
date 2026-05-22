@@ -34,6 +34,7 @@ impl ReplayStatsTimeline {
 #[ts(export)]
 pub struct ReplayStatsTimelineEvents {
     pub timeline: Vec<TimelineEvent>,
+    pub goal_context: Vec<GoalContextEvent>,
     pub backboard: Vec<BackboardBounceEvent>,
     pub ceiling_shot: Vec<CeilingShotEvent>,
     pub double_tap: Vec<DoubleTapEvent>,

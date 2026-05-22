@@ -104,6 +104,7 @@ struct CoreStatsExport<'a> {
     team_one: CoreTeamStats,
     player_stats: Vec<PlayerStatsEntry<'a, CorePlayerStats>>,
     timeline: &'a [TimelineEvent],
+    goal_context: &'a [GoalContextEvent],
 }
 
 #[derive(Serialize)]
@@ -165,6 +166,26 @@ struct CorePlayerStatsSnapshot {
     saves: i32,
     shots: i32,
     goals_conceded_while_last_defender: u32,
+    goals_for_while_most_back: u32,
+    goals_against_while_most_back: u32,
+    goal_against_boost_sample_count: u32,
+    average_boost_on_goals_against: f32,
+    last_boost_on_goal_against: Option<f32>,
+    goal_against_boost_leadup_sample_count: u32,
+    average_boost_in_goal_against_leadup: f32,
+    average_min_boost_in_goal_against_leadup: f32,
+    last_average_boost_in_goal_against_leadup: Option<f32>,
+    last_min_boost_in_goal_against_leadup: Option<f32>,
+    goal_against_position_sample_count: u32,
+    average_goal_against_position_x: f32,
+    average_goal_against_position_y: f32,
+    average_goal_against_position_z: f32,
+    last_goal_against_position: Option<GoalContextPosition>,
+    scoring_goal_last_touch_position_sample_count: u32,
+    average_scoring_goal_last_touch_position_x: f32,
+    average_scoring_goal_last_touch_position_y: f32,
+    average_scoring_goal_last_touch_position_z: f32,
+    last_scoring_goal_last_touch_position: Option<GoalContextPosition>,
     kickoff_goal_count: u32,
     short_goal_count: u32,
     medium_goal_count: u32,
@@ -186,6 +207,42 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
             goals_conceded_while_last_defender: stats
                 .scoring_context
                 .goals_conceded_while_last_defender,
+            goals_for_while_most_back: stats.scoring_context.goals_for_while_most_back,
+            goals_against_while_most_back: stats.scoring_context.goals_against_while_most_back,
+            goal_against_boost_sample_count: stats.scoring_context.goal_against_boost_sample_count,
+            average_boost_on_goals_against: stats.average_boost_on_goals_against(),
+            last_boost_on_goal_against: stats.scoring_context.last_boost_on_goal_against,
+            goal_against_boost_leadup_sample_count: stats
+                .scoring_context
+                .goal_against_boost_leadup_sample_count,
+            average_boost_in_goal_against_leadup: stats.average_boost_in_goal_against_leadup(),
+            average_min_boost_in_goal_against_leadup: stats
+                .average_min_boost_in_goal_against_leadup(),
+            last_average_boost_in_goal_against_leadup: stats
+                .scoring_context
+                .last_average_boost_in_goal_against_leadup,
+            last_min_boost_in_goal_against_leadup: stats
+                .scoring_context
+                .last_min_boost_in_goal_against_leadup,
+            goal_against_position_sample_count: stats
+                .scoring_context
+                .goal_against_position_sample_count,
+            average_goal_against_position_x: stats.average_goal_against_position_x(),
+            average_goal_against_position_y: stats.average_goal_against_position_y(),
+            average_goal_against_position_z: stats.average_goal_against_position_z(),
+            last_goal_against_position: stats.scoring_context.last_goal_against_position,
+            scoring_goal_last_touch_position_sample_count: stats
+                .scoring_context
+                .scoring_goal_last_touch_position_sample_count,
+            average_scoring_goal_last_touch_position_x: stats
+                .average_scoring_goal_last_touch_position_x(),
+            average_scoring_goal_last_touch_position_y: stats
+                .average_scoring_goal_last_touch_position_y(),
+            average_scoring_goal_last_touch_position_z: stats
+                .average_scoring_goal_last_touch_position_z(),
+            last_scoring_goal_last_touch_position: stats
+                .scoring_context
+                .last_scoring_goal_last_touch_position,
             kickoff_goal_count: stats.scoring_context.goal_after_kickoff.kickoff_goal_count,
             short_goal_count: stats.scoring_context.goal_after_kickoff.short_goal_count,
             medium_goal_count: stats.scoring_context.goal_after_kickoff.medium_goal_count,
@@ -260,6 +317,7 @@ pub(crate) fn builtin_module_json(
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
                 timeline: calculator.timeline(),
+                goal_context: calculator.goal_context_events(),
             })
         }
         "backboard" => {

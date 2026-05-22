@@ -10,6 +10,7 @@ const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 2.5;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
+const GOAL_CONTEXT_BOOST_LEADUP_SECONDS: f32 = 5.0;
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalAfterKickoffStats {
@@ -107,10 +108,146 @@ impl GoalBuildupStats {
 #[ts(export)]
 pub struct PlayerScoringContextStats {
     pub goals_conceded_while_last_defender: u32,
+    pub goals_for_while_most_back: u32,
+    pub goals_against_while_most_back: u32,
+    pub goal_against_boost_sample_count: u32,
+    pub cumulative_boost_on_goals_against: f32,
+    pub last_boost_on_goal_against: Option<f32>,
+    pub goal_against_boost_leadup_sample_count: u32,
+    pub cumulative_average_boost_in_goal_against_leadup: f32,
+    pub cumulative_min_boost_in_goal_against_leadup: f32,
+    pub last_average_boost_in_goal_against_leadup: Option<f32>,
+    pub last_min_boost_in_goal_against_leadup: Option<f32>,
+    pub goal_against_position_sample_count: u32,
+    pub cumulative_goal_against_position_x: f32,
+    pub cumulative_goal_against_position_y: f32,
+    pub cumulative_goal_against_position_z: f32,
+    pub last_goal_against_position: Option<GoalContextPosition>,
+    pub scoring_goal_last_touch_position_sample_count: u32,
+    pub cumulative_scoring_goal_last_touch_position_x: f32,
+    pub cumulative_scoring_goal_last_touch_position_y: f32,
+    pub cumulative_scoring_goal_last_touch_position_z: f32,
+    pub last_scoring_goal_last_touch_position: Option<GoalContextPosition>,
     #[serde(flatten)]
     pub goal_after_kickoff: GoalAfterKickoffStats,
     #[serde(flatten)]
     pub goal_buildup: GoalBuildupStats,
+}
+
+impl PlayerScoringContextStats {
+    fn record_goal_against_snapshot(
+        &mut self,
+        boost_amount: Option<f32>,
+        position: Option<GoalContextPosition>,
+        boost_leadup: Option<BoostLeadupStats>,
+    ) {
+        if let Some(boost_amount) = boost_amount {
+            self.goal_against_boost_sample_count += 1;
+            self.cumulative_boost_on_goals_against += boost_amount;
+            self.last_boost_on_goal_against = Some(boost_amount);
+        }
+
+        if let Some(boost_leadup) = boost_leadup {
+            self.goal_against_boost_leadup_sample_count += 1;
+            self.cumulative_average_boost_in_goal_against_leadup += boost_leadup.average_boost;
+            self.cumulative_min_boost_in_goal_against_leadup += boost_leadup.min_boost;
+            self.last_average_boost_in_goal_against_leadup = Some(boost_leadup.average_boost);
+            self.last_min_boost_in_goal_against_leadup = Some(boost_leadup.min_boost);
+        }
+
+        if let Some(position) = position {
+            self.goal_against_position_sample_count += 1;
+            self.cumulative_goal_against_position_x += position.x;
+            self.cumulative_goal_against_position_y += position.y;
+            self.cumulative_goal_against_position_z += position.z;
+            self.last_goal_against_position = Some(position);
+        }
+    }
+
+    fn record_scoring_goal_last_touch_position(&mut self, position: GoalContextPosition) {
+        self.scoring_goal_last_touch_position_sample_count += 1;
+        self.cumulative_scoring_goal_last_touch_position_x += position.x;
+        self.cumulative_scoring_goal_last_touch_position_y += position.y;
+        self.cumulative_scoring_goal_last_touch_position_z += position.z;
+        self.last_scoring_goal_last_touch_position = Some(position);
+    }
+
+    fn average_boost_on_goals_against(&self) -> f32 {
+        if self.goal_against_boost_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_boost_on_goals_against / self.goal_against_boost_sample_count as f32
+        }
+    }
+
+    fn average_boost_in_goal_against_leadup(&self) -> f32 {
+        if self.goal_against_boost_leadup_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_average_boost_in_goal_against_leadup
+                / self.goal_against_boost_leadup_sample_count as f32
+        }
+    }
+
+    fn average_min_boost_in_goal_against_leadup(&self) -> f32 {
+        if self.goal_against_boost_leadup_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_min_boost_in_goal_against_leadup
+                / self.goal_against_boost_leadup_sample_count as f32
+        }
+    }
+
+    fn average_goal_against_position_x(&self) -> f32 {
+        if self.goal_against_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_goal_against_position_x / self.goal_against_position_sample_count as f32
+        }
+    }
+
+    fn average_goal_against_position_y(&self) -> f32 {
+        if self.goal_against_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_goal_against_position_y / self.goal_against_position_sample_count as f32
+        }
+    }
+
+    fn average_goal_against_position_z(&self) -> f32 {
+        if self.goal_against_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_goal_against_position_z / self.goal_against_position_sample_count as f32
+        }
+    }
+
+    fn average_scoring_goal_last_touch_position_x(&self) -> f32 {
+        if self.scoring_goal_last_touch_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_scoring_goal_last_touch_position_x
+                / self.scoring_goal_last_touch_position_sample_count as f32
+        }
+    }
+
+    fn average_scoring_goal_last_touch_position_y(&self) -> f32 {
+        if self.scoring_goal_last_touch_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_scoring_goal_last_touch_position_y
+                / self.scoring_goal_last_touch_position_sample_count as f32
+        }
+    }
+
+    fn average_scoring_goal_last_touch_position_z(&self) -> f32 {
+        if self.scoring_goal_last_touch_position_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_scoring_goal_last_touch_position_z
+                / self.scoring_goal_last_touch_position_sample_count as f32
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -144,6 +281,46 @@ impl CorePlayerStats {
         self.scoring_context
             .goal_after_kickoff
             .median_goal_time_after_kickoff()
+    }
+
+    pub fn average_boost_on_goals_against(&self) -> f32 {
+        self.scoring_context.average_boost_on_goals_against()
+    }
+
+    pub fn average_boost_in_goal_against_leadup(&self) -> f32 {
+        self.scoring_context.average_boost_in_goal_against_leadup()
+    }
+
+    pub fn average_min_boost_in_goal_against_leadup(&self) -> f32 {
+        self.scoring_context
+            .average_min_boost_in_goal_against_leadup()
+    }
+
+    pub fn average_goal_against_position_x(&self) -> f32 {
+        self.scoring_context.average_goal_against_position_x()
+    }
+
+    pub fn average_goal_against_position_y(&self) -> f32 {
+        self.scoring_context.average_goal_against_position_y()
+    }
+
+    pub fn average_goal_against_position_z(&self) -> f32 {
+        self.scoring_context.average_goal_against_position_z()
+    }
+
+    pub fn average_scoring_goal_last_touch_position_x(&self) -> f32 {
+        self.scoring_context
+            .average_scoring_goal_last_touch_position_x()
+    }
+
+    pub fn average_scoring_goal_last_touch_position_y(&self) -> f32 {
+        self.scoring_context
+            .average_scoring_goal_last_touch_position_y()
+    }
+
+    pub fn average_scoring_goal_last_touch_position_z(&self) -> f32 {
+        self.scoring_context
+            .average_scoring_goal_last_touch_position_z()
     }
 }
 
@@ -211,6 +388,66 @@ pub struct TimelineEvent {
     pub is_team_0: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalContextPosition {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+impl From<glam::Vec3> for GoalContextPosition {
+    fn from(position: glam::Vec3) -> Self {
+        Self {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalPlayerContext {
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub position: Option<GoalContextPosition>,
+    pub boost_amount: Option<f32>,
+    pub average_boost_in_leadup: Option<f32>,
+    pub min_boost_in_leadup: Option<f32>,
+    pub is_most_back: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalTouchContext {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub ball_position: Option<GoalContextPosition>,
+    pub player_position: Option<GoalContextPosition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalContextEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub scoring_team_is_team_0: bool,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    pub scorer: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    pub scoring_team_most_back_player: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    pub defending_team_most_back_player: Option<PlayerId>,
+    pub ball_position: Option<GoalContextPosition>,
+    pub scorer_last_touch: Option<GoalTouchContext>,
+    pub players: Vec<GoalPlayerContext>,
+}
+
 #[derive(Debug, Clone)]
 struct PendingGoalEvent {
     event: GoalEvent,
@@ -224,6 +461,18 @@ struct GoalBuildupSample {
     ball_y: f32,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BoostLeadupSample {
+    time: f32,
+    boost_amount: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BoostLeadupStats {
+    average_boost: f32,
+    min_boost: f32,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct MatchStatsCalculator {
     player_stats: HashMap<PlayerId, CorePlayerStats>,
@@ -235,6 +484,9 @@ pub struct MatchStatsCalculator {
     kickoff_waiting_for_first_touch: bool,
     active_kickoff_touch_time: Option<f32>,
     goal_buildup_samples: Vec<GoalBuildupSample>,
+    goal_context_events: Vec<GoalContextEvent>,
+    last_touch_context_by_player: HashMap<PlayerId, GoalTouchContext>,
+    boost_leadup_samples_by_player: HashMap<PlayerId, VecDeque<BoostLeadupSample>>,
 }
 
 impl MatchStatsCalculator {
@@ -248,6 +500,10 @@ impl MatchStatsCalculator {
 
     pub fn timeline(&self) -> &[TimelineEvent] {
         &self.timeline
+    }
+
+    pub fn goal_context_events(&self) -> &[GoalContextEvent] {
+        &self.goal_context_events
     }
 
     pub fn team_zero_stats(&self) -> CoreTeamStats {
@@ -377,6 +633,230 @@ impl MatchStatsCalculator {
             .map(|(player_id, _)| player_id)
     }
 
+    fn most_back_player(players: &PlayerFrameState, team_is_team_0: bool) -> Option<PlayerId> {
+        players
+            .players
+            .iter()
+            .filter(|player| player.is_team_0 == team_is_team_0)
+            .filter_map(|player| {
+                player.position().map(|position| {
+                    (
+                        player.player_id.clone(),
+                        normalized_y(team_is_team_0, position),
+                    )
+                })
+            })
+            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .map(|(player_id, _)| player_id)
+    }
+
+    fn player_position(players: &PlayerFrameState, player_id: &PlayerId) -> Option<glam::Vec3> {
+        players
+            .players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+            .and_then(PlayerSample::position)
+    }
+
+    fn update_last_touch_contexts(
+        &mut self,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+    ) {
+        let ball_position = ball.position().map(GoalContextPosition::from);
+        for touch in &events.touch_events {
+            let Some(player_id) = touch.player.clone() else {
+                continue;
+            };
+            self.last_touch_context_by_player.insert(
+                player_id.clone(),
+                GoalTouchContext {
+                    time: touch.time,
+                    frame: touch.frame,
+                    player: player_id.clone(),
+                    is_team_0: touch.team_is_team_0,
+                    ball_position,
+                    player_position: Self::player_position(players, &player_id)
+                        .map(GoalContextPosition::from),
+                },
+            );
+        }
+    }
+
+    fn update_boost_leadup_samples(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        let cutoff_time = frame.time - GOAL_CONTEXT_BOOST_LEADUP_SECONDS;
+        for player in &players.players {
+            let Some(boost_amount) = player.boost_amount.or(player.last_boost_amount) else {
+                continue;
+            };
+            let samples = self
+                .boost_leadup_samples_by_player
+                .entry(player.player_id.clone())
+                .or_default();
+            samples.push_back(BoostLeadupSample {
+                time: frame.time,
+                boost_amount,
+            });
+            while samples
+                .front()
+                .is_some_and(|sample| sample.time < cutoff_time)
+            {
+                samples.pop_front();
+            }
+        }
+
+        self.boost_leadup_samples_by_player
+            .retain(|_, samples| !samples.is_empty());
+    }
+
+    fn boost_leadup_for_player(&self, player_id: &PlayerId) -> Option<BoostLeadupStats> {
+        let samples = self.boost_leadup_samples_by_player.get(player_id)?;
+        if samples.is_empty() {
+            return None;
+        }
+
+        let mut sum = 0.0;
+        let mut min_boost = f32::INFINITY;
+        for sample in samples {
+            sum += sample.boost_amount;
+            min_boost = min_boost.min(sample.boost_amount);
+        }
+
+        Some(BoostLeadupStats {
+            average_boost: sum / samples.len() as f32,
+            min_boost,
+        })
+    }
+
+    fn goal_player_contexts(
+        &self,
+        players: &PlayerFrameState,
+        scoring_team_is_team_0: bool,
+        scoring_team_most_back_player: Option<&PlayerId>,
+        defending_team_most_back_player: Option<&PlayerId>,
+    ) -> Vec<GoalPlayerContext> {
+        players
+            .players
+            .iter()
+            .map(|player| {
+                let most_back_player = if player.is_team_0 == scoring_team_is_team_0 {
+                    scoring_team_most_back_player
+                } else {
+                    defending_team_most_back_player
+                };
+                let boost_leadup = self.boost_leadup_for_player(&player.player_id);
+                GoalPlayerContext {
+                    player: player.player_id.clone(),
+                    is_team_0: player.is_team_0,
+                    position: player.position().map(GoalContextPosition::from),
+                    boost_amount: player.boost_amount.or(player.last_boost_amount),
+                    average_boost_in_leadup: boost_leadup.map(|stats| stats.average_boost),
+                    min_boost_in_leadup: boost_leadup.map(|stats| stats.min_boost),
+                    is_most_back: most_back_player == Some(&player.player_id),
+                }
+            })
+            .collect()
+    }
+
+    fn record_goal_context_stats(
+        &mut self,
+        players: &PlayerFrameState,
+        goal_event: &GoalEvent,
+        scoring_team_most_back_player: Option<&PlayerId>,
+        defending_team_most_back_player: Option<&PlayerId>,
+        scorer_last_touch: Option<&GoalTouchContext>,
+    ) {
+        if let Some(player_id) = scoring_team_most_back_player {
+            self.player_stats
+                .entry(player_id.clone())
+                .or_default()
+                .scoring_context
+                .goals_for_while_most_back += 1;
+        }
+
+        if let Some(player_id) = defending_team_most_back_player {
+            self.player_stats
+                .entry(player_id.clone())
+                .or_default()
+                .scoring_context
+                .goals_against_while_most_back += 1;
+        }
+
+        for player in players
+            .players
+            .iter()
+            .filter(|player| player.is_team_0 != goal_event.scoring_team_is_team_0)
+        {
+            let boost_leadup = self.boost_leadup_for_player(&player.player_id);
+            self.player_stats
+                .entry(player.player_id.clone())
+                .or_default()
+                .scoring_context
+                .record_goal_against_snapshot(
+                    player.boost_amount.or(player.last_boost_amount),
+                    player.position().map(GoalContextPosition::from),
+                    boost_leadup,
+                );
+        }
+
+        if let Some(scorer) = goal_event.player.as_ref() {
+            if let Some(touch_position) = scorer_last_touch.and_then(|touch| touch.ball_position) {
+                self.player_stats
+                    .entry(scorer.clone())
+                    .or_default()
+                    .scoring_context
+                    .record_scoring_goal_last_touch_position(touch_position);
+            }
+        }
+    }
+
+    fn record_goal_context_events(
+        &mut self,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+    ) {
+        let ball_position = ball.position().map(GoalContextPosition::from);
+        for goal_event in &events.goal_events {
+            let scoring_team_most_back_player =
+                Self::most_back_player(players, goal_event.scoring_team_is_team_0);
+            let defending_team_most_back_player =
+                Self::most_back_player(players, !goal_event.scoring_team_is_team_0);
+            let scorer_last_touch = goal_event
+                .player
+                .as_ref()
+                .and_then(|player_id| self.last_touch_context_by_player.get(player_id))
+                .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
+                .cloned();
+
+            self.record_goal_context_stats(
+                players,
+                goal_event,
+                scoring_team_most_back_player.as_ref(),
+                defending_team_most_back_player.as_ref(),
+                scorer_last_touch.as_ref(),
+            );
+
+            self.goal_context_events.push(GoalContextEvent {
+                time: goal_event.time,
+                frame: goal_event.frame,
+                scoring_team_is_team_0: goal_event.scoring_team_is_team_0,
+                scorer: goal_event.player.clone(),
+                scoring_team_most_back_player: scoring_team_most_back_player.clone(),
+                defending_team_most_back_player: defending_team_most_back_player.clone(),
+                ball_position,
+                scorer_last_touch,
+                players: self.goal_player_contexts(
+                    players,
+                    goal_event.scoring_team_is_team_0,
+                    scoring_team_most_back_player.as_ref(),
+                    defending_team_most_back_player.as_ref(),
+                ),
+            });
+        }
+    }
+
     fn prune_goal_buildup_samples(&mut self, current_time: f32) {
         self.goal_buildup_samples
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
@@ -478,7 +958,13 @@ impl MatchStatsCalculator {
         self.prune_goal_buildup_samples(frame.time);
         if live_play_state.is_live_play {
             self.record_goal_buildup_sample(frame, ball);
+            self.update_boost_leadup_samples(frame, players);
+        } else if events.goal_events.is_empty() {
+            self.last_touch_context_by_player.clear();
+            self.boost_leadup_samples_by_player.clear();
         }
+        self.update_last_touch_contexts(ball, players, events);
+        self.record_goal_context_events(ball, players, events);
         self.pending_goal_events
             .extend(events.goal_events.iter().cloned().map(|event| {
                 PendingGoalEvent {
