@@ -42,7 +42,7 @@ macro_rules! impl_analysis_node {
             }
 
             $(
-                fn finish(&mut self) -> SubtrActorResult<()> {
+                fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                     self.$finish_field.$finish_method()
                 }
             )?
@@ -101,7 +101,7 @@ macro_rules! impl_analysis_node {
             }
 
             $(
-                fn finish(&mut self) -> SubtrActorResult<()> {
+                fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                     self.$finish_field.$finish_method()
                 }
             )?
@@ -162,7 +162,7 @@ macro_rules! impl_analysis_node {
             }
 
             $(
-                fn finish(&mut self) -> SubtrActorResult<()> {
+                fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                     let $finish_self = self;
                     $finish
                 }

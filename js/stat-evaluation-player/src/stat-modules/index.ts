@@ -6,6 +6,7 @@ import {
 } from "./teamModules.ts";
 import {
   createBackboardModule,
+  createAirDribbleModule,
   createBallCarryModule,
   createBoostModule,
   createCeilingShotModule,
@@ -70,6 +71,7 @@ export function createStatModules(
     createFlickModule(),
     createMustyFlickModule(),
     createDodgeResetModule(),
+    createAirDribbleModule(),
     createBoostModule(runtime, options.boostPickupFilters),
     createBallCarryModule(),
     createMovementModule(runtime),

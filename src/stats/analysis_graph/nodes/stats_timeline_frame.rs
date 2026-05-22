@@ -77,6 +77,11 @@ impl StatsTimelineFrameNode {
             } else {
                 ball_carry.team_one_stats().clone()
             },
+            air_dribble: if is_team_zero {
+                ball_carry.team_zero_air_dribble_stats().clone()
+            } else {
+                ball_carry.team_one_air_dribble_stats().clone()
+            },
             boost: if is_team_zero {
                 boost.team_zero_stats().clone()
             } else {
@@ -186,6 +191,12 @@ impl StatsTimelineFrameNode {
             ball_carry: ctx
                 .get::<BallCarryCalculator>()?
                 .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            air_dribble: ctx
+                .get::<BallCarryCalculator>()?
+                .player_air_dribble_stats()
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),

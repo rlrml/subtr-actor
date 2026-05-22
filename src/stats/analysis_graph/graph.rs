@@ -143,7 +143,7 @@ pub trait AnalysisNode: 'static {
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()>;
 
-    fn finish(&mut self) -> SubtrActorResult<()> {
+    fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         Ok(())
     }
 
@@ -163,7 +163,7 @@ pub trait AnalysisNodeDyn: 'static {
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()>;
 
-    fn finish(&mut self) -> SubtrActorResult<()>;
+    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()>;
 
     fn state_any(&self) -> &dyn Any;
 }
@@ -196,8 +196,8 @@ where
         AnalysisNode::evaluate(self, ctx)
     }
 
-    fn finish(&mut self) -> SubtrActorResult<()> {
-        AnalysisNode::finish(self)
+    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        AnalysisNode::finish(self, ctx)
     }
 
     fn state_any(&self) -> &dyn Any {
@@ -413,8 +413,14 @@ impl AnalysisGraph {
     }
 
     pub fn finish(&mut self) -> SubtrActorResult<()> {
-        for node in &mut self.nodes {
-            node.finish()?;
+        self.resolve()?;
+        for node_index in self.evaluation_order.clone() {
+            let (before, current_and_after) = self.nodes.split_at_mut(node_index);
+            let (current, _) = current_and_after
+                .split_first_mut()
+                .expect("evaluation order should contain valid indexes");
+            let ctx = AnalysisStateContext::from_parts(&self.root_states, &[], before);
+            current.finish(&ctx)?;
         }
         Ok(())
     }

@@ -27,6 +27,7 @@ import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
   renderBackboardStats,
+  renderAirDribbleStats,
   renderBallCarryStats,
   renderBoostStats,
   renderCeilingShotStats,
@@ -209,6 +210,15 @@ export function createBallCarryModule(): StatModule {
     getTimelineEvents(ctx) {
       return buildBallCarryTimelineEvents(ctx.statsTimeline, ctx.replay);
     },
+  });
+}
+
+export function createAirDribbleModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "air-dribble",
+    label: "Air Dribble",
+    select: (player) => player.air_dribble,
+    render: (airDribble) => renderAirDribbleStats(airDribble),
   });
 }
 

@@ -460,6 +460,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             backboard: self.frame_team_stat_or_default_typed(frame, "backboard", team_key)?,
             double_tap: self.frame_team_stat_or_default_typed(frame, "double_tap", team_key)?,
             ball_carry: self.frame_team_stat_or_default_typed(frame, "ball_carry", team_key)?,
+            air_dribble: self.frame_team_stat_or_default_typed(frame, "air_dribble", team_key)?,
             boost: self.frame_team_stat_or_default_typed(frame, "boost", team_key)?,
             movement: self.frame_team_stat_or_default_typed(frame, "movement", team_key)?,
             powerslide: self.frame_team_stat_or_default_typed(frame, "powerslide", team_key)?,
@@ -530,6 +531,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ball_carry: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "ball_carry",
+                &player_key,
+            )?,
+            air_dribble: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "air_dribble",
                 &player_key,
             )?,
             boost: self.frame_player_stat_or_default_typed_by_key(frame, "boost", &player_key)?,
@@ -614,6 +620,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         team.insert(
             "ball_carry".to_owned(),
             self.frame_team_stat_or_default::<BallCarryStats>(frame, "ball_carry", team_key),
+        );
+        team.insert(
+            "air_dribble".to_owned(),
+            self.frame_team_stat_or_default::<AirDribbleStats>(frame, "air_dribble", team_key),
         );
         team.insert(
             "boost".to_owned(),
@@ -756,6 +766,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<BallCarryStats>(
                 frame,
                 "ball_carry",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "air_dribble".to_owned(),
+            self.frame_player_stat_or_default_by_key::<AirDribbleStats>(
+                frame,
+                "air_dribble",
                 &player_key,
             )?,
         );

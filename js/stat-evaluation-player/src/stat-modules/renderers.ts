@@ -313,6 +313,20 @@ export function renderBallCarryStats(
     <div class="stat-row"><span class="label">Avg gap</span><span class="value">${formatNumber(averageHorizontalGap, 0)}</span></div>
   `;
 }
+export function renderAirDribbleStats(
+  airDribble: PlayerStatsSnapshot["air_dribble"] | undefined,
+): string {
+  const averageHorizontalGap = airDribble && airDribble.count > 0
+    ? airDribble.average_horizontal_gap_sum / airDribble.count
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Air dribbles</span><span class="value">${formatInteger(airDribble?.count)}</span></div>
+    <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(airDribble?.total_time, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(airDribble?.longest_time, 1, "s")}</span></div>
+    <div class="stat-row"><span class="label">Furthest</span><span class="value">${formatNumber(airDribble?.furthest_distance, 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg gap</span><span class="value">${formatNumber(averageHorizontalGap, 0)}</span></div>
+  `;
+}
 
 export function renderPowerslideStats(
   powerslide: PlayerStatsSnapshot["powerslide"] | undefined,

@@ -59,6 +59,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         backboard: BackboardTeamStats::default(),
         double_tap: DoubleTapTeamStats::default(),
         ball_carry: BallCarryStats::default(),
+        air_dribble: AirDribbleStats::default(),
         boost: BoostStats::default(),
         movement: MovementStats::default(),
         powerslide: PowerslideStats::default(),
@@ -303,6 +304,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             fifty_fifty: Vec::new(),
             rush: Vec::new(),
             speed_flip: Vec::new(),
+            wavedash: Vec::new(),
             whiff: Vec::new(),
             boost_pickups: Vec::new(),
         },
@@ -549,6 +551,10 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         ball_carry.team_zero_stats().clone()
     );
     assert_eq!(
+        final_frame.team_zero.air_dribble,
+        ball_carry.team_zero_air_dribble_stats().clone()
+    );
+    assert_eq!(
         final_frame.team_zero.backboard,
         backboard.team_zero_stats().clone()
     );
@@ -567,6 +573,10 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     assert_eq!(
         final_frame.team_one.ball_carry,
         ball_carry.team_one_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.air_dribble,
+        ball_carry.team_one_air_dribble_stats().clone()
     );
     assert_eq!(final_frame.team_zero.boost, boost.team_zero_stats().clone());
     assert_eq!(final_frame.team_one.boost, boost.team_one_stats().clone());
@@ -607,6 +617,14 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
             player.ball_carry,
             ball_carry
                 .player_stats()
+                .get(&player.player_id)
+                .cloned()
+                .unwrap_or_default()
+        );
+        assert_eq!(
+            player.air_dribble,
+            ball_carry
+                .player_air_dribble_stats()
                 .get(&player.player_id)
                 .cloned()
                 .unwrap_or_default()

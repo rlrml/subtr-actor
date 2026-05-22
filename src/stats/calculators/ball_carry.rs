@@ -49,10 +49,60 @@ impl BallCarryStats {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AirDribbleStats {
+    pub count: u32,
+    pub total_time: f32,
+    pub total_straight_line_distance: f32,
+    pub total_path_distance: f32,
+    pub longest_time: f32,
+    pub furthest_distance: f32,
+    pub fastest_speed: f32,
+    pub speed_sum: f32,
+    pub average_horizontal_gap_sum: f32,
+    pub average_vertical_gap_sum: f32,
+}
+
+impl AirDribbleStats {
+    fn count_average(&self, value: f32) -> f32 {
+        if self.count == 0 {
+            0.0
+        } else {
+            value / self.count as f32
+        }
+    }
+
+    pub fn average_time(&self) -> f32 {
+        self.count_average(self.total_time)
+    }
+
+    pub fn average_straight_line_distance(&self) -> f32 {
+        self.count_average(self.total_straight_line_distance)
+    }
+
+    pub fn average_path_distance(&self) -> f32 {
+        self.count_average(self.total_path_distance)
+    }
+
+    pub fn average_speed(&self) -> f32 {
+        self.count_average(self.speed_sum)
+    }
+
+    pub fn average_horizontal_gap(&self) -> f32 {
+        self.count_average(self.average_horizontal_gap_sum)
+    }
+
+    pub fn average_vertical_gap(&self) -> f32 {
+        self.count_average(self.average_vertical_gap_sum)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BallCarryEvent {
     pub player_id: PlayerId,
     pub is_team_0: bool,
+    pub kind: BallCarryKind,
     pub start_frame: usize,
     pub end_frame: usize,
     pub start_time: f32,
@@ -65,39 +115,24 @@ pub struct BallCarryEvent {
     pub average_speed: f32,
 }
 
-#[derive(Debug, Clone)]
-struct ActiveBallCarry {
-    player_id: PlayerId,
-    is_team_0: bool,
-    start_frame: usize,
-    last_frame: usize,
-    start_time: f32,
-    last_time: f32,
-    start_position: glam::Vec3,
-    last_position: glam::Vec3,
-    duration: f32,
-    path_distance: f32,
-    horizontal_gap_integral: f32,
-    vertical_gap_integral: f32,
-    speed_integral: f32,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct BallCarryFrameSample {
-    player_position: glam::Vec3,
-    horizontal_gap: f32,
-    vertical_gap: f32,
-    speed: f32,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum BallCarryKind {
+    Carry,
+    AirDribble,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct BallCarryCalculator {
     player_stats: HashMap<PlayerId, BallCarryStats>,
+    player_air_dribble_stats: HashMap<PlayerId, AirDribbleStats>,
     team_zero_stats: BallCarryStats,
     team_one_stats: BallCarryStats,
+    team_zero_air_dribble_stats: AirDribbleStats,
+    team_one_air_dribble_stats: AirDribbleStats,
     carry_events: Vec<BallCarryEvent>,
-    active_carry: Option<ActiveBallCarry>,
-    last_touch_player: Option<PlayerId>,
+    processed_control_sequence_count: usize,
 }
 
 impl BallCarryCalculator {
@@ -109,6 +144,10 @@ impl BallCarryCalculator {
         &self.player_stats
     }
 
+    pub fn player_air_dribble_stats(&self) -> &HashMap<PlayerId, AirDribbleStats> {
+        &self.player_air_dribble_stats
+    }
+
     pub fn team_zero_stats(&self) -> &BallCarryStats {
         &self.team_zero_stats
     }
@@ -117,123 +156,158 @@ impl BallCarryCalculator {
         &self.team_one_stats
     }
 
+    pub fn team_zero_air_dribble_stats(&self) -> &AirDribbleStats {
+        &self.team_zero_air_dribble_stats
+    }
+
+    pub fn team_one_air_dribble_stats(&self) -> &AirDribbleStats {
+        &self.team_one_air_dribble_stats
+    }
+
     pub fn carry_events(&self) -> &[BallCarryEvent] {
         &self.carry_events
     }
 
-    fn carry_frame_sample(
+    pub(crate) fn carry_frame_sample(
         player: &PlayerSample,
         ball: &BallSample,
-    ) -> Option<BallCarryFrameSample> {
+    ) -> Option<ContinuousBallControlSample<BallCarryKind>> {
         let player_position = player.position()?;
         let ball_position = ball.position();
+        let horizontal_gap = player_position
+            .truncate()
+            .distance(ball_position.truncate());
+        let vertical_gap = ball_position.z - player_position.z;
+
+        if Self::is_air_dribble_sample(player_position, ball_position, horizontal_gap, vertical_gap)
+        {
+            return Some(ContinuousBallControlSample {
+                player_position,
+                kind: BallCarryKind::AirDribble,
+                horizontal_gap,
+                vertical_gap,
+                speed: player.speed().unwrap_or(0.0),
+            });
+        }
+
         if !(BALL_CARRY_MIN_BALL_Z..=BALL_CARRY_MAX_BALL_Z).contains(&ball_position.z) {
             return None;
         }
 
-        let horizontal_gap = player_position
-            .truncate()
-            .distance(ball_position.truncate());
         if horizontal_gap > BALL_CARRY_MAX_HORIZONTAL_GAP {
             return None;
         }
 
-        let vertical_gap = ball_position.z - player_position.z;
         if !(0.0..=BALL_CARRY_MAX_VERTICAL_GAP).contains(&vertical_gap) {
             return None;
         }
 
-        Some(BallCarryFrameSample {
+        Some(ContinuousBallControlSample {
             player_position,
+            kind: BallCarryKind::Carry,
             horizontal_gap,
             vertical_gap,
             speed: player.speed().unwrap_or(0.0),
         })
     }
 
-    fn begin_carry(
-        &self,
-        frame: &FrameInfo,
-        player: &PlayerSample,
-        frame_sample: BallCarryFrameSample,
-    ) -> ActiveBallCarry {
-        let start_time = (frame.time - frame.dt).max(0.0);
-        let start_frame = frame.frame_number.saturating_sub(1);
-        ActiveBallCarry {
-            player_id: player.player_id.clone(),
-            is_team_0: player.is_team_0,
-            start_frame,
-            last_frame: frame.frame_number,
-            start_time,
-            last_time: frame.time,
-            start_position: frame_sample.player_position,
-            last_position: frame_sample.player_position,
-            duration: frame.dt,
-            path_distance: 0.0,
-            horizontal_gap_integral: frame_sample.horizontal_gap * frame.dt,
-            vertical_gap_integral: frame_sample.vertical_gap * frame.dt,
-            speed_integral: frame_sample.speed * frame.dt,
+    fn is_air_dribble_sample(
+        player_position: glam::Vec3,
+        ball_position: glam::Vec3,
+        horizontal_gap: f32,
+        vertical_gap: f32,
+    ) -> bool {
+        ball_position.z >= AIR_DRIBBLE_MIN_BALL_Z
+            && player_position.z >= AIR_DRIBBLE_MIN_PLAYER_Z
+            && horizontal_gap <= AIR_DRIBBLE_MAX_HORIZONTAL_GAP
+            && (-AIR_DRIBBLE_MAX_BELOW_CAR_GAP..=AIR_DRIBBLE_MAX_ABOVE_CAR_GAP)
+                .contains(&vertical_gap)
+    }
+
+    pub(crate) fn min_duration_for_kind(kind: BallCarryKind) -> f32 {
+        match kind {
+            BallCarryKind::Carry => BALL_CARRY_MIN_DURATION,
+            BallCarryKind::AirDribble => AIR_DRIBBLE_MIN_DURATION,
         }
     }
 
-    fn extend_carry(
-        active_carry: &mut ActiveBallCarry,
-        frame: &FrameInfo,
-        frame_sample: BallCarryFrameSample,
-    ) {
-        active_carry.duration += frame.dt;
-        active_carry.path_distance += frame_sample
-            .player_position
-            .distance(active_carry.last_position);
-        active_carry.last_position = frame_sample.player_position;
-        active_carry.last_time = frame.time;
-        active_carry.last_frame = frame.frame_number;
-        active_carry.horizontal_gap_integral += frame_sample.horizontal_gap * frame.dt;
-        active_carry.vertical_gap_integral += frame_sample.vertical_gap * frame.dt;
-        active_carry.speed_integral += frame_sample.speed * frame.dt;
+    pub(crate) fn control_candidate(
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        live_play: bool,
+        controlling_player: Option<&PlayerId>,
+    ) -> Option<ContinuousBallControlCandidate<BallCarryKind>> {
+        if !live_play {
+            return None;
+        }
+        let ball = ball.sample()?;
+        let player_id = controlling_player?;
+        players
+            .players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+            .and_then(|player| {
+                Self::carry_frame_sample(player, ball).map(|sample| {
+                    ContinuousBallControlCandidate {
+                        player_id: player.player_id.clone(),
+                        is_team_0: player.is_team_0,
+                        sample,
+                    }
+                })
+            })
     }
 
-    fn finalize_active_carry(&mut self) {
-        let Some(active_carry) = self.active_carry.take() else {
-            return;
-        };
-        if active_carry.duration < BALL_CARRY_MIN_DURATION {
-            return;
+    fn event_from_sequence(
+        sequence: CompletedBallControlSequence<BallCarryKind>,
+    ) -> BallCarryEvent {
+        BallCarryEvent {
+            player_id: sequence.player_id,
+            is_team_0: sequence.is_team_0,
+            kind: sequence.kind,
+            start_frame: sequence.start_frame,
+            end_frame: sequence.end_frame,
+            start_time: sequence.start_time,
+            end_time: sequence.end_time,
+            duration: sequence.duration,
+            straight_line_distance: sequence.straight_line_distance,
+            path_distance: sequence.path_distance,
+            average_horizontal_gap: sequence.average_horizontal_gap,
+            average_vertical_gap: sequence.average_vertical_gap,
+            average_speed: sequence.average_speed,
         }
-
-        let event = BallCarryEvent {
-            player_id: active_carry.player_id.clone(),
-            is_team_0: active_carry.is_team_0,
-            start_frame: active_carry.start_frame,
-            end_frame: active_carry.last_frame,
-            start_time: active_carry.start_time,
-            end_time: active_carry.last_time,
-            duration: active_carry.duration,
-            straight_line_distance: active_carry
-                .start_position
-                .truncate()
-                .distance(active_carry.last_position.truncate()),
-            path_distance: active_carry.path_distance,
-            average_horizontal_gap: active_carry.horizontal_gap_integral / active_carry.duration,
-            average_vertical_gap: active_carry.vertical_gap_integral / active_carry.duration,
-            average_speed: active_carry.speed_integral / active_carry.duration,
-        };
-        self.record_carry_event(event);
     }
 
     fn record_carry_event(&mut self, event: BallCarryEvent) {
-        let player_stats = self
-            .player_stats
-            .entry(event.player_id.clone())
-            .or_default();
-        Self::apply_carry_event(player_stats, &event);
+        match event.kind {
+            BallCarryKind::Carry => {
+                let player_stats = self
+                    .player_stats
+                    .entry(event.player_id.clone())
+                    .or_default();
+                Self::apply_carry_event(player_stats, &event);
 
-        let team_stats = if event.is_team_0 {
-            &mut self.team_zero_stats
-        } else {
-            &mut self.team_one_stats
-        };
-        Self::apply_carry_event(team_stats, &event);
+                let team_stats = if event.is_team_0 {
+                    &mut self.team_zero_stats
+                } else {
+                    &mut self.team_one_stats
+                };
+                Self::apply_carry_event(team_stats, &event);
+            }
+            BallCarryKind::AirDribble => {
+                let player_stats = self
+                    .player_air_dribble_stats
+                    .entry(event.player_id.clone())
+                    .or_default();
+                Self::apply_air_dribble_event(player_stats, &event);
+
+                let team_stats = if event.is_team_0 {
+                    &mut self.team_zero_air_dribble_stats
+                } else {
+                    &mut self.team_one_air_dribble_stats
+                };
+                Self::apply_air_dribble_event(team_stats, &event);
+            }
+        }
         self.carry_events.push(event);
     }
 
@@ -252,78 +326,33 @@ impl BallCarryCalculator {
         stats.average_vertical_gap_sum += event.average_vertical_gap;
     }
 
-    fn process_sample(
-        &mut self,
-        frame: &FrameInfo,
-        ball: &BallFrameState,
-        players: &PlayerFrameState,
-        live_play: bool,
-        controlling_player: Option<PlayerId>,
-    ) -> SubtrActorResult<()> {
-        let carry_candidate = if live_play && frame.dt > 0.0 {
-            if let (Some(ball), Some(player_id)) = (ball.sample(), controlling_player.as_ref()) {
-                players
-                    .players
-                    .iter()
-                    .find(|player| &player.player_id == player_id)
-                    .and_then(|player| {
-                        Self::carry_frame_sample(player, ball)
-                            .map(|frame_sample| (player, frame_sample))
-                    })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        match (self.active_carry.as_mut(), carry_candidate) {
-            (Some(active_carry), Some((player, frame_sample)))
-                if active_carry.player_id == player.player_id =>
-            {
-                Self::extend_carry(active_carry, frame, frame_sample);
-            }
-            (Some(_), Some((player, frame_sample))) => {
-                self.finalize_active_carry();
-                self.active_carry = Some(self.begin_carry(frame, player, frame_sample));
-            }
-            (Some(_), None) => {
-                self.finalize_active_carry();
-            }
-            (None, Some((player, frame_sample))) => {
-                self.active_carry = Some(self.begin_carry(frame, player, frame_sample));
-            }
-            (None, None) => {}
-        }
-
-        if let Some(active_carry) = &self.active_carry {
-            if controlling_player.as_ref() != Some(&active_carry.player_id) {
-                self.finalize_active_carry();
-            }
-        }
-
-        self.last_touch_player = controlling_player;
-        Ok(())
+    fn apply_air_dribble_event(stats: &mut AirDribbleStats, event: &BallCarryEvent) {
+        stats.count += 1;
+        stats.total_time += event.duration;
+        stats.total_straight_line_distance += event.straight_line_distance;
+        stats.total_path_distance += event.path_distance;
+        stats.longest_time = stats.longest_time.max(event.duration);
+        stats.furthest_distance = stats.furthest_distance.max(event.straight_line_distance);
+        stats.fastest_speed = stats.fastest_speed.max(event.average_speed);
+        stats.speed_sum += event.average_speed;
+        stats.average_horizontal_gap_sum += event.average_horizontal_gap;
+        stats.average_vertical_gap_sum += event.average_vertical_gap;
     }
 
-    pub fn update(
-        &mut self,
-        frame: &FrameInfo,
-        ball: &BallFrameState,
-        players: &PlayerFrameState,
-        touch_state: &TouchState,
-        live_play_state: &LivePlayState,
-    ) -> SubtrActorResult<()> {
-        self.process_sample(
-            frame,
-            ball,
-            players,
-            live_play_state.is_live_play,
-            touch_state.last_touch_player.clone(),
-        )
-    }
-    pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
-        self.finalize_active_carry();
+    pub fn update(&mut self, control_state: &ContinuousBallControlState) -> SubtrActorResult<()> {
+        for sequence in control_state
+            .completed_sequences
+            .iter()
+            .skip(self.processed_control_sequence_count)
+            .cloned()
+        {
+            self.record_carry_event(Self::event_from_sequence(sequence));
+        }
+        self.processed_control_sequence_count = control_state.completed_sequences.len();
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "ball_carry_tests.rs"]
+mod tests;

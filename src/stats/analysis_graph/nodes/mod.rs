@@ -1,8 +1,9 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     BackboardBounceState, BackboardCalculator, BallCarryCalculator, BallFrameState,
-    BoostCalculator, CeilingShotCalculator, DemoCalculator, DodgeResetCalculator,
-    DoubleTapCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FrameEventsState,
+    BoostCalculator, CeilingShotCalculator, ContinuousBallControlState, DemoCalculator,
+    DodgeResetCalculator, DoubleTapCalculator, FiftyFiftyCalculator, FiftyFiftyState,
+    FlickCalculator, FrameEventsState,
     FrameInfo, GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator,
     MustyFlickCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
     PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
@@ -16,6 +17,7 @@ pub(crate) mod ball_carry;
 pub(crate) mod ball_frame_state;
 pub(crate) mod boost;
 pub(crate) mod ceiling_shot;
+pub(crate) mod continuous_ball_control;
 pub(crate) mod demo;
 pub(crate) mod dodge_reset;
 pub(crate) mod double_tap;
@@ -58,6 +60,8 @@ pub use ball_frame_state::BallFrameStateNode;
 pub use boost::BoostNode;
 #[allow(unused_imports)]
 pub use ceiling_shot::CeilingShotNode;
+#[allow(unused_imports)]
+pub use continuous_ball_control::ContinuousBallControlNode;
 #[allow(unused_imports)]
 pub use demo::DemoNode;
 #[allow(unused_imports)]
@@ -167,6 +171,12 @@ pub(crate) fn live_play_dependency() -> AnalysisDependency {
 
 pub(crate) fn backboard_bounce_state_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<BackboardBounceState>(backboard_bounce::boxed_default)
+}
+
+pub(crate) fn continuous_ball_control_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<ContinuousBallControlState>(
+        continuous_ball_control::boxed_default,
+    )
 }
 
 pub(crate) fn fifty_fifty_state_dependency() -> AnalysisDependency {
