@@ -1,11 +1,19 @@
 use super::*;
 
-const WHIFF_ENTER_DISTANCE: f32 = 185.0;
-const WHIFF_EXIT_DISTANCE: f32 = 340.0;
+const WHIFF_ENTER_DISTANCE: f32 = 150.0;
+const WHIFF_EXIT_DISTANCE: f32 = 285.0;
 const WHIFF_MAX_CANDIDATE_SECONDS: f32 = 0.65;
-const WHIFF_MIN_APPROACH_SPEED: f32 = 300.0;
-const WHIFF_MIN_FORWARD_ALIGNMENT: f32 = 0.15;
-const WHIFF_MIN_DODGE_APPROACH_SPEED: f32 = 100.0;
+const WHIFF_MIN_APPROACH_SPEED: f32 = 700.0;
+const WHIFF_MIN_CLOSING_SPEED: f32 = 450.0;
+const WHIFF_MIN_FORWARD_ALIGNMENT: f32 = 0.55;
+const WHIFF_MIN_VELOCITY_ALIGNMENT: f32 = 0.7;
+const WHIFF_MIN_DODGE_APPROACH_SPEED: f32 = 450.0;
+const WHIFF_MIN_DODGE_CLOSING_SPEED: f32 = 300.0;
+const WHIFF_MIN_DODGE_FORWARD_ALIGNMENT: f32 = 0.25;
+const WHIFF_MAX_LATERAL_OFFSET: f32 = 120.0;
+const WHIFF_MAX_DODGE_LATERAL_OFFSET: f32 = 150.0;
+const WHIFF_MIN_LOCAL_FORWARD_OFFSET: f32 = 0.0;
+const WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET: f32 = -20.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -128,9 +136,16 @@ impl WhiffCalculator {
         Some(glam::Vec3::new(x_distance, y_distance, z_distance).length())
     }
 
+    fn local_ball_position(ball_position: glam::Vec3, player: &PlayerSample) -> Option<glam::Vec3> {
+        let rigid_body = player.rigid_body.as_ref()?;
+        let player_position = player.position()?;
+        Some(quat_to_glam(&rigid_body.rotation).inverse() * (ball_position - player_position))
+    }
+
     fn whiff_candidate(
         frame: &FrameInfo,
         ball_position: glam::Vec3,
+        ball_velocity: glam::Vec3,
         player: &PlayerSample,
     ) -> Option<ActiveWhiffCandidate> {
         let distance = Self::hitbox_distance(ball_position, player)?;
@@ -140,6 +155,7 @@ impl WhiffCalculator {
 
         let rigid_body = player.rigid_body.as_ref()?;
         let player_position = player.position()?;
+        let local_ball_position = Self::local_ball_position(ball_position, player)?;
         let to_ball = (ball_position - player_position).normalize_or_zero();
         if to_ball.length_squared() <= f32::EPSILON {
             return None;
@@ -147,12 +163,29 @@ impl WhiffCalculator {
 
         let rotation = quat_to_glam(&rigid_body.rotation);
         let forward_alignment = (rotation * glam::Vec3::X).dot(to_ball);
-        let approach_speed = player.velocity().unwrap_or(glam::Vec3::ZERO).dot(to_ball);
+        let player_velocity = player.velocity().unwrap_or(glam::Vec3::ZERO);
+        let player_speed = player_velocity.length();
+        let velocity_alignment = if player_speed <= f32::EPSILON {
+            0.0
+        } else {
+            player_velocity.normalize_or_zero().dot(to_ball)
+        };
+        let approach_speed = player_velocity.dot(to_ball);
+        let closing_speed = (player_velocity - ball_velocity).dot(to_ball);
+        let ball_in_front = local_ball_position.x >= WHIFF_MIN_LOCAL_FORWARD_OFFSET
+            && local_ball_position.y.abs() <= WHIFF_MAX_LATERAL_OFFSET;
+        let dodge_ball_in_front = local_ball_position.x >= WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET
+            && local_ball_position.y.abs() <= WHIFF_MAX_DODGE_LATERAL_OFFSET;
         let committed_approach = approach_speed >= WHIFF_MIN_APPROACH_SPEED
+            && closing_speed >= WHIFF_MIN_CLOSING_SPEED
             && forward_alignment >= WHIFF_MIN_FORWARD_ALIGNMENT;
-        let committed_dodge =
-            player.dodge_active && approach_speed >= WHIFF_MIN_DODGE_APPROACH_SPEED;
-        if !committed_approach && !committed_dodge {
+        let directed_motion = velocity_alignment >= WHIFF_MIN_VELOCITY_ALIGNMENT;
+        let committed_dodge = player.dodge_active
+            && approach_speed >= WHIFF_MIN_DODGE_APPROACH_SPEED
+            && closing_speed >= WHIFF_MIN_DODGE_CLOSING_SPEED
+            && forward_alignment >= WHIFF_MIN_DODGE_FORWARD_ALIGNMENT
+            && dodge_ball_in_front;
+        if !(committed_approach && directed_motion && ball_in_front) && !committed_dodge {
             return None;
         }
 
@@ -238,6 +271,7 @@ impl WhiffCalculator {
         &mut self,
         frame: &FrameInfo,
         ball_position: glam::Vec3,
+        ball_velocity: glam::Vec3,
         players: &PlayerFrameState,
     ) {
         let mut visible_players = HashSet::new();
@@ -254,7 +288,9 @@ impl WhiffCalculator {
                     candidate.closest_approach_distance = distance;
                     candidate.closest_time = frame.time;
                     candidate.closest_frame = frame.frame_number;
-                    if let Some(updated) = Self::whiff_candidate(frame, ball_position, player) {
+                    if let Some(updated) =
+                        Self::whiff_candidate(frame, ball_position, ball_velocity, player)
+                    {
                         candidate.forward_alignment = updated.forward_alignment;
                         candidate.approach_speed = updated.approach_speed;
                         candidate.dodge_active |= updated.dodge_active;
@@ -272,7 +308,9 @@ impl WhiffCalculator {
                 continue;
             }
 
-            if let Some(candidate) = Self::whiff_candidate(frame, ball_position, player) {
+            if let Some(candidate) =
+                Self::whiff_candidate(frame, ball_position, ball_velocity, player)
+            {
                 self.active_candidates.insert(player_id, candidate);
             }
         }
@@ -305,7 +343,12 @@ impl WhiffCalculator {
         self.begin_sample(frame);
         self.cancel_touched_candidates(touch_state);
         if let Some(ball_position) = ball.position() {
-            self.update_active_candidates(frame, ball_position, players);
+            self.update_active_candidates(
+                frame,
+                ball_position,
+                ball.velocity().unwrap_or(glam::Vec3::ZERO),
+                players,
+            );
         }
 
         if let Some(player_id) = self.current_last_whiff_player.as_ref() {
