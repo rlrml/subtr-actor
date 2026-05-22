@@ -4,6 +4,13 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.4 - 2026-05-22
+
+- Add a Goals tab to the stats report page that summarizes goal metadata,
+  goal-tag counts, scorer/timing context, tag evidence, and lead-up player
+  state from the stats timeline.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.4`.
+
 ## v0.7.3 - 2026-05-22
 
 - Fix the stats-player packed-package smoke test fixture so it includes the

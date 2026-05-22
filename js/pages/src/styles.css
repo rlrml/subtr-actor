@@ -355,6 +355,117 @@ input {
   font-size: 0.82rem;
 }
 
+.stats-report-goal-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.stats-report-goal-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-left: 3px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--ui-radius-lg);
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2);
+}
+
+.stats-report-goal-card[data-team="blue"] {
+  border-left-color: var(--blue);
+}
+
+.stats-report-goal-card[data-team="orange"] {
+  border-left-color: var(--orange);
+}
+
+.stats-report-goal-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stats-report-goal-card h2,
+.stats-report-goal-subsection h3 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.stats-report-goal-card h2 {
+  font-size: 1rem;
+}
+
+.stats-report-goal-card > header span {
+  overflow: hidden;
+  color: var(--muted);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-report-goal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  padding: 0.7rem 0.9rem 0;
+}
+
+.stats-report-goal-tag {
+  padding: 0.2rem 0.48rem;
+  border: 1px solid rgba(88, 166, 255, 0.24);
+  border-radius: var(--ui-radius-md);
+  background: rgba(88, 166, 255, 0.14);
+  color: #d8ecff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stats-report-goal-tag-empty {
+  border-color: rgba(159, 173, 183, 0.2);
+  background: rgba(159, 173, 183, 0.12);
+  color: #c8d2d9;
+}
+
+.stats-report-detail-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.7rem 0.9rem;
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+}
+
+.stats-report-detail-item {
+  min-width: 0;
+}
+
+.stats-report-detail-list dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-report-detail-list dd {
+  overflow-wrap: anywhere;
+  margin: 0.22rem 0 0;
+  color: #edf5fa;
+  font-weight: 700;
+}
+
+.stats-report-goal-subsection {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0 0.9rem 0.9rem;
+}
+
+.stats-report-goal-subsection h3 {
+  color: #dce8ee;
+  font-size: 0.88rem;
+}
+
 .stats-report-jump-nav {
   display: flex;
   flex-wrap: wrap;
@@ -439,6 +550,10 @@ input {
   .stats-report-charts {
     grid-template-columns: 1fr;
   }
+
+  .stats-report-detail-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 620px) {
@@ -453,5 +568,17 @@ input {
 
   .stats-report-pie {
     width: min(11rem, 54vw);
+  }
+
+  .stats-report-goal-card > header {
+    display: grid;
+  }
+
+  .stats-report-goal-card > header span {
+    text-align: left;
+  }
+
+  .stats-report-detail-list {
+    grid-template-columns: 1fr;
   }
 }
