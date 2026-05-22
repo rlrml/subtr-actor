@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.3 - 2026-05-22
+
+- Fix the stats-player packed-package smoke test fixture so it includes the
+  current stats timeline config and event buckets.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.3`.
+
 ## v0.7.2 - 2026-05-22
 
 - Keep JavaScript release builds green when npm credentials are unavailable by
