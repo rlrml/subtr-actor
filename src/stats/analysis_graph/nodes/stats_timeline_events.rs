@@ -111,7 +111,6 @@ impl_analysis_node! {
                 speed_flip,
                 half_flip,
                 wavedash,
-                whiff,
             ),
             goal_context: match_stats.goal_context_events().to_vec(),
             backboard: backboard.events().to_vec(),
@@ -188,7 +187,6 @@ fn build_mechanic_events(
     speed_flip: &SpeedFlipCalculator,
     half_flip: &HalfFlipCalculator,
     wavedash: &WavedashCalculator,
-    whiff: &WhiffCalculator,
 ) -> Vec<MechanicEvent> {
     let mut events = Vec::new();
 
@@ -327,17 +325,6 @@ fn build_mechanic_events(
             event.dodge_frame,
             event.frame,
             event.dodge_time,
-            event.time,
-            event.player.clone(),
-            event.is_team_0,
-        ));
-    }
-
-    for (index, event) in whiff.events().iter().enumerate() {
-        events.push(moment_mechanic_event(
-            "whiff",
-            index,
-            event.frame,
             event.time,
             event.player.clone(),
             event.is_team_0,

@@ -31,7 +31,6 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   pass: "P",
   speed_flip: "SF",
   wavedash: "WD",
-  whiff: "W",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
 

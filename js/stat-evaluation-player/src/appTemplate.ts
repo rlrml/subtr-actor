@@ -341,6 +341,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
           <section
             class="floating-window floating-window-mechanics"
             data-window-id="mechanics"
+            hidden
             style="--window-x: 1rem; --window-y: 16rem;"
           >
             <header class="floating-window-header">

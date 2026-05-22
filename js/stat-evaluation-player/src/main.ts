@@ -3081,9 +3081,6 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
-    if (activeMechanicTimelineKinds.size === 0) {
-      activeMechanicTimelineKinds = new Set(getMechanicKinds(statsTimeline));
-    }
 
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>

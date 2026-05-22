@@ -299,18 +299,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.is_team_0,
             ));
         }
-        for (index, value) in self.module_array("whiff", "events").iter().enumerate() {
-            let event = parse_whiff_event(value)?;
-            events.push(moment_mechanic_event(
-                "whiff",
-                index,
-                event.frame,
-                event.time,
-                event.player,
-                event.is_team_0,
-            ));
-        }
-
         events.sort_by(|left, right| {
             let left_time = mechanic_event_start_time(left);
             let right_time = mechanic_event_start_time(right);
