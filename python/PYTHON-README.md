@@ -179,6 +179,7 @@ Common player features:
 - `PlayerAnyJump`
 - `PlayerJump`
 - `PlayerDodgeRefreshed`
+- `AnalysisPlayerTouches`
 
 `PlayerBoost` is exposed in raw replay units (`0-255`), not `0-100` percent.
 

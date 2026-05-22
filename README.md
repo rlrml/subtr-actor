@@ -107,13 +107,15 @@ fn main() -> anyhow::Result<()> {
 
     let mut collector = NDArrayCollector::new(
         vec![
-            InterpolatedBallRigidBodyNoVelocities::arc_new(0.003),
-            CurrentTime::arc_new(),
+            NDArrayFeatureAdder::plain(InterpolatedBallRigidBodyNoVelocities::arc_new(0.003)),
+            NDArrayFeatureAdder::plain(CurrentTime::arc_new()),
         ],
         vec![
-            InterpolatedPlayerRigidBodyNoVelocities::arc_new(0.003),
-            PlayerBoost::arc_new(),
-            PlayerAnyJump::arc_new(),
+            NDArrayPlayerFeatureAdder::plain(
+                InterpolatedPlayerRigidBodyNoVelocities::arc_new(0.003),
+            ),
+            NDArrayPlayerFeatureAdder::plain(PlayerBoost::arc_new()),
+            NDArrayPlayerFeatureAdder::plain(PlayerAnyJump::arc_new()),
         ],
     );
 
@@ -194,7 +196,7 @@ Use this to resample replay processing to a fixed FPS before collecting data.
 These are useful when working through the Python or JavaScript bindings:
 
 - Global: `BallRigidBody`, `CurrentTime`, `SecondsRemaining`
-- Player: `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerDoubleJump`
+- Player: `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerJump`, `AnalysisPlayerTouches`
 
 `PlayerBoost` is exposed in raw replay units (`0-255`), not percentage.
 
