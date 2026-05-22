@@ -4,6 +4,19 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.0 - 2026-05-22
+
+- Add stats report page improvements, including grouped team/player views,
+  overview pressure bars, and clearer boost tank colors.
+- Add goal lead-up context stats, flick stats, ball-advancement touch stats,
+  wavedash stats, air-dribble stats, goal tags, one-timer and pass stats, and
+  half-flip detection across Rust exports and the stats player.
+- Add mechanic review playlist generation/playback support plus mechanics and
+  goal overview windows in the stats player.
+- Improve replay loading progress ordering and keep stats snapshot conversion
+  aligned with graph-backed air-dribble timeline snapshots.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.0`.
+
 ## v0.6.6 - 2026-05-13
 
 - Keep old replay player cars visible through bounded gaps in exported player
