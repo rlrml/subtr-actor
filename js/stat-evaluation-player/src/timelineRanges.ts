@@ -7,6 +7,7 @@ import type {
   PlayerStatsSnapshot,
   StatsTimeline,
 } from "./statsTimeline.ts";
+import { formatMechanicKind } from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -26,6 +27,18 @@ const BOOST_PICKUP_COMPARISON_COLORS: Record<BoostPickupComparison, string> = {
   both: "rgba(52, 211, 153, 0.86)",
   ghost: "rgba(239, 68, 68, 0.9)",
   missed: "rgba(59, 130, 246, 0.9)",
+};
+const MECHANIC_SHORT_LABELS: Record<string, string> = {
+  air_dribble: "AD",
+  ball_carry: "BC",
+  ceiling_shot: "CS",
+  double_tap: "DT",
+  flick: "F",
+  half_flip: "HF",
+  musty_flick: "M",
+  one_timer: "OT",
+  pass: "P",
+  wavedash: "WD",
 };
 
 type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
@@ -67,6 +80,66 @@ function teamTimelineColor(isTeamZero: boolean | null | undefined): string | nul
   }
 
   return null;
+}
+
+function mechanicShortLabel(kind: string): string {
+  return MECHANIC_SHORT_LABELS[kind] ?? (
+    kind
+      .split(/[_-]+/)
+      .filter((part) => part.length > 0)
+      .map((part) => part.slice(0, 1).toUpperCase())
+      .join("")
+      .slice(0, 3) ||
+    "M"
+  );
+}
+
+export function buildMechanicTimelineRanges(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+  enabledKinds?: Iterable<string>,
+): ReplayTimelineRange[] {
+  const enabled = enabledKinds ? new Set(enabledKinds) : null;
+  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
+
+  return (statsTimeline.events.mechanics ?? [])
+    .filter((event) => event.timing.type === "span" && (!enabled || enabled.has(event.kind)))
+    .map((event): ReplayTimelineRange => {
+      if (event.timing.type !== "span") {
+        throw new Error("unreachable non-span mechanic event");
+      }
+
+      const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
+      const playerName = playerNames.get(playerId) ?? playerId;
+      const mechanicLabel = formatMechanicKind(event.kind);
+      const startTime = getReplayFrameTime(
+        replay,
+        event.timing.start_frame,
+        event.timing.start_time,
+      );
+      const endTime = Math.max(
+        startTime,
+        getReplayFrameTime(replay, event.timing.end_frame, event.timing.end_time),
+      );
+
+      return {
+        id: event.id,
+        startTime,
+        endTime,
+        lane: `mechanic:${event.kind}`,
+        laneLabel: mechanicLabel,
+        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
+        shortLabel: mechanicShortLabel(event.kind),
+        isTeamZero: event.is_team_0,
+        color: teamTimelineColor(event.is_team_0) ?? undefined,
+      };
+    })
+    .sort((left, right) => {
+      if (left.startTime !== right.startTime) {
+        return left.startTime - right.startTime;
+      }
+      return (left.id ?? "").localeCompare(right.id ?? "");
+    });
 }
 
 function resolvePressureHalfControlState(

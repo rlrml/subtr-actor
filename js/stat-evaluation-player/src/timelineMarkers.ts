@@ -13,17 +13,89 @@ import {
   buildTouchMarkers,
   playerIdToString,
 } from "./touchOverlay.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { MechanicEvent, StatsTimeline } from "./statsTimeline.ts";
 
 const BLUE_TIMELINE_COLOR = "#3b82f6";
 const ORANGE_TIMELINE_COLOR = "#f59e0b";
 const NEUTRAL_TIMELINE_COLOR = "#d1d9e0";
+const MECHANIC_SHORT_LABELS: Record<string, string> = {
+  air_dribble: "AD",
+  ball_carry: "BC",
+  ceiling_shot: "CS",
+  double_tap: "DT",
+  flick: "F",
+  flip_reset: "FR",
+  half_flip: "HF",
+  musty_flick: "M",
+  one_timer: "OT",
+  pass: "P",
+  speed_flip: "SF",
+  wavedash: "WD",
+  whiff: "W",
+};
+
 function getReplayFrameTime(
   replay: ReplayModel,
   frame: number | undefined,
   fallbackTime: number,
 ): number {
   return replay.frames[frame ?? -1]?.time ?? fallbackTime;
+}
+
+export function formatMechanicKind(kind: string): string {
+  return kind
+    .split(/[_-]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function mechanicShortLabel(kind: string): string {
+  return MECHANIC_SHORT_LABELS[kind] ?? (
+    kind
+      .split(/[_-]+/)
+      .filter((part) => part.length > 0)
+      .map((part) => part.slice(0, 1).toUpperCase())
+      .join("")
+      .slice(0, 3) ||
+    "M"
+  );
+}
+
+export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
+  return [...new Set((statsTimeline?.events.mechanics ?? []).map((event) => event.kind))]
+    .sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+}
+
+export function buildMechanicTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+  enabledKinds?: Iterable<string>,
+): ReplayTimelineEvent[] {
+  const enabled = enabledKinds ? new Set(enabledKinds) : null;
+  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
+
+  return (statsTimeline.events.mechanics ?? [])
+    .filter((event): event is MechanicEvent & { timing: { type: "moment" } } =>
+      event.timing.type === "moment" && (!enabled || enabled.has(event.kind))
+    )
+    .map((event) => {
+      const playerId = playerIdToString(event.player_id);
+      const playerName = playerNames.get(playerId) ?? playerId;
+      const mechanicLabel = formatMechanicKind(event.kind);
+      return {
+        id: event.id,
+        time: getReplayFrameTime(replay, event.timing.frame, event.timing.time),
+        frame: event.timing.frame,
+        kind: event.kind,
+        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
+        shortLabel: mechanicShortLabel(event.kind),
+        playerId,
+        playerName,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
 }
 
 function buildPlayerCountTimelineEvents(
@@ -390,6 +462,32 @@ export function buildSpeedFlipTimelineEvents(
   });
 }
 
+export function buildHalfFlipTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.half_flip.map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const qualityPercent = Math.round(event.confidence * 100);
+    const speedGain = Math.round(event.end_speed - event.start_speed);
+
+    return {
+      id: `half-flip:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "half-flip",
+      label: `${playerName} half flip ${qualityPercent}% | +${speedGain}uu/s`,
+      shortLabel: "HF",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 export function buildWavedashTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -514,6 +612,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("speed-flip")) {
     count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("half-flip")) {
+    count += buildHalfFlipTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("wavedash")) {

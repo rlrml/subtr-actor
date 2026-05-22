@@ -11,6 +11,7 @@ mod dodge_reset;
 mod double_tap;
 mod fifty_fifty;
 mod flick;
+mod half_flip;
 mod movement;
 mod musty_flick;
 mod one_timer;

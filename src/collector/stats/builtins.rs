@@ -336,6 +336,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "whiff",
         "wavedash",
         "speed_flip",
+        "half_flip",
         "flick",
         "musty_flick",
         "dodge_reset",
@@ -520,6 +521,13 @@ pub(crate) fn builtin_module_json(
         }
         "speed_flip" => {
             let calculator = graph_state::<SpeedFlipCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "half_flip" => {
+            let calculator = graph_state::<HalfFlipCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.events(),
@@ -721,6 +729,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "half_flip" => {
+            let calculator = graph_state::<HalfFlipCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "flick" => {
             let calculator = graph_state::<FlickCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -887,8 +901,8 @@ pub(crate) fn builtin_snapshot_config_json(
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"
         | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
-        | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost" | "movement"
-        | "powerslide" | "demo" => None,
+        | "half_flip" | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
+        | "movement" | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

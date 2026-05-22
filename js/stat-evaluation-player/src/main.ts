@@ -51,8 +51,12 @@ import {
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import {
   countEnabledTimelineEvents,
+  buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
+  formatMechanicKind,
+  getMechanicKinds,
 } from "./timelineMarkers.ts";
+import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
@@ -140,6 +144,7 @@ const MODULES = createStatModules({
 let activeModules: StatModule[] = [];
 let activeTimelineEventModuleIds = new Set<string>();
 let activeTimelineRangeModuleIds = new Set<string>();
+let activeMechanicTimelineKinds = new Set<string>();
 let activeRenderEffectModuleIds = new Set<string>();
 
 const RENDER_EFFECT_MODULE_IDS = new Set([
@@ -152,6 +157,8 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "touch",
 ]);
 const TOUCH_MODULE_ID = "touch";
+const MECHANIC_EVENT_SOURCE_ID = "mechanics:events";
+const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -167,6 +174,7 @@ let launcherToggle!: HTMLButtonElement;
 let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
+let mechanicsTimelineWindowBody!: HTMLDivElement;
 let boostPickupFiltersWindowBody!: HTMLDivElement;
 let touchControlsWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
@@ -248,6 +256,7 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "camera",
   "playback",
   "recording",
+  "mechanics",
   "boost-pickups",
   "touch-controls",
 ];
@@ -284,6 +293,7 @@ function getActiveModuleSignature(): string {
   return [
     `events=${[...activeTimelineEventModuleIds].sort().join(",")}`,
     `ranges=${[...activeTimelineRangeModuleIds].sort().join(",")}`,
+    `mechanics=${[...activeMechanicTimelineKinds].sort().join(",")}`,
     `effects=${[...activeRenderEffectModuleIds].sort().join(",")}`,
   ].join("|");
 }
@@ -438,6 +448,18 @@ function syncTimelineEvents(): void {
     timelineSourceRemovers.set(mod.id, timelineOverlay.addEventSource(events));
   }
 
+  const mechanicEvents = buildMechanicTimelineEvents(
+    ctx.statsTimeline,
+    ctx.replay,
+    activeMechanicTimelineKinds,
+  );
+  if (mechanicEvents.length > 0) {
+    timelineSourceRemovers.set(
+      MECHANIC_EVENT_SOURCE_ID,
+      timelineOverlay.addEventSource(mechanicEvents),
+    );
+  }
+
   timelineOverlay.refreshEvents();
 }
 
@@ -460,6 +482,18 @@ function syncTimelineRanges(): void {
     );
   }
 
+  const mechanicRanges = buildMechanicTimelineRanges(
+    ctx.statsTimeline,
+    ctx.replay,
+    activeMechanicTimelineKinds,
+  );
+  if (mechanicRanges.length > 0) {
+    timelineRangeSourceRemovers.set(
+      MECHANIC_RANGE_SOURCE_ID,
+      timelineOverlay.addRangeSource(mechanicRanges),
+    );
+  }
+
   timelineOverlay.refreshRanges();
 }
 
@@ -469,11 +503,22 @@ function renderTimelineEventCount(): void {
     return;
   }
 
+  const mechanicEventCount = buildMechanicTimelineEvents(
+    statsTimeline,
+    replayPlayer.replay,
+    activeMechanicTimelineKinds,
+  ).length;
+  const mechanicRangeCount = buildMechanicTimelineRanges(
+    statsTimeline,
+    replayPlayer.replay,
+    activeMechanicTimelineKinds,
+  ).length;
+
   eventsReadout.textContent = `${countEnabledTimelineEvents(
     activeTimelineEventModuleIds,
     replayPlayer.replay,
     statsTimeline,
-  )}`;
+  ) + mechanicEventCount + mechanicRangeCount}`;
 }
 
 function mustElement<T extends HTMLElement>(
@@ -637,6 +682,7 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
     overlays: {
       timelineEvents: [...activeTimelineEventModuleIds],
       timelineRanges: [...activeTimelineRangeModuleIds],
+      mechanics: [...activeMechanicTimelineKinds],
       renderEffects: [...activeRenderEffectModuleIds],
       followedPlayerHud: false,
       boostPads: boostPadOverlayEnabled,
@@ -720,6 +766,7 @@ function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   activeTimelineEventModuleIds = new Set(config.overlays.timelineEvents);
   activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
+  activeMechanicTimelineKinds = new Set(config.overlays.mechanics);
   activeRenderEffectModuleIds = new Set(config.overlays.renderEffects);
   boostPadOverlayEnabled = config.overlays.boostPads;
   skipPostGoalTransitions.checked =
@@ -953,6 +1000,97 @@ function renderModuleSummary(): void {
   );
 }
 
+function renderMechanicsTimelineControls(): void {
+  mechanicsTimelineWindowBody.replaceChildren();
+
+  const kinds = getMechanicKinds(statsTimeline);
+  const counts = new Map<string, number>();
+  for (const event of statsTimeline?.events.mechanics ?? []) {
+    counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1);
+  }
+
+  if (kinds.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stat-window-empty";
+    empty.textContent = "No mechanic events loaded.";
+    mechanicsTimelineWindowBody.append(empty);
+    return;
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "mechanics-actions";
+
+  const allButton = document.createElement("button");
+  allButton.type = "button";
+  allButton.className = "module-summary-item";
+  allButton.addEventListener("click", () => {
+    activeMechanicTimelineKinds = new Set(kinds);
+    syncTimelineEvents();
+    syncTimelineRanges();
+    renderMechanicsTimelineControls();
+    renderTimelineEventCount();
+    scheduleConfigUrlUpdate();
+  });
+  const allName = document.createElement("span");
+  allName.textContent = "All mechanics";
+  const allCount = document.createElement("strong");
+  allCount.textContent = `${kinds.length}`;
+  allButton.append(allName, allCount);
+
+  const noneButton = document.createElement("button");
+  noneButton.type = "button";
+  noneButton.className = "module-summary-item";
+  noneButton.addEventListener("click", () => {
+    activeMechanicTimelineKinds.clear();
+    syncTimelineEvents();
+    syncTimelineRanges();
+    renderMechanicsTimelineControls();
+    renderTimelineEventCount();
+    scheduleConfigUrlUpdate();
+  });
+  const noneName = document.createElement("span");
+  noneName.textContent = "No mechanics";
+  const noneState = document.createElement("strong");
+  noneState.textContent = "Off";
+  noneButton.append(noneName, noneState);
+
+  actions.append(allButton, noneButton);
+
+  const list = document.createElement("div");
+  list.className = "module-list mechanics-list";
+  for (const kind of kinds) {
+    const active = activeMechanicTimelineKinds.has(kind);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "module-summary-item";
+    item.dataset.active = active ? "true" : "false";
+    item.setAttribute("aria-pressed", active ? "true" : "false");
+    item.addEventListener("click", () => {
+      if (activeMechanicTimelineKinds.has(kind)) {
+        activeMechanicTimelineKinds.delete(kind);
+      } else {
+        activeMechanicTimelineKinds.add(kind);
+      }
+      syncTimelineEvents();
+      syncTimelineRanges();
+      renderMechanicsTimelineControls();
+      renderTimelineEventCount();
+      scheduleConfigUrlUpdate();
+    });
+
+    const name = document.createElement("span");
+    name.textContent = formatMechanicKind(kind);
+
+    const state = document.createElement("strong");
+    state.textContent = `${active ? "On" : "Off"} ${counts.get(kind) ?? 0}`;
+
+    item.append(name, state);
+    list.append(item);
+  }
+
+  mechanicsTimelineWindowBody.append(actions, list);
+}
+
 function renderModuleSummaryGroup(
   title: string,
   items: HTMLButtonElement[],
@@ -985,6 +1123,7 @@ function getCapabilityLabel(
     "dodge-reset:events": "Dodge reset",
     "double-tap:events": "Double tap",
     "fifty-fifty:events": "50/50",
+    "half-flip:events": "Half flip",
     "musty-flick:events": "Musty flick",
     "possession:ranges": "Possession",
     "powerslide:events": "Powerslide",
@@ -2221,6 +2360,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
   clearStandalonePlugins();
   clearRenderCaches();
   renderTimelineEventCount();
+  renderMechanicsTimelineControls();
   renderModuleSettings();
   syncRecordingWindow();
 
@@ -2239,6 +2379,9 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
+    if (activeMechanicTimelineKinds.size === 0) {
+      activeMechanicTimelineKinds = new Set(getMechanicKinds(statsTimeline));
+    }
 
     timelineOverlay = createTimelineOverlayPlugin({
       replayEvents: (context) =>
@@ -2292,6 +2435,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
       .join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
     renderTimelineEventCount();
+    renderMechanicsTimelineControls();
     setTransportEnabled(true);
     syncCameraControlAvailability(replayPlayer.getState());
     renderSnapshot(replayPlayer.getState());
@@ -2360,6 +2504,10 @@ export function mountStatEvaluationPlayer(
   launcherMenu = mustElement<HTMLDivElement>(root, "#launcher-menu");
   loadReplayAction = mustElement<HTMLButtonElement>(root, "#load-replay-action");
   floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
+  mechanicsTimelineWindowBody = mustElement<HTMLDivElement>(
+    root,
+    "#mechanics-timeline-window-body",
+  );
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
     root,
     "#boost-pickup-filters-window-body",
@@ -2549,6 +2697,7 @@ export function mountStatEvaluationPlayer(
     replayLoadModal = null;
     activeTimelineEventModuleIds = new Set<string>();
     activeTimelineRangeModuleIds = new Set<string>();
+    activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
     boostPadOverlayEnabled = true;
     loadedReplayName = null;

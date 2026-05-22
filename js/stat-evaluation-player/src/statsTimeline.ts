@@ -7,6 +7,10 @@ import type { LabeledCountEntry } from "./generated/LabeledCountEntry.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { LabeledFloatSumEntry } from "./generated/LabeledFloatSumEntry.ts";
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
+import type { MechanicEvent } from "./generated/MechanicEvent.ts";
+import type { MechanicTiming } from "./generated/MechanicTiming.ts";
+import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
+import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { ReplayMeta } from "./generated/ReplayMeta.ts";
 import type { ReplayStatsFrame } from "./generated/ReplayStatsFrame.ts";
@@ -17,6 +21,7 @@ import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsTimelineConfig } from "./generated/StatsTimelineConfig.ts";
 import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generated/TeamStatsSnapshot.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
+import type { HalfFlipEvent } from "./generated/HalfFlipEvent.ts";
 import type { WavedashEvent } from "./generated/WavedashEvent.ts";
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 
@@ -35,11 +40,16 @@ export type {
   LabeledCounts,
   LabeledFloatSumEntry,
   LabeledFloatSums,
+  MechanicEvent,
+  MechanicTiming,
+  OneTimerEvent,
+  PassEvent,
   ReplayMeta,
   RushEvent,
   StatLabel,
   StatsTimelineConfig,
   TimelineEvent,
+  HalfFlipEvent,
   WavedashEvent,
   WhiffEvent,
   BoostPickupComparisonEvent,

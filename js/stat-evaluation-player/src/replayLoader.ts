@@ -1,5 +1,4 @@
-import { normalizeReplayDataAsync } from "subtr-actor-player";
-import type { ReplayModel, RawReplayFramesData } from "subtr-actor-player";
+import type { ReplayModel } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
 export {
@@ -29,12 +28,8 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
+  replayBuffer: ArrayBuffer;
   statsTimelineParts: TransferableStatsTimelineParts;
-}
-
-interface ReplayRawDataMessage {
-  type: "raw-replay-data";
-  rawReplayDataBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -51,7 +46,6 @@ interface TransferableStatsTimelineParts {
 
 type ReplayWorkerMessage =
   | ReplayProgressMessage
-  | ReplayRawDataMessage
   | ReplayDoneMessage
   | ReplayErrorMessage;
 
@@ -135,7 +129,6 @@ export async function loadReplayBundleInWorker(
   const reportEveryNFrames = options.reportEveryNFrames ?? 100;
 
   return new Promise<ReplayLoadBundle>((resolve, reject) => {
-    let rawReplayDataBuffer: ArrayBuffer | null = null;
     const cleanup = () => {
       worker.terminate();
     };
@@ -148,11 +141,6 @@ export async function loadReplayBundleInWorker(
         return;
       }
 
-      if (message.type === "raw-replay-data") {
-        rawReplayDataBuffer = message.rawReplayDataBuffer;
-        return;
-      }
-
       if (message.type === "error") {
         cleanup();
         reject(new Error(message.error));
@@ -160,16 +148,10 @@ export async function loadReplayBundleInWorker(
       }
 
       cleanup();
-      if (!rawReplayDataBuffer) {
-        reject(new Error("Replay loading worker finished without replay data"));
-        return;
-      }
       const decoder = new TextDecoder();
       options.onProgress?.({ stage: "decoding-replay", progress: 0 });
       await waitForNextPaint();
-      const rawReplayData = JSON.parse(
-        decoder.decode(new Uint8Array(rawReplayDataBuffer)),
-      ) as RawReplayFramesData;
+      const replay = parseJsonBuffer<ReplayModel>(decoder, message.replayBuffer);
       options.onProgress?.({ stage: "decoding-replay", progress: 1 });
       await waitForNextPaint();
       const statsTimeline = await parseStatsTimelineParts(
@@ -177,18 +159,6 @@ export async function loadReplayBundleInWorker(
         message.statsTimelineParts,
         options.onProgress,
       );
-      options.onProgress?.({ stage: "normalizing", progress: 0 });
-      await waitForNextPaint();
-      const replay = await normalizeReplayDataAsync(rawReplayData, {
-        progressReportFrameInterval: reportEveryNFrames,
-        onProgress(progress) {
-          options.onProgress?.({
-            stage: "normalizing",
-            progress,
-          });
-        },
-      });
-      options.onProgress?.({ stage: "normalizing", progress: 1 });
       resolve({
         replay,
         statsTimeline,

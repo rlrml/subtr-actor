@@ -5,12 +5,12 @@ use crate::stats::calculators::{
     ContinuousBallControlState, DemoCalculator, DodgeResetCalculator, DoubleTapCalculator,
     EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator,
     FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState,
-    HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
-    MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PlayerFrameState, PlayerVerticalState,
-    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
-    PressureCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
-    WavedashCalculator, WhiffCalculator,
+    HalfFlipCalculator, HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator,
+    MatchStatsCalculator, MovementCalculator, MustyFlickCalculator, OneTimerCalculator,
+    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PlayerFrameState,
+    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
+    PowerslideCalculator, PressureCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator,
+    TouchState, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -30,6 +30,7 @@ pub(crate) mod frame_events_state;
 pub(crate) mod frame_info;
 pub(crate) mod gameplay_state;
 pub(crate) mod goal_tags;
+pub(crate) mod half_flip;
 pub(crate) mod live_play;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
@@ -90,6 +91,8 @@ pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode,
     HighAerialGoalNode, LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode,
 };
+#[allow(unused_imports)]
+pub use half_flip::HalfFlipNode;
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
 #[allow(unused_imports)]
@@ -281,6 +284,10 @@ pub(crate) fn wavedash_dependency() -> AnalysisDependency {
 
 pub(crate) fn speed_flip_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<SpeedFlipCalculator>(speed_flip::boxed_default)
+}
+
+pub(crate) fn half_flip_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<HalfFlipCalculator>(half_flip::boxed_default)
 }
 
 pub(crate) fn musty_flick_dependency() -> AnalysisDependency {

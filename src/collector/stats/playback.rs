@@ -211,6 +211,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
+            mechanics: Vec::new(),
             goal_context: self.module_player_events(
                 "core",
                 "goal_context",
@@ -241,6 +242,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_speed_flip_event,
             )?,
+            half_flip: self.module_player_events("half_flip", "events", parse_half_flip_event)?,
             wavedash: self.module_player_events("wavedash", "events", parse_wavedash_event)?,
             whiff: self.module_player_events("whiff", "events", parse_whiff_event)?,
             boost_pickups: self.module_player_events(
@@ -254,6 +256,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_value(&self) -> Value {
         let mut events = Map::new();
         events.insert("timeline".to_owned(), Value::Array(self.timeline_events()));
+        events.insert("mechanics".to_owned(), Value::Array(Vec::new()));
         events.insert(
             "backboard".to_owned(),
             Value::Array(self.module_array("backboard", "events")),
@@ -289,6 +292,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "speed_flip".to_owned(),
             Value::Array(self.module_array("speed_flip", "events")),
+        );
+        events.insert(
+            "half_flip".to_owned(),
+            Value::Array(self.module_array("half_flip", "events")),
         );
         events.insert(
             "wavedash".to_owned(),
@@ -740,6 +747,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "speed_flip",
                 &player_key,
             )?,
+            half_flip: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "half_flip",
+                &player_key,
+            )?,
             wavedash: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "wavedash",
@@ -971,6 +983,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<SpeedFlipStats>(
                 frame,
                 "speed_flip",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "half_flip".to_owned(),
+            self.frame_player_stat_or_default_by_key::<HalfFlipStats>(
+                frame,
+                "half_flip",
                 &player_key,
             )?,
         );
@@ -1634,6 +1654,25 @@ fn parse_speed_flip_event(value: &Value) -> SubtrActorResult<SpeedFlipEvent> {
         diagonal_score: json_required_f32(object, "diagonal_score")?,
         cancel_score: json_required_f32(object, "cancel_score")?,
         speed_score: json_required_f32(object, "speed_score")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_half_flip_event(value: &Value) -> SubtrActorResult<HalfFlipEvent> {
+    let object = json_object(value, "half flip event")?;
+    Ok(HalfFlipEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_position: json_required_vec3(object, "start_position")?,
+        end_position: json_required_vec3(object, "end_position")?,
+        start_speed: json_required_f32(object, "start_speed")?,
+        end_speed: json_required_f32(object, "end_speed")?,
+        start_backward_alignment: json_required_f32(object, "start_backward_alignment")?,
+        best_reorientation_alignment: json_required_f32(object, "best_reorientation_alignment")?,
+        best_forward_reversal: json_required_f32(object, "best_forward_reversal")?,
+        max_forward_vertical: json_required_f32(object, "max_forward_vertical")?,
         confidence: json_required_f32(object, "confidence")?,
     })
 }

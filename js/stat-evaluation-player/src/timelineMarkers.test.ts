@@ -9,6 +9,7 @@ import {
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
   buildFiftyFiftyTimelineEvents,
+  buildHalfFlipTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
@@ -465,6 +466,16 @@ test("buildBallCarryTimelineEvents maps carry completions to timeline markers", 
               carry_speed_sum: 0,
               average_horizontal_gap_sum: 0,
               average_vertical_gap_sum: 0,
+              air_dribble_count: 0,
+              total_air_dribble_time: 0,
+              total_air_dribble_straight_line_distance: 0,
+              total_air_dribble_path_distance: 0,
+              longest_air_dribble_time: 0,
+              furthest_air_dribble_distance: 0,
+              fastest_air_dribble_speed: 0,
+              air_dribble_speed_sum: 0,
+              average_air_dribble_horizontal_gap_sum: 0,
+              average_air_dribble_vertical_gap_sum: 0,
             },
           },
         ],
@@ -579,6 +590,57 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
       kind: "speed-flip",
       label: "Blue speed flip 86%",
       shortLabel: "SF",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildHalfFlipTimelineEvents maps serialized half flips to timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    half_flip_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        start_position: [0, 0, 20],
+        end_position: [-200, 0, 20],
+        start_speed: 600,
+        end_speed: 1180,
+        start_backward_alignment: 0.94,
+        best_reorientation_alignment: 0.91,
+        best_forward_reversal: 0.89,
+        max_forward_vertical: 0.73,
+        confidence: 0.82,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildHalfFlipTimelineEvents(statsTimeline, replay), [
+    {
+      id: "half-flip:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "half-flip",
+      label: "Blue half flip 82% | +580uu/s",
+      shortLabel: "HF",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,
@@ -785,6 +847,23 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         confidence: 0.88,
       },
     ],
+    half_flip_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        start_position: [0, 0, 20],
+        end_position: [-140, 0, 20],
+        start_speed: 620,
+        end_speed: 1180,
+        start_backward_alignment: 0.95,
+        best_reorientation_alignment: 0.9,
+        best_forward_reversal: 0.88,
+        max_forward_vertical: 0.7,
+        confidence: 0.81,
+      },
+    ],
     wavedash_events: [
       {
         time: 1.1,
@@ -882,6 +961,16 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
               carry_speed_sum: 0,
               average_horizontal_gap_sum: 0,
               average_vertical_gap_sum: 0,
+              air_dribble_count: 0,
+              total_air_dribble_time: 0,
+              total_air_dribble_straight_line_distance: 0,
+              total_air_dribble_path_distance: 0,
+              longest_air_dribble_time: 0,
+              furthest_air_dribble_distance: 0,
+              fastest_air_dribble_speed: 0,
+              air_dribble_speed_sum: 0,
+              average_air_dribble_horizontal_gap_sum: 0,
+              average_air_dribble_vertical_gap_sum: 0,
             },
             powerslide: {
               total_duration: 0,
@@ -933,12 +1022,13 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "ball-carry",
         "powerslide",
         "speed-flip",
+        "half-flip",
         "wavedash",
         "whiff",
       ],
       replay,
       statsTimeline,
     ),
-    14,
+    15,
   );
 });

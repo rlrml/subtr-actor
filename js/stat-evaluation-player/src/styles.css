@@ -273,6 +273,10 @@ input {
   width: min(21rem, calc(100vw - 1.6rem));
 }
 
+.floating-window-mechanics {
+  width: min(22rem, calc(100vw - 1.6rem));
+}
+
 .floating-window-boost-pickups {
   width: min(34rem, calc(100vw - 1.6rem));
 }
@@ -1040,6 +1044,13 @@ input[type="range"] {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.mechanics-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
 }
 
 .module-settings {

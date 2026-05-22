@@ -20,6 +20,7 @@ export type SingletonWindowId =
   | "camera"
   | "playback"
   | "recording"
+  | "mechanics"
   | "boost-pickups"
   | "touch-controls";
 export type ConfigWindowKind = SingletonWindowId | "stats";
@@ -75,6 +76,7 @@ export interface PlayerCameraConfig {
 export interface PlayerOverlayConfig {
   readonly timelineEvents: string[];
   readonly timelineRanges: string[];
+  readonly mechanics: string[];
   readonly renderEffects: string[];
   readonly followedPlayerHud: boolean;
   readonly boostPads: boolean;
@@ -343,6 +345,7 @@ function normalizeOverlayConfig(value: unknown): PlayerOverlayConfig {
   return {
     timelineEvents: stringArray(record.timelineEvents),
     timelineRanges: stringArray(record.timelineRanges),
+    mechanics: stringArray(record.mechanics),
     renderEffects: stringArray(record.renderEffects),
     followedPlayerHud: booleanValue(record.followedPlayerHud) ?? false,
     boostPads: booleanValue(record.boostPads) ?? true,
@@ -423,7 +426,7 @@ function normalizePlacement(value: unknown): WindowPlacementConfig {
 
 function isSingletonWindowId(value: unknown): value is SingletonWindowId {
   return value === "camera" || value === "playback" || value === "recording" ||
-    value === "boost-pickups" || value === "touch-controls";
+    value === "mechanics" || value === "boost-pickups" || value === "touch-controls";
 }
 
 function isStatsWindowKind(value: unknown): value is StatsWindowKind {

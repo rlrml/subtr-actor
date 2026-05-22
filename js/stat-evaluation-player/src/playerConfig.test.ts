@@ -37,6 +37,7 @@ const CONFIG: StatsPlayerConfig = {
   overlays: {
     timelineEvents: ["touch", "demo"],
     timelineRanges: ["boost"],
+    mechanics: ["air_dribble", "double_tap"],
     renderEffects: ["touch"],
     followedPlayerHud: true,
     boostPads: false,

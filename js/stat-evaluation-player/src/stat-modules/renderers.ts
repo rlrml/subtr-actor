@@ -283,6 +283,43 @@ export function renderDoubleTapStats(
   `;
 }
 
+export function renderPassStats(
+  pass: PlayerStatsSnapshot["pass"] | undefined,
+): string {
+  const averageDistance = pass && pass.completed_pass_count > 0
+    ? pass.total_pass_distance / pass.completed_pass_count
+    : undefined;
+  const averageAdvance = pass && pass.completed_pass_count > 0
+    ? pass.total_pass_advance / pass.completed_pass_count
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Completed</span><span class="value">${formatInteger(pass?.completed_pass_count)}</span></div>
+    <div class="stat-row"><span class="label">Received</span><span class="value">${formatInteger(pass?.received_pass_count)}</span></div>
+    <div class="stat-row"><span class="label">Avg distance</span><span class="value">${formatNumber(averageDistance, 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg advance</span><span class="value">${formatNumber(averageAdvance, 0)}</span></div>
+    <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(pass?.longest_pass_distance, 0)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(pass?.time_since_last_completed_pass), 2, "s")}</span></div>
+  `;
+}
+
+export function renderOneTimerStats(
+  oneTimer: PlayerStatsSnapshot["one_timer"] | undefined,
+): string {
+  const averageBallSpeed = oneTimer && oneTimer.count > 0
+    ? oneTimer.total_ball_speed / oneTimer.count
+    : undefined;
+  const averagePassDistance = oneTimer && oneTimer.count > 0
+    ? oneTimer.total_pass_distance / oneTimer.count
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(oneTimer?.count)}</span></div>
+    <div class="stat-row"><span class="label">Avg speed</span><span class="value">${formatNumber(averageBallSpeed, 0)}</span></div>
+    <div class="stat-row"><span class="label">Fastest</span><span class="value">${formatNumber(oneTimer?.fastest_ball_speed, 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg pass distance</span><span class="value">${formatNumber(averagePassDistance, 0)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(oneTimer?.time_since_last_one_timer), 2, "s")}</span></div>
+  `;
+}
+
 export function renderCeilingShotStats(
   ceilingShot: PlayerStatsSnapshot["ceiling_shot"] | undefined,
 ): string {
@@ -313,6 +350,7 @@ export function renderBallCarryStats(
     <div class="stat-row"><span class="label">Avg gap</span><span class="value">${formatNumber(averageHorizontalGap, 0)}</span></div>
   `;
 }
+
 export function renderAirDribbleStats(
   airDribble: PlayerStatsSnapshot["air_dribble"] | undefined,
 ): string {
@@ -427,6 +465,25 @@ export function renderSpeedFlipStats(
     <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageQuality, 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(speedFlip?.best_quality), 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(speedFlip?.time_since_last_speed_flip), 2, "s")}</span></div>
+  `;
+}
+
+export function renderHalfFlipStats(
+  halfFlip: PlayerStatsSnapshot["half_flip"] | undefined,
+): string {
+  const averageQuality = halfFlip && halfFlip.count > 0
+    ? halfFlip.cumulative_quality / halfFlip.count
+    : undefined;
+  const lastQualityPercent = percentageFromUnit(halfFlip?.last_quality);
+  const averageQualityPercent = percentageFromUnit(averageQuality);
+  const bestQualityPercent = percentageFromUnit(halfFlip?.best_quality);
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(halfFlip?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(halfFlip?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(lastQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(bestQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(halfFlip?.time_since_last_half_flip), 2, "s")}</span></div>
   `;
 }
 

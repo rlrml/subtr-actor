@@ -176,6 +176,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            half_flip: ctx
+                .get::<HalfFlipCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             wavedash: ctx
                 .get::<WavedashCalculator>()?
                 .player_stats()
@@ -295,6 +301,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             whiff_dependency(),
             wavedash_dependency(),
             speed_flip_dependency(),
+            half_flip_dependency(),
             flick_dependency(),
             musty_flick_dependency(),
             dodge_reset_dependency(),

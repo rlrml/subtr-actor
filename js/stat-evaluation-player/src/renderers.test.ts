@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   renderBoostStats,
   renderAbsolutePositioningStats,
+  renderHalfFlipStats,
   renderRelativePositioningStats,
   renderWavedashStats,
   renderWhiffStats,
@@ -168,4 +169,26 @@ test("wavedash renderer shows quality counts and derives average quality", () =>
   assert.match(html, /Avg quality.*75%/s);
   assert.match(html, /Best quality.*86%/s);
   assert.match(html, /Since last.*0\.90s/s);
+});
+
+test("half flip renderer shows quality counts and derives average quality", () => {
+  const halfFlip = createPlayerStatsSnapshot({
+    half_flip: {
+      count: 2,
+      high_confidence_count: 1,
+      last_quality: 0.72,
+      best_quality: 0.88,
+      cumulative_quality: 1.4,
+      time_since_last_half_flip: 0.75,
+    },
+  }).half_flip;
+
+  const html = renderHalfFlipStats(halfFlip);
+
+  assert.match(html, /Attempts.*2/s);
+  assert.match(html, /High conf.*1/s);
+  assert.match(html, /Last quality.*72%/s);
+  assert.match(html, /Avg quality.*70%/s);
+  assert.match(html, /Best quality.*88%/s);
+  assert.match(html, /Since last.*0\.75s/s);
 });

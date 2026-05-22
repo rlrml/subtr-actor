@@ -45,6 +45,7 @@ impl ReplayStatsTimeline {
 #[ts(export)]
 pub struct ReplayStatsTimelineEvents {
     pub timeline: Vec<TimelineEvent>,
+    pub mechanics: Vec<MechanicEvent>,
     pub goal_context: Vec<GoalContextEvent>,
     pub backboard: Vec<BackboardBounceEvent>,
     pub ceiling_shot: Vec<CeilingShotEvent>,
@@ -55,9 +56,37 @@ pub struct ReplayStatsTimelineEvents {
     pub goal_tags: Vec<GoalTagEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
+    pub half_flip: Vec<HalfFlipEvent>,
     pub wavedash: Vec<WavedashEvent>,
     pub whiff: Vec<WhiffEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum MechanicTiming {
+    Moment {
+        frame: usize,
+        time: f32,
+    },
+    Span {
+        start_frame: usize,
+        end_frame: usize,
+        start_time: f32,
+        end_time: f32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct MechanicEvent {
+    pub id: String,
+    pub kind: String,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub timing: MechanicTiming,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -110,6 +139,7 @@ pub struct PlayerStatsSnapshot {
     pub pass: PassPlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
+    pub half_flip: HalfFlipStats,
     pub wavedash: WavedashStats,
     pub touch: TouchStats,
     pub whiff: WhiffStats,

@@ -15,6 +15,7 @@ import {
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
   buildFlickTimelineEvents,
+  buildHalfFlipTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
@@ -36,7 +37,10 @@ import {
   renderDodgeResetStats,
   renderDoubleTapStats,
   renderFlickStats,
+  renderHalfFlipStats,
   renderMustyFlickStats,
+  renderOneTimerStats,
+  renderPassStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
   renderWavedashStats,
@@ -246,6 +250,24 @@ export function createDoubleTapModule(): StatModule {
   });
 }
 
+export function createPassModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "pass",
+    label: "Pass",
+    select: (player) => player.pass,
+    render: (pass) => renderPassStats(pass),
+  });
+}
+
+export function createOneTimerModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "one-timer",
+    label: "One-timer",
+    select: (player) => player.one_timer,
+    render: (oneTimer) => renderOneTimerStats(oneTimer),
+  });
+}
+
 export function createMustyFlickModule(): StatModule {
   return {
     id: "musty-flick",
@@ -379,6 +401,47 @@ export function createSpeedFlipModule(): StatModule {
       if (!player) return "";
 
       return renderSpeedFlipStats(player.speed_flip);
+    },
+  };
+}
+
+export function createHalfFlipModule(): StatModule {
+  return {
+    id: "half-flip",
+    label: "Half Flip",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildHalfFlipTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderHalfFlipStats(player.half_flip),
+        player.half_flip?.is_last_half_flip
+          ? '<span class="role-indicator role-forward">Last Half Flip</span>'
+          : "",
+      ));
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderHalfFlipStats(player.half_flip);
     },
   };
 }

@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 
 import * as subtrActor from "@colonelpanic8/subtr-actor";
+import { normalizeReplayData } from "subtr-actor-player";
+import type { RawReplayFramesData } from "subtr-actor-player";
 import type { ReplayLoadProgress } from "./replayLoader";
 
 interface ReplayLoadRequest {
@@ -16,12 +18,8 @@ interface ReplayProgressMessage {
 
 interface ReplayDoneMessage {
   type: "done";
+  replayBuffer: ArrayBuffer;
   statsTimelineParts: TransferableStatsTimelineParts;
-}
-
-interface ReplayRawDataMessage {
-  type: "raw-replay-data";
-  rawReplayDataBuffer: ArrayBuffer;
 }
 
 interface TransferableStatsTimelineParts {
@@ -38,7 +36,6 @@ interface ReplayErrorMessage {
 
 type ReplayWorkerResponse =
   | ReplayProgressMessage
-  | ReplayRawDataMessage
   | ReplayDoneMessage
   | ReplayErrorMessage;
 
@@ -103,10 +100,28 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       32 * 1024 * 1024,
     );
 
-    self.postMessage({
-      type: "raw-replay-data",
-      rawReplayDataBuffer: replayBundle.rawReplayData.buffer,
-    }, [replayBundle.rawReplayData.buffer]);
+    postMessageToMain({
+      type: "progress",
+      progress: { stage: "decoding-replay", progress: 0 },
+    });
+    const rawReplayData = JSON.parse(
+      new TextDecoder().decode(replayBundle.rawReplayData),
+    ) as RawReplayFramesData;
+    postMessageToMain({
+      type: "progress",
+      progress: { stage: "normalizing", progress: 0 },
+    });
+    const replay = normalizeReplayData(rawReplayData, {
+      progressReportFrameInterval: event.data.reportEveryNFrames,
+      onProgress(progress) {
+        postMessageToMain({
+          type: "progress",
+          progress: { stage: "normalizing", progress },
+        });
+      },
+    });
+    const replayBuffer = new TextEncoder().encode(JSON.stringify(replay));
+
     const frameChunkBuffers = Array.from(
       replayBundle.statsTimelineParts.frameChunks,
       (chunk) => chunk.buffer,
@@ -114,6 +129,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
 
     self.postMessage({
       type: "done",
+      replayBuffer: replayBuffer.buffer,
       statsTimelineParts: {
         configBuffer: replayBundle.statsTimelineParts.config.buffer,
         replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
@@ -121,6 +137,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
         frameChunkBuffers,
       },
     }, [
+      replayBuffer.buffer,
       replayBundle.statsTimelineParts.config.buffer,
       replayBundle.statsTimelineParts.replayMeta.buffer,
       replayBundle.statsTimelineParts.events.buffer,
