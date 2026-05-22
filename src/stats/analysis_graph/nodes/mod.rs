@@ -1,14 +1,15 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
-    BackboardBounceState, BackboardCalculator, BallCarryCalculator, BallFrameState,
-    BoostCalculator, CeilingShotCalculator, ContinuousBallControlState, DemoCalculator,
-    DodgeResetCalculator, DoubleTapCalculator, FiftyFiftyCalculator, FiftyFiftyState,
-    FlickCalculator, FrameEventsState,
-    FrameInfo, GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator,
-    MustyFlickCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState, WavedashCalculator,
-    WhiffCalculator,
+    AerialGoalCalculator, BackboardBounceState, BackboardCalculator, BallCarryCalculator,
+    BallFrameState, BoostCalculator, CeilingShotCalculator, ContinuousBallControlState,
+    DemoCalculator, DodgeResetCalculator, DoubleTapCalculator, EmptyNetGoalCalculator,
+    FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FrameEventsState, FrameInfo,
+    GameplayState, HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator,
+    MatchStatsCalculator, MovementCalculator, MustyFlickCalculator, OwnHalfGoalCalculator,
+    PlayerFrameState, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    PressureCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
+    WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -27,6 +28,7 @@ pub(crate) mod flick;
 pub(crate) mod frame_events_state;
 pub(crate) mod frame_info;
 pub(crate) mod gameplay_state;
+pub(crate) mod goal_tags;
 pub(crate) mod live_play;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
@@ -80,6 +82,10 @@ pub use frame_events_state::FrameEventsStateNode;
 pub use frame_info::FrameInfoNode;
 #[allow(unused_imports)]
 pub use gameplay_state::GameplayStateNode;
+#[allow(unused_imports)]
+pub use goal_tags::{
+    AerialGoalNode, EmptyNetGoalNode, HighAerialGoalNode, LongDistanceGoalNode, OwnHalfGoalNode,
+};
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
 #[allow(unused_imports)]
@@ -185,6 +191,28 @@ pub(crate) fn fifty_fifty_state_dependency() -> AnalysisDependency {
 
 pub(crate) fn match_stats_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<MatchStatsCalculator>(match_stats::boxed_default)
+}
+
+pub(crate) fn aerial_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<AerialGoalCalculator>(goal_tags::boxed_aerial_goal)
+}
+
+pub(crate) fn high_aerial_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<HighAerialGoalCalculator>(goal_tags::boxed_high_aerial_goal)
+}
+
+pub(crate) fn long_distance_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<LongDistanceGoalCalculator>(
+        goal_tags::boxed_long_distance_goal,
+    )
+}
+
+pub(crate) fn own_half_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<OwnHalfGoalCalculator>(goal_tags::boxed_own_half_goal)
+}
+
+pub(crate) fn empty_net_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<EmptyNetGoalCalculator>(goal_tags::boxed_empty_net_goal)
 }
 
 pub(crate) fn backboard_dependency() -> AnalysisDependency {

@@ -55,6 +55,17 @@ impl StatsTimelineCollector {
             rush_defender_distance_y: RushCalculatorConfig::default().defender_distance_y,
             rush_min_possession_retained_seconds: RushCalculatorConfig::default()
                 .min_possession_retained_seconds,
+            aerial_goal_min_ball_z: AerialGoalCalculatorConfig::default().min_ball_z,
+            high_aerial_goal_min_ball_z: HighAerialGoalCalculatorConfig::default().min_ball_z,
+            long_distance_goal_max_attacking_y: LongDistanceGoalCalculatorConfig::default()
+                .max_attacking_y,
+            own_half_goal_max_attacking_y: OwnHalfGoalCalculatorConfig::default().max_attacking_y,
+            empty_net_min_defender_y_margin: EmptyNetGoalCalculatorConfig::default()
+                .min_defender_y_margin,
+            empty_net_min_defender_distance: EmptyNetGoalCalculatorConfig::default()
+                .min_defender_distance,
+            empty_net_max_touch_attacking_y: EmptyNetGoalCalculatorConfig::default()
+                .max_touch_attacking_y,
         }
     }
 

@@ -156,6 +156,50 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .collect()
     }
 
+    fn goal_tag_events_typed(&self) -> SubtrActorResult<Vec<GoalTagEvent>> {
+        let mut events = Vec::new();
+        for module_name in [
+            "aerial_goal",
+            "high_aerial_goal",
+            "long_distance_goal",
+            "own_half_goal",
+            "empty_net_goal",
+        ] {
+            events.extend(self.module_player_events(
+                module_name,
+                "events",
+                parse_goal_tag_event,
+            )?);
+        }
+        events.sort_by(|left, right| {
+            left.time
+                .total_cmp(&right.time)
+                .then_with(|| left.frame.cmp(&right.frame))
+                .then_with(|| left.goal_index.cmp(&right.goal_index))
+                .then_with(|| format!("{:?}", left.kind).cmp(&format!("{:?}", right.kind)))
+        });
+        Ok(events)
+    }
+
+    fn goal_tag_events_value(&self) -> Vec<Value> {
+        let mut events = Vec::new();
+        for module_name in [
+            "aerial_goal",
+            "high_aerial_goal",
+            "long_distance_goal",
+            "own_half_goal",
+            "empty_net_goal",
+        ] {
+            events.extend(self.module_array(module_name, "events"));
+        }
+        events.sort_by(|left, right| {
+            let left_time = left.get("time").and_then(Value::as_f64).unwrap_or(0.0);
+            let right_time = right.get("time").and_then(Value::as_f64).unwrap_or(0.0);
+            left_time.total_cmp(&right_time)
+        });
+        events
+    }
+
     fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
@@ -180,6 +224,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_fifty_fifty_event,
             )?,
+            goal_tags: self.goal_tag_events_typed()?,
             rush: self.module_typed_array("rush", "events")?,
             speed_flip: self.module_player_events(
                 "speed_flip",
@@ -210,6 +255,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "double_tap".to_owned(),
             Value::Array(self.module_array("double_tap", "events")),
+        );
+        events.insert(
+            "goal_tags".to_owned(),
+            Value::Array(self.goal_tag_events_value()),
         );
         events.insert(
             "fifty_fifty".to_owned(),
@@ -243,6 +292,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
         let rush_defaults = RushCalculatorConfig::default();
+        let aerial_goal_config = self.config.get("aerial_goal").and_then(Value::as_object);
+        let high_aerial_goal_config = self
+            .config
+            .get("high_aerial_goal")
+            .and_then(Value::as_object);
+        let long_distance_goal_config = self
+            .config
+            .get("long_distance_goal")
+            .and_then(Value::as_object);
+        let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
+        let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
 
         StatsTimelineConfig {
             most_back_forward_threshold_y: positioning_config
@@ -273,6 +333,34 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("rush_min_possession_retained_seconds"))
                 .and_then(json_f32)
                 .unwrap_or(rush_defaults.min_possession_retained_seconds),
+            aerial_goal_min_ball_z: aerial_goal_config
+                .and_then(|config| config.get("aerial_goal_min_ball_z"))
+                .and_then(json_f32)
+                .unwrap_or(AerialGoalCalculatorConfig::default().min_ball_z),
+            high_aerial_goal_min_ball_z: high_aerial_goal_config
+                .and_then(|config| config.get("high_aerial_goal_min_ball_z"))
+                .and_then(json_f32)
+                .unwrap_or(HighAerialGoalCalculatorConfig::default().min_ball_z),
+            long_distance_goal_max_attacking_y: long_distance_goal_config
+                .and_then(|config| config.get("long_distance_goal_max_attacking_y"))
+                .and_then(json_f32)
+                .unwrap_or(LongDistanceGoalCalculatorConfig::default().max_attacking_y),
+            own_half_goal_max_attacking_y: own_half_goal_config
+                .and_then(|config| config.get("own_half_goal_max_attacking_y"))
+                .and_then(json_f32)
+                .unwrap_or(OwnHalfGoalCalculatorConfig::default().max_attacking_y),
+            empty_net_min_defender_y_margin: empty_net_goal_config
+                .and_then(|config| config.get("empty_net_min_defender_y_margin"))
+                .and_then(json_f32)
+                .unwrap_or(EmptyNetGoalCalculatorConfig::default().min_defender_y_margin),
+            empty_net_min_defender_distance: empty_net_goal_config
+                .and_then(|config| config.get("empty_net_min_defender_distance"))
+                .and_then(json_f32)
+                .unwrap_or(EmptyNetGoalCalculatorConfig::default().min_defender_distance),
+            empty_net_max_touch_attacking_y: empty_net_goal_config
+                .and_then(|config| config.get("empty_net_max_touch_attacking_y"))
+                .and_then(json_f32)
+                .unwrap_or(EmptyNetGoalCalculatorConfig::default().max_touch_attacking_y),
         }
     }
 
@@ -280,6 +368,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
+        let aerial_goal_config = self.config.get("aerial_goal").and_then(Value::as_object);
+        let high_aerial_goal_config = self
+            .config
+            .get("high_aerial_goal")
+            .and_then(Value::as_object);
+        let long_distance_goal_config = self
+            .config
+            .get("long_distance_goal")
+            .and_then(Value::as_object);
+        let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
+        let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
 
         let mut config = Map::new();
         config.insert(
@@ -352,6 +451,53 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     .unwrap_or(rush_defaults.min_possession_retained_seconds as f64),
             )?,
         );
+        for (module_config, key, default_value) in [
+            (
+                aerial_goal_config,
+                "aerial_goal_min_ball_z",
+                AerialGoalCalculatorConfig::default().min_ball_z,
+            ),
+            (
+                high_aerial_goal_config,
+                "high_aerial_goal_min_ball_z",
+                HighAerialGoalCalculatorConfig::default().min_ball_z,
+            ),
+            (
+                long_distance_goal_config,
+                "long_distance_goal_max_attacking_y",
+                LongDistanceGoalCalculatorConfig::default().max_attacking_y,
+            ),
+            (
+                own_half_goal_config,
+                "own_half_goal_max_attacking_y",
+                OwnHalfGoalCalculatorConfig::default().max_attacking_y,
+            ),
+            (
+                empty_net_goal_config,
+                "empty_net_min_defender_y_margin",
+                EmptyNetGoalCalculatorConfig::default().min_defender_y_margin,
+            ),
+            (
+                empty_net_goal_config,
+                "empty_net_min_defender_distance",
+                EmptyNetGoalCalculatorConfig::default().min_defender_distance,
+            ),
+            (
+                empty_net_goal_config,
+                "empty_net_max_touch_attacking_y",
+                EmptyNetGoalCalculatorConfig::default().max_touch_attacking_y,
+            ),
+        ] {
+            config.insert(
+                key.to_owned(),
+                serialize_to_json_value(
+                    &module_config
+                        .and_then(|config| config.get(key))
+                        .and_then(Value::as_f64)
+                        .unwrap_or(default_value as f64),
+                )?,
+            );
+        }
         Ok(Value::Object(config))
     }
 
@@ -1220,6 +1366,13 @@ fn parse_goal_touch_context(value: &Value) -> SubtrActorResult<GoalTouchContext>
         is_team_0: json_required_bool(object, "is_team_0")?,
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
         player_position: json_optional_goal_context_position(object.get("player_position"))?,
+        players: match object.get("players").and_then(Value::as_array) {
+            Some(players) => players
+                .iter()
+                .map(parse_goal_player_context)
+                .collect::<SubtrActorResult<Vec<_>>>()?,
+            None => Vec::new(),
+        },
     })
 }
 
@@ -1264,6 +1417,34 @@ fn parse_double_tap_event(value: &Value) -> SubtrActorResult<DoubleTapEvent> {
         is_team_0: json_required_bool(object, "is_team_0")?,
         backboard_time: json_required_f32(object, "backboard_time")?,
         backboard_frame: json_required_usize(object, "backboard_frame")?,
+    })
+}
+
+
+fn parse_goal_tag_event(value: &Value) -> SubtrActorResult<GoalTagEvent> {
+    let object = json_object(value, "goal tag event")?;
+    Ok(GoalTagEvent {
+        goal_index: json_required_usize(object, "goal_index")?,
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
+        scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
+        scorer: json_optional_remote_id(object.get("scorer"))?,
+        confidence: json_required_f32(object, "confidence")?,
+        evidence: json_required_array(object, "evidence")?
+            .iter()
+            .map(parse_goal_tag_evidence)
+            .collect::<SubtrActorResult<Vec<_>>>()?,
+    })
+}
+
+fn parse_goal_tag_evidence(value: &Value) -> SubtrActorResult<GoalTagEvidence> {
+    let object = json_object(value, "goal tag evidence")?;
+    Ok(GoalTagEvidence {
+        kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_optional_remote_id(object.get("player"))?,
     })
 }
 

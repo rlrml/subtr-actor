@@ -5,10 +5,11 @@ import type { CeilingShotEvent } from "./CeilingShotEvent.ts";
 import type { DoubleTapEvent } from "./DoubleTapEvent.ts";
 import type { FiftyFiftyEvent } from "./FiftyFiftyEvent.ts";
 import type { GoalContextEvent } from "./GoalContextEvent.ts";
+import type { GoalTagEvent } from "./GoalTagEvent.ts";
 import type { RushEvent } from "./RushEvent.ts";
 import type { SpeedFlipEvent } from "./SpeedFlipEvent.ts";
 import type { TimelineEvent } from "./TimelineEvent.ts";
 import type { WavedashEvent } from "./WavedashEvent.ts";
 import type { WhiffEvent } from "./WhiffEvent.ts";
 
-export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, };
+export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, goal_tags: Array<GoalTagEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, };

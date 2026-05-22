@@ -86,6 +86,11 @@ struct StatsWithEventsExport<'a, T, E> {
 }
 
 #[derive(Serialize)]
+struct EventsExport<'a, E> {
+    events: &'a [E],
+}
+
+#[derive(Serialize)]
 struct StatsWithPlayerEventsExport<'a, T, Player, E> {
     stats: &'a T,
     player_stats: Vec<PlayerStatsEntry<'a, Player>>,
@@ -312,6 +317,11 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "backboard",
         "ceiling_shot",
         "double_tap",
+        "aerial_goal",
+        "high_aerial_goal",
+        "long_distance_goal",
+        "own_half_goal",
+        "empty_net_goal",
         "fifty_fifty",
         "possession",
         "pressure",
@@ -380,6 +390,36 @@ pub(crate) fn builtin_module_json(
                 team_zero: calculator.team_zero_stats(),
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "aerial_goal" => {
+            let calculator = graph_state::<AerialGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "high_aerial_goal" => {
+            let calculator = graph_state::<HighAerialGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "long_distance_goal" => {
+            let calculator = graph_state::<LongDistanceGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "own_half_goal" => {
+            let calculator = graph_state::<OwnHalfGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "empty_net_goal" => {
+            let calculator = graph_state::<EmptyNetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
         }
@@ -559,6 +599,8 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "aerial_goal" | "high_aerial_goal" | "long_distance_goal" | "own_half_goal"
+        | "empty_net_goal" => serialize_to_json_value(&serde_json::json!({}))?,
         "fifty_fifty" => {
             let calculator = graph_state::<FiftyFiftyCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsWithPlayerStatsExport {
@@ -722,9 +764,41 @@ pub(crate) fn builtin_snapshot_config_json(
                 "rush_min_possession_retained_seconds": calculator.config().min_possession_retained_seconds,
             }))?)
         }
-        "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession"
-        | "touch" | "whiff" | "wavedash" | "speed_flip" | "flick" | "musty_flick"
-        | "dodge_reset" | "ball_carry" | "boost" | "movement" | "powerslide" | "demo" => None,
+        "aerial_goal" => {
+            let calculator = graph_state::<AerialGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "aerial_goal_min_ball_z": calculator.config().min_ball_z,
+            }))?)
+        }
+        "high_aerial_goal" => {
+            let calculator = graph_state::<HighAerialGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "high_aerial_goal_min_ball_z": calculator.config().min_ball_z,
+            }))?)
+        }
+        "long_distance_goal" => {
+            let calculator = graph_state::<LongDistanceGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "long_distance_goal_max_attacking_y": calculator.config().max_attacking_y,
+            }))?)
+        }
+        "own_half_goal" => {
+            let calculator = graph_state::<OwnHalfGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "own_half_goal_max_attacking_y": calculator.config().max_attacking_y,
+            }))?)
+        }
+        "empty_net_goal" => {
+            let calculator = graph_state::<EmptyNetGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "empty_net_min_defender_y_margin": calculator.config().min_defender_y_margin,
+                "empty_net_min_defender_distance": calculator.config().min_defender_distance,
+                "empty_net_max_touch_attacking_y": calculator.config().max_touch_attacking_y,
+            }))?)
+        }
+        "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
+        | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost" | "movement"
+        | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

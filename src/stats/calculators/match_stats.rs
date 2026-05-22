@@ -429,6 +429,7 @@ pub struct GoalTouchContext {
     pub is_team_0: bool,
     pub ball_position: Option<GoalContextPosition>,
     pub player_position: Option<GoalContextPosition>,
+    pub players: Vec<GoalPlayerContext>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -669,6 +670,15 @@ impl MatchStatsCalculator {
             let Some(player_id) = touch.player.clone() else {
                 continue;
             };
+            let touch_team_most_back_player = Self::most_back_player(players, touch.team_is_team_0);
+            let other_team_most_back_player =
+                Self::most_back_player(players, !touch.team_is_team_0);
+            let touch_players = self.goal_player_contexts(
+                players,
+                touch.team_is_team_0,
+                touch_team_most_back_player.as_ref(),
+                other_team_most_back_player.as_ref(),
+            );
             self.last_touch_context_by_player.insert(
                 player_id.clone(),
                 GoalTouchContext {
@@ -679,6 +689,7 @@ impl MatchStatsCalculator {
                     ball_position,
                     player_position: Self::player_position(players, &player_id)
                         .map(GoalContextPosition::from),
+                    players: touch_players,
                 },
             );
         }

@@ -289,6 +289,17 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             rush_defender_distance_y: RushCalculatorConfig::default().defender_distance_y,
             rush_min_possession_retained_seconds: RushCalculatorConfig::default()
                 .min_possession_retained_seconds,
+            aerial_goal_min_ball_z: AerialGoalCalculatorConfig::default().min_ball_z,
+            high_aerial_goal_min_ball_z: HighAerialGoalCalculatorConfig::default().min_ball_z,
+            long_distance_goal_max_attacking_y: LongDistanceGoalCalculatorConfig::default()
+                .max_attacking_y,
+            own_half_goal_max_attacking_y: OwnHalfGoalCalculatorConfig::default().max_attacking_y,
+            empty_net_min_defender_y_margin: EmptyNetGoalCalculatorConfig::default()
+                .min_defender_y_margin,
+            empty_net_min_defender_distance: EmptyNetGoalCalculatorConfig::default()
+                .min_defender_distance,
+            empty_net_max_touch_attacking_y: EmptyNetGoalCalculatorConfig::default()
+                .max_touch_attacking_y,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
@@ -302,6 +313,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             ceiling_shot: Vec::new(),
             double_tap: Vec::new(),
             fifty_fifty: Vec::new(),
+            goal_tags: Vec::new(),
             rush: Vec::new(),
             speed_flip: Vec::new(),
             wavedash: Vec::new(),

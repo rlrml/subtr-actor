@@ -11,6 +11,13 @@ pub struct StatsTimelineConfig {
     pub rush_attack_support_distance_y: f32,
     pub rush_defender_distance_y: f32,
     pub rush_min_possession_retained_seconds: f32,
+    pub aerial_goal_min_ball_z: f32,
+    pub high_aerial_goal_min_ball_z: f32,
+    pub long_distance_goal_max_attacking_y: f32,
+    pub own_half_goal_max_attacking_y: f32,
+    pub empty_net_min_defender_y_margin: f32,
+    pub empty_net_min_defender_distance: f32,
+    pub empty_net_max_touch_attacking_y: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -39,6 +46,7 @@ pub struct ReplayStatsTimelineEvents {
     pub ceiling_shot: Vec<CeilingShotEvent>,
     pub double_tap: Vec<DoubleTapEvent>,
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
+    pub goal_tags: Vec<GoalTagEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
     pub wavedash: Vec<WavedashEvent>,
