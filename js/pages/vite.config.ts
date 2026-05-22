@@ -69,7 +69,7 @@ export default defineConfig({
   },
   worker: {
     rollupOptions: {
-      external: ["subtr-actor-player"],
+      external: [],
     },
   },
   optimizeDeps: {

@@ -82,7 +82,7 @@ export default defineConfig(({ command, mode }) => {
         // Site builds need the wasm package bundled into workers, while the
         // published library keeps it external for downstream consumers.
         external: siteBuild
-          ? ["subtr-actor-player"]
+          ? []
           : ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
       },
     },
