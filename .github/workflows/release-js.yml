@@ -35,6 +35,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Preflight npm auth
+        id: npm_auth
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -42,12 +43,18 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
-            echo "Missing NPM_TOKEN secret. Add it in repo Settings -> Secrets and variables -> Actions."
-            exit 1
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Missing NPM_TOKEN secret. npm packages will be built and smoke-tested, but publishing will be skipped."
+            exit 0
           fi
 
-          npm whoami --registry=https://registry.npmjs.org >/dev/null
-          echo "npm auth preflight passed."
+          if npm whoami --registry=https://registry.npmjs.org >/dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "npm auth preflight passed."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::NPM_TOKEN was rejected by npm. npm packages will be built and smoke-tested, but publishing will be skipped."
+          fi
 
       - name: Resolve npm package metadata
         id: metadata
@@ -62,12 +69,14 @@ jobs:
           stats_player_name="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["name"])')"
           stats_player_version="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["version"])')"
 
-          echo "bindings_name=${bindings_name}" >> "$GITHUB_OUTPUT"
-          echo "bindings_version=${bindings_version}" >> "$GITHUB_OUTPUT"
-          echo "player_name=${player_name}" >> "$GITHUB_OUTPUT"
-          echo "player_version=${player_version}" >> "$GITHUB_OUTPUT"
-          echo "stats_player_name=${stats_player_name}" >> "$GITHUB_OUTPUT"
-          echo "stats_player_version=${stats_player_version}" >> "$GITHUB_OUTPUT"
+          {
+            echo "bindings_name=${bindings_name}"
+            echo "bindings_version=${bindings_version}"
+            echo "player_name=${player_name}"
+            echo "player_version=${player_version}"
+            echo "stats_player_name=${stats_player_name}"
+            echo "stats_player_version=${stats_player_version}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Check npm publish state
         id: publish_state
@@ -128,14 +137,14 @@ jobs:
         run: npm run smoke:install
 
       - name: Publish bindings package to npm
-        if: steps.publish_state.outputs.bindings_already_published != 'true'
+        if: steps.npm_auth.outputs.available == 'true' && steps.publish_state.outputs.bindings_already_published != 'true'
         working-directory: js/pkg
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish player package to npm
-        if: steps.publish_state.outputs.player_already_published != 'true'
+        if: steps.npm_auth.outputs.available == 'true' && steps.publish_state.outputs.player_already_published != 'true'
         shell: bash
         working-directory: js/player
         run: |
@@ -149,7 +158,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish stats player package to npm
-        if: steps.publish_state.outputs.stats_player_already_published != 'true'
+        if: steps.npm_auth.outputs.available == 'true' && steps.publish_state.outputs.stats_player_already_published != 'true'
         shell: bash
         working-directory: js/stat-evaluation-player
         run: |
@@ -161,3 +170,12 @@ jobs:
           )
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Report skipped npm publish
+        if: steps.npm_auth.outputs.available != 'true'
+        run: |
+          {
+            echo "### npm publish skipped"
+            echo "The npm release build completed without usable npm credentials."
+            echo "Update the repository NPM_TOKEN secret and rerun this workflow to publish npm packages."
+          } >> "$GITHUB_STEP_SUMMARY"

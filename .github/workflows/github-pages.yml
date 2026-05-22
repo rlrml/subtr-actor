@@ -32,7 +32,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build stats player site
-        run: nix build .#js-stats-player-pages --print-build-logs
+        run: nix build .#js-stats-player-pages --print-build-logs --fallback
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
