@@ -185,7 +185,7 @@ impl WhiffCalculator {
             && closing_speed >= WHIFF_MIN_DODGE_CLOSING_SPEED
             && forward_alignment >= WHIFF_MIN_DODGE_FORWARD_ALIGNMENT
             && dodge_ball_in_front;
-        if !(committed_approach && directed_motion && ball_in_front) && !committed_dodge {
+        if !(committed_dodge || committed_approach && directed_motion && ball_in_front) {
             return None;
         }
 
