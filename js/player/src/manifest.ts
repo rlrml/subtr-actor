@@ -1,5 +1,6 @@
 import type {
   PlaybackBound,
+  PlaylistPlaybackOptions,
   PlaylistItem,
   PlaylistManifest,
   PlaylistManifestItem,
@@ -103,6 +104,41 @@ function parseManifestItem(
   };
 }
 
+function parsePlaybackOptions(value: unknown): PlaylistPlaybackOptions {
+  if (!isObject(value)) {
+    throw new Error("manifest.playback must be an object");
+  }
+
+  if (
+    value.advanceMode !== undefined &&
+    value.advanceMode !== "auto" &&
+    value.advanceMode !== "manual"
+  ) {
+    throw new Error('manifest.playback.advanceMode must be "auto" or "manual"');
+  }
+
+  if (
+    value.endMode !== undefined &&
+    value.endMode !== "stop" &&
+    value.endMode !== "loop"
+  ) {
+    throw new Error('manifest.playback.endMode must be "stop" or "loop"');
+  }
+
+  if (
+    value.advanceOnEnd !== undefined &&
+    typeof value.advanceOnEnd !== "boolean"
+  ) {
+    throw new Error("manifest.playback.advanceOnEnd must be a boolean");
+  }
+
+  return {
+    advanceMode: value.advanceMode,
+    endMode: value.endMode,
+    advanceOnEnd: value.advanceOnEnd,
+  };
+}
+
 export function parsePlaylistManifest(manifest: unknown): PlaylistManifest {
   if (!isObject(manifest)) {
     throw new Error("manifest must be an object");
@@ -124,11 +160,17 @@ export function parsePlaylistManifest(manifest: unknown): PlaylistManifest {
     throw new Error("manifest.meta must be an object when provided");
   }
 
+  const playback =
+    manifest.playback === undefined
+      ? undefined
+      : parsePlaybackOptions(manifest.playback);
+
   return {
     replays: manifest.replays?.map(parseManifestReplay),
     items: manifest.items.map(parseManifestItem),
     label: manifest.label,
     meta: manifest.meta,
+    playback,
   };
 }
 

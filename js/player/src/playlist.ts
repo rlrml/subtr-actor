@@ -5,10 +5,14 @@ import type {
   CameraSettings,
   LoadedReplay,
   PlaybackBound,
+  PlaylistAdvanceMode,
+  PlaylistEndMode,
   PlaylistItem,
+  PlaylistLoadSource,
+  PlaylistPreloadContext,
+  PlaylistPreloadPolicy,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
-  ReplayPreloadContext,
   ReplayPreloadPolicy,
   RawReplayFramesData,
   ReplayModel,
@@ -31,6 +35,18 @@ type ReplayPlaylistPlayerListener = (
 
 type ReplayPathLoader = (path: string) => Promise<LoadedReplay>;
 
+export interface FullReplayPlaylistItemOptions {
+  label?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface ReplayPlaylistPlayerSingleReplayOptions
+  extends ReplayPlaylistPlayerOptions {
+  replayId?: string;
+  itemLabel?: string;
+  itemMeta?: Record<string, unknown>;
+}
+
 type PlayerPreferences = {
   speed: number;
   cameraDistanceScale: number;
@@ -43,7 +59,9 @@ type PlayerPreferences = {
   skipKickoffsEnabled: boolean;
 };
 
-function isReplaySource(value: string | ReplaySource): value is ReplaySource {
+function isPlaylistSource<TSource extends PlaylistLoadSource<unknown>>(
+  value: string | TSource
+): value is TSource {
   return typeof value !== "string";
 }
 
@@ -151,9 +169,15 @@ function createInitialPreferences(
   };
 }
 
-function normalizePreloadPolicy(
-  options: ReplayPlaylistPlayerOptions
-): ReplayPreloadPolicy {
+function normalizePreloadPolicy<
+  TSource extends PlaylistLoadSource<unknown>,
+  TItem extends PlaylistItem<TSource>,
+>(
+  options: {
+    preloadPolicy?: PlaylistPreloadPolicy<TSource, TItem>;
+    preloadRadius?: number;
+  }
+): PlaylistPreloadPolicy<TSource, TItem> {
   if (options.preloadPolicy) {
     return options.preloadPolicy;
   }
@@ -173,8 +197,31 @@ function normalizePreloadPolicy(
   };
 }
 
-function uniqueSourcesFromItems(items: PlaylistItem[]): ReplaySource[] {
-  const uniqueSources: ReplaySource[] = [];
+function normalizeAdvanceMode(
+  options: {
+    advanceMode?: PlaylistAdvanceMode;
+    advanceOnEnd?: boolean;
+  }
+): PlaylistAdvanceMode {
+  if (options.advanceMode) {
+    return options.advanceMode;
+  }
+
+  return options.advanceOnEnd === false ? "manual" : "auto";
+}
+
+function normalizeEndMode(
+  options: {
+    endMode?: PlaylistEndMode;
+  }
+): PlaylistEndMode {
+  return options.endMode ?? "stop";
+}
+
+function uniqueSourcesFromItems<TSource extends PlaylistLoadSource<unknown>>(
+  items: PlaylistItem<TSource>[]
+): TSource[] {
+  const uniqueSources: TSource[] = [];
   const seenSourceIds = new Set<string>();
 
   for (const item of items) {
@@ -188,14 +235,14 @@ function uniqueSourcesFromItems(items: PlaylistItem[]): ReplaySource[] {
   return uniqueSources;
 }
 
-function collectAdjacentSources(
-  items: PlaylistItem[],
+function collectAdjacentSources<TSource extends PlaylistLoadSource<unknown>>(
+  items: PlaylistItem<TSource>[],
   currentIndex: number,
   direction: -1 | 1,
   limit: number,
   currentSourceId: string
-): ReplaySource[] {
-  const sources: ReplaySource[] = [];
+): TSource[] {
+  const sources: TSource[] = [];
   const seenSourceIds = new Set<string>([currentSourceId]);
 
   for (
@@ -214,11 +261,14 @@ function collectAdjacentSources(
   return sources;
 }
 
-function resolvePolicySources(
-  items: PlaylistItem[],
+function resolvePolicySources<
+  TSource extends PlaylistLoadSource<unknown>,
+  TItem extends PlaylistItem<TSource>,
+>(
+  items: TItem[],
   currentIndex: number,
-  preloadPolicy: ReplayPreloadPolicy
-): ReplaySource[] {
+  preloadPolicy: PlaylistPreloadPolicy<TSource, TItem>
+): TSource[] {
   const currentItem = items[currentIndex];
   if (!currentItem) {
     return [];
@@ -252,19 +302,19 @@ function resolvePolicySources(
     return [...behind, ...ahead];
   }
 
-  const preloadContext: ReplayPreloadContext = {
+  const preloadContext: PlaylistPreloadContext<TSource, TItem> = {
     items,
     currentIndex,
     currentItem,
   };
   const sourceIds = new Set<string>([currentItem.replay.id]);
-  const sources: ReplaySource[] = [];
-  const availableSources = new Map<string, ReplaySource>(
+  const sources: TSource[] = [];
+  const availableSources = new Map<string, TSource>(
     uniqueSourcesFromItems(items).map((source) => [source.id, source])
   );
 
   for (const selected of preloadPolicy.pick(preloadContext)) {
-    const source = isReplaySource(selected)
+    const source = isPlaylistSource(selected)
       ? selected
       : availableSources.get(selected);
     if (!source || sourceIds.has(source.id)) {
@@ -303,7 +353,9 @@ export function createReplayBytesSource(
   id: string,
   data: Uint8Array
 ): ReplaySource {
-  return createReplaySource(id, async () => loadReplayFromBytes(data));
+  return createReplaySource(id, async () =>
+    loadReplayFromBytes(data, { useWorker: true })
+  );
 }
 
 export function createReplayFileSource(
@@ -312,7 +364,7 @@ export function createReplayFileSource(
 ): ReplaySource {
   return createReplaySource(id, async () => {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    return loadReplayFromBytes(bytes);
+    return loadReplayFromBytes(bytes, { useWorker: true });
   });
 }
 
@@ -322,6 +374,291 @@ export function createReplayPathSource(
   id = path
 ): ReplaySource {
   return createReplaySource(id, async () => loadReplay(path));
+}
+
+export function createFullReplayPlaylistItem(
+  replay: ReplaySource,
+  options: FullReplayPlaylistItemOptions = {}
+): PlaylistItem {
+  return {
+    replay,
+    start: timeBound(0),
+    end: timeBound(Number.POSITIVE_INFINITY),
+    label: options.label,
+    meta: options.meta,
+  };
+}
+
+export class PlaylistLoadCache<
+  TLoaded,
+  TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
+> {
+  private readonly cache = new Map<string, Promise<TLoaded>>();
+
+  load(source: TSource): Promise<TLoaded> {
+    const cached = this.cache.get(source.id);
+    if (cached) {
+      return cached;
+    }
+
+    const loadPromise = source.load().catch((error) => {
+      this.cache.delete(source.id);
+      throw error;
+    });
+    this.cache.set(source.id, loadPromise);
+    return loadPromise;
+  }
+
+  preload(sources: Iterable<TSource>): void {
+    for (const source of sources) {
+      void this.load(source);
+    }
+  }
+
+  has(source: TSource | string): boolean {
+    return this.cache.has(typeof source === "string" ? source : source.id);
+  }
+
+  delete(source: TSource | string): boolean {
+    return this.cache.delete(typeof source === "string" ? source : source.id);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+export interface PlaylistSessionState<
+  TLoaded,
+  TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
+  TItem extends PlaylistItem<TSource> = PlaylistItem<TSource>,
+> {
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  itemIndex: number;
+  itemCount: number;
+  item: TItem | null;
+  loaded: TLoaded | null;
+  advanceMode: PlaylistAdvanceMode;
+  endMode: PlaylistEndMode;
+  playlistEnded: boolean;
+}
+
+export interface PlaylistSessionOptions<
+  TLoaded,
+  TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
+  TItem extends PlaylistItem<TSource> = PlaylistItem<TSource>,
+> {
+  initialItemIndex?: number;
+  advanceMode?: PlaylistAdvanceMode;
+  endMode?: PlaylistEndMode;
+  advanceOnEnd?: boolean;
+  preloadPolicy?: PlaylistPreloadPolicy<TSource, TItem>;
+  preloadRadius?: number;
+  loadCache?: PlaylistLoadCache<TLoaded, TSource>;
+}
+
+type PlaylistSessionListener<
+  TLoaded,
+  TSource extends PlaylistLoadSource<TLoaded>,
+  TItem extends PlaylistItem<TSource>,
+> = (state: PlaylistSessionState<TLoaded, TSource, TItem>) => void;
+
+export class PlaylistSession<
+  TLoaded,
+  TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
+  TItem extends PlaylistItem<TSource> = PlaylistItem<TSource>,
+> {
+  readonly items: TItem[];
+  readonly loadCache: PlaylistLoadCache<TLoaded, TSource>;
+
+  private currentItemIndex = 0;
+  private pendingItemIndex: number | null = null;
+  private loading = false;
+  private error: string | null = null;
+  private currentLoaded: TLoaded | null = null;
+  private disposed = false;
+  private loadGeneration = 0;
+  private pendingLoad: Promise<void> = Promise.resolve();
+  private playlistEnded = false;
+  private readonly listeners = new Set<
+    PlaylistSessionListener<TLoaded, TSource, TItem>
+  >();
+  private readonly preloadPolicy: PlaylistPreloadPolicy<TSource, TItem>;
+  private advanceMode: PlaylistAdvanceMode;
+  private endMode: PlaylistEndMode;
+
+  constructor(
+    items: TItem[],
+    options: PlaylistSessionOptions<TLoaded, TSource, TItem> = {},
+  ) {
+    this.items = items;
+    this.loadCache = options.loadCache ?? new PlaylistLoadCache<TLoaded, TSource>();
+    this.preloadPolicy = normalizePreloadPolicy<TSource, TItem>(options);
+    this.advanceMode = normalizeAdvanceMode(options);
+    this.endMode = normalizeEndMode(options);
+
+    if (items.length > 0) {
+      this.currentItemIndex = clamp(
+        options.initialItemIndex ?? 0,
+        0,
+        items.length - 1,
+      );
+      this.pendingLoad = this.loadItem(this.currentItemIndex);
+    }
+  }
+
+  async waitForCurrentItem(): Promise<void> {
+    await this.pendingLoad;
+  }
+
+  async setCurrentItemIndex(index: number): Promise<void> {
+    this.pendingLoad = this.loadItem(index);
+    await this.pendingLoad;
+  }
+
+  async next(): Promise<boolean> {
+    const currentIndex = this.pendingItemIndex ?? this.currentItemIndex;
+    if (currentIndex >= this.items.length - 1) {
+      if (this.endMode === "loop" && this.items.length > 0) {
+        await this.setCurrentItemIndex(0);
+        return true;
+      }
+      return false;
+    }
+
+    await this.setCurrentItemIndex(currentIndex + 1);
+    return true;
+  }
+
+  async previous(): Promise<boolean> {
+    const currentIndex = this.pendingItemIndex ?? this.currentItemIndex;
+    if (currentIndex <= 0) {
+      if (this.endMode === "loop" && this.items.length > 0) {
+        await this.setCurrentItemIndex(this.items.length - 1);
+        return true;
+      }
+      return false;
+    }
+
+    await this.setCurrentItemIndex(currentIndex - 1);
+    return true;
+  }
+
+  async completeCurrentItem(): Promise<boolean> {
+    if (this.advanceMode !== "auto") {
+      this.playlistEnded = this.currentItemIndex >= this.items.length - 1;
+      this.emitChange();
+      return false;
+    }
+
+    const advanced = await this.next();
+    this.playlistEnded = !advanced && this.currentItemIndex >= this.items.length - 1;
+    this.emitChange();
+    return advanced;
+  }
+
+  setAdvanceMode(mode: PlaylistAdvanceMode): void {
+    this.advanceMode = mode;
+    this.emitChange();
+  }
+
+  setEndMode(mode: PlaylistEndMode): void {
+    this.endMode = mode;
+    this.playlistEnded = false;
+    this.emitChange();
+  }
+
+  getCurrentLoaded(): TLoaded | null {
+    return this.currentLoaded;
+  }
+
+  getState(): PlaylistSessionState<TLoaded, TSource, TItem> {
+    const itemIndex = this.pendingItemIndex ?? this.currentItemIndex;
+    return {
+      ready: this.currentLoaded !== null && !this.loading && this.error === null,
+      loading: this.loading,
+      error: this.error,
+      itemIndex,
+      itemCount: this.items.length,
+      item: this.items[itemIndex] ?? null,
+      loaded: this.currentLoaded,
+      advanceMode: this.advanceMode,
+      endMode: this.endMode,
+      playlistEnded: this.playlistEnded,
+    };
+  }
+
+  subscribe(
+    listener: PlaylistSessionListener<TLoaded, TSource, TItem>,
+  ): () => void {
+    this.listeners.add(listener);
+    listener(this.getState());
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  destroy(): void {
+    this.disposed = true;
+    this.listeners.clear();
+  }
+
+  dispose(): void {
+    this.destroy();
+  }
+
+  private async loadItem(index: number): Promise<void> {
+    if (this.items.length === 0) {
+      return;
+    }
+
+    const clampedIndex = clamp(index, 0, this.items.length - 1);
+    const generation = ++this.loadGeneration;
+    const item = this.items[clampedIndex]!;
+
+    this.pendingItemIndex = clampedIndex;
+    this.loading = true;
+    this.error = null;
+    this.playlistEnded = false;
+    this.emitChange();
+
+    try {
+      const loaded = await this.loadCache.load(item.replay);
+      if (this.disposed || generation !== this.loadGeneration) {
+        return;
+      }
+
+      this.currentItemIndex = clampedIndex;
+      this.pendingItemIndex = null;
+      this.currentLoaded = loaded;
+      this.loading = false;
+      this.error = null;
+      this.loadCache.preload(
+        resolvePolicySources(this.items, clampedIndex, this.preloadPolicy),
+      );
+      this.emitChange();
+    } catch (error) {
+      if (this.disposed || generation !== this.loadGeneration) {
+        return;
+      }
+
+      this.pendingItemIndex = null;
+      this.loading = false;
+      this.error = describeError(error);
+      this.currentLoaded = null;
+      this.emitChange();
+      throw error;
+    }
+  }
+
+  private emitChange(): void {
+    const state = this.getState();
+    for (const listener of this.listeners) {
+      listener(state);
+    }
+  }
 }
 
 export function resolvePlaylistItem(
@@ -358,9 +695,41 @@ export class ReplayPlaylistPlayer extends EventTarget {
   private loadGeneration = 0;
   private boundaryGuard = false;
   private pendingLoad: Promise<void> = Promise.resolve();
-  private readonly replayCache = new Map<string, Promise<LoadedReplay>>();
+  private readonly replayCache =
+    new PlaylistLoadCache<LoadedReplay, ReplaySource>();
   private readonly preferences: PlayerPreferences;
   private readonly preloadPolicy: ReplayPreloadPolicy;
+  private advanceMode: PlaylistAdvanceMode;
+  private endMode: PlaylistEndMode;
+
+  static fromReplay(
+    container: HTMLElement,
+    replay: LoadedReplay,
+    options: ReplayPlaylistPlayerSingleReplayOptions = {}
+  ): ReplayPlaylistPlayer {
+    return ReplayPlaylistPlayer.fromReplaySource(
+      container,
+      createStaticReplaySource(options.replayId ?? "replay", replay),
+      options,
+    );
+  }
+
+  static fromReplaySource(
+    container: HTMLElement,
+    source: ReplaySource,
+    options: ReplayPlaylistPlayerSingleReplayOptions = {}
+  ): ReplayPlaylistPlayer {
+    return new ReplayPlaylistPlayer(
+      container,
+      [
+        createFullReplayPlaylistItem(source, {
+          label: options.itemLabel,
+          meta: options.itemMeta,
+        }),
+      ],
+      options,
+    );
+  }
 
   constructor(
     container: HTMLElement,
@@ -373,6 +742,8 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.options = options;
     this.preferences = createInitialPreferences(options);
     this.preloadPolicy = normalizePreloadPolicy(options);
+    this.advanceMode = normalizeAdvanceMode(options);
+    this.endMode = normalizeEndMode(options);
     this.playbackIntent = options.autoplay ?? false;
 
     if (items.length > 0) {
@@ -400,6 +771,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
   async next(): Promise<boolean> {
     const currentIndex = this.pendingItemIndex ?? this.currentItemIndex;
     if (currentIndex >= this.items.length - 1) {
+      if (this.endMode === "loop" && this.items.length > 0) {
+        await this.setCurrentItemIndex(0);
+        return true;
+      }
       return false;
     }
 
@@ -410,6 +785,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
   async previous(): Promise<boolean> {
     const currentIndex = this.pendingItemIndex ?? this.currentItemIndex;
     if (currentIndex <= 0) {
+      if (this.endMode === "loop" && this.items.length > 0) {
+        await this.setCurrentItemIndex(this.items.length - 1);
+        return true;
+      }
       return false;
     }
 
@@ -542,6 +921,16 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setAdvanceMode(mode: PlaylistAdvanceMode): void {
+    this.advanceMode = mode;
+    this.emitChange();
+  }
+
+  setEndMode(mode: PlaylistEndMode): void {
+    this.endMode = mode;
+    this.emitChange();
+  }
+
   getState(): ReplayPlaylistPlayerState {
     const playerState = this.player?.getState() ?? null;
     const itemIndex = this.pendingItemIndex ?? this.currentItemIndex;
@@ -551,6 +940,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
       playerState?.duration ?? this.currentResolvedItem?.replay.replay.duration ?? 0;
     const itemStartTime = this.currentResolvedItem?.start.time ?? 0;
     const duration = this.currentResolvedItem?.duration ?? 0;
+    const currentTime = clamp(replayCurrentTime - itemStartTime, 0, duration);
+    const itemEnded =
+      this.currentResolvedItem !== null &&
+      currentTime >= duration - END_TIME_EPSILON;
 
     return {
       ready: this.currentResolvedItem !== null && !this.loading && this.error === null,
@@ -559,7 +952,11 @@ export class ReplayPlaylistPlayer extends EventTarget {
       itemIndex,
       itemCount: this.items.length,
       item,
-      currentTime: clamp(replayCurrentTime - itemStartTime, 0, duration),
+      advanceMode: this.advanceMode,
+      endMode: this.endMode,
+      itemEnded,
+      playlistEnded: itemEnded && itemIndex >= this.items.length - 1,
+      currentTime,
       duration,
       replayCurrentTime,
       replayDuration,
@@ -673,27 +1070,13 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 
   private loadReplaySource(source: ReplaySource): Promise<LoadedReplay> {
-    const cachedReplay = this.replayCache.get(source.id);
-    if (cachedReplay) {
-      return cachedReplay;
-    }
-
-    const loadPromise = source.load().catch((error) => {
-      this.replayCache.delete(source.id);
-      throw error;
-    });
-    this.replayCache.set(source.id, loadPromise);
-    return loadPromise;
+    return this.replayCache.load(source);
   }
 
   private prefetchNearbyReplays(index: number): void {
-    for (const source of resolvePolicySources(
-      this.items,
-      index,
-      this.preloadPolicy
-    )) {
-      void this.loadReplaySource(source);
-    }
+    this.replayCache.preload(
+      resolvePolicySources(this.items, index, this.preloadPolicy)
+    );
   }
 
   private attachPlayer(resolvedItem: ResolvedPlaylistItem): void {
@@ -749,27 +1132,30 @@ export class ReplayPlaylistPlayer extends EventTarget {
     }
 
     const endTime = this.currentResolvedItem.end.time;
-    if (state.currentTime > endTime + END_TIME_EPSILON) {
+    if (state.playing && state.currentTime >= endTime - END_TIME_EPSILON) {
       this.boundaryGuard = true;
-      this.player?.setState({ currentTime: endTime, playing: false });
-      this.playbackIntent = false;
+      if (this.advanceMode === "auto" && this.playbackIntent) {
+        if (this.currentItemIndex < this.items.length - 1) {
+          void this.setCurrentItemIndex(this.currentItemIndex + 1);
+        } else if (this.endMode === "loop" && this.items.length > 0) {
+          void this.setCurrentItemIndex(0);
+        } else {
+          this.playbackIntent = false;
+          this.player?.setState({ currentTime: endTime, playing: false });
+        }
+      } else {
+        this.playbackIntent = false;
+        this.player?.setState({ currentTime: endTime, playing: false });
+      }
       this.boundaryGuard = false;
       this.emitChange();
       return;
     }
 
-    if (state.playing && state.currentTime >= endTime - END_TIME_EPSILON) {
+    if (state.currentTime > endTime + END_TIME_EPSILON) {
       this.boundaryGuard = true;
-      if (
-        (this.options.advanceOnEnd ?? true) &&
-        this.playbackIntent &&
-        this.currentItemIndex < this.items.length - 1
-      ) {
-        void this.setCurrentItemIndex(this.currentItemIndex + 1);
-      } else {
-        this.playbackIntent = false;
-        this.player?.setState({ currentTime: endTime, playing: false });
-      }
+      this.player?.setState({ currentTime: endTime, playing: false });
+      this.playbackIntent = false;
       this.boundaryGuard = false;
       this.emitChange();
       return;

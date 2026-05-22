@@ -1,0 +1,28 @@
+{
+  "name": "subtr-actor-mechanic-review-player",
+  "version": "0.1.0",
+  "description": "Mechanic candidate review player for subtr-actor playlist manifests",
+  "type": "module",
+  "scripts": {
+    "check": "../stat-evaluation-player/node_modules/.bin/tsc --noEmit",
+    "dev": "../stat-evaluation-player/node_modules/.bin/vite",
+    "build": "../scripts/with-clean-npm-env.sh node --run=check && ../stat-evaluation-player/node_modules/.bin/vite build",
+    "dev-with-wasm": "../scripts/with-clean-npm-env.sh node --run=dev"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vite-plugin-wasm": "^3.6.0"
+  },
+  "keywords": [
+    "rocket-league",
+    "replay",
+    "mechanic-review",
+    "playlist"
+  ],
+  "license": "MIT"
+}

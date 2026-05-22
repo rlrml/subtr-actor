@@ -132,7 +132,7 @@ export function createBallchasingReplaySource(
     id: `ballchasing:${id}`,
     async load(): Promise<LoadedReplay> {
       const bytes = await fetchBallchasingReplayBytes(id, options);
-      return loadReplayFromBytes(bytes);
+      return loadReplayFromBytes(bytes, { useWorker: true });
     },
   };
 }

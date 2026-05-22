@@ -1,12 +1,13 @@
 import "./styles.css";
 import {
-  ReplayPlayer,
+  ReplayPlaylistPlayer,
   createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
-  createReplayLoadOverlay,
   createTimelineOverlayPlugin,
-  formatReplayLoadProgress,
+  createFullReplayPlaylistItem,
+  createReplaySource,
   loadReplayFromBytes,
+  timeBound,
 } from "../../player/src/lib.ts";
 
 function mustElement(selector) {
@@ -32,8 +33,8 @@ app.innerHTML = `
         </p>
       </div>
       <label class="file-picker">
-        <span>Choose replay</span>
-        <input id="replay-file" type="file" accept=".replay" />
+          <span>Choose replay(s)</span>
+          <input id="replay-file" type="file" accept=".replay" multiple />
       </label>
     </section>
     <section class="workspace">
@@ -139,6 +140,37 @@ app.innerHTML = `
           </div>
         </div>
         <div class="panel">
+          <h2>Playlist</h2>
+          <div class="transport-row">
+            <button id="previous-item" disabled>Previous</button>
+            <button id="next-item" disabled>Next</button>
+          </div>
+          <label>
+            <span class="label">Advance</span>
+            <select id="playlist-advance" disabled>
+              <option value="auto" selected>Auto</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <label>
+            <span class="label">End</span>
+            <select id="playlist-end" disabled>
+              <option value="stop" selected>Stop</option>
+              <option value="loop">Loop</option>
+            </select>
+          </label>
+          <dl class="info-list">
+            <div>
+              <dt>Item</dt>
+              <dd id="playlist-item-readout">--</dd>
+            </div>
+            <div>
+              <dt>Clip</dt>
+              <dd id="playlist-clip-readout">--</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="panel">
           <h2>Replay</h2>
           <dl class="info-list">
             <div>
@@ -190,15 +222,27 @@ const scoreboardClock = mustElement("#scoreboard-clock");
 const kickoffOverlay = mustElement("#kickoff-overlay");
 const kickoffCountdown = mustElement("#kickoff-countdown");
 const playOverlay = mustElement("#play-overlay");
+const previousItem = mustElement("#previous-item");
+const nextItem = mustElement("#next-item");
+const playlistAdvance = mustElement("#playlist-advance");
+const playlistEnd = mustElement("#playlist-end");
+const playlistItemReadout = mustElement("#playlist-item-readout");
+const playlistClipReadout = mustElement("#playlist-clip-readout");
 
 let replayPlayer = null;
 let unsubscribe = null;
 let currentReplayRaw = null;
+let activePlaylistItems = [];
+let renderedReplaySourceId = null;
 
 function setControlsEnabled(enabled) {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
   attachedPlayer.disabled = !enabled;
+  previousItem.disabled = !enabled;
+  nextItem.disabled = !enabled;
+  playlistAdvance.disabled = !enabled;
+  playlistEnd.disabled = !enabled;
   syncCameraModeButtons(enabled ? replayPlayer?.getSnapshot() : undefined);
 }
 
@@ -280,7 +324,19 @@ function getScoreAtFrame(frameIndex) {
 }
 
 function renderSnapshot(snapshot) {
-  const metadata = replayPlayer?.replay.frames[snapshot.frameIndex];
+  const currentReplay = replayPlayer?.getCurrentReplay?.() ?? null;
+  currentReplayRaw = currentReplay?.raw ?? null;
+  const replaySourceId =
+    replayPlayer?.getCurrentResolvedItem?.()?.source.replay.id ?? null;
+  if (currentReplay && replaySourceId !== renderedReplaySourceId) {
+    renderedReplaySourceId = replaySourceId;
+    populateAttachedPlayerOptions(currentReplay.replay.players);
+    teamsReadout.textContent = `${currentReplay.replay.teamZeroNames.length} blue / ${currentReplay.replay.teamOneNames.length} orange`;
+    playersReadout.textContent = currentReplay.replay.players
+      .map((player) => player.name)
+      .join(", ");
+  }
+  const metadata = currentReplay?.replay.frames[snapshot.frameIndex];
   const kickoffMetadata =
     snapshot.activeMetadata?.kind === "kickoff-countdown"
       ? snapshot.activeMetadata
@@ -290,6 +346,13 @@ function renderSnapshot(snapshot) {
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${snapshot.frameIndex}`;
   durationReadout.textContent = `${snapshot.duration.toFixed(2)}s`;
+  playlistAdvance.value = snapshot.advanceMode;
+  playlistEnd.value = snapshot.endMode;
+  playlistItemReadout.textContent =
+    snapshot.itemCount === 0
+      ? "--"
+      : `${snapshot.itemIndex + 1} / ${snapshot.itemCount}`;
+  playlistClipReadout.textContent = snapshot.item?.label ?? "--";
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
   cameraDistance.value = `${snapshot.cameraDistanceScale}`;
   cameraDistanceReadout.textContent = `${snapshot.cameraDistanceScale.toFixed(2)}x`;
@@ -334,8 +397,37 @@ function populateAttachedPlayerOptions(players) {
   }
 }
 
-async function loadReplayFile(file) {
-  statusReadout.textContent = "Parsing replay...";
+function createDemoPlaylistSource(file, index) {
+  return createReplaySource(`file:${index}:${file.name}:${file.size}`, async () => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return loadReplayFromBytes(bytes, {
+      useWorker: true,
+      reportEveryNFrames: 500,
+    });
+  });
+}
+
+function createDemoPlaylistItem(file, index, fileCount) {
+  const source = createDemoPlaylistSource(file, index);
+  if (fileCount === 1) {
+    return createFullReplayPlaylistItem(source, {
+      label: file.name,
+    });
+  }
+
+  return {
+    replay: source,
+    start: timeBound(10),
+    end: timeBound(25),
+    label: `${file.name} · 10s-25s`,
+    meta: {
+      fileName: file.name,
+    },
+  };
+}
+
+async function loadReplayFiles(files) {
+  statusReadout.textContent = "Preparing playlist...";
   setControlsEnabled(false);
   scoreboard.hidden = true;
   kickoffOverlay.hidden = true;
@@ -349,42 +441,23 @@ async function loadReplayFile(file) {
   replayPlayer?.destroy();
   replayPlayer = null;
   currentReplayRaw = null;
-
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const loadOverlay = createReplayLoadOverlay(viewport, {
-    title: "Replay Loading",
-  });
-  let destroyOverlayTimer = null;
-
-  const destroyOverlaySoon = () => {
-    if (destroyOverlayTimer !== null) {
-      window.clearTimeout(destroyOverlayTimer);
-    }
-    destroyOverlayTimer = window.setTimeout(() => {
-      loadOverlay.destroy();
-      destroyOverlayTimer = null;
-    }, 180);
-  };
+  renderedReplaySourceId = null;
+  activePlaylistItems = files.map((file, index) =>
+    createDemoPlaylistItem(file, index, files.length)
+  );
 
   try {
-    const { replay, raw } = await loadReplayFromBytes(bytes, {
-      useWorker: true,
-      reportEveryNFrames: 500,
-      onProgress(progress) {
-        loadOverlay.update(progress);
-        statusReadout.textContent = formatReplayLoadProgress(progress);
-      },
-    });
-    currentReplayRaw = raw;
-
-    replayPlayer = new ReplayPlayer(viewport, replay, {
+    replayPlayer = new ReplayPlaylistPlayer(viewport, activePlaylistItems, {
       autoplay: true,
+      advanceMode: playlistAdvance.value,
+      endMode: playlistEnd.value,
       initialCameraDistanceScale: 2.25,
       initialAttachedPlayerId: null,
       initialBallCamEnabled: false,
       initialBoostMeterEnabled: false,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
+      preloadPolicy: { kind: "adjacent", ahead: 1, behind: 1 },
       plugins: [
         createBallchasingOverlayPlugin(),
         createBoostPadOverlayPlugin(),
@@ -393,35 +466,35 @@ async function loadReplayFile(file) {
         }),
       ],
     });
+    statusReadout.textContent = "Loading first playlist item...";
+    await replayPlayer.waitForCurrentItem();
     unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
+    const { replay } = replayPlayer.getCurrentReplay();
     populateAttachedPlayerOptions(replay.players);
 
     emptyState.hidden = true;
     teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
     playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-    statusReadout.textContent = `Loaded ${file.name}`;
-    loadOverlay.complete(`Loaded ${file.name}`);
-    destroyOverlaySoon();
+    statusReadout.textContent =
+      files.length === 1
+        ? `Loaded ${files[0].name}`
+        : `Loaded ${files.length} replay playlist`;
     setControlsEnabled(true);
     renderSnapshot(replayPlayer.getSnapshot());
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load replay";
-    loadOverlay.fail(message);
-    destroyOverlaySoon();
     throw error;
   }
 }
 
 fileInput.addEventListener("change", async () => {
-  const file = fileInput.files?.[0];
-  if (!file) {
+  const files = Array.from(fileInput.files ?? []);
+  if (files.length === 0) {
     return;
   }
 
   try {
-    await loadReplayFile(file);
+    await loadReplayFiles(files);
   } catch (error) {
     statusReadout.textContent =
       error instanceof Error ? error.message : "Failed to load replay";
@@ -466,6 +539,36 @@ ballCam.addEventListener("change", () => {
 
 playOverlay.addEventListener("click", () => {
   replayPlayer?.play();
+});
+
+previousItem.addEventListener("click", async () => {
+  if (!replayPlayer) {
+    return;
+  }
+  await replayPlayer.previous();
+  const replay = replayPlayer.getCurrentReplay()?.replay;
+  if (replay) {
+    populateAttachedPlayerOptions(replay.players);
+  }
+});
+
+nextItem.addEventListener("click", async () => {
+  if (!replayPlayer) {
+    return;
+  }
+  await replayPlayer.next();
+  const replay = replayPlayer.getCurrentReplay()?.replay;
+  if (replay) {
+    populateAttachedPlayerOptions(replay.players);
+  }
+});
+
+playlistAdvance.addEventListener("change", () => {
+  replayPlayer?.setAdvanceMode(playlistAdvance.value);
+});
+
+playlistEnd.addEventListener("change", () => {
+  replayPlayer?.setEndMode(playlistEnd.value);
 });
 
 skipPostGoalTransitions.addEventListener("change", () => {

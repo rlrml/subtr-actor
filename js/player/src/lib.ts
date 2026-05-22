@@ -42,7 +42,10 @@ export {
   resolvePlaylistItemsFromManifest,
 } from "./manifest";
 export {
+  PlaylistLoadCache,
+  PlaylistSession,
   ReplayPlaylistPlayer,
+  createFullReplayPlaylistItem,
   createReplayBytesSource,
   createReplayFileSource,
   createReplayPathSource,
@@ -51,6 +54,12 @@ export {
   frameBound,
   resolvePlaylistItem,
   timeBound,
+} from "./playlist";
+export type {
+  FullReplayPlaylistItemOptions,
+  PlaylistSessionOptions,
+  PlaylistSessionState,
+  ReplayPlaylistPlayerSingleReplayOptions,
 } from "./playlist";
 export {
   findFrameIndexAtTime,
@@ -79,10 +88,16 @@ export type {
   LoadedReplay,
   PlaybackBound,
   PlaybackFrame,
+  PlaylistAdvanceMode,
+  PlaylistEndMode,
   PlaylistItem,
+  PlaylistLoadSource,
   PlaylistManifest,
   PlaylistManifestItem,
   PlaylistManifestReplay,
+  PlaylistPlaybackOptions,
+  PlaylistPreloadContext,
+  PlaylistPreloadPolicy,
   ReplayPreloadContext,
   ReplayPreloadPolicy,
   PlayerSample,

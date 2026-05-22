@@ -100,6 +100,16 @@ optional `label`/`meta`, while `ReplayPlaylistPlayer` handles replay loading,
 bound resolution, configurable replay-source prefetching, and clip-to-clip
 transitions.
 
+Playback behavior is controlled separately from the playlist items:
+
+- `advanceMode: "auto"` plays highlights back-to-back.
+- `advanceMode: "manual"` pauses at each item end for review workflows.
+- `endMode: "stop"` pauses at the final item.
+- `endMode: "loop"` wraps from the final item back to the first item.
+
+The older `advanceOnEnd` option remains available as a compatibility alias for
+`advanceMode`.
+
 Preloading is controlled with `preloadPolicy`. Built-in modes are:
 
 - `{ kind: "none" }`
@@ -109,6 +119,19 @@ Preloading is controlled with `preloadPolicy`. Built-in modes are:
 
 Policies operate on unique replay sources rather than raw playlist items, so a
 run of multiple clips from the same replay only triggers one replay preload.
+The headless core is `PlaylistSession<TLoaded>`, which manages item index,
+loading state, preload/cache behavior, and playback policies without creating a
+`ReplayPlayer` or touching the DOM. `ReplayPlaylistPlayer` is the UI/player
+adapter for ordinary `LoadedReplay` playback.
+
+A single replay can be treated as the natural one-item playlist with
+`createFullReplayPlaylistItem(source)` or `ReplayPlaylistPlayer.fromReplay(...)`.
+The item starts at `0` and resolves its end bound to the loaded replay duration.
+
+For workflows that need extra processing during eager loads, such as a stats
+evaluation app that loads both replay data and a stats timeline, use
+`PlaylistSession<ReplayLoadBundle>` or `PlaylistLoadCache<ReplayLoadBundle>`
+with custom `PlaylistLoadSource<ReplayLoadBundle>` objects.
 
 The package also includes lightweight manifest helpers for disk-backed playlist
 workflows:

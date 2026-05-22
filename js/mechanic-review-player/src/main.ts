@@ -1,0 +1,361 @@
+import "./styles.css";
+import {
+  ReplayPlaylistPlayer,
+  createBallchasingReplaySource,
+  createReplaySource,
+  loadPlaylistManifestFromFile,
+  loadReplayFromBytes,
+  parsePlaylistManifest,
+  resolvePlaylistItemsFromManifest,
+  type PlaylistAdvanceMode,
+  type PlaylistEndMode,
+  type PlaylistItem,
+  type PlaylistManifest,
+  type PlaylistManifestReplay,
+  type ReplayPlaylistPlayerState,
+  type ReplaySource,
+} from "subtr-actor-player";
+
+type CandidateMeta = {
+  itemId?: string;
+  mechanic?: string;
+  mechanicLabel?: string;
+  detector?: string;
+  confidence?: number;
+  reason?: string;
+  playerId?: string;
+  playerName?: string | null;
+  team?: string | null;
+  target?: {
+    kind?: string;
+    playerId?: string;
+    startTime?: number;
+    endTime?: number;
+    setupStartTime?: number;
+    eventTime?: number;
+    setupStartFrame?: number;
+    eventFrame?: number;
+  };
+  event?: unknown;
+};
+
+const viewport = requireElement<HTMLDivElement>("viewport");
+const statusLine = requireElement<HTMLDivElement>("status");
+const playlistSummary = requireElement<HTMLDivElement>("playlist-summary");
+const playlistFile = requireElement<HTMLInputElement>("playlist-file");
+const playlistUrl = requireElement<HTMLInputElement>("playlist-url");
+const loadUrlButton = requireElement<HTMLButtonElement>("load-url");
+const candidateIndex = requireElement<HTMLDivElement>("candidate-index");
+const candidateTitle = requireElement<HTMLHeadingElement>("candidate-title");
+const candidateMechanic = requireElement<HTMLElement>("candidate-mechanic");
+const candidatePlayer = requireElement<HTMLElement>("candidate-player");
+const candidateConfidence = requireElement<HTMLElement>("candidate-confidence");
+const candidateReplay = requireElement<HTMLElement>("candidate-replay");
+const candidateReason = requireElement<HTMLElement>("candidate-reason");
+const scrubber = requireElement<HTMLInputElement>("scrubber");
+const timeReadout = requireElement<HTMLDivElement>("time-readout");
+const previousButton = requireElement<HTMLButtonElement>("previous");
+const playButton = requireElement<HTMLButtonElement>("play");
+const nextButton = requireElement<HTMLButtonElement>("next");
+const advanceMode = requireElement<HTMLSelectElement>("advance-mode");
+const endMode = requireElement<HTMLSelectElement>("end-mode");
+const speedSelect = requireElement<HTMLSelectElement>("speed");
+const followPlayer = requireElement<HTMLInputElement>("follow-player");
+const playlistCount = requireElement<HTMLElement>("playlist-count");
+const playlistItems = requireElement<HTMLDivElement>("playlist-items");
+const eventJson = requireElement<HTMLPreElement>("event-json");
+
+let reviewPlayer: ReplayPlaylistPlayer | null = null;
+let activeManifest: PlaylistManifest | null = null;
+let activeManifestUrl: string | null = null;
+let scrubbing = false;
+
+function requireElement<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Missing element #${id}`);
+  }
+  return element as T;
+}
+
+function candidateMeta(item: PlaylistItem | null): CandidateMeta {
+  return (item?.meta ?? {}) as CandidateMeta;
+}
+
+function formatSeconds(value: number): string {
+  return `${value.toFixed(1)}s`;
+}
+
+function formatConfidence(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(value * 100)}%`
+    : "-";
+}
+
+function mechanicLabel(meta: CandidateMeta): string {
+  return meta.mechanicLabel ?? meta.mechanic?.replaceAll("_", " ") ?? "-";
+}
+
+function resolveReplayFetchUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+  if (path.startsWith("/")) {
+    return `/@fs${path}`;
+  }
+  if (activeManifestUrl) {
+    return new URL(path, activeManifestUrl).href;
+  }
+  return path;
+}
+
+async function fetchReplayBytes(path: string): Promise<Uint8Array> {
+  const response = await fetch(resolveReplayFetchUrl(path));
+  if (!response.ok) {
+    throw new Error(`Failed to load replay ${path}: ${response.status}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+function ballchasingIdFromReplayId(replayId: string): string | null {
+  return replayId.startsWith("ballchasing:")
+    ? replayId.slice("ballchasing:".length)
+    : null;
+}
+
+function resolveReplaySource(context: {
+  replayId: string;
+  replay?: PlaylistManifestReplay;
+}): ReplaySource {
+  const path = context.replay?.path;
+  if (path) {
+    return createReplaySource(context.replayId, async () =>
+      loadReplayFromBytes(await fetchReplayBytes(path), { useWorker: true }),
+    );
+  }
+
+  const ballchasingId = ballchasingIdFromReplayId(context.replayId);
+  if (ballchasingId) {
+    return createBallchasingReplaySource(ballchasingId);
+  }
+
+  throw new Error(`No loadable replay locator for ${context.replayId}`);
+}
+
+async function loadPlaylist(manifest: PlaylistManifest, sourceUrl: string | null) {
+  activeManifest = manifest;
+  activeManifestUrl = sourceUrl;
+  reviewPlayer?.destroy();
+  viewport.replaceChildren();
+
+  const items = resolvePlaylistItemsFromManifest(manifest, resolveReplaySource);
+  reviewPlayer = new ReplayPlaylistPlayer(viewport, items, {
+    autoplay: false,
+    advanceMode: manifest.playback?.advanceMode ?? "manual",
+    endMode: manifest.playback?.endMode ?? "stop",
+    initialPlaybackRate: Number(speedSelect.value),
+    initialCameraViewMode: "follow",
+    initialBallCamEnabled: true,
+    preloadRadius: 1,
+  });
+  reviewPlayer.subscribe(renderState);
+  advanceMode.value = manifest.playback?.advanceMode ?? "manual";
+  endMode.value = manifest.playback?.endMode ?? "stop";
+  playlistSummary.textContent = `${manifest.label ?? "Playlist"} · ${items.length} candidates`;
+  renderPlaylistItems(items);
+
+  try {
+    await reviewPlayer.waitForCurrentItem();
+    attachCandidatePlayer();
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+function renderPlaylistItems(items: PlaylistItem[]) {
+  playlistCount.textContent = `${items.length} ${items.length === 1 ? "item" : "items"}`;
+  playlistItems.replaceChildren();
+  for (const [index, item] of items.entries()) {
+    const meta = candidateMeta(item);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "playlist-item";
+    button.dataset.index = String(index);
+    button.innerHTML = `
+      <span class="playlist-item-index">${index + 1}</span>
+      <span class="playlist-item-main">
+        <span class="playlist-item-title"></span>
+        <span class="playlist-item-meta"></span>
+      </span>
+    `;
+    button.querySelector(".playlist-item-title")!.textContent =
+      item.label ?? `${mechanicLabel(meta)} candidate`;
+    button.querySelector(".playlist-item-meta")!.textContent = [
+      mechanicLabel(meta),
+      formatConfidence(meta.confidence),
+      meta.reason,
+    ]
+      .filter((value) => value && value !== "-")
+      .join(" · ");
+    button.addEventListener("click", async () => {
+      await reviewPlayer?.setCurrentItemIndex(index);
+      attachCandidatePlayer();
+    });
+    playlistItems.append(button);
+  }
+}
+
+function updatePlaylistSelection(index: number) {
+  for (const button of playlistItems.querySelectorAll<HTMLButtonElement>(".playlist-item")) {
+    button.classList.toggle("active", Number(button.dataset.index) === index);
+  }
+  const active = playlistItems.querySelector<HTMLButtonElement>(".playlist-item.active");
+  active?.scrollIntoView({ block: "nearest" });
+}
+
+async function loadPlaylistUrl(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load playlist: ${response.status}`);
+  }
+  const manifest = parsePlaylistManifest(await response.json());
+  await loadPlaylist(manifest, new URL(url, window.location.href).href);
+}
+
+function setStatus(message: string, isError = false) {
+  statusLine.textContent = message;
+  statusLine.classList.toggle("error", isError);
+}
+
+function attachCandidatePlayer() {
+  if (!reviewPlayer || !followPlayer.checked) {
+    return;
+  }
+  const meta = candidateMeta(reviewPlayer.getState().item);
+  const playerId = meta.target?.playerId ?? meta.playerId ?? null;
+  if (playerId) {
+    reviewPlayer.setAttachedPlayer(playerId);
+  }
+}
+
+function renderState(state: ReplayPlaylistPlayerState) {
+  const item = state.item;
+  const meta = candidateMeta(item);
+  candidateIndex.textContent =
+    state.itemCount > 0 ? `${state.itemIndex + 1} / ${state.itemCount}` : "0 / 0";
+  candidateTitle.textContent = item?.label ?? "No candidate selected";
+  candidateMechanic.textContent = mechanicLabel(meta);
+  candidatePlayer.textContent = meta.playerName
+    ? `${meta.playerName}${meta.team ? ` (${meta.team})` : ""}`
+    : meta.playerId ?? "-";
+  candidateConfidence.textContent = formatConfidence(meta.confidence);
+  candidateReplay.textContent = item?.replay.id ?? "-";
+  candidateReason.textContent = meta.reason ?? "-";
+  eventJson.textContent = JSON.stringify(meta.event ?? meta.target ?? {}, null, 2);
+  updatePlaylistSelection(state.itemIndex);
+
+  if (!scrubbing) {
+    scrubber.value = state.duration > 0
+      ? String(Math.round((state.currentTime / state.duration) * 1000))
+      : "0";
+  }
+  timeReadout.textContent = `${formatSeconds(state.currentTime)} / ${formatSeconds(state.duration)}`;
+  playButton.textContent = state.playing ? "Pause" : "Play";
+  previousButton.disabled = state.itemCount === 0 || (state.itemIndex === 0 && state.endMode !== "loop");
+  nextButton.disabled =
+    state.itemCount === 0 ||
+    (state.itemIndex >= state.itemCount - 1 && state.endMode !== "loop");
+  scrubber.disabled = !state.ready || state.duration <= 0;
+
+  if (state.error) {
+    setStatus(state.error, true);
+  } else if (state.loading) {
+    setStatus("Loading replay...");
+  } else if (state.ready) {
+    setStatus(state.itemEnded ? "Candidate ended." : "Ready.");
+  } else {
+    setStatus(activeManifest ? "No candidates in playlist." : "Load a playlist to begin.");
+  }
+}
+
+playlistFile.addEventListener("change", async () => {
+  const file = playlistFile.files?.[0];
+  if (!file) {
+    return;
+  }
+  try {
+    setStatus("Loading playlist...");
+    await loadPlaylist(await loadPlaylistManifestFromFile(file), null);
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }
+});
+
+loadUrlButton.addEventListener("click", async () => {
+  const url = playlistUrl.value.trim();
+  if (!url) {
+    return;
+  }
+  try {
+    setStatus("Loading playlist...");
+    await loadPlaylistUrl(url);
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }
+});
+
+previousButton.addEventListener("click", async () => {
+  if (await reviewPlayer?.previous()) {
+    attachCandidatePlayer();
+  }
+});
+
+nextButton.addEventListener("click", async () => {
+  if (await reviewPlayer?.next()) {
+    attachCandidatePlayer();
+  }
+});
+
+playButton.addEventListener("click", () => {
+  reviewPlayer?.togglePlayback();
+});
+
+advanceMode.addEventListener("change", () => {
+  reviewPlayer?.setAdvanceMode(advanceMode.value as PlaylistAdvanceMode);
+});
+
+endMode.addEventListener("change", () => {
+  reviewPlayer?.setEndMode(endMode.value as PlaylistEndMode);
+});
+
+speedSelect.addEventListener("change", () => {
+  reviewPlayer?.setPlaybackRate(Number(speedSelect.value));
+});
+
+followPlayer.addEventListener("change", () => {
+  if (followPlayer.checked) {
+    attachCandidatePlayer();
+  } else {
+    reviewPlayer?.setAttachedPlayer(null);
+    reviewPlayer?.setCameraViewMode("free");
+  }
+});
+
+scrubber.addEventListener("input", () => {
+  const state = reviewPlayer?.getState();
+  if (!reviewPlayer || !state || state.duration <= 0) {
+    return;
+  }
+  scrubbing = true;
+  reviewPlayer.seek((Number(scrubber.value) / 1000) * state.duration);
+  scrubbing = false;
+});
+
+const searchParams = new URLSearchParams(window.location.search);
+const urlParam = searchParams.get("playlist") ?? searchParams.get("playlistUrl");
+if (urlParam) {
+  playlistUrl.value = urlParam;
+  void loadPlaylistUrl(urlParam).catch((error) => {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  });
+}

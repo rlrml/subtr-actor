@@ -130,6 +130,9 @@
             pushd js/pages
             ../scripts/with-clean-npm-env.sh npm run build
             popd
+            pushd js/mechanic-review-player
+            ../scripts/with-clean-npm-env.sh npm run build
+            popd
             runHook postBuild
           '';
 
@@ -139,6 +142,8 @@
             cp -r js/stat-evaluation-player/dist/. $out/
             mkdir -p $out/stats
             cp -r js/pages/dist/. $out/stats/
+            mkdir -p $out/review
+            cp -r js/mechanic-review-player/dist/. $out/review/
             runHook postInstall
           '';
         };

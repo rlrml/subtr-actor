@@ -54,7 +54,7 @@ function shouldUseWorker(options: ReplayLoadOptions): boolean {
     return options.useWorker && typeof Worker !== "undefined";
   }
 
-  return typeof Worker !== "undefined" && options.onProgress !== undefined;
+  return typeof Worker !== "undefined";
 }
 
 interface ReplayLoadRequest {
@@ -71,6 +71,7 @@ interface ReplayProgressMessage {
 interface ReplayDoneMessage {
   type: "done";
   rawBuffer: ArrayBuffer;
+  replayBuffer: ArrayBuffer;
 }
 
 interface ReplayErrorMessage {
@@ -111,23 +112,19 @@ async function loadReplayFromBytesWithWorker(
       }
 
       cleanup();
-      options.onProgress?.({ stage: "normalizing", progress: 0.1 });
+      options.onProgress?.({ stage: "decoding-replay", progress: 0 });
       if (typeof requestAnimationFrame === "function") {
         await new Promise<void>((done) => requestAnimationFrame(() => done()));
       }
-      const rawJson = new TextDecoder().decode(new Uint8Array(message.rawBuffer));
-      options.onProgress?.({ stage: "normalizing", progress: 0.45 });
-      const raw = JSON.parse(rawJson) as RawReplayFramesData;
-      options.onProgress?.({ stage: "normalizing", progress: 0.65 });
-      const replay = await normalizeReplayDataAsync(raw, {
-        onProgress(progress) {
-          options.onProgress?.({
-            stage: "normalizing",
-            progress: 0.65 + (progress * 0.35),
-          });
-        },
-      });
-      options.onProgress?.({ stage: "normalizing", progress: 1 });
+      const decoder = new TextDecoder();
+      const raw = JSON.parse(
+        decoder.decode(new Uint8Array(message.rawBuffer)),
+      ) as RawReplayFramesData;
+      options.onProgress?.({ stage: "decoding-replay", progress: 0.5 });
+      const replay = JSON.parse(
+        decoder.decode(new Uint8Array(message.replayBuffer)),
+      ) as ReplayLoadResult["replay"];
+      options.onProgress?.({ stage: "decoding-replay", progress: 1 });
       resolve({
         raw,
         replay,

@@ -229,17 +229,48 @@ export type PlaybackBound =
   | { kind: "frame"; value: number }
   | { kind: "time"; value: number };
 
-export interface ReplaySource {
+export interface PlaylistLoadSource<TLoaded> {
   id: string;
-  load: () => Promise<LoadedReplay>;
+  load: () => Promise<TLoaded>;
 }
 
-export interface PlaylistItem {
-  replay: ReplaySource;
+export interface ReplaySource extends PlaylistLoadSource<LoadedReplay> {}
+
+export interface PlaylistItem<
+  TSource extends PlaylistLoadSource<unknown> = ReplaySource,
+> {
+  replay: TSource;
   start: PlaybackBound;
   end: PlaybackBound;
   label?: string;
   meta?: Record<string, unknown>;
+}
+
+export type PlaylistAdvanceMode = "auto" | "manual";
+
+export type PlaylistEndMode = "stop" | "loop";
+
+export interface PlaylistPlaybackOptions {
+  /**
+   * Controls what happens when the active playlist item reaches its end bound.
+   *
+   * - "auto" advances to the next item.
+   * - "manual" pauses at the item end until the caller chooses another item.
+   */
+  advanceMode?: PlaylistAdvanceMode;
+  /**
+   * Controls what happens when automatic advancement reaches the end of the
+   * playlist.
+   *
+   * - "stop" pauses at the final item end.
+   * - "loop" continues playback from the first item.
+   */
+  endMode?: PlaylistEndMode;
+  /**
+   * @deprecated Use advanceMode instead. true maps to "auto", false maps to
+   * "manual".
+   */
+  advanceOnEnd?: boolean;
 }
 
 export interface PlaylistManifestReplay {
@@ -262,6 +293,7 @@ export interface PlaylistManifest {
   items: PlaylistManifestItem[];
   label?: string;
   meta?: Record<string, unknown>;
+  playback?: PlaylistPlaybackOptions;
 }
 
 export interface ResolvedPlaybackBound {
@@ -277,22 +309,38 @@ export interface ResolvedPlaylistItem {
   duration: number;
 }
 
-export interface ReplayPreloadContext {
-  items: PlaylistItem[];
+export interface PlaylistPreloadContext<
+  TSource extends PlaylistLoadSource<unknown> = ReplaySource,
+  TItem extends PlaylistItem<TSource> = PlaylistItem<TSource>,
+> {
+  items: TItem[];
   currentIndex: number;
-  currentItem: PlaylistItem;
+  currentItem: TItem;
 }
 
-export type ReplayPreloadPolicy =
+export type PlaylistPreloadPolicy<
+  TSource extends PlaylistLoadSource<unknown> = ReplaySource,
+  TItem extends PlaylistItem<TSource> = PlaylistItem<TSource>,
+> =
   | { kind: "none" }
   | { kind: "all" }
   | { kind: "adjacent"; ahead: number; behind?: number }
   | {
       kind: "custom";
       pick: (
-        context: ReplayPreloadContext
-      ) => Iterable<string | ReplaySource>;
+        context: PlaylistPreloadContext<TSource, TItem>
+      ) => Iterable<string | TSource>;
     };
+
+export type ReplayPreloadContext = PlaylistPreloadContext<
+  ReplaySource,
+  PlaylistItem
+>;
+
+export type ReplayPreloadPolicy = PlaylistPreloadPolicy<
+  ReplaySource,
+  PlaylistItem
+>;
 
 export interface ReplayPlayerPluginContext {
   player: ReplayPlayer;
@@ -366,9 +414,9 @@ export interface ReplayPlayerOptions {
 }
 
 export interface ReplayPlaylistPlayerOptions
-  extends Omit<ReplayPlayerOptions, "autoplay"> {
+  extends Omit<ReplayPlayerOptions, "autoplay">,
+    PlaylistPlaybackOptions {
   autoplay?: boolean;
-  advanceOnEnd?: boolean;
   initialItemIndex?: number;
   preloadPolicy?: ReplayPreloadPolicy;
   preloadRadius?: number;
@@ -399,6 +447,10 @@ export interface ReplayPlaylistPlayerState {
   itemIndex: number;
   itemCount: number;
   item: PlaylistItem | null;
+  advanceMode: PlaylistAdvanceMode;
+  endMode: PlaylistEndMode;
+  itemEnded: boolean;
+  playlistEnded: boolean;
   currentTime: number;
   duration: number;
   replayCurrentTime: number;
