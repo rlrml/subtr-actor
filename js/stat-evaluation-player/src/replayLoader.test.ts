@@ -53,22 +53,22 @@ test("replay loading exposes each user-visible work phase", () => {
         label: "Serialize stats timeline",
       },
       {
-        stage: "decoding-replay",
+        stage: "normalizing",
         index: 6,
+        total: 8,
+        label: "Normalize replay model",
+      },
+      {
+        stage: "decoding-replay",
+        index: 7,
         total: 8,
         label: "Decode replay data",
       },
       {
         stage: "decoding-stats",
-        index: 7,
-        total: 8,
-        label: "Decode stats chunks",
-      },
-      {
-        stage: "normalizing",
         index: 8,
         total: 8,
-        label: "Normalize replay model",
+        label: "Decode stats chunks",
       },
     ],
   );
@@ -104,16 +104,16 @@ test("getReplayLoadCompletion maps replay loading stages to monotonic overall pr
     0.81,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "decoding-replay", progress: 1 }),
+    getReplayLoadCompletion({ stage: "normalizing", progress: 0.6 }),
     0.89,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }),
+    getReplayLoadCompletion({ stage: "decoding-replay", progress: 1 }),
     0.94,
   );
   assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "normalizing", progress: 0.6 }),
-    0.97,
+    getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }),
+    0.99,
   );
 });
 
@@ -205,6 +205,12 @@ test("getReplayLoadPhaseStates marks prior detailed phases complete", () => {
         indeterminate: false,
       },
       {
+        stage: "normalizing",
+        state: "complete",
+        completion: 1,
+        indeterminate: false,
+      },
+      {
         stage: "decoding-replay",
         state: "complete",
         completion: 1,
@@ -216,14 +222,37 @@ test("getReplayLoadPhaseStates marks prior detailed phases complete", () => {
         completion: 0.5,
         indeterminate: false,
       },
-      {
-        stage: "normalizing",
-        state: "pending",
-        completion: 0,
-        indeterminate: false,
-      },
     ],
   );
+});
+
+test("phase states stay monotonic through the worker and main thread load sequence", () => {
+  const progressSequence = [
+    { stage: "validating", progress: 0 },
+    { stage: "processing", progress: 0 },
+    { stage: "processing", progress: 1 },
+    { stage: "stats-timeline", progress: 0.25 },
+    { stage: "stats-timeline", progress: 0.42 },
+    { stage: "stats-timeline", progress: 0.75 },
+    { stage: "normalizing", progress: 0 },
+    { stage: "normalizing", progress: 1 },
+    { stage: "decoding-replay", progress: 0 },
+    { stage: "decoding-replay", progress: 1 },
+    { stage: "decoding-stats", progress: 0 },
+    { stage: "decoding-stats", progress: 1 },
+  ] as const;
+  const previousCompletionByStage = new Map<string, number>();
+
+  for (const progress of progressSequence) {
+    for (const state of getReplayLoadPhaseStates(progress)) {
+      const previousCompletion = previousCompletionByStage.get(state.stage) ?? 0;
+      assert.ok(
+        state.completion >= previousCompletion,
+        `${state.stage} regressed from ${previousCompletion} to ${state.completion}`,
+      );
+      previousCompletionByStage.set(state.stage, state.completion);
+    }
+  }
 });
 
 test("getReplayLoadPhaseStates keeps legacy stats timeline indeterminate without progress", () => {

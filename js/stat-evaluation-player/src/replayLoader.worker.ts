@@ -102,15 +102,11 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
 
     postMessageToMain({
       type: "progress",
-      progress: { stage: "decoding-replay", progress: 0 },
+      progress: { stage: "normalizing", progress: 0 },
     });
     const rawReplayData = JSON.parse(
       new TextDecoder().decode(replayBundle.rawReplayData),
     ) as RawReplayFramesData;
-    postMessageToMain({
-      type: "progress",
-      progress: { stage: "normalizing", progress: 0 },
-    });
     const replay = normalizeReplayData(rawReplayData, {
       progressReportFrameInterval: event.data.reportEveryNFrames,
       onProgress(progress) {
