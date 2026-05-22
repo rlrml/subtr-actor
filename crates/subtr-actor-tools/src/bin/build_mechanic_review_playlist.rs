@@ -14,9 +14,9 @@ use subtr_actor::{
     },
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
-    DoubleTapCalculator, FlickCalculator, FlipResetTracker, GoalEvent, MustyFlickCalculator,
-    OneTimerCalculator, PlayerId, PlayerInfo, ReplayMeta, ReplayProcessor, SpeedFlipCalculator,
-    SubtrActorResult, TimeAdvance, WavedashCalculator,
+    DoubleTapCalculator, FlickCalculator, FlipResetTracker, GoalEvent, HalfFlipCalculator,
+    MustyFlickCalculator, OneTimerCalculator, PlayerId, PlayerInfo, ReplayMeta, ReplayProcessor,
+    SpeedFlipCalculator, SubtrActorResult, TimeAdvance, WavedashCalculator,
 };
 
 const BALLCHASING_API_BASE_URL: &str = "https://ballchasing.com/api";
@@ -47,6 +47,8 @@ const ALL_MECHANICS: &[&str] = &[
     "ceiling_shot",
     "double_tap",
     "speed_flip",
+    "half_flip",
+    "wavedash",
 ];
 
 #[derive(Debug)]
@@ -199,7 +201,7 @@ Output:
 
 Supported mechanics:
   flick, musty_flick, one_timer, air_dribble, flip_reset, ceiling_shot,
-  double_tap, speed_flip, wavedash, default, all.
+  double_tap, speed_flip, half_flip, wavedash, default, all.
 
 Ballchasing API calls require BALLCHASING_API_KEY."
 }
@@ -574,6 +576,7 @@ fn graph_node_names_for_mechanics(mechanics: &[&str]) -> Vec<&'static str> {
             "ceiling_shot" => Some("ceiling_shot"),
             "double_tap" => Some("double_tap"),
             "speed_flip" => Some("speed_flip"),
+            "half_flip" => Some("half_flip"),
             "wavedash" => Some("wavedash"),
             "flip_reset" => Some("dodge_reset"),
             _ => None,
@@ -903,6 +906,34 @@ fn extract_candidates(
                             event.max_speed,
                             event.diagonal_score,
                             event.cancel_score
+                        ),
+                        event: event_json(event),
+                    }
+                }));
+            }
+            "half_flip" => {
+                let Some(calculator) = graph.state::<HalfFlipCalculator>() else {
+                    continue;
+                };
+                candidates.extend(calculator.events().iter().map(|event| {
+                    let confidence = event.confidence;
+                    MechanicCandidate {
+                        mechanic: "half_flip",
+                        mechanic_label: "Half Flip",
+                        detector: "builtin:half_flip",
+                        player_id: Some(player_id_string(&event.player)),
+                        is_team_0: Some(event.is_team_0),
+                        event_time: event.time,
+                        event_frame: event.frame,
+                        start_time: (event.time - 0.65).max(0.0),
+                        end_time: event.time,
+                        confidence: Some(confidence),
+                        reason: format!(
+                            "{}% confidence; backward {:.2}; reorientation {:.2}; speed delta {:+.0}",
+                            confidence_pct(confidence),
+                            event.start_backward_alignment,
+                            event.best_reorientation_alignment,
+                            event.end_speed - event.start_speed
                         ),
                         event: event_json(event),
                     }
