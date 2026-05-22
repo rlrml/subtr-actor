@@ -63,6 +63,11 @@ const BOOST_TANK_COLORS = {
   high: "#58a6ff",
 } as const;
 
+const PAD_COLLECTION_COLORS = {
+  big: "#f39a37",
+  small: "#65d6ad",
+} as const;
+
 const PAGES: readonly { id: ReportPageId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "boost", label: "Boost" },
@@ -569,17 +574,12 @@ function renderBoostPage(
             {
               label: "Big",
               value: player.boost.amount_collected_big,
-              color: CHART_COLORS[index % CHART_COLORS.length]!,
+              color: PAD_COLLECTION_COLORS.big,
             },
             {
               label: "Small",
               value: player.boost.amount_collected_small,
-              color: "#65d6ad",
-            },
-            {
-              label: "Inactive",
-              value: player.boost.amount_collected_inactive,
-              color: "rgba(255,255,255,0.22)",
+              color: PAD_COLLECTION_COLORS.small,
             },
           ],
         })),
