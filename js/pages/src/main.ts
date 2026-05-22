@@ -352,6 +352,32 @@ function renderPieChart(definition: StatDefinition, finalFrame: StatsFrame): HTM
   );
 }
 
+function renderTerritoryShareChart(finalFrame: StatsFrame, title = "Territory share"): HTMLElement {
+  return renderChartCard(
+    title,
+    renderPieChartRows(
+      [
+        {
+          label: "Blue half",
+          value: finalFrame.team_zero.pressure.defensive_half_time,
+          color: TEAM_COLORS[0]!,
+        },
+        {
+          label: "Neutral",
+          value: finalFrame.team_zero.pressure.neutral_time,
+          color: "#65d6ad",
+        },
+        {
+          label: "Orange half",
+          value: finalFrame.team_zero.pressure.offensive_half_time,
+          color: TEAM_COLORS[1]!,
+        },
+      ],
+      formatSeconds,
+    ),
+  );
+}
+
 function renderChartCard(
   title: string,
   body: HTMLElement,
@@ -478,10 +504,10 @@ function renderOverviewPage(
     getLeader(finalFrame.players, (player) => player.core.score, (value) => `${value} score`),
   ]));
 
-  const charts = renderCharts(definitions, finalFrame, OVERVIEW_CHARTS);
-  if (charts) {
-    page.append(charts);
-  }
+  const charts = renderCharts(definitions, finalFrame, OVERVIEW_CHARTS)
+    ?? el("section", { className: "stats-report-charts" });
+  charts.append(renderTerritoryShareChart(finalFrame));
+  page.append(charts);
   return page;
 }
 
@@ -739,29 +765,7 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
         formatSeconds,
       ),
     ),
-    renderChartCard(
-      "Field half pressure",
-      renderPieChartRows(
-        [
-          {
-            label: "Blue half",
-            value: finalFrame.team_zero.pressure.defensive_half_time,
-            color: TEAM_COLORS[0]!,
-          },
-          {
-            label: "Neutral",
-            value: finalFrame.team_zero.pressure.neutral_time,
-            color: "#65d6ad",
-          },
-          {
-            label: "Orange half",
-            value: finalFrame.team_zero.pressure.offensive_half_time,
-            color: TEAM_COLORS[1]!,
-          },
-        ],
-        formatSeconds,
-      ),
-    ),
+    renderTerritoryShareChart(finalFrame, "Field half pressure"),
     renderChartCard(
       "Player field thirds",
       renderStackedRows(
