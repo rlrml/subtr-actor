@@ -84,7 +84,7 @@
         packages.python-env = pythonEnv;
         packages.js-web-wasm = rustPlatform.buildRustPackage {
           pname = "subtr-actor-js-web-wasm";
-          version = "0.7.0";
+          version = "0.7.1";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = [
@@ -109,13 +109,13 @@
         };
         packages.js-stats-player-pages = pkgs.buildNpmPackage rec {
           pname = "subtr-actor-js-pages";
-          version = "0.7.0";
+          version = "0.7.1";
           src = ./.;
           npmRoot = "js/stat-evaluation-player";
           npmDeps = pkgs.fetchNpmDeps {
             inherit pname version;
             src = ./js/stat-evaluation-player;
-            hash = "sha256-9njifzZWzrSdeLXXh672bd0IolR1n2HZgotxT3nOfqM=";
+            hash = "sha256-4OfTvE0h9dRi1g2YpAfAa8SNFOzG0s67M231laLghuo=";
           };
           preBuild = ''
             rm -rf js/pkg

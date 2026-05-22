@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.1 - 2026-05-22
+
+- Fix CI on Rust 1.95 by simplifying the whiff-attempt boolean expression that
+  clippy now flags as nonminimal.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.1`.
+
 ## v0.7.0 - 2026-05-22
 
 - Add stats report page improvements, including grouped team/player views,
