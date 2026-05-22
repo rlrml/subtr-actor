@@ -7,7 +7,7 @@ import type {
   PlayerStatsSnapshot,
   StatsTimeline,
 } from "./statsTimeline.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
+import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -103,7 +103,11 @@ export function buildMechanicTimelineRanges(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter((event) => event.timing.type === "span" && (!enabled || enabled.has(event.kind)))
+    .filter((event) =>
+      isVisibleMechanicKind(event.kind) &&
+      event.timing.type === "span" &&
+      (!enabled || enabled.has(event.kind))
+    )
     .map((event): ReplayTimelineRange => {
       if (event.timing.type !== "span") {
         throw new Error("unreachable non-span mechanic event");

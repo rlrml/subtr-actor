@@ -55,6 +55,7 @@ import {
   filterReplayTimelineEvents,
   formatMechanicKind,
   getMechanicKinds,
+  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 import {
@@ -1798,6 +1799,10 @@ function getStatsWindowTitle(kind: StatsWindowKind): string {
       return "All players stats";
     case "all-teams":
       return "All teams stats";
+    case "mechanics-overview":
+      return "Mechanics counts";
+    case "goals-overview":
+      return "Goal labels";
     case "ad-hoc":
       return "Ad hoc stats";
   }
@@ -1805,6 +1810,10 @@ function getStatsWindowTitle(kind: StatsWindowKind): string {
 
 function hasStatsWindowScopeSelector(kind: StatsWindowKind): boolean {
   return kind === "player" || kind === "team";
+}
+
+function hasStatsWindowStatPicker(kind: StatsWindowKind): boolean {
+  return kind !== "mechanics-overview" && kind !== "goals-overview";
 }
 
 function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
@@ -1815,6 +1824,9 @@ function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null
     case "team":
     case "all-teams":
       return "team";
+    case "mechanics-overview":
+    case "goals-overview":
+      return null;
     case "ad-hoc":
       return null;
   }
@@ -1943,8 +1955,10 @@ function renderStatsWindow(
   statsWindow.body.replaceChildren();
 
   renderStatsWindowScope(statsWindow);
-  renderStatsWindowAddControl(statsWindow);
-  renderStatsWindowPicker(statsWindow);
+  if (hasStatsWindowStatPicker(statsWindow.kind)) {
+    renderStatsWindowAddControl(statsWindow);
+    renderStatsWindowPicker(statsWindow);
+  }
   renderStatsWindowEntries(statsWindow, frameIndex);
 
   if (searchFocused) {
@@ -2189,6 +2203,15 @@ function renderStatsWindowEntries(
   statsWindow: StatsWindowState,
   frameIndex: number,
 ): void {
+  if (statsWindow.kind === "mechanics-overview") {
+    renderMechanicsOverviewStats(statsWindow);
+    return;
+  }
+  if (statsWindow.kind === "goals-overview") {
+    renderGoalLabelsOverview(statsWindow);
+    return;
+  }
+
   const frame = getCurrentStatsFrame(frameIndex);
   const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
   const entries = statsWindow.entries
@@ -2242,6 +2265,206 @@ function renderStatsWindowEntries(
   if (statsWindow.kind === "ad-hoc") {
     renderAdHocStats(statsWindow, frame, entries);
   }
+}
+
+function renderMechanicsOverviewStats(statsWindow: StatsWindowState): void {
+  const timeline = statsTimeline;
+  const replay = replayPlayer?.replay ?? null;
+  if (!timeline || !replay) {
+    appendStatsWindowEmpty(statsWindow, "Load a replay to show mechanics.");
+    return;
+  }
+
+  const players = replay.players;
+  const playerNames = new Map(players.map((player) => [player.id, player.name]));
+  const playerTeams = new Map(players.map((player) => [player.id, player.isTeamZero]));
+  const mechanics = getMechanicKinds(timeline);
+  if (mechanics.length === 0) {
+    appendStatsWindowEmpty(statsWindow, "No mechanic events loaded.");
+    return;
+  }
+
+  const counts = new Map<string, number>();
+  const teamCounts = new Map<string, number>();
+  for (const event of timeline.events.mechanics ?? []) {
+    if (!isVisibleMechanicKind(event.kind)) {
+      continue;
+    }
+    const playerId = playerIdToString(event.player_id);
+    const playerKey = `${event.kind}:${playerId}`;
+    counts.set(playerKey, (counts.get(playerKey) ?? 0) + 1);
+    const teamKey = `${event.kind}:${event.is_team_0 ? "blue" : "orange"}`;
+    teamCounts.set(teamKey, (teamCounts.get(teamKey) ?? 0) + 1);
+    if (!playerNames.has(playerId)) {
+      playerNames.set(playerId, playerId);
+      playerTeams.set(playerId, event.is_team_0);
+    }
+  }
+
+  const allPlayerIds = [
+    ...players.map((player) => player.id),
+    ...[...playerNames.keys()].filter((playerId) =>
+      !players.some((player) => player.id === playerId)
+    ),
+  ];
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "stats-overview-table-wrap";
+  const table = document.createElement("table");
+  table.className = "stats-overview-table mechanics-count-table";
+  const thead = document.createElement("thead");
+  const header = document.createElement("tr");
+  for (const label of ["Mechanic", "Blue", "Orange", ...allPlayerIds.map((id) =>
+    playerNames.get(id) ?? id
+  )]) {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    header.append(cell);
+  }
+  thead.append(header);
+
+  const tbody = document.createElement("tbody");
+  for (const mechanic of mechanics) {
+    const row = document.createElement("tr");
+    const label = document.createElement("th");
+    label.scope = "row";
+    label.textContent = formatMechanicKind(mechanic);
+    row.append(label);
+
+    for (const team of ["blue", "orange"] as const) {
+      const cell = document.createElement("td");
+      cell.className = `stats-overview-count ${getTeamScopeClass(team)}`;
+      cell.textContent = String(teamCounts.get(`${mechanic}:${team}`) ?? 0);
+      row.append(cell);
+    }
+
+    for (const playerId of allPlayerIds) {
+      const cell = document.createElement("td");
+      const team = playerTeams.get(playerId);
+      if (team !== undefined) {
+        cell.className = `stats-overview-count ${getTeamClass(team)}`;
+      } else {
+        cell.className = "stats-overview-count";
+      }
+      cell.textContent = String(counts.get(`${mechanic}:${playerId}`) ?? 0);
+      row.append(cell);
+    }
+    tbody.append(row);
+  }
+
+  table.append(thead, tbody);
+  wrapper.append(table);
+  statsWindow.body.append(wrapper);
+}
+
+function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
+  const timeline = statsTimeline;
+  const replay = replayPlayer?.replay ?? null;
+  if (!timeline || !replay) {
+    appendStatsWindowEmpty(statsWindow, "Load a replay to show goal labels.");
+    return;
+  }
+
+  const goalContexts = [...(timeline.events.goal_context ?? [])]
+    .sort((left, right) => left.time - right.time);
+  const tagsByGoalIndex = new Map<number, typeof timeline.events.goal_tags>();
+  for (const tag of timeline.events.goal_tags ?? []) {
+    const group = tagsByGoalIndex.get(tag.goal_index) ?? [];
+    group.push(tag);
+    tagsByGoalIndex.set(tag.goal_index, group);
+  }
+  for (const group of tagsByGoalIndex.values()) {
+    group.sort((left, right) =>
+      left.kind.localeCompare(right.kind) || right.confidence - left.confidence
+    );
+  }
+
+  const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
+  for (const index of tagsByGoalIndex.keys()) {
+    goalIndexes.add(index);
+  }
+  const orderedGoalIndexes = [...goalIndexes].sort((left, right) => left - right);
+  if (orderedGoalIndexes.length === 0) {
+    appendStatsWindowEmpty(statsWindow, "No goals loaded.");
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "goal-label-list";
+  for (const goalIndex of orderedGoalIndexes) {
+    const context = goalContexts[goalIndex] ?? null;
+    const tags = tagsByGoalIndex.get(goalIndex) ?? [];
+    const firstTag = tags[0] ?? null;
+    const time = context?.time ?? firstTag?.time ?? 0;
+    const scorer = context?.scorer ?? firstTag?.scorer ?? null;
+    const scorerName = scorer
+      ? replay.players.find((player) => player.id === playerIdToString(scorer))?.name ??
+        playerIdToString(scorer)
+      : "Unknown scorer";
+    const isTeamZero = context?.scoring_team_is_team_0 ??
+      firstTag?.scoring_team_is_team_0 ??
+      null;
+
+    const item = document.createElement("section");
+    item.className = "goal-label-item";
+    if (isTeamZero !== null) {
+      item.classList.add(getTeamClass(isTeamZero));
+    }
+
+    const header = document.createElement("header");
+    const title = document.createElement("h3");
+    title.textContent = `Goal ${goalIndex + 1}`;
+    const meta = document.createElement("span");
+    meta.textContent = `${formatTime(time)} · ${scorerName}`;
+    header.append(title, meta);
+
+    const labels = document.createElement("div");
+    labels.className = "goal-label-tags";
+    if (tags.length === 0) {
+      const empty = document.createElement("span");
+      empty.className = "goal-label-tag goal-label-tag-empty";
+      empty.textContent = "Unlabeled";
+      labels.append(empty);
+    } else {
+      for (const tag of tags) {
+        const chip = document.createElement("span");
+        chip.className = "goal-label-tag";
+        chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;
+        labels.append(chip);
+      }
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "goal-label-actions";
+    const jump = document.createElement("button");
+    jump.type = "button";
+    jump.textContent = "Go";
+    jump.addEventListener("click", () => {
+      replayPlayer?.seek(Math.max(0, time - 2));
+    });
+    actions.append(jump);
+
+    item.append(header, labels, actions);
+    list.append(item);
+  }
+  statsWindow.body.append(list);
+}
+
+function appendStatsWindowEmpty(statsWindow: StatsWindowState, message: string): void {
+  const empty = document.createElement("p");
+  empty.className = "stat-window-empty";
+  empty.textContent = message;
+  statsWindow.body.append(empty);
+}
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds)) {
+    return "--";
+  }
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  const remainingSeconds = Math.max(0, seconds) - minutes * 60;
+  return `${minutes}:${remainingSeconds.toFixed(1).padStart(4, "0")}`;
 }
 
 function renderScopedStatList(

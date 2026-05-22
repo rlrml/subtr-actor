@@ -1005,6 +1005,132 @@ input {
   font-size: 0.7rem;
 }
 
+.stats-overview-table-wrap {
+  max-width: min(72vw, 58rem);
+  overflow: auto;
+}
+
+.stats-overview-table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.stats-overview-table th,
+.stats-overview-table td {
+  padding: 0.4rem 0.48rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stats-overview-table th:first-child,
+.stats-overview-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 8.5rem;
+  background: rgba(10, 17, 24, 0.96);
+  text-align: left;
+}
+
+.stats-overview-table thead th {
+  color: #87afd4;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-overview-count {
+  color: #edf5fa;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-overview-count.team-blue {
+  color: #9cc9ff;
+}
+
+.stats-overview-count.team-orange {
+  color: #ffc680;
+}
+
+.goal-label-list {
+  display: grid;
+  gap: var(--ui-gap-sm);
+  min-width: min(26rem, 72vw);
+}
+
+.goal-label-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-gap-sm);
+  align-items: center;
+  padding: 0.56rem 0.62rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.goal-label-item.team-blue,
+.goal-label-item.team-orange {
+  border-left-color: var(--team-accent);
+  background: linear-gradient(90deg, var(--team-soft), rgba(255, 255, 255, 0.03));
+}
+
+.goal-label-item header {
+  min-width: 0;
+}
+
+.goal-label-item h3 {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.goal-label-item header span {
+  display: block;
+  margin-top: 0.12rem;
+  color: #9eb4c6;
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-label-tags {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+
+.goal-label-tag {
+  padding: 0.16rem 0.38rem;
+  border-radius: var(--ui-radius-sm);
+  background: rgba(142, 197, 255, 0.13);
+  color: #cfe6ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.goal-label-tag-empty {
+  background: rgba(132, 149, 168, 0.16);
+  color: #c0cbd6;
+}
+
+.goal-label-actions {
+  justify-self: end;
+}
+
+.goal-label-actions button {
+  min-height: 1.8rem;
+  padding: 0.2rem 0.48rem;
+  font-size: 0.72rem;
+}
+
 .panel {
   padding: var(--ui-panel-padding);
   display: grid;

@@ -47,7 +47,6 @@ const ALL_MECHANICS: &[&str] = &[
     "ceiling_shot",
     "double_tap",
     "speed_flip",
-    "wavedash",
 ];
 
 #[derive(Debug)]

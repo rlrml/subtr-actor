@@ -12,6 +12,8 @@ export type StatsWindowKind =
   | "team"
   | "all-players"
   | "all-teams"
+  | "mechanics-overview"
+  | "goals-overview"
   | "ad-hoc";
 
 export type TeamScope = "blue" | "orange";
@@ -433,7 +435,8 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
 
 function isStatsWindowKind(value: unknown): value is StatsWindowKind {
   return value === "player" || value === "team" || value === "all-players" ||
-    value === "all-teams" || value === "ad-hoc";
+    value === "all-teams" || value === "mechanics-overview" ||
+    value === "goals-overview" || value === "ad-hoc";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

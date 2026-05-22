@@ -33,6 +33,7 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   wavedash: "WD",
   whiff: "W",
 };
+const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
 
 function getReplayFrameTime(
   replay: ReplayModel,
@@ -63,8 +64,16 @@ function mechanicShortLabel(kind: string): string {
 }
 
 export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
-  return [...new Set((statsTimeline?.events.mechanics ?? []).map((event) => event.kind))]
+  return [...new Set(
+    (statsTimeline?.events.mechanics ?? [])
+      .filter((event) => isVisibleMechanicKind(event.kind))
+      .map((event) => event.kind),
+  )]
     .sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+}
+
+export function isVisibleMechanicKind(kind: string): boolean {
+  return !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
 export function buildMechanicTimelineEvents(
@@ -77,7 +86,9 @@ export function buildMechanicTimelineEvents(
 
   return (statsTimeline.events.mechanics ?? [])
     .filter((event): event is MechanicEvent & { timing: { type: "moment" } } =>
-      event.timing.type === "moment" && (!enabled || enabled.has(event.kind))
+      isVisibleMechanicKind(event.kind) &&
+      event.timing.type === "moment" &&
+      (!enabled || enabled.has(event.kind))
     )
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
