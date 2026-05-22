@@ -34,6 +34,7 @@ impl AnalysisNode for TouchNode {
             player_vertical_state_dependency(),
             touch_state_dependency(),
             possession_state_dependency(),
+            fifty_fifty_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -46,6 +47,7 @@ impl AnalysisNode for TouchNode {
             ctx.get::<PlayerVerticalState>()?,
             touch_state,
             ctx.get::<PossessionState>()?,
+            ctx.get::<FiftyFiftyState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

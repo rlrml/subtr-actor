@@ -277,6 +277,10 @@ input {
   width: min(34rem, calc(100vw - 1.6rem));
 }
 
+.floating-window-touch-controls {
+  width: min(24rem, calc(100vw - 1.6rem));
+}
+
 .floating-window-header,
 .stats-window-header {
   display: flex;

@@ -427,7 +427,7 @@ export function createWavedashModule(): StatModule {
 export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlay: TouchEventOverlay | null = null;
   let decaySeconds = 5;
-  let overlayMode: TouchOverlayMode = "markers";
+  let overlayMode: TouchOverlayMode = "advancement";
   let settingsEl: HTMLDivElement | null = null;
   let decayReadoutEl: HTMLElement | null = null;
   let overlayModeReadoutEl: HTMLElement | null = null;

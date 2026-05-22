@@ -16,7 +16,12 @@ export type StatsWindowKind =
 
 export type TeamScope = "blue" | "orange";
 export type ModuleCapabilityKind = "events" | "ranges" | "effects";
-export type SingletonWindowId = "camera" | "playback" | "recording" | "boost-pickups";
+export type SingletonWindowId =
+  | "camera"
+  | "playback"
+  | "recording"
+  | "boost-pickups"
+  | "touch-controls";
 export type ConfigWindowKind = SingletonWindowId | "stats";
 
 export interface ConfigViewportSize {
@@ -418,7 +423,7 @@ function normalizePlacement(value: unknown): WindowPlacementConfig {
 
 function isSingletonWindowId(value: unknown): value is SingletonWindowId {
   return value === "camera" || value === "playback" || value === "recording" ||
-    value === "boost-pickups";
+    value === "boost-pickups" || value === "touch-controls";
 }
 
 function isStatsWindowKind(value: unknown): value is StatsWindowKind {

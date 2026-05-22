@@ -151,6 +151,7 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "speed-flip",
   "touch",
 ]);
+const TOUCH_MODULE_ID = "touch";
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -167,6 +168,7 @@ let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
 let boostPickupFiltersWindowBody!: HTMLDivElement;
+let touchControlsWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let playbackRate!: HTMLSelectElement;
@@ -247,6 +249,7 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "playback",
   "recording",
   "boost-pickups",
+  "touch-controls",
 ];
 
 interface SelectedStatEntry {
@@ -1039,19 +1042,21 @@ function renderModuleSettings(): void {
 
   const ctx = getModuleContext();
   const panels = activeModules
-    .filter((mod) => mod.id !== "boost")
+    .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)
     .map((mod) => mod.renderSettings?.(ctx) ?? null)
     .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
 
   if (panels.length === 0) {
     moduleSettingsEl.hidden = true;
     renderBoostPickupFiltersWindow();
+    renderTouchControlsWindow();
     return;
   }
 
   moduleSettingsEl.hidden = false;
   moduleSettingsEl.append(...panels);
   renderBoostPickupFiltersWindow();
+  renderTouchControlsWindow();
 }
 
 function renderBoostPickupFiltersWindow(): void {
@@ -1064,6 +1069,20 @@ function renderBoostPickupFiltersWindow(): void {
     showHeader: false,
   });
   boostPickupFiltersWindowBody.replaceChildren(panel);
+}
+
+function renderTouchControlsWindow(): void {
+  if (!touchControlsWindowBody) {
+    return;
+  }
+
+  const ctx = getModuleContext();
+  const touchModule = MODULES.find((mod) => mod.id === TOUCH_MODULE_ID);
+  const panel = touchModule?.renderSettings?.(ctx) ?? null;
+  touchControlsWindowBody.replaceChildren();
+  if (panel instanceof HTMLElement) {
+    touchControlsWindowBody.append(panel);
+  }
 }
 
 function getStatById(statId: string): StatDefinition | null {
@@ -2344,6 +2363,10 @@ export function mountStatEvaluationPlayer(
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
     root,
     "#boost-pickup-filters-window-body",
+  );
+  touchControlsWindowBody = mustElement<HTMLDivElement>(
+    root,
+    "#touch-controls-window-body",
   );
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
