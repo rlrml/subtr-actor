@@ -18,10 +18,10 @@ pub struct StatsTimelineConfig {
     pub empty_net_min_defender_y_margin: f32,
     pub empty_net_min_defender_distance: f32,
     pub empty_net_max_touch_attacking_y: f32,
-    pub flick_goal_max_event_to_touch_seconds: f32,
-    pub one_timer_goal_max_event_to_touch_seconds: f32,
-    pub air_dribble_goal_max_end_to_touch_seconds: f32,
-    pub flip_reset_goal_max_event_to_touch_seconds: f32,
+    pub flick_goal_max_event_to_goal_seconds: f32,
+    pub one_timer_goal_max_event_to_goal_seconds: f32,
+    pub air_dribble_goal_max_end_to_goal_seconds: f32,
+    pub flip_reset_goal_max_event_to_goal_seconds: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

@@ -7,10 +7,10 @@ const DEFAULT_OWN_HALF_GOAL_MAX_ATTACKING_Y: f32 = 0.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_Y_MARGIN: f32 = 700.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_DISTANCE: f32 = 1000.0;
 const DEFAULT_EMPTY_NET_MAX_TOUCH_ATTACKING_Y: f32 = 3600.0;
-const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_TOUCH_SECONDS: f32 = 0.5;
-const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_TOUCH_SECONDS: f32 = 0.5;
-const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_TOUCH_SECONDS: f32 = 1.0;
-const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_TOUCH_SECONDS: f32 = 5.0;
+const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -40,6 +40,13 @@ pub enum GoalTagEvidenceKind {
     FlipReset,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GoalTagModifier {
+    ByScorer,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagEvidence {
@@ -61,6 +68,7 @@ pub struct GoalTagEvent {
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub scorer: Option<PlayerId>,
     pub confidence: f32,
+    pub modifiers: Vec<GoalTagModifier>,
     pub evidence: Vec<GoalTagEvidence>,
 }
 
@@ -141,13 +149,13 @@ impl Default for EmptyNetGoalCalculatorConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlickGoalCalculatorConfig {
-    pub max_event_to_touch_seconds: f32,
+    pub max_event_to_goal_seconds: f32,
 }
 
 impl Default for FlickGoalCalculatorConfig {
     fn default() -> Self {
         Self {
-            max_event_to_touch_seconds: DEFAULT_FLICK_GOAL_MAX_EVENT_TO_TOUCH_SECONDS,
+            max_event_to_goal_seconds: DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
         }
     }
 }
@@ -155,13 +163,13 @@ impl Default for FlickGoalCalculatorConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerGoalCalculatorConfig {
-    pub max_event_to_touch_seconds: f32,
+    pub max_event_to_goal_seconds: f32,
 }
 
 impl Default for OneTimerGoalCalculatorConfig {
     fn default() -> Self {
         Self {
-            max_event_to_touch_seconds: DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_TOUCH_SECONDS,
+            max_event_to_goal_seconds: DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
         }
     }
 }
@@ -169,13 +177,13 @@ impl Default for OneTimerGoalCalculatorConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct AirDribbleGoalCalculatorConfig {
-    pub max_end_to_touch_seconds: f32,
+    pub max_end_to_goal_seconds: f32,
 }
 
 impl Default for AirDribbleGoalCalculatorConfig {
     fn default() -> Self {
         Self {
-            max_end_to_touch_seconds: DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_TOUCH_SECONDS,
+            max_end_to_goal_seconds: DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS,
         }
     }
 }
@@ -183,13 +191,13 @@ impl Default for AirDribbleGoalCalculatorConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlipResetGoalCalculatorConfig {
-    pub max_event_to_touch_seconds: f32,
+    pub max_event_to_goal_seconds: f32,
 }
 
 impl Default for FlipResetGoalCalculatorConfig {
     fn default() -> Self {
         Self {
-            max_event_to_touch_seconds: DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_TOUCH_SECONDS,
+            max_event_to_goal_seconds: DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
         }
     }
 }
@@ -424,7 +432,7 @@ impl FlickGoalCalculator {
             goals,
             events,
             GoalTagKind::FlickGoal,
-            self.config.max_event_to_touch_seconds,
+            self.config.max_event_to_goal_seconds,
         )
     }
 }
@@ -444,7 +452,7 @@ impl OneTimerGoalCalculator {
             goals,
             events,
             GoalTagKind::OneTimerGoal,
-            self.config.max_event_to_touch_seconds,
+            self.config.max_event_to_goal_seconds,
         )
     }
 }
@@ -464,7 +472,7 @@ impl AirDribbleGoalCalculator {
         goals: &[GoalContextEvent],
         events: &[BallCarryEvent],
     ) -> Vec<GoalTagEvent> {
-        tag_goals_by_air_dribble_event(goals, events, self.config.max_end_to_touch_seconds)
+        tag_goals_by_air_dribble_event(goals, events, self.config.max_end_to_goal_seconds)
     }
 }
 
@@ -490,7 +498,7 @@ impl FlipResetGoalCalculator {
             goals,
             events,
             GoalTagKind::FlipResetGoal,
-            self.config.max_event_to_touch_seconds,
+            self.config.max_event_to_goal_seconds,
         )
     }
 }
@@ -639,18 +647,15 @@ fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     goals: &[GoalContextEvent],
     events: &[E],
     kind: GoalTagKind,
-    max_event_to_touch_seconds: f32,
+    max_event_to_goal_seconds: f32,
 ) -> Vec<GoalTagEvent> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let ctx = GoalTaggingContext { goal_index, goal };
-        let Some(touch) = goal.scorer_last_touch.as_ref() else {
-            continue;
-        };
         let Some(event) = events
             .iter()
-            .filter(|event| point_event_matches_touch(*event, goal, touch))
-            .filter(|event| touch.time - event.event_time() <= max_event_to_touch_seconds)
+            .filter(|event| point_event_matches_goal(*event, goal))
+            .filter(|event| goal.time - event.event_time() <= max_event_to_goal_seconds)
             .max_by(|left, right| {
                 left.event_time()
                     .total_cmp(&right.event_time())
@@ -660,45 +665,37 @@ fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
             continue;
         };
 
-        tags.push(goal_tag(
+        tags.push(goal_tag_with_modifiers(
             ctx,
             kind,
             event.event_confidence(),
-            vec![point_mechanic_evidence(event), last_touch_evidence(touch)],
+            mechanic_goal_modifiers(goal, event.event_player()),
+            mechanic_goal_evidence(goal, point_mechanic_evidence(event)),
         ));
     }
     tags
 }
 
-fn point_event_matches_touch<E: GoalMechanicPointEvent>(
-    event: &E,
-    goal: &GoalContextEvent,
-    touch: &GoalTouchContext,
-) -> bool {
-    const MAX_EVENT_AFTER_TOUCH_SECONDS: f32 = 0.05;
+fn point_event_matches_goal<E: GoalMechanicPointEvent>(event: &E, goal: &GoalContextEvent) -> bool {
+    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
 
-    event.event_player() == &touch.player
-        && event.event_team_is_team_0() == touch.is_team_0
-        && event.event_team_is_team_0() == goal.scoring_team_is_team_0
-        && event.event_time() <= touch.time + MAX_EVENT_AFTER_TOUCH_SECONDS
+    event.event_team_is_team_0() == goal.scoring_team_is_team_0
+        && event.event_time() <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
         && event.event_frame() <= goal.frame
 }
 
 fn tag_goals_by_air_dribble_event(
     goals: &[GoalContextEvent],
     events: &[BallCarryEvent],
-    max_end_to_touch_seconds: f32,
+    max_end_to_goal_seconds: f32,
 ) -> Vec<GoalTagEvent> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let ctx = GoalTaggingContext { goal_index, goal };
-        let Some(touch) = goal.scorer_last_touch.as_ref() else {
-            continue;
-        };
         let Some(event) = events
             .iter()
-            .filter(|event| air_dribble_event_matches_touch(event, goal, touch))
-            .filter(|event| touch.time - event.end_time <= max_end_to_touch_seconds)
+            .filter(|event| air_dribble_event_matches_goal(event, goal))
+            .filter(|event| goal.time - event.end_time <= max_end_to_goal_seconds)
             .max_by(|left, right| {
                 left.end_time
                     .total_cmp(&right.end_time)
@@ -708,26 +705,24 @@ fn tag_goals_by_air_dribble_event(
             continue;
         };
 
-        tags.push(goal_tag(
+        tags.push(goal_tag_with_modifiers(
             ctx,
             GoalTagKind::AirDribbleGoal,
             1.0,
-            vec![air_dribble_evidence(event), last_touch_evidence(touch)],
+            mechanic_goal_modifiers(goal, &event.player_id),
+            mechanic_goal_evidence(goal, air_dribble_evidence(event)),
         ));
     }
     tags
 }
 
-fn air_dribble_event_matches_touch(
-    event: &BallCarryEvent,
-    goal: &GoalContextEvent,
-    touch: &GoalTouchContext,
-) -> bool {
+fn air_dribble_event_matches_goal(event: &BallCarryEvent, goal: &GoalContextEvent) -> bool {
+    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+
     event.kind == BallCarryKind::AirDribble
-        && event.player_id == touch.player
-        && event.is_team_0 == touch.is_team_0
         && event.is_team_0 == goal.scoring_team_is_team_0
-        && event.start_time <= touch.time
+        && event.start_time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event.end_time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
         && event.end_frame <= goal.frame
 }
 
@@ -780,10 +775,46 @@ fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
     }
 }
 
+fn mechanic_goal_modifiers(
+    goal: &GoalContextEvent,
+    mechanic_player: &PlayerId,
+) -> Vec<GoalTagModifier> {
+    if goal
+        .scorer
+        .as_ref()
+        .is_some_and(|scorer| scorer == mechanic_player)
+    {
+        vec![GoalTagModifier::ByScorer]
+    } else {
+        Vec::new()
+    }
+}
+
+fn mechanic_goal_evidence(
+    goal: &GoalContextEvent,
+    mechanic_evidence: GoalTagEvidence,
+) -> Vec<GoalTagEvidence> {
+    let mut evidence = vec![mechanic_evidence, goal_context_evidence(goal)];
+    if let Some(touch) = goal.scorer_last_touch.as_ref() {
+        evidence.push(last_touch_evidence(touch));
+    }
+    evidence
+}
+
 fn goal_tag(
     ctx: GoalTaggingContext<'_>,
     kind: GoalTagKind,
     confidence: f32,
+    evidence: Vec<GoalTagEvidence>,
+) -> GoalTagEvent {
+    goal_tag_with_modifiers(ctx, kind, confidence, Vec::new(), evidence)
+}
+
+fn goal_tag_with_modifiers(
+    ctx: GoalTaggingContext<'_>,
+    kind: GoalTagKind,
+    confidence: f32,
+    modifiers: Vec<GoalTagModifier>,
     evidence: Vec<GoalTagEvidence>,
 ) -> GoalTagEvent {
     GoalTagEvent {
@@ -794,6 +825,7 @@ fn goal_tag(
         scoring_team_is_team_0: ctx.goal.scoring_team_is_team_0,
         scorer: ctx.goal.scorer.clone(),
         confidence,
+        modifiers,
         evidence,
     }
 }

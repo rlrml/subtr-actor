@@ -864,25 +864,25 @@ pub(crate) fn builtin_snapshot_config_json(
         "flick_goal" => {
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
-                "flick_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+                "flick_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "one_timer_goal" => {
             let calculator = graph_state::<OneTimerGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
-                "one_timer_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+                "one_timer_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "air_dribble_goal" => {
             let calculator = graph_state::<AirDribbleGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
-                "air_dribble_goal_max_end_to_touch_seconds": calculator.config().max_end_to_touch_seconds,
+                "air_dribble_goal_max_end_to_goal_seconds": calculator.config().max_end_to_goal_seconds,
             }))?)
         }
         "flip_reset_goal" => {
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
-                "flip_reset_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+                "flip_reset_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"

@@ -66,14 +66,14 @@ impl StatsTimelineCollector {
                 .min_defender_distance,
             empty_net_max_touch_attacking_y: EmptyNetGoalCalculatorConfig::default()
                 .max_touch_attacking_y,
-            flick_goal_max_event_to_touch_seconds: FlickGoalCalculatorConfig::default()
-                .max_event_to_touch_seconds,
-            one_timer_goal_max_event_to_touch_seconds: OneTimerGoalCalculatorConfig::default()
-                .max_event_to_touch_seconds,
-            air_dribble_goal_max_end_to_touch_seconds: AirDribbleGoalCalculatorConfig::default()
-                .max_end_to_touch_seconds,
-            flip_reset_goal_max_event_to_touch_seconds: FlipResetGoalCalculatorConfig::default()
-                .max_event_to_touch_seconds,
+            flick_goal_max_event_to_goal_seconds: FlickGoalCalculatorConfig::default()
+                .max_event_to_goal_seconds,
+            one_timer_goal_max_event_to_goal_seconds: OneTimerGoalCalculatorConfig::default()
+                .max_event_to_goal_seconds,
+            air_dribble_goal_max_end_to_goal_seconds: AirDribbleGoalCalculatorConfig::default()
+                .max_end_to_goal_seconds,
+            flip_reset_goal_max_event_to_goal_seconds: FlipResetGoalCalculatorConfig::default()
+                .max_event_to_goal_seconds,
         }
     }
 

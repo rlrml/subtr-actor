@@ -389,22 +389,30 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("empty_net_max_touch_attacking_y"))
                 .and_then(json_f32)
                 .unwrap_or(EmptyNetGoalCalculatorConfig::default().max_touch_attacking_y),
-            flick_goal_max_event_to_touch_seconds: flick_goal_config
-                .and_then(|config| config.get("flick_goal_max_event_to_touch_seconds"))
-                .and_then(json_f32)
-                .unwrap_or(FlickGoalCalculatorConfig::default().max_event_to_touch_seconds),
-            one_timer_goal_max_event_to_touch_seconds: one_timer_goal_config
-                .and_then(|config| config.get("one_timer_goal_max_event_to_touch_seconds"))
-                .and_then(json_f32)
-                .unwrap_or(OneTimerGoalCalculatorConfig::default().max_event_to_touch_seconds),
-            air_dribble_goal_max_end_to_touch_seconds: air_dribble_goal_config
-                .and_then(|config| config.get("air_dribble_goal_max_end_to_touch_seconds"))
-                .and_then(json_f32)
-                .unwrap_or(AirDribbleGoalCalculatorConfig::default().max_end_to_touch_seconds),
-            flip_reset_goal_max_event_to_touch_seconds: flip_reset_goal_config
-                .and_then(|config| config.get("flip_reset_goal_max_event_to_touch_seconds"))
-                .and_then(json_f32)
-                .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_touch_seconds),
+            flick_goal_max_event_to_goal_seconds: json_config_f32(
+                flick_goal_config,
+                "flick_goal_max_event_to_goal_seconds",
+                "flick_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(FlickGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            one_timer_goal_max_event_to_goal_seconds: json_config_f32(
+                one_timer_goal_config,
+                "one_timer_goal_max_event_to_goal_seconds",
+                "one_timer_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(OneTimerGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            air_dribble_goal_max_end_to_goal_seconds: json_config_f32(
+                air_dribble_goal_config,
+                "air_dribble_goal_max_end_to_goal_seconds",
+                "air_dribble_goal_max_end_to_touch_seconds",
+            )
+            .unwrap_or(AirDribbleGoalCalculatorConfig::default().max_end_to_goal_seconds),
+            flip_reset_goal_max_event_to_goal_seconds: json_config_f32(
+                flip_reset_goal_config,
+                "flip_reset_goal_max_event_to_goal_seconds",
+                "flip_reset_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds),
         }
     }
 
@@ -543,23 +551,23 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ),
             (
                 flick_goal_config,
-                "flick_goal_max_event_to_touch_seconds",
-                FlickGoalCalculatorConfig::default().max_event_to_touch_seconds,
+                "flick_goal_max_event_to_goal_seconds",
+                FlickGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
             (
                 one_timer_goal_config,
-                "one_timer_goal_max_event_to_touch_seconds",
-                OneTimerGoalCalculatorConfig::default().max_event_to_touch_seconds,
+                "one_timer_goal_max_event_to_goal_seconds",
+                OneTimerGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
             (
                 air_dribble_goal_config,
-                "air_dribble_goal_max_end_to_touch_seconds",
-                AirDribbleGoalCalculatorConfig::default().max_end_to_touch_seconds,
+                "air_dribble_goal_max_end_to_goal_seconds",
+                AirDribbleGoalCalculatorConfig::default().max_end_to_goal_seconds,
             ),
             (
                 flip_reset_goal_config,
-                "flip_reset_goal_max_event_to_touch_seconds",
-                FlipResetGoalCalculatorConfig::default().max_event_to_touch_seconds,
+                "flip_reset_goal_max_event_to_goal_seconds",
+                FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
         ] {
             config.insert(
@@ -1570,6 +1578,10 @@ fn parse_goal_tag_event(value: &Value) -> SubtrActorResult<GoalTagEvent> {
         scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
         scorer: json_optional_remote_id(object.get("scorer"))?,
         confidence: json_required_f32(object, "confidence")?,
+        modifiers: json_optional_array(object.get("modifiers"))?
+            .iter()
+            .map(|modifier| decode_json_value(modifier.clone()))
+            .collect::<SubtrActorResult<Vec<_>>>()?,
         evidence: json_required_array(object, "evidence")?
             .iter()
             .map(parse_goal_tag_evidence)
@@ -1718,8 +1730,31 @@ fn json_required_array<'a>(
         })
 }
 
+fn json_optional_array<'a>(value: Option<&'a Value>) -> SubtrActorResult<&'a [Value]> {
+    match value {
+        Some(Value::Array(values)) => Ok(values),
+        Some(_) => SubtrActorError::new_result(SubtrActorErrorVariant::StatsSerializationError(
+            "Expected optional JSON value to be an array".to_owned(),
+        )),
+        None => Ok(&[]),
+    }
+}
+
 fn json_f32(value: &Value) -> Option<f32> {
     value.as_f64().map(|number| number as f32)
+}
+
+fn json_config_f32(
+    config: Option<&Map<String, Value>>,
+    key: &str,
+    legacy_key: &str,
+) -> Option<f32> {
+    config.and_then(|config| {
+        config
+            .get(key)
+            .or_else(|| config.get(legacy_key))
+            .and_then(json_f32)
+    })
 }
 
 fn json_required_f32(
