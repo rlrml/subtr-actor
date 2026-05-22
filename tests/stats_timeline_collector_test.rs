@@ -58,6 +58,8 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         core: CoreTeamStats::default(),
         backboard: BackboardTeamStats::default(),
         double_tap: DoubleTapTeamStats::default(),
+        one_timer: OneTimerTeamStats::default(),
+        pass: PassTeamStats::default(),
         ball_carry: BallCarryStats::default(),
         air_dribble: AirDribbleStats::default(),
         boost: BoostStats::default(),
@@ -300,6 +302,14 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .min_defender_distance,
             empty_net_max_touch_attacking_y: EmptyNetGoalCalculatorConfig::default()
                 .max_touch_attacking_y,
+            flick_goal_max_event_to_touch_seconds: FlickGoalCalculatorConfig::default()
+                .max_event_to_touch_seconds,
+            one_timer_goal_max_event_to_touch_seconds: OneTimerGoalCalculatorConfig::default()
+                .max_event_to_touch_seconds,
+            air_dribble_goal_max_end_to_touch_seconds: AirDribbleGoalCalculatorConfig::default()
+                .max_end_to_touch_seconds,
+            flip_reset_goal_max_event_to_touch_seconds: FlipResetGoalCalculatorConfig::default()
+                .max_event_to_touch_seconds,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
@@ -313,6 +323,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             ceiling_shot: Vec::new(),
             double_tap: Vec::new(),
             fifty_fifty: Vec::new(),
+            one_timer: Vec::new(),
+            pass: Vec::new(),
             goal_tags: Vec::new(),
             rush: Vec::new(),
             speed_flip: Vec::new(),

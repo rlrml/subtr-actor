@@ -1,12 +1,13 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
-    AerialGoalCalculator, BackboardBounceState, BackboardCalculator, BallCarryCalculator,
-    BallFrameState, BoostCalculator, CeilingShotCalculator, ContinuousBallControlState,
-    DemoCalculator, DodgeResetCalculator, DoubleTapCalculator, EmptyNetGoalCalculator,
-    FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FrameEventsState, FrameInfo,
-    GameplayState, HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator,
-    MatchStatsCalculator, MovementCalculator, MustyFlickCalculator, OwnHalfGoalCalculator,
-    PlayerFrameState, PlayerVerticalState,
+    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
+    BallCarryCalculator, BallFrameState, BoostCalculator, CeilingShotCalculator,
+    ContinuousBallControlState, DemoCalculator, DodgeResetCalculator, DoubleTapCalculator,
+    EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator,
+    FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState,
+    HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
+    MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PlayerFrameState, PlayerVerticalState,
     PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
     PressureCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
     WavedashCalculator, WhiffCalculator,
@@ -33,6 +34,8 @@ pub(crate) mod live_play;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
 pub(crate) mod musty_flick;
+pub(crate) mod one_timer;
+pub(crate) mod pass;
 pub(crate) mod player_frame_state;
 pub(crate) mod player_vertical_state;
 pub(crate) mod positioning;
@@ -84,7 +87,8 @@ pub use frame_info::FrameInfoNode;
 pub use gameplay_state::GameplayStateNode;
 #[allow(unused_imports)]
 pub use goal_tags::{
-    AerialGoalNode, EmptyNetGoalNode, HighAerialGoalNode, LongDistanceGoalNode, OwnHalfGoalNode,
+    AerialGoalNode, AirDribbleGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode,
+    HighAerialGoalNode, LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode,
 };
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
@@ -94,6 +98,10 @@ pub use match_stats::MatchStatsNode;
 pub use movement::MovementNode;
 #[allow(unused_imports)]
 pub use musty_flick::MustyFlickNode;
+#[allow(unused_imports)]
+pub use one_timer::OneTimerNode;
+#[allow(unused_imports)]
+pub use pass::PassNode;
 #[allow(unused_imports)]
 pub use player_frame_state::PlayerFrameStateNode;
 #[allow(unused_imports)]
@@ -215,6 +223,22 @@ pub(crate) fn empty_net_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<EmptyNetGoalCalculator>(goal_tags::boxed_empty_net_goal)
 }
 
+pub(crate) fn flick_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<FlickGoalCalculator>(goal_tags::boxed_flick_goal)
+}
+
+pub(crate) fn one_timer_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<OneTimerGoalCalculator>(goal_tags::boxed_one_timer_goal)
+}
+
+pub(crate) fn air_dribble_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<AirDribbleGoalCalculator>(goal_tags::boxed_air_dribble_goal)
+}
+
+pub(crate) fn flip_reset_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<FlipResetGoalCalculator>(goal_tags::boxed_flip_reset_goal)
+}
+
 pub(crate) fn backboard_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<BackboardCalculator>(backboard::boxed_default)
 }
@@ -261,6 +285,14 @@ pub(crate) fn speed_flip_dependency() -> AnalysisDependency {
 
 pub(crate) fn musty_flick_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<MustyFlickCalculator>(musty_flick::boxed_default)
+}
+
+pub(crate) fn pass_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<PassCalculator>(pass::boxed_default)
+}
+
+pub(crate) fn one_timer_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<OneTimerCalculator>(one_timer::boxed_default)
 }
 
 pub(crate) fn flick_dependency() -> AnalysisDependency {

@@ -13,6 +13,8 @@ mod fifty_fifty;
 mod flick;
 mod movement;
 mod musty_flick;
+mod one_timer;
+mod pass;
 mod positioning;
 mod possession;
 mod powerslide;

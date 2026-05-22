@@ -84,6 +84,79 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
     ])
 }
 
+fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
+    FlickEvent {
+        time,
+        frame,
+        player,
+        is_team_0: true,
+        dodge_time: time - 0.1,
+        dodge_frame: frame.saturating_sub(1),
+        time_since_dodge: 0.1,
+        setup_start_time: time - 0.3,
+        setup_start_frame: frame.saturating_sub(3),
+        setup_duration: 0.3,
+        setup_touch_count: 2,
+        average_horizontal_gap: 40.0,
+        average_vertical_gap: 80.0,
+        ball_speed_change: 600.0,
+        ball_impulse: [0.0, 600.0, 0.0],
+        impulse_away_alignment: 0.8,
+        vertical_impulse: 0.0,
+        confidence: 0.82,
+    }
+}
+
+fn one_timer_event(time: f32, frame: usize, player: PlayerId) -> OneTimerEvent {
+    OneTimerEvent {
+        time,
+        frame,
+        player,
+        passer: player_id(2),
+        is_team_0: true,
+        pass_start_time: time - 0.8,
+        pass_start_frame: frame.saturating_sub(8),
+        pass_duration: 0.8,
+        pass_travel_distance: 1200.0,
+        pass_advance_distance: 900.0,
+        ball_speed: 1800.0,
+        goal_alignment: 0.9,
+    }
+}
+
+fn air_dribble_event(
+    start_time: f32,
+    end_time: f32,
+    player: PlayerId,
+    kind: BallCarryKind,
+) -> BallCarryEvent {
+    BallCarryEvent {
+        player_id: player,
+        is_team_0: true,
+        kind,
+        start_frame: (start_time * 10.0) as usize,
+        end_frame: (end_time * 10.0) as usize,
+        start_time,
+        end_time,
+        duration: end_time - start_time,
+        straight_line_distance: 900.0,
+        path_distance: 1000.0,
+        average_horizontal_gap: 80.0,
+        average_vertical_gap: 120.0,
+        average_speed: 700.0,
+    }
+}
+
+fn dodge_refreshed_event(time: f32, frame: usize, player: PlayerId) -> DodgeRefreshedEvent {
+    DodgeRefreshedEvent {
+        time,
+        frame,
+        player,
+        is_team_0: true,
+        counter_value: 1,
+    }
+}
+
 #[test]
 fn high_aerial_goal_also_gets_aerial_goal_tag() {
     let goal = goal_with_touch(true, position(0.0, 1500.0, 900.0), Vec::new());
@@ -166,4 +239,89 @@ fn empty_net_goal_rejects_goal_mouth_scrambles() {
     let events = all_goal_tag_events(&[goal]);
 
     assert!(!tag_kinds(&events).contains(&GoalTagKind::EmptyNetGoal));
+}
+
+#[test]
+fn flick_goal_tags_matching_scorer_flick_before_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let events =
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
+    assert_eq!(events[0].confidence, 0.82);
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::Flick));
+}
+
+#[test]
+fn flick_goal_rejects_stale_flicks() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let events =
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(8.5, 85, player_id(1))]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
+    let events =
+        OneTimerGoalCalculator::new().tag_goals(&[goal], &[one_timer_event(9.4, 94, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::OneTimerGoal]);
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::OneTimer));
+}
+
+#[test]
+fn air_dribble_goal_tags_air_dribble_control_that_reaches_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 600.0), Vec::new());
+    let events = AirDribbleGoalCalculator::new().tag_goals(
+        &[goal],
+        &[air_dribble_event(
+            8.0,
+            9.2,
+            player_id(1),
+            BallCarryKind::AirDribble,
+        )],
+    );
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::AirDribbleGoal]);
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::AirDribble));
+}
+
+#[test]
+fn air_dribble_goal_rejects_ground_carries() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 600.0), Vec::new());
+    let events = AirDribbleGoalCalculator::new().tag_goals(
+        &[goal],
+        &[air_dribble_event(
+            8.0,
+            9.4,
+            player_id(1),
+            BallCarryKind::Carry,
+        )],
+    );
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
+    let events = FlipResetGoalCalculator::new()
+        .tag_goals(&[goal], &[dodge_refreshed_event(7.0, 70, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipReset));
 }

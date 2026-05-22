@@ -164,6 +164,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "long_distance_goal",
             "own_half_goal",
             "empty_net_goal",
+            "flick_goal",
+            "one_timer_goal",
+            "air_dribble_goal",
+            "flip_reset_goal",
         ] {
             events.extend(self.module_player_events(
                 module_name,
@@ -189,6 +193,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "long_distance_goal",
             "own_half_goal",
             "empty_net_goal",
+            "flick_goal",
+            "one_timer_goal",
+            "air_dribble_goal",
+            "flip_reset_goal",
         ] {
             events.extend(self.module_array(module_name, "events"));
         }
@@ -219,11 +227,13 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_double_tap_event,
             )?,
+            one_timer: self.module_player_events("one_timer", "events", parse_one_timer_event)?,
             fifty_fifty: self.module_player_events(
                 "fifty_fifty",
                 "events",
                 parse_fifty_fifty_event,
             )?,
+            pass: self.module_player_events("pass", "events", parse_pass_event)?,
             goal_tags: self.goal_tag_events_typed()?,
             rush: self.module_typed_array("rush", "events")?,
             speed_flip: self.module_player_events(
@@ -255,6 +265,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "double_tap".to_owned(),
             Value::Array(self.module_array("double_tap", "events")),
+        );
+        events.insert(
+            "one_timer".to_owned(),
+            Value::Array(self.module_array("one_timer", "events")),
+        );
+        events.insert(
+            "pass".to_owned(),
+            Value::Array(self.module_array("pass", "events")),
         );
         events.insert(
             "goal_tags".to_owned(),
@@ -303,6 +321,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .and_then(Value::as_object);
         let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
         let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
+        let flick_goal_config = self.config.get("flick_goal").and_then(Value::as_object);
+        let one_timer_goal_config = self.config.get("one_timer_goal").and_then(Value::as_object);
+        let air_dribble_goal_config = self
+            .config
+            .get("air_dribble_goal")
+            .and_then(Value::as_object);
+        let flip_reset_goal_config = self
+            .config
+            .get("flip_reset_goal")
+            .and_then(Value::as_object);
 
         StatsTimelineConfig {
             most_back_forward_threshold_y: positioning_config
@@ -361,6 +389,22 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("empty_net_max_touch_attacking_y"))
                 .and_then(json_f32)
                 .unwrap_or(EmptyNetGoalCalculatorConfig::default().max_touch_attacking_y),
+            flick_goal_max_event_to_touch_seconds: flick_goal_config
+                .and_then(|config| config.get("flick_goal_max_event_to_touch_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(FlickGoalCalculatorConfig::default().max_event_to_touch_seconds),
+            one_timer_goal_max_event_to_touch_seconds: one_timer_goal_config
+                .and_then(|config| config.get("one_timer_goal_max_event_to_touch_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(OneTimerGoalCalculatorConfig::default().max_event_to_touch_seconds),
+            air_dribble_goal_max_end_to_touch_seconds: air_dribble_goal_config
+                .and_then(|config| config.get("air_dribble_goal_max_end_to_touch_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(AirDribbleGoalCalculatorConfig::default().max_end_to_touch_seconds),
+            flip_reset_goal_max_event_to_touch_seconds: flip_reset_goal_config
+                .and_then(|config| config.get("flip_reset_goal_max_event_to_touch_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_touch_seconds),
         }
     }
 
@@ -379,6 +423,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .and_then(Value::as_object);
         let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
         let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
+        let flick_goal_config = self.config.get("flick_goal").and_then(Value::as_object);
+        let one_timer_goal_config = self.config.get("one_timer_goal").and_then(Value::as_object);
+        let air_dribble_goal_config = self
+            .config
+            .get("air_dribble_goal")
+            .and_then(Value::as_object);
+        let flip_reset_goal_config = self
+            .config
+            .get("flip_reset_goal")
+            .and_then(Value::as_object);
 
         let mut config = Map::new();
         config.insert(
@@ -486,6 +540,26 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 empty_net_goal_config,
                 "empty_net_max_touch_attacking_y",
                 EmptyNetGoalCalculatorConfig::default().max_touch_attacking_y,
+            ),
+            (
+                flick_goal_config,
+                "flick_goal_max_event_to_touch_seconds",
+                FlickGoalCalculatorConfig::default().max_event_to_touch_seconds,
+            ),
+            (
+                one_timer_goal_config,
+                "one_timer_goal_max_event_to_touch_seconds",
+                OneTimerGoalCalculatorConfig::default().max_event_to_touch_seconds,
+            ),
+            (
+                air_dribble_goal_config,
+                "air_dribble_goal_max_end_to_touch_seconds",
+                AirDribbleGoalCalculatorConfig::default().max_end_to_touch_seconds,
+            ),
+            (
+                flip_reset_goal_config,
+                "flip_reset_goal_max_event_to_touch_seconds",
+                FlipResetGoalCalculatorConfig::default().max_event_to_touch_seconds,
             ),
         ] {
             config.insert(
@@ -605,6 +679,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             core: self.frame_team_stat_or_default_typed(frame, "core", team_key)?,
             backboard: self.frame_team_stat_or_default_typed(frame, "backboard", team_key)?,
             double_tap: self.frame_team_stat_or_default_typed(frame, "double_tap", team_key)?,
+            one_timer: self.frame_team_stat_or_default_typed(frame, "one_timer", team_key)?,
+            pass: self.frame_team_stat_or_default_typed(frame, "pass", team_key)?,
             ball_carry: self.frame_team_stat_or_default_typed(frame, "ball_carry", team_key)?,
             air_dribble: self.frame_team_stat_or_default_typed(frame, "air_dribble", team_key)?,
             boost: self.frame_team_stat_or_default_typed(frame, "boost", team_key)?,
@@ -640,6 +716,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "double_tap",
                 &player_key,
             )?,
+            one_timer: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "one_timer",
+                &player_key,
+            )?,
+            pass: self.frame_player_stat_or_default_typed_by_key(frame, "pass", &player_key)?,
             fifty_fifty: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "fifty_fifty",
@@ -764,6 +846,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_team_stat_or_default::<DoubleTapTeamStats>(frame, "double_tap", team_key),
         );
         team.insert(
+            "one_timer".to_owned(),
+            self.frame_team_stat_or_default::<OneTimerTeamStats>(frame, "one_timer", team_key),
+        );
+        team.insert(
+            "pass".to_owned(),
+            self.frame_team_stat_or_default::<PassTeamStats>(frame, "pass", team_key),
+        );
+        team.insert(
             "ball_carry".to_owned(),
             self.frame_team_stat_or_default::<BallCarryStats>(frame, "ball_carry", team_key),
         );
@@ -841,6 +931,22 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<DoubleTapPlayerStats>(
                 frame,
                 "double_tap",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "one_timer".to_owned(),
+            self.frame_player_stat_or_default_by_key::<OneTimerPlayerStats>(
+                frame,
+                "one_timer",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "pass".to_owned(),
+            self.frame_player_stat_or_default_by_key::<PassPlayerStats>(
+                frame,
+                "pass",
                 &player_key,
             )?,
         );
@@ -1420,6 +1526,39 @@ fn parse_double_tap_event(value: &Value) -> SubtrActorResult<DoubleTapEvent> {
     })
 }
 
+fn parse_pass_event(value: &Value) -> SubtrActorResult<PassEvent> {
+    let object = json_object(value, "pass event")?;
+    Ok(PassEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        passer: json_required_remote_id(object, "passer")?,
+        receiver: json_required_remote_id(object, "receiver")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_time: json_required_f32(object, "start_time")?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        duration: json_required_f32(object, "duration")?,
+        ball_travel_distance: json_required_f32(object, "ball_travel_distance")?,
+        ball_advance_distance: json_required_f32(object, "ball_advance_distance")?,
+    })
+}
+
+fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {
+    let object = json_object(value, "one timer event")?;
+    Ok(OneTimerEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        passer: json_required_remote_id(object, "passer")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        pass_start_time: json_required_f32(object, "pass_start_time")?,
+        pass_start_frame: json_required_usize(object, "pass_start_frame")?,
+        pass_duration: json_required_f32(object, "pass_duration")?,
+        pass_travel_distance: json_required_f32(object, "pass_travel_distance")?,
+        pass_advance_distance: json_required_f32(object, "pass_advance_distance")?,
+        ball_speed: json_required_f32(object, "ball_speed")?,
+        goal_alignment: json_required_f32(object, "goal_alignment")?,
+    })
+}
 
 fn parse_goal_tag_event(value: &Value) -> SubtrActorResult<GoalTagEvent> {
     let object = json_object(value, "goal tag event")?;

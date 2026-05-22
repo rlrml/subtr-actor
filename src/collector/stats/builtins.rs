@@ -317,11 +317,17 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "backboard",
         "ceiling_shot",
         "double_tap",
+        "one_timer",
+        "pass",
         "aerial_goal",
         "high_aerial_goal",
         "long_distance_goal",
         "own_half_goal",
         "empty_net_goal",
+        "flick_goal",
+        "one_timer_goal",
+        "air_dribble_goal",
+        "flip_reset_goal",
         "fifty_fifty",
         "possession",
         "pressure",
@@ -393,6 +399,24 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "one_timer" => {
+            let calculator = graph_state::<OneTimerCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "pass" => {
+            let calculator = graph_state::<PassCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
         "aerial_goal" => {
             let calculator = graph_state::<AerialGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
@@ -419,6 +443,30 @@ pub(crate) fn builtin_module_json(
         }
         "empty_net_goal" => {
             let calculator = graph_state::<EmptyNetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "flick_goal" => {
+            let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "one_timer_goal" => {
+            let calculator = graph_state::<OneTimerGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "air_dribble_goal" => {
+            let calculator = graph_state::<AirDribbleGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "flip_reset_goal" => {
+            let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -599,8 +647,25 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "one_timer" => {
+            let calculator = graph_state::<OneTimerCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
+        "pass" => {
+            let calculator = graph_state::<PassCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "aerial_goal" | "high_aerial_goal" | "long_distance_goal" | "own_half_goal"
-        | "empty_net_goal" => serialize_to_json_value(&serde_json::json!({}))?,
+        | "empty_net_goal" | "flick_goal" | "one_timer_goal" | "air_dribble_goal"
+        | "flip_reset_goal" => serialize_to_json_value(&serde_json::json!({}))?,
         "fifty_fifty" => {
             let calculator = graph_state::<FiftyFiftyCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsWithPlayerStatsExport {
@@ -796,7 +861,32 @@ pub(crate) fn builtin_snapshot_config_json(
                 "empty_net_max_touch_attacking_y": calculator.config().max_touch_attacking_y,
             }))?)
         }
-        "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
+        "flick_goal" => {
+            let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "flick_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+            }))?)
+        }
+        "one_timer_goal" => {
+            let calculator = graph_state::<OneTimerGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "one_timer_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+            }))?)
+        }
+        "air_dribble_goal" => {
+            let calculator = graph_state::<AirDribbleGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "air_dribble_goal_max_end_to_touch_seconds": calculator.config().max_end_to_touch_seconds,
+            }))?)
+        }
+        "flip_reset_goal" => {
+            let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "flip_reset_goal_max_event_to_touch_seconds": calculator.config().max_event_to_touch_seconds,
+            }))?)
+        }
+        "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"
+        | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
         | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost" | "movement"
         | "powerslide" | "demo" => None,
         _ => {

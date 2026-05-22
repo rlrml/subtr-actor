@@ -10,6 +10,7 @@ pub struct DodgeResetStats {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     player_stats: HashMap<PlayerId, DodgeResetStats>,
+    on_ball_events: Vec<DodgeRefreshedEvent>,
 }
 
 impl DodgeResetCalculator {
@@ -19,6 +20,10 @@ impl DodgeResetCalculator {
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
         &self.player_stats
+    }
+
+    pub fn on_ball_events(&self) -> &[DodgeRefreshedEvent] {
+        &self.on_ball_events
     }
 
     fn on_ball_dodge_reset(
@@ -74,6 +79,7 @@ impl DodgeResetCalculator {
             stats.count += 1;
             if on_ball {
                 stats.on_ball_count += 1;
+                self.on_ball_events.push(event.clone());
             }
         }
         Ok(())

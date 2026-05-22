@@ -47,6 +47,8 @@ impl StatsTimelineFrameNode {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let backboard = ctx.get::<BackboardCalculator>()?;
         let double_tap = ctx.get::<DoubleTapCalculator>()?;
+        let one_timer = ctx.get::<OneTimerCalculator>()?;
+        let pass = ctx.get::<PassCalculator>()?;
         let ball_carry = ctx.get::<BallCarryCalculator>()?;
         let boost = ctx.get::<BoostCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
@@ -71,6 +73,16 @@ impl StatsTimelineFrameNode {
                 double_tap.team_zero_stats().clone()
             } else {
                 double_tap.team_one_stats().clone()
+            },
+            one_timer: if is_team_zero {
+                one_timer.team_zero_stats().clone()
+            } else {
+                one_timer.team_one_stats().clone()
+            },
+            pass: if is_team_zero {
+                pass.team_zero_stats().clone()
+            } else {
+                pass.team_one_stats().clone()
             },
             ball_carry: if is_team_zero {
                 ball_carry.team_zero_stats().clone()
@@ -136,6 +148,18 @@ impl StatsTimelineFrameNode {
                 .unwrap_or_default(),
             double_tap: ctx
                 .get::<DoubleTapCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            one_timer: ctx
+                .get::<OneTimerCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            pass: ctx
+                .get::<PassCalculator>()?
                 .player_stats()
                 .get(player_id)
                 .cloned()
@@ -261,6 +285,8 @@ impl AnalysisNode for StatsTimelineFrameNode {
             backboard_dependency(),
             ceiling_shot_dependency(),
             double_tap_dependency(),
+            one_timer_dependency(),
+            pass_dependency(),
             fifty_fifty_dependency(),
             possession_dependency(),
             pressure_dependency(),

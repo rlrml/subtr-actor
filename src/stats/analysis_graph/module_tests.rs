@@ -1,8 +1,9 @@
 use super::*;
 use crate::{
-    AerialGoalCalculator, BackboardCalculator, EmptyNetGoalCalculator, FlickCalculator,
-    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator,
-    OwnHalfGoalCalculator, PlayerVerticalState, PossessionState, TouchState,
+    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, EmptyNetGoalCalculator,
+    FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, HighAerialGoalCalculator,
+    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PlayerVerticalState, PossessionState, TouchState,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -24,7 +25,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 38);
+    assert_eq!(names.len(), 45);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -35,12 +36,18 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("touch"));
     assert!(names.contains("whiff"));
     assert!(names.contains("wavedash"));
+    assert!(names.contains("one_timer"));
+    assert!(names.contains("pass"));
     assert!(names.contains("flick"));
     assert!(names.contains("aerial_goal"));
     assert!(names.contains("high_aerial_goal"));
     assert!(names.contains("long_distance_goal"));
     assert!(names.contains("own_half_goal"));
     assert!(names.contains("empty_net_goal"));
+    assert!(names.contains("flick_goal"));
+    assert!(names.contains("one_timer_goal"));
+    assert!(names.contains("air_dribble_goal"));
+    assert!(names.contains("flip_reset_goal"));
 }
 
 #[test]
@@ -54,10 +61,16 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<PossessionState>().is_some());
     assert!(graph.state::<BackboardCalculator>().is_some());
     assert!(graph.state::<MatchStatsCalculator>().is_some());
+    assert!(graph.state::<OneTimerCalculator>().is_some());
+    assert!(graph.state::<PassCalculator>().is_some());
     assert!(graph.state::<FlickCalculator>().is_some());
     assert!(graph.state::<AerialGoalCalculator>().is_some());
     assert!(graph.state::<HighAerialGoalCalculator>().is_some());
     assert!(graph.state::<LongDistanceGoalCalculator>().is_some());
     assert!(graph.state::<OwnHalfGoalCalculator>().is_some());
     assert!(graph.state::<EmptyNetGoalCalculator>().is_some());
+    assert!(graph.state::<FlickGoalCalculator>().is_some());
+    assert!(graph.state::<OneTimerGoalCalculator>().is_some());
+    assert!(graph.state::<AirDribbleGoalCalculator>().is_some());
+    assert!(graph.state::<FlipResetGoalCalculator>().is_some());
 }

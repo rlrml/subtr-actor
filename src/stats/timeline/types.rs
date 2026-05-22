@@ -18,6 +18,10 @@ pub struct StatsTimelineConfig {
     pub empty_net_min_defender_y_margin: f32,
     pub empty_net_min_defender_distance: f32,
     pub empty_net_max_touch_attacking_y: f32,
+    pub flick_goal_max_event_to_touch_seconds: f32,
+    pub one_timer_goal_max_event_to_touch_seconds: f32,
+    pub air_dribble_goal_max_end_to_touch_seconds: f32,
+    pub flip_reset_goal_max_event_to_touch_seconds: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -46,6 +50,8 @@ pub struct ReplayStatsTimelineEvents {
     pub ceiling_shot: Vec<CeilingShotEvent>,
     pub double_tap: Vec<DoubleTapEvent>,
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
+    pub one_timer: Vec<OneTimerEvent>,
+    pub pass: Vec<PassEvent>,
     pub goal_tags: Vec<GoalTagEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
@@ -79,6 +85,8 @@ pub struct TeamStatsSnapshot {
     pub core: CoreTeamStats,
     pub backboard: BackboardTeamStats,
     pub double_tap: DoubleTapTeamStats,
+    pub one_timer: OneTimerTeamStats,
+    pub pass: PassTeamStats,
     pub ball_carry: BallCarryStats,
     pub air_dribble: AirDribbleStats,
     pub boost: BoostStats,
@@ -98,6 +106,8 @@ pub struct PlayerStatsSnapshot {
     pub backboard: BackboardPlayerStats,
     pub ceiling_shot: CeilingShotStats,
     pub double_tap: DoubleTapPlayerStats,
+    pub one_timer: OneTimerPlayerStats,
+    pub pass: PassPlayerStats,
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
     pub wavedash: WavedashStats,
