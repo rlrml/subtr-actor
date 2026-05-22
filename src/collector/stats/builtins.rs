@@ -549,8 +549,9 @@ pub(crate) fn builtin_module_json(
         }
         "dodge_reset" => {
             let calculator = graph_state::<DodgeResetCalculator>(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.on_ball_events(),
             })
         }
         "ball_carry" => {

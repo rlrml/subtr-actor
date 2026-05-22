@@ -26,6 +26,9 @@ Useful options:
 - `--replay-path <path>` to use local replay files.
 - `--min-confidence <f32>` to filter heuristic candidates.
 - `--before-seconds <f32>` and `--after-seconds <f32>` to tune clip windows.
+- `--goal-lookahead-seconds <f32>` and `--goal-tail-seconds <f32>` to extend
+  clips through same-team goals.
+- `--min-clip-seconds <f32>` to avoid very short clips.
 - `--max-items <n>` to cap the review list.
 - `--mechanic <name>` or `--mechanics flick,one_timer,air_dribble` to choose
   detectors. Use `--mechanic all` for every supported event detector.

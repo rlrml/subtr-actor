@@ -1,10 +1,11 @@
 import type {
   PlaybackBound,
-  PlaylistPlaybackOptions,
   PlaylistItem,
   PlaylistManifest,
   PlaylistManifestItem,
+  PlaylistManifestPlaybackOptions,
   PlaylistManifestReplay,
+  PlaylistManifestReplayLocator,
   ReplaySource,
 } from "./types";
 
@@ -66,11 +67,17 @@ function parseManifestReplay(
     throw new Error(`${path}.meta must be an object when provided`);
   }
 
+  const replayPath = typeof value.path === "string" ? value.path : "";
   return {
     id: value.id,
-    path: value.path,
-    label: value.label,
-    meta: value.meta,
+    path: replayPath,
+    label: typeof value.label === "string" ? value.label : value.id,
+    locator: parseManifestReplayLocator(
+      value.locator,
+      `${path}.locator`,
+      replayPath
+    ),
+    meta: value.meta ?? {},
   };
 }
 
@@ -96,15 +103,57 @@ function parseManifestItem(
   }
 
   return {
+    id: typeof value.id === "string" && value.id.trim() !== ""
+      ? value.id
+      : `${value.replay}:${index}`,
     replay: value.replay,
     start: parsePlaybackBound(value.start, `${path}.start`),
     end: parsePlaybackBound(value.end, `${path}.end`),
-    label: value.label,
-    meta: value.meta,
+    label: typeof value.label === "string" ? value.label : "",
+    meta: value.meta ?? {},
   };
 }
 
-function parsePlaybackOptions(value: unknown): PlaylistPlaybackOptions {
+function parseManifestReplayLocator(
+  value: unknown,
+  path: string,
+  fallbackPath: string
+): PlaylistManifestReplayLocator {
+  if (value === undefined) {
+    return fallbackPath
+      ? { kind: "path", path: fallbackPath }
+      : { kind: "inline" };
+  }
+
+  if (!isObject(value)) {
+    throw new Error(`${path} must be an object when provided`);
+  }
+
+  if (typeof value.kind !== "string" || value.kind.trim() === "") {
+    throw new Error(`${path}.kind must be a non-empty string`);
+  }
+
+  if (value.id !== undefined && typeof value.id !== "string") {
+    throw new Error(`${path}.id must be a string when provided`);
+  }
+
+  if (value.path !== undefined && typeof value.path !== "string") {
+    throw new Error(`${path}.path must be a string when provided`);
+  }
+
+  if (value.cachePath !== undefined && typeof value.cachePath !== "string") {
+    throw new Error(`${path}.cachePath must be a string when provided`);
+  }
+
+  return {
+    kind: value.kind,
+    id: value.id,
+    path: value.path,
+    cachePath: value.cachePath,
+  };
+}
+
+function parsePlaybackOptions(value: unknown): PlaylistManifestPlaybackOptions {
   if (!isObject(value)) {
     throw new Error("manifest.playback must be an object");
   }
@@ -133,9 +182,9 @@ function parsePlaybackOptions(value: unknown): PlaylistPlaybackOptions {
   }
 
   return {
-    advanceMode: value.advanceMode,
-    endMode: value.endMode,
-    advanceOnEnd: value.advanceOnEnd,
+    advanceMode: value.advanceMode ??
+      (value.advanceOnEnd === true ? "auto" : "manual"),
+    endMode: value.endMode ?? "stop",
   };
 }
 
@@ -162,14 +211,16 @@ export function parsePlaylistManifest(manifest: unknown): PlaylistManifest {
 
   const playback =
     manifest.playback === undefined
-      ? undefined
+      ? { advanceMode: "manual" as const, endMode: "stop" as const }
       : parsePlaybackOptions(manifest.playback);
 
   return {
-    replays: manifest.replays?.map(parseManifestReplay),
+    version: typeof manifest.version === "number" ? manifest.version : 1,
+    kind: typeof manifest.kind === "string" ? manifest.kind : "playlist",
+    replays: (manifest.replays ?? []).map(parseManifestReplay),
     items: manifest.items.map(parseManifestItem),
-    label: manifest.label,
-    meta: manifest.meta,
+    label: typeof manifest.label === "string" ? manifest.label : "Playlist",
+    meta: manifest.meta ?? {},
     playback,
   };
 }
@@ -212,7 +263,7 @@ export function resolvePlaylistItemsFromManifest(
       }),
       start: item.start,
       end: item.end,
-      label: item.label ?? replay?.label,
+      label: item.label || replay?.label,
       meta: item.meta,
     };
   });

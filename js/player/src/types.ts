@@ -2,6 +2,18 @@ import type { Group, Object3D } from "three";
 import type { RawReplayFramesData } from "./raw-types";
 import type { ReplayScene } from "./scene";
 import type { ReplayPlayer } from "./player";
+import type { PlaybackBound } from "./generated/PlaybackBound";
+import type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
+import type { PlaylistEndMode } from "./generated/PlaylistEndMode";
+
+export type { PlaybackBound } from "./generated/PlaybackBound";
+export type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
+export type { PlaylistEndMode } from "./generated/PlaylistEndMode";
+export type { PlaylistManifest } from "./generated/PlaylistManifest";
+export type { PlaylistManifestItem } from "./generated/PlaylistManifestItem";
+export type { PlaylistManifestReplay } from "./generated/PlaylistManifestReplay";
+export type { PlaylistManifestReplayLocator } from "./generated/PlaylistManifestReplayLocator";
+export type { PlaylistPlaybackOptions as PlaylistManifestPlaybackOptions } from "./generated/PlaylistPlaybackOptions";
 
 export type {
   RawBallData,
@@ -225,10 +237,6 @@ export interface LoadedReplay {
   raw?: RawReplayFramesData;
 }
 
-export type PlaybackBound =
-  | { kind: "frame"; value: number }
-  | { kind: "time"; value: number };
-
 export interface PlaylistLoadSource<TLoaded> {
   id: string;
   load: () => Promise<TLoaded>;
@@ -245,10 +253,6 @@ export interface PlaylistItem<
   label?: string;
   meta?: Record<string, unknown>;
 }
-
-export type PlaylistAdvanceMode = "auto" | "manual";
-
-export type PlaylistEndMode = "stop" | "loop";
 
 export interface PlaylistPlaybackOptions {
   /**
@@ -271,29 +275,6 @@ export interface PlaylistPlaybackOptions {
    * "manual".
    */
   advanceOnEnd?: boolean;
-}
-
-export interface PlaylistManifestReplay {
-  id: string;
-  path?: string;
-  label?: string;
-  meta?: Record<string, unknown>;
-}
-
-export interface PlaylistManifestItem {
-  replay: string;
-  start: PlaybackBound;
-  end: PlaybackBound;
-  label?: string;
-  meta?: Record<string, unknown>;
-}
-
-export interface PlaylistManifest {
-  replays?: PlaylistManifestReplay[];
-  items: PlaylistManifestItem[];
-  label?: string;
-  meta?: Record<string, unknown>;
-  playback?: PlaylistPlaybackOptions;
 }
 
 export interface ResolvedPlaybackBound {

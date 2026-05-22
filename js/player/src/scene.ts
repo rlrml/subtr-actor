@@ -843,6 +843,9 @@ export function createReplayScene(
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.domElement.style.display = "block";
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute("aria-label", "Replay player viewport");
   container.replaceChildren(renderer.domElement);

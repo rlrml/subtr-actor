@@ -185,6 +185,143 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(events)
     }
 
+    fn mechanic_events_typed(&self) -> SubtrActorResult<Vec<MechanicEvent>> {
+        let mut events = Vec::new();
+
+        for (index, value) in self.module_array("ball_carry", "events").iter().enumerate() {
+            events.push(parse_ball_carry_mechanic_event(value, index)?);
+        }
+        for (index, value) in self
+            .module_array("ceiling_shot", "events")
+            .iter()
+            .enumerate()
+        {
+            let event = parse_ceiling_shot_event(value)?;
+            events.push(span_mechanic_event(
+                "ceiling_shot",
+                index,
+                event.ceiling_contact_frame,
+                event.frame,
+                event.ceiling_contact_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self
+            .module_array("dodge_reset", "events")
+            .iter()
+            .enumerate()
+        {
+            events.push(parse_dodge_reset_mechanic_event(value, index)?);
+        }
+        for (index, value) in self.module_array("double_tap", "events").iter().enumerate() {
+            let event = parse_double_tap_event(value)?;
+            events.push(span_mechanic_event(
+                "double_tap",
+                index,
+                event.backboard_frame,
+                event.frame,
+                event.backboard_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("flick", "events").iter().enumerate() {
+            events.push(parse_flick_mechanic_event(value, index)?);
+        }
+        for (index, value) in self
+            .module_array("musty_flick", "events")
+            .iter()
+            .enumerate()
+        {
+            events.push(parse_musty_flick_mechanic_event(value, index)?);
+        }
+        for (index, value) in self.module_array("one_timer", "events").iter().enumerate() {
+            let event = parse_one_timer_event(value)?;
+            events.push(span_mechanic_event(
+                "one_timer",
+                index,
+                event.pass_start_frame,
+                event.frame,
+                event.pass_start_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("pass", "events").iter().enumerate() {
+            let event = parse_pass_event(value)?;
+            events.push(span_mechanic_event(
+                "pass",
+                index,
+                event.start_frame,
+                event.frame,
+                event.start_time,
+                event.time,
+                event.passer,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("speed_flip", "events").iter().enumerate() {
+            let event = parse_speed_flip_event(value)?;
+            events.push(moment_mechanic_event(
+                "speed_flip",
+                index,
+                event.frame,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("half_flip", "events").iter().enumerate() {
+            let event = parse_half_flip_event(value)?;
+            events.push(moment_mechanic_event(
+                "half_flip",
+                index,
+                event.frame,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("wavedash", "events").iter().enumerate() {
+            let event = parse_wavedash_event(value)?;
+            events.push(span_mechanic_event(
+                "wavedash",
+                index,
+                event.dodge_frame,
+                event.frame,
+                event.dodge_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+        for (index, value) in self.module_array("whiff", "events").iter().enumerate() {
+            let event = parse_whiff_event(value)?;
+            events.push(moment_mechanic_event(
+                "whiff",
+                index,
+                event.frame,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
+
+        events.sort_by(|left, right| {
+            let left_time = mechanic_event_start_time(left);
+            let right_time = mechanic_event_start_time(right);
+            left_time
+                .total_cmp(&right_time)
+                .then_with(|| left.kind.cmp(&right.kind))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Ok(events)
+    }
+
     fn goal_tag_events_value(&self) -> Vec<Value> {
         let mut events = Vec::new();
         for module_name in [
@@ -211,7 +348,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
-            mechanics: Vec::new(),
+            mechanics: self.mechanic_events_typed()?,
             goal_context: self.module_player_events(
                 "core",
                 "goal_context",
@@ -1453,6 +1590,120 @@ fn parse_timeline_event(value: &Value) -> SubtrActorResult<TimelineEvent> {
     })
 }
 
+fn moment_mechanic_event(
+    kind: &str,
+    index: usize,
+    frame: usize,
+    time: f32,
+    player_id: PlayerId,
+    is_team_0: bool,
+) -> MechanicEvent {
+    MechanicEvent {
+        id: format!("{kind}:{frame}:{index}"),
+        kind: kind.to_owned(),
+        player_id,
+        is_team_0,
+        timing: MechanicTiming::Moment { frame, time },
+    }
+}
+
+fn span_mechanic_event(
+    kind: &str,
+    index: usize,
+    start_frame: usize,
+    end_frame: usize,
+    start_time: f32,
+    end_time: f32,
+    player_id: PlayerId,
+    is_team_0: bool,
+) -> MechanicEvent {
+    MechanicEvent {
+        id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
+        kind: kind.to_owned(),
+        player_id,
+        is_team_0,
+        timing: MechanicTiming::Span {
+            start_frame,
+            end_frame,
+            start_time,
+            end_time,
+        },
+    }
+}
+
+fn mechanic_event_start_time(event: &MechanicEvent) -> f32 {
+    match event.timing {
+        MechanicTiming::Moment { time, .. } => time,
+        MechanicTiming::Span { start_time, .. } => start_time,
+    }
+}
+
+fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
+    let object = json_object(value, "ball carry mechanic event")?;
+    let serialized_kind = json_required_str(object, "kind")?;
+    let kind = match serialized_kind {
+        "carry" => "ball_carry",
+        "air_dribble" => "air_dribble",
+        other => other,
+    };
+    Ok(span_mechanic_event(
+        kind,
+        index,
+        json_required_usize(object, "start_frame")?,
+        json_required_usize(object, "end_frame")?,
+        json_required_f32(object, "start_time")?,
+        json_required_f32(object, "end_time")?,
+        json_required_remote_id(object, "player_id")?,
+        json_required_bool(object, "is_team_0")?,
+    ))
+}
+
+fn parse_dodge_reset_mechanic_event(
+    value: &Value,
+    index: usize,
+) -> SubtrActorResult<MechanicEvent> {
+    let object = json_object(value, "dodge reset mechanic event")?;
+    Ok(moment_mechanic_event(
+        "flip_reset",
+        index,
+        json_required_usize(object, "frame")?,
+        json_required_f32(object, "time")?,
+        json_required_remote_id(object, "player")?,
+        json_required_bool(object, "is_team_0")?,
+    ))
+}
+
+fn parse_flick_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
+    let object = json_object(value, "flick mechanic event")?;
+    Ok(span_mechanic_event(
+        "flick",
+        index,
+        json_required_usize(object, "setup_start_frame")?,
+        json_required_usize(object, "frame")?,
+        json_required_f32(object, "setup_start_time")?,
+        json_required_f32(object, "time")?,
+        json_required_remote_id(object, "player")?,
+        json_required_bool(object, "is_team_0")?,
+    ))
+}
+
+fn parse_musty_flick_mechanic_event(
+    value: &Value,
+    index: usize,
+) -> SubtrActorResult<MechanicEvent> {
+    let object = json_object(value, "musty flick mechanic event")?;
+    Ok(span_mechanic_event(
+        "musty_flick",
+        index,
+        json_required_usize(object, "dodge_frame")?,
+        json_required_usize(object, "frame")?,
+        json_required_f32(object, "dodge_time")?,
+        json_required_f32(object, "time")?,
+        json_required_remote_id(object, "player")?,
+        json_required_bool(object, "is_team_0")?,
+    ))
+}
+
 fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent> {
     let object = json_object(value, "goal context event")?;
     Ok(GoalContextEvent {
@@ -1832,6 +2083,17 @@ fn json_required_bool(
                 "Expected JSON field '{field}' to be a bool"
             )))
         })
+}
+
+fn json_required_str<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<&'a str> {
+    json_required_value(object, field)?.as_str().ok_or_else(|| {
+        SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+            "Expected JSON field '{field}' to be a string"
+        )))
+    })
 }
 
 fn json_optional_bool(value: Option<&Value>) -> Option<bool> {

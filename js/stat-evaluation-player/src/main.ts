@@ -175,6 +175,20 @@ let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
 let mechanicsTimelineWindowBody!: HTMLDivElement;
+let mechanicsReviewFile!: HTMLInputElement;
+let mechanicsReviewUrl!: HTMLInputElement;
+let mechanicsReviewLoadUrl!: HTMLButtonElement;
+let mechanicsReviewStatus!: HTMLElement;
+let mechanicsReviewIndex!: HTMLElement;
+let mechanicsReviewTitle!: HTMLElement;
+let mechanicsReviewMechanic!: HTMLElement;
+let mechanicsReviewPlayer!: HTMLElement;
+let mechanicsReviewReason!: HTMLElement;
+let mechanicsReviewPrev!: HTMLButtonElement;
+let mechanicsReviewReplay!: HTMLButtonElement;
+let mechanicsReviewNext!: HTMLButtonElement;
+let mechanicsReviewCount!: HTMLElement;
+let mechanicsReviewList!: HTMLDivElement;
 let boostPickupFiltersWindowBody!: HTMLDivElement;
 let touchControlsWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
@@ -257,9 +271,61 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "playback",
   "recording",
   "mechanics",
+  "mechanics-review",
   "boost-pickups",
   "touch-controls",
 ];
+
+type MechanicsReviewPlaybackBound =
+  | { kind: "time"; value: number }
+  | { kind: "frame"; value: number };
+
+interface MechanicsReviewReplay {
+  id: string;
+  path?: string;
+  label?: string;
+  locator?: Record<string, unknown>;
+  meta?: Record<string, unknown>;
+}
+
+interface MechanicsReviewItemMeta {
+  confidence?: number | null;
+  mechanic?: string;
+  mechanicLabel?: string;
+  playerId?: string;
+  playerName?: string | null;
+  reason?: string;
+  target?: Record<string, unknown>;
+  followupGoal?: unknown;
+  [key: string]: unknown;
+}
+
+interface MechanicsReviewItem {
+  id?: string;
+  replay: string;
+  start: MechanicsReviewPlaybackBound;
+  end: MechanicsReviewPlaybackBound;
+  label?: string;
+  meta?: MechanicsReviewItemMeta;
+}
+
+interface MechanicsReviewPlaylist {
+  label?: string;
+  replays?: MechanicsReviewReplay[];
+  items: MechanicsReviewItem[];
+  playback?: unknown;
+  meta?: unknown;
+}
+
+interface ActiveMechanicsReview {
+  manifest: MechanicsReviewPlaylist;
+  sourceUrl: string | null;
+  replaysById: Map<string, MechanicsReviewReplay>;
+  currentIndex: number;
+  loading: boolean;
+  currentReplayId: string | null;
+  currentClip: { startTime: number; endTime: number } | null;
+}
 
 interface SelectedStatEntry {
   key: string;
@@ -280,6 +346,8 @@ interface StatsWindowState {
 }
 
 const statsWindows = new Map<string, StatsWindowState>();
+let activeMechanicsReview: ActiveMechanicsReview | null = null;
+let mechanicsReviewBoundaryGuard = false;
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
@@ -1089,6 +1157,413 @@ function renderMechanicsTimelineControls(): void {
   }
 
   mechanicsTimelineWindowBody.append(actions, list);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseMechanicsReviewBound(value: unknown): MechanicsReviewPlaybackBound | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    (value.kind === "time" || value.kind === "frame") &&
+    typeof value.value === "number" &&
+    Number.isFinite(value.value)
+  ) {
+    return {
+      kind: value.kind,
+      value: value.value,
+    };
+  }
+  return null;
+}
+
+function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
+  if (!isRecord(value) || !Array.isArray(value.items)) {
+    throw new Error("Review playlist must contain an items array.");
+  }
+
+  const items = value.items.map((rawItem, index): MechanicsReviewItem => {
+    if (!isRecord(rawItem) || typeof rawItem.replay !== "string") {
+      throw new Error(`Invalid review item at index ${index}.`);
+    }
+    const start = parseMechanicsReviewBound(rawItem.start);
+    const end = parseMechanicsReviewBound(rawItem.end);
+    if (!start || !end) {
+      throw new Error(`Review item ${index + 1} has invalid start or end.`);
+    }
+    return {
+      id: typeof rawItem.id === "string" ? rawItem.id : undefined,
+      replay: rawItem.replay,
+      start,
+      end,
+      label: typeof rawItem.label === "string" ? rawItem.label : undefined,
+      meta: isRecord(rawItem.meta) ? rawItem.meta : undefined,
+    };
+  });
+
+  const replays = Array.isArray(value.replays)
+    ? value.replays
+      .map((rawReplay): MechanicsReviewReplay | null => {
+        if (!isRecord(rawReplay) || typeof rawReplay.id !== "string") {
+          return null;
+        }
+        return {
+          id: rawReplay.id,
+          path: typeof rawReplay.path === "string" ? rawReplay.path : undefined,
+          label: typeof rawReplay.label === "string" ? rawReplay.label : undefined,
+          locator: isRecord(rawReplay.locator) ? rawReplay.locator : undefined,
+          meta: isRecord(rawReplay.meta) ? rawReplay.meta : undefined,
+        };
+      })
+      .filter((replay): replay is MechanicsReviewReplay => replay !== null)
+    : undefined;
+
+  return {
+    label: typeof value.label === "string" ? value.label : undefined,
+    replays,
+    items,
+    playback: value.playback,
+    meta: value.meta,
+  };
+}
+
+function parseMechanicsReviewPlaylistJson(text: string): MechanicsReviewPlaylist {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `Invalid review playlist JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  return parseMechanicsReviewPlaylist(parsed);
+}
+
+function getMechanicsReviewUrlFromLocation(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("reviewPlaylist")?.trim() ||
+    params.get("review")?.trim() ||
+    params.get("playlistUrl")?.trim() ||
+    null;
+}
+
+function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): string {
+  const path = value.startsWith("path:") ? value.slice("path:".length) : value;
+  if (/^https?:\/\//i.test(path) || path.startsWith("/@fs/")) {
+    return path;
+  }
+  if (path.startsWith("/")) {
+    return `/@fs${path}`;
+  }
+  return sourceUrl ? new URL(path, sourceUrl).href : path;
+}
+
+function getMechanicsReviewReplayPath(
+  item: MechanicsReviewItem,
+  review: ActiveMechanicsReview,
+): string {
+  const replay = review.replaysById.get(item.replay);
+  if (replay?.path) {
+    return replay.path;
+  }
+  if (isRecord(replay?.locator) && replay.locator.kind === "path" &&
+    typeof replay.locator.path === "string") {
+    return replay.locator.path;
+  }
+  if (/^https?:\/\//i.test(item.replay) || item.replay.startsWith("/") ||
+    item.replay.startsWith("/@fs/") || item.replay.startsWith("path:")) {
+    return item.replay;
+  }
+  throw new Error(`Review replay "${item.replay}" does not include a loadable path.`);
+}
+
+function getMechanicsReviewReplayLabel(
+  item: MechanicsReviewItem,
+  review: ActiveMechanicsReview,
+): string {
+  const replay = review.replaysById.get(item.replay);
+  const rawPath = replay?.path ?? getMechanicsReviewReplayPath(item, review);
+  const fileName = rawPath.replace(/^path:/, "").split("/").filter(Boolean).pop();
+  return replay?.label ?? fileName ?? "review replay";
+}
+
+function createMechanicsReviewReplaySource(
+  item: MechanicsReviewItem,
+  review: ActiveMechanicsReview,
+  signal?: AbortSignal,
+): ReplayInputSource {
+  const replayPath = getMechanicsReviewReplayPath(item, review);
+  const url = resolveMechanicsReviewUrl(replayPath, review.sourceUrl);
+  return {
+    name: getMechanicsReviewReplayLabel(item, review),
+    preparingStatus: "Loading review replay...",
+    async readBytes() {
+      const response = await fetch(url, { signal });
+      if (!response.ok) {
+        const statusText = response.statusText ? ` ${response.statusText}` : "";
+        throw new Error(
+          `Failed to fetch review replay from ${url} (${response.status}${statusText})`,
+        );
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    },
+  };
+}
+
+function getMechanicsReviewBoundTime(bound: MechanicsReviewPlaybackBound): number {
+  if (bound.kind === "time") {
+    return bound.value;
+  }
+  const frameIndex = Math.max(0, Math.trunc(bound.value));
+  return replayPlayer?.replay.frames[frameIndex]?.time ??
+    replayPlayer?.replay.frames.at(-1)?.time ??
+    0;
+}
+
+function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
+  return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;
+}
+
+function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | null {
+  if (typeof item.meta?.playerId === "string") {
+    return item.meta.playerId;
+  }
+  if (isRecord(item.meta?.target) && typeof item.meta.target.playerId === "string") {
+    return item.meta.target.playerId;
+  }
+  return null;
+}
+
+function getMechanicsReviewPlayerName(item: MechanicsReviewItem): string {
+  if (typeof item.meta?.playerName === "string" && item.meta.playerName.trim()) {
+    return item.meta.playerName;
+  }
+  const playerId = getMechanicsReviewPlayerId(item);
+  return playerId
+    ? replayPlayer?.replay.players.find((player) => player.id === playerId)?.name ??
+      playerId
+    : "--";
+}
+
+function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
+  if (typeof item.meta?.mechanicLabel === "string" && item.meta.mechanicLabel.trim()) {
+    return item.meta.mechanicLabel;
+  }
+  return typeof item.meta?.mechanic === "string"
+    ? formatMechanicKind(item.meta.mechanic)
+    : "--";
+}
+
+function setMechanicsReviewStatus(message: string): void {
+  if (mechanicsReviewStatus) {
+    mechanicsReviewStatus.textContent = message;
+  }
+}
+
+function renderMechanicsReviewWindow(): void {
+  if (!mechanicsReviewList) {
+    return;
+  }
+
+  const review = activeMechanicsReview;
+  const items = review?.manifest.items ?? [];
+  const item = review ? items[review.currentIndex] ?? null : null;
+  const hasItems = items.length > 0;
+
+  mechanicsReviewCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
+  mechanicsReviewIndex.textContent = hasItems && review
+    ? `${review.currentIndex + 1} / ${items.length}`
+    : "0 / 0";
+  mechanicsReviewTitle.textContent = item
+    ? getMechanicsReviewItemLabel(item, review?.currentIndex ?? 0)
+    : "No candidate selected";
+  mechanicsReviewMechanic.textContent = item
+    ? getMechanicsReviewMechanicLabel(item)
+    : "--";
+  mechanicsReviewPlayer.textContent = item
+    ? getMechanicsReviewPlayerName(item)
+    : "--";
+  mechanicsReviewReason.textContent = item?.meta?.reason ?? "--";
+  mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;
+  mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;
+  mechanicsReviewNext.disabled = !review || review.loading ||
+    review.currentIndex >= items.length - 1;
+
+  mechanicsReviewList.replaceChildren();
+  if (!review || items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stat-window-empty";
+    empty.textContent = "No review playlist loaded.";
+    mechanicsReviewList.append(empty);
+    return;
+  }
+
+  items.forEach((candidate, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mechanics-review-item";
+    button.dataset.active = index === review.currentIndex ? "true" : "false";
+    button.disabled = review.loading;
+    button.addEventListener("click", () => {
+      void activateMechanicsReviewItem(index);
+    });
+
+    const title = document.createElement("span");
+    title.textContent = getMechanicsReviewItemLabel(candidate, index);
+
+    const meta = document.createElement("strong");
+    meta.textContent = getMechanicsReviewMechanicLabel(candidate);
+
+    button.append(title, meta);
+    mechanicsReviewList.append(button);
+  });
+}
+
+async function loadMechanicsReviewPlaylist(
+  manifest: MechanicsReviewPlaylist,
+  sourceUrl: string | null,
+): Promise<void> {
+  const replaysById = new Map<string, MechanicsReviewReplay>();
+  for (const replay of manifest.replays ?? []) {
+    replaysById.set(replay.id, replay);
+  }
+
+  activeMechanicsReview = {
+    manifest,
+    sourceUrl,
+    replaysById,
+    currentIndex: 0,
+    loading: false,
+    currentReplayId: null,
+    currentClip: null,
+  };
+  setMechanicsReviewStatus(
+    manifest.label
+      ? `Loaded ${manifest.label}.`
+      : `Loaded review playlist.`,
+  );
+  renderMechanicsReviewWindow();
+
+  if (manifest.items.length > 0) {
+    await activateMechanicsReviewItem(0);
+  }
+}
+
+async function loadMechanicsReviewPlaylistFromUrl(urlText: string): Promise<void> {
+  if (!urlText) {
+    setMechanicsReviewStatus("Enter a review playlist URL.");
+    return;
+  }
+  const url = resolveMechanicsReviewUrl(urlText, window.location.href);
+  setMechanicsReviewStatus("Loading review playlist...");
+  const response = await fetch(url);
+  if (!response.ok) {
+    const statusText = response.statusText ? ` ${response.statusText}` : "";
+    throw new Error(
+      `Failed to fetch review playlist from ${url} (${response.status}${statusText})`,
+    );
+  }
+  const manifest = parseMechanicsReviewPlaylistJson(await response.text());
+  await loadMechanicsReviewPlaylist(manifest, response.url || url);
+}
+
+async function activateMechanicsReviewItem(index: number): Promise<void> {
+  const review = activeMechanicsReview;
+  const item = review?.manifest.items[index];
+  if (!review || !item || review.loading) {
+    return;
+  }
+
+  review.loading = true;
+  review.currentIndex = index;
+  renderMechanicsReviewWindow();
+  setMechanicsReviewStatus(`Loading ${getMechanicsReviewItemLabel(item, index)}...`);
+
+  try {
+    if (!replayPlayer || review.currentReplayId !== item.replay) {
+      await loadReplay(createMechanicsReviewReplaySource(item, review));
+      review.currentReplayId = item.replay;
+    }
+
+    const startTime = Math.max(0, getMechanicsReviewBoundTime(item.start));
+    const endTime = Math.min(
+      replayPlayer?.getState().duration ?? Number.POSITIVE_INFINITY,
+      Math.max(startTime, getMechanicsReviewBoundTime(item.end)),
+    );
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime) ||
+      endTime <= startTime) {
+      throw new Error("Review item has an empty playback range.");
+    }
+
+    const playerId = getMechanicsReviewPlayerId(item);
+    if (playerId && replayPlayer?.replay.players.some((player) => player.id === playerId)) {
+      replayPlayer.setAttachedPlayer(playerId);
+      replayPlayer.setCameraViewMode("follow");
+      lastFreeCameraPreset = null;
+    }
+
+    skipPostGoalTransitions.checked = false;
+    review.currentClip = { startTime, endTime };
+    replayPlayer?.setState({
+      currentTime: startTime,
+      playing: false,
+      skipPostGoalTransitionsEnabled: false,
+    });
+    setMechanicsReviewStatus(
+      `${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`,
+    );
+  } catch (error) {
+    console.error("Failed to activate mechanics review item:", error);
+    review.currentClip = null;
+    setMechanicsReviewStatus(
+      error instanceof Error ? error.message : "Failed to load review item",
+    );
+  } finally {
+    review.loading = false;
+    renderMechanicsReviewWindow();
+  }
+}
+
+function replayMechanicsReviewClip(): void {
+  const clip = activeMechanicsReview?.currentClip;
+  if (!clip || !replayPlayer) {
+    return;
+  }
+  replayPlayer.setState({
+    currentTime: clip.startTime,
+    playing: true,
+    skipPostGoalTransitionsEnabled: false,
+  });
+}
+
+function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
+  const clip = activeMechanicsReview?.currentClip;
+  if (!clip || !replayPlayer || mechanicsReviewBoundaryGuard) {
+    return false;
+  }
+
+  const beforeStart = state.currentTime < clip.startTime - 0.1;
+  const atOrPastEnd = state.currentTime >= clip.endTime - 0.025;
+  if (!beforeStart && !atOrPastEnd) {
+    return false;
+  }
+
+  mechanicsReviewBoundaryGuard = true;
+  try {
+    replayPlayer.setState({
+      currentTime: beforeStart ? clip.startTime : clip.endTime,
+      playing: false,
+      skipPostGoalTransitionsEnabled: false,
+    });
+  } finally {
+    mechanicsReviewBoundaryGuard = false;
+  }
+  return true;
 }
 
 function renderModuleSummaryGroup(
@@ -2265,6 +2740,10 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
+  if (enforceMechanicsReviewClipBoundary(state)) {
+    return;
+  }
+
   timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${state.frameIndex}`;
   durationReadout.textContent = `${state.duration.toFixed(2)}s`;
@@ -2508,6 +2987,62 @@ export function mountStatEvaluationPlayer(
     root,
     "#mechanics-timeline-window-body",
   );
+  mechanicsReviewFile = mustElement<HTMLInputElement>(
+    root,
+    "#mechanics-review-file",
+  );
+  mechanicsReviewUrl = mustElement<HTMLInputElement>(
+    root,
+    "#mechanics-review-url",
+  );
+  mechanicsReviewLoadUrl = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-load-url",
+  );
+  mechanicsReviewStatus = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-status",
+  );
+  mechanicsReviewIndex = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-index",
+  );
+  mechanicsReviewTitle = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-title",
+  );
+  mechanicsReviewMechanic = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-mechanic",
+  );
+  mechanicsReviewPlayer = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-player",
+  );
+  mechanicsReviewReason = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-reason",
+  );
+  mechanicsReviewPrev = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-prev",
+  );
+  mechanicsReviewReplay = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-replay",
+  );
+  mechanicsReviewNext = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-next",
+  );
+  mechanicsReviewCount = mustElement<HTMLElement>(
+    root,
+    "#mechanics-review-count",
+  );
+  mechanicsReviewList = mustElement<HTMLDivElement>(
+    root,
+    "#mechanics-review-list",
+  );
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
     root,
     "#boost-pickup-filters-window-body",
@@ -2699,6 +3234,8 @@ export function mountStatEvaluationPlayer(
     activeTimelineRangeModuleIds = new Set<string>();
     activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
+    activeMechanicsReview = null;
+    mechanicsReviewBoundaryGuard = false;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     lastFreeCameraPreset = null;
@@ -2780,11 +3317,67 @@ export function mountStatEvaluationPlayer(
     if (!file) return;
 
     try {
+      if (activeMechanicsReview) {
+        activeMechanicsReview.currentClip = null;
+        activeMechanicsReview.currentReplayId = null;
+        renderMechanicsReviewWindow();
+      }
       await loadReplay(createFileReplaySource(file));
     } catch (error) {
       console.error("Failed to load replay:", error);
       statusReadout.textContent =
         error instanceof Error ? error.message : "Failed to load replay";
+    }
+  }, { signal: listeners.signal });
+
+  mechanicsReviewFile.addEventListener("change", async () => {
+    const file = mechanicsReviewFile.files?.[0];
+    if (!file) return;
+
+    try {
+      const manifest = parseMechanicsReviewPlaylistJson(await file.text());
+      await loadMechanicsReviewPlaylist(manifest, null);
+    } catch (error) {
+      console.error("Failed to load mechanics review playlist:", error);
+      setMechanicsReviewStatus(
+        error instanceof Error
+          ? error.message
+          : "Failed to load mechanics review playlist",
+      );
+    } finally {
+      mechanicsReviewFile.value = "";
+    }
+  }, { signal: listeners.signal });
+
+  mechanicsReviewLoadUrl.addEventListener("click", () => {
+    void loadMechanicsReviewPlaylistFromUrl(mechanicsReviewUrl.value.trim())
+      .catch((error) => {
+        console.error("Failed to load mechanics review playlist URL:", error);
+        setMechanicsReviewStatus(
+          error instanceof Error
+            ? error.message
+            : "Failed to load mechanics review playlist URL",
+        );
+      });
+  }, { signal: listeners.signal });
+
+  mechanicsReviewPrev.addEventListener("click", () => {
+    const review = activeMechanicsReview;
+    if (review) {
+      void activateMechanicsReviewItem(Math.max(0, review.currentIndex - 1));
+    }
+  }, { signal: listeners.signal });
+
+  mechanicsReviewReplay.addEventListener("click", replayMechanicsReviewClip, {
+    signal: listeners.signal,
+  });
+
+  mechanicsReviewNext.addEventListener("click", () => {
+    const review = activeMechanicsReview;
+    if (review) {
+      void activateMechanicsReviewItem(
+        Math.min(review.manifest.items.length - 1, review.currentIndex + 1),
+      );
     }
   }, { signal: listeners.signal });
 
@@ -2950,7 +3543,25 @@ export function mountStatEvaluationPlayer(
   syncCameraModeButtons();
   syncRecordingWindow();
   renderTimelineEventCount();
+  renderMechanicsReviewWindow();
   loadReplayFromLocation(listeners.signal);
+
+  const reviewUrl = getMechanicsReviewUrlFromLocation();
+  if (reviewUrl) {
+    mechanicsReviewUrl.value = reviewUrl;
+    showWindow("mechanics-review");
+    void loadMechanicsReviewPlaylistFromUrl(reviewUrl).catch((error) => {
+      if (listeners.signal.aborted) {
+        return;
+      }
+      console.error("Failed to load mechanics review playlist from URL:", error);
+      setMechanicsReviewStatus(
+        error instanceof Error
+          ? error.message
+          : "Failed to load mechanics review playlist from URL",
+      );
+    });
+  }
 
   return {
     root,

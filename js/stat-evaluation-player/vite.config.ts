@@ -71,7 +71,10 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       fs: {
-        allow: [path.resolve(import.meta.dirname, "..")],
+        allow: [
+          path.resolve(import.meta.dirname, ".."),
+          path.resolve(import.meta.dirname, "../.."),
+        ],
       },
     },
     worker: {

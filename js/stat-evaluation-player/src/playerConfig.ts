@@ -21,6 +21,7 @@ export type SingletonWindowId =
   | "playback"
   | "recording"
   | "mechanics"
+  | "mechanics-review"
   | "boost-pickups"
   | "touch-controls";
 export type ConfigWindowKind = SingletonWindowId | "stats";
@@ -426,7 +427,8 @@ function normalizePlacement(value: unknown): WindowPlacementConfig {
 
 function isSingletonWindowId(value: unknown): value is SingletonWindowId {
   return value === "camera" || value === "playback" || value === "recording" ||
-    value === "mechanics" || value === "boost-pickups" || value === "touch-controls";
+    value === "mechanics" || value === "mechanics-review" ||
+    value === "boost-pickups" || value === "touch-controls";
 }
 
 function isStatsWindowKind(value: unknown): value is StatsWindowKind {

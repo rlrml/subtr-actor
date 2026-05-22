@@ -156,6 +156,7 @@ async function loadPlaylist(manifest: PlaylistManifest, sourceUrl: string | null
     initialPlaybackRate: Number(speedSelect.value),
     initialCameraViewMode: "follow",
     initialBallCamEnabled: true,
+    initialSkipPostGoalTransitionsEnabled: false,
     preloadRadius: 1,
   });
   reviewPlayer.subscribe(renderState);
