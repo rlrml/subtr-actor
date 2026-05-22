@@ -26,6 +26,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     fifty_fifty: [],
     rush: [],
     speed_flip: [],
+    wavedash: [],
     whiff: [],
     boost_pickups: [],
   }, overrides);
@@ -103,6 +104,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
   fifty_fifty_events?: StatsEvents["fifty_fifty"];
   rush_events?: StatsEvents["rush"];
   speed_flip_events?: StatsEvents["speed_flip"];
+  wavedash_events?: StatsEvents["wavedash"];
   whiff_events?: StatsEvents["whiff"];
   boost_pickups?: StatsEvents["boost_pickups"];
 } = {}): StatsTimeline {
@@ -117,6 +119,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
+      wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
     },

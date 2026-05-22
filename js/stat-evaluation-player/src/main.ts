@@ -989,6 +989,7 @@ function getCapabilityLabel(
     "rush:ranges": "Rush",
     "speed-flip:events": "Speed flip",
     "touch:events": "Touch",
+    "wavedash:events": "Wavedash",
   };
   const inGameVisualizationLabels: Record<string, string> = {
     "absolute-positioning": "Position zones",

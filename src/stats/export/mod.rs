@@ -19,6 +19,7 @@ mod pressure;
 mod rush;
 mod speed_flip;
 mod touch;
+mod wavedash;
 mod whiff;
 
 pub const LEGACY_STAT_VARIANT: &str = "legacy";

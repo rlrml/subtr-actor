@@ -70,6 +70,8 @@ pub mod touch;
 pub use touch::*;
 pub mod touch_state;
 pub use touch_state::*;
+pub mod wavedash;
+pub use wavedash::*;
 pub mod whiff;
 pub use whiff::*;
 

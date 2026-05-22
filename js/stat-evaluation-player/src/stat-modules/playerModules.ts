@@ -19,6 +19,7 @@ import {
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
+  buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
@@ -37,6 +38,7 @@ import {
   renderMustyFlickStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
+  renderWavedashStats,
   renderWhiffStats,
 } from "./renderers.ts";
 import {
@@ -367,6 +369,47 @@ export function createSpeedFlipModule(): StatModule {
       if (!player) return "";
 
       return renderSpeedFlipStats(player.speed_flip);
+    },
+  };
+}
+
+export function createWavedashModule(): StatModule {
+  return {
+    id: "wavedash",
+    label: "Wavedash",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildWavedashTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderWavedashStats(player.wavedash),
+        player.wavedash?.is_last_wavedash
+          ? '<span class="role-indicator role-forward">Last Wavedash</span>'
+          : "",
+      ));
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderWavedashStats(player.wavedash);
     },
   };
 }

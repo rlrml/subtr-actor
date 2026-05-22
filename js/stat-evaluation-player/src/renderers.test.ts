@@ -5,6 +5,7 @@ import {
   renderBoostStats,
   renderAbsolutePositioningStats,
   renderRelativePositioningStats,
+  renderWavedashStats,
   renderWhiffStats,
 } from "./stat-modules/renderers.ts";
 import {
@@ -145,4 +146,26 @@ test("whiff renderer shows counts and derives average closest approach", () => {
   assert.match(html, /Best closest.*72/s);
   assert.match(html, /Avg closest.*100/s);
   assert.match(html, /Since last.*1\.25s/s);
+});
+
+test("wavedash renderer shows quality counts and derives average quality", () => {
+  const wavedash = createPlayerStatsSnapshot({
+    wavedash: {
+      count: 2,
+      high_confidence_count: 1,
+      last_quality: 0.74,
+      best_quality: 0.86,
+      cumulative_quality: 1.5,
+      time_since_last_wavedash: 0.9,
+    },
+  }).wavedash;
+
+  const html = renderWavedashStats(wavedash);
+
+  assert.match(html, /Attempts.*2/s);
+  assert.match(html, /High conf.*1/s);
+  assert.match(html, /Last quality.*74%/s);
+  assert.match(html, /Avg quality.*75%/s);
+  assert.match(html, /Best quality.*86%/s);
+  assert.match(html, /Since last.*0\.90s/s);
 });

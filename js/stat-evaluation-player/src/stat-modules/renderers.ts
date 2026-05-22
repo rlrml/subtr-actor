@@ -153,6 +153,11 @@ function asNumber(value: unknown): number | undefined {
     : undefined;
 }
 
+function percentageFromUnit(value: unknown): number | undefined {
+  const number = asNumber(value);
+  return number === undefined ? undefined : number * 100;
+}
+
 function getPositioningTrackedTime(
   positioning: PlayerStatsSnapshot["positioning"] | undefined,
 ): number | undefined {
@@ -408,6 +413,25 @@ export function renderSpeedFlipStats(
     <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageQuality, 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(speedFlip?.best_quality), 0, "%")}</span></div>
     <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(speedFlip?.time_since_last_speed_flip), 2, "s")}</span></div>
+  `;
+}
+
+export function renderWavedashStats(
+  wavedash: PlayerStatsSnapshot["wavedash"] | undefined,
+): string {
+  const averageQuality = wavedash && wavedash.count > 0
+    ? wavedash.cumulative_quality / wavedash.count
+    : undefined;
+  const lastQualityPercent = percentageFromUnit(wavedash?.last_quality);
+  const averageQualityPercent = percentageFromUnit(averageQuality);
+  const bestQualityPercent = percentageFromUnit(wavedash?.best_quality);
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(wavedash?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(wavedash?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(lastQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(bestQualityPercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(wavedash?.time_since_last_wavedash), 2, "s")}</span></div>
   `;
 }
 

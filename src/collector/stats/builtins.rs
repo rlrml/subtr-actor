@@ -318,6 +318,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "rush",
         "touch",
         "whiff",
+        "wavedash",
         "speed_flip",
         "flick",
         "musty_flick",
@@ -417,6 +418,13 @@ pub(crate) fn builtin_module_json(
         }
         "whiff" => {
             let calculator = graph_state::<WhiffCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "wavedash" => {
+            let calculator = graph_state::<WavedashCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.events(),
@@ -594,6 +602,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "wavedash" => {
+            let calculator = graph_state::<WavedashCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "speed_flip" => {
             let calculator = graph_state::<SpeedFlipCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -709,8 +723,8 @@ pub(crate) fn builtin_snapshot_config_json(
             }))?)
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession"
-        | "touch" | "whiff" | "speed_flip" | "flick" | "musty_flick" | "dodge_reset"
-        | "ball_carry" | "boost" | "movement" | "powerslide" | "demo" => None,
+        | "touch" | "whiff" | "wavedash" | "speed_flip" | "flick" | "musty_flick"
+        | "dodge_reset" | "ball_carry" | "boost" | "movement" | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

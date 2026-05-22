@@ -13,6 +13,7 @@ import {
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
+  buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
@@ -586,6 +587,58 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
   ]);
 });
 
+test("buildWavedashTimelineEvents maps serialized wavedashes to their own timeline markers", () => {
+  const replay = {
+    frames: [
+      { time: 0 },
+      { time: 1.5 },
+      { time: 2.25 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    wavedash_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        dodge_time: 1.05,
+        dodge_frame: 0,
+        time_since_dodge: 0.15,
+        dodge_position: [0, 0, 70],
+        landing_position: [120, 0, 17],
+        start_speed: 700,
+        landing_speed: 1240,
+        horizontal_speed_gain: 540,
+        landing_uprightness: 0.92,
+        confidence: 0.81,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildWavedashTimelineEvents(statsTimeline, replay), [
+    {
+      id: "wavedash:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "wavedash",
+      label: "Blue wavedash 81% | +540uu/s",
+      shortLabel: "WD",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
 test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () => {
   const replay = {
     frames: [
@@ -732,6 +785,24 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         confidence: 0.88,
       },
     ],
+    wavedash_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        dodge_time: 1.0,
+        dodge_frame: 0,
+        time_since_dodge: 0.1,
+        dodge_position: [0, 0, 80],
+        landing_position: [100, 0, 17],
+        start_speed: 720,
+        landing_speed: 1260,
+        horizontal_speed_gain: 540,
+        landing_uprightness: 0.9,
+        confidence: 0.82,
+      },
+    ],
     whiff_events: [
       {
         time: 1.1,
@@ -862,11 +933,12 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "ball-carry",
         "powerslide",
         "speed-flip",
+        "wavedash",
         "whiff",
       ],
       replay,
       statsTimeline,
     ),
-    13,
+    14,
   );
 });

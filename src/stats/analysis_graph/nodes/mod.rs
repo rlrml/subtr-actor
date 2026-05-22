@@ -6,7 +6,8 @@ use crate::stats::calculators::{
     FrameInfo, GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator,
     MustyFlickCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
     PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState, WhiffCalculator,
+    RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState, WavedashCalculator,
+    WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -42,6 +43,7 @@ pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
 pub(crate) mod touch;
 pub(crate) mod touch_state;
+pub(crate) mod wavedash;
 pub(crate) mod whiff;
 
 #[allow(unused_imports)]
@@ -110,6 +112,8 @@ pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
+#[allow(unused_imports)]
+pub use wavedash::WavedashNode;
 #[allow(unused_imports)]
 pub use whiff::WhiffNode;
 
@@ -207,6 +211,10 @@ pub(crate) fn touch_dependency() -> AnalysisDependency {
 
 pub(crate) fn whiff_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<WhiffCalculator>(whiff::boxed_default)
+}
+
+pub(crate) fn wavedash_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<WavedashCalculator>(wavedash::boxed_default)
 }
 
 pub(crate) fn speed_flip_dependency() -> AnalysisDependency {

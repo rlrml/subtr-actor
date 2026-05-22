@@ -16,6 +16,7 @@ import type { PowerslideStats } from "./PowerslideStats.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { SpeedFlipStats } from "./SpeedFlipStats.ts";
 import type { TouchStats } from "./TouchStats.ts";
+import type { WavedashStats } from "./WavedashStats.ts";
 import type { WhiffStats } from "./WhiffStats.ts";
 
-export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, boost: BoostStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };
+export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, wavedash: WavedashStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, boost: BoostStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };

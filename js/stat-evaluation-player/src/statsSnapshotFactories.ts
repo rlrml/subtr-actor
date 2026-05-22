@@ -261,6 +261,18 @@ export function createPlayerStatsSnapshot(
       best_quality: 0,
       cumulative_quality: 0,
     },
+    wavedash: {
+      count: 0,
+      high_confidence_count: 0,
+      is_last_wavedash: false,
+      last_wavedash_time: null,
+      last_wavedash_frame: null,
+      time_since_last_wavedash: null,
+      frames_since_last_wavedash: null,
+      last_quality: null,
+      best_quality: 0,
+      cumulative_quality: 0,
+    },
     touch: {
       touch_count: 0,
       dribble_touch_count: 0,

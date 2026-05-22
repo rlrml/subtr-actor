@@ -19,6 +19,7 @@ import {
   createPowerslideModule,
   createSpeedFlipModule,
   createTouchModule,
+  createWavedashModule,
   createWhiffModule,
 } from "./playerModules.ts";
 import {
@@ -63,6 +64,7 @@ export function createStatModules(
     createRelativePositioningModule(),
     createAbsolutePositioningModule(),
     createSpeedFlipModule(),
+    createWavedashModule(),
     createTouchModule(runtime),
     createWhiffModule(),
     createFlickModule(),

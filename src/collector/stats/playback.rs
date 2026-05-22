@@ -186,6 +186,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_speed_flip_event,
             )?,
+            wavedash: self.module_player_events("wavedash", "events", parse_wavedash_event)?,
             whiff: self.module_player_events("whiff", "events", parse_whiff_event)?,
             boost_pickups: self.module_player_events(
                 "boost",
@@ -221,6 +222,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "speed_flip".to_owned(),
             Value::Array(self.module_array("speed_flip", "events")),
+        );
+        events.insert(
+            "wavedash".to_owned(),
+            Value::Array(self.module_array("wavedash", "events")),
         );
         events.insert(
             "whiff".to_owned(),
@@ -498,6 +503,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "speed_flip",
                 &player_key,
             )?,
+            wavedash: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "wavedash",
+                &player_key,
+            )?,
             touch: if frame.modules.contains_key("touch") {
                 self.frame_player_stat_or_default_with_by_key(frame, "touch", &player_key, || {
                     TouchStats::default().with_complete_labeled_touch_counts()
@@ -691,6 +701,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<SpeedFlipStats>(
                 frame,
                 "speed_flip",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "wavedash".to_owned(),
+            self.frame_player_stat_or_default_by_key::<WavedashStats>(
+                frame,
+                "wavedash",
                 &player_key,
             )?,
         );
@@ -1266,6 +1284,26 @@ fn parse_speed_flip_event(value: &Value) -> SubtrActorResult<SpeedFlipEvent> {
         diagonal_score: json_required_f32(object, "diagonal_score")?,
         cancel_score: json_required_f32(object, "cancel_score")?,
         speed_score: json_required_f32(object, "speed_score")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_wavedash_event(value: &Value) -> SubtrActorResult<WavedashEvent> {
+    let object = json_object(value, "wavedash event")?;
+    Ok(WavedashEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        dodge_time: json_required_f32(object, "dodge_time")?,
+        dodge_frame: json_required_usize(object, "dodge_frame")?,
+        time_since_dodge: json_required_f32(object, "time_since_dodge")?,
+        dodge_position: json_required_vec3(object, "dodge_position")?,
+        landing_position: json_required_vec3(object, "landing_position")?,
+        start_speed: json_required_f32(object, "start_speed")?,
+        landing_speed: json_required_f32(object, "landing_speed")?,
+        horizontal_speed_gain: json_required_f32(object, "horizontal_speed_gain")?,
+        landing_uprightness: json_required_f32(object, "landing_uprightness")?,
         confidence: json_required_f32(object, "confidence")?,
     })
 }

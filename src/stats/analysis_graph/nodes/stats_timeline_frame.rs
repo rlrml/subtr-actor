@@ -147,6 +147,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            wavedash: ctx
+                .get::<WavedashCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             touch: ctx
                 .get::<TouchCalculator>()?
                 .player_stats()
@@ -250,6 +256,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             rush_dependency(),
             touch_dependency(),
             whiff_dependency(),
+            wavedash_dependency(),
             speed_flip_dependency(),
             flick_dependency(),
             musty_flick_dependency(),

@@ -390,6 +390,32 @@ export function buildSpeedFlipTimelineEvents(
   });
 }
 
+export function buildWavedashTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.wavedash.map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const qualityPercent = Math.round(event.confidence * 100);
+    const speedGain = Math.round(event.horizontal_speed_gain);
+
+    return {
+      id: `wavedash:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "wavedash",
+      label: `${playerName} wavedash ${qualityPercent}% | +${speedGain}uu/s`,
+      shortLabel: "WD",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 function getWhiffShortLabel(
   event: StatsTimeline["events"]["whiff"][number],
 ): string {
@@ -488,6 +514,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("speed-flip")) {
     count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("wavedash")) {
+    count += buildWavedashTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("whiff")) {
