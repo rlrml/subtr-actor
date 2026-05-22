@@ -762,6 +762,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "air_dribble" => {
+            let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_air_dribble_stats(),
+                team_one: calculator.team_one_air_dribble_stats(),
+                player_stats: player_stats_entries(calculator.player_air_dribble_stats()),
+            })?
+        }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {

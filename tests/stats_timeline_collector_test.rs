@@ -318,6 +318,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         },
         events: ReplayStatsTimelineEvents {
             timeline: Vec::new(),
+            mechanics: Vec::new(),
             goal_context: Vec::new(),
             backboard: Vec::new(),
             ceiling_shot: Vec::new(),
@@ -328,6 +329,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             goal_tags: Vec::new(),
             rush: Vec::new(),
             speed_flip: Vec::new(),
+            half_flip: Vec::new(),
             wavedash: Vec::new(),
             whiff: Vec::new(),
             boost_pickups: Vec::new(),

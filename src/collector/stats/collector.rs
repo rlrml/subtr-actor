@@ -104,6 +104,13 @@ impl BuiltinModuleSelection {
             if let Some(snapshot) = builtin_snapshot_frame_json(module_name, graph, replay_meta)? {
                 modules.insert(module_name.to_owned(), snapshot);
             }
+            if module_name == "ball_carry" {
+                if let Some(snapshot) =
+                    builtin_snapshot_frame_json("air_dribble", graph, replay_meta)?
+                {
+                    modules.insert("air_dribble".to_owned(), snapshot);
+                }
+            }
         }
         Ok(modules)
     }
