@@ -66,6 +66,14 @@ function formatInteger(value: number | undefined): string {
   return `${Math.round(value)}`;
 }
 
+function formatNumber(value: number | undefined, digits = 0, suffix = ""): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return "?";
+  }
+
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -208,6 +216,9 @@ export function renderTouchStats(
 
   return `
     ${renderStatRow("Touches", formatInteger(touch?.touch_count))}
+    ${renderStatRow("Ball advanced", formatNumber(touch?.total_ball_advance_distance, 0, " uu"))}
+    ${renderStatRow("Ball traveled", formatNumber(touch?.total_ball_travel_distance, 0, " uu"))}
+    ${renderStatRow("Ball retreated", formatNumber(touch?.total_ball_retreat_distance, 0, " uu"))}
     ${breakdownRows}
   `;
 }

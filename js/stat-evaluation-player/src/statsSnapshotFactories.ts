@@ -277,6 +277,9 @@ export function createPlayerStatsSnapshot(
       last_ball_speed_change: null,
       max_ball_speed_change: 0,
       cumulative_ball_speed_change: 0,
+      total_ball_travel_distance: 0,
+      total_ball_advance_distance: 0,
+      total_ball_retreat_distance: 0,
       labeled_touch_counts: { entries: [] },
     },
     whiff: {

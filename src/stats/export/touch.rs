@@ -113,6 +113,24 @@ impl StatFieldProvider for TouchStats {
             StatUnit::UnrealUnitsPerSecond,
             self.max_ball_speed_change,
         ));
+        visitor(ExportedStat::float(
+            "touch",
+            "total_ball_travel_distance",
+            StatUnit::UnrealUnits,
+            self.total_ball_travel_distance,
+        ));
+        visitor(ExportedStat::float(
+            "touch",
+            "total_ball_advance_distance",
+            StatUnit::UnrealUnits,
+            self.total_ball_advance_distance,
+        ));
+        visitor(ExportedStat::float(
+            "touch",
+            "total_ball_retreat_distance",
+            StatUnit::UnrealUnits,
+            self.total_ball_retreat_distance,
+        ));
     }
 }
 

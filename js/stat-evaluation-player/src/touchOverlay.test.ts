@@ -115,8 +115,103 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
       playerId: "Steam:blue-id",
       playerName: "Blue",
       position: { x: 100, y: -250, z: 320 },
+      endPosition: { x: 100, y: -250, z: 320 },
+      totalBallAdvanceDistance: 0,
+      totalBallRetreatDistance: 0,
+      totalBallTravelDistance: 0,
     },
   ]);
+});
+
+test("buildTouchMarkers assigns credited ball movement to the active touch marker", () => {
+  const replay = {
+    ballFrames: [
+      { position: { x: 0, y: 0, z: 92 } },
+      { position: { x: 0, y: 100, z: 92 } },
+      { position: { x: 40, y: 170, z: 92 } },
+    ],
+    frames: [
+      { time: 0 },
+      { time: 1 },
+      { time: 2 },
+    ],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    frames: [
+      {
+        frame_number: 0,
+        time: 0,
+        dt: 0.1,
+        players: [
+          createPlayerStatsSnapshot({
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            touch: {
+              touch_count: 1,
+              is_last_touch: true,
+              last_touch_time: 0,
+              last_touch_frame: 0,
+            },
+          }),
+        ],
+      },
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 0.1,
+        players: [
+          createPlayerStatsSnapshot({
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            touch: {
+              touch_count: 1,
+              is_last_touch: true,
+              last_touch_time: 0,
+              last_touch_frame: 0,
+              total_ball_travel_distance: 100,
+              total_ball_advance_distance: 100,
+            },
+          }),
+        ],
+      },
+      {
+        frame_number: 2,
+        time: 2,
+        dt: 0.1,
+        players: [
+          createPlayerStatsSnapshot({
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            touch: {
+              touch_count: 1,
+              is_last_touch: true,
+              last_touch_time: 0,
+              last_touch_frame: 0,
+              total_ball_travel_distance: 180,
+              total_ball_advance_distance: 170,
+              total_ball_retreat_distance: 0,
+            },
+          }),
+        ],
+      },
+    ],
+  });
+
+  const [marker] = buildTouchMarkers(statsTimeline, replay);
+  assert.equal(marker?.totalBallTravelDistance, 180);
+  assert.equal(marker?.totalBallAdvanceDistance, 170);
+  assert.equal(marker?.totalBallRetreatDistance, 0);
+  assert.deepEqual(marker?.endPosition, { x: 40, y: 170, z: 92 });
 });
 
 test("buildTouchMarkers uses normalized replay frame time instead of raw stats time", () => {
@@ -173,6 +268,10 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       playerId: "Steam:blue-id",
       playerName: "Blue",
       position: { x: 0, y: 0, z: 0 },
+      endPosition: { x: 0, y: 0, z: 0 },
+      totalBallAdvanceDistance: 0,
+      totalBallRetreatDistance: 0,
+      totalBallTravelDistance: 0,
     },
     {
       id: "touch:2",
@@ -182,6 +281,10 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       playerId: "Steam:orange-id",
       playerName: "Orange",
       position: { x: 0, y: 0, z: 0 },
+      endPosition: { x: 0, y: 0, z: 0 },
+      totalBallAdvanceDistance: 0,
+      totalBallRetreatDistance: 0,
+      totalBallTravelDistance: 0,
     },
   ];
 

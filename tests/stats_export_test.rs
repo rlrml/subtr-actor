@@ -347,6 +347,9 @@ fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
         last_ball_speed_change: Some(420.0),
         max_ball_speed_change: 960.0,
         cumulative_ball_speed_change: 2_100.0,
+        total_ball_travel_distance: 1_000.0,
+        total_ball_advance_distance: 650.0,
+        total_ball_retreat_distance: 150.0,
         ..TouchStats::default()
     };
 
@@ -393,5 +396,17 @@ fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
     assert_eq!(
         find_field(&fields, "touch", "max_ball_speed_change").value,
         StatValue::Float(960.0)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "total_ball_travel_distance").value,
+        StatValue::Float(1_000.0)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "total_ball_advance_distance").value,
+        StatValue::Float(650.0)
+    );
+    assert_eq!(
+        find_field(&fields, "touch", "total_ball_retreat_distance").value,
+        StatValue::Float(150.0)
     );
 }

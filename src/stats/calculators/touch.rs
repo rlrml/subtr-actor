@@ -60,6 +60,12 @@ pub struct TouchStats {
     pub last_ball_speed_change: Option<f32>,
     pub max_ball_speed_change: f32,
     pub cumulative_ball_speed_change: f32,
+    #[serde(default)]
+    pub total_ball_travel_distance: f32,
+    #[serde(default)]
+    pub total_ball_advance_distance: f32,
+    #[serde(default)]
+    pub total_ball_retreat_distance: f32,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_touch_counts: LabeledCounts,
 }
@@ -108,6 +114,7 @@ pub struct TouchCalculator {
     player_stats: HashMap<PlayerId, TouchStats>,
     current_last_touch_player: Option<PlayerId>,
     previous_ball_velocity: Option<glam::Vec3>,
+    previous_ball_position: Option<glam::Vec3>,
 }
 
 impl TouchCalculator {
@@ -233,22 +240,71 @@ impl TouchCalculator {
         }
     }
 
+    fn credit_ball_movement(
+        &mut self,
+        ball: &BallFrameState,
+        possession_state: &PossessionState,
+        live_play: bool,
+    ) {
+        let current_ball_position = ball.position();
+        if !live_play {
+            self.previous_ball_position = current_ball_position;
+            return;
+        }
+
+        let Some(current_ball_position) = current_ball_position else {
+            self.previous_ball_position = None;
+            return;
+        };
+        let Some(previous_ball_position) = self.previous_ball_position else {
+            self.previous_ball_position = Some(current_ball_position);
+            return;
+        };
+        self.previous_ball_position = Some(current_ball_position);
+
+        let (Some(player_id), Some(team_is_team_0)) = (
+            possession_state.active_player_before_sample.as_ref(),
+            possession_state.active_team_before_sample,
+        ) else {
+            return;
+        };
+
+        let delta = current_ball_position - previous_ball_position;
+        let travel_distance = delta.length();
+        if travel_distance <= f32::EPSILON {
+            return;
+        }
+
+        let team_forward_sign = if team_is_team_0 { 1.0 } else { -1.0 };
+        let advance_distance = delta.y * team_forward_sign;
+        let stats = self.player_stats.entry(player_id.clone()).or_default();
+        stats.total_ball_travel_distance += travel_distance;
+        if advance_distance >= 0.0 {
+            stats.total_ball_advance_distance += advance_distance;
+        } else {
+            stats.total_ball_retreat_distance += -advance_distance;
+        }
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         vertical_state: &PlayerVerticalState,
         touch_state: &TouchState,
+        possession_state: &PossessionState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         if !live_play {
             self.current_last_touch_player = None;
             self.previous_ball_velocity = ball.velocity();
+            self.previous_ball_position = ball.position();
             return Ok(());
         }
 
         self.begin_sample(frame);
         self.apply_touch_events(frame, ball, vertical_state, &touch_state.touch_events);
+        self.credit_ball_movement(ball, possession_state, live_play);
         self.previous_ball_velocity = ball.velocity();
 
         if let Some(player_id) = touch_state.last_touch_player.as_ref() {
@@ -264,3 +320,7 @@ impl TouchCalculator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "touch_tests.rs"]
+mod tests;

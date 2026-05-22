@@ -14,6 +14,10 @@ const TOUCH_RING_OUTER_RADIUS = 196;
 const TOUCH_RING_HEIGHT = 24;
 const TOUCH_LABEL_HEIGHT = 210;
 const DEFAULT_DECAY_SECONDS = 5;
+const TOUCH_CREDIT_EPSILON = 0.1;
+const ADVANCEMENT_ARROW_MIN_LENGTH = 48;
+
+export type TouchOverlayMode = "markers" | "advancement";
 
 export interface TouchMarker {
   id: string;
@@ -27,13 +31,29 @@ export interface TouchMarker {
     y: number;
     z: number;
   };
+  endPosition: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  totalBallTravelDistance: number;
+  totalBallAdvanceDistance: number;
+  totalBallRetreatDistance: number;
 }
 
 interface TouchMarkerView {
   marker: TouchMarker;
   ring: THREE.Mesh;
   material: THREE.MeshBasicMaterial;
+  arrow: THREE.ArrowHelper;
   label: HTMLDivElement;
+}
+
+interface PlayerTouchSnapshot {
+  touchCount: number;
+  totalBallTravelDistance: number;
+  totalBallAdvanceDistance: number;
+  totalBallRetreatDistance: number;
 }
 
 export function getLastTouchPlayer(statsFrame: StatsFrame): PlayerStatsSnapshot | null {
@@ -46,22 +66,92 @@ export function playerIdToString(playerId: Record<string, unknown>): string {
   return `${kind}:${normalizedValue}`;
 }
 
+function touchSnapshot(player: PlayerStatsSnapshot): PlayerTouchSnapshot {
+  return {
+    touchCount: player.touch?.touch_count ?? 0,
+    totalBallTravelDistance: player.touch?.total_ball_travel_distance ?? 0,
+    totalBallAdvanceDistance: player.touch?.total_ball_advance_distance ?? 0,
+    totalBallRetreatDistance: player.touch?.total_ball_retreat_distance ?? 0,
+  };
+}
+
+function positiveDelta(current: number, previous: number): number {
+  return Math.max(0, current - previous);
+}
+
+function touchCreditLabel(marker: TouchMarker, mode: TouchOverlayMode): string {
+  if (mode === "markers") {
+    return marker.playerName;
+  }
+
+  const advance = Math.round(marker.totalBallAdvanceDistance);
+  const retreat = Math.round(marker.totalBallRetreatDistance);
+  if (advance > 0 && retreat > 0) {
+    return `${marker.playerName} +${advance} / -${retreat} uu`;
+  }
+  if (retreat > 0) {
+    return `${marker.playerName} -${retreat} uu`;
+  }
+  return `${marker.playerName} +${advance} uu`;
+}
+
 export function buildTouchMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): TouchMarker[] {
-  const previousTouchCounts = new Map<string, number>();
+  const previousSnapshots = new Map<string, PlayerTouchSnapshot>();
+  const activeMarkerByPlayer = new Map<string, number>();
   const markers: TouchMarker[] = [];
 
   for (const statsFrame of statsTimeline.frames) {
+    const frameBallPosition = replay.ballFrames[statsFrame.frame_number]?.position;
+
     for (const player of statsFrame.players) {
       const playerId = playerIdToString(player.player_id);
-      const touchCount = player.touch?.touch_count ?? 0;
-      const previousTouchCount = previousTouchCounts.get(playerId) ?? 0;
-      previousTouchCounts.set(playerId, touchCount);
+      const snapshot = touchSnapshot(player);
+      const previousSnapshot = previousSnapshots.get(playerId) ?? {
+        touchCount: 0,
+        totalBallTravelDistance: 0,
+        totalBallAdvanceDistance: 0,
+        totalBallRetreatDistance: 0,
+      };
 
-      const delta = Math.max(0, touchCount - previousTouchCount);
+      const activeMarkerIndex = activeMarkerByPlayer.get(playerId);
+      const travelDelta = positiveDelta(
+        snapshot.totalBallTravelDistance,
+        previousSnapshot.totalBallTravelDistance,
+      );
+      const advanceDelta = positiveDelta(
+        snapshot.totalBallAdvanceDistance,
+        previousSnapshot.totalBallAdvanceDistance,
+      );
+      const retreatDelta = positiveDelta(
+        snapshot.totalBallRetreatDistance,
+        previousSnapshot.totalBallRetreatDistance,
+      );
+      if (
+        activeMarkerIndex !== undefined &&
+        frameBallPosition &&
+        (travelDelta > TOUCH_CREDIT_EPSILON ||
+          advanceDelta > TOUCH_CREDIT_EPSILON ||
+          retreatDelta > TOUCH_CREDIT_EPSILON)
+      ) {
+        const activeMarker = markers[activeMarkerIndex];
+        if (activeMarker) {
+          activeMarker.totalBallTravelDistance += travelDelta;
+          activeMarker.totalBallAdvanceDistance += advanceDelta;
+          activeMarker.totalBallRetreatDistance += retreatDelta;
+          activeMarker.endPosition = {
+            x: frameBallPosition.x,
+            y: frameBallPosition.y,
+            z: frameBallPosition.z,
+          };
+        }
+      }
+
+      const delta = Math.max(0, snapshot.touchCount - previousSnapshot.touchCount);
       if (delta === 0) {
+        previousSnapshots.set(playerId, snapshot);
         continue;
       }
 
@@ -71,12 +161,14 @@ export function buildTouchMarkers(
         ?? statsFrame.time;
       const ballPosition = replay.ballFrames[touchFrame]?.position;
       if (!ballPosition) {
+        previousSnapshots.set(playerId, snapshot);
         continue;
       }
 
       for (let offset = 0; offset < delta; offset += 1) {
+        const markerIndex = markers.length;
         markers.push({
-          id: `touch-stat:${touchFrame}:${playerId}:${touchCount - delta + offset + 1}`,
+          id: `touch-stat:${touchFrame}:${playerId}:${snapshot.touchCount - delta + offset + 1}`,
           time: touchTime,
           frame: touchFrame,
           isTeamZero: player.is_team_0,
@@ -87,8 +179,19 @@ export function buildTouchMarkers(
             y: ballPosition.y,
             z: ballPosition.z,
           },
+          endPosition: {
+            x: ballPosition.x,
+            y: ballPosition.y,
+            z: ballPosition.z,
+          },
+          totalBallTravelDistance: 0,
+          totalBallAdvanceDistance: 0,
+          totalBallRetreatDistance: 0,
         });
+        activeMarkerByPlayer.set(playerId, markerIndex);
       }
+
+      previousSnapshots.set(playerId, snapshot);
     }
   }
 
@@ -142,6 +245,11 @@ function ensureStyles(): void {
       will-change: transform, opacity;
     }
 
+    .sap-touch-overlay-label-advancement {
+      min-width: 4.8rem;
+      text-align: center;
+    }
+
     .sap-touch-overlay-label-blue {
       border-color: rgba(89, 195, 255, 0.5);
       background: rgba(17, 47, 73, 0.84);
@@ -179,6 +287,30 @@ function projectToContainer(
   return true;
 }
 
+function arrowMaterials(arrow: THREE.ArrowHelper): THREE.Material[] {
+  return [arrow.line.material, arrow.cone.material].flatMap((material) =>
+    Array.isArray(material) ? material : [material]
+  );
+}
+
+function setArrowOpacity(arrow: THREE.ArrowHelper, opacity: number): void {
+  for (const material of arrowMaterials(arrow)) {
+    material.transparent = true;
+    material.opacity = opacity;
+    material.depthWrite = false;
+    material.depthTest = false;
+  }
+}
+
+function disposeArrow(arrow: THREE.ArrowHelper): void {
+  arrow.removeFromParent();
+  arrow.line.geometry.dispose();
+  arrow.cone.geometry.dispose();
+  for (const material of arrowMaterials(arrow)) {
+    material.dispose();
+  }
+}
+
 export class TouchEventOverlay {
   private readonly scene: ReplayScene;
   private readonly container: HTMLElement;
@@ -186,12 +318,16 @@ export class TouchEventOverlay {
   private readonly labelRoot: HTMLDivElement;
   private readonly projectedPosition = new THREE.Vector3();
   private readonly worldPosition = new THREE.Vector3();
+  private readonly arrowStart = new THREE.Vector3();
+  private readonly arrowEnd = new THREE.Vector3();
+  private readonly arrowDirection = new THREE.Vector3();
   private readonly labelOffset = new THREE.Vector3(0, 0, TOUCH_LABEL_HEIGHT);
   private readonly markers: TouchMarker[];
   private readonly views = new Map<string, TouchMarkerView>();
   private changedContainerPosition = false;
   private originalContainerPosition = "";
   private decaySeconds = DEFAULT_DECAY_SECONDS;
+  private mode: TouchOverlayMode = "markers";
 
   constructor(
     scene: ReplayScene,
@@ -200,12 +336,14 @@ export class TouchEventOverlay {
     statsTimeline: StatsTimeline,
     options?: {
       decaySeconds?: number;
+      mode?: TouchOverlayMode;
     },
   ) {
     ensureStyles();
     this.scene = scene;
     this.container = container;
     this.decaySeconds = Math.max(0.1, options?.decaySeconds ?? DEFAULT_DECAY_SECONDS);
+    this.mode = options?.mode ?? "markers";
     this.labelOffset.set(0, 0, TOUCH_LABEL_HEIGHT);
     this.markers = buildTouchMarkers(statsTimeline, replay);
 
@@ -231,6 +369,14 @@ export class TouchEventOverlay {
     this.decaySeconds = Math.max(0.1, value);
   }
 
+  getMode(): TouchOverlayMode {
+    return this.mode;
+  }
+
+  setMode(mode: TouchOverlayMode): void {
+    this.mode = mode;
+  }
+
   update(currentTime: number): void {
     const visibleMarkers = getVisibleTouchMarkers(
       this.markers,
@@ -246,6 +392,7 @@ export class TouchEventOverlay {
       view.ring.removeFromParent();
       view.ring.geometry.dispose();
       view.material.dispose();
+      disposeArrow(view.arrow);
       view.label.remove();
       this.views.delete(id);
     }
@@ -264,6 +411,13 @@ export class TouchEventOverlay {
         marker.position.z + TOUCH_RING_HEIGHT,
       );
       view.ring.scale.setScalar(scale);
+      view.label.textContent = touchCreditLabel(marker, this.mode);
+      view.label.classList.toggle(
+        "sap-touch-overlay-label-advancement",
+        this.mode === "advancement",
+      );
+
+      this.updateArrow(view, marker, baseOpacity);
 
       this.worldPosition.set(
         marker.position.x,
@@ -297,6 +451,7 @@ export class TouchEventOverlay {
       view.ring.removeFromParent();
       view.ring.geometry.dispose();
       view.material.dispose();
+      disposeArrow(view.arrow);
       view.label.remove();
     }
     this.views.clear();
@@ -330,6 +485,21 @@ export class TouchEventOverlay {
     ring.renderOrder = 40;
     this.group.add(ring);
 
+    const arrow = new THREE.ArrowHelper(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(),
+      1,
+      marker.isTeamZero ? BLUE_TOUCH_COLOR : ORANGE_TOUCH_COLOR,
+      1,
+      1,
+    );
+    arrow.visible = false;
+    arrow.renderOrder = 45;
+    arrow.line.renderOrder = 45;
+    arrow.cone.renderOrder = 45;
+    setArrowOpacity(arrow, 0.7);
+    this.group.add(arrow);
+
     const label = document.createElement("div");
     label.className = `sap-touch-overlay-label ${
       marker.isTeamZero ? "sap-touch-overlay-label-blue" : "sap-touch-overlay-label-orange"
@@ -342,9 +512,52 @@ export class TouchEventOverlay {
       marker,
       ring,
       material,
+      arrow,
       label,
     };
     this.views.set(marker.id, view);
     return view;
+  }
+
+  private updateArrow(
+    view: TouchMarkerView,
+    marker: TouchMarker,
+    opacity: number,
+  ): void {
+    if (
+      this.mode !== "advancement" ||
+      marker.totalBallTravelDistance <= TOUCH_CREDIT_EPSILON
+    ) {
+      view.arrow.visible = false;
+      return;
+    }
+
+    this.arrowStart.set(
+      marker.position.x,
+      marker.position.y,
+      marker.position.z + TOUCH_RING_HEIGHT * 2,
+    );
+    this.arrowEnd.set(
+      marker.endPosition.x,
+      marker.endPosition.y,
+      marker.endPosition.z + TOUCH_RING_HEIGHT * 2,
+    );
+    this.arrowDirection.copy(this.arrowEnd).sub(this.arrowStart);
+    const length = this.arrowDirection.length();
+    if (length < ADVANCEMENT_ARROW_MIN_LENGTH) {
+      view.arrow.visible = false;
+      return;
+    }
+
+    this.arrowDirection.normalize();
+    view.arrow.visible = true;
+    view.arrow.position.copy(this.arrowStart);
+    view.arrow.setDirection(this.arrowDirection);
+    view.arrow.setLength(
+      length,
+      Math.min(140, Math.max(42, length * 0.18)),
+      Math.min(86, Math.max(24, length * 0.1)),
+    );
+    setArrowOpacity(view.arrow, Math.min(0.86, opacity + 0.12));
   }
 }

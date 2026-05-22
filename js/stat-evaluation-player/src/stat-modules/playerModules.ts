@@ -4,6 +4,7 @@ import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
+import type { TouchOverlayMode } from "../touchOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import { createBoostPickupFilterController } from "../boostPickupFilters.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
@@ -373,8 +374,10 @@ export function createSpeedFlipModule(): StatModule {
 export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlay: TouchEventOverlay | null = null;
   let decaySeconds = 5;
+  let overlayMode: TouchOverlayMode = "markers";
   let settingsEl: HTMLDivElement | null = null;
   let decayReadoutEl: HTMLElement | null = null;
+  let overlayModeReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
   const orderedBreakdownClasses: TouchBreakdownClass[] = [
@@ -392,6 +395,9 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         ctx.player.container,
         ctx.replay,
         ctx.statsTimeline,
+        {
+          mode: overlayMode,
+        },
       );
       overlay.setDecaySeconds(decaySeconds);
       syncTouchSettingsUi();
@@ -413,6 +419,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     getConfig() {
       return {
         decaySeconds,
+        overlayMode,
         breakdownClasses: getActiveBreakdownClasses(),
       };
     },
@@ -424,6 +431,13 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
           Number.isFinite(record.decaySeconds)) {
           decaySeconds = Math.max(1, Math.min(10, record.decaySeconds));
           overlay?.setDecaySeconds(decaySeconds);
+        }
+        if (
+          record.overlayMode === "markers" ||
+          record.overlayMode === "advancement"
+        ) {
+          overlayMode = record.overlayMode;
+          overlay?.setMode(overlayMode);
         }
         activeBreakdownClasses.clear();
         if (Array.isArray(record.breakdownClasses)) {
@@ -508,6 +522,55 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         });
 
         label.append(labelText, input);
+
+        const modeSection = document.createElement("div");
+        modeSection.className = "module-settings-subgroup";
+
+        const modeHeader = document.createElement("div");
+        modeHeader.className = "module-settings-header";
+
+        const modeText = document.createElement("div");
+        const modeEyebrow = document.createElement("p");
+        modeEyebrow.className = "module-settings-eyebrow";
+        modeEyebrow.textContent = "Overlay";
+        const modeTitle = document.createElement("h3");
+        modeTitle.textContent = "Touch mode";
+        modeText.append(modeEyebrow, modeTitle);
+
+        overlayModeReadoutEl = document.createElement("strong");
+        overlayModeReadoutEl.className = "metric-readout";
+        modeHeader.append(modeText, overlayModeReadoutEl);
+
+        const modeOptions = document.createElement("div");
+        modeOptions.className = "module-settings-options";
+        for (const option of [
+          { mode: "markers", label: "Markers" },
+          { mode: "advancement", label: "Advancement" },
+        ] satisfies Array<{ mode: TouchOverlayMode; label: string }>) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "toggle";
+
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "touch-overlay-mode";
+          radio.dataset.overlayMode = option.mode;
+          radio.addEventListener("change", () => {
+            if (!radio.checked) {
+              return;
+            }
+            overlayMode = option.mode;
+            overlay?.setMode(overlayMode);
+            syncTouchSettingsUi();
+            runtime.requestConfigSync?.();
+          });
+
+          const optionText = document.createElement("span");
+          optionText.textContent = option.label;
+          optionLabel.append(radio, optionText);
+          modeOptions.append(optionLabel);
+        }
+        modeSection.append(modeHeader, modeOptions);
+
         const breakdownSection = document.createElement("div");
         breakdownSection.className = "module-settings-subgroup";
 
@@ -557,7 +620,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         }
 
         breakdownSection.append(breakdownHeader, breakdownOptions);
-        settingsEl.append(header, label, breakdownSection);
+        settingsEl.append(header, label, modeSection, breakdownSection);
       }
 
       syncTouchSettingsUi();
@@ -577,6 +640,15 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     }
     if (decayReadoutEl) {
       decayReadoutEl.textContent = `${value.toFixed(1)}s`;
+    }
+    for (const radio of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-overlay-mode]",
+    )) {
+      radio.checked = radio.dataset.overlayMode === overlayMode;
+    }
+    if (overlayModeReadoutEl) {
+      overlayModeReadoutEl.textContent =
+        overlayMode === "advancement" ? "Advancement" : "Markers";
     }
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
       "input[data-breakdown-class]",

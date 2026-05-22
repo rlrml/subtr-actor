@@ -56,9 +56,15 @@ test("renderTouchStats defaults to total touches when no classes are selected", 
   const html = renderTouchStats(createTouchStats({
     touch_count: 1,
     is_last_touch: false,
+    total_ball_advance_distance: 150,
+    total_ball_travel_distance: 240,
+    total_ball_retreat_distance: 30,
   }));
 
   assert.match(html, /Touches<\/span><span class="value">1/);
+  assert.match(html, /Ball advanced<\/span><span class="value">150 uu/);
+  assert.match(html, /Ball traveled<\/span><span class="value">240 uu/);
+  assert.match(html, /Ball retreated<\/span><span class="value">30 uu/);
   assert.doesNotMatch(html, /Dribble<\/span>/);
   assert.doesNotMatch(html, /Ground<\/span>/);
 });
