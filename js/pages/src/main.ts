@@ -741,28 +741,25 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
     ),
     renderChartCard(
       "Field half pressure",
-      renderStackedRows(
-        [{
-          label: "Ball territory",
-          segments: [
-            {
-              label: "Blue half",
-              value: finalFrame.team_zero.pressure.defensive_half_time,
-              color: TEAM_COLORS[0]!,
-            },
-            {
-              label: "Neutral",
-              value: finalFrame.team_zero.pressure.neutral_time,
-              color: "#65d6ad",
-            },
-            {
-              label: "Orange half",
-              value: finalFrame.team_zero.pressure.offensive_half_time,
-              color: TEAM_COLORS[1]!,
-            },
-          ],
-        }],
-        formatShare,
+      renderPieChartRows(
+        [
+          {
+            label: "Blue half",
+            value: finalFrame.team_zero.pressure.defensive_half_time,
+            color: TEAM_COLORS[0]!,
+          },
+          {
+            label: "Neutral",
+            value: finalFrame.team_zero.pressure.neutral_time,
+            color: "#65d6ad",
+          },
+          {
+            label: "Orange half",
+            value: finalFrame.team_zero.pressure.offensive_half_time,
+            color: TEAM_COLORS[1]!,
+          },
+        ],
+        formatSeconds,
       ),
     ),
     renderChartCard(
