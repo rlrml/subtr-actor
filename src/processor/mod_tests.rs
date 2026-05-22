@@ -1,0 +1,41 @@
+use super::ReplayProcessor;
+
+#[test]
+fn rigid_body_normalization_factors_split_at_expected_legacy_boundary() {
+    assert_eq!(
+        ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(None),
+        100.0
+    );
+    assert_eq!(
+        ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(None),
+        10.0
+    );
+    assert_eq!(
+        ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(2)),
+        100.0
+    );
+    assert_eq!(
+        ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(2)),
+        10.0
+    );
+    assert!(ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(2)));
+    assert_eq!(
+        ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(5)),
+        1.0
+    );
+    assert_eq!(
+        ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(5)),
+        1.0
+    );
+    assert!(ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(5)));
+    assert_eq!(
+        ReplayProcessor::rigid_body_location_normalization_factor_for_net_version(Some(10)),
+        1.0
+    );
+    assert_eq!(
+        ReplayProcessor::rigid_body_velocity_normalization_factor_for_net_version(Some(10)),
+        1.0
+    );
+    assert!(!ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(7)));
+    assert!(!ReplayProcessor::uses_legacy_rigid_body_rotation_for_net_version(Some(10)));
+}

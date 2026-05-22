@@ -29,6 +29,9 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 
 - Treat the Rust crate as the source of truth. Binding changes in `python/` and
   `js/` usually mirror behavior already defined in `src/`.
+- Keep tests in separate files from production code. For Rust unit tests, prefer
+  adjacent `*_tests.rs` files included with `#[cfg(test)] #[path = "..."] mod
+  tests;`; for JavaScript/TypeScript, keep tests in `.test.ts` files.
 - For the current stats DAG layout, see
   [`docs/calculators-and-analysis-nodes.md`](./docs/calculators-and-analysis-nodes.md).
 - Most feature extraction work lands either in `src/collector/ndarray/`,
