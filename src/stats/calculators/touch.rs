@@ -282,13 +282,13 @@ impl TouchCalculator {
         delta: glam::Vec3,
         travel_distance: f32,
     ) {
-        let pending =
-            self.pending_fifty_fifty_movement
-                .get_or_insert_with(|| PendingFiftyFiftyMovement {
-                    start_frame,
-                    travel_distance: 0.0,
-                    y_delta: 0.0,
-                });
+        let pending = self
+            .pending_fifty_fifty_movement
+            .get_or_insert(PendingFiftyFiftyMovement {
+                start_frame,
+                travel_distance: 0.0,
+                y_delta: 0.0,
+            });
         if pending.start_frame != start_frame {
             *pending = PendingFiftyFiftyMovement {
                 start_frame,
@@ -376,6 +376,7 @@ impl TouchCalculator {
         self.apply_ball_movement_credit(player_id, team_is_team_0, delta, travel_distance);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         frame: &FrameInfo,

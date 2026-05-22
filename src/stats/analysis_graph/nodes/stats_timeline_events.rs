@@ -150,6 +150,7 @@ fn moment_mechanic_event(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn span_mechanic_event(
     kind: &str,
     index: usize,

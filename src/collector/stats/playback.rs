@@ -1607,6 +1607,7 @@ fn moment_mechanic_event(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn span_mechanic_event(
     kind: &str,
     index: usize,
@@ -2020,7 +2021,7 @@ fn json_required_array<'a>(
         })
 }
 
-fn json_optional_array<'a>(value: Option<&'a Value>) -> SubtrActorResult<&'a [Value]> {
+fn json_optional_array(value: Option<&Value>) -> SubtrActorResult<&[Value]> {
     match value {
         Some(Value::Array(values)) => Ok(values),
         Some(_) => SubtrActorError::new_result(SubtrActorErrorVariant::StatsSerializationError(
