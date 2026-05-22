@@ -40,6 +40,8 @@ pub mod fifty_fifty;
 pub use fifty_fifty::*;
 pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
+pub mod flick;
+pub use flick::*;
 pub mod match_stats;
 pub use match_stats::*;
 pub mod movement;

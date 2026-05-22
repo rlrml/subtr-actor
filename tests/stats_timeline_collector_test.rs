@@ -296,6 +296,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         },
         events: ReplayStatsTimelineEvents {
             timeline: Vec::new(),
+            goal_context: Vec::new(),
             backboard: Vec::new(),
             ceiling_shot: Vec::new(),
             double_tap: Vec::new(),

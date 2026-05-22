@@ -57,6 +57,24 @@ The aliases `replayUrlZ` and `replay_url_z` are also accepted for compressed
 URLs. Remote replay files must be served with CORS headers that allow the viewer
 origin to fetch them.
 
+To preload a replay from Ballchasing, pass the replay UUID with `ballchasing`:
+
+```text
+https://example.com/stats-player/?ballchasing=56889c3e-c420-45db-92fd-47ce2a3604b0
+```
+
+The aliases `ballchasingId`, `ballchasingUuid`, and `ballchasingReplay` are also
+accepted. `ballchasingReplay` can be either a UUID or a
+`https://ballchasing.com/replay/{uuid}` URL. Ballchasing file downloads use the
+same public endpoint as the website download button,
+`POST https://ballchasing.com/dl/replay/{uuid}`.
+
+To inspect the stats-player configuration loaded from a share link, add
+`cfgDebug=1` to the query string or hash. On page load, the browser console logs
+the exact parsed URL parameters, the selected `cfg` source, the raw `cfg` text,
+and the normalized decoded configuration. If both the query string and hash
+contain `cfg`, the hash value is used and the debug log includes a warning.
+
 The package also exports the stat timeline helpers and overlay utilities used by
 the viewer, so consumers can build their own derived UI around the same data.
 

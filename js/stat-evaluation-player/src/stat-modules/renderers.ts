@@ -372,6 +372,29 @@ export function renderMustyFlickStats(
   `;
 }
 
+export function renderFlickStats(
+  flick: PlayerStatsSnapshot["flick"] | undefined,
+): string {
+  const averageConfidence = flick && flick.count > 0
+    ? flick.cumulative_confidence / flick.count
+    : undefined;
+  const averageSetupDuration = flick && flick.count > 0
+    ? flick.cumulative_setup_duration / flick.count
+    : undefined;
+  const averageBallSpeedChange = flick && flick.count > 0
+    ? flick.cumulative_ball_speed_change / flick.count
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(flick?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(flick?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(flick?.last_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidence, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg setup</span><span class="value">${formatNumber(averageSetupDuration, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg impulse</span><span class="value">${formatNumber(averageBallSpeedChange, 0, "uu/s")}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(flick?.time_since_last_flick), 2, "s")}</span></div>
+  `;
+}
+
 export function renderSpeedFlipStats(
   speedFlip: PlayerStatsSnapshot["speed_flip"] | undefined,
 ): string {

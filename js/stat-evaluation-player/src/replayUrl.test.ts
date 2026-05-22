@@ -4,12 +4,14 @@ import {
   decodeCompressedReplayUrl,
   encodeCompressedReplayUrl,
   getReplayFileNameFromUrl,
+  getReplayFetchRequestFromSearch,
   getReplayUrlFromSearch,
 } from "./replayUrl.ts";
 
 const BASE_URL = "https://viewer.example/app/";
 const GITHUB_REPLAY_URL =
   "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay";
+const BALLCHASING_ID = "56889c3e-c420-45db-92fd-47ce2a3604b0";
 
 test("getReplayUrlFromSearch accepts replayUrl parameter", () => {
   const replayUrl = getReplayUrlFromSearch(
@@ -59,6 +61,47 @@ test("getReplayUrlFromSearch rejects invalid compressed replay URL parameters", 
     () => getReplayUrlFromSearch("?r=not-valid-deflate", BASE_URL),
     /Invalid compressed replay URL/,
   );
+});
+
+test("getReplayFetchRequestFromSearch accepts a Ballchasing replay id", () => {
+  const request = getReplayFetchRequestFromSearch(
+    `?ballchasing=${BALLCHASING_ID}`,
+    BASE_URL,
+  );
+
+  assert.equal(request?.kind, "ballchasing");
+  assert.equal(
+    request?.url.href,
+    `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`,
+  );
+  assert.equal(request?.name, `ballchasing-${BALLCHASING_ID}.replay`);
+  assert.deepEqual(request?.fetchInit, { method: "POST" });
+});
+
+test("getReplayFetchRequestFromSearch accepts Ballchasing replay URLs", () => {
+  const request = getReplayFetchRequestFromSearch(
+    `?ballchasingReplay=${encodeURIComponent(
+      `https://ballchasing.com/replay/${BALLCHASING_ID}`,
+    )}`,
+    BASE_URL,
+  );
+
+  assert.equal(request?.kind, "ballchasing");
+  assert.equal(
+    request?.url.href,
+    `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`,
+  );
+});
+
+test("getReplayFetchRequestFromSearch falls back to replay URL parameters", () => {
+  const request = getReplayFetchRequestFromSearch(
+    `?replayUrl=${GITHUB_REPLAY_URL}`,
+    BASE_URL,
+  );
+
+  assert.equal(request?.kind, "url");
+  assert.equal(request?.url.href, GITHUB_REPLAY_URL);
+  assert.equal(request?.name, "dodges_refreshed_counter.replay");
 });
 
 test("getReplayFileNameFromUrl derives a readable name", () => {

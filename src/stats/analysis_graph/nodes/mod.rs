@@ -2,11 +2,11 @@ pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     BackboardBounceState, BackboardCalculator, BallCarryCalculator, BallFrameState,
     BoostCalculator, CeilingShotCalculator, DemoCalculator, DodgeResetCalculator,
-    DoubleTapCalculator, FiftyFiftyCalculator, FiftyFiftyState, FrameEventsState, FrameInfo,
-    GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
-    PlayerFrameState, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
-    PossessionState, PowerslideCalculator, PressureCalculator, RushCalculator, SpeedFlipCalculator,
-    TouchCalculator, TouchState, WhiffCalculator,
+    DoubleTapCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FrameEventsState,
+    FrameInfo, GameplayState, LivePlayState, MatchStatsCalculator, MovementCalculator,
+    MustyFlickCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
+    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
+    RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -20,6 +20,7 @@ pub(crate) mod dodge_reset;
 pub(crate) mod double_tap;
 pub(crate) mod fifty_fifty;
 pub(crate) mod fifty_fifty_state;
+pub(crate) mod flick;
 pub(crate) mod frame_events_state;
 pub(crate) mod frame_info;
 pub(crate) mod gameplay_state;
@@ -65,6 +66,8 @@ pub use double_tap::DoubleTapNode;
 pub use fifty_fifty::FiftyFiftyNode;
 #[allow(unused_imports)]
 pub use fifty_fifty_state::FiftyFiftyStateNode;
+#[allow(unused_imports)]
+pub use flick::FlickNode;
 #[allow(unused_imports)]
 pub use frame_events_state::FrameEventsStateNode;
 #[allow(unused_imports)]
@@ -212,6 +215,10 @@ pub(crate) fn speed_flip_dependency() -> AnalysisDependency {
 
 pub(crate) fn musty_flick_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<MustyFlickCalculator>(musty_flick::boxed_default)
+}
+
+pub(crate) fn flick_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<FlickCalculator>(flick::boxed_default)
 }
 
 pub(crate) fn dodge_reset_dependency() -> AnalysisDependency {

@@ -92,6 +92,7 @@ pub struct PlayerStatsSnapshot {
     pub speed_flip: SpeedFlipStats,
     pub touch: TouchStats,
     pub whiff: WhiffStats,
+    pub flick: FlickStats,
     pub musty_flick: MustyFlickStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,

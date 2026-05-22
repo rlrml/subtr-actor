@@ -1,4 +1,16 @@
 export { ReplayPlayer } from "./player";
+export {
+  BALLCHASING_API_BASE_URL,
+  BALLCHASING_BASE_URL,
+  createBallchasingReplaySource,
+  fetchBallchasingReplayBytes,
+  getBallchasingReplayApiFileUrl,
+  getBallchasingReplayFileName,
+  getBallchasingReplayFileUrl,
+  isBallchasingReplayId,
+  normalizeBallchasingReplayId,
+} from "./ballchasing";
+export type { BallchasingReplayDownloadOptions } from "./ballchasing";
 export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
 export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
 export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";

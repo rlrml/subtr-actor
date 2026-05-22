@@ -36,10 +36,15 @@ is the reference consumer in this repository.
 Replay loading follows the same model. The library exposes:
 
 - `loadReplayFromBytes(bytes, { useWorker, onProgress, reportEveryNFrames })`
+- `createBallchasingReplaySource(idOrUrl)`
 - `createReplayLoadOverlay(container, options)`
 - `formatReplayLoadProgress(progress)`
 
 So callers can choose between the built-in DOM overlay or their own status/progress UI while consuming the same `ReplayLoadProgress` events.
+
+Ballchasing sources use the same public download endpoint as the website's
+download button, `POST https://ballchasing.com/dl/replay/{id}`. Public
+downloadable replays do not require a Ballchasing API token.
 
 Optional replay extensions can be installed through `ReplayPlayerOptions.plugins`
 or at runtime with `ReplayPlayer.addPlugin(...)`. Plugins receive:

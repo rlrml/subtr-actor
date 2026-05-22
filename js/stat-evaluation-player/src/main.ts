@@ -58,11 +58,13 @@ import {
   loadReplayBundleInWorker,
 } from "./replayLoader.ts";
 import {
-  getReplayFileNameFromUrl,
-  getReplayUrlFromSearch,
+  getReplayFetchRequestFromSearch,
+  type ReplayFetchRequest,
 } from "./replayUrl.ts";
 import {
+  getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
+  isStatsPlayerConfigDebugEnabled,
   mapWindowPlacementToViewport,
   setStatsPlayerConfigOnUrl,
   STATS_PLAYER_CONFIG_VERSION,
@@ -73,6 +75,7 @@ import {
   type SingletonWindowConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
+  type StatsPlayerConfigParamSnapshot,
   type StatsWindowConfig,
   type StatsWindowKind,
   type TeamScope,
@@ -658,6 +661,45 @@ function scheduleConfigUrlUpdate(): void {
     );
     window.history.replaceState(window.history.state, "", nextUrl);
   }, 150);
+}
+
+function logStatsPlayerConfigLoadDebug(
+  snapshot: StatsPlayerConfigParamSnapshot,
+  config: StatsPlayerConfig | null,
+  error: unknown,
+): void {
+  console.groupCollapsed("[subtr-actor] stats player cfg load");
+  console.log("location.href", window.location.href);
+  console.log("location.search", snapshot.search || "(empty)");
+  console.log("location.hash", snapshot.hash || "(empty)");
+  console.table([
+    ...snapshot.searchParams.map(([name, value]) => ({
+      source: "search",
+      name,
+      value,
+    })),
+    ...snapshot.hashParams.map(([name, value]) => ({
+      source: "hash",
+      name,
+      value,
+    })),
+  ]);
+  console.log("cfg selected source", snapshot.selectedSource ?? "(none)");
+  console.log("cfg selected raw text", snapshot.selectedValue ?? "(none)");
+  console.log("cfg selected raw length", snapshot.selectedValue?.length ?? 0);
+  console.log("cfg search values", snapshot.searchValues);
+  console.log("cfg hash values", snapshot.hashValues);
+  if (snapshot.hashValues.length > 0 && snapshot.searchValues.length > 0) {
+    console.warn("Both hash and search contain cfg; hash cfg is used.");
+  }
+  if (config) {
+    console.log("cfg normalized JSON", JSON.stringify(config, null, 2));
+    console.log("cfg normalized object", config);
+  }
+  if (error) {
+    console.error("cfg decode/apply error", error);
+  }
+  console.groupEnd();
 }
 
 function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
@@ -2102,21 +2144,29 @@ function createFileReplaySource(file: File): ReplayInputSource {
   };
 }
 
-function createUrlReplaySource(
-  url: URL,
+function createRemoteReplaySource(
+  request: ReplayFetchRequest,
   signal: AbortSignal,
 ): ReplayInputSource {
   return {
-    name: getReplayFileNameFromUrl(url),
+    name: request.name,
     preparingStatus: "Fetching replay...",
     async readBytes() {
-      const response = await fetch(url, { signal });
+      const response = await fetch(request.url, {
+        ...request.fetchInit,
+        signal,
+      });
       if (!response.ok) {
         const statusText = response.statusText
           ? ` ${response.statusText}`
           : "";
+        const authHint =
+          request.kind === "ballchasing" &&
+            [401, 403, 404].includes(response.status)
+            ? ". The replay may be private, unavailable, or not downloadable without a Ballchasing session"
+            : "";
         throw new Error(
-          `Failed to fetch replay from ${url.href} (${response.status}${statusText})`,
+          `Failed to fetch replay from ${request.url.href} (${response.status}${statusText})${authHint}`,
         );
       }
       return new Uint8Array(await response.arrayBuffer());
@@ -2242,9 +2292,9 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 }
 
 function loadReplayFromLocation(signal: AbortSignal): void {
-  let replayUrl: URL | null;
+  let replayRequest: ReplayFetchRequest | null;
   try {
-    replayUrl = getReplayUrlFromSearch(
+    replayRequest = getReplayFetchRequestFromSearch(
       window.location.search,
       window.location.href,
     );
@@ -2256,19 +2306,21 @@ function loadReplayFromLocation(signal: AbortSignal): void {
     return;
   }
 
-  if (!replayUrl) {
+  if (!replayRequest) {
     return;
   }
 
-  void loadReplay(createUrlReplaySource(replayUrl, signal)).catch((error) => {
-    if (signal.aborted) {
-      return;
-    }
-    console.error("Failed to load replay URL:", error);
-    statusReadout.textContent = error instanceof Error
-      ? error.message
-      : "Failed to load replay URL";
-  });
+  void loadReplay(createRemoteReplaySource(replayRequest, signal)).catch(
+    (error) => {
+      if (signal.aborted) {
+        return;
+      }
+      console.error("Failed to load replay URL:", error);
+      statusReadout.textContent = error instanceof Error
+        ? error.message
+        : "Failed to load replay URL";
+    },
+  );
 }
 
 export function mountStatEvaluationPlayer(
@@ -2427,14 +2479,25 @@ export function mountStatEvaluationPlayer(
   recordingSize = mustElement<HTMLElement>(root, "#recording-size");
   recordingType = mustElement<HTMLElement>(root, "#recording-type");
 
+  const configParamSnapshot = getStatsPlayerConfigParamSnapshot(window.location);
+  const configDebugEnabled = isStatsPlayerConfigDebugEnabled(window.location);
+  let configLoadError: unknown = null;
   try {
     initialUrlConfig = getStatsPlayerConfigFromLocation(window.location);
   } catch (error) {
+    configLoadError = error;
     console.error("Invalid stats player config:", error);
     statusReadout.textContent = error instanceof Error
       ? error.message
       : "Invalid stats player config";
     initialUrlConfig = null;
+  }
+  if (configDebugEnabled) {
+    logStatsPlayerConfigLoadDebug(
+      configParamSnapshot,
+      initialUrlConfig,
+      configLoadError,
+    );
   }
 
   const listeners = new AbortController();

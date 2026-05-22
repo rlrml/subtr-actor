@@ -19,6 +19,7 @@ export {
 export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEvents {
   return merge<StatsEvents>({
     timeline: [],
+    goal_context: [],
     backboard: [],
     ceiling_shot: [],
     double_tap: [],

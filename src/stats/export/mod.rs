@@ -9,6 +9,7 @@ mod demo;
 mod dodge_reset;
 mod double_tap;
 mod fifty_fifty;
+mod flick;
 mod movement;
 mod musty_flick;
 mod positioning;

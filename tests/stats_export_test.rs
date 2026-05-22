@@ -120,6 +120,7 @@ fn test_core_player_stats_export_uses_legacy_variant_metadata() {
             goals_conceded_while_last_defender: 1,
             goal_after_kickoff,
             goal_buildup: GoalBuildupStats::default(),
+            ..PlayerScoringContextStats::default()
         },
     };
 

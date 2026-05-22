@@ -13,6 +13,7 @@ import {
   buildCeilingShotTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
+  buildFlickTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
@@ -31,6 +32,7 @@ import {
   renderDemoStats,
   renderDodgeResetStats,
   renderDoubleTapStats,
+  renderFlickStats,
   renderMustyFlickStats,
   renderPowerslideStats,
   renderSpeedFlipStats,
@@ -268,6 +270,47 @@ export function createMustyFlickModule(): StatModule {
       if (!player) return "";
 
       return renderMustyFlickStats(player.musty_flick);
+    },
+  };
+}
+
+export function createFlickModule(): StatModule {
+  return {
+    id: "flick",
+    label: "Flick",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildFlickTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(
+        ctx.statsFrameLookup,
+        frameIndex,
+      );
+      if (!statsFrame) return "";
+
+      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
+        player.name,
+        player.is_team_0,
+        renderFlickStats(player.flick),
+        player.flick?.is_last_flick
+          ? '<span class="role-indicator role-forward">Last Flick</span>'
+          : "",
+      ));
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderFlickStats(player.flick);
     },
   };
 }

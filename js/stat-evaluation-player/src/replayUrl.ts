@@ -1,4 +1,9 @@
 import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
+import {
+  getBallchasingReplayFileName,
+  getBallchasingReplayFileUrl,
+  normalizeBallchasingReplayId,
+} from "subtr-actor-player";
 
 const REPLAY_URL_QUERY_PARAMS = ["replayUrl", "replay_url", "replay"] as const;
 const COMPRESSED_REPLAY_URL_QUERY_PARAMS = [
@@ -6,6 +11,21 @@ const COMPRESSED_REPLAY_URL_QUERY_PARAMS = [
   "replayUrlZ",
   "replay_url_z",
 ] as const;
+const BALLCHASING_REPLAY_QUERY_PARAMS = [
+  "ballchasing",
+  "ballchasingId",
+  "ballchasingUuid",
+  "ballchasingReplay",
+] as const;
+
+export type ReplayFetchRequestKind = "url" | "ballchasing";
+
+export interface ReplayFetchRequest {
+  readonly kind: ReplayFetchRequestKind;
+  readonly url: URL;
+  readonly name: string;
+  readonly fetchInit?: RequestInit;
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -80,6 +100,50 @@ export function getReplayUrlFromSearch(
   }
 
   return null;
+}
+
+function getFirstParam(
+  params: URLSearchParams,
+  names: readonly string[],
+): string | null {
+  for (const name of names) {
+    const rawValue = params.get(name)?.trim();
+    if (rawValue) {
+      return rawValue;
+    }
+  }
+  return null;
+}
+
+export function getReplayFetchRequestFromSearch(
+  search: string,
+  baseUrl: string,
+): ReplayFetchRequest | null {
+  const params = new URLSearchParams(search);
+  const ballchasingValue = getFirstParam(
+    params,
+    BALLCHASING_REPLAY_QUERY_PARAMS,
+  );
+  if (ballchasingValue) {
+    const id = normalizeBallchasingReplayId(ballchasingValue);
+    return {
+      kind: "ballchasing",
+      url: getBallchasingReplayFileUrl(id),
+      name: getBallchasingReplayFileName(id),
+      fetchInit: { method: "POST" },
+    };
+  }
+
+  const replayUrl = getReplayUrlFromSearch(search, baseUrl);
+  if (!replayUrl) {
+    return null;
+  }
+
+  return {
+    kind: "url",
+    url: replayUrl,
+    name: getReplayFileNameFromUrl(replayUrl),
+  };
 }
 
 export function getReplayFileNameFromUrl(url: URL): string {

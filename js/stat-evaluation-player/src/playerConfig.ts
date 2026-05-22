@@ -95,6 +95,20 @@ export interface StatsPlayerConfigV1 {
 export type StatsPlayerConfig = StatsPlayerConfigV1;
 
 export const STATS_PLAYER_CONFIG_PARAM = "cfg";
+export const STATS_PLAYER_CONFIG_DEBUG_PARAM = "cfgDebug";
+
+export type StatsPlayerConfigParamSource = "hash" | "search";
+
+export interface StatsPlayerConfigParamSnapshot {
+  readonly search: string;
+  readonly hash: string;
+  readonly searchParams: readonly [string, string][];
+  readonly hashParams: readonly [string, string][];
+  readonly searchValues: readonly string[];
+  readonly hashValues: readonly string[];
+  readonly selectedSource: StatsPlayerConfigParamSource | null;
+  readonly selectedValue: string | null;
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -143,13 +157,50 @@ export function decodeStatsPlayerConfig(value: string): StatsPlayerConfig {
 export function getStatsPlayerConfigFromLocation(
   location: Pick<Location, "search" | "hash">,
 ): StatsPlayerConfig | null {
-  const hashParams = new URLSearchParams(
-    location.hash.startsWith("#") ? location.hash.slice(1) : location.hash,
-  );
+  const snapshot = getStatsPlayerConfigParamSnapshot(location);
+  return snapshot.selectedValue
+    ? decodeStatsPlayerConfig(snapshot.selectedValue)
+    : null;
+}
+
+export function getStatsPlayerConfigParamSnapshot(
+  location: Pick<Location, "search" | "hash">,
+): StatsPlayerConfigParamSnapshot {
+  const hashParams = new URLSearchParams(getHashParamText(location.hash));
   const searchParams = new URLSearchParams(location.search);
-  const rawValue = hashParams.get(STATS_PLAYER_CONFIG_PARAM) ??
-    searchParams.get(STATS_PLAYER_CONFIG_PARAM);
-  return rawValue ? decodeStatsPlayerConfig(rawValue) : null;
+  const hashValues = hashParams.getAll(STATS_PLAYER_CONFIG_PARAM);
+  const searchValues = searchParams.getAll(STATS_PLAYER_CONFIG_PARAM);
+  const selectedSource = hashValues[0]
+    ? "hash"
+    : searchValues[0]
+      ? "search"
+      : null;
+  const selectedValue = selectedSource === "hash"
+    ? hashValues[0]
+    : selectedSource === "search"
+      ? searchValues[0]
+      : null;
+
+  return {
+    search: location.search,
+    hash: location.hash,
+    searchParams: [...searchParams.entries()],
+    hashParams: [...hashParams.entries()],
+    searchValues,
+    hashValues,
+    selectedSource,
+    selectedValue,
+  };
+}
+
+export function isStatsPlayerConfigDebugEnabled(
+  location: Pick<Location, "search" | "hash">,
+): boolean {
+  const searchParams = new URLSearchParams(location.search);
+  const hashParams = new URLSearchParams(getHashParamText(location.hash));
+  const value = searchParams.get(STATS_PLAYER_CONFIG_DEBUG_PARAM) ??
+    hashParams.get(STATS_PLAYER_CONFIG_DEBUG_PARAM);
+  return value === "" || value === "1" || value === "true";
 }
 
 export function setStatsPlayerConfigOnUrl(
@@ -157,12 +208,14 @@ export function setStatsPlayerConfigOnUrl(
   config: StatsPlayerConfig,
 ): URL {
   const next = new URL(url.href);
-  const hashParams = new URLSearchParams(
-    next.hash.startsWith("#") ? next.hash.slice(1) : next.hash,
-  );
+  const hashParams = new URLSearchParams(getHashParamText(next.hash));
   hashParams.set(STATS_PLAYER_CONFIG_PARAM, encodeStatsPlayerConfig(config));
   next.hash = hashParams.toString();
   return next;
+}
+
+function getHashParamText(hash: string): string {
+  return hash.startsWith("#") ? hash.slice(1) : hash;
 }
 
 export function mapWindowPlacementToViewport(

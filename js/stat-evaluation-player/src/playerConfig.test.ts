@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
   decodeStatsPlayerConfig,
   encodeStatsPlayerConfig,
+  getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
+  isStatsPlayerConfigDebugEnabled,
   mapWindowPlacementToViewport,
   setStatsPlayerConfigOnUrl,
   type StatsPlayerConfig,
@@ -118,6 +120,46 @@ test("stats player config also accepts cfg in search params", () => {
       hash: "",
     } as Location),
     CONFIG,
+  );
+});
+
+test("stats player config param snapshot exposes raw parsed cfg sources", () => {
+  const hashEncoded = encodeStatsPlayerConfig(CONFIG);
+  const searchEncoded = encodeStatsPlayerConfig({
+    ...CONFIG,
+    playback: { ...CONFIG.playback, currentTime: 12 },
+  });
+  const snapshot = getStatsPlayerConfigParamSnapshot({
+    search: `?cfg=${searchEncoded}&cfgDebug=1`,
+    hash: `#cfg=${hashEncoded}&tab=stats`,
+  } as Location);
+
+  assert.equal(snapshot.selectedSource, "hash");
+  assert.equal(snapshot.selectedValue, hashEncoded);
+  assert.deepEqual(snapshot.searchValues, [searchEncoded]);
+  assert.deepEqual(snapshot.hashValues, [hashEncoded]);
+  assert.deepEqual(snapshot.searchParams, [
+    ["cfg", searchEncoded],
+    ["cfgDebug", "1"],
+  ]);
+  assert.deepEqual(snapshot.hashParams, [
+    ["cfg", hashEncoded],
+    ["tab", "stats"],
+  ]);
+});
+
+test("stats player config debug flag can come from search or hash params", () => {
+  assert.equal(
+    isStatsPlayerConfigDebugEnabled({ search: "?cfgDebug=1", hash: "" } as Location),
+    true,
+  );
+  assert.equal(
+    isStatsPlayerConfigDebugEnabled({ search: "", hash: "#cfgDebug=true" } as Location),
+    true,
+  );
+  assert.equal(
+    isStatsPlayerConfigDebugEnabled({ search: "?cfgDebug=0", hash: "" } as Location),
+    false,
   );
 });
 

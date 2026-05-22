@@ -8,6 +8,7 @@ import type { DemoPlayerStats } from "./DemoPlayerStats.ts";
 import type { DodgeResetStats } from "./DodgeResetStats.ts";
 import type { DoubleTapPlayerStats } from "./DoubleTapPlayerStats.ts";
 import type { FiftyFiftyPlayerStats } from "./FiftyFiftyPlayerStats.ts";
+import type { FlickStats } from "./FlickStats.ts";
 import type { MovementStats } from "./MovementStats.ts";
 import type { MustyFlickStats } from "./MustyFlickStats.ts";
 import type { PositioningStats } from "./PositioningStats.ts";
@@ -17,4 +18,4 @@ import type { SpeedFlipStats } from "./SpeedFlipStats.ts";
 import type { TouchStats } from "./TouchStats.ts";
 import type { WhiffStats } from "./WhiffStats.ts";
 
-export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, touch: TouchStats, whiff: WhiffStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, boost: BoostStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };
+export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, boost: BoostStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };

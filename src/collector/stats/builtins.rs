@@ -169,19 +169,28 @@ struct CorePlayerStatsSnapshot {
     goals_for_while_most_back: u32,
     goals_against_while_most_back: u32,
     goal_against_boost_sample_count: u32,
+    cumulative_boost_on_goals_against: f32,
     average_boost_on_goals_against: f32,
     last_boost_on_goal_against: Option<f32>,
     goal_against_boost_leadup_sample_count: u32,
+    cumulative_average_boost_in_goal_against_leadup: f32,
+    cumulative_min_boost_in_goal_against_leadup: f32,
     average_boost_in_goal_against_leadup: f32,
     average_min_boost_in_goal_against_leadup: f32,
     last_average_boost_in_goal_against_leadup: Option<f32>,
     last_min_boost_in_goal_against_leadup: Option<f32>,
     goal_against_position_sample_count: u32,
+    cumulative_goal_against_position_x: f32,
+    cumulative_goal_against_position_y: f32,
+    cumulative_goal_against_position_z: f32,
     average_goal_against_position_x: f32,
     average_goal_against_position_y: f32,
     average_goal_against_position_z: f32,
     last_goal_against_position: Option<GoalContextPosition>,
     scoring_goal_last_touch_position_sample_count: u32,
+    cumulative_scoring_goal_last_touch_position_x: f32,
+    cumulative_scoring_goal_last_touch_position_y: f32,
+    cumulative_scoring_goal_last_touch_position_z: f32,
     average_scoring_goal_last_touch_position_x: f32,
     average_scoring_goal_last_touch_position_y: f32,
     average_scoring_goal_last_touch_position_z: f32,
@@ -210,11 +219,20 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
             goals_for_while_most_back: stats.scoring_context.goals_for_while_most_back,
             goals_against_while_most_back: stats.scoring_context.goals_against_while_most_back,
             goal_against_boost_sample_count: stats.scoring_context.goal_against_boost_sample_count,
+            cumulative_boost_on_goals_against: stats
+                .scoring_context
+                .cumulative_boost_on_goals_against,
             average_boost_on_goals_against: stats.average_boost_on_goals_against(),
             last_boost_on_goal_against: stats.scoring_context.last_boost_on_goal_against,
             goal_against_boost_leadup_sample_count: stats
                 .scoring_context
                 .goal_against_boost_leadup_sample_count,
+            cumulative_average_boost_in_goal_against_leadup: stats
+                .scoring_context
+                .cumulative_average_boost_in_goal_against_leadup,
+            cumulative_min_boost_in_goal_against_leadup: stats
+                .scoring_context
+                .cumulative_min_boost_in_goal_against_leadup,
             average_boost_in_goal_against_leadup: stats.average_boost_in_goal_against_leadup(),
             average_min_boost_in_goal_against_leadup: stats
                 .average_min_boost_in_goal_against_leadup(),
@@ -227,6 +245,15 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
             goal_against_position_sample_count: stats
                 .scoring_context
                 .goal_against_position_sample_count,
+            cumulative_goal_against_position_x: stats
+                .scoring_context
+                .cumulative_goal_against_position_x,
+            cumulative_goal_against_position_y: stats
+                .scoring_context
+                .cumulative_goal_against_position_y,
+            cumulative_goal_against_position_z: stats
+                .scoring_context
+                .cumulative_goal_against_position_z,
             average_goal_against_position_x: stats.average_goal_against_position_x(),
             average_goal_against_position_y: stats.average_goal_against_position_y(),
             average_goal_against_position_z: stats.average_goal_against_position_z(),
@@ -234,6 +261,15 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
             scoring_goal_last_touch_position_sample_count: stats
                 .scoring_context
                 .scoring_goal_last_touch_position_sample_count,
+            cumulative_scoring_goal_last_touch_position_x: stats
+                .scoring_context
+                .cumulative_scoring_goal_last_touch_position_x,
+            cumulative_scoring_goal_last_touch_position_y: stats
+                .scoring_context
+                .cumulative_scoring_goal_last_touch_position_y,
+            cumulative_scoring_goal_last_touch_position_z: stats
+                .scoring_context
+                .cumulative_scoring_goal_last_touch_position_z,
             average_scoring_goal_last_touch_position_x: stats
                 .average_scoring_goal_last_touch_position_x(),
             average_scoring_goal_last_touch_position_y: stats
@@ -283,6 +319,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "touch",
         "whiff",
         "speed_flip",
+        "flick",
         "musty_flick",
         "dodge_reset",
         "ball_carry",
@@ -387,6 +424,13 @@ pub(crate) fn builtin_module_json(
         }
         "speed_flip" => {
             let calculator = graph_state::<SpeedFlipCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "flick" => {
+            let calculator = graph_state::<FlickCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.events(),
@@ -556,6 +600,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "flick" => {
+            let calculator = graph_state::<FlickCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "musty_flick" => {
             let calculator = graph_state::<MustyFlickCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -659,8 +709,8 @@ pub(crate) fn builtin_snapshot_config_json(
             }))?)
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "fifty_fifty" | "possession"
-        | "touch" | "whiff" | "speed_flip" | "musty_flick" | "dodge_reset" | "ball_carry"
-        | "boost" | "movement" | "powerslide" | "demo" => None,
+        | "touch" | "whiff" | "speed_flip" | "flick" | "musty_flick" | "dodge_reset"
+        | "ball_carry" | "boost" | "movement" | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

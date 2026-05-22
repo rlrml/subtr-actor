@@ -472,7 +472,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             player_id: player.remote_id.clone(),
             name: player.name.clone(),
             is_team_0: self.is_team_zero_player(player),
-            core: self.frame_player_stat_or_default_typed_by_key(frame, "core", &player_key)?,
+            core: self.frame_core_player_stat_or_default_by_key(frame, &player_key)?,
             backboard: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "backboard",
@@ -506,6 +506,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 self.frame_player_stat_or_default_typed_by_key(frame, "touch", &player_key)?
             },
             whiff: self.frame_player_stat_or_default_typed_by_key(frame, "whiff", &player_key)?,
+            flick: self.frame_player_stat_or_default_typed_by_key(frame, "flick", &player_key)?,
             musty_flick: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "musty_flick",
@@ -713,6 +714,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<WhiffStats>(frame, "whiff", &player_key)?,
         );
         player_value.insert(
+            "flick".to_owned(),
+            self.frame_player_stat_or_default_by_key::<FlickStats>(frame, "flick", &player_key)?,
+        );
+        player_value.insert(
             "musty_flick".to_owned(),
             self.frame_player_stat_or_default_by_key::<MustyFlickStats>(
                 frame,
@@ -879,6 +884,19 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         self.frame_player_stat_or_default_with_by_key(frame, module_name, player_key, T::default)
     }
 
+    fn frame_core_player_stat_or_default_by_key(
+        &self,
+        frame: &StatsSnapshotFrame,
+        player_key: &str,
+    ) -> SubtrActorResult<CorePlayerStats> {
+        decode_core_player_stats_value(self.frame_player_stat_or_value_by_key(
+            frame,
+            "core",
+            player_key,
+            default_json_value::<CorePlayerStats>(),
+        )?)
+    }
+
     fn frame_player_stat_or_default_with_by_key<T, F>(
         &self,
         frame: &StatsSnapshotFrame,
@@ -1007,6 +1025,106 @@ where
             error.to_string(),
         ))
     })
+}
+
+fn decode_core_player_stats_value(mut value: Value) -> SubtrActorResult<CorePlayerStats> {
+    normalize_core_player_stats_snapshot(&mut value)?;
+    decode_json_value(value)
+}
+
+fn normalize_core_player_stats_snapshot(value: &mut Value) -> SubtrActorResult<()> {
+    let Some(object) = value.as_object_mut() else {
+        return Ok(());
+    };
+
+    insert_cumulative_from_average(
+        object,
+        "cumulative_boost_on_goals_against",
+        "average_boost_on_goals_against",
+        "goal_against_boost_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_average_boost_in_goal_against_leadup",
+        "average_boost_in_goal_against_leadup",
+        "goal_against_boost_leadup_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_min_boost_in_goal_against_leadup",
+        "average_min_boost_in_goal_against_leadup",
+        "goal_against_boost_leadup_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_goal_against_position_x",
+        "average_goal_against_position_x",
+        "goal_against_position_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_goal_against_position_y",
+        "average_goal_against_position_y",
+        "goal_against_position_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_goal_against_position_z",
+        "average_goal_against_position_z",
+        "goal_against_position_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_scoring_goal_last_touch_position_x",
+        "average_scoring_goal_last_touch_position_x",
+        "scoring_goal_last_touch_position_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_scoring_goal_last_touch_position_y",
+        "average_scoring_goal_last_touch_position_y",
+        "scoring_goal_last_touch_position_sample_count",
+    )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_scoring_goal_last_touch_position_z",
+        "average_scoring_goal_last_touch_position_z",
+        "scoring_goal_last_touch_position_sample_count",
+    )?;
+
+    if let Value::Object(defaults) = default_json_value::<CorePlayerStats>() {
+        for (field, default_value) in defaults {
+            object.entry(field).or_insert(default_value);
+        }
+    }
+
+    Ok(())
+}
+
+fn insert_cumulative_from_average(
+    object: &mut Map<String, Value>,
+    cumulative_field: &str,
+    average_field: &str,
+    sample_count_field: &str,
+) -> SubtrActorResult<()> {
+    if object.contains_key(cumulative_field) {
+        return Ok(());
+    }
+
+    let average = object
+        .get(average_field)
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0) as f32;
+    let sample_count = object
+        .get(sample_count_field)
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as f32;
+    object.insert(
+        cumulative_field.to_owned(),
+        serialize_to_json_value(&(average * sample_count))?,
+    );
+
+    Ok(())
 }
 
 fn parse_timeline_event(value: &Value) -> SubtrActorResult<TimelineEvent> {

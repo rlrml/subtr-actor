@@ -235,7 +235,6 @@ const replayName = ${JSON.stringify(path.basename(replayPath))};
 const statusEl = document.getElementById("status");
 const startedAt = performance.now();
 const stageTimings = new Map();
-const progressEvents = [];
 
 function now() {
   return performance.now();
@@ -256,17 +255,6 @@ function recordProgress(progress) {
   timing.lastProgress = progress.progress ?? null;
   stageTimings.set(stage, timing);
 
-  if (progressEvents.length < 200) {
-    progressEvents.push({
-      atMs: timestamp - startedAt,
-      stage,
-      progress: progress.progress ?? null,
-      processedFrames: progress.processedFrames ?? null,
-      totalFrames: progress.totalFrames ?? null,
-      processedChunks: progress.processedChunks ?? null,
-      totalChunks: progress.totalChunks ?? null,
-    });
-  }
   statusEl.textContent = stage + " " + Math.round((progress.progress ?? 0) * 100) + "%";
 }
 
@@ -302,7 +290,6 @@ try {
       ...timing,
       durationMs: timing.endMs - timing.startMs,
     })),
-    progressEvents,
   };
   statusEl.textContent = JSON.stringify(result, null, 2);
   console.log(resultPrefix + JSON.stringify(result));
