@@ -17,7 +17,7 @@ When you push a tag starting with `v` (e.g., `v0.1.11`), the following workflows
 
 ### GitHub (`release-github.yml`)
 Creates or updates the GitHub Release page for the tag using the matching
-section from `CHANGELOG.md`.
+section from [`CHANGELOG.md`](../CHANGELOG.md).
 
 ### Rust (`release-rust.yml`)
 Publishes the Rust crate to crates.io.

@@ -198,8 +198,7 @@ These are useful when working through the Python or JavaScript bindings:
 ## Documentation
 
 - Rust API docs: <https://docs.rs/subtr-actor>
-- Project docs: [docs/README.md](./docs/README.md)
-- Changelog: [docs/CHANGELOG.md](./docs/CHANGELOG.md)
+- Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Python package README: [python/PYTHON-README.md](./python/PYTHON-README.md)
 - JavaScript package README: [js/README.md](./js/README.md)
 - JavaScript player README: [js/player/README.md](./js/player/README.md)

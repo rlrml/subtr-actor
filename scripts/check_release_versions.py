@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CHANGELOG = ROOT / "docs" / "CHANGELOG.md"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
 
 def load_toml(path: str) -> dict:
@@ -80,7 +80,7 @@ def main() -> int:
 
     if not changelog_has_release_entry(expected):
         print(
-            f"docs/CHANGELOG.md is missing a release section for v{expected}.",
+            f"CHANGELOG.md is missing a release section for v{expected}.",
             file=sys.stderr,
         )
         return 1

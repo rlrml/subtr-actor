@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CHANGELOG = ROOT / "docs" / "CHANGELOG.md"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
 
 def extract_release_notes(version: str) -> str:
@@ -30,7 +30,7 @@ def extract_release_notes(version: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Extract a release section from docs/CHANGELOG.md."
+        description="Extract a release section from CHANGELOG.md."
     )
     parser.add_argument("version", help="Release version with or without the v prefix.")
     args = parser.parse_args()
