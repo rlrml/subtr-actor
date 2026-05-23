@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.5 - 2026-05-23
+
+- Use the stats `TouchState` attribution stream for goal context, pass,
+  backboard-bounce, and double-tap analysis instead of older raw team-touch
+  events, fixing stale scorer-touch context on post-EAC replays.
+- Prevent stale credited scorer touches from producing own-half goal tags.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.5`.
+
 ## v0.7.4 - 2026-05-22
 
 - Add a Goals tab to the stats report page that summarizes goal metadata,
