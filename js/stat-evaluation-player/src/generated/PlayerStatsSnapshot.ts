@@ -3,6 +3,7 @@ import type { AirDribbleStats } from "./AirDribbleStats.ts";
 import type { BackboardPlayerStats } from "./BackboardPlayerStats.ts";
 import type { BallCarryStats } from "./BallCarryStats.ts";
 import type { BoostStats } from "./BoostStats.ts";
+import type { BumpPlayerStats } from "./BumpPlayerStats.ts";
 import type { CeilingShotStats } from "./CeilingShotStats.ts";
 import type { CorePlayerStats } from "./CorePlayerStats.ts";
 import type { DemoPlayerStats } from "./DemoPlayerStats.ts";
@@ -23,4 +24,4 @@ import type { TouchStats } from "./TouchStats.ts";
 import type { WavedashStats } from "./WavedashStats.ts";
 import type { WhiffStats } from "./WhiffStats.ts";
 
-export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, one_timer: OneTimerPlayerStats, pass: PassPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, half_flip: HalfFlipStats, wavedash: WavedashStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };
+export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, double_tap: DoubleTapPlayerStats, one_timer: OneTimerPlayerStats, pass: PassPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, speed_flip: SpeedFlipStats, half_flip: HalfFlipStats, wavedash: WavedashStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, musty_flick: MustyFlickStats, dodge_reset: DodgeResetStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpPlayerStats, movement: MovementStats, positioning: PositioningStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };

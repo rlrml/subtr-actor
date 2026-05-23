@@ -342,6 +342,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "dodge_reset",
         "ball_carry",
         "boost",
+        "bump",
         "movement",
         "positioning",
         "powerslide",
@@ -572,6 +573,15 @@ pub(crate) fn builtin_module_json(
                 events: calculator.pickup_comparison_events(),
             })
         }
+        "bump" => {
+            let calculator = graph_state::<BumpCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
         "movement" => {
             let calculator = graph_state::<MovementCalculator>(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -778,6 +788,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "bump" => {
+            let calculator = graph_state::<BumpCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "movement" => {
             let calculator = graph_state::<MovementCalculator>(graph, module_name)?;
             let player_stats = calculator
@@ -911,7 +929,7 @@ pub(crate) fn builtin_snapshot_config_json(
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"
         | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
         | "half_flip" | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
-        | "movement" | "powerslide" | "demo" => None,
+        | "bump" | "movement" | "powerslide" | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

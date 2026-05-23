@@ -187,6 +187,10 @@ export function createTeamStatsSnapshot(
     demo: {
       demos_inflicted: 0,
     },
+    bump: {
+      bumps_inflicted: 0,
+      team_bumps_inflicted: 0,
+    },
   }, overrides);
 }
 
@@ -457,6 +461,17 @@ export function createPlayerStatsSnapshot(
     demo: {
       demos_inflicted: 0,
       demos_taken: 0,
+    },
+    bump: {
+      bumps_inflicted: 0,
+      bumps_taken: 0,
+      team_bumps_inflicted: 0,
+      team_bumps_taken: 0,
+      last_bump_time: null,
+      last_bump_frame: null,
+      last_bump_strength: null,
+      max_bump_strength: 0,
+      cumulative_bump_strength: 0,
     },
   }, overrides);
 }

@@ -4,6 +4,7 @@ mod air_dribble;
 mod backboard;
 mod ball_carry;
 mod boost;
+mod bump;
 mod ceiling_shot;
 mod core;
 mod demo;

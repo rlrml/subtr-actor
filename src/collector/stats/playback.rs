@@ -375,6 +375,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_boost_pickup_comparison_event,
             )?,
+            bump: self.module_player_events("bump", "events", parse_bump_event)?,
         })
     }
 
@@ -433,6 +434,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "boost_pickups".to_owned(),
             Value::Array(self.module_array("boost", "events")),
+        );
+        events.insert(
+            "bump".to_owned(),
+            Value::Array(self.module_array("bump", "events")),
         );
         Value::Object(events)
     }
@@ -824,6 +829,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ball_carry: self.frame_team_stat_or_default_typed(frame, "ball_carry", team_key)?,
             air_dribble: self.frame_team_stat_or_default_typed(frame, "air_dribble", team_key)?,
             boost: self.frame_team_stat_or_default_typed(frame, "boost", team_key)?,
+            bump: self.frame_team_stat_or_default_typed(frame, "bump", team_key)?,
             movement: self.frame_team_stat_or_default_typed(frame, "movement", team_key)?,
             powerslide: self.frame_team_stat_or_default_typed(frame, "powerslide", team_key)?,
             demo: self.frame_team_stat_or_default_typed(frame, "demo", team_key)?,
@@ -912,6 +918,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &player_key,
             )?,
             boost: self.frame_player_stat_or_default_typed_by_key(frame, "boost", &player_key)?,
+            bump: self.frame_player_stat_or_default_typed_by_key(frame, "bump", &player_key)?,
             movement: self.frame_player_stat_or_default_with_by_key(
                 frame,
                 "movement",
@@ -1009,6 +1016,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         team.insert(
             "boost".to_owned(),
             self.frame_team_stat_or_default::<BoostStats>(frame, "boost", team_key),
+        );
+        team.insert(
+            "bump".to_owned(),
+            self.frame_team_stat_or_default::<BumpTeamStats>(frame, "bump", team_key),
         );
         team.insert(
             "movement".to_owned(),
@@ -1185,6 +1196,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         player_value.insert(
             "boost".to_owned(),
             self.frame_player_stat_or_default_by_key::<BoostStats>(frame, "boost", &player_key)?,
+        );
+        player_value.insert(
+            "bump".to_owned(),
+            self.frame_player_stat_or_default_by_key::<BumpPlayerStats>(
+                frame,
+                "bump",
+                &player_key,
+            )?,
         );
         player_value.insert(
             "movement".to_owned(),
@@ -1949,6 +1968,26 @@ fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
         approach_speed: json_required_f32(object, "approach_speed")?,
         dodge_active: json_required_bool(object, "dodge_active")?,
         aerial: json_required_bool(object, "aerial")?,
+    })
+}
+
+fn parse_bump_event(value: &Value) -> SubtrActorResult<BumpEvent> {
+    let object = json_object(value, "bump event")?;
+    Ok(BumpEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        initiator: json_required_remote_id(object, "initiator")?,
+        victim: json_required_remote_id(object, "victim")?,
+        initiator_is_team_0: json_required_bool(object, "initiator_is_team_0")?,
+        victim_is_team_0: json_required_bool(object, "victim_is_team_0")?,
+        is_team_bump: json_required_bool(object, "is_team_bump")?,
+        strength: json_required_f32(object, "strength")?,
+        confidence: json_required_f32(object, "confidence")?,
+        contact_distance: json_required_f32(object, "contact_distance")?,
+        closing_speed: json_required_f32(object, "closing_speed")?,
+        victim_impulse: json_required_f32(object, "victim_impulse")?,
+        initiator_position: json_required_vec3(object, "initiator_position")?,
+        victim_position: json_required_vec3(object, "victim_position")?,
     })
 }
 

@@ -26,6 +26,8 @@ pub mod ball_carry;
 pub use ball_carry::*;
 pub mod boost;
 pub use boost::*;
+pub mod bump;
+pub use bump::*;
 pub mod ceiling_shot;
 pub use ceiling_shot::*;
 pub mod demo;

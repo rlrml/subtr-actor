@@ -11,6 +11,7 @@ import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
+  buildBumpTimelineEvents,
   buildCeilingShotTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
@@ -31,6 +32,7 @@ import {
   renderAirDribbleStats,
   renderBallCarryStats,
   renderBoostStats,
+  renderBumpStats,
   renderCeilingShotStats,
   renderCoreStats,
   renderDemoStats,
@@ -985,5 +987,17 @@ export function createDemoModule(): StatModule {
     label: "Demo",
     select: (player) => player.demo,
     render: (demo) => renderDemoStats(demo),
+  });
+}
+
+export function createBumpModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "bump",
+    label: "Bump",
+    select: (player) => player.bump,
+    render: (bump) => renderBumpStats(bump),
+    getTimelineEvents(ctx) {
+      return buildBumpTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }

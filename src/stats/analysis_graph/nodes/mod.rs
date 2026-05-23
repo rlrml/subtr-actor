@@ -1,7 +1,7 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
-    BallCarryCalculator, BallFrameState, BoostCalculator, CeilingShotCalculator,
+    BallCarryCalculator, BallFrameState, BoostCalculator, BumpCalculator, CeilingShotCalculator,
     ContinuousBallControlState, DemoCalculator, DodgeResetCalculator, DoubleTapCalculator,
     EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator,
     FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState,
@@ -18,6 +18,7 @@ pub(crate) mod backboard_bounce;
 pub(crate) mod ball_carry;
 pub(crate) mod ball_frame_state;
 pub(crate) mod boost;
+pub(crate) mod bump;
 pub(crate) mod ceiling_shot;
 pub(crate) mod continuous_ball_control;
 pub(crate) mod demo;
@@ -64,6 +65,8 @@ pub use ball_carry::BallCarryNode;
 pub use ball_frame_state::BallFrameStateNode;
 #[allow(unused_imports)]
 pub use boost::BoostNode;
+#[allow(unused_imports)]
+pub use bump::BumpNode;
 #[allow(unused_imports)]
 pub use ceiling_shot::CeilingShotNode;
 #[allow(unused_imports)]
@@ -316,6 +319,10 @@ pub(crate) fn ball_carry_dependency() -> AnalysisDependency {
 
 pub(crate) fn boost_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<BoostCalculator>(boost::boxed_default)
+}
+
+pub(crate) fn bump_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<BumpCalculator>(bump::boxed_default)
 }
 
 pub(crate) fn movement_dependency() -> AnalysisDependency {

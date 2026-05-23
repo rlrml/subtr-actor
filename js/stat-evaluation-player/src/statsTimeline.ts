@@ -1,5 +1,6 @@
 import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
 import type { BoostPickupComparisonEvent } from "./generated/BoostPickupComparisonEvent.ts";
+import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
@@ -53,6 +54,7 @@ export type {
   WavedashEvent,
   WhiffEvent,
   BoostPickupComparisonEvent,
+  BumpEvent,
 };
 
 export function createStatsFrameLookup(statsTimeline: StatsTimeline): Map<number, StatsFrame> {

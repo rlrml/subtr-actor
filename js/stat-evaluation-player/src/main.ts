@@ -1594,6 +1594,7 @@ function getCapabilityLabel(
     "backboard:events": "Backboard",
     "ball-carry:events": "Ball carry",
     "boost:ranges": "Boost pickup timeline",
+    "bump:events": "Bump",
     "ceiling-shot:events": "Ceiling shot",
     "demo:events": "Demo",
     "dodge-reset:events": "Dodge reset",

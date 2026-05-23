@@ -34,6 +34,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     wavedash: [],
     whiff: [],
     boost_pickups: [],
+    bump: [],
   }, overrides);
 }
 

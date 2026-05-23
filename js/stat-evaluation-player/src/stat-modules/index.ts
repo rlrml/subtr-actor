@@ -9,6 +9,7 @@ import {
   createAirDribbleModule,
   createBallCarryModule,
   createBoostModule,
+  createBumpModule,
   createCeilingShotModule,
   createCoreModule,
   createDemoModule,
@@ -83,5 +84,6 @@ export function createStatModules(
     createMovementModule(runtime),
     createPowerslideModule(),
     createDemoModule(),
+    createBumpModule(),
   ];
 }

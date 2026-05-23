@@ -524,6 +524,34 @@ export function buildWavedashTimelineEvents(
   });
 }
 
+export function buildBumpTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.bump.map((event, index) => {
+    const initiatorId = playerIdToString(event.initiator);
+    const victimId = playerIdToString(event.victim);
+    const initiatorName = replay.players.find((player) => player.id === initiatorId)?.name
+      ?? initiatorId;
+    const victimName = replay.players.find((player) => player.id === victimId)?.name ?? victimId;
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const confidencePercent = Math.round(event.confidence * 100);
+
+    return {
+      id: `bump:${event.frame}:${initiatorId}:${victimId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "bump",
+      label: `${initiatorName} bumped ${victimName} ${confidencePercent}%`,
+      shortLabel: "B",
+      playerId: initiatorId,
+      playerName: initiatorName,
+      isTeamZero: event.initiator_is_team_0,
+      color: event.initiator_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 function getWhiffShortLabel(
   event: StatsTimeline["events"]["whiff"][number],
 ): string {

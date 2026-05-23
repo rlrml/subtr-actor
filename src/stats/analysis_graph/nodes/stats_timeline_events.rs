@@ -51,6 +51,7 @@ impl_analysis_node! {
         wavedash_dependency(),
         whiff_dependency(),
         boost_dependency(),
+        bump_dependency(),
     ],
     inputs = {
         match_stats: MatchStatsCalculator,
@@ -80,6 +81,7 @@ impl_analysis_node! {
         wavedash: WavedashCalculator,
         whiff: WhiffCalculator,
         boost: BoostCalculator,
+        bump: BumpCalculator,
     },
     evaluate = |node| {
         let mut timeline = match_stats.timeline().to_vec();
@@ -126,6 +128,7 @@ impl_analysis_node! {
             wavedash: wavedash.events().to_vec(),
             whiff: whiff.events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
+            bump: bump.events().to_vec(),
         };
         Ok(())
     },

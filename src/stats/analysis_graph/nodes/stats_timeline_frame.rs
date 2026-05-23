@@ -51,6 +51,7 @@ impl StatsTimelineFrameNode {
         let pass = ctx.get::<PassCalculator>()?;
         let ball_carry = ctx.get::<BallCarryCalculator>()?;
         let boost = ctx.get::<BoostCalculator>()?;
+        let bump = ctx.get::<BumpCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let powerslide = ctx.get::<PowerslideCalculator>()?;
         let demo = ctx.get::<DemoCalculator>()?;
@@ -98,6 +99,11 @@ impl StatsTimelineFrameNode {
                 boost.team_zero_stats().clone()
             } else {
                 boost.team_one_stats().clone()
+            },
+            bump: if is_team_zero {
+                bump.team_zero_stats().clone()
+            } else {
+                bump.team_one_stats().clone()
             },
             movement: if is_team_zero {
                 movement.team_zero_stats().clone()
@@ -236,6 +242,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            bump: ctx
+                .get::<BumpCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             movement: ctx
                 .get::<MovementCalculator>()?
                 .player_stats()
@@ -307,6 +319,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             dodge_reset_dependency(),
             ball_carry_dependency(),
             boost_dependency(),
+            bump_dependency(),
             movement_dependency(),
             positioning_dependency(),
             powerslide_dependency(),

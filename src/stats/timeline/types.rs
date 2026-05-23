@@ -60,6 +60,7 @@ pub struct ReplayStatsTimelineEvents {
     pub wavedash: Vec<WavedashEvent>,
     pub whiff: Vec<WhiffEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
+    pub bump: Vec<BumpEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -119,6 +120,7 @@ pub struct TeamStatsSnapshot {
     pub ball_carry: BallCarryStats,
     pub air_dribble: AirDribbleStats,
     pub boost: BoostStats,
+    pub bump: BumpTeamStats,
     pub movement: MovementStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoTeamStats,
@@ -149,6 +151,7 @@ pub struct PlayerStatsSnapshot {
     pub ball_carry: BallCarryStats,
     pub air_dribble: AirDribbleStats,
     pub boost: BoostStats,
+    pub bump: BumpPlayerStats,
     pub movement: MovementStats,
     pub positioning: PositioningStats,
     pub powerslide: PowerslideStats,

@@ -404,6 +404,21 @@ export function renderDemoStats(demo: PlayerStatsSnapshot["demo"] | undefined): 
   `;
 }
 
+export function renderBumpStats(bump: PlayerStatsSnapshot["bump"] | undefined): string {
+  const averageStrength = bump && bump.bumps_inflicted > 0
+    ? bump.cumulative_bump_strength / bump.bumps_inflicted
+    : undefined;
+  return `
+    <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(bump?.bumps_inflicted)}</span></div>
+    <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(bump?.bumps_taken)}</span></div>
+    <div class="stat-row"><span class="label">Team inflicted</span><span class="value">${formatInteger(bump?.team_bumps_inflicted)}</span></div>
+    <div class="stat-row"><span class="label">Team taken</span><span class="value">${formatInteger(bump?.team_bumps_taken)}</span></div>
+    <div class="stat-row"><span class="label">Last strength</span><span class="value">${formatNumber(asNumber(bump?.last_bump_strength), 0)}</span></div>
+    <div class="stat-row"><span class="label">Max strength</span><span class="value">${formatNumber(asNumber(bump?.max_bump_strength), 0)}</span></div>
+    <div class="stat-row"><span class="label">Avg strength</span><span class="value">${formatNumber(averageStrength, 0)}</span></div>
+  `;
+}
+
 export function renderDodgeResetStats(
   dodgeReset: PlayerStatsSnapshot["dodge_reset"] | undefined,
 ): string {

@@ -1,6 +1,7 @@
 use super::*;
 use crate::{
-    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, EmptyNetGoalCalculator,
+    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BumpCalculator,
+    EmptyNetGoalCalculator,
     FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, HighAerialGoalCalculator,
     LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
     OwnHalfGoalCalculator, PassCalculator, PlayerVerticalState, PossessionState, TouchState,
@@ -25,7 +26,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 46);
+    assert_eq!(names.len(), 47);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -34,6 +35,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("match_stats"));
     assert!(names.contains("live_play"));
     assert!(names.contains("touch"));
+    assert!(names.contains("bump"));
     assert!(names.contains("whiff"));
     assert!(names.contains("wavedash"));
     assert!(names.contains("half_flip"));
@@ -61,6 +63,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<TouchState>().is_some());
     assert!(graph.state::<PossessionState>().is_some());
     assert!(graph.state::<BackboardCalculator>().is_some());
+    assert!(graph.state::<BumpCalculator>().is_some());
     assert!(graph.state::<MatchStatsCalculator>().is_some());
     assert!(graph.state::<OneTimerCalculator>().is_some());
     assert!(graph.state::<PassCalculator>().is_some());
