@@ -31,7 +31,7 @@ impl AnalysisNode for DoubleTapNode {
         vec![
             frame_info_dependency(),
             ball_frame_state_dependency(),
-            frame_events_state_dependency(),
+            touch_state_dependency(),
             backboard_bounce_state_dependency(),
             live_play_dependency(),
         ]
@@ -41,7 +41,7 @@ impl AnalysisNode for DoubleTapNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
-            ctx.get::<FrameEventsState>()?,
+            ctx.get::<TouchState>()?,
             ctx.get::<BackboardBounceState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )

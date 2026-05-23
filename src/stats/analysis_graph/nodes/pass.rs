@@ -31,7 +31,7 @@ impl AnalysisNode for PassNode {
         vec![
             frame_info_dependency(),
             ball_frame_state_dependency(),
-            frame_events_state_dependency(),
+            touch_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -40,7 +40,7 @@ impl AnalysisNode for PassNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
-            ctx.get::<FrameEventsState>()?,
+            ctx.get::<TouchState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

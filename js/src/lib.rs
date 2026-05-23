@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector},

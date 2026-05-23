@@ -4,6 +4,8 @@ const DEFAULT_AERIAL_GOAL_MIN_BALL_Z: f32 = 600.0;
 const DEFAULT_HIGH_AERIAL_GOAL_MIN_BALL_Z: f32 = 700.0;
 const DEFAULT_LONG_DISTANCE_GOAL_MAX_ATTACKING_Y: f32 = 1024.0;
 const DEFAULT_OWN_HALF_GOAL_MAX_ATTACKING_Y: f32 = 0.0;
+// Avoid labeling long delayed clears as own-half goals solely from replay goal credit.
+const OWN_HALF_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 8.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_Y_MARGIN: f32 = 700.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_DISTANCE: f32 = 1000.0;
 const DEFAULT_EMPTY_NET_MAX_TOUCH_ATTACKING_Y: f32 = 3600.0;
@@ -347,7 +349,12 @@ impl OwnHalfGoalCalculator {
     }
 
     fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
-        tag_goals_by_attacking_y(goals, GoalTagKind::OwnHalfGoal, self.config.max_attacking_y)
+        tag_goals_by_recent_attacking_y(
+            goals,
+            GoalTagKind::OwnHalfGoal,
+            self.config.max_attacking_y,
+            OWN_HALF_GOAL_MAX_TOUCH_TO_GOAL_SECONDS,
+        )
     }
 }
 
@@ -621,11 +628,23 @@ fn tag_goals_by_attacking_y(
     kind: GoalTagKind,
     max_attacking_y: f32,
 ) -> Vec<GoalTagEvent> {
+    tag_goals_by_recent_attacking_y(goals, kind, max_attacking_y, f32::INFINITY)
+}
+
+fn tag_goals_by_recent_attacking_y(
+    goals: &[GoalContextEvent],
+    kind: GoalTagKind,
+    max_attacking_y: f32,
+    max_touch_to_goal_seconds: f32,
+) -> Vec<GoalTagEvent> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let Some(touch) = goal.scorer_last_touch.as_ref() else {
             continue;
         };
+        if goal.time - touch.time > max_touch_to_goal_seconds {
+            continue;
+        }
         let Some(ball_position) = touch.ball_position else {
             continue;
         };

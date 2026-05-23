@@ -208,7 +208,7 @@ impl PassCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        events: &FrameEventsState,
+        touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.begin_sample(frame);
@@ -222,7 +222,7 @@ impl PassCalculator {
             return Ok(());
         };
 
-        for touch in &events.touch_events {
+        for touch in &touch_state.touch_events {
             let Some(player) = touch.player.clone() else {
                 self.last_touch = None;
                 continue;

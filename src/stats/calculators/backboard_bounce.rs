@@ -94,7 +94,7 @@ impl BackboardBounceCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        events: &FrameEventsState,
+        touch_state: &TouchState,
         live_play_state: &LivePlayState,
     ) -> BackboardBounceState {
         if !live_play_state.is_live_play {
@@ -105,14 +105,14 @@ impl BackboardBounceCalculator {
         }
 
         let bounce_events: Vec<_> = self
-            .detect_bounce(frame, ball.sample(), &events.touch_events)
+            .detect_bounce(frame, ball.sample(), &touch_state.touch_events)
             .into_iter()
             .collect();
         if let Some(last_bounce_event) = bounce_events.last() {
             self.last_bounce_event = Some(last_bounce_event.clone());
         }
 
-        if let Some(last_touch) = events.touch_events.last() {
+        if let Some(last_touch) = touch_state.touch_events.last() {
             self.last_touch = Some(last_touch.clone());
         }
         self.previous_ball_velocity = ball.velocity();

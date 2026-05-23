@@ -663,10 +663,10 @@ impl MatchStatsCalculator {
         &mut self,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        events: &FrameEventsState,
+        touch_events: &[TouchEvent],
     ) {
         let ball_position = ball.position().map(GoalContextPosition::from);
-        for touch in &events.touch_events {
+        for touch in touch_events {
             let Some(player_id) = touch.player.clone() else {
                 continue;
             };
@@ -956,6 +956,7 @@ impl MatchStatsCalculator {
 }
 
 impl MatchStatsCalculator {
+    #[allow(clippy::too_many_arguments)]
     pub fn update_parts(
         &mut self,
         frame: &FrameInfo,
@@ -964,6 +965,7 @@ impl MatchStatsCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
         live_play_state: &LivePlayState,
+        touch_state: &TouchState,
     ) -> SubtrActorResult<()> {
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
@@ -974,7 +976,7 @@ impl MatchStatsCalculator {
             self.last_touch_context_by_player.clear();
             self.boost_leadup_samples_by_player.clear();
         }
-        self.update_last_touch_contexts(ball, players, events);
+        self.update_last_touch_contexts(ball, players, &touch_state.touch_events);
         self.record_goal_context_events(ball, players, events);
         self.pending_goal_events
             .extend(events.goal_events.iter().cloned().map(|event| {

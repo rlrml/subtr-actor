@@ -25,6 +25,7 @@ impl_analysis_node! {
         player_frame_state_dependency() => PlayerFrameState,
         frame_events_state_dependency() => FrameEventsState,
         live_play_dependency() => LivePlayState,
+        touch_state_dependency() => TouchState,
     ],
     call = calculator.update_parts,
 }

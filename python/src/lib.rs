@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::*;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use subtr_actor::*;
 
 #[allow(clippy::useless_conversion)]
@@ -133,8 +133,8 @@ fn parse_ndarray_dtype(dtype: Option<String>) -> PyResult<NDArrayDType> {
     }
 }
 
-fn replay_from_filepath(filepath: &PathBuf) -> PyResult<boxcars::Replay> {
-    let data = std::fs::read(filepath.as_path()).map_err(to_py_error)?;
+fn replay_from_filepath(filepath: &Path) -> PyResult<boxcars::Replay> {
+    let data = std::fs::read(filepath).map_err(to_py_error)?;
     replay_from_data(&data)
 }
 

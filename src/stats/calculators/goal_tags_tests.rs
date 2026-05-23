@@ -186,6 +186,21 @@ fn own_half_goal_also_gets_long_distance_goal_tag() {
 }
 
 #[test]
+fn own_half_goal_rejects_stale_scorer_touch() {
+    let mut goal = goal_with_touch(true, position(0.0, -100.0, 120.0), Vec::new());
+    goal.scorer_last_touch.as_mut().unwrap().time = 1.0;
+
+    let own_half_events = OwnHalfGoalCalculator::new().tag_goals(&[goal.clone()]);
+    let long_distance_events = LongDistanceGoalCalculator::new().tag_goals(&[goal]);
+
+    assert!(own_half_events.is_empty());
+    assert_eq!(
+        tag_kinds(&long_distance_events),
+        vec![GoalTagKind::LongDistanceGoal]
+    );
+}
+
+#[test]
 fn long_distance_goal_does_not_require_own_half_touch() {
     let goal = goal_with_touch(true, position(0.0, 800.0, 120.0), Vec::new());
 

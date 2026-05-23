@@ -75,6 +75,43 @@ fn assert_finite_json(value: &Value, path: &str) {
 }
 
 #[test]
+fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
+    let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("failed to collect stats timeline for post-EAC standard replay");
+
+    assert!(
+        timeline.events.goal_context.len() >= 2,
+        "expected at least two goals in post-EAC standard replay"
+    );
+    let second_goal = &timeline.events.goal_context[1];
+    let scorer_last_touch = second_goal
+        .scorer_last_touch
+        .as_ref()
+        .expect("expected the second goal scorer touch to resolve");
+    assert!(
+        scorer_last_touch.time > 98.0,
+        "expected second goal scorer touch to come from the late attacking touch, got {}",
+        scorer_last_touch.time
+    );
+    assert!(
+        scorer_last_touch
+            .ball_position
+            .is_some_and(|position| position.y < 0.0),
+        "expected second goal scorer touch to be in the orange attacking half"
+    );
+    assert!(
+        !timeline
+            .events
+            .goal_tags
+            .iter()
+            .any(|event| { event.goal_index == 1 && event.kind == GoalTagKind::OwnHalfGoal }),
+        "second goal should not be tagged as own-half"
+    );
+}
+
+#[test]
 fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
     let timeline = StatsTimelineCollector::new()

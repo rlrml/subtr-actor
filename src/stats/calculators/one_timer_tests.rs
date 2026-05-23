@@ -50,9 +50,9 @@ fn update_pass(
         .update(
             &frame,
             &ball,
-            &FrameEventsState {
+            &TouchState {
                 touch_events,
-                ..FrameEventsState::default()
+                ..TouchState::default()
             },
             true,
         )

@@ -370,8 +370,7 @@ fn download_ballchasing_replay(
 ) -> anyhow::Result<()> {
     let bytes = client
         .get(format!(
-            "{BALLCHASING_API_BASE_URL}/replays/{}/file",
-            replay_id
+            "{BALLCHASING_API_BASE_URL}/replays/{replay_id}/file"
         ))
         .header("Authorization", api_key)
         .send()
@@ -449,7 +448,7 @@ fn collect_sources(config: &Config) -> anyhow::Result<Vec<ReplaySourceInput>> {
             ),
             bytes_path: cache_path.clone(),
             label,
-            meta: serde_json::to_value(&summary_meta(&summary))?,
+            meta: serde_json::to_value(summary_meta(&summary))?,
         });
     }
 

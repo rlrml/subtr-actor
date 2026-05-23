@@ -23,7 +23,7 @@ impl_analysis_node! {
     dependencies = [
         frame_info_dependency() => FrameInfo,
         ball_frame_state_dependency() => BallFrameState,
-        frame_events_state_dependency() => FrameEventsState,
+        touch_state_dependency() => TouchState,
         live_play_dependency() => LivePlayState,
     ],
     update_state = calculator.update,
