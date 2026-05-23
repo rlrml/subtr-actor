@@ -210,8 +210,12 @@ test("replay normalization carries bounded player frame gaps", () => {
 
   assert.deepEqual(frames[1]!.position, frames[0]!.position);
   assert.deepEqual(frames[2]!.position, frames[0]!.position);
+  assert.equal(frames[1]!.isPresent, false);
+  assert.equal(frames[2]!.isPresent, false);
   assert.equal(frames[1]!.boostActive, false);
   assert.equal(frames[2]!.boostActive, false);
   assert.deepEqual(frames[3]!.position, { x: 30, y: 0, z: 17 });
+  assert.equal(frames[3]!.isPresent, true);
   assert.equal(frames[4]!.position, null);
+  assert.equal(frames[4]!.isPresent, false);
 });

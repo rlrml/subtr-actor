@@ -240,7 +240,7 @@ export function updateAttachedCamera(options: {
   );
   const frame = attachedPlayer?.frames[frameIndex];
 
-  if (!attachedPlayer || !frame?.position) {
+  if (!attachedPlayer || !frame?.position || frame.isPresent === false) {
     controls.enabled = true;
     return;
   }

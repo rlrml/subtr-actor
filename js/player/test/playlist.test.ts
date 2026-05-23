@@ -34,7 +34,6 @@ test("playlist manifests preserve generic playback policy", () => {
   assert.deepEqual(manifest.playback, {
     advanceMode: "manual",
     endMode: "loop",
-    advanceOnEnd: undefined,
   });
 });
 

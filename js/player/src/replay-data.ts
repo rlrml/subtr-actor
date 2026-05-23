@@ -182,6 +182,7 @@ function normalizeReplayTime(rawTime: number, startTime: number): number {
 function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   if (frame === "Empty") {
     return {
+      isPresent: false,
       position: null,
       linearVelocity: null,
       angularVelocity: null,
@@ -208,6 +209,7 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
     : null;
 
   return {
+    isPresent: true,
     position: rigidBody.location,
     linearVelocity: rigidBody.linear_velocity ?? null,
     angularVelocity: rigidBody.angular_velocity ?? null,
@@ -231,6 +233,7 @@ function hasPlayerPosition(sample: PlayerSample): boolean {
 function carriedPlayerSample(sample: PlayerSample): PlayerSample {
   return {
     ...sample,
+    isPresent: false,
     linearVelocity: null,
     angularVelocity: null,
     boostActive: false,
@@ -1125,6 +1128,7 @@ function demoTimelineEvent(
     playerName: attacker?.name ?? attackerId,
     secondaryPlayerId: victimId,
     secondaryPlayerName: victim?.name ?? victimId,
+    location: event.victim_location,
     isTeamZero: attacker?.isTeamZero ?? null,
   };
 }

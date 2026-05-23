@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
+import {
+  createReplayScene,
+  updateBoostMeter,
+  type DemoIndicator,
+  type ReplayScene,
+} from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
@@ -49,6 +54,7 @@ import type {
 const DEFAULT_FIELD_SCALE = 1;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const DEFAULT_CAMERA_VIEW_MODE: ReplayCameraViewMode = "free";
+const DEMO_INDICATOR_DURATION_SECONDS = 3.2;
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
@@ -93,6 +99,12 @@ function normalizeCustomCameraSettings(
     normalized.transitionSpeed = transitionSpeed;
   }
   return normalized;
+}
+
+function isPlayerSamplePresent(
+  sample: ReplayModel["players"][number]["frames"][number] | null | undefined,
+): boolean {
+  return Boolean(sample?.position) && sample?.isPresent !== false;
 }
 
 export class ReplayPlayer extends EventTarget {
@@ -671,18 +683,24 @@ export class ReplayPlayer extends EventTarget {
     for (const [playerIndex, player] of this.replay.players.entries()) {
       const mesh = this.sceneState.playerMeshes.get(player.id);
       const boostTrail = this.sceneState.playerBoostTrails.get(player.id);
+      const boostMeter = this.sceneState.playerBoostMeters.get(player.id);
+      const demoIndicator = this.sceneState.playerDemoIndicators.get(player.id);
       const frame = player.frames[frameIndex] ?? null;
       const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
       let interpolatedPosition: Vec3 | null = null;
+      let renderPosition: Vec3 | null = null;
       let boostFraction = 0;
       if (!mesh) {
+        if (demoIndicator) {
+          demoIndicator.group.visible = false;
+        }
         renderPlayers.push({
           track: player,
           mesh: null,
           boostTrail: boostTrail ?? null,
           frame,
           nextFrame,
-          interpolatedPosition,
+          interpolatedPosition: renderPosition,
           boostFraction,
         });
         continue;
@@ -698,19 +716,55 @@ export class ReplayPlayer extends EventTarget {
         if (boostTrail) {
           boostTrail.visible = false;
         }
+        if (boostMeter) {
+          boostMeter.group.visible = false;
+        }
+        if (demoIndicator) {
+          demoIndicator.group.visible = false;
+        }
         renderPlayers.push({
           track: player,
           mesh,
           boostTrail: boostTrail ?? null,
           frame,
           nextFrame,
+          interpolatedPosition: renderPosition,
+          boostFraction,
+        });
+        continue;
+      }
+
+      const playerVisible = isPlayerSamplePresent(frame);
+      if (!playerVisible) {
+        mesh.visible = false;
+        if (boostTrail) {
+          boostTrail.visible = false;
+        }
+        if (boostMeter) {
+          boostMeter.group.visible = false;
+        }
+        this.updateDemoIndicator(
+          player.id,
+          demoIndicator ?? null,
           interpolatedPosition,
+        );
+        renderPlayers.push({
+          track: player,
+          mesh,
+          boostTrail: boostTrail ?? null,
+          frame,
+          nextFrame,
+          interpolatedPosition: renderPosition,
           boostFraction,
         });
         continue;
       }
 
       mesh.visible = true;
+      if (demoIndicator) {
+        demoIndicator.group.visible = false;
+      }
+      renderPosition = interpolatedPosition;
       mesh.position.copy(rootPosition(interpolatedPosition));
       if (frame?.rotation) {
         mesh.quaternion.set(
@@ -748,7 +802,6 @@ export class ReplayPlayer extends EventTarget {
         );
       }
 
-      const boostMeter = this.sceneState.playerBoostMeters.get(player.id);
       if (boostMeter) {
         if (this.boostMeterEnabled) {
           boostMeter.group.visible = true;
@@ -773,7 +826,7 @@ export class ReplayPlayer extends EventTarget {
         boostTrail: boostTrail ?? null,
         frame,
         nextFrame,
-        interpolatedPosition,
+        interpolatedPosition: renderPosition,
         boostFraction,
       });
     }
@@ -1016,6 +1069,65 @@ export class ReplayPlayer extends EventTarget {
       entry.plugin.onStateChange?.(pluginStateContext);
     }
     this.dispatchEvent(new CustomEvent<ReplayPlayerState>("change", { detail: state }));
+  }
+
+  private getActiveDemoEvent(
+    victimPlayerId: string,
+    currentTime: number,
+  ): ReplayModel["timelineEvents"][number] | null {
+    for (let index = this.replay.timelineEvents.length - 1; index >= 0; index -= 1) {
+      const event = this.replay.timelineEvents[index]!;
+      const age = currentTime - event.time;
+      if (age < 0) {
+        continue;
+      }
+      if (age > DEMO_INDICATOR_DURATION_SECONDS) {
+        break;
+      }
+      if (event.kind === "demo" && event.secondaryPlayerId === victimPlayerId) {
+        return event;
+      }
+    }
+    return null;
+  }
+
+  private updateDemoIndicator(
+    playerId: string,
+    indicator: DemoIndicator | null,
+    fallbackPosition: Vec3 | null,
+  ): void {
+    if (!indicator) {
+      return;
+    }
+
+    const demoEvent = this.getActiveDemoEvent(playerId, this.currentTime);
+    const position = demoEvent?.location ?? fallbackPosition;
+    if (!demoEvent || !position) {
+      indicator.group.visible = false;
+      return;
+    }
+
+    const age = Math.max(0, this.currentTime - demoEvent.time);
+    const phase = this.currentTime * 8;
+    const pulse = 1 + 0.08 * Math.sin(phase);
+    indicator.group.visible = true;
+    indicator.group.position.copy(rootPosition(position));
+    indicator.ring.rotation.z = phase * 0.15;
+    indicator.ring.scale.setScalar(pulse);
+    indicator.label.quaternion.copy(this.sceneState.camera.quaternion);
+    indicator.label.scale.setScalar(1 + 0.04 * Math.sin(phase + 1.3));
+
+    const opacity = THREE.MathUtils.clamp(
+      1 - age / DEMO_INDICATOR_DURATION_SECONDS,
+      0.28,
+      1,
+    );
+    for (const node of [indicator.ring, indicator.label]) {
+      const material = node.material;
+      if (material instanceof THREE.Material) {
+        material.opacity = opacity;
+      }
+    }
   }
 
   private updateBoostTrail(

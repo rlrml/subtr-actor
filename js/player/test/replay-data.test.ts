@@ -250,6 +250,45 @@ test("normalization keeps PlayStation players with duplicate online ids distinct
   );
 });
 
+test("normalization marks carried player frame gaps as not present", () => {
+  const raw = buildReplayData(3, 2);
+  raw.frame_data.players[0]![1].frames = [
+    playerFrame("Blue 1", 0),
+    "Empty",
+    playerFrame("Blue 1", 2),
+  ];
+
+  const replay = normalizeReplayData(raw);
+  const frames = replay.players[0]!.frames;
+
+  assert.equal(frames[0]!.isPresent, true);
+  assert.equal(frames[1]!.isPresent, false);
+  assert.deepEqual(frames[1]!.position, frames[0]!.position);
+  assert.equal(frames[2]!.isPresent, true);
+});
+
+test("normalization includes victim location on demo timeline events", () => {
+  const raw = buildReplayData(3, 2);
+  raw.demolish_infos = [
+    {
+      time: 10.1,
+      seconds_remaining: 299.9,
+      frame: 1,
+      attacker: { Steam: "blue-player-0" },
+      victim: { Steam: "orange-player-0" },
+      attacker_velocity: { x: 2300, y: 0, z: 0 },
+      victim_velocity: { x: 0, y: 0, z: 0 },
+      victim_location: { x: 120, y: -300, z: 17 },
+    },
+  ];
+
+  const replay = normalizeReplayData(raw);
+  const demoEvent = replay.timelineEvents.find((event) => event.kind === "demo");
+
+  assert.equal(demoEvent?.secondaryPlayerId, "Steam:orange-player-0");
+  assert.deepEqual(demoEvent?.location, { x: 120, y: -300, z: 17 });
+});
+
 test("async normalization yields at configured frame progress intervals", async () => {
   let yieldCount = 0;
   const raw = buildReplayData(24);

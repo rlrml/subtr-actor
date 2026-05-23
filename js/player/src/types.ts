@@ -93,6 +93,7 @@ export interface BallSample {
 }
 
 export interface PlayerSample {
+  isPresent?: boolean;
   position: Vec3 | null;
   linearVelocity: Vec3 | null;
   angularVelocity: Vec3 | null;
@@ -137,6 +138,7 @@ export interface ReplayTimelineEvent {
   playerName?: string | null;
   secondaryPlayerId?: string | null;
   secondaryPlayerName?: string | null;
+  location?: Vec3 | null;
   isTeamZero?: boolean | null;
   color?: string;
 }

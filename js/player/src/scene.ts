@@ -14,6 +14,7 @@ export interface ReplayScene {
   playerMeshes: Map<string, THREE.Object3D>;
   playerBoostTrails: Map<string, THREE.Group>;
   playerBoostMeters: Map<string, BoostMeter>;
+  playerDemoIndicators: Map<string, DemoIndicator>;
   updateWallVisibility: () => void;
 }
 
@@ -667,6 +668,12 @@ export interface BoostMeter {
   lastPercent: number | null;
 }
 
+export interface DemoIndicator {
+  group: THREE.Group;
+  ring: THREE.Mesh;
+  label: THREE.Mesh;
+}
+
 function createBoostMeter(): BoostMeter {
   const group = new THREE.Group();
   group.visible = false;
@@ -749,6 +756,58 @@ function createBoostMeter(): BoostMeter {
     labelCanvas,
     lastPercent: null,
   };
+}
+
+function createDemoIndicator(): DemoIndicator {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffd15c,
+    transparent: true,
+    opacity: 0.86,
+    depthWrite: false,
+  });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(170, 8, 8, 48), ringMaterial);
+  ring.position.z = 16;
+  group.add(ring);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 192;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to create demo indicator label context");
+  }
+
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.lineJoin = "round";
+  context.font = "800 86px sans-serif";
+  context.lineWidth = 20;
+  context.strokeStyle = "rgba(7, 19, 29, 0.94)";
+  context.strokeText("DEMO", canvas.width / 2, 88);
+  context.fillStyle = "#fff0b8";
+  context.fillText("DEMO", canvas.width / 2, 88);
+  context.font = "700 34px sans-serif";
+  context.lineWidth = 10;
+  context.strokeText("RESPAWNING", canvas.width / 2, 150);
+  context.fillStyle = "#ffbd4a";
+  context.fillText("RESPAWNING", canvas.width / 2, 150);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const labelMaterial = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(310, 116), labelMaterial);
+  label.position.z = 300;
+  group.add(label);
+
+  return { group, ring, label };
 }
 
 export function updateBoostMeter(
@@ -877,16 +936,20 @@ export function createReplayScene(
   const playerMeshes = new Map<string, THREE.Object3D>();
   const playerBoostTrails = new Map<string, THREE.Group>();
   const playerBoostMeters = new Map<string, BoostMeter>();
+  const playerDemoIndicators = new Map<string, DemoIndicator>();
   for (const player of replay.players) {
     const mesh = createExampleCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40");
     const boostTrail = createBoostTrail();
     mesh.add(boostTrail);
     const boostMeter = createBoostMeter();
     mesh.add(boostMeter.group);
+    const demoIndicator = createDemoIndicator();
     replayRoot.add(mesh);
+    replayRoot.add(demoIndicator.group);
     playerMeshes.set(player.id, mesh);
     playerBoostTrails.set(player.id, boostTrail);
     playerBoostMeters.set(player.id, boostMeter);
+    playerDemoIndicators.set(player.id, demoIndicator);
   }
 
   const resize = (): void => {
@@ -947,6 +1010,7 @@ export function createReplayScene(
     playerMeshes,
     playerBoostTrails,
     playerBoostMeters,
+    playerDemoIndicators,
     updateWallVisibility,
   };
 }
