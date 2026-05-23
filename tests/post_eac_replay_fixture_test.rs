@@ -3,8 +3,8 @@ mod common;
 use serde_json::Value;
 use subtr_actor::{
     builtin_stats_module_names, evaluate_replay_plausibility, Collector, FrameRateDecorator,
-    NDArrayCollector, PlayerFrame, ReplayDataCollector, StatsCollector, StatsFrameResolution,
-    StatsTimelineCollector,
+    GoalTagKind, NDArrayCollector, PlayerFrame, ReplayDataCollector, StatsCollector,
+    StatsFrameResolution, StatsTimelineCollector,
 };
 
 struct PostEacFixture {
@@ -42,6 +42,7 @@ const POST_EAC_FIXTURES: &[PostEacFixture] = &[
 ];
 
 const POST_EAC_BUILD_VERSION: &str = "260316.80791.512269";
+const POST_EAC_RANKED_STANDARD_REPLAY: &str = "assets/post-eac-ranked-standard-2026-04-28.replay";
 
 fn header_string<'a>(replay: &'a boxcars::Replay, key: &str) -> Option<&'a str> {
     replay
@@ -71,6 +72,34 @@ fn assert_finite_json(value: &Value, path: &str) {
             }
         }
     }
+}
+
+#[test]
+fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
+    let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("failed to collect stats timeline for post-EAC standard replay");
+
+    let third_goal = timeline
+        .events
+        .goal_context
+        .get(2)
+        .expect("expected at least three goals in post-EAC standard replay");
+    let last_touch_z = third_goal
+        .scorer_last_touch
+        .as_ref()
+        .and_then(|touch| touch.ball_position)
+        .map(|position| position.z);
+
+    assert!(
+        !timeline
+            .events
+            .goal_tags
+            .iter()
+            .any(|event| { event.goal_index == 2 && event.kind == GoalTagKind::AerialGoal }),
+        "third goal should not be tagged as aerial; last-touch ball z was {last_touch_z:?}"
+    );
 }
 
 fn assert_collected_stats_modules(value: &Value, path: &str) {
