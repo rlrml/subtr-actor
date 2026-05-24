@@ -47,7 +47,7 @@ impl AnalysisNode for ContinuousBallControlNode {
                 ctx.get::<BallFrameState>()?,
                 ctx.get::<PlayerFrameState>()?,
                 ctx.get::<LivePlayState>()?.is_live_play,
-                touch_state.last_touch_player.as_ref(),
+                touch_state,
             )
         } else {
             None

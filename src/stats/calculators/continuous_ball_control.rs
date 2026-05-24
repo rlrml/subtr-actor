@@ -18,6 +18,7 @@ pub struct ContinuousBallControlSample<K> {
 pub struct ContinuousBallControlCandidate<K> {
     pub player_id: PlayerId,
     pub is_team_0: bool,
+    pub touch_count: u32,
     pub sample: ContinuousBallControlSample<K>,
 }
 
@@ -36,6 +37,9 @@ pub struct CompletedBallControlSequence<K> {
     pub average_horizontal_gap: f32,
     pub average_vertical_gap: f32,
     pub average_speed: f32,
+    pub start_position: glam::Vec3,
+    pub end_position: glam::Vec3,
+    pub touch_count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +58,7 @@ struct ActiveBallControlSequence<K> {
     horizontal_gap_integral: f32,
     vertical_gap_integral: f32,
     speed_integral: f32,
+    touch_count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +98,7 @@ where
             horizontal_gap_integral: sample.horizontal_gap * frame.dt,
             vertical_gap_integral: sample.vertical_gap * frame.dt,
             speed_integral: sample.speed * frame.dt,
+            touch_count: candidate.touch_count,
         }
     }
 
@@ -100,6 +106,7 @@ where
         active_sequence: &mut ActiveBallControlSequence<K>,
         frame: &FrameInfo,
         sample: ContinuousBallControlSample<K>,
+        touch_count: u32,
     ) {
         active_sequence.duration += frame.dt;
         active_sequence.path_distance += sample
@@ -111,6 +118,7 @@ where
         active_sequence.horizontal_gap_integral += sample.horizontal_gap * frame.dt;
         active_sequence.vertical_gap_integral += sample.vertical_gap * frame.dt;
         active_sequence.speed_integral += sample.speed * frame.dt;
+        active_sequence.touch_count += touch_count;
     }
 
     fn complete_sequence(
@@ -134,6 +142,9 @@ where
                 / active_sequence.duration,
             average_vertical_gap: active_sequence.vertical_gap_integral / active_sequence.duration,
             average_speed: active_sequence.speed_integral / active_sequence.duration,
+            start_position: active_sequence.start_position,
+            end_position: active_sequence.last_position,
+            touch_count: active_sequence.touch_count,
         }
     }
 
@@ -178,7 +189,12 @@ where
 
         if same_sequence {
             if let Some(active_sequence) = self.active_sequence.as_mut() {
-                Self::extend_sequence(active_sequence, frame, candidate.sample);
+                Self::extend_sequence(
+                    active_sequence,
+                    frame,
+                    candidate.sample,
+                    candidate.touch_count,
+                );
             }
         } else {
             if let Some(sequence) = self.finish_active_sequence(min_duration_for_kind) {

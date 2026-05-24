@@ -9,6 +9,8 @@ import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { LabeledFloatSumEntry } from "./generated/LabeledFloatSumEntry.ts";
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
 import type { MechanicEvent } from "./generated/MechanicEvent.ts";
+import type { MechanicEventProperty } from "./generated/MechanicEventProperty.ts";
+import type { MechanicEventPropertyValue } from "./generated/MechanicEventPropertyValue.ts";
 import type { MechanicTiming } from "./generated/MechanicTiming.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
@@ -43,6 +45,8 @@ export type {
   LabeledFloatSumEntry,
   LabeledFloatSums,
   MechanicEvent,
+  MechanicEventProperty,
+  MechanicEventPropertyValue,
   MechanicTiming,
   OneTimerEvent,
   PassEvent,

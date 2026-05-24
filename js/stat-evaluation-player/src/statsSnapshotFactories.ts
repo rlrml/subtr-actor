@@ -137,6 +137,10 @@ export function createTeamStatsSnapshot(
     },
     air_dribble: {
       count: 0,
+      ground_to_air_count: 0,
+      wall_to_air_count: 0,
+      total_touch_count: 0,
+      max_touch_count: 0,
       total_time: 0,
       total_straight_line_distance: 0,
       total_path_distance: 0,
@@ -434,6 +438,10 @@ export function createPlayerStatsSnapshot(
     },
     air_dribble: {
       count: 0,
+      ground_to_air_count: 0,
+      wall_to_air_count: 0,
+      total_touch_count: 0,
+      max_touch_count: 0,
       total_time: 0,
       total_straight_line_distance: 0,
       total_path_distance: 0,

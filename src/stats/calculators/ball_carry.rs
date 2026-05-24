@@ -53,6 +53,14 @@ impl BallCarryStats {
 #[ts(export)]
 pub struct AirDribbleStats {
     pub count: u32,
+    #[serde(default)]
+    pub ground_to_air_count: u32,
+    #[serde(default)]
+    pub wall_to_air_count: u32,
+    #[serde(default)]
+    pub total_touch_count: u32,
+    #[serde(default)]
+    pub max_touch_count: u32,
     pub total_time: f32,
     pub total_straight_line_distance: f32,
     pub total_path_distance: f32,
@@ -89,12 +97,33 @@ impl AirDribbleStats {
         self.count_average(self.speed_sum)
     }
 
+    pub fn average_touch_count(&self) -> f32 {
+        self.count_average(self.total_touch_count as f32)
+    }
+
     pub fn average_horizontal_gap(&self) -> f32 {
         self.count_average(self.average_horizontal_gap_sum)
     }
 
     pub fn average_vertical_gap(&self) -> f32 {
         self.count_average(self.average_vertical_gap_sum)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum AirDribbleOrigin {
+    GroundToAir,
+    WallToAir,
+}
+
+impl AirDribbleOrigin {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::GroundToAir => "ground_to_air",
+            Self::WallToAir => "wall_to_air",
+        }
     }
 }
 
@@ -113,6 +142,9 @@ pub struct BallCarryEvent {
     pub average_horizontal_gap: f32,
     pub average_vertical_gap: f32,
     pub average_speed: f32,
+    pub touch_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub air_dribble_origin: Option<AirDribbleOrigin>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
@@ -235,13 +267,18 @@ impl BallCarryCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         live_play: bool,
-        controlling_player: Option<&PlayerId>,
+        touch_state: &TouchState,
     ) -> Option<ContinuousBallControlCandidate<BallCarryKind>> {
         if !live_play {
             return None;
         }
         let ball = ball.sample()?;
-        let player_id = controlling_player?;
+        let player_id = touch_state.last_touch_player.as_ref()?;
+        let touch_count = touch_state
+            .touch_events
+            .iter()
+            .filter(|event| event.player.as_ref() == Some(player_id))
+            .count() as u32;
         players
             .players
             .iter()
@@ -251,15 +288,33 @@ impl BallCarryCalculator {
                     ContinuousBallControlCandidate {
                         player_id: player.player_id.clone(),
                         is_team_0: player.is_team_0,
+                        touch_count,
                         sample,
                     }
                 })
             })
     }
 
+    fn air_dribble_origin(start_position: glam::Vec3) -> AirDribbleOrigin {
+        const WALL_TAKEOFF_MIN_Z: f32 = 120.0;
+        const SIDE_WALL_START_ABS_X: f32 = 3200.0;
+        const BACK_WALL_START_ABS_Y: f32 = 4600.0;
+
+        if start_position.z >= WALL_TAKEOFF_MIN_Z
+            && (start_position.x.abs() >= SIDE_WALL_START_ABS_X
+                || start_position.y.abs() >= BACK_WALL_START_ABS_Y)
+        {
+            AirDribbleOrigin::WallToAir
+        } else {
+            AirDribbleOrigin::GroundToAir
+        }
+    }
+
     fn event_from_sequence(
         sequence: CompletedBallControlSequence<BallCarryKind>,
     ) -> BallCarryEvent {
+        let air_dribble_origin = (sequence.kind == BallCarryKind::AirDribble)
+            .then(|| Self::air_dribble_origin(sequence.start_position));
         BallCarryEvent {
             player_id: sequence.player_id,
             is_team_0: sequence.is_team_0,
@@ -274,6 +329,8 @@ impl BallCarryCalculator {
             average_horizontal_gap: sequence.average_horizontal_gap,
             average_vertical_gap: sequence.average_vertical_gap,
             average_speed: sequence.average_speed,
+            touch_count: sequence.touch_count,
+            air_dribble_origin,
         }
     }
 
@@ -337,6 +394,13 @@ impl BallCarryCalculator {
         stats.speed_sum += event.average_speed;
         stats.average_horizontal_gap_sum += event.average_horizontal_gap;
         stats.average_vertical_gap_sum += event.average_vertical_gap;
+        stats.total_touch_count += event.touch_count;
+        stats.max_touch_count = stats.max_touch_count.max(event.touch_count);
+        match event.air_dribble_origin {
+            Some(AirDribbleOrigin::GroundToAir) => stats.ground_to_air_count += 1,
+            Some(AirDribbleOrigin::WallToAir) => stats.wall_to_air_count += 1,
+            None => {}
+        }
     }
 
     pub fn update(&mut self, control_state: &ContinuousBallControlState) -> SubtrActorResult<()> {

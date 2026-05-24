@@ -1760,6 +1760,7 @@ fn moment_mechanic_event(
         player_id,
         is_team_0,
         timing: MechanicTiming::Moment { frame, time },
+        properties: Vec::new(),
     }
 }
 
@@ -1785,6 +1786,7 @@ fn span_mechanic_event(
             start_time,
             end_time,
         },
+        properties: Vec::new(),
     }
 }
 
@@ -1795,6 +1797,36 @@ fn mechanic_event_start_time(event: &MechanicEvent) -> f32 {
     }
 }
 
+fn mechanic_event_text_property(key: &str, value: &str) -> MechanicEventProperty {
+    MechanicEventProperty {
+        key: key.to_owned(),
+        value: MechanicEventPropertyValue::Text(value.to_owned()),
+    }
+}
+
+fn mechanic_event_unsigned_property(key: &str, value: u32) -> MechanicEventProperty {
+    MechanicEventProperty {
+        key: key.to_owned(),
+        value: MechanicEventPropertyValue::Unsigned(value),
+    }
+}
+
+fn ball_carry_mechanic_event_properties(
+    object: &serde_json::Map<String, Value>,
+) -> Vec<MechanicEventProperty> {
+    let mut properties = Vec::new();
+    if let Some(origin) = object.get("air_dribble_origin").and_then(Value::as_str) {
+        properties.push(mechanic_event_text_property("origin", origin));
+    }
+    if let Some(touch_count) = object.get("touch_count").and_then(Value::as_u64) {
+        properties.push(mechanic_event_unsigned_property(
+            "touch_count",
+            touch_count as u32,
+        ));
+    }
+    properties
+}
+
 fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
     let object = json_object(value, "ball carry mechanic event")?;
     let serialized_kind = json_required_str(object, "kind")?;
@@ -1803,7 +1835,7 @@ fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorRes
         "air_dribble" => "air_dribble",
         other => other,
     };
-    Ok(span_mechanic_event(
+    let mut mechanic_event = span_mechanic_event(
         kind,
         index,
         json_required_usize(object, "start_frame")?,
@@ -1812,7 +1844,11 @@ fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorRes
         json_required_f32(object, "end_time")?,
         json_required_remote_id(object, "player_id")?,
         json_required_bool(object, "is_team_0")?,
-    ))
+    );
+    if kind == "air_dribble" {
+        mechanic_event.properties = ball_carry_mechanic_event_properties(object);
+    }
+    Ok(mechanic_event)
 }
 
 fn parse_dodge_reset_mechanic_event(

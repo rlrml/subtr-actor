@@ -88,6 +88,23 @@ pub enum MechanicTiming {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[ts(export)]
+pub enum MechanicEventPropertyValue {
+    Text(String),
+    Unsigned(u32),
+    Float(f32),
+    Boolean(bool),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct MechanicEventProperty {
+    pub key: String,
+    pub value: MechanicEventPropertyValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MechanicEvent {
     pub id: String,
@@ -96,6 +113,8 @@ pub struct MechanicEvent {
     pub player_id: PlayerId,
     pub is_team_0: bool,
     pub timing: MechanicTiming,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub properties: Vec<MechanicEventProperty>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

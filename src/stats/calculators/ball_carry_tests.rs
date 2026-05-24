@@ -55,6 +55,28 @@ fn touch_state() -> TouchState {
     }
 }
 
+fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
+    let player_id = boxcars::RemoteId::Steam(1);
+    TouchState {
+        touch_events: vec![TouchEvent {
+            time,
+            frame,
+            team_is_team_0: true,
+            player: Some(player_id.clone()),
+            closest_approach_distance: None,
+        }],
+        last_touch: Some(TouchEvent {
+            time,
+            frame,
+            team_is_team_0: true,
+            player: Some(player_id.clone()),
+            closest_approach_distance: None,
+        }),
+        last_touch_player: Some(player_id),
+        last_touch_team_is_team_0: Some(true),
+    }
+}
+
 #[derive(Default)]
 struct BallCarryHarness {
     tracker: ContinuousBallControlTracker<BallCarryKind>,
@@ -76,7 +98,7 @@ impl BallCarryHarness {
                 ball,
                 players,
                 live_play_state.is_live_play,
-                touch_state.last_touch_player.as_ref(),
+                touch_state,
             )
         } else {
             None
@@ -137,10 +159,16 @@ fn counts_air_dribble_when_airborne_player_carries_airborne_ball() {
         .get(&player_id)
         .unwrap();
     assert_eq!(stats.count, 1);
+    assert_eq!(stats.ground_to_air_count, 1);
+    assert_eq!(stats.wall_to_air_count, 0);
     assert!((stats.total_time - 1.0).abs() < f32::EPSILON);
     assert_eq!(
         harness.calculator.carry_events()[0].kind,
         BallCarryKind::AirDribble
+    );
+    assert_eq!(
+        harness.calculator.carry_events()[0].air_dribble_origin,
+        Some(AirDribbleOrigin::GroundToAir)
     );
 }
 
@@ -183,5 +211,91 @@ fn keeps_ground_carry_stats_separate_from_air_dribbles() {
     assert_eq!(
         harness.calculator.carry_events()[0].kind,
         BallCarryKind::Carry
+    );
+}
+
+#[test]
+fn records_air_dribble_touch_count() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut harness = BallCarryHarness::default();
+
+    for i in 1..=8 {
+        let x = i as f32 * 50.0;
+        let touch_state = if matches!(i, 1 | 4 | 7) {
+            touch_state_with_touch(i, i as f32 * 0.2)
+        } else {
+            touch_state()
+        };
+        harness.update(
+            &frame(i, i as f32 * 0.2),
+            &ball(
+                glam::Vec3::new(x, 0.0, 520.0),
+                glam::Vec3::new(250.0, 0.0, 0.0),
+            ),
+            &PlayerFrameState {
+                players: vec![player(
+                    glam::Vec3::new(x, 0.0, 360.0),
+                    glam::Vec3::new(250.0, 0.0, 0.0),
+                )],
+            },
+            &touch_state,
+            &LivePlayState {
+                is_live_play: true,
+                ..LivePlayState::default()
+            },
+        );
+    }
+
+    harness.finish();
+
+    let stats = harness
+        .calculator
+        .player_air_dribble_stats()
+        .get(&player_id)
+        .unwrap();
+    assert_eq!(stats.total_touch_count, 3);
+    assert_eq!(stats.max_touch_count, 3);
+    assert_eq!(stats.average_touch_count(), 3.0);
+    assert_eq!(harness.calculator.carry_events()[0].touch_count, 3);
+}
+
+#[test]
+fn records_wall_to_air_dribble_origin() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut harness = BallCarryHarness::default();
+
+    for i in 1..=5 {
+        harness.update(
+            &frame(i, i as f32 * 0.2),
+            &ball(
+                glam::Vec3::new(3420.0, i as f32 * 50.0, 520.0),
+                glam::Vec3::new(0.0, 250.0, 0.0),
+            ),
+            &PlayerFrameState {
+                players: vec![player(
+                    glam::Vec3::new(3300.0, i as f32 * 50.0, 360.0),
+                    glam::Vec3::new(0.0, 250.0, 0.0),
+                )],
+            },
+            &touch_state(),
+            &LivePlayState {
+                is_live_play: true,
+                ..LivePlayState::default()
+            },
+        );
+    }
+
+    harness.finish();
+
+    let stats = harness
+        .calculator
+        .player_air_dribble_stats()
+        .get(&player_id)
+        .unwrap();
+    assert_eq!(stats.ground_to_air_count, 0);
+    assert_eq!(stats.wall_to_air_count, 1);
+    assert_eq!(
+        harness.calculator.carry_events()[0].air_dribble_origin,
+        Some(AirDribbleOrigin::WallToAir)
     );
 }

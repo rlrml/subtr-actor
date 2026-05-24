@@ -395,8 +395,15 @@ export function renderAirDribbleStats(
   const averageHorizontalGap = airDribble && airDribble.count > 0
     ? airDribble.average_horizontal_gap_sum / airDribble.count
     : undefined;
+  const averageTouchCount = airDribble && airDribble.count > 0
+    ? airDribble.total_touch_count / airDribble.count
+    : undefined;
   return `
     <div class="stat-row"><span class="label">Air dribbles</span><span class="value">${formatInteger(airDribble?.count)}</span></div>
+    <div class="stat-row"><span class="label">Ground to air</span><span class="value">${formatInteger(airDribble?.ground_to_air_count)}</span></div>
+    <div class="stat-row"><span class="label">Wall to air</span><span class="value">${formatInteger(airDribble?.wall_to_air_count)}</span></div>
+    <div class="stat-row"><span class="label">Avg touches</span><span class="value">${formatNumber(averageTouchCount, 1)}</span></div>
+    <div class="stat-row"><span class="label">Max touches</span><span class="value">${formatInteger(airDribble?.max_touch_count)}</span></div>
     <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(airDribble?.total_time, 1, "s")}</span></div>
     <div class="stat-row"><span class="label">Longest</span><span class="value">${formatNumber(airDribble?.longest_time, 1, "s")}</span></div>
     <div class="stat-row"><span class="label">Furthest</span><span class="value">${formatNumber(airDribble?.furthest_distance, 0)}</span></div>

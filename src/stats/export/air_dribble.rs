@@ -10,6 +10,36 @@ impl StatFieldProvider for AirDribbleStats {
             StatUnit::Count,
             self.count,
         ));
+        visitor(ExportedStat::unsigned(
+            "air_dribble",
+            "ground_to_air_count",
+            StatUnit::Count,
+            self.ground_to_air_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "air_dribble",
+            "wall_to_air_count",
+            StatUnit::Count,
+            self.wall_to_air_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "air_dribble",
+            "total_touch_count",
+            StatUnit::Count,
+            self.total_touch_count,
+        ));
+        visitor(ExportedStat::float(
+            "air_dribble",
+            "avg_touch_count",
+            StatUnit::Count,
+            self.average_touch_count(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "air_dribble",
+            "max_touch_count",
+            StatUnit::Count,
+            self.max_touch_count,
+        ));
         visitor(ExportedStat::float(
             "air_dribble",
             "total_time",

@@ -156,6 +156,7 @@ fn moment_mechanic_event(
         player_id,
         is_team_0,
         timing: MechanicTiming::Moment { frame, time },
+        properties: Vec::new(),
     }
 }
 
@@ -181,7 +182,39 @@ fn span_mechanic_event(
             start_time,
             end_time,
         },
+        properties: Vec::new(),
     }
+}
+
+fn mechanic_event_text_property(key: &str, value: &str) -> MechanicEventProperty {
+    MechanicEventProperty {
+        key: key.to_owned(),
+        value: MechanicEventPropertyValue::Text(value.to_owned()),
+    }
+}
+
+fn mechanic_event_unsigned_property(key: &str, value: u32) -> MechanicEventProperty {
+    MechanicEventProperty {
+        key: key.to_owned(),
+        value: MechanicEventPropertyValue::Unsigned(value),
+    }
+}
+
+fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<MechanicEventProperty> {
+    let mut properties = Vec::new();
+    if let Some(origin) = event.air_dribble_origin {
+        properties.push(mechanic_event_text_property(
+            "origin",
+            origin.as_label_value(),
+        ));
+    }
+    if event.kind == BallCarryKind::AirDribble {
+        properties.push(mechanic_event_unsigned_property(
+            "touch_count",
+            event.touch_count,
+        ));
+    }
+    properties
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -206,7 +239,7 @@ fn build_mechanic_events(
             BallCarryKind::Carry => "ball_carry",
             BallCarryKind::AirDribble => "air_dribble",
         };
-        events.push(span_mechanic_event(
+        let mut mechanic_event = span_mechanic_event(
             kind,
             index,
             event.start_frame,
@@ -215,7 +248,9 @@ fn build_mechanic_events(
             event.end_time,
             event.player_id.clone(),
             event.is_team_0,
-        ));
+        );
+        mechanic_event.properties = ball_carry_mechanic_event_properties(event);
+        events.push(mechanic_event);
     }
 
     for (index, event) in ceiling_shot.events().iter().enumerate() {
