@@ -1,14 +1,13 @@
 use super::*;
 
 const SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS: f32 = 1.1;
-const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.22;
-const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.4;
+const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.32;
+const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
-const SPEED_FLIP_MIN_START_SPEED: f32 = 700.0;
+const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
-const SPEED_FLIP_TARGET_DIAGONAL_RATIO: f32 = 0.42;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -67,6 +66,8 @@ struct ActiveSpeedFlipCandidate {
     start_speed: f32,
     max_speed: f32,
     best_alignment: f32,
+    best_boost_alignment: f32,
+    boost_alignment_sample_count: u32,
     best_diagonal_score: f32,
     min_forward_z: f32,
     latest_forward_z: f32,
@@ -126,41 +127,16 @@ impl SpeedFlipCalculator {
             .x
             .abs()
             .max(local_angular_velocity.z.abs());
-        if pitch_rate <= f32::EPSILON {
+        if pitch_rate <= f32::EPSILON || side_spin <= f32::EPSILON {
             return 0.0;
         }
 
-        let pitch_score = Self::normalize_score(pitch_rate, 3.5, 8.5);
-        let ratio = side_spin / pitch_rate;
-        let ratio_score = 1.0
-            - ((ratio - SPEED_FLIP_TARGET_DIAGONAL_RATIO).abs() / SPEED_FLIP_TARGET_DIAGONAL_RATIO)
-                .clamp(0.0, 1.0);
+        let pitch_score = Self::normalize_score(pitch_rate, 35.0, 180.0);
+        let side_score = Self::normalize_score(side_spin, 60.0, 260.0);
+        let balance = pitch_rate.min(side_spin) / pitch_rate.max(side_spin);
+        let balance_score = Self::normalize_score(balance, 0.18, 0.65);
 
-        pitch_score * ratio_score
-    }
-
-    fn horizontal_alignment_to_target(
-        player: &PlayerSample,
-        target_position: glam::Vec3,
-    ) -> Option<f32> {
-        let velocity = player.velocity()?;
-        let player_position = player.position()?;
-        let to_target = target_position - player_position;
-        let velocity_xy = velocity.truncate().normalize_or_zero();
-        let to_target_xy = to_target.truncate().normalize_or_zero();
-        if velocity_xy.length_squared() <= f32::EPSILON
-            || to_target_xy.length_squared() <= f32::EPSILON
-        {
-            return None;
-        }
-
-        Some(velocity_xy.dot(to_target_xy))
-    }
-
-    fn kickoff_alignment_target(ball: &BallFrameState) -> glam::Vec3 {
-        ball.sample()
-            .map(BallSample::position)
-            .unwrap_or(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))
+        (pitch_score * side_score).sqrt() * (0.75 + 0.25 * balance_score)
     }
 
     fn forward_speed_alignment(player: &PlayerSample) -> Option<f32> {
@@ -181,16 +157,19 @@ impl SpeedFlipCalculator {
         Some(forward_xy.dot(velocity_xy))
     }
 
+    fn boost_alignment(player: &PlayerSample) -> Option<f32> {
+        player
+            .boost_active
+            .then(|| Self::forward_speed_alignment(player))
+            .flatten()
+    }
+
     fn candidate_alignment(
-        ball: &BallFrameState,
+        _ball: &BallFrameState,
         player: &PlayerSample,
-        is_kickoff: bool,
+        _is_kickoff: bool,
     ) -> Option<f32> {
-        if is_kickoff {
-            Self::horizontal_alignment_to_target(player, Self::kickoff_alignment_target(ball))
-        } else {
-            Self::forward_speed_alignment(player)
-        }
+        Self::forward_speed_alignment(player)
     }
 
     fn apply_event(&mut self, event: SpeedFlipEvent) {
@@ -234,9 +213,34 @@ impl SpeedFlipCalculator {
         }
     }
 
-    fn reset_kickoff_state(&mut self, frame: &FrameInfo) {
+    fn reset_kickoff_state(&mut self) {
         self.active_candidates.clear();
-        self.current_kickoff_start_time = Some(frame.time);
+        self.current_kickoff_start_time = None;
+    }
+
+    fn kickoff_motion_started(players: &PlayerFrameState) -> bool {
+        players.players.iter().any(|player| {
+            player.dodge_active
+                || player
+                    .speed()
+                    .is_some_and(|speed| speed >= SPEED_FLIP_KICKOFF_MOTION_SPEED)
+        })
+    }
+
+    fn update_kickoff_start_time(
+        &mut self,
+        frame: &FrameInfo,
+        kickoff_approach_active: bool,
+        players: &PlayerFrameState,
+    ) {
+        if !kickoff_approach_active {
+            self.current_kickoff_start_time = None;
+            return;
+        }
+
+        if self.current_kickoff_start_time.is_none() && Self::kickoff_motion_started(players) {
+            self.current_kickoff_start_time = Some(frame.time);
+        }
     }
 
     fn maybe_start_candidate(
@@ -279,9 +283,6 @@ impl SpeedFlipCalculator {
         }
 
         let start_speed = player.speed().unwrap_or(0.0);
-        if start_speed < SPEED_FLIP_MIN_START_SPEED {
-            return;
-        }
 
         let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
             return;
@@ -313,6 +314,8 @@ impl SpeedFlipCalculator {
                 start_speed,
                 max_speed: start_speed,
                 best_alignment,
+                best_boost_alignment: Self::boost_alignment(player).unwrap_or(best_alignment),
+                boost_alignment_sample_count: u32::from(player.boost_active),
                 best_diagonal_score,
                 min_forward_z: forward_z,
                 latest_forward_z: forward_z,
@@ -338,6 +341,10 @@ impl SpeedFlipCalculator {
         candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
         if let Some(alignment) = Self::candidate_alignment(ball, player, candidate.is_kickoff) {
             candidate.best_alignment = candidate.best_alignment.max(alignment);
+        }
+        if let Some(boost_alignment) = Self::boost_alignment(player) {
+            candidate.best_boost_alignment = candidate.best_boost_alignment.max(boost_alignment);
+            candidate.boost_alignment_sample_count += 1;
         }
 
         let rotation = quat_to_glam(&rigid_body.rotation);
@@ -372,20 +379,31 @@ impl SpeedFlipCalculator {
             1.0
         };
         let cancel_recovery = candidate.latest_forward_z - candidate.min_forward_z;
-        let cancel_score = 0.35 * Self::normalize_score(-candidate.min_forward_z, 0.22, 0.75)
-            + 0.40 * Self::normalize_score(cancel_recovery, 0.18, 0.7)
-            + 0.25 * Self::normalize_score(candidate.latest_forward_z, -0.55, -0.05);
+        let level_recovery_score =
+            1.0 - Self::normalize_score(candidate.latest_forward_z.abs(), 0.05, 0.55);
+        let cancel_score = 0.25 * Self::normalize_score(-candidate.min_forward_z, 0.05, 0.35)
+            + 0.35 * Self::normalize_score(cancel_recovery, 0.08, 0.5)
+            + 0.40 * level_recovery_score;
         let speed_score = 0.55 * Self::normalize_score(candidate.max_speed, 1450.0, 1900.0)
             + 0.45
                 * Self::normalize_score(candidate.max_speed - candidate.start_speed, 180.0, 650.0);
         let alignment_score = Self::normalize_score(candidate.best_alignment, 0.78, 0.98);
+        if candidate.boost_alignment_sample_count == 0 {
+            return None;
+        }
+        let boost_alignment_score =
+            Self::normalize_score(candidate.best_boost_alignment, 0.82, 0.99);
         let confidence = 0.30 * candidate.best_diagonal_score
             + 0.30 * cancel_score
-            + 0.20 * speed_score
+            + 0.15 * speed_score
             + 0.15 * alignment_score
+            + 0.05 * boost_alignment_score
             + 0.05 * timeliness_score;
 
-        if cancel_score < 0.45 || confidence < SPEED_FLIP_MIN_CONFIDENCE {
+        if boost_alignment_score < 0.25 {
+            return None;
+        }
+        if cancel_score < 0.35 || confidence < SPEED_FLIP_MIN_CONFIDENCE {
             return None;
         }
 
@@ -458,8 +476,10 @@ impl SpeedFlipCalculator {
         self.begin_sample(frame);
 
         if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
-            self.reset_kickoff_state(frame);
+            self.reset_kickoff_state();
         }
+
+        self.update_kickoff_start_time(frame, kickoff_approach_active, players);
 
         for player in &players.players {
             self.maybe_start_candidate(frame, gameplay, ball, player, live_play);
