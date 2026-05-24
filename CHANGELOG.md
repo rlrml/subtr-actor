@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.11 - 2026-05-24
+
+- Add optional playlist manifest pagination metadata and preserve it through
+  the JavaScript replay-player manifest parser and stats review player.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.11`.
+
 ## v0.7.10 - 2026-05-24
 
 - Emit consecutive same-player touch candidates without the previous short
