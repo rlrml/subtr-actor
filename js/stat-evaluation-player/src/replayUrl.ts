@@ -6,11 +6,7 @@ import {
 } from "subtr-actor-player";
 
 const REPLAY_URL_QUERY_PARAMS = ["replayUrl", "replay_url", "replay"] as const;
-const COMPRESSED_REPLAY_URL_QUERY_PARAMS = [
-  "r",
-  "replayUrlZ",
-  "replay_url_z",
-] as const;
+const COMPRESSED_REPLAY_URL_QUERY_PARAMS = ["r", "replayUrlZ", "replay_url_z"] as const;
 const BALLCHASING_REPLAY_QUERY_PARAMS = [
   "ballchasing",
   "ballchasingId",
@@ -33,10 +29,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
 function base64UrlToBytes(value: string): Uint8Array {
@@ -60,17 +53,12 @@ export function decodeCompressedReplayUrl(value: string): string {
     return strFromU8(inflateSync(base64UrlToBytes(value)));
   } catch (error) {
     throw new Error(
-      `Invalid compressed replay URL: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Invalid compressed replay URL: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
 
-export function getReplayUrlFromSearch(
-  search: string,
-  baseUrl: string,
-): URL | null {
+export function getReplayUrlFromSearch(search: string, baseUrl: string): URL | null {
   const params = new URLSearchParams(search);
 
   for (const name of REPLAY_URL_QUERY_PARAMS) {
@@ -102,10 +90,7 @@ export function getReplayUrlFromSearch(
   return null;
 }
 
-function getFirstParam(
-  params: URLSearchParams,
-  names: readonly string[],
-): string | null {
+function getFirstParam(params: URLSearchParams, names: readonly string[]): string | null {
   for (const name of names) {
     const rawValue = params.get(name)?.trim();
     if (rawValue) {
@@ -120,10 +105,7 @@ export function getReplayFetchRequestFromSearch(
   baseUrl: string,
 ): ReplayFetchRequest | null {
   const params = new URLSearchParams(search);
-  const ballchasingValue = getFirstParam(
-    params,
-    BALLCHASING_REPLAY_QUERY_PARAMS,
-  );
+  const ballchasingValue = getFirstParam(params, BALLCHASING_REPLAY_QUERY_PARAMS);
   if (ballchasingValue) {
     const id = normalizeBallchasingReplayId(ballchasingValue);
     return {

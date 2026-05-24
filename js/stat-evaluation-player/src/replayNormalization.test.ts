@@ -1,10 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  normalizeReplayData,
-  normalizeReplayDataAsync,
-} from "subtr-actor-player";
+import { normalizeReplayData, normalizeReplayDataAsync } from "subtr-actor-player";
 import type { RawReplayFramesData } from "subtr-actor-player";
 
 function rigidBody(x: number, y: number, z: number) {
@@ -88,11 +85,7 @@ const replayData: RawReplayFramesData = {
       [
         { Steam: "blue-player" },
         {
-          frames: [
-            playerFrame("Blue", 0),
-            playerFrame("Blue", 10),
-            playerFrame("Blue", 20),
-          ],
+          frames: [playerFrame("Blue", 0), playerFrame("Blue", 10), playerFrame("Blue", 20)],
         },
       ],
       [
@@ -136,10 +129,7 @@ test("async replay normalization matches sync output and can yield progress", as
   assert.equal(progressValues.at(-1), 1);
 
   for (let index = 1; index < progressValues.length; index += 1) {
-    assert.ok(
-      progressValues[index]! >= progressValues[index - 1]!,
-      "expected monotonic progress",
-    );
+    assert.ok(progressValues[index]! >= progressValues[index - 1]!, "expected monotonic progress");
   }
 });
 
@@ -180,25 +170,13 @@ test("replay normalization carries bounded player frame gaps", () => {
         },
       ],
       ball_data: {
-        frames: [
-          ballFrame(0),
-          ballFrame(100),
-          ballFrame(200),
-          ballFrame(300),
-          ballFrame(400),
-        ],
+        frames: [ballFrame(0), ballFrame(100), ballFrame(200), ballFrame(300), ballFrame(400)],
       },
       players: [
         [
           { Steam: "blue-player" },
           {
-            frames: [
-              playerFrame("Blue", 0),
-              "Empty",
-              "Empty",
-              playerFrame("Blue", 30),
-              "Empty",
-            ],
+            frames: [playerFrame("Blue", 0), "Empty", "Empty", playerFrame("Blue", 30), "Empty"],
           },
         ],
       ],

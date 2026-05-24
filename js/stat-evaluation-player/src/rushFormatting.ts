@@ -12,9 +12,7 @@ function renderStatRow(label: string, value: string): string {
   return `<div class="stat-row"><span class="label">${label}</span><span class="value">${value}</span></div>`;
 }
 
-export function renderRushStats(
-  rush: TeamStatsSnapshot["rush"],
-): string {
+export function renderRushStats(rush: TeamStatsSnapshot["rush"]): string {
   return `
     ${renderStatRow("Rushes", formatInteger(rush?.count))}
     ${renderStatRow("2v1", formatInteger(rush?.two_v_one_count))}

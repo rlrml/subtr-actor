@@ -94,15 +94,11 @@ function formatSeconds(value: number): string {
 }
 
 function formatConfidence(value: unknown): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? `${Math.round(value * 100)}%`
-    : "-";
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value * 100)}%` : "-";
 }
 
 function formatReviewStatus(value: unknown): string {
-  return typeof value === "string" && value.trim()
-    ? value.replaceAll("_", " ")
-    : "unreviewed";
+  return typeof value === "string" && value.trim() ? value.replaceAll("_", " ") : "unreviewed";
 }
 
 function mechanicLabel(meta: CandidateMeta): string {
@@ -138,9 +134,7 @@ async function fetchReplayBytes(path: string): Promise<Uint8Array> {
 }
 
 function ballchasingIdFromReplayId(replayId: string): string | null {
-  return replayId.startsWith("ballchasing:")
-    ? replayId.slice("ballchasing:".length)
-    : null;
+  return replayId.startsWith("ballchasing:") ? replayId.slice("ballchasing:".length) : null;
 }
 
 function resolveReplaySource(context: {
@@ -279,7 +273,7 @@ async function submitReview(status: "confirmed" | "rejected" | "uncertain") {
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
     try {
-      const body = await response.json() as { error?: unknown };
+      const body = (await response.json()) as { error?: unknown };
       if (typeof body.error === "string") {
         message = body.error;
       }
@@ -332,7 +326,7 @@ function renderState(state: ReplayPlaylistPlayerState) {
   candidateMechanic.textContent = mechanicLabel(meta);
   candidatePlayer.textContent = meta.playerName
     ? `${meta.playerName}${meta.team ? ` (${meta.team})` : ""}`
-    : meta.playerId ?? "-";
+    : (meta.playerId ?? "-");
   candidateConfidence.textContent = formatConfidence(meta.confidence);
   candidateReplay.textContent = item?.replay.id ?? "-";
   candidateReason.textContent = meta.reason ?? "-";
@@ -342,16 +336,15 @@ function renderState(state: ReplayPlaylistPlayerState) {
   updatePlaylistSelection(state.itemIndex);
 
   if (!scrubbing) {
-    scrubber.value = state.duration > 0
-      ? String(Math.round((state.currentTime / state.duration) * 1000))
-      : "0";
+    scrubber.value =
+      state.duration > 0 ? String(Math.round((state.currentTime / state.duration) * 1000)) : "0";
   }
   timeReadout.textContent = `${formatSeconds(state.currentTime)} / ${formatSeconds(state.duration)}`;
   playButton.textContent = state.playing ? "Pause" : "Play";
-  previousButton.disabled = state.itemCount === 0 || (state.itemIndex === 0 && state.endMode !== "loop");
+  previousButton.disabled =
+    state.itemCount === 0 || (state.itemIndex === 0 && state.endMode !== "loop");
   nextButton.disabled =
-    state.itemCount === 0 ||
-    (state.itemIndex >= state.itemCount - 1 && state.endMode !== "loop");
+    state.itemCount === 0 || (state.itemIndex >= state.itemCount - 1 && state.endMode !== "loop");
   confirmButton.disabled = state.itemCount === 0 || activeReviewEndpoint() === null;
   rejectButton.disabled = confirmButton.disabled;
   uncertainButton.disabled = confirmButton.disabled;

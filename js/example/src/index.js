@@ -326,8 +326,7 @@ function getScoreAtFrame(frameIndex) {
 function renderSnapshot(snapshot) {
   const currentReplay = replayPlayer?.getCurrentReplay?.() ?? null;
   currentReplayRaw = currentReplay?.raw ?? null;
-  const replaySourceId =
-    replayPlayer?.getCurrentResolvedItem?.()?.source.replay.id ?? null;
+  const replaySourceId = replayPlayer?.getCurrentResolvedItem?.()?.source.replay.id ?? null;
   if (currentReplay && replaySourceId !== renderedReplaySourceId) {
     renderedReplaySourceId = replaySourceId;
     populateAttachedPlayerOptions(currentReplay.replay.players);
@@ -338,9 +337,7 @@ function renderSnapshot(snapshot) {
   }
   const metadata = currentReplay?.replay.frames[snapshot.frameIndex];
   const kickoffMetadata =
-    snapshot.activeMetadata?.kind === "kickoff-countdown"
-      ? snapshot.activeMetadata
-      : null;
+    snapshot.activeMetadata?.kind === "kickoff-countdown" ? snapshot.activeMetadata : null;
   const { teamZeroScore, teamOneScore } = getScoreAtFrame(snapshot.frameIndex);
 
   timeReadout.textContent = `${snapshot.currentTime.toFixed(2)}s`;
@@ -349,9 +346,7 @@ function renderSnapshot(snapshot) {
   playlistAdvance.value = snapshot.advanceMode;
   playlistEnd.value = snapshot.endMode;
   playlistItemReadout.textContent =
-    snapshot.itemCount === 0
-      ? "--"
-      : `${snapshot.itemIndex + 1} / ${snapshot.itemCount}`;
+    snapshot.itemCount === 0 ? "--" : `${snapshot.itemIndex + 1} / ${snapshot.itemCount}`;
   playlistClipReadout.textContent = snapshot.item?.label ?? "--";
   togglePlayback.textContent = snapshot.playing ? "Pause" : "Play";
   cameraDistance.value = `${snapshot.cameraDistanceScale}`;
@@ -359,16 +354,16 @@ function renderSnapshot(snapshot) {
   ballCam.checked = snapshot.ballCamEnabled;
   attachedPlayer.value = snapshot.attachedPlayerId ?? "";
   syncCameraModeButtons(snapshot);
-  const hasAttachedCamera = replayPlayer === null
-    ? false
-    : snapshot.cameraViewMode === "follow" && snapshot.attachedPlayerId !== null;
+  const hasAttachedCamera =
+    replayPlayer === null
+      ? false
+      : snapshot.cameraViewMode === "follow" && snapshot.attachedPlayerId !== null;
   cameraDistance.disabled = !hasAttachedCamera;
   ballCam.disabled = !hasAttachedCamera;
   skipPostGoalTransitions.checked = snapshot.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = snapshot.skipKickoffsEnabled;
 
-  remainingReadout.textContent =
-    metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
+  remainingReadout.textContent = metadata === undefined ? "--" : `${metadata.secondsRemaining}s`;
   scoreboard.hidden = replayPlayer === null;
   blueScore.textContent = `${teamZeroScore}`;
   orangeScore.textContent = `${teamOneScore}`;
@@ -389,10 +384,7 @@ function populateAttachedPlayerOptions(players) {
 
   for (const player of players) {
     attachedPlayer.append(
-      new Option(
-        `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
-        player.id
-      )
+      new Option(`${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`, player.id),
     );
   }
 }
@@ -443,48 +435,42 @@ async function loadReplayFiles(files) {
   currentReplayRaw = null;
   renderedReplaySourceId = null;
   activePlaylistItems = files.map((file, index) =>
-    createDemoPlaylistItem(file, index, files.length)
+    createDemoPlaylistItem(file, index, files.length),
   );
 
-  try {
-    replayPlayer = new ReplayPlaylistPlayer(viewport, activePlaylistItems, {
-      autoplay: true,
-      advanceMode: playlistAdvance.value,
-      endMode: playlistEnd.value,
-      initialCameraDistanceScale: 2.25,
-      initialAttachedPlayerId: null,
-      initialBallCamEnabled: false,
-      initialBoostMeterEnabled: false,
-      initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
-      initialSkipKickoffsEnabled: skipKickoffs.checked,
-      preloadPolicy: { kind: "adjacent", ahead: 1, behind: 1 },
-      plugins: [
-        createBallchasingOverlayPlugin(),
-        createBoostPadOverlayPlugin(),
-        createTimelineOverlayPlugin({
-          replayEventKinds: ["goal", "save", "demo"],
-        }),
-      ],
-    });
-    statusReadout.textContent = "Loading first playlist item...";
-    await replayPlayer.waitForCurrentItem();
-    unsubscribe = replayPlayer.subscribe(renderSnapshot);
+  replayPlayer = new ReplayPlaylistPlayer(viewport, activePlaylistItems, {
+    autoplay: true,
+    advanceMode: playlistAdvance.value,
+    endMode: playlistEnd.value,
+    initialCameraDistanceScale: 2.25,
+    initialAttachedPlayerId: null,
+    initialBallCamEnabled: false,
+    initialBoostMeterEnabled: false,
+    initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
+    initialSkipKickoffsEnabled: skipKickoffs.checked,
+    preloadPolicy: { kind: "adjacent", ahead: 1, behind: 1 },
+    plugins: [
+      createBallchasingOverlayPlugin(),
+      createBoostPadOverlayPlugin(),
+      createTimelineOverlayPlugin({
+        replayEventKinds: ["goal", "save", "demo"],
+      }),
+    ],
+  });
+  statusReadout.textContent = "Loading first playlist item...";
+  await replayPlayer.waitForCurrentItem();
+  unsubscribe = replayPlayer.subscribe(renderSnapshot);
 
-    const { replay } = replayPlayer.getCurrentReplay();
-    populateAttachedPlayerOptions(replay.players);
+  const { replay } = replayPlayer.getCurrentReplay();
+  populateAttachedPlayerOptions(replay.players);
 
-    emptyState.hidden = true;
-    teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
-    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-    statusReadout.textContent =
-      files.length === 1
-        ? `Loaded ${files[0].name}`
-        : `Loaded ${files.length} replay playlist`;
-    setControlsEnabled(true);
-    renderSnapshot(replayPlayer.getSnapshot());
-  } catch (error) {
-    throw error;
-  }
+  emptyState.hidden = true;
+  teamsReadout.textContent = `${replay.teamZeroNames.length} blue / ${replay.teamOneNames.length} orange`;
+  playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+  statusReadout.textContent =
+    files.length === 1 ? `Loaded ${files[0].name}` : `Loaded ${files.length} replay playlist`;
+  setControlsEnabled(true);
+  renderSnapshot(replayPlayer.getSnapshot());
 }
 
 fileInput.addEventListener("change", async () => {
@@ -496,8 +482,7 @@ fileInput.addEventListener("change", async () => {
   try {
     await loadReplayFiles(files);
   } catch (error) {
-    statusReadout.textContent =
-      error instanceof Error ? error.message : "Failed to load replay";
+    statusReadout.textContent = error instanceof Error ? error.message : "Failed to load replay";
   }
 });
 

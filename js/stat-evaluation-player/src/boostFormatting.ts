@@ -18,8 +18,6 @@ export function formatCollectedWithRespawnBound(
     return collectedDisplay;
   }
 
-  const respawnInclusiveDisplay = formatBoostDisplayAmount(
-    amountCollected + amountRespawned,
-  );
+  const respawnInclusiveDisplay = formatBoostDisplayAmount(amountCollected + amountRespawned);
   return `${collectedDisplay} (${respawnInclusiveDisplay})`;
 }

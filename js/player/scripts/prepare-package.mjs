@@ -9,10 +9,10 @@ const distDir = path.resolve(packageDir, "dist");
 
 async function main() {
   const sourcePackage = JSON.parse(
-    await readFile(path.resolve(packageDir, "package.json"), "utf8")
+    await readFile(path.resolve(packageDir, "package.json"), "utf8"),
   );
   const bindingsPackage = JSON.parse(
-    await readFile(path.resolve(packageDir, "..", "package.json"), "utf8")
+    await readFile(path.resolve(packageDir, "..", "package.json"), "utf8"),
   );
   const publishPackage = {
     ...sourcePackage,
@@ -23,16 +23,14 @@ async function main() {
   delete publishPackage.scripts;
   delete publishPackage.devDependencies;
 
-  const outputDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-player-package-")
-  );
+  const outputDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-player-package-"));
 
   await cp(distDir, path.join(outputDir, "dist"), { recursive: true });
   await cp(path.resolve(packageDir, "README.md"), path.join(outputDir, "README.md"));
   await cp(path.resolve(packageDir, "LICENSE"), path.join(outputDir, "LICENSE"));
   await writeFile(
     path.join(outputDir, "package.json"),
-    `${JSON.stringify(publishPackage, null, 2)}\n`
+    `${JSON.stringify(publishPackage, null, 2)}\n`,
   );
 
   process.stdout.write(outputDir);

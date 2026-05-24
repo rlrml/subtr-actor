@@ -46,7 +46,7 @@ import init, {
 await init();
 
 const replayData = new Uint8Array(
-  await fetch("/example.replay").then((response) => response.arrayBuffer())
+  await fetch("/example.replay").then((response) => response.arrayBuffer()),
 );
 
 const validation = validate_replay(replayData);
@@ -57,13 +57,13 @@ if (!validation.valid) {
 const info = get_replay_info(replayData);
 const headers = get_column_headers(
   ["BallRigidBody", "SecondsRemaining"],
-  ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"]
+  ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
 );
 const ndarrayResult = get_ndarray_with_info(
   replayData,
   ["BallRigidBody", "SecondsRemaining"],
   ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
-  10.0
+  10.0,
 );
 const metadata = get_replay_meta(replayData);
 const frameData = get_replay_frames_data(replayData);

@@ -75,22 +75,10 @@ test("replay loading exposes each user-visible work phase", () => {
 });
 
 test("getReplayLoadCompletion maps replay loading stages to monotonic overall progress", () => {
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "validating", progress: 0 }),
-    0.04,
-  );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "processing", progress: 0 }),
-    0.08,
-  );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "processing", progress: 0.5 }),
-    0.35,
-  );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "processing", progress: 1 }),
-    0.62,
-  );
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "validating", progress: 0 }), 0.04);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "processing", progress: 0 }), 0.08);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "processing", progress: 0.5 }), 0.35);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "processing", progress: 1 }), 0.62);
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "building-stats", progress: 0.5 }),
     0.66,
@@ -103,59 +91,38 @@ test("getReplayLoadCompletion maps replay loading stages to monotonic overall pr
     getReplayLoadCompletion({ stage: "serializing-stats", progress: 0.5 }),
     0.81,
   );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "normalizing", progress: 0.6 }),
-    0.89,
-  );
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "normalizing", progress: 0.6 }), 0.89);
   assertApproximatelyEqual(
     getReplayLoadCompletion({ stage: "decoding-replay", progress: 1 }),
     0.94,
   );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }),
-    0.99,
-  );
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }), 0.99);
 });
 
 test("getReplayLoadCompletion clamps processing progress into the expected range", () => {
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "processing", progress: -1 }),
-    0.08,
-  );
-  assertApproximatelyEqual(
-    getReplayLoadCompletion({ stage: "processing", progress: 2 }),
-    0.62,
-  );
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "processing", progress: -1 }), 0.08);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "processing", progress: 2 }), 0.62);
 });
 
 test("legacy stats timeline progress maps to the newer concrete phases", () => {
-  assert.deepEqual(
-    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.25 }),
-    {
-      stage: "building-stats",
-      index: 3,
-      total: 8,
-      label: "Build stats snapshots",
-    },
-  );
-  assert.deepEqual(
-    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.42 }),
-    {
-      stage: "serializing-replay",
-      index: 4,
-      total: 8,
-      label: "Serialize replay data",
-    },
-  );
-  assert.deepEqual(
-    getReplayLoadPhase({ stage: "stats-timeline", progress: 0.75 }),
-    {
-      stage: "serializing-stats",
-      index: 5,
-      total: 8,
-      label: "Serialize stats timeline",
-    },
-  );
+  assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.25 }), {
+    stage: "building-stats",
+    index: 3,
+    total: 8,
+    label: "Build stats snapshots",
+  });
+  assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.42 }), {
+    stage: "serializing-replay",
+    index: 4,
+    total: 8,
+    label: "Serialize replay data",
+  });
+  assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.75 }), {
+    stage: "serializing-stats",
+    index: 5,
+    total: 8,
+    label: "Serialize stats timeline",
+  });
 });
 
 test("getReplayLoadPhaseStates marks prior detailed phases complete", () => {

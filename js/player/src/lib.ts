@@ -32,10 +32,7 @@ export type {
   CanvasRecorderStatusListener,
 } from "./canvas-recorder";
 export { createTimelineOverlayPlugin } from "./timeline-overlay";
-export type {
-  TimelineOverlayPlugin,
-  TimelineOverlayPluginOptions,
-} from "./timeline-overlay";
+export type { TimelineOverlayPlugin, TimelineOverlayPluginOptions } from "./timeline-overlay";
 export {
   loadPlaylistManifestFromFile,
   parsePlaylistManifest,
@@ -61,11 +58,7 @@ export type {
   PlaylistSessionState,
   ReplayPlaylistPlayerSingleReplayOptions,
 } from "./playlist";
-export {
-  findFrameIndexAtTime,
-  normalizeReplayData,
-  normalizeReplayDataAsync,
-} from "./replay-data";
+export { findFrameIndexAtTime, normalizeReplayData, normalizeReplayDataAsync } from "./replay-data";
 export type {
   NormalizeReplayDataAsyncOptions,
   NormalizeReplayDataOptions,

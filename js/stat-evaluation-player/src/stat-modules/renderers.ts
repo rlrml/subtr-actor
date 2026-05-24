@@ -49,10 +49,7 @@ function createSharedZoneBoundaryOverlayManager() {
   return {
     acquire(ctx: StatModuleContext): void {
       if (!zoneBoundaryLines) {
-        zoneBoundaryLines = createZoneBoundaryLines(
-          ctx.player.sceneState.scene,
-          ctx.fieldScale,
-        );
+        zoneBoundaryLines = createZoneBoundaryLines(ctx.player.sceneState.scene, ctx.fieldScale);
       }
       refCount += 1;
     },
@@ -73,40 +70,15 @@ function createSharedZoneBoundaryOverlayManager() {
 
 export const zoneBoundaryOverlayManager = createSharedZoneBoundaryOverlayManager();
 
-function getPositioningZoneTime(
-  positioning: PlayerStatsSnapshot["positioning"] | undefined,
-  zone: "defensive" | "neutral" | "offensive",
-): number | undefined {
-  switch (zone) {
-    case "defensive":
-      return positioning?.time_defensive_third;
-    case "neutral":
-      return positioning?.time_neutral_third;
-    case "offensive":
-      return positioning?.time_offensive_third;
-  }
-}
-
 function formatInteger(value: number | undefined): string {
-  return value === undefined || Number.isNaN(value)
-    ? "?"
-    : `${Math.round(value)}`;
+  return value === undefined || Number.isNaN(value) ? "?" : `${Math.round(value)}`;
 }
 
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
-  return value === undefined || Number.isNaN(value)
-    ? "?"
-    : `${value.toFixed(digits)}${suffix}`;
+function formatNumber(value: number | undefined, digits = 1, suffix = ""): string {
+  return value === undefined || Number.isNaN(value) ? "?" : `${value.toFixed(digits)}${suffix}`;
 }
 
-function formatPercentage(
-  value: number | undefined,
-  digits = 0,
-): string {
+function formatPercentage(value: number | undefined, digits = 0): string {
   return formatNumber(value, digits, "%");
 }
 
@@ -134,23 +106,20 @@ function formatTimeShareFromTrackedTime(
   timeDigits = 1,
   percentageDigits = 0,
 ): string {
-  const percentage = (
+  const percentage =
     value !== undefined &&
     trackedTime !== undefined &&
     !Number.isNaN(value) &&
     !Number.isNaN(trackedTime) &&
     trackedTime > 0
-  )
-    ? (value * 100) / trackedTime
-    : undefined;
+      ? (value * 100) / trackedTime
+      : undefined;
 
   return formatTimeShare(value, percentage, timeDigits, percentageDigits);
 }
 
 function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function percentageFromUnit(value: unknown): number | undefined {
@@ -177,9 +146,7 @@ function getPositioningPercentage(
   }
 
   const trackedTime = getPositioningTrackedTime(positioning);
-  const timeValue = asNumber(
-    positioning?.[timeFieldName as keyof NonNullable<typeof positioning>],
-  );
+  const timeValue = asNumber(positioning?.[timeFieldName as keyof NonNullable<typeof positioning>]);
   if (trackedTime === undefined || trackedTime <= 0 || timeValue === undefined) {
     return undefined;
   }
@@ -211,9 +178,7 @@ function getPositioningAverage(
   }
 
   const trackedTime = getPositioningTrackedTime(positioning);
-  const sumValue = asNumber(
-    positioning?.[sumFieldName as keyof NonNullable<typeof positioning>],
-  );
+  const sumValue = asNumber(positioning?.[sumFieldName as keyof NonNullable<typeof positioning>]);
   if (trackedTime === undefined || trackedTime <= 0 || sumValue === undefined) {
     return undefined;
   }
@@ -271,9 +236,7 @@ function formatStateLabel(value: string | undefined): string {
     .join(" ");
 }
 
-export function renderRotationStats(
-  rotation: PlayerStatsSnapshot["rotation"] | undefined,
-): string {
+export function renderRotationStats(rotation: PlayerStatsSnapshot["rotation"] | undefined): string {
   return `
     <div class="stat-row"><span class="label">Current role</span><span class="value">${formatStateLabel(rotation?.current_role_state)}</span></div>
     <div class="stat-row"><span class="label">Current depth</span><span class="value">${formatStateLabel(rotation?.current_depth_state)}</span></div>
@@ -290,9 +253,7 @@ export function renderRotationStats(
 }
 
 export function renderCoreStats(core: PlayerStatsSnapshot["core"] | undefined): string {
-  const shootingPercentage = core && core.shots > 0
-    ? (core.goals * 100) / core.shots
-    : undefined;
+  const shootingPercentage = core && core.shots > 0 ? (core.goals * 100) / core.shots : undefined;
   return `
     <div class="stat-row"><span class="label">Score</span><span class="value">${formatInteger(core?.score)}</span></div>
     <div class="stat-row"><span class="label">Goals</span><span class="value">${formatInteger(core?.goals)}</span></div>
@@ -321,15 +282,15 @@ export function renderDoubleTapStats(
   `;
 }
 
-export function renderPassStats(
-  pass: PlayerStatsSnapshot["pass"] | undefined,
-): string {
-  const averageDistance = pass && pass.completed_pass_count > 0
-    ? pass.total_pass_distance / pass.completed_pass_count
-    : undefined;
-  const averageAdvance = pass && pass.completed_pass_count > 0
-    ? pass.total_pass_advance / pass.completed_pass_count
-    : undefined;
+export function renderPassStats(pass: PlayerStatsSnapshot["pass"] | undefined): string {
+  const averageDistance =
+    pass && pass.completed_pass_count > 0
+      ? pass.total_pass_distance / pass.completed_pass_count
+      : undefined;
+  const averageAdvance =
+    pass && pass.completed_pass_count > 0
+      ? pass.total_pass_advance / pass.completed_pass_count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Completed</span><span class="value">${formatInteger(pass?.completed_pass_count)}</span></div>
     <div class="stat-row"><span class="label">Received</span><span class="value">${formatInteger(pass?.received_pass_count)}</span></div>
@@ -343,12 +304,10 @@ export function renderPassStats(
 export function renderOneTimerStats(
   oneTimer: PlayerStatsSnapshot["one_timer"] | undefined,
 ): string {
-  const averageBallSpeed = oneTimer && oneTimer.count > 0
-    ? oneTimer.total_ball_speed / oneTimer.count
-    : undefined;
-  const averagePassDistance = oneTimer && oneTimer.count > 0
-    ? oneTimer.total_pass_distance / oneTimer.count
-    : undefined;
+  const averageBallSpeed =
+    oneTimer && oneTimer.count > 0 ? oneTimer.total_ball_speed / oneTimer.count : undefined;
+  const averagePassDistance =
+    oneTimer && oneTimer.count > 0 ? oneTimer.total_pass_distance / oneTimer.count : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(oneTimer?.count)}</span></div>
     <div class="stat-row"><span class="label">Avg speed</span><span class="value">${formatNumber(averageBallSpeed, 0)}</span></div>
@@ -361,9 +320,10 @@ export function renderOneTimerStats(
 export function renderCeilingShotStats(
   ceilingShot: PlayerStatsSnapshot["ceiling_shot"] | undefined,
 ): string {
-  const averageConfidence = ceilingShot && ceilingShot.count > 0
-    ? ceilingShot.cumulative_confidence / ceilingShot.count
-    : undefined;
+  const averageConfidence =
+    ceilingShot && ceilingShot.count > 0
+      ? ceilingShot.cumulative_confidence / ceilingShot.count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(ceilingShot?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(ceilingShot?.high_confidence_count)}</span></div>
@@ -377,9 +337,10 @@ export function renderCeilingShotStats(
 export function renderBallCarryStats(
   ballCarry: PlayerStatsSnapshot["ball_carry"] | undefined,
 ): string {
-  const averageHorizontalGap = ballCarry && ballCarry.carry_count > 0
-    ? ballCarry.average_horizontal_gap_sum / ballCarry.carry_count
-    : undefined;
+  const averageHorizontalGap =
+    ballCarry && ballCarry.carry_count > 0
+      ? ballCarry.average_horizontal_gap_sum / ballCarry.carry_count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Carries</span><span class="value">${formatInteger(ballCarry?.carry_count)}</span></div>
     <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(ballCarry?.total_carry_time, 1, "s")}</span></div>
@@ -392,12 +353,14 @@ export function renderBallCarryStats(
 export function renderAirDribbleStats(
   airDribble: PlayerStatsSnapshot["air_dribble"] | undefined,
 ): string {
-  const averageHorizontalGap = airDribble && airDribble.count > 0
-    ? airDribble.average_horizontal_gap_sum / airDribble.count
-    : undefined;
-  const averageTouchCount = airDribble && airDribble.count > 0
-    ? airDribble.total_touch_count / airDribble.count
-    : undefined;
+  const averageHorizontalGap =
+    airDribble && airDribble.count > 0
+      ? airDribble.average_horizontal_gap_sum / airDribble.count
+      : undefined;
+  const averageTouchCount =
+    airDribble && airDribble.count > 0
+      ? airDribble.total_touch_count / airDribble.count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Air dribbles</span><span class="value">${formatInteger(airDribble?.count)}</span></div>
     <div class="stat-row"><span class="label">Ground to air</span><span class="value">${formatInteger(airDribble?.ground_to_air_count)}</span></div>
@@ -414,9 +377,10 @@ export function renderAirDribbleStats(
 export function renderPowerslideStats(
   powerslide: PlayerStatsSnapshot["powerslide"] | undefined,
 ): string {
-  const averageDuration = powerslide && powerslide.press_count > 0
-    ? powerslide.total_duration / powerslide.press_count
-    : undefined;
+  const averageDuration =
+    powerslide && powerslide.press_count > 0
+      ? powerslide.total_duration / powerslide.press_count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Presses</span><span class="value">${formatInteger(powerslide?.press_count)}</span></div>
     <div class="stat-row"><span class="label">Total time</span><span class="value">${formatNumber(powerslide?.total_duration, 1, "s")}</span></div>
@@ -424,12 +388,11 @@ export function renderPowerslideStats(
   `;
 }
 
-export function renderWhiffStats(
-  whiff: PlayerStatsSnapshot["whiff"] | undefined,
-): string {
-  const averageClosestApproach = whiff && whiff.whiff_count > 0
-    ? whiff.cumulative_closest_approach_distance / whiff.whiff_count
-    : undefined;
+export function renderWhiffStats(whiff: PlayerStatsSnapshot["whiff"] | undefined): string {
+  const averageClosestApproach =
+    whiff && whiff.whiff_count > 0
+      ? whiff.cumulative_closest_approach_distance / whiff.whiff_count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Whiffs</span><span class="value">${formatInteger(whiff?.whiff_count)}</span></div>
     <div class="stat-row"><span class="label">Grounded</span><span class="value">${formatInteger(whiff?.grounded_whiff_count)}</span></div>
@@ -450,9 +413,10 @@ export function renderDemoStats(demo: PlayerStatsSnapshot["demo"] | undefined): 
 }
 
 export function renderBumpStats(bump: PlayerStatsSnapshot["bump"] | undefined): string {
-  const averageStrength = bump && bump.bumps_inflicted > 0
-    ? bump.cumulative_bump_strength / bump.bumps_inflicted
-    : undefined;
+  const averageStrength =
+    bump && bump.bumps_inflicted > 0
+      ? bump.cumulative_bump_strength / bump.bumps_inflicted
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Inflicted</span><span class="value">${formatInteger(bump?.bumps_inflicted)}</span></div>
     <div class="stat-row"><span class="label">Taken</span><span class="value">${formatInteger(bump?.bumps_taken)}</span></div>
@@ -476,9 +440,10 @@ export function renderDodgeResetStats(
 export function renderMustyFlickStats(
   mustyFlick: PlayerStatsSnapshot["musty_flick"] | undefined,
 ): string {
-  const averageConfidence = mustyFlick && mustyFlick.count > 0
-    ? mustyFlick.cumulative_confidence / mustyFlick.count
-    : undefined;
+  const averageConfidence =
+    mustyFlick && mustyFlick.count > 0
+      ? mustyFlick.cumulative_confidence / mustyFlick.count
+      : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(mustyFlick?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(mustyFlick?.high_confidence_count)}</span></div>
@@ -489,18 +454,13 @@ export function renderMustyFlickStats(
   `;
 }
 
-export function renderFlickStats(
-  flick: PlayerStatsSnapshot["flick"] | undefined,
-): string {
-  const averageConfidence = flick && flick.count > 0
-    ? flick.cumulative_confidence / flick.count
-    : undefined;
-  const averageSetupDuration = flick && flick.count > 0
-    ? flick.cumulative_setup_duration / flick.count
-    : undefined;
-  const averageBallSpeedChange = flick && flick.count > 0
-    ? flick.cumulative_ball_speed_change / flick.count
-    : undefined;
+export function renderFlickStats(flick: PlayerStatsSnapshot["flick"] | undefined): string {
+  const averageConfidence =
+    flick && flick.count > 0 ? flick.cumulative_confidence / flick.count : undefined;
+  const averageSetupDuration =
+    flick && flick.count > 0 ? flick.cumulative_setup_duration / flick.count : undefined;
+  const averageBallSpeedChange =
+    flick && flick.count > 0 ? flick.cumulative_ball_speed_change / flick.count : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(flick?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(flick?.high_confidence_count)}</span></div>
@@ -515,9 +475,8 @@ export function renderFlickStats(
 export function renderSpeedFlipStats(
   speedFlip: PlayerStatsSnapshot["speed_flip"] | undefined,
 ): string {
-  const averageQuality = speedFlip && speedFlip.count > 0
-    ? speedFlip.cumulative_quality / speedFlip.count
-    : undefined;
+  const averageQuality =
+    speedFlip && speedFlip.count > 0 ? speedFlip.cumulative_quality / speedFlip.count : undefined;
   return `
     <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(speedFlip?.count)}</span></div>
     <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(speedFlip?.high_confidence_count)}</span></div>
@@ -531,9 +490,8 @@ export function renderSpeedFlipStats(
 export function renderHalfFlipStats(
   halfFlip: PlayerStatsSnapshot["half_flip"] | undefined,
 ): string {
-  const averageQuality = halfFlip && halfFlip.count > 0
-    ? halfFlip.cumulative_quality / halfFlip.count
-    : undefined;
+  const averageQuality =
+    halfFlip && halfFlip.count > 0 ? halfFlip.cumulative_quality / halfFlip.count : undefined;
   const lastQualityPercent = percentageFromUnit(halfFlip?.last_quality);
   const averageQualityPercent = percentageFromUnit(averageQuality);
   const bestQualityPercent = percentageFromUnit(halfFlip?.best_quality);
@@ -547,12 +505,9 @@ export function renderHalfFlipStats(
   `;
 }
 
-export function renderWavedashStats(
-  wavedash: PlayerStatsSnapshot["wavedash"] | undefined,
-): string {
-  const averageQuality = wavedash && wavedash.count > 0
-    ? wavedash.cumulative_quality / wavedash.count
-    : undefined;
+export function renderWavedashStats(wavedash: PlayerStatsSnapshot["wavedash"] | undefined): string {
+  const averageQuality =
+    wavedash && wavedash.count > 0 ? wavedash.cumulative_quality / wavedash.count : undefined;
   const lastQualityPercent = percentageFromUnit(wavedash?.last_quality);
   const averageQualityPercent = percentageFromUnit(averageQuality);
   const bestQualityPercent = percentageFromUnit(wavedash?.best_quality);
@@ -566,9 +521,7 @@ export function renderWavedashStats(
   `;
 }
 
-export function renderBoostStats(
-  boost: PlayerStatsSnapshot["boost"] | undefined,
-): string {
+export function renderBoostStats(boost: PlayerStatsSnapshot["boost"] | undefined): string {
   const avgBoost =
     boost && boost.tracked_time > 0
       ? toBoostDisplayUnits(boost.boost_integral / boost.tracked_time).toFixed(0)

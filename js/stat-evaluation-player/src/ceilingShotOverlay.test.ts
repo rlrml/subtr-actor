@@ -2,10 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import {
-  buildCeilingShotMarkers,
-  getVisibleCeilingShotMarkers,
-} from "./ceilingShotOverlay.ts";
+import { buildCeilingShotMarkers, getVisibleCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildCeilingShotMarkers uses replay-normalized frame time and player names", () => {

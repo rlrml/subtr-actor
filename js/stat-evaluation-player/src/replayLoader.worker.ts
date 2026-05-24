@@ -34,10 +34,7 @@ interface ReplayErrorMessage {
   error: string;
 }
 
-type ReplayWorkerResponse =
-  | ReplayProgressMessage
-  | ReplayDoneMessage
-  | ReplayErrorMessage;
+type ReplayWorkerResponse = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
 function toPlainData<T>(value: T): T {
   if (value instanceof Map) {
@@ -62,9 +59,11 @@ function toPlainData<T>(value: T): T {
 }
 
 async function ensureBindingsReady(): Promise<void> {
-  const maybeInit = (subtrActor as typeof subtrActor & {
-    default?: () => Promise<unknown>;
-  }).default;
+  const maybeInit = (
+    subtrActor as typeof subtrActor & {
+      default?: () => Promise<unknown>;
+    }
+  ).default;
   if (typeof maybeInit === "function") {
     await maybeInit();
   }
@@ -123,22 +122,25 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       (chunk) => chunk.buffer,
     );
 
-    self.postMessage({
-      type: "done",
-      replayBuffer: replayBuffer.buffer,
-      statsTimelineParts: {
-        configBuffer: replayBundle.statsTimelineParts.config.buffer,
-        replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
-        eventsBuffer: replayBundle.statsTimelineParts.events.buffer,
-        frameChunkBuffers,
+    self.postMessage(
+      {
+        type: "done",
+        replayBuffer: replayBuffer.buffer,
+        statsTimelineParts: {
+          configBuffer: replayBundle.statsTimelineParts.config.buffer,
+          replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
+          eventsBuffer: replayBundle.statsTimelineParts.events.buffer,
+          frameChunkBuffers,
+        },
       },
-    }, [
-      replayBuffer.buffer,
-      replayBundle.statsTimelineParts.config.buffer,
-      replayBundle.statsTimelineParts.replayMeta.buffer,
-      replayBundle.statsTimelineParts.events.buffer,
-      ...frameChunkBuffers,
-    ]);
+      [
+        replayBuffer.buffer,
+        replayBundle.statsTimelineParts.config.buffer,
+        replayBundle.statsTimelineParts.replayMeta.buffer,
+        replayBundle.statsTimelineParts.events.buffer,
+        ...frameChunkBuffers,
+      ],
+    );
   } catch (error: unknown) {
     postMessageToMain({
       type: "error",

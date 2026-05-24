@@ -1,12 +1,5 @@
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  TeamStatsSnapshot,
-} from "./statsTimeline.ts";
-import {
-  createPlayerStatsSnapshot,
-  createTeamStatsSnapshot,
-} from "./statsSnapshotFactories.ts";
+import type { PlayerStatsSnapshot, StatsFrame, TeamStatsSnapshot } from "./statsTimeline.ts";
+import { createPlayerStatsSnapshot, createTeamStatsSnapshot } from "./statsSnapshotFactories.ts";
 
 export type StatScopeKind = "player" | "team";
 
@@ -20,11 +13,7 @@ export interface StatDefinition {
   format(value: unknown): string;
 }
 
-const PLAYER_METADATA_KEYS = new Set([
-  "player_id",
-  "name",
-  "is_team_0",
-]);
+const PLAYER_METADATA_KEYS = new Set(["player_id", "name", "is_team_0"]);
 
 function isLeafStatValue(value: unknown): boolean {
   return (
@@ -129,15 +118,12 @@ function createStatRegistryForTargets(
   }
 
   return uniqueDefinitions(definitions).sort((left, right) =>
-    left.label.localeCompare(right.label)
+    left.label.localeCompare(right.label),
   );
 }
 
 export function createDefaultStatRegistry(): StatDefinition[] {
-  return createStatRegistryForTargets(
-    createPlayerStatsSnapshot(),
-    createTeamStatsSnapshot(),
-  );
+  return createStatRegistryForTargets(createPlayerStatsSnapshot(), createTeamStatsSnapshot());
 }
 
 export function createStatRegistry(frame: StatsFrame | null): StatDefinition[] {

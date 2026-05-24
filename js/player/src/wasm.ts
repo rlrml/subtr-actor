@@ -18,7 +18,7 @@ type ReplayValidation = {
 function toPlainData<T>(value: T): T {
   if (value instanceof Map) {
     return Object.fromEntries(
-      Array.from(value.entries()).map(([key, entry]) => [key, toPlainData(entry)])
+      Array.from(value.entries()).map(([key, entry]) => [key, toPlainData(entry)]),
     ) as T;
   }
 
@@ -39,12 +39,12 @@ function toPlainData<T>(value: T): T {
 
 export async function ensureBindingsReady(): Promise<void> {
   if (!bindingsReady) {
-    const maybeInit = (subtrActor as typeof subtrActor & {
-      default?: () => Promise<unknown>;
-    }).default;
-    bindingsReady = typeof maybeInit === "function"
-      ? maybeInit()
-      : Promise.resolve();
+    const maybeInit = (
+      subtrActor as typeof subtrActor & {
+        default?: () => Promise<unknown>;
+      }
+    ).default;
+    bindingsReady = typeof maybeInit === "function" ? maybeInit() : Promise.resolve();
   }
   await bindingsReady;
 }
@@ -79,10 +79,7 @@ interface ReplayErrorMessage {
   error: string;
 }
 
-type ReplayWorkerMessage =
-  | ReplayProgressMessage
-  | ReplayDoneMessage
-  | ReplayErrorMessage;
+type ReplayWorkerMessage = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
 async function loadReplayFromBytesWithWorker(
   data: Uint8Array,
@@ -165,12 +162,12 @@ export async function loadReplayFromBytes(
   const raw = toPlainData(
     options.onProgress
       ? subtrActor.get_replay_frames_data_with_progress(
-        data,
-        (progress: unknown) => {
-          options.onProgress?.(progress as ReplayLoadProgress);
-        },
-        options.reportEveryNFrames ?? 1000,
-      )
+          data,
+          (progress: unknown) => {
+            options.onProgress?.(progress as ReplayLoadProgress);
+          },
+          options.reportEveryNFrames ?? 1000,
+        )
       : subtrActor.get_replay_frames_data(data),
   ) as RawReplayFramesData;
   options.onProgress?.({ stage: "normalizing", progress: 0 });
@@ -187,7 +184,7 @@ export async function loadReplayFromBytes(
 
 export function validateReplayBytes(data: Uint8Array): ReplayValidation {
   const result = toPlainData(
-    subtrActor.validate_replay(data) as ReplayValidation | Map<string, unknown>
+    subtrActor.validate_replay(data) as ReplayValidation | Map<string, unknown>,
   );
   return result as ReplayValidation;
 }

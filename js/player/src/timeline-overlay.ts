@@ -57,10 +57,7 @@ interface TimelineMarkerRecord {
 }
 
 const STYLE_ID = "subtr-actor-timeline-overlay-styles";
-const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>([
-  "goal",
-  "save",
-]);
+const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>(["goal", "save"]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
 const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
 const COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS = 0.01;
@@ -522,9 +519,7 @@ function groupEvents(events: ReplayTimelineEvent[]): TimelineEventBucket[] {
   const groups = new Map<string, TimelineEventBucket>();
   for (const event of events) {
     const key =
-      event.frame !== undefined
-        ? `frame:${event.frame}`
-        : `time:${event.time.toFixed(2)}`;
+      event.frame !== undefined ? `frame:${event.frame}` : `time:${event.time.toFixed(2)}`;
     const existing = groups.get(key);
     if (existing) {
       existing.events.push(event);
@@ -553,7 +548,7 @@ function groupEvents(events: ReplayTimelineEvent[]): TimelineEventBucket[] {
 
 function resolveCustomEvents(
   source: ReplayTimelineEventSource | undefined,
-  context: ReplayPlayerPluginContext
+  context: ReplayPlayerPluginContext,
 ): ReplayTimelineEvent[] {
   if (!source) {
     return [];
@@ -564,7 +559,7 @@ function resolveCustomEvents(
 
 function resolveEventSources(
   sources: Iterable<ReplayTimelineEventSource>,
-  context: ReplayPlayerPluginContext
+  context: ReplayPlayerPluginContext,
 ): ReplayTimelineEvent[] {
   const events: ReplayTimelineEvent[] = [];
   for (const source of sources) {
@@ -575,7 +570,7 @@ function resolveEventSources(
 
 function resolveCustomRanges(
   source: ReplayTimelineRangeSource | undefined,
-  context: ReplayPlayerPluginContext
+  context: ReplayPlayerPluginContext,
 ): ReplayTimelineRange[] {
   if (!source) {
     return [];
@@ -586,7 +581,7 @@ function resolveCustomRanges(
 
 function resolveRangeSources(
   sources: Iterable<ReplayTimelineRangeSource>,
-  context: ReplayPlayerPluginContext
+  context: ReplayPlayerPluginContext,
 ): ReplayTimelineRange[] {
   const rangesById = new Set<string>();
   const ranges: ReplayTimelineRange[] = [];
@@ -645,7 +640,7 @@ function rangeAccent(range: ReplayTimelineRange): string {
 
 function resolveReplayEvents(
   options: TimelineOverlayPluginOptions,
-  context: ReplayPlayerPluginContext
+  context: ReplayPlayerPluginContext,
 ): ReplayTimelineEvent[] {
   if (options.replayEvents) {
     return resolveCustomEvents(options.replayEvents, context);
@@ -655,18 +650,11 @@ function resolveReplayEvents(
     return [];
   }
 
-  const allowedKinds = new Set(
-    options.replayEventKinds ?? DEFAULT_REPLAY_EVENT_KINDS
-  );
-  return context.replay.timelineEvents.filter((event) =>
-    allowedKinds.has(event.kind)
-  );
+  const allowedKinds = new Set(options.replayEventKinds ?? DEFAULT_REPLAY_EVENT_KINDS);
+  return context.replay.timelineEvents.filter((event) => allowedKinds.has(event.kind));
 }
 
-function markerSeekTime(
-  eventTime: number,
-  context: ReplayPlayerPluginContext
-): number {
+function markerSeekTime(eventTime: number, context: ReplayPlayerPluginContext): number {
   const projection = context.player.projectReplayTimeToTimeline(eventTime);
   if (!projection.hiddenBySkip) {
     return projection.seekTime;
@@ -674,15 +662,12 @@ function markerSeekTime(
 
   const nextTimelineTime = Math.min(
     context.player.getTimelineDuration(),
-    projection.timelineTime + HIDDEN_EVENT_SEEK_EPSILON_SECONDS
+    projection.timelineTime + HIDDEN_EVENT_SEEK_EPSILON_SECONDS,
   );
   return context.player.projectTimelineTimeToReplay(nextTimelineTime);
 }
 
-function markerLeftPercent(
-  timelineTime: number,
-  duration: number
-): string {
+function markerLeftPercent(timelineTime: number, duration: number): string {
   return `${(timelineTime / Math.max(duration, 0.0001)) * 100}%`;
 }
 
@@ -699,10 +684,7 @@ export function projectedRangeTimelineBounds(
     (startProjection.hiddenBySkip || endProjection.hiddenBySkip)
   ) {
     if (startTimelineTime >= duration) {
-      startTimelineTime = Math.max(
-        0,
-        duration - COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS,
-      );
+      startTimelineTime = Math.max(0, duration - COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS);
       endTimelineTime = duration;
     } else {
       endTimelineTime = Math.min(
@@ -716,7 +698,7 @@ export function projectedRangeTimelineBounds(
 }
 
 export function createTimelineOverlayPlugin(
-  options: TimelineOverlayPluginOptions = {}
+  options: TimelineOverlayPluginOptions = {},
 ): TimelineOverlayPlugin {
   const pauseWhileScrubbing = options.pauseWhileScrubbing ?? true;
   const extraEventSources = options.events ? [options.events] : [];
@@ -799,10 +781,7 @@ export function createTimelineOverlayPlugin(
     range.step = "0.01";
     range.value = `${Math.min(currentTime, duration)}`;
     toggleButton.dataset.playing = context.state.playing ? "true" : "false";
-    toggleButton.setAttribute(
-      "aria-label",
-      context.state.playing ? "Pause replay" : "Play replay"
-    );
+    toggleButton.setAttribute("aria-label", context.state.playing ? "Pause replay" : "Play replay");
     toggleButton.title = context.state.playing ? "Pause replay" : "Play replay";
     toggleButtonIcon.textContent = context.state.playing ? "||" : ">";
     toggleButtonLabel.textContent = context.state.playing ? "Pause" : "Play";
@@ -816,8 +795,7 @@ export function createTimelineOverlayPlugin(
         continue;
       }
       const timeSinceEvent = currentTime - markerRecord.timelineTime;
-      const active =
-        timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
+      const active = timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
       markerRecord.element.dataset.active = active ? "true" : "false";
       markerRecord.element.dataset.passed =
         markerRecord.timelineTime <= currentTime ? "true" : "false";
@@ -844,9 +822,7 @@ export function createTimelineOverlayPlugin(
     }
   }
 
-  function buildMarkers(
-    context: ReplayPlayerPluginContext
-  ): void {
+  function buildMarkers(context: ReplayPlayerPluginContext): void {
     if (!markers) {
       return;
     }
@@ -895,10 +871,11 @@ export function createTimelineOverlayPlugin(
     rangeElements.splice(0, rangeElements.length);
     rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
 
-    const customRanges = resolveRangeSources(extraRangeSources, context).filter((range) =>
-      Number.isFinite(range.startTime) &&
-      Number.isFinite(range.endTime) &&
-      range.endTime > range.startTime
+    const customRanges = resolveRangeSources(extraRangeSources, context).filter(
+      (range) =>
+        Number.isFinite(range.startTime) &&
+        Number.isFinite(range.endTime) &&
+        range.endTime > range.startTime,
     );
     rangeLanes = groupRanges(customRanges);
     const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
@@ -926,14 +903,13 @@ export function createTimelineOverlayPlugin(
       }
 
       for (const range of lane.ranges) {
-        const startProjection = context.player.projectReplayTimeToTimeline(
-          range.startTime
+        const startProjection = context.player.projectReplayTimeToTimeline(range.startTime);
+        const endProjection = context.player.projectReplayTimeToTimeline(range.endTime);
+        const { startTimelineTime, endTimelineTime } = projectedRangeTimelineBounds(
+          startProjection,
+          endProjection,
+          duration,
         );
-        const endProjection = context.player.projectReplayTimeToTimeline(
-          range.endTime
-        );
-        const { startTimelineTime, endTimelineTime } =
-          projectedRangeTimelineBounds(startProjection, endProjection, duration);
         const segment = document.createElement("div");
         segment.className = "sap-tl-range-segment";
         if (range.className) {
@@ -1123,9 +1099,7 @@ export function createTimelineOverlayPlugin(
           return;
         }
 
-        context.player.seek(
-          context.player.projectTimelineTimeToReplay(Number(range.value))
-        );
+        context.player.seek(context.player.projectTimelineTimeToReplay(Number(range.value)));
       };
       const handleWindowPointerUp = (): void => {
         endScrub();

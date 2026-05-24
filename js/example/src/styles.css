@@ -154,8 +154,7 @@ input {
   position: relative;
   border: 1px solid var(--hud-border);
   border-radius: 1rem;
-  background:
-    linear-gradient(180deg, rgba(33, 41, 52, 0.9), rgba(12, 16, 22, 0.98));
+  background: linear-gradient(180deg, rgba(33, 41, 52, 0.9), rgba(12, 16, 22, 0.98));
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(10px);
 }
@@ -260,8 +259,7 @@ input {
   padding: 0.82rem 1.15rem;
   border: 1px solid var(--hud-border);
   border-radius: 1.1rem;
-  background:
-    linear-gradient(135deg, rgba(14, 20, 28, 0.94), rgba(8, 12, 18, 0.98));
+  background: linear-gradient(135deg, rgba(14, 20, 28, 0.94), rgba(8, 12, 18, 0.98));
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
   pointer-events: none;
   overflow: hidden;
@@ -271,8 +269,13 @@ input {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(90deg, var(--hud-blue-soft), transparent 38%, transparent 62%, var(--hud-orange-soft));
+  background: linear-gradient(
+    90deg,
+    var(--hud-blue-soft),
+    transparent 38%,
+    transparent 62%,
+    var(--hud-orange-soft)
+  );
   opacity: 0.8;
   pointer-events: none;
 }
@@ -310,8 +313,7 @@ input {
   padding: 1rem 1.3rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, rgba(13, 18, 24, 0.9), rgba(7, 11, 16, 0.96));
+  background: linear-gradient(180deg, rgba(13, 18, 24, 0.9), rgba(7, 11, 16, 0.96));
   color: var(--hud-text);
   box-shadow: 0 20px 55px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(10px);
@@ -324,8 +326,7 @@ input {
 
 .play-overlay:hover {
   border-color: rgba(255, 255, 255, 0.18);
-  background:
-    linear-gradient(180deg, rgba(18, 24, 31, 0.94), rgba(8, 12, 18, 0.98));
+  background: linear-gradient(180deg, rgba(18, 24, 31, 0.94), rgba(8, 12, 18, 0.98));
 }
 
 .play-overlay-icon {
@@ -334,8 +335,7 @@ input {
   border-top: 0.72rem solid transparent;
   border-bottom: 0.72rem solid transparent;
   border-left: 1.05rem solid #ffffff;
-  filter:
-    drop-shadow(-8px 0 14px rgba(60, 134, 255, 0.22))
+  filter: drop-shadow(-8px 0 14px rgba(60, 134, 255, 0.22))
     drop-shadow(8px 0 14px rgba(242, 138, 37, 0.2));
 }
 
@@ -383,8 +383,7 @@ input {
 }
 
 .camera-presets button[data-active="true"] {
-  background:
-    linear-gradient(180deg, rgba(41, 86, 128, 0.96), rgba(15, 42, 65, 0.98));
+  background: linear-gradient(180deg, rgba(41, 86, 128, 0.96), rgba(15, 42, 65, 0.98));
   box-shadow: inset 0 0 0 1px rgba(142, 197, 255, 0.18);
 }
 

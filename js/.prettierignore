@@ -1,0 +1,10 @@
+node_modules/
+dist/
+pkg/
+pkg-*/
+*/dist/
+*/node_modules/
+*/package-lock.json
+example/yarn.lock
+player/src/generated/
+stat-evaluation-player/src/generated/

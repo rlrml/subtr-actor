@@ -13,9 +13,7 @@ export interface ReplayLoadModalController {
   destroy(): void;
 }
 
-export function createReplayLoadModal(
-  root: HTMLElement,
-): ReplayLoadModalController {
+export function createReplayLoadModal(root: HTMLElement): ReplayLoadModalController {
   const modal = document.createElement("div");
   modal.className = "replay-load-modal";
   modal.hidden = true;
@@ -115,23 +113,14 @@ export function createReplayLoadModal(
       setVisible(true);
       const currentPhase = getReplayLoadPhase(progress);
       updatePhaseRows(progress);
-      title.textContent =
-        `Phase ${currentPhase.index} of ${currentPhase.total}: ${currentPhase.label}`;
+      title.textContent = `Phase ${currentPhase.index} of ${currentPhase.total}: ${currentPhase.label}`;
       status.textContent = formatReplayLoadProgress(progress);
-      if (
-        progress.stage === "processing" &&
-        progress.totalFrames !== undefined
-      ) {
-        meta.textContent =
-          `${progress.processedFrames ?? 0}/${progress.totalFrames} frames`;
+      if (progress.stage === "processing" && progress.totalFrames !== undefined) {
+        meta.textContent = `${progress.processedFrames ?? 0}/${progress.totalFrames} frames`;
         return;
       }
-      if (
-        progress.stage === "decoding-stats" &&
-        progress.totalChunks !== undefined
-      ) {
-        meta.textContent =
-          `${progress.processedChunks ?? 0}/${progress.totalChunks} chunks`;
+      if (progress.stage === "decoding-stats" && progress.totalChunks !== undefined) {
+        meta.textContent = `${progress.processedChunks ?? 0}/${progress.totalChunks} chunks`;
         return;
       }
       meta.textContent = activeFileName ? `Loading ${activeFileName}` : "";

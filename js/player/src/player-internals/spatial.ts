@@ -108,18 +108,12 @@ export function updateFreeCameraTransition(options: {
   camera.position.lerp(position, FREE_CAMERA_TRANSITION_SMOOTHING);
   controls.target.lerp(target, FREE_CAMERA_TRANSITION_SMOOTHING);
   camera.up.lerp(up, FREE_CAMERA_TRANSITION_SMOOTHING).normalize();
-  camera.fov = THREE.MathUtils.lerp(
-    camera.fov,
-    fov,
-    FREE_CAMERA_TRANSITION_SMOOTHING,
-  );
+  camera.fov = THREE.MathUtils.lerp(camera.fov, fov, FREE_CAMERA_TRANSITION_SMOOTHING);
   camera.updateProjectionMatrix();
   camera.lookAt(controls.target);
 
-  const reachedPosition =
-    camera.position.distanceToSquared(position) <= CAMERA_POSITION_EPSILON_SQ;
-  const reachedTarget =
-    controls.target.distanceToSquared(target) <= CAMERA_TARGET_EPSILON_SQ;
+  const reachedPosition = camera.position.distanceToSquared(position) <= CAMERA_POSITION_EPSILON_SQ;
+  const reachedTarget = controls.target.distanceToSquared(target) <= CAMERA_TARGET_EPSILON_SQ;
   const reachedUp = camera.up.angleTo(up) <= CAMERA_UP_EPSILON_RAD;
   const reachedFov = Math.abs(camera.fov - fov) <= CAMERA_FOV_EPSILON;
   if (!reachedPosition || !reachedTarget || !reachedUp || !reachedFov) {
@@ -136,9 +130,7 @@ export function updateFreeCameraTransition(options: {
   return true;
 }
 
-function getOrientationVectors(
-  frame: ReplayModel["players"][number]["frames"][number],
-): {
+function getOrientationVectors(frame: ReplayModel["players"][number]["frames"][number]): {
   forward: THREE.Vector3;
   up: THREE.Vector3;
   right: THREE.Vector3;
@@ -149,9 +141,7 @@ function getOrientationVectors(
   const grounded = (frame.position?.z ?? Infinity) < GROUND_HEIGHT_THRESHOLD_UU;
 
   if (grounded) {
-    const forward = (rawForward ?? velocity ?? DEFAULT_FORWARD.clone())
-      .clone()
-      .setZ(0);
+    const forward = (rawForward ?? velocity ?? DEFAULT_FORWARD.clone()).clone().setZ(0);
 
     if (forward.lengthSq() < 0.0001) {
       return null;
@@ -161,12 +151,8 @@ function getOrientationVectors(
     if (velocity && velocity.lengthSq() > 0.0001 && forward.dot(velocity) < 0) {
       forward.negate();
     }
-    const right = new THREE.Vector3()
-      .crossVectors(DEFAULT_UP, forward)
-      .normalize();
-    const up = new THREE.Vector3()
-      .crossVectors(forward, right)
-      .normalize();
+    const right = new THREE.Vector3().crossVectors(DEFAULT_UP, forward).normalize();
+    const up = new THREE.Vector3().crossVectors(forward, right).normalize();
     return { forward, up, right };
   }
 
@@ -176,9 +162,7 @@ function getOrientationVectors(
 
   const forward = rawForward.clone().normalize();
   const right = new THREE.Vector3().crossVectors(rawUp, forward).normalize();
-  const up = new THREE.Vector3()
-    .crossVectors(forward, right)
-    .normalize();
+  const up = new THREE.Vector3().crossVectors(forward, right).normalize();
 
   return { forward, up, right };
 }
@@ -235,9 +219,7 @@ export function updateAttachedCamera(options: {
     return;
   }
 
-  const attachedPlayer = replay.players.find(
-    (player) => player.id === attachedPlayerId,
-  );
+  const attachedPlayer = replay.players.find((player) => player.id === attachedPlayerId);
   const frame = attachedPlayer?.frames[frameIndex];
 
   if (!attachedPlayer || !frame?.position || frame.isPresent === false) {
@@ -256,22 +238,11 @@ export function updateAttachedCamera(options: {
     ...attachedPlayer.cameraSettings,
     ...(customCameraSettings ?? {}),
   };
-  const distance =
-    (cameraSettings.distance ?? 270) *
-    fieldScale *
-    cameraDistanceScale;
-  const height =
-    (cameraSettings.height ?? 100) *
-    fieldScale *
-    CHASE_CAMERA_HEIGHT_MULTIPLIER;
+  const distance = (cameraSettings.distance ?? 270) * fieldScale * cameraDistanceScale;
+  const height = (cameraSettings.height ?? 100) * fieldScale * CHASE_CAMERA_HEIGHT_MULTIPLIER;
   const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4);
-  const lookDirection = forward
-    .clone()
-    .applyAxisAngle(right, pitch)
-    .normalize();
-  const chaseAnchor = basePosition
-    .clone()
-    .addScaledVector(DEFAULT_UP, height);
+  const lookDirection = forward.clone().applyAxisAngle(right, pitch).normalize();
+  const chaseAnchor = basePosition.clone().addScaledVector(DEFAULT_UP, height);
   const followOffset = forward
     .clone()
     .multiplyScalar(-distance)
@@ -288,24 +259,15 @@ export function updateAttachedCamera(options: {
       .addScaledVector(DEFAULT_UP, BALL_CAM_HEIGHT_BIAS_UU * fieldScale);
     const playerToBall = ballFocusPoint.clone().sub(playerFocusPoint);
     const ballCamDirection = (
-      playerToBall.lengthSq() > 0.0001
-        ? playerToBall.normalize()
-        : lookDirection.clone()
+      playerToBall.lengthSq() > 0.0001 ? playerToBall.normalize() : lookDirection.clone()
     )
       .multiplyScalar(BALL_CAM_DIRECTION_BLEND)
       .addScaledVector(lookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
       .normalize();
 
-    desiredLookTarget
-      .copy(playerFocusPoint)
-      .lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
-    desiredCameraPosition
-      .copy(chaseAnchor)
-      .addScaledVector(ballCamDirection, -distance);
-    desiredCameraPosition.z = Math.max(
-      MIN_CAMERA_HEIGHT_UU * fieldScale,
-      desiredCameraPosition.z,
-    );
+    desiredLookTarget.copy(playerFocusPoint).lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
+    desiredCameraPosition.copy(chaseAnchor).addScaledVector(ballCamDirection, -distance);
+    desiredCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, desiredCameraPosition.z);
     const cameraToPlayer = playerFocusPoint.clone().sub(desiredCameraPosition);
     const cameraToBall = ballFocusPoint.clone().sub(desiredCameraPosition);
     if (cameraToPlayer.lengthSq() > 0.0001 && cameraToBall.lengthSq() > 0.0001) {
@@ -316,27 +278,15 @@ export function updateAttachedCamera(options: {
       );
     }
   } else {
-    desiredCameraPosition
-      .copy(playerFocusPoint)
-      .add(followOffset);
-    desiredCameraPosition.z = Math.max(
-      MIN_CAMERA_HEIGHT_UU * fieldScale,
-      desiredCameraPosition.z,
-    );
+    desiredCameraPosition.copy(playerFocusPoint).add(followOffset);
+    desiredCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, desiredCameraPosition.z);
     desiredLookTarget.copy(playerFocusPoint);
   }
 
-  sceneState.camera.position.lerp(
-    desiredCameraPosition,
-    CAMERA_SMOOTHING,
-  );
+  sceneState.camera.position.lerp(desiredCameraPosition, CAMERA_SMOOTHING);
   sceneState.camera.up.lerp(DEFAULT_UP, CAMERA_SMOOTHING).normalize();
   controls.target.lerp(desiredLookTarget, CAMERA_SMOOTHING);
-  sceneState.camera.fov = THREE.MathUtils.lerp(
-    sceneState.camera.fov,
-    targetFov,
-    CAMERA_SMOOTHING,
-  );
+  sceneState.camera.fov = THREE.MathUtils.lerp(sceneState.camera.fov, targetFov, CAMERA_SMOOTHING);
   sceneState.camera.updateProjectionMatrix();
   sceneState.camera.lookAt(controls.target);
 }

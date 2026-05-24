@@ -54,12 +54,9 @@ function createVerticalWallBox(
   length: number,
   height: number,
   thickness: number,
-  material: THREE.Material
+  material: THREE.Material,
 ): THREE.Mesh {
-  return new THREE.Mesh(
-    new THREE.BoxGeometry(length, thickness, height, 6, 1, 6),
-    material
-  );
+  return new THREE.Mesh(new THREE.BoxGeometry(length, thickness, height, 6, 1, 6), material);
 }
 
 function drawBallLatitudeBand(
@@ -70,7 +67,7 @@ function drawBallLatitudeBand(
   amplitude: number,
   phase: number,
   lineWidth: number,
-  color: string
+  color: string,
 ): void {
   context.beginPath();
   for (let x = 0; x <= width; x += 8) {
@@ -98,7 +95,7 @@ function drawBallLongitudeBand(
   amplitude: number,
   phase: number,
   lineWidth: number,
-  color: string
+  color: string,
 ): void {
   context.beginPath();
   for (let y = 0; y <= height; y += 8) {
@@ -124,7 +121,7 @@ function drawBallMarker(
   centerY: number,
   radius: number,
   fillStyle: string,
-  strokeStyle: string
+  strokeStyle: string,
 ): void {
   context.beginPath();
   context.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -193,12 +190,9 @@ function createHorizontalWallBox(
   width: number,
   depth: number,
   thickness: number,
-  material: THREE.Material
+  material: THREE.Material,
 ): THREE.Mesh {
-  return new THREE.Mesh(
-    new THREE.BoxGeometry(width, depth, thickness, 6, 6, 1),
-    material
-  );
+  return new THREE.Mesh(new THREE.BoxGeometry(width, depth, thickness, 6, 6, 1), material);
 }
 
 function createExampleSoccarField(scale: number): {
@@ -221,7 +215,7 @@ function createExampleSoccarField(scale: number): {
   function registerWall(
     mesh: THREE.Mesh,
     outwardLocal: THREE.Vector3,
-    fixedOpacity: number | null = null
+    fixedOpacity: number | null = null,
   ): THREE.Mesh {
     const material = (mesh.material as THREE.Material).clone();
     mesh.material = material;
@@ -243,47 +237,28 @@ function createExampleSoccarField(scale: number): {
 
     for (const xSign of mirroredSigns) {
       const sideWall = registerWall(
-        createVerticalWallBox(
-          sideWallWidth,
-          SOCCAR_DEPTH,
-          WALL_THICKNESS,
-          wallMaterial
-        ),
-        new THREE.Vector3(0, 1, 0)
+        createVerticalWallBox(sideWallWidth, SOCCAR_DEPTH, WALL_THICKNESS, wallMaterial),
+        new THREE.Vector3(0, 1, 0),
       );
-      sideWall.position.set(
-        xSign * (sideWallWidth / 2 + GOAL_WIDTH / 2),
-        0,
-        SOCCAR_DEPTH / 2
-      );
+      sideWall.position.set(xSign * (sideWallWidth / 2 + GOAL_WIDTH / 2), 0, SOCCAR_DEPTH / 2);
       backWall.add(sideWall);
 
       const corner = registerWall(
-        createVerticalWallBox(
-          cornerWidth,
-          SOCCAR_DEPTH,
-          WALL_THICKNESS,
-          wallMaterial
-        ),
-        new THREE.Vector3(0, 1, 0)
+        createVerticalWallBox(cornerWidth, SOCCAR_DEPTH, WALL_THICKNESS, wallMaterial),
+        new THREE.Vector3(0, 1, 0),
       );
       corner.position.set(
         xSign * (SOCCAR_XSIZE / 2 - STADIUM_CORNER / 2),
         -STADIUM_CORNER / 2,
-        SOCCAR_DEPTH / 2
+        SOCCAR_DEPTH / 2,
       );
-      corner.rotateZ(-xSign * Math.PI / 4);
+      corner.rotateZ((-xSign * Math.PI) / 4);
       backWall.add(corner);
     }
 
     const top = registerWall(
-      createVerticalWallBox(
-        GOAL_WIDTH,
-        SOCCAR_DEPTH - GOAL_HEIGHT,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
-      new THREE.Vector3(0, 1, 0)
+      createVerticalWallBox(GOAL_WIDTH, SOCCAR_DEPTH - GOAL_HEIGHT, WALL_THICKNESS, wallMaterial),
+      new THREE.Vector3(0, 1, 0),
     );
     top.position.set(0, 0, SOCCAR_DEPTH / 2 + GOAL_HEIGHT / 2);
     backWall.add(top);
@@ -319,67 +294,41 @@ function createExampleSoccarField(scale: number): {
     const wallMaterial = createWallMaterial(color);
 
     const floorMesh = registerWall(
-      new THREE.Mesh(
-        new THREE.ShapeGeometry(floor),
-        floorMaterial
-      ),
-      new THREE.Vector3(0, 0, -1)
+      new THREE.Mesh(new THREE.ShapeGeometry(floor), floorMaterial),
+      new THREE.Vector3(0, 0, -1),
     );
     floorMesh.receiveShadow = true;
     res.add(floorMesh);
 
     for (const xSign of mirroredSigns) {
       const goalPost = registerWall(
-        createVerticalWallBox(
-          GOAL_DEPTH,
-          GOAL_HEIGHT,
-          WALL_THICKNESS,
-          wallMaterial
-        ),
+        createVerticalWallBox(GOAL_DEPTH, GOAL_HEIGHT, WALL_THICKNESS, wallMaterial),
         new THREE.Vector3(0, -xSign, 0),
-        OUTSIDE_WALL_OPACITY
+        OUTSIDE_WALL_OPACITY,
       );
       goalPost.position.set(
-        xSign * GOAL_WIDTH / 2,
+        (xSign * GOAL_WIDTH) / 2,
         SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
-        GOAL_HEIGHT / 2
+        GOAL_HEIGHT / 2,
       );
       goalPost.rotateZ(Math.PI / 2);
       res.add(goalPost);
     }
 
     const goalRoof = registerWall(
-      createHorizontalWallBox(
-        GOAL_WIDTH,
-        GOAL_DEPTH,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
+      createHorizontalWallBox(GOAL_WIDTH, GOAL_DEPTH, WALL_THICKNESS, wallMaterial),
       new THREE.Vector3(0, 0, 1),
-      OUTSIDE_WALL_OPACITY
+      OUTSIDE_WALL_OPACITY,
     );
-    goalRoof.position.set(
-      0,
-      SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2,
-      GOAL_HEIGHT
-    );
+    goalRoof.position.set(0, SOCCAR_YSIZE / 2 + GOAL_DEPTH / 2, GOAL_HEIGHT);
     res.add(goalRoof);
 
     const goalBack = registerWall(
-      createVerticalWallBox(
-        GOAL_WIDTH,
-        GOAL_HEIGHT,
-        WALL_THICKNESS,
-        wallMaterial
-      ),
+      createVerticalWallBox(GOAL_WIDTH, GOAL_HEIGHT, WALL_THICKNESS, wallMaterial),
       new THREE.Vector3(0, 1, 0),
-      OUTSIDE_WALL_OPACITY
+      OUTSIDE_WALL_OPACITY,
     );
-    goalBack.position.set(
-      0,
-      SOCCAR_YSIZE / 2 + GOAL_DEPTH,
-      GOAL_HEIGHT / 2
-    );
+    goalBack.position.set(0, SOCCAR_YSIZE / 2 + GOAL_DEPTH, GOAL_HEIGHT / 2);
     res.add(goalBack);
 
     const backWall = createBackWall(color);
@@ -392,14 +341,14 @@ function createExampleSoccarField(scale: number): {
           SOCCAR_YSIZE / 2 - STADIUM_CORNER,
           SOCCAR_DEPTH,
           WALL_THICKNESS,
-          wallMaterial
+          wallMaterial,
         ),
-        new THREE.Vector3(0, -xSign, 0)
+        new THREE.Vector3(0, -xSign, 0),
       );
       sideWall.position.set(
-        xSign * SOCCAR_XSIZE / 2,
+        (xSign * SOCCAR_XSIZE) / 2,
         (SOCCAR_YSIZE / 2 - STADIUM_CORNER) / 2,
-        SOCCAR_DEPTH / 2
+        SOCCAR_DEPTH / 2,
       );
       sideWall.rotateZ(Math.PI / 2);
       res.add(sideWall);
@@ -481,19 +430,13 @@ function createExampleCarMesh(color: string): THREE.Group {
   ];
 
   const bodyGeometry = new THREE.BufferGeometry();
-  bodyGeometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(vertices.flat(), 3)
-  );
+  bodyGeometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flat(), 3));
   bodyGeometry.setIndex(faces.flat());
   bodyGeometry.computeVertexNormals();
 
   const outer = new THREE.Group();
   const inner = new THREE.Group();
-  const body = new THREE.Mesh(
-    bodyGeometry,
-    new THREE.MeshLambertMaterial({ color })
-  );
+  const body = new THREE.Mesh(bodyGeometry, new THREE.MeshLambertMaterial({ color }));
   body.castShadow = true;
   inner.add(body);
 
@@ -534,7 +477,7 @@ function createExampleCarMesh(color: string): THREE.Group {
   const windowGeometry = new THREE.BufferGeometry();
   windowGeometry.setAttribute(
     "position",
-    new THREE.Float32BufferAttribute(windowVertices.flat(), 3)
+    new THREE.Float32BufferAttribute(windowVertices.flat(), 3),
   );
   windowGeometry.setIndex(windowFaces.flat());
   windowGeometry.computeVertexNormals();
@@ -552,14 +495,9 @@ function createExampleCarMesh(color: string): THREE.Group {
   windshieldGeometry.setAttribute(
     "position",
     new THREE.Float32BufferAttribute(
-      [
-        90, -110, 95,
-        -90, -110, 95,
-        140, -210, 25,
-        -140, -210, 25,
-      ],
-      3
-    )
+      [90, -110, 95, -90, -110, 95, 140, -210, 25, -140, -210, 25],
+      3,
+    ),
   );
   windshieldGeometry.setIndex([0, 2, 3, 0, 3, 1]);
   windshieldGeometry.computeVertexNormals();
@@ -572,10 +510,7 @@ function createExampleCarMesh(color: string): THREE.Group {
     shininess: 48,
   });
   const makeWheel = (x: number, y: number, z: number, width: number): THREE.Mesh => {
-    const wheel = new THREE.Mesh(
-      new THREE.CylinderGeometry(70, 70, width, 10),
-      wheelMaterial
-    );
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(70, 70, width, 10), wheelMaterial);
     wheel.rotateZ(Math.PI / 2);
     wheel.position.set(x, y, z);
     wheel.castShadow = true;
@@ -865,9 +800,10 @@ function makeLights(scene: THREE.Scene): void {
   scene.add(fillLight);
 }
 
-function makeBallMesh(
-  renderer: THREE.WebGLRenderer
-): { mesh: THREE.Mesh; texture: THREE.CanvasTexture } {
+function makeBallMesh(renderer: THREE.WebGLRenderer): {
+  mesh: THREE.Mesh;
+  texture: THREE.CanvasTexture;
+} {
   const texture = createBallTexture(renderer);
   const material = new THREE.MeshPhongMaterial({
     color: 0xffffff,
@@ -885,17 +821,12 @@ function makeBallMesh(
 export function createReplayScene(
   container: HTMLElement,
   replay: ReplayModel,
-  fieldScale: number
+  fieldScale: number,
 ): ReplayScene {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#081119");
 
-  const camera = new THREE.PerspectiveCamera(
-    48,
-    1,
-    10 * fieldScale,
-    500000 * fieldScale
-  );
+  const camera = new THREE.PerspectiveCamera(48, 1, 10 * fieldScale, 500000 * fieldScale);
   camera.up.set(0, 0, 1);
   camera.position.set(0, -9000 * fieldScale, 5000 * fieldScale);
   camera.lookAt(0, 0, 0);
@@ -982,9 +913,7 @@ export function createReplayScene(
       wallToCamera.copy(camera.position).sub(wallCenter);
       const isOutside = wallNormal.dot(wallToCamera) > 0;
       panel.material.transparent = true;
-      panel.material.opacity = isOutside
-        ? OUTSIDE_WALL_OPACITY
-        : OPAQUE_WALL_OPACITY;
+      panel.material.opacity = isOutside ? OUTSIDE_WALL_OPACITY : OPAQUE_WALL_OPACITY;
       panel.material.depthWrite = !isOutside;
     }
   };

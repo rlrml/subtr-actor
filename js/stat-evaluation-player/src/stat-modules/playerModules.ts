@@ -64,7 +64,6 @@ export function createBoostModule(
     rerenderCurrentState: runtime.rerenderCurrentState,
   }),
 ): StatModule {
-
   return {
     id: "boost",
     label: "Boost",
@@ -100,26 +99,17 @@ export function createBoostModule(
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderBoostStats(player.boost),
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(player.name, player.is_team_0, renderBoostStats(player.boost)),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       if (!player) return "";
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
 
       return renderBoostStats(player.boost);
     },
@@ -183,20 +173,19 @@ export function createCeilingShotModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderCeilingShotStats(player.ceiling_shot),
-        player.ceiling_shot?.is_last_ceiling_shot
-          ? '<span class="role-indicator role-forward">Last Ceiling Shot</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderCeilingShotStats(player.ceiling_shot),
+          player.ceiling_shot?.is_last_ceiling_shot
+            ? '<span class="role-indicator role-forward">Last Ceiling Shot</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -287,20 +276,19 @@ export function createMustyFlickModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderMustyFlickStats(player.musty_flick),
-        player.musty_flick?.is_last_musty
-          ? '<span class="role-indicator role-forward">Last Musty</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderMustyFlickStats(player.musty_flick),
+          player.musty_flick?.is_last_musty
+            ? '<span class="role-indicator role-forward">Last Musty</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -328,20 +316,19 @@ export function createFlickModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderFlickStats(player.flick),
-        player.flick?.is_last_flick
-          ? '<span class="role-indicator role-forward">Last Flick</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderFlickStats(player.flick),
+          player.flick?.is_last_flick
+            ? '<span class="role-indicator role-forward">Last Flick</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -383,20 +370,19 @@ export function createSpeedFlipModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderSpeedFlipStats(player.speed_flip),
-        player.speed_flip?.is_last_speed_flip
-          ? '<span class="role-indicator role-forward">Last Speed Flip</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderSpeedFlipStats(player.speed_flip),
+          player.speed_flip?.is_last_speed_flip
+            ? '<span class="role-indicator role-forward">Last Speed Flip</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -424,20 +410,19 @@ export function createHalfFlipModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderHalfFlipStats(player.half_flip),
-        player.half_flip?.is_last_half_flip
-          ? '<span class="role-indicator role-forward">Last Half Flip</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderHalfFlipStats(player.half_flip),
+          player.half_flip?.is_last_half_flip
+            ? '<span class="role-indicator role-forward">Last Half Flip</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -465,20 +450,19 @@ export function createWavedashModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderWavedashStats(player.wavedash),
-        player.wavedash?.is_last_wavedash
-          ? '<span class="role-indicator role-forward">Last Wavedash</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderWavedashStats(player.wavedash),
+          player.wavedash?.is_last_wavedash
+            ? '<span class="role-indicator role-forward">Last Wavedash</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -499,10 +483,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlayModeReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
-  const orderedBreakdownClasses: TouchBreakdownClass[] = [
-    "kind",
-    "height_band",
-  ];
+  const orderedBreakdownClasses: TouchBreakdownClass[] = ["kind", "height_band"];
 
   return {
     id: "touch",
@@ -546,15 +527,11 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     applyConfig(config) {
       if (config && typeof config === "object" && !Array.isArray(config)) {
         const record = config as Record<string, unknown>;
-        if (typeof record.decaySeconds === "number" &&
-          Number.isFinite(record.decaySeconds)) {
+        if (typeof record.decaySeconds === "number" && Number.isFinite(record.decaySeconds)) {
           decaySeconds = Math.max(1, Math.min(10, record.decaySeconds));
           overlay?.setDecaySeconds(decaySeconds);
         }
-        if (
-          record.overlayMode === "markers" ||
-          record.overlayMode === "advancement"
-        ) {
+        if (record.overlayMode === "markers" || record.overlayMode === "advancement") {
           overlayMode = record.overlayMode;
           overlay?.setMode(overlayMode);
         }
@@ -572,22 +549,21 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderTouchStats(player.touch, {
-          breakdownClasses: getActiveBreakdownClasses(),
-        }),
-        player.touch?.is_last_touch
-          ? '<span class="role-indicator role-forward">Last Touch</span>'
-          : "",
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderTouchStats(player.touch, {
+            breakdownClasses: getActiveBreakdownClasses(),
+          }),
+          player.touch?.is_last_touch
+            ? '<span class="role-indicator role-forward">Last Touch</span>'
+            : "",
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -760,39 +736,37 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     if (decayReadoutEl) {
       decayReadoutEl.textContent = `${value.toFixed(1)}s`;
     }
-    for (const radio of settingsEl.querySelectorAll<HTMLInputElement>(
-      "input[data-overlay-mode]",
-    )) {
+    for (const radio of settingsEl.querySelectorAll<HTMLInputElement>("input[data-overlay-mode]")) {
       radio.checked = radio.dataset.overlayMode === overlayMode;
     }
     if (overlayModeReadoutEl) {
-      overlayModeReadoutEl.textContent =
-        overlayMode === "advancement" ? "Advancement" : "Markers";
+      overlayModeReadoutEl.textContent = overlayMode === "advancement" ? "Advancement" : "Markers";
     }
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
       "input[data-breakdown-class]",
     )) {
-      const className = checkbox.dataset
-        .breakdownClass as TouchBreakdownClass | undefined;
-      checkbox.checked = className
-        ? activeBreakdownClasses.has(className)
-        : false;
+      const className = checkbox.dataset.breakdownClass as TouchBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
     }
     if (breakdownReadoutEl) {
       const active = getActiveBreakdownClasses();
-      breakdownReadoutEl.textContent = active.length > 0
-        ? active.map((className) => ({
-          kind: "Kind",
-          height_band: "Height",
-        }[className])).join(" + ")
-        : "Total only";
+      breakdownReadoutEl.textContent =
+        active.length > 0
+          ? active
+              .map(
+                (className) =>
+                  ({
+                    kind: "Kind",
+                    height_band: "Height",
+                  })[className],
+              )
+              .join(" + ")
+          : "Total only";
     }
   }
 
   function getActiveBreakdownClasses(): TouchBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
+    return orderedBreakdownClasses.filter((className) => activeBreakdownClasses.has(className));
   }
 }
 
@@ -812,10 +786,7 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
   let settingsEl: HTMLDivElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<MovementBreakdownClass>();
-  const orderedBreakdownClasses: MovementBreakdownClass[] = [
-    "speed_band",
-    "height_band",
-  ];
+  const orderedBreakdownClasses: MovementBreakdownClass[] = ["speed_band", "height_band"];
 
   return {
     id: "movement",
@@ -852,19 +823,18 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderMovementStats(player.movement, {
-          breakdownClasses: getActiveBreakdownClasses(),
-        }),
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderMovementStats(player.movement, {
+            breakdownClasses: getActiveBreakdownClasses(),
+          }),
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
@@ -945,28 +915,29 @@ export function createMovementModule(runtime: StatModuleRuntime): StatModule {
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
       "input[data-breakdown-class]",
     )) {
-      const className = checkbox.dataset
-        .breakdownClass as MovementBreakdownClass | undefined;
-      checkbox.checked = className
-        ? activeBreakdownClasses.has(className)
-        : false;
+      const className = checkbox.dataset.breakdownClass as MovementBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
     }
 
     if (breakdownReadoutEl) {
       const active = getActiveBreakdownClasses();
-      breakdownReadoutEl.textContent = active.length > 0
-        ? active.map((className) => ({
-          speed_band: "Speed band",
-          height_band: "Height band",
-        }[className])).join(" + ")
-        : "Total only";
+      breakdownReadoutEl.textContent =
+        active.length > 0
+          ? active
+              .map(
+                (className) =>
+                  ({
+                    speed_band: "Speed band",
+                    height_band: "Height band",
+                  })[className],
+              )
+              .join(" + ")
+          : "Total only";
     }
   }
 
   function getActiveBreakdownClasses(): MovementBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
+    return orderedBreakdownClasses.filter((className) => activeBreakdownClasses.has(className));
   }
 }
 

@@ -2,7 +2,6 @@ import type {
   BallSample,
   CameraSettings,
   PlaybackFrame,
-  RawBoostPad,
   RawBoostPadEvent,
   RawDemolishInfo,
   RawGoalEvent,
@@ -24,10 +23,7 @@ import type {
 } from "./types";
 
 export interface NormalizeReplayDataOptions {
-  onProgress?: (
-    progress: number,
-    details: NormalizeReplayProgress,
-  ) => void;
+  onProgress?: (progress: number, details: NormalizeReplayProgress) => void;
   progressReportMinDelta?: number;
   progressReportFrameInterval?: number;
 }
@@ -146,7 +142,7 @@ function rotateVectorByQuaternion(vector: Vec3, quaternion: Quaternion): Vec3 {
       y: -quaternion.y,
       z: -quaternion.z,
       w: quaternion.w,
-    }
+    },
   );
 
   return {
@@ -282,9 +278,9 @@ function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
   const boostPadCount = raw.boost_pads?.length ?? STANDARD_SOCCAR_BOOST_PAD_COUNT;
   const boostPadEventCount = raw.boost_pad_events?.length ?? 0;
   const timelineEventCount =
-    (raw.goal_events?.length ?? 0)
-    + (raw.player_stat_events?.length ?? 0)
-    + (raw.demolish_infos?.length ?? 0);
+    (raw.goal_events?.length ?? 0) +
+    (raw.player_stat_events?.length ?? 0) +
+    (raw.demolish_infos?.length ?? 0);
 
   return [
     Math.max(1, raw.frame_data.metadata_frames.length),
@@ -311,10 +307,7 @@ function getNormalizationTotalFrameUnits(raw: RawReplayFramesData): number {
 
 function createNormalizationProgressTracker(
   raw: RawReplayFramesData,
-  onProgress?: (
-    progress: number,
-    details: NormalizeReplayProgress,
-  ) => void,
+  onProgress?: (progress: number, details: NormalizeReplayProgress) => void,
   options: {
     progressReportMinDelta?: number;
     progressReportFrameInterval?: number;
@@ -328,14 +321,12 @@ function createNormalizationProgressTracker(
   let lastReportedProgress = -1;
   let lastReportedFrameUnits = -1;
   let lastYieldedAt = currentTimeMs();
-  const yieldEveryMs =
-    options.yieldEveryMs ?? Number.POSITIVE_INFINITY;
+  const yieldEveryMs = options.yieldEveryMs ?? Number.POSITIVE_INFINITY;
   const progressReportMinDelta =
     options.progressReportMinDelta ?? NORMALIZATION_PROGRESS_REPORT_MIN_DELTA;
   const progressReportFrameInterval = Math.max(
     1,
-    options.progressReportFrameInterval
-      ?? NORMALIZATION_PROGRESS_REPORT_FRAME_INTERVAL,
+    options.progressReportFrameInterval ?? NORMALIZATION_PROGRESS_REPORT_FRAME_INTERVAL,
   );
 
   const maybeReport = () => {
@@ -351,9 +342,9 @@ function createNormalizationProgressTracker(
     const frameDelta = completedFrameUnits - lastReportedFrameUnits;
     const reachedFrameInterval = frameDelta >= progressReportFrameInterval;
     if (
-      progress >= 1
-      || progress - lastReportedProgress >= progressReportMinDelta
-      || reachedFrameInterval
+      progress >= 1 ||
+      progress - lastReportedProgress >= progressReportMinDelta ||
+      reachedFrameInterval
     ) {
       lastReportedProgress = progress;
       lastReportedFrameUnits = completedFrameUnits;
@@ -411,21 +402,15 @@ function createAsyncNormalizationProgressTracker(
   raw: RawReplayFramesData,
   options: NormalizeReplayDataAsyncOptions,
 ): AsyncNormalizeReplayProgressTracker {
-  const progressTracker = createNormalizationProgressTracker(
-    raw,
-    options.onProgress,
-    {
-      progressReportMinDelta: options.progressReportMinDelta,
-      progressReportFrameInterval: options.progressReportFrameInterval,
-      yieldEveryMs:
-        options.yieldEveryMs ?? NORMALIZATION_ASYNC_YIELD_INTERVAL_MS,
-    },
-  );
+  const progressTracker = createNormalizationProgressTracker(raw, options.onProgress, {
+    progressReportMinDelta: options.progressReportMinDelta,
+    progressReportFrameInterval: options.progressReportFrameInterval,
+    yieldEveryMs: options.yieldEveryMs ?? NORMALIZATION_ASYNC_YIELD_INTERVAL_MS,
+  });
 
   return {
     ...progressTracker,
-    yieldToMainThread:
-      options.yieldToMainThread ?? defaultYieldToMainThread,
+    yieldToMainThread: options.yieldToMainThread ?? defaultYieldToMainThread,
   };
 }
 
@@ -491,7 +476,7 @@ function inferTeamSide(
   name: string,
   teamZeroNames: Set<string>,
   teamOneNames: Set<string>,
-  firstFrame: RawPlayerFrame | undefined
+  firstFrame: RawPlayerFrame | undefined,
 ): boolean {
   if (teamZeroNames.has(name)) {
     return true;
@@ -501,20 +486,14 @@ function inferTeamSide(
     return false;
   }
 
-  if (
-    firstFrame &&
-    firstFrame !== "Empty" &&
-    typeof firstFrame.Data.is_team_0 === "boolean"
-  ) {
+  if (firstFrame && firstFrame !== "Empty" && typeof firstFrame.Data.is_team_0 === "boolean") {
     return firstFrame.Data.is_team_0;
   }
 
   return true;
 }
 
-function getStatEntries(
-  stats: RawPlayerInfo["stats"] | undefined
-): Array<[string, unknown]> {
+function getStatEntries(stats: RawPlayerInfo["stats"] | undefined): Array<[string, unknown]> {
   if (!stats) {
     return [];
   }
@@ -522,10 +501,7 @@ function getStatEntries(
   return Object.entries(stats);
 }
 
-function extractNumericSetting(
-  entries: Array<[string, unknown]>,
-  key: string
-): number | undefined {
+function extractNumericSetting(entries: Array<[string, unknown]>, key: string): number | undefined {
   const value = entries.find(([entryKey]) => entryKey === key)?.[1];
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
@@ -536,13 +512,11 @@ function extractCameraSettings(playerInfo?: RawPlayerInfo): CameraSettings {
     fov: extractNumericSetting(entries, "CameraFOV") ?? DEFAULT_CAMERA_SETTINGS.fov,
     height: extractNumericSetting(entries, "CameraHeight") ?? DEFAULT_CAMERA_SETTINGS.height,
     pitch: extractNumericSetting(entries, "CameraPitch") ?? DEFAULT_CAMERA_SETTINGS.pitch,
-    distance:
-      extractNumericSetting(entries, "CameraDistance") ?? DEFAULT_CAMERA_SETTINGS.distance,
+    distance: extractNumericSetting(entries, "CameraDistance") ?? DEFAULT_CAMERA_SETTINGS.distance,
     stiffness:
       extractNumericSetting(entries, "CameraStiffness") ?? DEFAULT_CAMERA_SETTINGS.stiffness,
     swivelSpeed:
-      extractNumericSetting(entries, "CameraSwivelSpeed") ??
-      DEFAULT_CAMERA_SETTINGS.swivelSpeed,
+      extractNumericSetting(entries, "CameraSwivelSpeed") ?? DEFAULT_CAMERA_SETTINGS.swivelSpeed,
     transitionSpeed:
       extractNumericSetting(entries, "CameraTransitionSpeed") ??
       DEFAULT_CAMERA_SETTINGS.transitionSpeed,
@@ -636,7 +610,7 @@ function buildPlayerTracks(
     const name =
       firstFrame !== undefined && firstFrame.Data.player_name
         ? firstFrame.Data.player_name
-        : replayPlayers.byId.get(playerIdString)?.name ?? playerIdString;
+        : (replayPlayers.byId.get(playerIdString)?.name ?? playerIdString);
     const replayPlayerInfo =
       replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
 
@@ -687,7 +661,7 @@ async function buildPlayerTracksAsync(
     const name =
       firstFrame !== undefined && firstFrame.Data.player_name
         ? firstFrame.Data.player_name
-        : replayPlayers.byId.get(playerIdString)?.name ?? playerIdString;
+        : (replayPlayers.byId.get(playerIdString)?.name ?? playerIdString);
     const replayPlayerInfo =
       replayPlayers.byId.get(playerIdString) ?? replayPlayers.byName.get(name);
 
@@ -707,9 +681,7 @@ async function buildPlayerTracksAsync(
   return players;
 }
 
-function buildPlayerLookup(
-  players: ReplayPlayerTrack[]
-): Map<string, ReplayPlayerTrack> {
+function buildPlayerLookup(players: ReplayPlayerTrack[]): Map<string, ReplayPlayerTrack> {
   return new Map(players.map((player) => [player.id, player]));
 }
 
@@ -718,7 +690,7 @@ function pushPad(
   x: number,
   y: number,
   z: number,
-  size: ReplayBoostPadSize
+  size: ReplayBoostPadSize,
 ): void {
   pads.push({
     index: pads.length,
@@ -734,7 +706,7 @@ function pushMirrorX(
   x: number,
   y: number,
   z: number,
-  size: ReplayBoostPadSize
+  size: ReplayBoostPadSize,
 ): void {
   pushPad(pads, -x, y, z, size);
   pushPad(pads, x, y, z, size);
@@ -745,7 +717,7 @@ function pushMirrorY(
   x: number,
   y: number,
   z: number,
-  size: ReplayBoostPadSize
+  size: ReplayBoostPadSize,
 ): void {
   pushPad(pads, x, -y, z, size);
   pushPad(pads, x, y, z, size);
@@ -756,7 +728,7 @@ function pushMirrorXY(
   x: number,
   y: number,
   z: number,
-  size: ReplayBoostPadSize
+  size: ReplayBoostPadSize,
 ): void {
   pushMirrorX(pads, x, -y, z, size);
   pushMirrorX(pads, x, y, z, size);
@@ -766,49 +738,13 @@ function buildStandardSoccarBoostPads(): ReplayBoostPad[] {
   const pads: ReplayBoostPad[] = [];
 
   pushMirrorY(pads, 0, BOOST_PAD_GOAL_LINE_Y, BOOST_PAD_SMALL_Z, "small");
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_BACK_LANE_X,
-    BOOST_PAD_BACK_LANE_Y,
-    BOOST_PAD_SMALL_Z,
-    "small"
-  );
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_BACK_CORNER_X,
-    BOOST_PAD_BACK_CORNER_Y,
-    BOOST_PAD_BIG_Z,
-    "big"
-  );
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_BACK_MID_X,
-    BOOST_PAD_BACK_MID_Y,
-    BOOST_PAD_SMALL_Z,
-    "small"
-  );
+  pushMirrorXY(pads, BOOST_PAD_BACK_LANE_X, BOOST_PAD_BACK_LANE_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorXY(pads, BOOST_PAD_BACK_CORNER_X, BOOST_PAD_BACK_CORNER_Y, BOOST_PAD_BIG_Z, "big");
+  pushMirrorXY(pads, BOOST_PAD_BACK_MID_X, BOOST_PAD_BACK_MID_Y, BOOST_PAD_SMALL_Z, "small");
   pushMirrorY(pads, 0, BOOST_PAD_CENTER_BACK_Y, BOOST_PAD_SMALL_Z, "small");
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_SIDE_WALL_X,
-    BOOST_PAD_SIDE_WALL_Y,
-    BOOST_PAD_SMALL_Z,
-    "small"
-  );
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_SIDE_LANE_X,
-    BOOST_PAD_SIDE_LANE_Y,
-    BOOST_PAD_SMALL_Z,
-    "small"
-  );
-  pushMirrorXY(
-    pads,
-    BOOST_PAD_FRONT_LANE_X,
-    BOOST_PAD_FRONT_LANE_Y,
-    BOOST_PAD_SMALL_Z,
-    "small"
-  );
+  pushMirrorXY(pads, BOOST_PAD_SIDE_WALL_X, BOOST_PAD_SIDE_WALL_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorXY(pads, BOOST_PAD_SIDE_LANE_X, BOOST_PAD_SIDE_LANE_Y, BOOST_PAD_SMALL_Z, "small");
+  pushMirrorXY(pads, BOOST_PAD_FRONT_LANE_X, BOOST_PAD_FRONT_LANE_Y, BOOST_PAD_SMALL_Z, "small");
   pushMirrorY(pads, 0, BOOST_PAD_CENTER_MID_Y, BOOST_PAD_SMALL_Z, "small");
   pushMirrorX(pads, BOOST_PAD_SIDE_WALL_X, 0, BOOST_PAD_BIG_Z, "big");
   pushMirrorX(pads, BOOST_PAD_CENTER_X, 0, BOOST_PAD_SMALL_Z, "small");
@@ -959,7 +895,7 @@ function buildBoostPads(
         frame: event.frame,
         available: parseBoostPadAvailability(event.kind) ?? true,
         playerId,
-        playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
+        playerName: playerId ? (playersById.get(playerId)?.name ?? playerId) : null,
       };
     }
 
@@ -1035,7 +971,7 @@ async function buildBoostPadsAsync(
         frame: event.frame,
         available: parseBoostPadAvailability(event.kind) ?? true,
         playerId,
-        playerName: playerId ? playersById.get(playerId)?.name ?? playerId : null,
+        playerName: playerId ? (playersById.get(playerId)?.name ?? playerId) : null,
       };
     }
 
@@ -1054,21 +990,17 @@ async function buildBoostPadsAsync(
   return pads;
 }
 
-function createTimelineEventId(
-  prefix: string,
-  frame: number,
-  suffix: string
-): string {
+function createTimelineEventId(prefix: string, frame: number, suffix: string): string {
   return `${prefix}:${frame}:${suffix}`;
 }
 
 function goalTimelineEvent(
   event: RawGoalEvent,
   playersById: Map<string, ReplayPlayerTrack>,
-  startTime: number
+  startTime: number,
 ): ReplayTimelineEvent {
   const playerId = event.player ? playerIdToString(event.player) : null;
-  const playerName = playerId ? playersById.get(playerId)?.name ?? playerId : null;
+  const playerName = playerId ? (playersById.get(playerId)?.name ?? playerId) : null;
   const label = playerName ? `${playerName} scored` : "Goal";
   return {
     id: createTimelineEventId("goal", event.frame, playerId ?? "team"),
@@ -1086,15 +1018,13 @@ function goalTimelineEvent(
 function playerStatTimelineEvent(
   event: RawPlayerStatEvent,
   playersById: Map<string, ReplayPlayerTrack>,
-  startTime: number
+  startTime: number,
 ): ReplayTimelineEvent {
   const playerId = playerIdToString(event.player);
   const playerName = playersById.get(playerId)?.name ?? playerId;
   const kind = event.kind.toLowerCase() as ReplayTimelineEvent["kind"];
-  const verb =
-    event.kind === "Shot" ? "shot" : event.kind === "Save" ? "save" : "assist";
-  const shortLabel =
-    event.kind === "Shot" ? "SH" : event.kind === "Save" ? "SV" : "A";
+  const verb = event.kind === "Shot" ? "shot" : event.kind === "Save" ? "save" : "assist";
+  const shortLabel = event.kind === "Shot" ? "SH" : event.kind === "Save" ? "SV" : "A";
   return {
     id: createTimelineEventId(kind, event.frame, playerId),
     time: normalizeReplayTime(event.time, startTime),
@@ -1113,7 +1043,7 @@ function playerStatTimelineEvent(
 function demoTimelineEvent(
   event: RawDemolishInfo,
   playersById: Map<string, ReplayPlayerTrack>,
-  startTime: number
+  startTime: number,
 ): ReplayTimelineEvent {
   const attackerId = playerIdToString(event.attacker);
   const victimId = playerIdToString(event.victim);
@@ -1217,14 +1147,10 @@ export function normalizeReplayData(
   raw: RawReplayFramesData,
   options: NormalizeReplayDataOptions = {},
 ): ReplayModel {
-  const progressTracker = createNormalizationProgressTracker(
-    raw,
-    options.onProgress,
-    {
-      progressReportMinDelta: options.progressReportMinDelta,
-      progressReportFrameInterval: options.progressReportFrameInterval,
-    },
-  );
+  const progressTracker = createNormalizationProgressTracker(raw, options.onProgress, {
+    progressReportMinDelta: options.progressReportMinDelta,
+    progressReportFrameInterval: options.progressReportFrameInterval,
+  });
   const startTime = raw.frame_data.metadata_frames[0]?.time ?? 0;
   const frames = buildPlaybackFrames(raw, progressTracker);
   const players = buildPlayerTracks(raw, progressTracker);
@@ -1255,18 +1181,8 @@ export async function normalizeReplayDataAsync(
   const frames = await buildPlaybackFramesAsync(raw, progressTracker);
   const players = await buildPlayerTracksAsync(raw, progressTracker);
   const ballFrames = await buildBallFramesAsync(raw, progressTracker);
-  const boostPads = await buildBoostPadsAsync(
-    raw,
-    players,
-    startTime,
-    progressTracker,
-  );
-  const timelineEvents = await buildTimelineEventsAsync(
-    raw,
-    players,
-    startTime,
-    progressTracker,
-  );
+  const boostPads = await buildBoostPadsAsync(raw, players, startTime, progressTracker);
+  const timelineEvents = await buildTimelineEventsAsync(raw, players, startTime, progressTracker);
   progressTracker.finish();
 
   return {

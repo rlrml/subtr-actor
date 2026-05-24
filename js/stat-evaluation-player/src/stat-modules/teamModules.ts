@@ -26,10 +26,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
   let settingsEl: HTMLDivElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<PossessionBreakdownClass>();
-  const orderedBreakdownClasses: PossessionBreakdownClass[] = [
-    "possession_state",
-    "field_third",
-  ];
+  const orderedBreakdownClasses: PossessionBreakdownClass[] = ["possession_state", "field_third"];
 
   return {
     id: "possession",
@@ -70,10 +67,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const possession = statsFrame?.team_zero?.possession;
       if (!possession) return "";
 
@@ -89,10 +83,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       const possession = player?.is_team_0
         ? statsFrame?.team_zero?.possession
@@ -190,29 +181,25 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
       "input[data-breakdown-class]",
     )) {
-      const className = checkbox.dataset
-        .breakdownClass as PossessionBreakdownClass | undefined;
-      checkbox.checked = className
-        ? activeBreakdownClasses.has(className)
-        : false;
+      const className = checkbox.dataset.breakdownClass as PossessionBreakdownClass | undefined;
+      checkbox.checked = className ? activeBreakdownClasses.has(className) : false;
     }
 
     if (breakdownReadoutEl) {
       const enabled = orderedBreakdownClasses.filter((className) =>
-        activeBreakdownClasses.has(className)
+        activeBreakdownClasses.has(className),
       );
-      breakdownReadoutEl.textContent = enabled.length === 0
-        ? "Total only"
-        : enabled.map((className) =>
-          className === "possession_state" ? "Control" : "Third"
-        ).join(" x ");
+      breakdownReadoutEl.textContent =
+        enabled.length === 0
+          ? "Total only"
+          : enabled
+              .map((className) => (className === "possession_state" ? "Control" : "Third"))
+              .join(" x ");
     }
   }
 
   function getActiveBreakdownClasses(): PossessionBreakdownClass[] {
-    return orderedBreakdownClasses.filter((className) =>
-      activeBreakdownClasses.has(className)
-    );
+    return orderedBreakdownClasses.filter((className) => activeBreakdownClasses.has(className));
   }
 }
 
@@ -246,10 +233,7 @@ export function createFiftyFiftyModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
       const summary = renderSharedCard(
@@ -259,11 +243,13 @@ export function createFiftyFiftyModule(): StatModule {
         }),
       );
 
-      const players = renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderPlayerFiftyFiftyStats(player.fifty_fifty),
-      ));
+      const players = renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderPlayerFiftyFiftyStats(player.fifty_fifty),
+        ),
+      );
 
       return summary + players;
     },
@@ -287,10 +273,7 @@ export function createPressureModule(): StatModule {
 
     setup(ctx) {
       replay = ctx.replay;
-      halfFieldOverlay = new HalfFieldOverlay(
-        ctx.player.sceneState.scene,
-        ctx.fieldScale,
-      );
+      halfFieldOverlay = new HalfFieldOverlay(ctx.player.sceneState.scene, ctx.fieldScale);
     },
 
     teardown() {
@@ -309,10 +292,7 @@ export function createPressureModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const pressure = statsFrame?.team_zero?.pressure;
       if (!pressure) return "";
 
@@ -327,10 +307,7 @@ export function createPressureModule(): StatModule {
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
       const pressure = player?.is_team_0
         ? statsFrame?.team_zero?.pressure
@@ -362,37 +339,21 @@ export function createRushModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const teamZeroRush = statsFrame?.team_zero?.rush;
       const teamOneRush = statsFrame?.team_one?.rush;
       if (!teamZeroRush || !teamOneRush) return "";
 
       return [
-        renderPlayerCard(
-          "Blue Team",
-          true,
-          renderRushStats(teamZeroRush),
-        ),
-        renderPlayerCard(
-          "Orange Team",
-          false,
-          renderRushStats(teamOneRush),
-        ),
+        renderPlayerCard("Blue Team", true, renderRushStats(teamZeroRush)),
+        renderPlayerCard("Orange Team", false, renderRushStats(teamOneRush)),
       ].join("");
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      const rush = player?.is_team_0
-        ? statsFrame?.team_zero?.rush
-        : statsFrame?.team_one?.rush;
+      const rush = player?.is_team_0 ? statsFrame?.team_zero?.rush : statsFrame?.team_one?.rush;
       if (!rush || !player) return "";
 
       return renderRushStats(rush);

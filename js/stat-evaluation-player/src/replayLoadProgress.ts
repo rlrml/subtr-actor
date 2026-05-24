@@ -102,20 +102,14 @@ function clampUnitInterval(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function scaleProgress(
-  value: number | undefined,
-  start: number,
-  end: number,
-): number | undefined {
+function scaleProgress(value: number | undefined, start: number, end: number): number | undefined {
   if (value === undefined) {
     return undefined;
   }
   return clampUnitInterval((value - start) / (end - start));
 }
 
-function normalizeReplayLoadProgress(
-  progress: ReplayLoadProgress,
-): ReplayLoadProgress {
+function normalizeReplayLoadProgress(progress: ReplayLoadProgress): ReplayLoadProgress {
   if (progress.stage !== "stats-timeline") {
     return progress;
   }
@@ -153,9 +147,7 @@ function normalizeReplayLoadProgress(
 
 function getReplayLoadPhaseConfig(progress: ReplayLoadProgress) {
   const normalizedProgress = normalizeReplayLoadProgress(progress);
-  return REPLAY_LOAD_PHASES.find((phase) =>
-    phase.stage === normalizedProgress.stage
-  )!;
+  return REPLAY_LOAD_PHASES.find((phase) => phase.stage === normalizedProgress.stage)!;
 }
 
 export function listReplayLoadPhases(): ReplayLoadPhase[] {
@@ -177,9 +169,7 @@ export function getReplayLoadPhase(progress: ReplayLoadProgress): ReplayLoadPhas
   };
 }
 
-export function getReplayLoadPhaseStates(
-  progress: ReplayLoadProgress,
-): ReplayLoadPhaseState[] {
+export function getReplayLoadPhaseStates(progress: ReplayLoadProgress): ReplayLoadPhaseState[] {
   const normalizedProgress = normalizeReplayLoadProgress(progress);
   const currentPhase = getReplayLoadPhaseConfig(normalizedProgress);
 
@@ -215,9 +205,7 @@ export function getReplayLoadPhaseStates(
       total,
       label,
       state: "active",
-      completion: isDeterminate
-        ? clampUnitInterval(normalizedProgress.progress ?? 0)
-        : 1,
+      completion: isDeterminate ? clampUnitInterval(normalizedProgress.progress ?? 0) : 1,
       indeterminate: !isDeterminate,
     };
   });
@@ -225,9 +213,10 @@ export function getReplayLoadPhaseStates(
 
 export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
   const normalizedProgress = normalizeReplayLoadProgress(progress);
-  const percent = normalizedProgress.progress === undefined
-    ? null
-    : Math.round(normalizedProgress.progress * 100);
+  const percent =
+    normalizedProgress.progress === undefined
+      ? null
+      : Math.round(normalizedProgress.progress * 100);
 
   switch (normalizedProgress.stage) {
     case "validating":
@@ -280,16 +269,11 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
 
 export function getReplayLoadCompletion(progress: ReplayLoadProgress): number {
   const normalizedProgress = normalizeReplayLoadProgress(progress);
-  if (
-    normalizedProgress.stage !== "validating" &&
-    normalizedProgress.progress !== undefined
-  ) {
+  if (normalizedProgress.stage !== "validating" && normalizedProgress.progress !== undefined) {
     const phase = getReplayLoadPhaseConfig(normalizedProgress);
-    return phase.start + (
-      clampUnitInterval(normalizedProgress.progress) * (phase.end - phase.start)
-    );
+    return phase.start + clampUnitInterval(normalizedProgress.progress) * (phase.end - phase.start);
   }
 
   const phase = getReplayLoadPhaseConfig(normalizedProgress);
-  return phase.start + ((phase.end - phase.start) * 0.5);
+  return phase.start + (phase.end - phase.start) * 0.5;
 }

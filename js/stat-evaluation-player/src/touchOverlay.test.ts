@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
 import type { StatsFrame } from "./statsTimeline.ts";
-import {
-  buildTouchMarkers,
-  getLastTouchPlayer,
-  getVisibleTouchMarkers,
-} from "./touchOverlay.ts";
+import { buildTouchMarkers, getLastTouchPlayer, getVisibleTouchMarkers } from "./touchOverlay.ts";
 import {
   createLegacyStatsTimeline,
   createPlayerStatsSnapshot,
@@ -47,14 +43,8 @@ test("getLastTouchPlayer returns the player marked as the current last touch", (
 
 test("buildTouchMarkers derives markers from touch stats and ball frames", () => {
   const replay = {
-    ballFrames: [
-      { position: { x: 0, y: 0, z: 0 } },
-      { position: { x: 100, y: -250, z: 320 } },
-    ],
-    frames: [
-      { time: 0 },
-      { time: 1.25 },
-    ],
+    ballFrames: [{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 100, y: -250, z: 320 } }],
+    frames: [{ time: 0 }, { time: 1.25 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -130,11 +120,7 @@ test("buildTouchMarkers assigns credited ball movement to the active touch marke
       { position: { x: 0, y: 100, z: 92 } },
       { position: { x: 40, y: 170, z: 92 } },
     ],
-    frames: [
-      { time: 0 },
-      { time: 1 },
-      { time: 2 },
-    ],
+    frames: [{ time: 0 }, { time: 1 }, { time: 2 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -216,14 +202,8 @@ test("buildTouchMarkers assigns credited ball movement to the active touch marke
 
 test("buildTouchMarkers uses normalized replay frame time instead of raw stats time", () => {
   const replay = {
-    ballFrames: [
-      { position: { x: 0, y: 0, z: 0 } },
-      { position: { x: 100, y: -250, z: 320 } },
-    ],
-    frames: [
-      { time: 0 },
-      { time: 1.25 },
-    ],
+    ballFrames: [{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 100, y: -250, z: 320 } }],
+    frames: [{ time: 0 }, { time: 1.25 }],
     players: [
       {
         id: "Steam:blue-id",

@@ -2,10 +2,7 @@
 
 import * as subtrActor from "@colonelpanic8/subtr-actor";
 import { normalizeReplayData } from "./replay-data";
-import type {
-  RawReplayFramesData,
-  ReplayLoadProgress,
-} from "./types";
+import type { RawReplayFramesData, ReplayLoadProgress } from "./types";
 
 type ReplayValidation = {
   valid: boolean;
@@ -35,15 +32,12 @@ interface ReplayErrorMessage {
   error: string;
 }
 
-type ReplayWorkerResponse =
-  | ReplayProgressMessage
-  | ReplayDoneMessage
-  | ReplayErrorMessage;
+type ReplayWorkerResponse = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
 function toPlainData<T>(value: T): T {
   if (value instanceof Map) {
     return Object.fromEntries(
-      Array.from(value.entries()).map(([key, entry]) => [key, toPlainData(entry)])
+      Array.from(value.entries()).map(([key, entry]) => [key, toPlainData(entry)]),
     ) as T;
   }
 
@@ -63,9 +57,11 @@ function toPlainData<T>(value: T): T {
 }
 
 async function ensureBindingsReady(): Promise<void> {
-  const maybeInit = (subtrActor as typeof subtrActor & {
-    default?: () => Promise<unknown>;
-  }).default;
+  const maybeInit = (
+    subtrActor as typeof subtrActor & {
+      default?: () => Promise<unknown>;
+    }
+  ).default;
   if (typeof maybeInit === "function") {
     await maybeInit();
   }
@@ -97,23 +93,21 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
     }
 
     const rawBuffer = subtrActor.get_replay_frames_data_json_with_progress(
-        bytes,
-        (progress: unknown) => {
-          postMessageToMain({
-            type: "progress",
-            progress: progress as ReplayLoadProgress,
-          });
-        },
-        event.data.reportEveryNFrames,
-      );
+      bytes,
+      (progress: unknown) => {
+        postMessageToMain({
+          type: "progress",
+          progress: progress as ReplayLoadProgress,
+        });
+      },
+      event.data.reportEveryNFrames,
+    );
 
     postMessageToMain({
       type: "progress",
       progress: { stage: "normalizing", progress: 0 },
     });
-    const rawReplayData = JSON.parse(
-      new TextDecoder().decode(rawBuffer),
-    ) as RawReplayFramesData;
+    const rawReplayData = JSON.parse(new TextDecoder().decode(rawBuffer)) as RawReplayFramesData;
     const replay = normalizeReplayData(rawReplayData, {
       progressReportFrameInterval: event.data.reportEveryNFrames,
       onProgress(progress) {
@@ -125,11 +119,14 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
     });
     const replayBuffer = new TextEncoder().encode(JSON.stringify(replay));
 
-    self.postMessage({
-      type: "done",
-      rawBuffer: rawBuffer.buffer,
-      replayBuffer: replayBuffer.buffer,
-    }, [rawBuffer.buffer, replayBuffer.buffer]);
+    self.postMessage(
+      {
+        type: "done",
+        rawBuffer: rawBuffer.buffer,
+        replayBuffer: replayBuffer.buffer,
+      },
+      [rawBuffer.buffer, replayBuffer.buffer],
+    );
   } catch (error: unknown) {
     postMessageToMain({
       type: "error",

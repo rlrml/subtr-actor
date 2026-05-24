@@ -27,9 +27,7 @@ async function main() {
   delete publishPackage.scripts;
   delete publishPackage.devDependencies;
 
-  const outputDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-stats-player-package-"),
-  );
+  const outputDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-stats-player-package-"));
 
   await cp(distDir, path.join(outputDir, "dist"), { recursive: true });
   await cp(path.resolve(packageDir, "README.md"), path.join(outputDir, "README.md"));

@@ -8,6 +8,11 @@
     "build": "wasm-pack build --target web --out-dir pkg --no-pack && node ./scripts/prepare-wasm-package.mjs",
     "build:nodejs": "wasm-pack build --target nodejs --out-dir pkg-node",
     "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
+    "format": "prettier --write \"**/*.{js,mjs,ts,tsx,json,css,html,md}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,ts,tsx,json,css,html,md}\"",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "check:style": "npm run format:check && npm run lint",
     "test": "wasm-pack test --headless --firefox",
     "pack": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm pack pkg/",
     "publish": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm publish pkg/",
@@ -24,6 +29,11 @@
   "author": "Ivan Malison <ivanmalison@gmail.com>",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.3",
+    "typescript-eslint": "^8.59.4",
     "wasm-pack": "^0.14.0"
   }
 }

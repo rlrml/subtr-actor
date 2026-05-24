@@ -18,7 +18,7 @@ function ensureWasmBindingsPlugin() {
       ensureWasmPackageFresh({
         force,
         log: (message) => console.log(message),
-      })
+      }),
     );
     return rebuild;
   };
@@ -41,9 +41,7 @@ function ensureWasmBindingsPlugin() {
           await queueRebuild(true);
           server.ws.send({ type: "full-reload" });
         } catch (error) {
-          server.config.logger.error(
-            error instanceof Error ? error.message : String(error)
-          );
+          server.config.logger.error(error instanceof Error ? error.message : String(error));
         }
       };
 
@@ -67,10 +65,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@colonelpanic8/subtr-actor": path.resolve(
-        exampleDir,
-        "../pkg/rl_replay_subtr_actor.js"
-      ),
+      "@colonelpanic8/subtr-actor": path.resolve(exampleDir, "../pkg/rl_replay_subtr_actor.js"),
       three: path.resolve(exampleDir, "node_modules/three"),
     },
   },

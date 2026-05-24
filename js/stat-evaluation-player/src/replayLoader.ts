@@ -44,10 +44,7 @@ interface TransferableStatsTimelineParts {
   frameChunkBuffers: ArrayBuffer[];
 }
 
-type ReplayWorkerMessage =
-  | ReplayProgressMessage
-  | ReplayDoneMessage
-  | ReplayErrorMessage;
+type ReplayWorkerMessage = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
 function parseJsonBuffer<T>(decoder: TextDecoder, buffer: ArrayBuffer): T {
   return JSON.parse(decoder.decode(new Uint8Array(buffer))) as T;
@@ -59,22 +56,13 @@ async function parseStatsTimelineParts(
   onProgress?: (progress: ReplayLoadProgress) => void,
 ): Promise<StatsTimeline> {
   onProgress?.({ stage: "decoding-stats", progress: 0 });
-  const config = parseJsonBuffer<StatsTimeline["config"]>(
-    decoder,
-    parts.configBuffer,
-  );
+  const config = parseJsonBuffer<StatsTimeline["config"]>(decoder, parts.configBuffer);
   onProgress?.({ stage: "decoding-stats", progress: 0.05 });
   await waitForNextPaint();
-  const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(
-    decoder,
-    parts.replayMetaBuffer,
-  );
+  const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(decoder, parts.replayMetaBuffer);
   onProgress?.({ stage: "decoding-stats", progress: 0.1 });
   await waitForNextPaint();
-  const events = parseJsonBuffer<StatsTimeline["events"]>(
-    decoder,
-    parts.eventsBuffer,
-  );
+  const events = parseJsonBuffer<StatsTimeline["events"]>(decoder, parts.eventsBuffer);
   onProgress?.({ stage: "decoding-stats", progress: 0.15 });
   await waitForNextPaint();
 
@@ -87,7 +75,7 @@ async function parseStatsTimelineParts(
       stage: "decoding-stats",
       processedChunks: index + 1,
       totalChunks,
-      progress: 0.15 + (((index + 1) / Math.max(1, totalChunks)) * 0.85),
+      progress: 0.15 + ((index + 1) / Math.max(1, totalChunks)) * 0.85,
     });
     await waitForNextPaint();
   }

@@ -7,11 +7,7 @@ import type {
   ReplayTimelineRange,
 } from "subtr-actor-player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsTimeline,
-} from "../statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
 
 export interface StatModuleContext {
@@ -32,16 +28,10 @@ export interface StatModule {
   getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
   getConfig?(): unknown;
   applyConfig?(config: unknown): void;
-  includeBoostPickupAnimationPickup?(
-    pickup: BoostPickupAnimationPickup,
-  ): boolean;
+  includeBoostPickupAnimationPickup?(pickup: BoostPickupAnimationPickup): boolean;
   renderStats(frameIndex: number, ctx: StatModuleContext): string;
   renderSettings?(ctx: StatModuleContext | null): HTMLElement | null;
-  renderFocusedPlayerStats(
-    playerId: string,
-    frameIndex: number,
-    ctx: StatModuleContext,
-  ): string;
+  renderFocusedPlayerStats(playerId: string, frameIndex: number, ctx: StatModuleContext): string;
 }
 
 export interface StatModuleRuntime {
@@ -80,11 +70,8 @@ function renderStatCard(
     tone: StatCardTone;
   },
 ): string {
-  const toneClass = options.tone === "shared"
-    ? "shared"
-    : options.tone === "blue"
-      ? "team-blue"
-      : "team-orange";
+  const toneClass =
+    options.tone === "shared" ? "shared" : options.tone === "blue" ? "team-blue" : "team-orange";
 
   return `<div class="player-card ${toneClass}">
     <div class="player-card-header">
@@ -111,11 +98,9 @@ export function renderGroupedPlayerCards(
   players: readonly PlayerStatsSnapshot[],
   renderPlayer: (player: PlayerStatsSnapshot) => string,
 ): string {
-  return `<div class="player-team-stack">${
-    ([true, false] as const).map((isTeamZero) => {
-      const teamPlayers = players.filter((player) =>
-        player.is_team_0 === isTeamZero
-      );
+  return `<div class="player-team-stack">${([true, false] as const)
+    .map((isTeamZero) => {
+      const teamPlayers = players.filter((player) => player.is_team_0 === isTeamZero);
       if (teamPlayers.length === 0) {
         return "";
       }
@@ -130,15 +115,11 @@ export function renderGroupedPlayerCards(
           ${teamPlayers.map(renderPlayer).join("")}
         </div>
       </section>`;
-    }).join("")
-  }</div>`;
+    })
+    .join("")}</div>`;
 }
 
-export function renderSharedCard(
-  name: string,
-  bodyHtml: string,
-  metaHtml = "",
-): string {
+export function renderSharedCard(name: string, bodyHtml: string, metaHtml = ""): string {
   return renderStatCard(name, bodyHtml, {
     metaHtml,
     tone: "shared",
@@ -153,9 +134,9 @@ export function getStatsPlayerSnapshot(
   const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
   if (!statsFrame) return null;
 
-  return statsFrame.players.find(
-    (player) => playerIdToString(player.player_id) === playerId,
-  ) ?? null;
+  return (
+    statsFrame.players.find((player) => playerIdToString(player.player_id) === playerId) ?? null
+  );
 }
 
 export function getCurrentDepthRole(
@@ -181,9 +162,7 @@ export function getCurrentDepthRole(
     const candidateFrame = candidate.frames[frameIndex];
     if (!candidateFrame?.position) continue;
 
-    const value = isTeamZero
-      ? candidateFrame.position.y
-      : -candidateFrame.position.y;
+    const value = isTeamZero ? candidateFrame.position.y : -candidateFrame.position.y;
     allYs.push(value);
     if (candidate.id === playerId) {
       normalizedY = value;

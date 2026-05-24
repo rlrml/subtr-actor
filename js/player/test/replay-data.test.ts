@@ -1,14 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  normalizeReplayData,
-  normalizeReplayDataAsync,
-} from "../src/replay-data";
-import {
-  formatReplayLoadProgress,
-  formatReplayLoadProgressMeta,
-} from "../src/load-ui";
+import { normalizeReplayData, normalizeReplayDataAsync } from "../src/replay-data";
+import { formatReplayLoadProgress, formatReplayLoadProgressMeta } from "../src/load-ui";
 import type { RawReplayFramesData } from "../src/types";
 
 function rigidBody(x: number, y: number, z: number) {
@@ -57,17 +51,14 @@ function buildReplayData(frameCount: number, playerCount = 4): RawReplayFramesDa
     stats: null,
     name: `Orange ${index + 1}`,
   }));
-  const players: RawReplayFramesData["frame_data"]["players"] = [
-    ...teamZero,
-    ...teamOne,
-  ].map((player): RawReplayFramesData["frame_data"]["players"][number] => [
-    player.remote_id,
-    {
-      frames: Array.from({ length: frameCount }, (_, index) =>
-        playerFrame(player.name, index),
-      ),
-    },
-  ]);
+  const players: RawReplayFramesData["frame_data"]["players"] = [...teamZero, ...teamOne].map(
+    (player): RawReplayFramesData["frame_data"]["players"][number] => [
+      player.remote_id,
+      {
+        frames: Array.from({ length: frameCount }, (_, index) => playerFrame(player.name, index)),
+      },
+    ],
+  );
 
   return {
     meta: {
@@ -102,10 +93,7 @@ function assertMonotonicProgress(progressValues: number[]): void {
   assert.equal(progressValues.at(-1), 1);
 
   for (let index = 1; index < progressValues.length; index += 1) {
-    assert.ok(
-      progressValues[index]! >= progressValues[index - 1]!,
-      "expected monotonic progress",
-    );
+    assert.ok(progressValues[index]! >= progressValues[index - 1]!, "expected monotonic progress");
   }
 }
 
@@ -216,20 +204,13 @@ test("normalization keeps PlayStation players with duplicate online ids distinct
     },
   };
   const raw = buildReplayData(2, 0);
-  raw.meta.team_zero = [
-    { remote_id: firstId, stats: null, name: "Raptor_Attacks_" },
-  ];
-  raw.meta.team_one = [
-    { remote_id: secondId, stats: null, name: "remrocker29" },
-  ];
+  raw.meta.team_zero = [{ remote_id: firstId, stats: null, name: "Raptor_Attacks_" }];
+  raw.meta.team_one = [{ remote_id: secondId, stats: null, name: "remrocker29" }];
   raw.frame_data.players = [
     [
       firstId,
       {
-        frames: [
-          playerFrame("Raptor_Attacks_", 0),
-          playerFrame("Raptor_Attacks_", 1),
-        ],
+        frames: [playerFrame("Raptor_Attacks_", 0), playerFrame("Raptor_Attacks_", 1)],
       },
     ],
     [
@@ -358,10 +339,7 @@ test("async normalization yields when percent progress reports are emitted", asy
   });
 
   assert.deepEqual(replay, normalizeReplayData(raw));
-  assert.ok(
-    yieldCount >= 3,
-    "expected progress reports to give the browser paint opportunities",
-  );
+  assert.ok(yieldCount >= 3, "expected progress reports to give the browser paint opportunities");
 });
 
 test("replay loading text shows incremental normalization substeps", () => {

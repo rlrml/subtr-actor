@@ -274,7 +274,7 @@ function setBoostBar(
   fill: HTMLElement | null,
   text: HTMLElement | null,
   amount: number,
-  playerName: string
+  playerName: string,
 ): void {
   if (!fill || !text) {
     return;
@@ -289,7 +289,7 @@ function makePlayerSelectable(
   element: HTMLDivElement | null,
   context: ReplayPlayerPluginContext,
   playerId: string,
-  playerName: string
+  playerName: string,
 ): void {
   if (!element) {
     return;
@@ -320,7 +320,7 @@ function projectToContainer(
   worldOffset: THREE.Vector3,
   camera: THREE.Camera,
   container: HTMLElement,
-  out: THREE.Vector3
+  out: THREE.Vector3,
 ): boolean {
   mesh.getWorldPosition(out);
   out.add(worldOffset);
@@ -343,7 +343,7 @@ function projectToContainer(
 }
 
 export function createBallchasingOverlayPlugin(
-  options: BallchasingOverlayPluginOptions = {}
+  options: BallchasingOverlayPluginOptions = {},
 ): ReplayPlayerPlugin {
   const showFloatingNames = options.showFloatingNames ?? true;
   const showFloatingBoostBars = options.showFloatingBoostBars ?? true;
@@ -369,10 +369,7 @@ export function createBallchasingOverlayPlugin(
     }
   }
 
-  function buildHud(
-    context: ReplayPlayerPluginContext,
-    container: HTMLElement
-  ): void {
+  function buildHud(context: ReplayPlayerPluginContext, container: HTMLElement): void {
     ensureStyles();
     if (getComputedStyle(container).position === "static") {
       changedContainerPosition = true;
@@ -507,14 +504,9 @@ export function createBallchasingOverlayPlugin(
           elements.floatingBoostFill,
           elements.floatingBoostText,
           boostAmount,
-          player.track.name
+          player.track.name,
         );
-        setBoostBar(
-          elements.teamHudFill,
-          elements.teamHudText,
-          boostAmount,
-          player.track.name
-        );
+        setBoostBar(elements.teamHudFill, elements.teamHudText, boostAmount, player.track.name);
 
         const mesh = player.mesh;
         const active = mesh !== null && player.interpolatedPosition !== null;
@@ -531,7 +523,7 @@ export function createBallchasingOverlayPlugin(
             floatingOffset,
             context.scene.camera,
             context.container,
-            projected
+            projected,
           )
         ) {
           elements.floatingRoot.hidden = true;

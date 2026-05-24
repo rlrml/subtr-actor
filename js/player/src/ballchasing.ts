@@ -20,9 +20,7 @@ function buildApiUrl(path: string, apiBaseUrl: string | URL): URL {
   return new URL(`${normalizedBase}/${path.replace(/^\/+/, "")}`);
 }
 
-function mergeFetchInit(
-  options: BallchasingReplayDownloadOptions,
-): RequestInit {
+function mergeFetchInit(options: BallchasingReplayDownloadOptions): RequestInit {
   const headers = new Headers(options.fetchInit?.headers);
 
   return {
@@ -69,11 +67,12 @@ export function normalizeBallchasingReplayId(value: string): string {
   const pathParts = url.pathname.split("/").filter(Boolean);
   const replayIndex = pathParts.findIndex((part) => part === "replay");
   const apiReplayIndex = pathParts.findIndex((part) => part === "replays");
-  const id = replayIndex >= 0
-    ? pathParts[replayIndex + 1]
-    : apiReplayIndex >= 0
-      ? pathParts[apiReplayIndex + 1]
-      : undefined;
+  const id =
+    replayIndex >= 0
+      ? pathParts[replayIndex + 1]
+      : apiReplayIndex >= 0
+        ? pathParts[apiReplayIndex + 1]
+        : undefined;
 
   if (!id || !isBallchasingReplayId(id)) {
     throw new Error(`Invalid Ballchasing replay URL: ${value}`);
@@ -106,10 +105,7 @@ export async function fetchBallchasingReplayBytes(
   idOrUrl: string,
   options: BallchasingReplayDownloadOptions = {},
 ): Promise<Uint8Array> {
-  const replayUrl = getBallchasingReplayFileUrl(
-    idOrUrl,
-    options.baseUrl ?? BALLCHASING_BASE_URL,
-  );
+  const replayUrl = getBallchasingReplayFileUrl(idOrUrl, options.baseUrl ?? BALLCHASING_BASE_URL);
   const fetcher = options.fetch ?? globalThis.fetch;
   if (!fetcher) {
     throw new Error("No fetch implementation is available");

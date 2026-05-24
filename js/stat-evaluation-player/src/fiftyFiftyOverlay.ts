@@ -1,9 +1,6 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "subtr-actor-player";
-import type {
-  FiftyFiftyEvent,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import type { FiftyFiftyEvent, StatsTimeline } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-fifty-fifty-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
@@ -41,7 +38,10 @@ function playerIdToString(playerId: Record<string, unknown> | null | undefined):
   return `${kind}:${normalizedValue}`;
 }
 
-function findPlayerName(replay: ReplayModel, playerId: Record<string, unknown> | null | undefined): string {
+function findPlayerName(
+  replay: ReplayModel,
+  playerId: Record<string, unknown> | null | undefined,
+): string {
   const normalizedId = playerIdToString(playerId);
   if (!normalizedId) {
     return "Unknown";
@@ -57,28 +57,19 @@ function formatWinnerLabel(
   const blueName = findPlayerName(replay, event.team_zero_player);
   const orangeName = findPlayerName(replay, event.team_one_player);
   const prefix = event.is_kickoff ? "Kickoff 50/50" : "50/50";
-  const winner = event.winning_team_is_team_0 === undefined
-    ? null
-    : event.winning_team_is_team_0;
-  const possession = event.possession_team_is_team_0 === undefined
-    ? null
-    : event.possession_team_is_team_0;
+  const winner = event.winning_team_is_team_0 === undefined ? null : event.winning_team_is_team_0;
+  const possession =
+    event.possession_team_is_team_0 === undefined ? null : event.possession_team_is_team_0;
 
-  const winnerLabel = winner === null
-    ? "neutral"
-    : winner
-      ? "blue win"
-      : "orange win";
-  const possessionLabel = possession === null
-    ? "neutral poss"
-    : possession
-      ? "blue poss"
-      : "orange poss";
-  const className = winner === null
-    ? "sap-fifty-fifty-overlay-label-neutral"
-    : winner
-      ? "sap-fifty-fifty-overlay-label-blue"
-      : "sap-fifty-fifty-overlay-label-orange";
+  const winnerLabel = winner === null ? "neutral" : winner ? "blue win" : "orange win";
+  const possessionLabel =
+    possession === null ? "neutral poss" : possession ? "blue poss" : "orange poss";
+  const className =
+    winner === null
+      ? "sap-fifty-fifty-overlay-label-neutral"
+      : winner
+        ? "sap-fifty-fifty-overlay-label-blue"
+        : "sap-fifty-fifty-overlay-label-orange";
 
   return {
     text: `${prefix}: ${blueName} vs ${orangeName} | ${winnerLabel} | ${possessionLabel}`,
@@ -315,16 +306,14 @@ export class FiftyFiftyOverlay {
       return existing;
     }
 
-    const geometry = new THREE.BufferGeometry().setFromPoints([
-      marker.axisStart,
-      marker.axisEnd,
-    ]);
+    const geometry = new THREE.BufferGeometry().setFromPoints([marker.axisStart, marker.axisEnd]);
     const material = new THREE.LineBasicMaterial({
-      color: marker.winnerIsTeamZero === null
-        ? NEUTRAL_COLOR
-        : marker.winnerIsTeamZero
-          ? BLUE_COLOR
-          : ORANGE_COLOR,
+      color:
+        marker.winnerIsTeamZero === null
+          ? NEUTRAL_COLOR
+          : marker.winnerIsTeamZero
+            ? BLUE_COLOR
+            : ORANGE_COLOR,
       transparent: true,
       opacity: 0.9,
     });

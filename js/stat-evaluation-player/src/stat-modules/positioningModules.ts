@@ -44,10 +44,7 @@ export function createRelativePositioningModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
       return renderGroupedPlayerCards(statsFrame.players, (player) => {
@@ -95,17 +92,16 @@ export function createAbsolutePositioningModule(): StatModule {
     },
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        renderAbsolutePositioningStats(player.positioning),
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderAbsolutePositioningStats(player.positioning),
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {

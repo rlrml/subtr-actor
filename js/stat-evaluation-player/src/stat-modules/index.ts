@@ -34,9 +34,7 @@ import {
 } from "./positioningModules.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 
-export {
-  hasBoostPickupAnimationTimelineMatch,
-} from "../boostPickupFilters.ts";
+export { hasBoostPickupAnimationTimelineMatch } from "../boostPickupFilters.ts";
 export {
   DEPTH_ROLE_LABELS,
   getCurrentDepthRole,
@@ -46,13 +44,7 @@ export {
   RELATIVE_POSITIONING_MODULE_ID,
   ROLE_LABELS,
 } from "./types.ts";
-export type {
-  DepthRole,
-  Role,
-  StatModule,
-  StatModuleContext,
-  StatModuleRuntime,
-} from "./types.ts";
+export type { DepthRole, Role, StatModule, StatModuleContext, StatModuleRuntime } from "./types.ts";
 
 export function createStatModules(
   runtime: import("./types.ts").StatModuleRuntime,

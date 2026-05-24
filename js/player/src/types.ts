@@ -61,13 +61,9 @@ export interface CameraSettings {
   transitionSpeed?: number;
 }
 
-export type ReplayCameraViewMode =
-  | "free"
-  | "follow";
+export type ReplayCameraViewMode = "free" | "follow";
 
-export type ReplayFreeCameraPreset =
-  | "overhead"
-  | "side";
+export type ReplayFreeCameraPreset = "overhead" | "side";
 
 export interface PlaybackFrame {
   time: number;
@@ -83,8 +79,7 @@ export interface ReplayPlayerKickoffCountdownMetadata {
   endsAt: number;
 }
 
-export type ReplayPlayerActiveMetadata =
-  | ReplayPlayerKickoffCountdownMetadata;
+export type ReplayPlayerActiveMetadata = ReplayPlayerKickoffCountdownMetadata;
 
 export interface BallSample {
   position: Vec3 | null;
@@ -118,13 +113,7 @@ export interface ReplayPlayerTrack {
   frames: PlayerSample[];
 }
 
-export type ReplayTimelineEventKind =
-  | "goal"
-  | "shot"
-  | "save"
-  | "assist"
-  | "demo"
-  | (string & {});
+export type ReplayTimelineEventKind = "goal" | "shot" | "save" | "assist" | "demo" | (string & {});
 
 export interface ReplayTimelineEvent {
   id?: string;
@@ -205,11 +194,7 @@ export interface ReplayLoadResult {
   raw: RawReplayFramesData;
 }
 
-export type ReplayLoadStage =
-  | "validating"
-  | "processing"
-  | "normalizing"
-  | (string & {});
+export type ReplayLoadStage = "validating" | "processing" | "normalizing" | (string & {});
 
 export interface ReplayLoadProgress {
   stage: ReplayLoadStage;
@@ -248,9 +233,7 @@ export interface PlaylistLoadSource<TLoaded> {
 
 export interface ReplaySource extends PlaylistLoadSource<LoadedReplay> {}
 
-export interface PlaylistItem<
-  TSource extends PlaylistLoadSource<unknown> = ReplaySource,
-> {
+export interface PlaylistItem<TSource extends PlaylistLoadSource<unknown> = ReplaySource> {
   replay: TSource;
   start: PlaybackBound;
   end: PlaybackBound;
@@ -312,20 +295,12 @@ export type PlaylistPreloadPolicy<
   | { kind: "adjacent"; ahead: number; behind?: number }
   | {
       kind: "custom";
-      pick: (
-        context: PlaylistPreloadContext<TSource, TItem>
-      ) => Iterable<string | TSource>;
+      pick: (context: PlaylistPreloadContext<TSource, TItem>) => Iterable<string | TSource>;
     };
 
-export type ReplayPreloadContext = PlaylistPreloadContext<
-  ReplaySource,
-  PlaylistItem
->;
+export type ReplayPreloadContext = PlaylistPreloadContext<ReplaySource, PlaylistItem>;
 
-export type ReplayPreloadPolicy = PlaylistPreloadPolicy<
-  ReplaySource,
-  PlaylistItem
->;
+export type ReplayPreloadPolicy = PlaylistPreloadPolicy<ReplaySource, PlaylistItem>;
 
 export interface ReplayPlayerPluginContext {
   player: ReplayPlayer;
@@ -335,8 +310,7 @@ export interface ReplayPlayerPluginContext {
   options: ReplayPlayerOptions;
 }
 
-export interface ReplayPlayerPluginStateContext
-  extends ReplayPlayerPluginContext {
+export interface ReplayPlayerPluginStateContext extends ReplayPlayerPluginContext {
   state: ReplayPlayerState;
 }
 
@@ -350,9 +324,7 @@ export interface ReplayPlayerRenderTrackContext {
   boostFraction: number;
 }
 
-export interface ReplayPlayerRenderContext
-  extends ReplayPlayerPluginStateContext,
-    FrameRenderInfo {
+export interface ReplayPlayerRenderContext extends ReplayPlayerPluginStateContext, FrameRenderInfo {
   frame: PlaybackFrame | null;
   nextFrame: PlaybackFrame | null;
   ballFrame: BallSample | null;
@@ -370,9 +342,7 @@ export interface ReplayPlayerPlugin {
 }
 
 export type ReplayPlayerPluginFactory = () => ReplayPlayerPlugin;
-export type ReplayPlayerPluginDefinition =
-  | ReplayPlayerPlugin
-  | ReplayPlayerPluginFactory;
+export type ReplayPlayerPluginDefinition = ReplayPlayerPlugin | ReplayPlayerPluginFactory;
 
 export type ReplayTimelineEventSource =
   | ReplayTimelineEvent[]
@@ -399,8 +369,7 @@ export interface ReplayPlayerOptions {
 }
 
 export interface ReplayPlaylistPlayerOptions
-  extends Omit<ReplayPlayerOptions, "autoplay">,
-    PlaylistPlaybackOptions {
+  extends Omit<ReplayPlayerOptions, "autoplay">, PlaylistPlaybackOptions {
   autoplay?: boolean;
   initialItemIndex?: number;
   preloadPolicy?: ReplayPreloadPolicy;

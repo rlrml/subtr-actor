@@ -83,7 +83,7 @@ If you need to add markers later, keep a reference to the plugin instance:
 const timeline = createTimelineOverlayPlugin();
 
 const detachShots = timeline.addEventSource(({ replay }) =>
-  replay.timelineEvents.filter((event) => event.kind === "shot")
+  replay.timelineEvents.filter((event) => event.kind === "shot"),
 );
 
 timeline.refreshEvents();

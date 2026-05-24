@@ -1,10 +1,6 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "subtr-actor-player";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-touch-overlay-styles";
 const BLUE_TOUCH_COLOR = 0x59c3ff;
@@ -156,9 +152,8 @@ export function buildTouchMarkers(
       }
 
       const touchFrame = player.touch?.last_touch_frame ?? statsFrame.frame_number;
-      const touchTime = replay.frames[touchFrame]?.time
-        ?? player.touch?.last_touch_time
-        ?? statsFrame.time;
+      const touchTime =
+        replay.frames[touchFrame]?.time ?? player.touch?.last_touch_time ?? statsFrame.time;
       const ballPosition = replay.ballFrames[touchFrame]?.position;
       if (!ballPosition) {
         previousSnapshots.set(playerId, snapshot);
@@ -289,7 +284,7 @@ function projectToContainer(
 
 function arrowMaterials(arrow: THREE.ArrowHelper): THREE.Material[] {
   return [arrow.line.material, arrow.cone.material].flatMap((material) =>
-    Array.isArray(material) ? material : [material]
+    Array.isArray(material) ? material : [material],
   );
 }
 
@@ -378,11 +373,7 @@ export class TouchEventOverlay {
   }
 
   update(currentTime: number): void {
-    const visibleMarkers = getVisibleTouchMarkers(
-      this.markers,
-      currentTime,
-      this.decaySeconds,
-    );
+    const visibleMarkers = getVisibleTouchMarkers(this.markers, currentTime, this.decaySeconds);
     const visibleIds = new Set(visibleMarkers.map((marker) => marker.id));
 
     for (const [id, view] of this.views.entries()) {
@@ -419,11 +410,7 @@ export class TouchEventOverlay {
 
       this.updateArrow(view, marker, baseOpacity);
 
-      this.worldPosition.set(
-        marker.position.x,
-        marker.position.y,
-        marker.position.z,
-      );
+      this.worldPosition.set(marker.position.x, marker.position.y, marker.position.z);
       this.worldPosition.add(this.labelOffset);
       this.scene.replayRoot.localToWorld(this.worldPosition);
 
@@ -519,15 +506,8 @@ export class TouchEventOverlay {
     return view;
   }
 
-  private updateArrow(
-    view: TouchMarkerView,
-    marker: TouchMarker,
-    opacity: number,
-  ): void {
-    if (
-      this.mode !== "advancement" ||
-      marker.totalBallTravelDistance <= TOUCH_CREDIT_EPSILON
-    ) {
+  private updateArrow(view: TouchMarkerView, marker: TouchMarker, opacity: number): void {
+    if (this.mode !== "advancement" || marker.totalBallTravelDistance <= TOUCH_CREDIT_EPSILON) {
       view.arrow.visible = false;
       return;
     }

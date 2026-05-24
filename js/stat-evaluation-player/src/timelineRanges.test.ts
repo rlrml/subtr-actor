@@ -220,12 +220,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
 
 test("buildRushTimelineRanges maps serialized rush spans to replay timeline ranges", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-      { time: 3.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }, { time: 3.5 }],
   } as ReplayModel;
   const timeline = createLegacyStatsTimeline({
     rush_events: [
@@ -330,30 +325,36 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
 
   const legacyTimeline = createLegacyStatsTimeline();
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay, {
-    sizes: ["small"],
-  }), [
-    {
-      id: "boost-pickup:3:10:0",
-      startTime: 1.25,
-      endTime: 1.33,
-      lane: "boost-pickups",
-      laneLabel: "Boost Pickups",
-      label: "Blue picked up small boost pad 3",
-      shortLabel: "12",
-      color: "#3b82f6",
-      isTeamZero: true,
-    },
-  ]);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(legacyTimeline, replay, {
+      sizes: ["small"],
+    }),
+    [
+      {
+        id: "boost-pickup:3:10:0",
+        startTime: 1.25,
+        endTime: 1.33,
+        lane: "boost-pickups",
+        laneLabel: "Boost Pickups",
+        label: "Blue picked up small boost pad 3",
+        shortLabel: "12",
+        color: "#3b82f6",
+        isTeamZero: true,
+      },
+    ],
+  );
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay).map((range) => range.id), [
-    "boost-pickup:3:10:0",
-    "boost-pickup:9:20:0",
-  ]);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(legacyTimeline, replay).map((range) => range.id),
+    ["boost-pickup:3:10:0", "boost-pickup:9:20:0"],
+  );
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(legacyTimeline, replay, {
-    comparisons: ["ghost"],
-  }), []);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(legacyTimeline, replay, {
+      comparisons: ["ghost"],
+    }),
+    [],
+  );
 });
 
 test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events", () => {
@@ -416,35 +417,42 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
     boostPads: [],
   } as Partial<ReplayModel> as ReplayModel;
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
-    comparisons: ["ghost"],
-  }), [
-    {
-      id: "boost-pickup:ghost:20:Steam:orange-id:0",
-      startTime: 2.25,
-      endTime: 2.33,
-      lane: "boost-pickups",
-      laneLabel: "Boost Pickups",
-      label: "Orange ghost small boost pickup",
-      shortLabel: "G",
-      color: "#f59e0b",
-      isTeamZero: false,
-    },
-  ]);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(timeline, replay, {
+      comparisons: ["ghost"],
+    }),
+    [
+      {
+        id: "boost-pickup:ghost:20:Steam:orange-id:0",
+        startTime: 2.25,
+        endTime: 2.33,
+        lane: "boost-pickups",
+        laneLabel: "Boost Pickups",
+        label: "Orange ghost small boost pickup",
+        shortLabel: "G",
+        color: "#f59e0b",
+        isTeamZero: false,
+      },
+    ],
+  );
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
-    padTypes: ["big"],
-    comparisons: ["ghost"],
-    playerIds: ["Steam:orange-id"],
-  }), []);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(timeline, replay, {
+      padTypes: ["big"],
+      comparisons: ["ghost"],
+      playerIds: ["Steam:orange-id"],
+    }),
+    [],
+  );
 
-  assert.deepEqual(buildBoostPickupTimelineRanges(timeline, replay, {
-    padTypes: ["small"],
-    comparisons: ["ghost"],
-    playerIds: ["Steam:orange-id"],
-  }).map((range) => range.id), [
-    "boost-pickup:ghost:20:Steam:orange-id:0",
-  ]);
+  assert.deepEqual(
+    buildBoostPickupTimelineRanges(timeline, replay, {
+      padTypes: ["small"],
+      comparisons: ["ghost"],
+      playerIds: ["Steam:orange-id"],
+    }).map((range) => range.id),
+    ["boost-pickup:ghost:20:Steam:orange-id:0"],
+  );
 });
 
 test("buildPressureTimelineRanges uses replay centerline fallback for legacy half-control stats", () => {

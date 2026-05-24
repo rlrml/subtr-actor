@@ -1,30 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  renderFiftyFiftySummary,
-  renderPlayerFiftyFiftyStats,
-} from "./fiftyFiftyFormatting.ts";
+import { renderFiftyFiftySummary, renderPlayerFiftyFiftyStats } from "./fiftyFiftyFormatting.ts";
 
 test("renderFiftyFiftySummary renders team-perspective win and possession counts", () => {
-  const html = renderFiftyFiftySummary({
-    count: 6,
-    wins: 4,
-    losses: 1,
-    neutral_outcomes: 1,
-    kickoff_count: 3,
-    kickoff_wins: 2,
-    kickoff_losses: 1,
-    kickoff_neutral_outcomes: 0,
-    possession_after_count: 5,
-    opponent_possession_after_count: 1,
-    neutral_possession_after_count: 0,
-    kickoff_possession_after_count: 2,
-    kickoff_opponent_possession_after_count: 1,
-    kickoff_neutral_possession_after_count: 0,
-  }, {
-    kind: "team",
-  });
+  const html = renderFiftyFiftySummary(
+    {
+      count: 6,
+      wins: 4,
+      losses: 1,
+      neutral_outcomes: 1,
+      kickoff_count: 3,
+      kickoff_wins: 2,
+      kickoff_losses: 1,
+      kickoff_neutral_outcomes: 0,
+      possession_after_count: 5,
+      opponent_possession_after_count: 1,
+      neutral_possession_after_count: 0,
+      kickoff_possession_after_count: 2,
+      kickoff_opponent_possession_after_count: 1,
+      kickoff_neutral_possession_after_count: 0,
+    },
+    {
+      kind: "team",
+    },
+  );
 
   assert.match(html, /50s<\/span><span class="value">6<\/span>/);
   assert.match(html, /Wins<\/span><span class="value">4 \(66\.7%\)<\/span>/);
@@ -33,24 +33,27 @@ test("renderFiftyFiftySummary renders team-perspective win and possession counts
 });
 
 test("renderFiftyFiftySummary can render a shared challenge summary", () => {
-  const html = renderFiftyFiftySummary({
-    count: 6,
-    wins: 4,
-    losses: 1,
-    neutral_outcomes: 1,
-    kickoff_count: 3,
-    kickoff_wins: 2,
-    kickoff_losses: 1,
-    kickoff_neutral_outcomes: 0,
-    possession_after_count: 5,
-    opponent_possession_after_count: 1,
-    neutral_possession_after_count: 0,
-    kickoff_possession_after_count: 2,
-    kickoff_opponent_possession_after_count: 1,
-    kickoff_neutral_possession_after_count: 0,
-  }, {
-    kind: "shared",
-  });
+  const html = renderFiftyFiftySummary(
+    {
+      count: 6,
+      wins: 4,
+      losses: 1,
+      neutral_outcomes: 1,
+      kickoff_count: 3,
+      kickoff_wins: 2,
+      kickoff_losses: 1,
+      kickoff_neutral_outcomes: 0,
+      possession_after_count: 5,
+      opponent_possession_after_count: 1,
+      neutral_possession_after_count: 0,
+      kickoff_possession_after_count: 2,
+      kickoff_opponent_possession_after_count: 1,
+      kickoff_neutral_possession_after_count: 0,
+    },
+    {
+      kind: "shared",
+    },
+  );
 
   assert.match(html, /Blue wins<\/span><span class="value">4 \(66\.7%\)<\/span>/);
   assert.match(html, /Orange wins<\/span><span class="value">1 \(16\.7%\)<\/span>/);

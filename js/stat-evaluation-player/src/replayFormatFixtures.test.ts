@@ -26,12 +26,8 @@ interface ChildResult {
 
 async function replayFormatFixtureNames(): Promise<string[]> {
   const repoRoot = path.resolve(import.meta.dirname, "../../..");
-  const docs = await readFile(
-    path.join(repoRoot, "docs/replay-format-evolution.md"),
-    "utf8",
-  );
-  const fixtures = [...docs.matchAll(/\| `([^`]+\.replay)` \|/g)]
-    .map((match) => match[1]!);
+  const docs = await readFile(path.join(repoRoot, "docs/replay-format-evolution.md"), "utf8");
+  const fixtures = [...docs.matchAll(/\| `([^`]+\.replay)` \|/g)].map((match) => match[1]!);
   return [...new Set(fixtures)];
 }
 
@@ -42,20 +38,14 @@ function runFixtureLoadChild(fixture: string): Promise<ChildResult> {
       [
         "--import",
         "tsx",
-        path.join(
-          import.meta.dirname,
-          "replayFormatFixtureLoadChild.test-helper.ts",
-        ),
+        path.join(import.meta.dirname, "replayFormatFixtureLoadChild.test-helper.ts"),
         fixture,
       ],
       {
         cwd: path.resolve(import.meta.dirname, ".."),
         env: {
           ...process.env,
-          TSX_TSCONFIG_PATH: path.resolve(
-            import.meta.dirname,
-            "../tsconfig.test.json",
-          ),
+          TSX_TSCONFIG_PATH: path.resolve(import.meta.dirname, "../tsconfig.test.json"),
         },
         stdio: ["ignore", "pipe", "pipe"],
       },

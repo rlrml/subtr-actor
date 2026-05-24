@@ -12,11 +12,7 @@ export function clampFrameIndex(replay: ReplayModel, frameIndex: number): number
     return 0;
   }
 
-  return THREE.MathUtils.clamp(
-    Math.round(frameIndex),
-    0,
-    replay.frames.length - 1,
-  );
+  return THREE.MathUtils.clamp(Math.round(frameIndex), 0, replay.frames.length - 1);
 }
 
 export function inferLiveGameState(replay: ReplayModel): number | null {
@@ -108,8 +104,10 @@ export function isPostGoalTransitionFrame(
   liveGameState: number | null,
   kickoffGameState: number | null,
 ): boolean {
-  return !isLiveGameplayFrame(frame, liveGameState)
-    && !isRenderableKickoffFrame(replay, frame, frameIndex, kickoffGameState);
+  return (
+    !isLiveGameplayFrame(frame, liveGameState) &&
+    !isRenderableKickoffFrame(replay, frame, frameIndex, kickoffGameState)
+  );
 }
 
 function isSkippedTimelineFrame(
@@ -123,13 +121,7 @@ function isSkippedTimelineFrame(
 ): boolean {
   return (
     (skipPostGoalTransitionsEnabled &&
-      isPostGoalTransitionFrame(
-        replay,
-        frame,
-        frameIndex,
-        liveGameState,
-        kickoffGameState,
-      )) ||
+      isPostGoalTransitionFrame(replay, frame, frameIndex, liveGameState, kickoffGameState)) ||
     (skipKickoffsEnabled && isKickoffFrame(frame, kickoffGameState))
   );
 }
@@ -144,25 +136,25 @@ export function computeTimelineSegments(
   const segments: ReplayPlayerTimelineSegment[] = [];
   const { frames } = replay;
 
-  if (
-    frames.length === 0 ||
-    (!skipPostGoalTransitionsEnabled && !skipKickoffsEnabled)
-  ) {
+  if (frames.length === 0 || (!skipPostGoalTransitionsEnabled && !skipKickoffsEnabled)) {
     return segments;
   }
 
   let index = 0;
   while (index < frames.length) {
     const frame = frames[index];
-    if (!frame || !isSkippedTimelineFrame(
-      replay,
-      frame,
-      index,
-      skipPostGoalTransitionsEnabled,
-      skipKickoffsEnabled,
-      liveGameState,
-      kickoffGameState,
-    )) {
+    if (
+      !frame ||
+      !isSkippedTimelineFrame(
+        replay,
+        frame,
+        index,
+        skipPostGoalTransitionsEnabled,
+        skipKickoffsEnabled,
+        liveGameState,
+        kickoffGameState,
+      )
+    ) {
       index += 1;
       continue;
     }
@@ -205,11 +197,7 @@ export function projectReplayTimeToTimeline(
   segments: ReplayPlayerTimelineSegment[],
   replayTime: number,
 ): ReplayPlayerTimelineProjection {
-  const clampedReplayTime = THREE.MathUtils.clamp(
-    replayTime,
-    0,
-    replayDuration,
-  );
+  const clampedReplayTime = THREE.MathUtils.clamp(replayTime, 0, replayDuration);
   let skippedDuration = 0;
 
   for (const segment of segments) {
@@ -243,11 +231,7 @@ export function projectTimelineTimeToReplay(
   segments: ReplayPlayerTimelineSegment[],
   timelineTime: number,
 ): number {
-  const clampedTimelineTime = THREE.MathUtils.clamp(
-    timelineTime,
-    0,
-    timelineDuration,
-  );
+  const clampedTimelineTime = THREE.MathUtils.clamp(timelineTime, 0, timelineDuration);
   let skippedDuration = 0;
 
   for (const segment of segments) {
@@ -259,11 +243,7 @@ export function projectTimelineTimeToReplay(
     skippedDuration += segment.endTime - segment.startTime;
   }
 
-  return THREE.MathUtils.clamp(
-    clampedTimelineTime + skippedDuration,
-    0,
-    replayDuration,
-  );
+  return THREE.MathUtils.clamp(clampedTimelineTime + skippedDuration, 0, replayDuration);
 }
 
 export function getReplayPlaybackEndTime(
@@ -289,27 +269,18 @@ export function getKickoffCountdownMetadata(
   }
 
   let startIndex = frameIndex;
-  while (
-    startIndex > 0 &&
-    (replay.frames[startIndex - 1]?.kickoffCountdown ?? 0) > 0
-  ) {
+  while (startIndex > 0 && (replay.frames[startIndex - 1]?.kickoffCountdown ?? 0) > 0) {
     startIndex -= 1;
   }
 
   let endIndex = frameIndex + 1;
-  while (
-    endIndex < replay.frames.length &&
-    replay.frames[endIndex].kickoffCountdown > 0
-  ) {
+  while (endIndex < replay.frames.length && replay.frames[endIndex].kickoffCountdown > 0) {
     endIndex += 1;
   }
 
   let maxCountdown = 0;
   for (let index = startIndex; index < endIndex; index += 1) {
-    maxCountdown = Math.max(
-      maxCountdown,
-      replay.frames[index].kickoffCountdown,
-    );
+    maxCountdown = Math.max(maxCountdown, replay.frames[index].kickoffCountdown);
   }
 
   const endsAt = replay.frames[endIndex]?.time ?? replay.duration;

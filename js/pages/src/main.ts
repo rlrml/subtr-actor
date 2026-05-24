@@ -129,7 +129,10 @@ function remoteIdKey(playerId: Record<string, unknown> | null | undefined): stri
   return playerId ? playerIdToString(playerId) : null;
 }
 
-function playerNameForId(finalFrame: StatsFrame, playerId: Record<string, unknown> | null | undefined): string {
+function playerNameForId(
+  finalFrame: StatsFrame,
+  playerId: Record<string, unknown> | null | undefined,
+): string {
   const key = remoteIdKey(playerId);
   if (!key) return "--";
   return finalFrame.players.find((player) => remoteIdKey(player.player_id) === key)?.name ?? key;
@@ -149,11 +152,7 @@ function getPlayerTeamColor(player: PlayerStatsSnapshot): string {
   return player.is_team_0 ? TEAM_COLORS[0]! : TEAM_COLORS[1]!;
 }
 
-function getChartTargetColor(
-  target: StatsTarget,
-  scope: StatScopeKind,
-  index: number,
-): string {
+function getChartTargetColor(target: StatsTarget, scope: StatScopeKind, index: number): string {
   return scope === "player"
     ? getPlayerTeamColor(target as PlayerStatsSnapshot)
     : TEAM_COLORS[index % TEAM_COLORS.length]!;
@@ -186,7 +185,9 @@ function formatFieldPosition(position: GoalContextPosition | null | undefined): 
 }
 
 function formatBoostAmount(raw: number | null | undefined): string {
-  return raw == null || !Number.isFinite(raw) ? "--" : `${Number(toBoostDisplayUnits(raw).toFixed(0))}`;
+  return raw == null || !Number.isFinite(raw)
+    ? "--"
+    : `${Number(toBoostDisplayUnits(raw).toFixed(0))}`;
 }
 
 function formatTime(seconds: number | null | undefined): string {
@@ -209,16 +210,10 @@ function getPlayerUrlForGoal(
   const scorerId = remoteIdKey(scorer);
   const playerUrl = new URL("../", window.location.href);
   playerUrl.searchParams.set("replayUrl", replayUrl.href);
-  return setStatsPlayerConfigOnUrl(
-    playerUrl,
-    getGoalWatchPlayerConfig(goalTime, scorerId),
-  ).href;
+  return setStatsPlayerConfigOnUrl(playerUrl, getGoalWatchPlayerConfig(goalTime, scorerId)).href;
 }
 
-function getGoalWatchPlayerConfig(
-  goalTime: number,
-  scorerId: string | null,
-): StatsPlayerConfig {
+function getGoalWatchPlayerConfig(goalTime: number, scorerId: string | null): StatsPlayerConfig {
   return {
     version: STATS_PLAYER_CONFIG_VERSION,
     playback: {
@@ -230,13 +225,13 @@ function getGoalWatchPlayerConfig(
     },
     camera: scorerId
       ? {
-        mode: "follow",
-        attachedPlayerId: scorerId,
-        ballCam: true,
-      }
+          mode: "follow",
+          attachedPlayerId: scorerId,
+          ballCam: true,
+        }
       : {
-        mode: "free",
-      },
+          mode: "free",
+        },
     overlays: {
       timelineEvents: ["core"],
       timelineRanges: [],
@@ -373,10 +368,7 @@ function getChartRows(definition: StatDefinition, finalFrame: StatsFrame): Numbe
     .filter((row) => row.value > 0);
 }
 
-function renderBarChartRows(
-  rows: NumberRow[],
-  format: (value: number) => string,
-): HTMLElement {
+function renderBarChartRows(rows: NumberRow[], format: (value: number) => string): HTMLElement {
   const max = Math.max(...rows.map((row) => row.value), 1);
   const body = el("div", { className: "stats-report-bar-chart" });
   rows.forEach((row) => {
@@ -395,11 +387,12 @@ function renderBarChartRows(
 
 function formatChartValue(definition: StatDefinition, value: number): string {
   const pathText = definition.path.join(".");
-  if (definition.category === "boost" && (
-    pathText.includes("amount_") ||
-    pathText.includes("overfill") ||
-    pathText.includes("boost_integral")
-  )) {
+  if (
+    definition.category === "boost" &&
+    (pathText.includes("amount_") ||
+      pathText.includes("overfill") ||
+      pathText.includes("boost_integral"))
+  ) {
     return formatBoostAmount(value);
   }
   if (
@@ -416,9 +409,8 @@ function formatChartValue(definition: StatDefinition, value: number): string {
 }
 
 function renderBarChart(definition: StatDefinition, finalFrame: StatsFrame): HTMLElement {
-  return renderBarChartRows(
-    getChartRows(definition, finalFrame),
-    (value) => formatChartValue(definition, value),
+  return renderBarChartRows(getChartRows(definition, finalFrame), (value) =>
+    formatChartValue(definition, value),
   );
 }
 
@@ -429,13 +421,13 @@ function describePieSegments(rows: NumberRow[]): string {
   }
 
   let cursor = 0;
-  return `conic-gradient(${
-    rows.map((row) => {
+  return `conic-gradient(${rows
+    .map((row) => {
       const start = cursor;
       cursor += (row.value / total) * 360;
       return `${row.color} ${start}deg ${cursor}deg`;
-    }).join(", ")
-  })`;
+    })
+    .join(", ")})`;
 }
 
 function renderPieChartRows(rows: NumberRow[], format: (value: number) => string): HTMLElement {
@@ -461,9 +453,8 @@ function renderPieChartRows(rows: NumberRow[], format: (value: number) => string
 }
 
 function renderPieChart(definition: StatDefinition, finalFrame: StatsFrame): HTMLElement {
-  return renderPieChartRows(
-    getChartRows(definition, finalFrame),
-    (value) => formatChartValue(definition, value),
+  return renderPieChartRows(getChartRows(definition, finalFrame), (value) =>
+    formatChartValue(definition, value),
   );
 }
 
@@ -493,11 +484,7 @@ function renderTerritoryShareChart(finalFrame: StatsFrame, title = "Territory sh
   );
 }
 
-function renderChartCard(
-  title: string,
-  body: HTMLElement,
-  detail?: string,
-): HTMLElement {
+function renderChartCard(title: string, body: HTMLElement, detail?: string): HTMLElement {
   const card = el("section", { className: "stats-report-chart-card" });
   card.append(el("h3", { text: title }));
   if (detail) {
@@ -600,27 +587,41 @@ function renderOverviewPage(
 ): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
   page.append(createSummary(state, finalFrame));
-  page.append(createPageIntro(
-    "Featured stats",
-    "A shorter readout of stable scoreboard, touch, boost, possession, and pressure signals. The raw export remains available in All stats.",
-  ));
+  page.append(
+    createPageIntro(
+      "Featured stats",
+      "A shorter readout of stable scoreboard, touch, boost, possession, and pressure signals. The raw export remains available in All stats.",
+    ),
+  );
 
   const score = `${finalFrame.team_zero.core.goals}-${finalFrame.team_one.core.goals}`;
-  page.append(renderMetricGrid([
-    createSummaryCard("Final score", score, "Blue - Orange"),
-    getLeader(finalFrame.players, (player) => player.touch.touch_count, (value) => `${value} touches`),
-    getLeader(
-      finalFrame.players,
-      (player) => player.boost.tracked_time > 0
-        ? toBoostDisplayUnits(player.boost.boost_integral / player.boost.tracked_time)
-        : 0,
-      (value) => `${Number(value.toFixed(0))} avg boost`,
-    ),
-    getLeader(finalFrame.players, (player) => player.core.score, (value) => `${value} score`),
-  ]));
+  page.append(
+    renderMetricGrid([
+      createSummaryCard("Final score", score, "Blue - Orange"),
+      getLeader(
+        finalFrame.players,
+        (player) => player.touch.touch_count,
+        (value) => `${value} touches`,
+      ),
+      getLeader(
+        finalFrame.players,
+        (player) =>
+          player.boost.tracked_time > 0
+            ? toBoostDisplayUnits(player.boost.boost_integral / player.boost.tracked_time)
+            : 0,
+        (value) => `${Number(value.toFixed(0))} avg boost`,
+      ),
+      getLeader(
+        finalFrame.players,
+        (player) => player.core.score,
+        (value) => `${value} score`,
+      ),
+    ]),
+  );
 
-  const charts = renderCharts(definitions, finalFrame, OVERVIEW_CHARTS)
-    ?? el("section", { className: "stats-report-charts" });
+  const charts =
+    renderCharts(definitions, finalFrame, OVERVIEW_CHARTS) ??
+    el("section", { className: "stats-report-charts" });
   charts.append(renderTerritoryShareChart(finalFrame));
   page.append(charts);
   return page;
@@ -634,14 +635,17 @@ function groupGoalTagsByGoalIndex(goalTags: GoalTagEvent[]): Map<number, GoalTag
     groups.set(tag.goal_index, group);
   }
   for (const group of groups.values()) {
-    group.sort((left, right) =>
-      left.kind.localeCompare(right.kind) || right.confidence - left.confidence
+    group.sort(
+      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
     );
   }
   return groups;
 }
 
-function getOrderedGoalIndexes(goalContexts: GoalContextEvent[], tagsByGoalIndex: Map<number, GoalTagEvent[]>): number[] {
+function getOrderedGoalIndexes(
+  goalContexts: GoalContextEvent[],
+  tagsByGoalIndex: Map<number, GoalTagEvent[]>,
+): number[] {
   const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
   for (const goalIndex of tagsByGoalIndex.keys()) {
     goalIndexes.add(goalIndex);
@@ -655,8 +659,10 @@ function getGoalTagCounts(goalTags: GoalTagEvent[]): NumberRow[] {
     counts.set(tag.kind, (counts.get(tag.kind) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .sort(([leftKind, leftCount], [rightKind, rightCount]) =>
-      rightCount - leftCount || formatMechanicKind(leftKind).localeCompare(formatMechanicKind(rightKind))
+    .sort(
+      ([leftKind, leftCount], [rightKind, rightCount]) =>
+        rightCount - leftCount ||
+        formatMechanicKind(leftKind).localeCompare(formatMechanicKind(rightKind)),
     )
     .map(([kind, count], index) => ({
       label: formatMechanicKind(kind),
@@ -679,21 +685,24 @@ function createDetailList(items: { label: string; value: string }[]): HTMLElemen
 function renderGoalTagChips(tags: GoalTagEvent[]): HTMLElement {
   const list = el("div", { className: "stats-report-goal-tags" });
   if (tags.length === 0) {
-    list.append(el("span", {
-      className: "stats-report-goal-tag stats-report-goal-tag-empty",
-      text: "Unlabeled",
-    }));
+    list.append(
+      el("span", {
+        className: "stats-report-goal-tag stats-report-goal-tag-empty",
+        text: "Unlabeled",
+      }),
+    );
     return list;
   }
 
   for (const tag of tags) {
-    const modifiers = tag.modifiers.length > 0
-      ? ` - ${tag.modifiers.map(formatMechanicKind).join(", ")}`
-      : "";
-    list.append(el("span", {
-      className: "stats-report-goal-tag",
-      text: `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%${modifiers}`,
-    }));
+    const modifiers =
+      tag.modifiers.length > 0 ? ` - ${tag.modifiers.map(formatMechanicKind).join(", ")}` : "";
+    list.append(
+      el("span", {
+        className: "stats-report-goal-tag",
+        text: `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%${modifiers}`,
+      }),
+    );
   }
   return list;
 }
@@ -703,7 +712,7 @@ function renderGoalEvidence(finalFrame: StatsFrame, tags: GoalTagEvent[]): HTMLE
     tag.evidence.map((evidence) => ({
       tag,
       evidence,
-    }))
+    })),
   );
   if (rows.length === 0) return null;
 
@@ -736,7 +745,10 @@ function renderGoalEvidence(finalFrame: StatsFrame, tags: GoalTagEvent[]): HTMLE
   return section;
 }
 
-function renderGoalPlayerContextTable(finalFrame: StatsFrame, players: GoalPlayerContext[]): HTMLElement | null {
+function renderGoalPlayerContextTable(
+  finalFrame: StatsFrame,
+  players: GoalPlayerContext[],
+): HTMLElement | null {
   if (players.length === 0) return null;
 
   const section = el("div", { className: "stats-report-goal-subsection" });
@@ -778,7 +790,8 @@ function renderGoalCard(
   tags: GoalTagEvent[],
 ): HTMLElement {
   const firstTag = tags[0] ?? null;
-  const scoringTeamIsTeamZero = context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
+  const scoringTeamIsTeamZero =
+    context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
   const scorer = context?.scorer ?? firstTag?.scorer ?? null;
   const time = context?.time ?? firstTag?.time ?? null;
   const frame = context?.frame ?? firstTag?.frame ?? null;
@@ -850,13 +863,16 @@ function renderGoalCard(
 
 function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
-  page.append(createPageIntro(
-    "Goal metadata",
-    "Goal-by-goal scorer, timing, context, tag confidence, evidence, and lead-up player state from the stats timeline event stream.",
-  ));
+  page.append(
+    createPageIntro(
+      "Goal metadata",
+      "Goal-by-goal scorer, timing, context, tag confidence, evidence, and lead-up player state from the stats timeline event stream.",
+    ),
+  );
 
-  const goalContexts = [...(state.statsTimeline.events.goal_context ?? [])]
-    .sort((left, right) => left.time - right.time);
+  const goalContexts = [...(state.statsTimeline.events.goal_context ?? [])].sort(
+    (left, right) => left.time - right.time,
+  );
   const goalTags = [...(state.statsTimeline.events.goal_tags ?? [])];
   const tagsByGoalIndex = groupGoalTagsByGoalIndex(goalTags);
   const goalIndexes = getOrderedGoalIndexes(goalContexts, tagsByGoalIndex);
@@ -864,18 +880,22 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
   const tagRows = getGoalTagCounts(goalTags);
   const topTag = tagRows[0];
 
-  page.append(renderMetricGrid([
-    createSummaryCard("Goals found", goalIndexes.length.toLocaleString()),
-    createSummaryCard("Tagged goals", taggedGoalCount.toLocaleString()),
-    createSummaryCard("Goal tags", goalTags.length.toLocaleString()),
-    createSummaryCard("Top tag", topTag ? `${topTag.label} (${topTag.value})` : "--"),
-  ]));
+  page.append(
+    renderMetricGrid([
+      createSummaryCard("Goals found", goalIndexes.length.toLocaleString()),
+      createSummaryCard("Tagged goals", taggedGoalCount.toLocaleString()),
+      createSummaryCard("Goal tags", goalTags.length.toLocaleString()),
+      createSummaryCard("Top tag", topTag ? `${topTag.label} (${topTag.value})` : "--"),
+    ]),
+  );
 
   if (goalIndexes.length === 0) {
-    page.append(el("section", {
-      className: "stats-report-empty",
-      text: "No goal metadata was emitted for this replay.",
-    }));
+    page.append(
+      el("section", {
+        className: "stats-report-empty",
+        text: "No goal metadata was emitted for this replay.",
+      }),
+    );
     return page;
   }
 
@@ -894,9 +914,8 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
           const context = goalContexts[goalIndex] ?? null;
           const firstTag = tagsByGoalIndex.get(goalIndex)?.[0] ?? null;
           const value = context?.time ?? firstTag?.time ?? 0;
-          const scoringTeamIsTeamZero = context?.scoring_team_is_team_0 ??
-            firstTag?.scoring_team_is_team_0 ??
-            true;
+          const scoringTeamIsTeamZero =
+            context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? true;
           return {
             label: `Goal ${goalIndex + 1}`,
             value,
@@ -912,50 +931,53 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
 
   const list = el("div", { className: "stats-report-goal-list" });
   for (const goalIndex of goalIndexes) {
-    list.append(renderGoalCard(
-      finalFrame,
-      state.replayUrl,
-      goalIndex,
-      goalContexts[goalIndex] ?? null,
-      tagsByGoalIndex.get(goalIndex) ?? [],
-    ));
+    list.append(
+      renderGoalCard(
+        finalFrame,
+        state.replayUrl,
+        goalIndex,
+        goalContexts[goalIndex] ?? null,
+        tagsByGoalIndex.get(goalIndex) ?? [],
+      ),
+    );
   }
   page.append(list);
   return page;
 }
 
-function renderBoostPage(
-  finalFrame: StatsFrame,
-  definitions: StatDefinition[],
-): HTMLElement {
+function renderBoostPage(finalFrame: StatsFrame, definitions: StatDefinition[]): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
-  page.append(createPageIntro(
-    "Boost economy",
-    "A focused view of boost usage, collection, pad mix, starvation, and waste. Values are shown in normal 0-100 boost units.",
-  ));
+  page.append(
+    createPageIntro(
+      "Boost economy",
+      "A focused view of boost usage, collection, pad mix, starvation, and waste. Values are shown in normal 0-100 boost units.",
+    ),
+  );
 
-  page.append(renderMetricGrid([
-    getLeader(
-      finalFrame.players,
-      (player) => player.boost.amount_used,
-      (value) => `${formatBoostAmount(value)} used`,
-    ),
-    getLeader(
-      finalFrame.players,
-      (player) => player.boost.amount_stolen,
-      (value) => `${formatBoostAmount(value)} stolen`,
-    ),
-    getLeader(
-      finalFrame.players,
-      (player) => player.boost.overfill_total,
-      (value) => `${formatBoostAmount(value)} overfill`,
-    ),
-    getLeader(
-      finalFrame.players,
-      (player) => player.boost.time_zero_boost,
-      (value) => `${formatSeconds(value)} at zero`,
-    ),
-  ]));
+  page.append(
+    renderMetricGrid([
+      getLeader(
+        finalFrame.players,
+        (player) => player.boost.amount_used,
+        (value) => `${formatBoostAmount(value)} used`,
+      ),
+      getLeader(
+        finalFrame.players,
+        (player) => player.boost.amount_stolen,
+        (value) => `${formatBoostAmount(value)} stolen`,
+      ),
+      getLeader(
+        finalFrame.players,
+        (player) => player.boost.overfill_total,
+        (value) => `${formatBoostAmount(value)} overfill`,
+      ),
+      getLeader(
+        finalFrame.players,
+        (player) => player.boost.time_zero_boost,
+        (value) => `${formatSeconds(value)} at zero`,
+      ),
+    ]),
+  );
 
   const charts = el("section", { className: "stats-report-charts" });
   charts.append(
@@ -964,9 +986,10 @@ function renderBoostPage(
       renderBarChartRows(
         finalFrame.players.map((player, index) => ({
           label: player.name || `Player ${index + 1}`,
-          value: player.boost.tracked_time > 0
-            ? toBoostDisplayUnits(player.boost.amount_used) / player.boost.tracked_time * 60
-            : 0,
+          value:
+            player.boost.tracked_time > 0
+              ? (toBoostDisplayUnits(player.boost.amount_used) / player.boost.tracked_time) * 60
+              : 0,
           color: getPlayerTeamColor(player),
           formatted: formatBoostPerMinute(player.boost.amount_used, player.boost.tracked_time),
         })),
@@ -1002,8 +1025,16 @@ function renderBoostPage(
           segments: [
             { label: "0", value: player.boost.time_zero_boost, color: BOOST_TANK_COLORS.zero },
             { label: "0-25", value: player.boost.time_boost_0_25, color: BOOST_TANK_COLORS.low },
-            { label: "25-50", value: player.boost.time_boost_25_50, color: BOOST_TANK_COLORS.midLow },
-            { label: "50-75", value: player.boost.time_boost_50_75, color: BOOST_TANK_COLORS.midHigh },
+            {
+              label: "25-50",
+              value: player.boost.time_boost_25_50,
+              color: BOOST_TANK_COLORS.midLow,
+            },
+            {
+              label: "50-75",
+              value: player.boost.time_boost_50_75,
+              color: BOOST_TANK_COLORS.midHigh,
+            },
             {
               label: "75-100",
               value: player.boost.time_boost_75_100 + player.boost.time_hundred_boost,
@@ -1120,33 +1151,37 @@ function renderBoostScorecard(finalFrame: StatsFrame): HTMLElement {
 
 function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
-  page.append(createPageIntro(
-    "Possession & territory",
-    "Team control, field-half pressure, and where each player spent time relative to the field and the ball.",
-  ));
+  page.append(
+    createPageIntro(
+      "Possession & territory",
+      "Team control, field-half pressure, and where each player spent time relative to the field and the ball.",
+    ),
+  );
 
   const possessionTotal = finalFrame.team_zero.possession.tracked_time;
   const pressureTotal = finalFrame.team_zero.pressure.tracked_time;
-  page.append(renderMetricGrid([
-    createSummaryCard(
-      "Blue possession",
-      formatShare(finalFrame.team_zero.possession.possession_time, possessionTotal),
-    ),
-    createSummaryCard(
-      "Orange possession",
-      formatShare(finalFrame.team_zero.possession.opponent_possession_time, possessionTotal),
-    ),
-    createSummaryCard(
-      "Blue pressure",
-      formatShare(finalFrame.team_zero.pressure.offensive_half_time, pressureTotal),
-      "Time in Orange half",
-    ),
-    createSummaryCard(
-      "Orange pressure",
-      formatShare(finalFrame.team_zero.pressure.defensive_half_time, pressureTotal),
-      "Time in Blue half",
-    ),
-  ]));
+  page.append(
+    renderMetricGrid([
+      createSummaryCard(
+        "Blue possession",
+        formatShare(finalFrame.team_zero.possession.possession_time, possessionTotal),
+      ),
+      createSummaryCard(
+        "Orange possession",
+        formatShare(finalFrame.team_zero.possession.opponent_possession_time, possessionTotal),
+      ),
+      createSummaryCard(
+        "Blue pressure",
+        formatShare(finalFrame.team_zero.pressure.offensive_half_time, pressureTotal),
+        "Time in Orange half",
+      ),
+      createSummaryCard(
+        "Orange pressure",
+        formatShare(finalFrame.team_zero.pressure.defensive_half_time, pressureTotal),
+        "Time in Blue half",
+      ),
+    ]),
+  );
 
   const charts = el("section", { className: "stats-report-charts" });
   charts.append(
@@ -1204,8 +1239,16 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
           segments: [
             { label: "Most back", value: player.positioning.time_most_back, color: "#58a6ff" },
             { label: "Mid", value: player.positioning.time_mid_role, color: "#65d6ad" },
-            { label: "Most forward", value: player.positioning.time_most_forward, color: "#f39a37" },
-            { label: "Other", value: player.positioning.time_other_role, color: "rgba(255,255,255,0.22)" },
+            {
+              label: "Most forward",
+              value: player.positioning.time_most_forward,
+              color: "#f39a37",
+            },
+            {
+              label: "Other",
+              value: player.positioning.time_other_role,
+              color: "rgba(255,255,255,0.22)",
+            },
           ],
         })),
         formatShare,
@@ -1216,15 +1259,14 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
   return page;
 }
 
-function renderInvolvementPage(
-  finalFrame: StatsFrame,
-  definitions: StatDefinition[],
-): HTMLElement {
+function renderInvolvementPage(finalFrame: StatsFrame, definitions: StatDefinition[]): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
-  page.append(createPageIntro(
-    "Player involvement",
-    "Interaction stats that are usually easier to trust at a glance: touches, hits, demos, 50/50 outcomes, movement, and powerslide usage.",
-  ));
+  page.append(
+    createPageIntro(
+      "Player involvement",
+      "Interaction stats that are usually easier to trust at a glance: touches, hits, demos, 50/50 outcomes, movement, and powerslide usage.",
+    ),
+  );
 
   const charts = renderCharts(definitions, finalFrame, INVOLVEMENT_CHARTS);
   if (charts) {
@@ -1263,10 +1305,12 @@ function renderInvolvementPage(
     ),
   );
   page.append(movementCharts);
-  page.append(el("p", {
-    className: "stats-report-note",
-    text: "Experimental mechanic detectors such as musty flicks, speed flips, dodge resets, and ceiling shots are kept in All stats until their precision is stronger.",
-  }));
+  page.append(
+    el("p", {
+      className: "stats-report-note",
+      text: "Experimental mechanic detectors such as musty flicks, speed flips, dodge resets, and ceiling shots are kept in All stats until their precision is stronger.",
+    }),
+  );
   return page;
 }
 
@@ -1275,10 +1319,12 @@ function renderDumpPage(
   finalFrame: StatsFrame,
 ): HTMLElement {
   const page = el("div", { className: "stats-report-page" });
-  page.append(createPageIntro(
-    "All stats dump",
-    "Everything emitted by the current stats timeline, including experimental mechanic counters and low-level breakdowns.",
-  ));
+  page.append(
+    createPageIntro(
+      "All stats dump",
+      "Everything emitted by the current stats timeline, including experimental mechanic counters and low-level breakdowns.",
+    ),
+  );
 
   const nav = el("nav", { className: "stats-report-jump-nav" });
   for (const key of grouped.keys()) {
@@ -1298,10 +1344,14 @@ function renderDumpPage(
 
 function getActivePageId(): ReportPageId {
   const raw = window.location.hash.replace(/^#/, "");
-  return PAGES.some((page) => page.id === raw) ? raw as ReportPageId : "overview";
+  return PAGES.some((page) => page.id === raw) ? (raw as ReportPageId) : "overview";
 }
 
-function renderPageTabs(activePage: ReportPageId, root: HTMLElement, state: ReportState): HTMLElement {
+function renderPageTabs(
+  activePage: ReportPageId,
+  root: HTMLElement,
+  state: ReportState,
+): HTMLElement {
   const nav = el("nav", { className: "stats-report-tabs" });
   PAGES.forEach((page) => {
     const button = el("button", { text: page.label });
@@ -1324,8 +1374,9 @@ function createHeader(statusText?: string): HTMLElement {
   title.append(
     el("h1", { text: "Replay Stats" }),
     el("p", {
-      text: statusText
-        ?? "Load a Rocket League replay to review curated stats pages, comparison graphs, and the complete raw stat dump.",
+      text:
+        statusText ??
+        "Load a Rocket League replay to review curated stats pages, comparison graphs, and the complete raw stat dump.",
     }),
   );
 
@@ -1359,10 +1410,12 @@ function createHeader(statusText?: string): HTMLElement {
 function renderReport(root: HTMLElement, state: ReportState): void {
   const finalFrame = getFinalFrame(state.statsTimeline);
   if (!finalFrame) {
-    root.replaceChildren(el("main", {
-      className: "stats-report-empty",
-      text: "The replay did not produce any stats frames.",
-    }));
+    root.replaceChildren(
+      el("main", {
+        className: "stats-report-empty",
+        text: "The replay did not produce any stats frames.",
+      }),
+    );
     return;
   }
 
@@ -1418,12 +1471,7 @@ async function loadReplayBytes(
 
 async function loadReplayFile(root: HTMLElement, file: File): Promise<void> {
   try {
-    await loadReplayBytes(
-      root,
-      new Uint8Array(await file.arrayBuffer()),
-      file.name,
-      null,
-    );
+    await loadReplayBytes(root, new Uint8Array(await file.arrayBuffer()), file.name, null);
   } catch (error) {
     renderLoading(root, error instanceof Error ? error.message : String(error));
   }
@@ -1452,10 +1500,12 @@ async function loadReplayUrl(root: HTMLElement, replayUrl: string): Promise<void
 function mountStatsReport(root: HTMLElement): void {
   const main = el("main", { className: "stats-report" });
   main.append(createHeader());
-  main.append(el("section", {
-    className: "stats-report-empty",
-    text: "Load a replay to generate the stats report.",
-  }));
+  main.append(
+    el("section", {
+      className: "stats-report-empty",
+      text: "Load a replay to generate the stats report.",
+    }),
+  );
   root.replaceChildren(main);
 
   const replayUrl = new URL(window.location.href).searchParams.get("replayUrl");

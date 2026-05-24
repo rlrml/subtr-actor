@@ -24,10 +24,7 @@ import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("timeline defaults to goals and adds core and demo replay events when enabled", () => {
   assert.deepEqual(getReplayTimelineEventKinds([]), ["goal"]);
-  assert.deepEqual(
-    getReplayTimelineEventKinds(["core", "demo"]),
-    ["goal", "save", "shot", "demo"],
-  );
+  assert.deepEqual(getReplayTimelineEventKinds(["core", "demo"]), ["goal", "save", "shot", "demo"]);
 });
 
 test("filterReplayTimelineEvents keeps only goal markers by default", () => {
@@ -101,11 +98,7 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
 
 test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -155,11 +148,7 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
 
 test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
   } as ReplayModel;
 
   const statsTimeline = {
@@ -223,10 +212,7 @@ test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline mar
 
 test("buildBackboardTimelineEvents maps serialized backboard events to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -264,10 +250,7 @@ test("buildBackboardTimelineEvents maps serialized backboard events to timeline 
 
 test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -307,14 +290,8 @@ test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline
 
 test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
-    ballFrames: [
-      { position: { x: 0, y: 0, z: 0 } },
-      { position: { x: 10, y: 20, z: 30 } },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
+    ballFrames: [{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 10, y: 20, z: 30 } }],
   } as ReplayModel;
 
   const statsTimeline = {
@@ -360,11 +337,7 @@ test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", 
 
 test("buildDodgeResetTimelineEvents distinguishes on-ball resets", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
   } as ReplayModel;
 
   const statsTimeline = {
@@ -436,10 +409,7 @@ test("buildDodgeResetTimelineEvents distinguishes on-ball resets", () => {
 
 test("buildBallCarryTimelineEvents maps carry completions to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
   } as ReplayModel;
 
   const statsTimeline = {
@@ -501,10 +471,7 @@ test("buildBallCarryTimelineEvents maps carry completions to timeline markers", 
 
 test("buildPowerslideTimelineEvents maps powerslide presses to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
   } as ReplayModel;
 
   const statsTimeline = {
@@ -548,11 +515,7 @@ test("buildPowerslideTimelineEvents maps powerslide presses to timeline markers"
 
 test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -600,11 +563,7 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
 
 test("buildHalfFlipTimelineEvents maps serialized half flips to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -651,11 +610,7 @@ test("buildHalfFlipTimelineEvents maps serialized half flips to timeline markers
 
 test("buildWavedashTimelineEvents maps serialized wavedashes to their own timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-      { time: 2.25 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -703,10 +658,7 @@ test("buildWavedashTimelineEvents maps serialized wavedashes to their own timeli
 
 test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () => {
   const replay = {
-    frames: [
-      { time: 0 },
-      { time: 1.5 },
-    ],
+    frames: [{ time: 0 }, { time: 1.5 }],
     players: [
       {
         id: "Steam:blue-id",
@@ -753,14 +705,8 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       { kind: "goal", time: 10 },
       { kind: "save", time: 12 },
     ],
-    frames: [
-      { time: 0 },
-      { time: 1.25 },
-    ],
-    ballFrames: [
-      { position: { x: 0, y: 0, z: 0 } },
-      { position: { x: 10, y: 20, z: 30 } },
-    ],
+    frames: [{ time: 0 }, { time: 1.25 }],
+    ballFrames: [{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 10, y: 20, z: 30 } }],
     players: [
       {
         id: "Steam:blue-id",
@@ -983,10 +929,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   });
 
   assert.equal(countEnabledTimelineEvents([], replay, statsTimeline), 1);
-  assert.equal(
-    countEnabledTimelineEvents(["core", "fifty-fifty"], replay, statsTimeline),
-    3,
-  );
+  assert.equal(countEnabledTimelineEvents(["core", "fifty-fifty"], replay, statsTimeline), 3);
   assert.equal(
     countEnabledTimelineEvents(["core", "fifty-fifty", "rush"], replay, statsTimeline),
     3,

@@ -1,15 +1,10 @@
-import type {
-  PlayerStatsSnapshot,
-  TeamStatsSnapshot,
-} from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, TeamStatsSnapshot } from "./statsTimeline.ts";
 
 interface FiftyFiftySummaryOptions {
   kind: "shared";
 }
 
-type FiftyFiftySummaryPerspective =
-  | FiftyFiftySummaryOptions
-  | { kind: "team" };
+type FiftyFiftySummaryPerspective = FiftyFiftySummaryOptions | { kind: "team" };
 
 function formatInteger(value: number | undefined): string {
   if (value === undefined || Number.isNaN(value)) {
@@ -73,9 +68,7 @@ export function renderFiftyFiftySummary(
   `;
 }
 
-export function renderPlayerFiftyFiftyStats(
-  stats: PlayerStatsSnapshot["fifty_fifty"],
-): string {
+export function renderPlayerFiftyFiftyStats(stats: PlayerStatsSnapshot["fifty_fifty"]): string {
   return `
     <div class="stat-row"><span class="label">50s</span><span class="value">${formatInteger(stats?.count)}</span></div>
     <div class="stat-row"><span class="label">Wins</span><span class="value">${formatInteger(stats?.wins)} (${formatPercentage(stats?.wins, stats?.count)})</span></div>

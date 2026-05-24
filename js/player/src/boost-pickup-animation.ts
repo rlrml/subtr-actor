@@ -19,9 +19,7 @@ export interface BoostPickupAnimationPickup {
   player: ReplayPlayerTrack;
 }
 
-export type BoostPickupAnimationFilter = (
-  pickup: BoostPickupAnimationPickup,
-) => boolean;
+export type BoostPickupAnimationFilter = (pickup: BoostPickupAnimationPickup) => boolean;
 
 interface BoostPickupAnimationEvent {
   time: number;
@@ -57,10 +55,7 @@ function padPickupEvents(pad: ReplayBoostPad): ReplayBoostPadEvent[] {
   return pad.events.filter((event) => !event.available && event.playerId);
 }
 
-function createCountTexture(
-  count: number,
-  color: string,
-): THREE.CanvasTexture {
+function createCountTexture(count: number, color: string): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = TEXT_CANVAS_WIDTH;
   canvas.height = TEXT_CANVAS_HEIGHT;
@@ -90,9 +85,7 @@ function disposeTexture(texture: THREE.Texture | null): void {
   texture?.dispose();
 }
 
-function createPickupGroup(
-  color: string,
-): {
+function createPickupGroup(color: string): {
   group: THREE.Group;
   textMaterial: THREE.SpriteMaterial;
   ringMaterial: THREE.MeshBasicMaterial;
@@ -136,10 +129,7 @@ function createPickupGroup(
   return { group, textMaterial, ringMaterial };
 }
 
-function syncPickupCountTexture(
-  event: BoostPickupAnimationEvent,
-  count: number,
-): void {
+function syncPickupCountTexture(event: BoostPickupAnimationEvent, count: number): void {
   if (event.currentCount === count) {
     return;
   }
@@ -150,9 +140,7 @@ function syncPickupCountTexture(
   event.currentCount = count;
 }
 
-function buildAnimationEvents(
-  context: ReplayPlayerPluginContext,
-): BoostPickupAnimationEvent[] {
+function buildAnimationEvents(context: ReplayPlayerPluginContext): BoostPickupAnimationEvent[] {
   const playersById = new Map<string, ReplayPlayerTrack>();
   for (const player of context.replay.players) {
     playersById.set(player.id, player);
@@ -198,11 +186,7 @@ function buildAnimationEvents(
       player,
       color,
       currentCount: 1,
-      position: new THREE.Vector3(
-        pad.position.x,
-        pad.position.y,
-        pad.position.z,
-      ),
+      position: new THREE.Vector3(pad.position.x, pad.position.y, pad.position.z),
       size: pad.size,
       group,
       textMaterial,
@@ -246,18 +230,17 @@ function updateAnimationEvent(
 export function createBoostPickupAnimationPlugin(
   options: BoostPickupAnimationPluginOptions = {},
 ): ReplayPlayerPlugin {
-  const durationSeconds = Math.max(
-    0.1,
-    options.durationSeconds ?? DEFAULT_DURATION_SECONDS,
-  );
+  const durationSeconds = Math.max(0.1, options.durationSeconds ?? DEFAULT_DURATION_SECONDS);
   let events: BoostPickupAnimationEvent[] = [];
 
   function includeEvent(event: BoostPickupAnimationEvent): boolean {
-    return options.includePickup?.({
-      pad: event.pad,
-      event: event.event,
-      player: event.player,
-    }) ?? true;
+    return (
+      options.includePickup?.({
+        pad: event.pad,
+        event: event.event,
+        player: event.player,
+      }) ?? true
+    );
   }
 
   function hideAll(): void {
@@ -297,11 +280,7 @@ export function createBoostPickupAnimationPlugin(
         }
 
         syncPickupCountTexture(event, pickupCount);
-        updateAnimationEvent(
-          event,
-          context.currentTime - event.time,
-          durationSeconds,
-        );
+        updateAnimationEvent(event, context.currentTime - event.time, durationSeconds);
       }
     },
     teardown(): void {

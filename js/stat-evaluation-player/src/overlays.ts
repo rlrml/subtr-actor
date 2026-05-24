@@ -142,10 +142,7 @@ export function computeTeamBandDescriptors(
   ];
 }
 
-function createArrowHeadGeometry(
-  width: number,
-  length: number,
-): THREE.ShapeGeometry {
+function createArrowHeadGeometry(width: number, length: number): THREE.ShapeGeometry {
   const shape = new THREE.Shape();
   shape.moveTo(0, length / 2);
   shape.lineTo(width / 2, -length / 2);
@@ -168,19 +165,13 @@ function makeDirectionMarker(fieldScale: number): DirectionMarker {
   const group = new THREE.Group();
   group.visible = false;
 
-  const shaftGeom = new THREE.PlaneGeometry(
-    TEAM_STRIPE_WIDTH * 0.55 * fieldScale,
-    1,
-  );
+  const shaftGeom = new THREE.PlaneGeometry(TEAM_STRIPE_WIDTH * 0.55 * fieldScale, 1);
   const shaftMesh = new THREE.Mesh(shaftGeom, material);
   shaftMesh.position.z = ARROW_Z;
   shaftMesh.renderOrder = 22;
   group.add(shaftMesh);
 
-  const headGeom = createArrowHeadGeometry(
-    ARROW_HEAD_WIDTH * fieldScale,
-    headLength,
-  );
+  const headGeom = createArrowHeadGeometry(ARROW_HEAD_WIDTH * fieldScale, headLength);
   const headMesh = new THREE.Mesh(headGeom, material);
   headMesh.position.z = ARROW_Z;
   headMesh.renderOrder = 23;
@@ -203,10 +194,7 @@ function setDirectionMarker(
   totalLength: number,
   direction: number,
 ): void {
-  const shaftLength = Math.max(
-    totalLength - marker.headLength,
-    marker.headLength * 0.2,
-  );
+  const shaftLength = Math.max(totalLength - marker.headLength, marker.headLength * 0.2);
 
   marker.group.position.x = centerX;
   marker.group.rotation.z = direction > 0 ? 0 : Math.PI;
@@ -221,10 +209,7 @@ function hideDirectionMarker(marker: DirectionMarker): void {
   marker.group.visible = false;
 }
 
-function makeThresholdZone(
-  fieldScale: number,
-  stripeColor: number,
-): ThresholdZone {
+function makeThresholdZone(fieldScale: number, stripeColor: number): ThresholdZone {
   const group = new THREE.Group();
   group.visible = false;
 
@@ -293,10 +278,7 @@ function updateZone(
   const laneWidth = lane.width * fieldScale;
   const laneCenterX = lane.centerX * fieldScale;
   const stripeWidth = TEAM_STRIPE_WIDTH * fieldScale;
-  const maxArrowLength = Math.max(
-    depth - 32 * fieldScale,
-    zone.primaryMarker.headLength * 1.15,
-  );
+  const maxArrowLength = Math.max(depth - 32 * fieldScale, zone.primaryMarker.headLength * 1.15);
   const arrowLength = Math.min(
     maxArrowLength,
     Math.max(MIN_ARROW_LENGTH * fieldScale, depth * 0.6),
@@ -314,12 +296,7 @@ function updateZone(
   hideDirectionMarker(zone.secondaryMarker);
 
   if (descriptor.directions.length === 1) {
-    setDirectionMarker(
-      zone.primaryMarker,
-      laneCenterX,
-      arrowLength,
-      descriptor.directions[0]!,
-    );
+    setDirectionMarker(zone.primaryMarker, laneCenterX, arrowLength, descriptor.directions[0]!);
   } else {
     const arrowOffsetX = laneWidth * 0.18;
     setDirectionMarker(
@@ -361,10 +338,7 @@ export class ThresholdZoneOverlay {
     this.blueForward = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
     this.blueOther = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
     this.orangeBack = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
-    this.orangeForward = makeThresholdZone(
-      fieldScale,
-      ORANGE_TEAM_ACCENT_COLOR,
-    );
+    this.orangeForward = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
     this.orangeOther = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
 
     for (const zone of this.getZones()) {
@@ -399,11 +373,7 @@ export class ThresholdZoneOverlay {
         continue;
       }
 
-      const descriptors = computeTeamBandDescriptors(
-        rawYs,
-        isTeamZero,
-        threshold,
-      );
+      const descriptors = computeTeamBandDescriptors(rawYs, isTeamZero, threshold);
       for (const descriptor of descriptors) {
         const zone = teamZones.get(descriptor.kind);
         if (!zone) continue;
@@ -488,13 +458,9 @@ export class HalfFieldOverlay {
   update(ballY: number | null | undefined): void {
     const ballSide = getBallSideFromY(ballY);
     this.teamZeroSide.material.opacity =
-      ballSide === "team-zero"
-        ? HALF_FIELD_ACTIVE_OPACITY
-        : HALF_FIELD_BASE_OPACITY;
+      ballSide === "team-zero" ? HALF_FIELD_ACTIVE_OPACITY : HALF_FIELD_BASE_OPACITY;
     this.teamOneSide.material.opacity =
-      ballSide === "team-one"
-        ? HALF_FIELD_ACTIVE_OPACITY
-        : HALF_FIELD_BASE_OPACITY;
+      ballSide === "team-one" ? HALF_FIELD_ACTIVE_OPACITY : HALF_FIELD_BASE_OPACITY;
   }
 
   dispose(): void {
@@ -521,18 +487,11 @@ export class HalfFieldOverlay {
   }
 }
 
-export function createZoneBoundaryLines(
-  scene: THREE.Scene,
-  fieldScale: number,
-): THREE.Group {
+export function createZoneBoundaryLines(scene: THREE.Scene, fieldScale: number): THREE.Group {
   const group = new THREE.Group();
   const fieldWidth = FIELD_HALF_X * 2 * fieldScale;
 
-  const makeStrip = (
-    y: number,
-    thickness: number,
-    opacity: number,
-  ): THREE.Mesh => {
+  const makeStrip = (y: number, thickness: number, opacity: number): THREE.Mesh => {
     const geometry = new THREE.PlaneGeometry(fieldWidth, thickness * fieldScale);
     const material = new THREE.MeshBasicMaterial({
       color: ZONE_BOUNDARY_COLOR,

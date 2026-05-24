@@ -54,7 +54,7 @@ npm run dev-with-wasm
 4. It loads full structured frame data with `get_replay_frames_data()`.
 5. It passes the bytes into `js/player` via `loadReplayFromBytes(..., { useWorker, onProgress })`.
 6. It renders the built-in `createReplayLoadOverlay()` UI while also updating its own custom status text from the same progress events.
-6. It wires the demo controls to `ReplayPlayer` methods and change events.
+7. It wires the demo controls to `ReplayPlayer` methods and change events.
 
 ## Relevant Files
 

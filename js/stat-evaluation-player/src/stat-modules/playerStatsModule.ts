@@ -29,17 +29,16 @@ export function createPlayerStatsModule<T>(options: {
     getTimelineEvents: options.getTimelineEvents,
 
     renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(
-        ctx.statsFrameLookup,
-        frameIndex,
-      );
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
 
-      return renderGroupedPlayerCards(statsFrame.players, (player) => renderPlayerCard(
-        player.name,
-        player.is_team_0,
-        options.render(options.select(player), player),
-      ));
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          options.render(options.select(player), player),
+        ),
+      );
     },
 
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {

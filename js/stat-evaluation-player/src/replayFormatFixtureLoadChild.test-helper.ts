@@ -22,7 +22,7 @@ function parseStatsTimelineParts(
     replay_meta: parseJsonBuffer(decoder, parts.replayMeta),
     events: parseJsonBuffer(decoder, parts.events),
     frames: parts.frameChunks.flatMap((chunk) =>
-      parseJsonBuffer<StatsTimeline["frames"]>(decoder, chunk)
+      parseJsonBuffer<StatsTimeline["frames"]>(decoder, chunk),
     ),
   };
 }
@@ -44,13 +44,12 @@ async function main(): Promise<void> {
   const rawReplayDataBuffer = get_replay_frames_data_json_with_progress(
     bytes,
     (progress: unknown) => {
-      const stage = progress instanceof Map
-        ? progress.get("stage")
-        : progress &&
-          typeof progress === "object" &&
-          "stage" in progress
-          ? progress.stage
-          : null;
+      const stage =
+        progress instanceof Map
+          ? progress.get("stage")
+          : progress && typeof progress === "object" && "stage" in progress
+            ? progress.stage
+            : null;
       if (typeof stage === "string") {
         progressStages.push(stage);
       }
@@ -58,31 +57,29 @@ async function main(): Promise<void> {
     500,
   );
   progressStages.push("stats-timeline");
-  const statsTimelineParts = get_stats_timeline_json_parts(
-    bytes,
-    32 * 1024 * 1024,
-  );
+  const statsTimelineParts = get_stats_timeline_json_parts(bytes, 32 * 1024 * 1024);
 
   const decoder = new TextDecoder();
-  const rawReplayData = JSON.parse(
-    decoder.decode(rawReplayDataBuffer),
-  ) as RawReplayFramesData;
+  const rawReplayData = JSON.parse(decoder.decode(rawReplayDataBuffer)) as RawReplayFramesData;
   const statsTimeline = parseStatsTimelineParts(decoder, statsTimelineParts);
   const replay = await normalizeReplayDataAsync(rawReplayData);
 
-  process.stdout.write(`${JSON.stringify({
-    fixture,
-    frameCount: replay.frameCount,
-    players: replay.players.length,
-    statsFrames: statsTimeline.frames.length,
-    progressStages: [...new Set(progressStages)],
-  })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({
+      fixture,
+      frameCount: replay.frameCount,
+      players: replay.players.length,
+      statsFrames: statsTimeline.frames.length,
+      progressStages: [...new Set(progressStages)],
+    })}\n`,
+  );
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error
-    ? `${error.name}: ${error.message}\n${error.stack ?? ""}`
-    : String(error);
+  const message =
+    error instanceof Error
+      ? `${error.name}: ${error.message}\n${error.stack ?? ""}`
+      : String(error);
   process.stderr.write(message);
   process.exit(1);
 });

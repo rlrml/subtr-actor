@@ -2,10 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import {
-  buildFiftyFiftyMarkers,
-  getVisibleFiftyFiftyMarkers,
-} from "./fiftyFiftyOverlay.ts";
+import { buildFiftyFiftyMarkers, getVisibleFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildFiftyFiftyMarkers anchors 50/50 markers to the challenge start", () => {

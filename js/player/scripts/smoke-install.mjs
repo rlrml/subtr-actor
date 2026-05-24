@@ -17,9 +17,7 @@ function run(command, args, cwd) {
 }
 
 async function main() {
-  const scratchDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-player-smoke-")
-  );
+  const scratchDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-player-smoke-"));
   let publishDir = null;
 
   try {
@@ -39,7 +37,7 @@ async function main() {
       {
         cwd: path.resolve(jsDir, "pkg"),
         encoding: "utf8",
-      }
+      },
     );
     const [{ filename: bindingsFilename }] = JSON.parse(bindingsPackOutput);
 
@@ -53,7 +51,7 @@ async function main() {
       {
         cwd: publishDir,
         encoding: "utf8",
-      }
+      },
     );
     const [{ filename: playerFilename }] = JSON.parse(playerPackOutput);
 
@@ -82,8 +80,8 @@ async function main() {
           },
         },
         null,
-        2
-      )
+        2,
+      ),
     );
 
     await writeFile(
@@ -101,8 +99,8 @@ async function main() {
           include: ["src"],
         },
         null,
-        2
-      )
+        2,
+      ),
     );
 
     await writeFile(
@@ -116,21 +114,21 @@ async function main() {
         "  </body>",
         "</html>",
         "",
-      ].join("\n")
+      ].join("\n"),
     );
 
     await writeFile(
       path.join(sourceDir, "main.ts"),
       [
-        'import {',
-        '  ReplayPlayer,',
-        '  ReplayPlaylistPlayer,',
-        '  createReplayBytesSource,',
-        '  ensureBindingsReady,',
-        '  frameBound,',
-        '  parsePlaylistManifest,',
-        '  type PlaylistManifest,',
-        '  type ReplayPlayerOptions,',
+        "import {",
+        "  ReplayPlayer,",
+        "  ReplayPlaylistPlayer,",
+        "  createReplayBytesSource,",
+        "  ensureBindingsReady,",
+        "  frameBound,",
+        "  parsePlaylistManifest,",
+        "  type PlaylistManifest,",
+        "  type ReplayPlayerOptions,",
         '} from "subtr-actor-player";',
         "",
         "const manifest: PlaylistManifest = parsePlaylistManifest({",
@@ -154,7 +152,7 @@ async function main() {
         "void frameBound;",
         "console.log(manifest, options);",
         "",
-      ].join("\n")
+      ].join("\n"),
     );
 
     run("npm", ["install"], consumerDir);

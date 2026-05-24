@@ -208,11 +208,7 @@ export class SpeedFlipOverlay {
   }
 
   update(currentTime: number): void {
-    const visibleMarkers = getVisibleSpeedFlipMarkers(
-      this.markers,
-      currentTime,
-      this.decaySeconds,
-    );
+    const visibleMarkers = getVisibleSpeedFlipMarkers(this.markers, currentTime, this.decaySeconds);
     const visibleIds = new Set(visibleMarkers.map((marker) => marker.id));
 
     for (const [id, view] of this.views.entries()) {
@@ -234,18 +230,12 @@ export class SpeedFlipOverlay {
       const scale = 0.96 + (1 - life) * 0.22;
 
       view.material.opacity = opacity;
-      view.ring.position.set(
-        marker.position.x,
-        marker.position.y,
-        marker.position.z + 14,
-      );
+      view.ring.position.set(marker.position.x, marker.position.y, marker.position.z + 14);
       view.ring.scale.setScalar(scale + marker.quality * 0.08);
 
-      this.worldPosition.set(
-        marker.position.x,
-        marker.position.y,
-        marker.position.z,
-      ).add(this.labelOffset);
+      this.worldPosition
+        .set(marker.position.x, marker.position.y, marker.position.z)
+        .add(this.labelOffset);
       const visible = projectToContainer(
         this.worldPosition,
         this.scene.camera,
@@ -284,11 +274,12 @@ export class SpeedFlipOverlay {
     }
 
     const material = new THREE.MeshBasicMaterial({
-      color: marker.quality >= 0.75
-        ? HIGH_CONFIDENCE_COLOR
-        : marker.isTeamZero
-          ? BLUE_COLOR
-          : ORANGE_COLOR,
+      color:
+        marker.quality >= 0.75
+          ? HIGH_CONFIDENCE_COLOR
+          : marker.isTeamZero
+            ? BLUE_COLOR
+            : ORANGE_COLOR,
       transparent: true,
       opacity: 0.8,
       side: THREE.DoubleSide,

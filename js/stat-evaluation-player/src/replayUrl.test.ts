@@ -14,10 +14,7 @@ const GITHUB_REPLAY_URL =
 const BALLCHASING_ID = "56889c3e-c420-45db-92fd-47ce2a3604b0";
 
 test("getReplayUrlFromSearch accepts replayUrl parameter", () => {
-  const replayUrl = getReplayUrlFromSearch(
-    `?replayUrl=${GITHUB_REPLAY_URL}`,
-    BASE_URL,
-  );
+  const replayUrl = getReplayUrlFromSearch(`?replayUrl=${GITHUB_REPLAY_URL}`, BASE_URL);
 
   assert.equal(replayUrl?.href, GITHUB_REPLAY_URL);
 });
@@ -28,10 +25,7 @@ test("getReplayUrlFromSearch accepts compressed replay URL parameter", () => {
 
   assert.equal(decodeCompressedReplayUrl(encoded), GITHUB_REPLAY_URL);
   assert.equal(replayUrl?.href, GITHUB_REPLAY_URL);
-  assert.ok(
-    `?r=${encoded}`.length <
-      `?replayUrl=${encodeURIComponent(GITHUB_REPLAY_URL)}`.length,
-  );
+  assert.ok(`?r=${encoded}`.length < `?replayUrl=${encodeURIComponent(GITHUB_REPLAY_URL)}`.length);
 });
 
 test("getReplayUrlFromSearch accepts legacy aliases and relative URLs", () => {
@@ -64,40 +58,26 @@ test("getReplayUrlFromSearch rejects invalid compressed replay URL parameters", 
 });
 
 test("getReplayFetchRequestFromSearch accepts a Ballchasing replay id", () => {
-  const request = getReplayFetchRequestFromSearch(
-    `?ballchasing=${BALLCHASING_ID}`,
-    BASE_URL,
-  );
+  const request = getReplayFetchRequestFromSearch(`?ballchasing=${BALLCHASING_ID}`, BASE_URL);
 
   assert.equal(request?.kind, "ballchasing");
-  assert.equal(
-    request?.url.href,
-    `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`,
-  );
+  assert.equal(request?.url.href, `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`);
   assert.equal(request?.name, `ballchasing-${BALLCHASING_ID}.replay`);
   assert.deepEqual(request?.fetchInit, { method: "POST" });
 });
 
 test("getReplayFetchRequestFromSearch accepts Ballchasing replay URLs", () => {
   const request = getReplayFetchRequestFromSearch(
-    `?ballchasingReplay=${encodeURIComponent(
-      `https://ballchasing.com/replay/${BALLCHASING_ID}`,
-    )}`,
+    `?ballchasingReplay=${encodeURIComponent(`https://ballchasing.com/replay/${BALLCHASING_ID}`)}`,
     BASE_URL,
   );
 
   assert.equal(request?.kind, "ballchasing");
-  assert.equal(
-    request?.url.href,
-    `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`,
-  );
+  assert.equal(request?.url.href, `https://ballchasing.com/dl/replay/${BALLCHASING_ID}`);
 });
 
 test("getReplayFetchRequestFromSearch falls back to replay URL parameters", () => {
-  const request = getReplayFetchRequestFromSearch(
-    `?replayUrl=${GITHUB_REPLAY_URL}`,
-    BASE_URL,
-  );
+  const request = getReplayFetchRequestFromSearch(`?replayUrl=${GITHUB_REPLAY_URL}`, BASE_URL);
 
   assert.equal(request?.kind, "url");
   assert.equal(request?.url.href, GITHUB_REPLAY_URL);
@@ -106,13 +86,8 @@ test("getReplayFetchRequestFromSearch falls back to replay URL parameters", () =
 
 test("getReplayFileNameFromUrl derives a readable name", () => {
   assert.equal(
-    getReplayFileNameFromUrl(
-      new URL("https://cdn.example/replays/test%20one.replay"),
-    ),
+    getReplayFileNameFromUrl(new URL("https://cdn.example/replays/test%20one.replay")),
     "test one.replay",
   );
-  assert.equal(
-    getReplayFileNameFromUrl(new URL("https://cdn.example/replays/")),
-    "replays",
-  );
+  assert.equal(getReplayFileNameFromUrl(new URL("https://cdn.example/replays/")), "replays");
 });

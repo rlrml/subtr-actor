@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  computeTeamBandDescriptors,
-  getBallSideFromY,
-  getTeamLaneBounds,
-} from "./overlays.ts";
+import { computeTeamBandDescriptors, getBallSideFromY, getTeamLaneBounds } from "./overlays.ts";
 
 test("blue and orange team lanes stay disjoint so team bands do not fully overlap", () => {
   const blueLane = getTeamLaneBounds(true);
@@ -57,12 +53,14 @@ test("team one back and forward bands reverse direction in world space", () => {
 test("other bands keep both team-relative directions", () => {
   const descriptors = computeTeamBandDescriptors([-1400, -1280, -1200], false, 236);
 
-  assert.deepEqual(descriptors, [{
-    kind: "other",
-    centerY: -1300,
-    halfDepth: 136,
-    directions: [1, -1],
-  }]);
+  assert.deepEqual(descriptors, [
+    {
+      kind: "other",
+      centerY: -1300,
+      halfDepth: 136,
+      directions: [1, -1],
+    },
+  ]);
 });
 
 test("ball side helper maps field halves to team-side labels", () => {

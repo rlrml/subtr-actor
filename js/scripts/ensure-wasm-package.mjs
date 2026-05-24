@@ -42,7 +42,7 @@ async function walkFiles(rootDir) {
         return walkFiles(fullPath);
       }
       return fullPath;
-    })
+    }),
   );
 
   return files.flat();
@@ -98,7 +98,7 @@ function runBuildScript() {
       {
         cwd: jsDir,
         stdio: "inherit",
-      }
+      },
     );
 
     child.on("exit", (code) => {
@@ -121,15 +121,11 @@ export function isWasmSourcePath(filePath) {
   const resolvedPath = path.resolve(filePath);
   return getWasmWatchTargets().some(
     (targetPath) =>
-      resolvedPath === targetPath ||
-      resolvedPath.startsWith(`${targetPath}${path.sep}`)
+      resolvedPath === targetPath || resolvedPath.startsWith(`${targetPath}${path.sep}`),
   );
 }
 
-export async function ensureWasmPackageFresh({
-  force = false,
-  log = console.log,
-} = {}) {
+export async function ensureWasmPackageFresh({ force = false, log = console.log } = {}) {
   if (process.env.SUBTR_ACTOR_SKIP_WASM_BUILD === "1") {
     if ((await earliestMtime(outputFiles)) === 0) {
       throw new Error("SUBTR_ACTOR_SKIP_WASM_BUILD=1 but js/pkg is missing");

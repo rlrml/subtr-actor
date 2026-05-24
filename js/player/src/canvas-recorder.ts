@@ -5,12 +5,7 @@ import type {
   ReplayPlayerState,
 } from "./types";
 
-export type CanvasRecorderState =
-  | "idle"
-  | "recording"
-  | "stopping"
-  | "ready"
-  | "error";
+export type CanvasRecorderState = "idle" | "recording" | "stopping" | "ready" | "error";
 
 export interface CanvasRecorderStatus {
   state: CanvasRecorderState;
@@ -33,12 +28,9 @@ export interface CanvasRecorderRangeOptions extends CanvasRecorderStartOptions {
   restorePlaybackState?: boolean;
 }
 
-export type CanvasRecorderStatusListener = (
-  status: CanvasRecorderStatus,
-) => void;
+export type CanvasRecorderStatusListener = (status: CanvasRecorderStatus) => void;
 
-export interface CanvasRecorderPluginOptions
-  extends CanvasRecorderStartOptions {
+export interface CanvasRecorderPluginOptions extends CanvasRecorderStartOptions {
   onStatusChange?: CanvasRecorderStatusListener;
   onComplete?: (recording: Blob) => void;
 }
@@ -55,11 +47,7 @@ export interface CanvasRecorderPlugin extends ReplayPlayerPlugin {
 }
 
 const DEFAULT_FPS = 60;
-const DEFAULT_MIME_TYPES = [
-  "video/webm;codecs=vp9",
-  "video/webm;codecs=vp8",
-  "video/webm",
-];
+const DEFAULT_MIME_TYPES = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
 
 function chooseMimeType(requested: string | undefined): string {
   if (requested && MediaRecorder.isTypeSupported(requested)) {
@@ -101,8 +89,14 @@ export function createCanvasRecorderPlugin(
   function status(): CanvasRecorderStatus {
     return {
       state: recorder
-        ? recorder.state === "recording" ? "recording" : "stopping"
-        : error ? "error" : recording ? "ready" : "idle",
+        ? recorder.state === "recording"
+          ? "recording"
+          : "stopping"
+        : error
+          ? "error"
+          : recording
+            ? "ready"
+            : "idle",
       elapsedSeconds,
       mimeType,
       sizeBytes,
@@ -233,8 +227,7 @@ export function createCanvasRecorderPlugin(
       const stream = canvas.captureStream(fps);
       recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond:
-          startOptions.videoBitsPerSecond ?? options.videoBitsPerSecond,
+        videoBitsPerSecond: startOptions.videoBitsPerSecond ?? options.videoBitsPerSecond,
       });
 
       stopPromise = new Promise((resolve) => {
@@ -248,14 +241,22 @@ export function createCanvasRecorderPlugin(
           notify();
         }
       });
-      recorder.addEventListener("stop", () => {
-        stream.getTracks().forEach((track) => track.stop());
-        finish(new Blob(chunks, { type: mimeType || "video/webm" }));
-      }, { once: true });
-      recorder.addEventListener("error", (event) => {
-        stream.getTracks().forEach((track) => track.stop());
-        fail((event as ErrorEvent).error ?? event);
-      }, { once: true });
+      recorder.addEventListener(
+        "stop",
+        () => {
+          stream.getTracks().forEach((track) => track.stop());
+          finish(new Blob(chunks, { type: mimeType || "video/webm" }));
+        },
+        { once: true },
+      );
+      recorder.addEventListener(
+        "error",
+        (event) => {
+          stream.getTracks().forEach((track) => track.stop());
+          fail((event as ErrorEvent).error ?? event);
+        },
+        { once: true },
+      );
 
       recorder.start(1000);
       notify();
@@ -268,9 +269,11 @@ export function createCanvasRecorderPlugin(
       if (recorder.state === "inactive") {
         return stopPromise ?? Promise.resolve(recording);
       }
-      const promise = stopPromise ?? new Promise<Blob | null>((resolve) => {
-        stopResolve = resolve;
-      });
+      const promise =
+        stopPromise ??
+        new Promise<Blob | null>((resolve) => {
+          stopResolve = resolve;
+        });
       recorder.stop();
       notify();
       return promise;

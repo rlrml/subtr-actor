@@ -38,10 +38,7 @@ test("boost pickup player filters restored from config survive initial replay se
   });
 
   assert.deepEqual(controller.getConfig().playerIds, ["Steam:player-1"]);
-  assert.deepEqual(
-    [...(controller.getTimelineRangeOptions().playerIds ?? [])],
-    ["Steam:player-1"],
-  );
+  assert.deepEqual([...(controller.getTimelineRangeOptions().playerIds ?? [])], ["Steam:player-1"]);
 });
 
 test("boost pickup player filters still reset across later replay changes", () => {

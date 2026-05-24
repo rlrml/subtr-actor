@@ -3,18 +3,14 @@ import type { TeamStatsSnapshot } from "./statsTimeline.ts";
 interface PressureRenderOptions {
   labelPerspective:
     | {
-      kind: "shared";
-    }
+        kind: "shared";
+      }
     | {
-      kind: "team";
-    };
+        kind: "team";
+      };
 }
 
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
+function formatNumber(value: number | undefined, digits = 1, suffix = ""): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -40,11 +36,7 @@ function formatPercentage(
   return `${((numerator * 100) / denominator).toFixed(digits)}%`;
 }
 
-function formatTimeShare(
-  value: number | undefined,
-  total: number | undefined,
-  digits = 1,
-): string {
+function formatTimeShare(value: number | undefined, total: number | undefined, digits = 1): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -117,10 +109,12 @@ function renderPressureBreakdownRows(
 
   return orderedHalves
     .filter((half) => totals.has(half))
-    .map((half) => renderStatRow(
-      formatFieldHalfLabel(half, labelPerspective),
-      formatTimeShare(totals.get(half), trackedTime),
-    ))
+    .map((half) =>
+      renderStatRow(
+        formatFieldHalfLabel(half, labelPerspective),
+        formatTimeShare(totals.get(half), trackedTime),
+      ),
+    )
     .join("");
 }
 
@@ -134,9 +128,8 @@ export function renderPressureStats(
     trackedTime,
     options.labelPerspective,
   );
-  const trackedRow = breakdownRows.length === 0
-    ? renderStatRow("Tracked", formatNumber(trackedTime, 1, "s"))
-    : "";
+  const trackedRow =
+    breakdownRows.length === 0 ? renderStatRow("Tracked", formatNumber(trackedTime, 1, "s")) : "";
 
   return `
     ${trackedRow}

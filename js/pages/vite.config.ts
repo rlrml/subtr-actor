@@ -14,7 +14,7 @@ function ensureWasmBindingsPlugin() {
       ensureWasmPackageFresh({
         force,
         log: (message: string) => console.log(message),
-      })
+      }),
     );
     return rebuild;
   };
@@ -36,9 +36,7 @@ function ensureWasmBindingsPlugin() {
           await queueRebuild(true);
           server.ws.send({ type: "full-reload" });
         } catch (error: unknown) {
-          server.config.logger.error(
-            error instanceof Error ? error.message : String(error),
-          );
+          server.config.logger.error(error instanceof Error ? error.message : String(error));
         }
       };
 

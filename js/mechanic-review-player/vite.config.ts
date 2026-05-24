@@ -36,9 +36,7 @@ function ensureWasmBindingsPlugin() {
           await queueRebuild(true);
           server.ws.send({ type: "full-reload" });
         } catch (error: unknown) {
-          server.config.logger.error(
-            error instanceof Error ? error.message : String(error),
-          );
+          server.config.logger.error(error instanceof Error ? error.message : String(error));
         }
       };
 
@@ -58,14 +56,8 @@ export default defineConfig({
         import.meta.dirname,
         "../pkg/rl_replay_subtr_actor.js",
       ),
-      "subtr-actor-player": path.resolve(
-        import.meta.dirname,
-        "../player/src/lib.ts",
-      ),
-      three: path.resolve(
-        import.meta.dirname,
-        "../stat-evaluation-player/node_modules/three",
-      ),
+      "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+      three: path.resolve(import.meta.dirname, "../stat-evaluation-player/node_modules/three"),
     },
   },
   server: {

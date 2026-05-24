@@ -24,9 +24,7 @@ test("stat definition search treats space-separated terms as independent filters
   ];
 
   assert.deepEqual(
-    getStatDefinitionSearchMatches(definitions, "boost air").map((definition) =>
-      definition.id
-    ),
+    getStatDefinitionSearchMatches(definitions, "boost air").map((definition) => definition.id),
     ["player:boost.amount_used_while_airborne"],
   );
 });
@@ -38,14 +36,12 @@ test("stat definition search requires the typed string for each term", () => {
   ];
 
   assert.deepEqual(
-    getStatDefinitionSearchMatches(definitions, "bst air usd").map((definition) =>
-      definition.id
-    ),
+    getStatDefinitionSearchMatches(definitions, "bst air usd").map((definition) => definition.id),
     [],
   );
   assert.deepEqual(
-    getStatDefinitionSearchMatches(definitions, "boost air used").map((definition) =>
-      definition.id
+    getStatDefinitionSearchMatches(definitions, "boost air used").map(
+      (definition) => definition.id,
     ),
     ["player:boost.amount_used_while_airborne"],
   );

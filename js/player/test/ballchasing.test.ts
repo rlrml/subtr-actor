@@ -13,10 +13,7 @@ const REPLAY_ID = "56889c3e-c420-45db-92fd-47ce2a3604b0";
 
 test("recognizes and normalizes Ballchasing replay ids", () => {
   assert.equal(isBallchasingReplayId(REPLAY_ID), true);
-  assert.equal(
-    normalizeBallchasingReplayId(REPLAY_ID.toUpperCase()),
-    REPLAY_ID,
-  );
+  assert.equal(normalizeBallchasingReplayId(REPLAY_ID.toUpperCase()), REPLAY_ID);
   assert.equal(isBallchasingReplayId("not-a-replay-id"), false);
 });
 
@@ -26,9 +23,7 @@ test("extracts Ballchasing replay ids from web and API URLs", () => {
     REPLAY_ID,
   );
   assert.equal(
-    normalizeBallchasingReplayId(
-      `https://ballchasing.com/api/replays/${REPLAY_ID}/file`,
-    ),
+    normalizeBallchasingReplayId(`https://ballchasing.com/api/replays/${REPLAY_ID}/file`),
     REPLAY_ID,
   );
 });
@@ -53,10 +48,7 @@ test("builds Ballchasing replay file URLs and names", () => {
     getBallchasingReplayApiFileUrl(REPLAY_ID).href,
     `https://ballchasing.com/api/replays/${REPLAY_ID}/file`,
   );
-  assert.equal(
-    getBallchasingReplayFileName(REPLAY_ID),
-    `ballchasing-${REPLAY_ID}.replay`,
-  );
+  assert.equal(getBallchasingReplayFileName(REPLAY_ID), `ballchasing-${REPLAY_ID}.replay`);
 });
 
 test("fetchBallchasingReplayBytes posts to the public download endpoint", async () => {

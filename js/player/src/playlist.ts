@@ -29,9 +29,7 @@ const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const DEFAULT_PLAYBACK_RATE = 1;
 const END_TIME_EPSILON = 0.0001;
 
-type ReplayPlaylistPlayerListener = (
-  state: ReplayPlaylistPlayerState
-) => void;
+type ReplayPlaylistPlayerListener = (state: ReplayPlaylistPlayerState) => void;
 
 type ReplayPathLoader = (path: string) => Promise<LoadedReplay>;
 
@@ -40,8 +38,7 @@ export interface FullReplayPlaylistItemOptions {
   meta?: Record<string, unknown>;
 }
 
-export interface ReplayPlaylistPlayerSingleReplayOptions
-  extends ReplayPlaylistPlayerOptions {
+export interface ReplayPlaylistPlayerSingleReplayOptions extends ReplayPlaylistPlayerOptions {
   replayId?: string;
   itemLabel?: string;
   itemMeta?: Record<string, unknown>;
@@ -60,7 +57,7 @@ type PlayerPreferences = {
 };
 
 function isPlaylistSource<TSource extends PlaylistLoadSource<unknown>>(
-  value: string | TSource
+  value: string | TSource,
 ): value is TSource {
   return typeof value !== "string";
 }
@@ -83,9 +80,7 @@ function describeError(error: unknown): string {
 }
 
 function finiteSetting(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeCustomCameraSettings(
@@ -115,10 +110,7 @@ function normalizeCustomCameraSettings(
   return normalized;
 }
 
-function resolvePlaybackBound(
-  replay: ReplayModel,
-  bound: PlaybackBound
-): ResolvedPlaybackBound {
+function resolvePlaybackBound(replay: ReplayModel, bound: PlaybackBound): ResolvedPlaybackBound {
   if (bound.kind === "frame") {
     const frameIndex = clampFrameIndex(replay, bound.value);
     return {
@@ -137,7 +129,7 @@ function resolvePlaybackBound(
 function validateResolvedBounds(
   item: PlaylistItem,
   start: ResolvedPlaybackBound,
-  end: ResolvedPlaybackBound
+  end: ResolvedPlaybackBound,
 ): void {
   if (end.time < start.time) {
     const label = item.label ? ` "${item.label}"` : "";
@@ -145,26 +137,20 @@ function validateResolvedBounds(
   }
 }
 
-function createInitialPreferences(
-  options: ReplayPlaylistPlayerOptions
-): PlayerPreferences {
+function createInitialPreferences(options: ReplayPlaylistPlayerOptions): PlayerPreferences {
   return {
     speed: Math.max(0.1, options.initialPlaybackRate ?? DEFAULT_PLAYBACK_RATE),
     cameraDistanceScale: Math.max(
       0.25,
-      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
+      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
     ),
-    customCameraSettings: normalizeCustomCameraSettings(
-      options.initialCustomCameraSettings,
-    ),
-    cameraViewMode: options.initialCameraViewMode ??
-      (options.initialAttachedPlayerId ? "follow" : "free"),
+    customCameraSettings: normalizeCustomCameraSettings(options.initialCustomCameraSettings),
+    cameraViewMode:
+      options.initialCameraViewMode ?? (options.initialAttachedPlayerId ? "follow" : "free"),
     attachedPlayerId: options.initialAttachedPlayerId ?? null,
     ballCamEnabled: options.initialBallCamEnabled ?? false,
-    boostPickupAnimationEnabled:
-      options.initialBoostPickupAnimationEnabled ?? true,
-    skipPostGoalTransitionsEnabled:
-      options.initialSkipPostGoalTransitionsEnabled ?? true,
+    boostPickupAnimationEnabled: options.initialBoostPickupAnimationEnabled ?? true,
+    skipPostGoalTransitionsEnabled: options.initialSkipPostGoalTransitionsEnabled ?? true,
     skipKickoffsEnabled: options.initialSkipKickoffsEnabled ?? false,
   };
 }
@@ -172,12 +158,10 @@ function createInitialPreferences(
 function normalizePreloadPolicy<
   TSource extends PlaylistLoadSource<unknown>,
   TItem extends PlaylistItem<TSource>,
->(
-  options: {
-    preloadPolicy?: PlaylistPreloadPolicy<TSource, TItem>;
-    preloadRadius?: number;
-  }
-): PlaylistPreloadPolicy<TSource, TItem> {
+>(options: {
+  preloadPolicy?: PlaylistPreloadPolicy<TSource, TItem>;
+  preloadRadius?: number;
+}): PlaylistPreloadPolicy<TSource, TItem> {
   if (options.preloadPolicy) {
     return options.preloadPolicy;
   }
@@ -197,12 +181,10 @@ function normalizePreloadPolicy<
   };
 }
 
-function normalizeAdvanceMode(
-  options: {
-    advanceMode?: PlaylistAdvanceMode;
-    advanceOnEnd?: boolean;
-  }
-): PlaylistAdvanceMode {
+function normalizeAdvanceMode(options: {
+  advanceMode?: PlaylistAdvanceMode;
+  advanceOnEnd?: boolean;
+}): PlaylistAdvanceMode {
   if (options.advanceMode) {
     return options.advanceMode;
   }
@@ -210,16 +192,12 @@ function normalizeAdvanceMode(
   return options.advanceOnEnd === false ? "manual" : "auto";
 }
 
-function normalizeEndMode(
-  options: {
-    endMode?: PlaylistEndMode;
-  }
-): PlaylistEndMode {
+function normalizeEndMode(options: { endMode?: PlaylistEndMode }): PlaylistEndMode {
   return options.endMode ?? "stop";
 }
 
 function uniqueSourcesFromItems<TSource extends PlaylistLoadSource<unknown>>(
-  items: PlaylistItem<TSource>[]
+  items: PlaylistItem<TSource>[],
 ): TSource[] {
   const uniqueSources: TSource[] = [];
   const seenSourceIds = new Set<string>();
@@ -240,7 +218,7 @@ function collectAdjacentSources<TSource extends PlaylistLoadSource<unknown>>(
   currentIndex: number,
   direction: -1 | 1,
   limit: number,
-  currentSourceId: string
+  currentSourceId: string,
 ): TSource[] {
   const sources: TSource[] = [];
   const seenSourceIds = new Set<string>([currentSourceId]);
@@ -267,7 +245,7 @@ function resolvePolicySources<
 >(
   items: TItem[],
   currentIndex: number,
-  preloadPolicy: PlaylistPreloadPolicy<TSource, TItem>
+  preloadPolicy: PlaylistPreloadPolicy<TSource, TItem>,
 ): TSource[] {
   const currentItem = items[currentIndex];
   if (!currentItem) {
@@ -279,9 +257,7 @@ function resolvePolicySources<
   }
 
   if (preloadPolicy.kind === "all") {
-    return uniqueSourcesFromItems(items).filter(
-      (source) => source.id !== currentItem.replay.id
-    );
+    return uniqueSourcesFromItems(items).filter((source) => source.id !== currentItem.replay.id);
   }
 
   if (preloadPolicy.kind === "adjacent") {
@@ -290,14 +266,14 @@ function resolvePolicySources<
       currentIndex,
       -1,
       preloadPolicy.behind ?? 0,
-      currentItem.replay.id
+      currentItem.replay.id,
     );
     const ahead = collectAdjacentSources(
       items,
       currentIndex,
       1,
       preloadPolicy.ahead,
-      currentItem.replay.id
+      currentItem.replay.id,
     );
     return [...behind, ...ahead];
   }
@@ -310,13 +286,11 @@ function resolvePolicySources<
   const sourceIds = new Set<string>([currentItem.replay.id]);
   const sources: TSource[] = [];
   const availableSources = new Map<string, TSource>(
-    uniqueSourcesFromItems(items).map((source) => [source.id, source])
+    uniqueSourcesFromItems(items).map((source) => [source.id, source]),
   );
 
   for (const selected of preloadPolicy.pick(preloadContext)) {
-    const source = isPlaylistSource(selected)
-      ? selected
-      : availableSources.get(selected);
+    const source = isPlaylistSource(selected) ? selected : availableSources.get(selected);
     if (!source || sourceIds.has(source.id)) {
       continue;
     }
@@ -335,32 +309,21 @@ export function timeBound(value: number): PlaybackBound {
   return { kind: "time", value };
 }
 
-export function createReplaySource(
-  id: string,
-  load: () => Promise<LoadedReplay>
-): ReplaySource {
+export function createReplaySource(id: string, load: () => Promise<LoadedReplay>): ReplaySource {
   return { id, load };
 }
 
-export function createStaticReplaySource(
-  id: string,
-  replay: LoadedReplay
-): ReplaySource {
+export function createStaticReplaySource(id: string, replay: LoadedReplay): ReplaySource {
   return createReplaySource(id, async () => replay);
 }
 
-export function createReplayBytesSource(
-  id: string,
-  data: Uint8Array
-): ReplaySource {
-  return createReplaySource(id, async () =>
-    loadReplayFromBytes(data, { useWorker: true })
-  );
+export function createReplayBytesSource(id: string, data: Uint8Array): ReplaySource {
+  return createReplaySource(id, async () => loadReplayFromBytes(data, { useWorker: true }));
 }
 
 export function createReplayFileSource(
   file: File,
-  id = file.webkitRelativePath || file.name
+  id = file.webkitRelativePath || file.name,
 ): ReplaySource {
   return createReplaySource(id, async () => {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -371,14 +334,14 @@ export function createReplayFileSource(
 export function createReplayPathSource(
   path: string,
   loadReplay: ReplayPathLoader,
-  id = path
+  id = path,
 ): ReplaySource {
   return createReplaySource(id, async () => loadReplay(path));
 }
 
 export function createFullReplayPlaylistItem(
   replay: ReplaySource,
-  options: FullReplayPlaylistItemOptions = {}
+  options: FullReplayPlaylistItemOptions = {},
 ): PlaylistItem {
   return {
     replay,
@@ -482,17 +445,12 @@ export class PlaylistSession<
   private loadGeneration = 0;
   private pendingLoad: Promise<void> = Promise.resolve();
   private playlistEnded = false;
-  private readonly listeners = new Set<
-    PlaylistSessionListener<TLoaded, TSource, TItem>
-  >();
+  private readonly listeners = new Set<PlaylistSessionListener<TLoaded, TSource, TItem>>();
   private readonly preloadPolicy: PlaylistPreloadPolicy<TSource, TItem>;
   private advanceMode: PlaylistAdvanceMode;
   private endMode: PlaylistEndMode;
 
-  constructor(
-    items: TItem[],
-    options: PlaylistSessionOptions<TLoaded, TSource, TItem> = {},
-  ) {
+  constructor(items: TItem[], options: PlaylistSessionOptions<TLoaded, TSource, TItem> = {}) {
     this.items = items;
     this.loadCache = options.loadCache ?? new PlaylistLoadCache<TLoaded, TSource>();
     this.preloadPolicy = normalizePreloadPolicy<TSource, TItem>(options);
@@ -500,11 +458,7 @@ export class PlaylistSession<
     this.endMode = normalizeEndMode(options);
 
     if (items.length > 0) {
-      this.currentItemIndex = clamp(
-        options.initialItemIndex ?? 0,
-        0,
-        items.length - 1,
-      );
+      this.currentItemIndex = clamp(options.initialItemIndex ?? 0, 0, items.length - 1);
       this.pendingLoad = this.loadItem(this.currentItemIndex);
     }
   }
@@ -590,9 +544,7 @@ export class PlaylistSession<
     };
   }
 
-  subscribe(
-    listener: PlaylistSessionListener<TLoaded, TSource, TItem>,
-  ): () => void {
+  subscribe(listener: PlaylistSessionListener<TLoaded, TSource, TItem>): () => void {
     this.listeners.add(listener);
     listener(this.getState());
     return () => {
@@ -635,9 +587,7 @@ export class PlaylistSession<
       this.currentLoaded = loaded;
       this.loading = false;
       this.error = null;
-      this.loadCache.preload(
-        resolvePolicySources(this.items, clampedIndex, this.preloadPolicy),
-      );
+      this.loadCache.preload(resolvePolicySources(this.items, clampedIndex, this.preloadPolicy));
       this.emitChange();
     } catch (error) {
       if (this.disposed || generation !== this.loadGeneration) {
@@ -663,7 +613,7 @@ export class PlaylistSession<
 
 export function resolvePlaylistItem(
   item: PlaylistItem,
-  replay: LoadedReplay
+  replay: LoadedReplay,
 ): ResolvedPlaylistItem {
   const start = resolvePlaybackBound(replay.replay, item.start);
   const end = resolvePlaybackBound(replay.replay, item.end);
@@ -695,8 +645,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   private loadGeneration = 0;
   private boundaryGuard = false;
   private pendingLoad: Promise<void> = Promise.resolve();
-  private readonly replayCache =
-    new PlaylistLoadCache<LoadedReplay, ReplaySource>();
+  private readonly replayCache = new PlaylistLoadCache<LoadedReplay, ReplaySource>();
   private readonly preferences: PlayerPreferences;
   private readonly preloadPolicy: ReplayPreloadPolicy;
   private advanceMode: PlaylistAdvanceMode;
@@ -705,7 +654,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   static fromReplay(
     container: HTMLElement,
     replay: LoadedReplay,
-    options: ReplayPlaylistPlayerSingleReplayOptions = {}
+    options: ReplayPlaylistPlayerSingleReplayOptions = {},
   ): ReplayPlaylistPlayer {
     return ReplayPlaylistPlayer.fromReplaySource(
       container,
@@ -717,7 +666,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   static fromReplaySource(
     container: HTMLElement,
     source: ReplaySource,
-    options: ReplayPlaylistPlayerSingleReplayOptions = {}
+    options: ReplayPlaylistPlayerSingleReplayOptions = {},
   ): ReplayPlaylistPlayer {
     return new ReplayPlaylistPlayer(
       container,
@@ -734,7 +683,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   constructor(
     container: HTMLElement,
     items: PlaylistItem[],
-    options: ReplayPlaylistPlayerOptions = {}
+    options: ReplayPlaylistPlayerOptions = {},
   ) {
     super();
     this.container = container;
@@ -747,11 +696,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.playbackIntent = options.autoplay ?? false;
 
     if (items.length > 0) {
-      const initialIndex = clamp(
-        options.initialItemIndex ?? 0,
-        0,
-        items.length - 1
-      );
+      const initialIndex = clamp(options.initialItemIndex ?? 0, 0, items.length - 1);
       this.pendingLoad = this.loadItem(initialIndex);
       return;
     }
@@ -824,7 +769,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
     const targetTime = clamp(
       this.currentResolvedItem.start.time + time,
       this.currentResolvedItem.start.time,
-      this.currentResolvedItem.end.time
+      this.currentResolvedItem.end.time,
     );
     this.player.seek(targetTime);
   }
@@ -872,8 +817,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 
   setCustomCameraSettings(settings: CameraSettings | null): void {
-    this.preferences.customCameraSettings =
-      normalizeCustomCameraSettings(settings);
+    this.preferences.customCameraSettings = normalizeCustomCameraSettings(settings);
     this.player?.setCustomCameraSettings(this.preferences.customCameraSettings);
     this.emitChange();
   }
@@ -942,8 +886,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
     const duration = this.currentResolvedItem?.duration ?? 0;
     const currentTime = clamp(replayCurrentTime - itemStartTime, 0, duration);
     const itemEnded =
-      this.currentResolvedItem !== null &&
-      currentTime >= duration - END_TIME_EPSILON;
+      this.currentResolvedItem !== null && currentTime >= duration - END_TIME_EPSILON;
 
     return {
       ready: this.currentResolvedItem !== null && !this.loading && this.error === null,
@@ -964,26 +907,18 @@ export class ReplayPlaylistPlayer extends EventTarget {
       activeMetadata: playerState?.activeMetadata ?? null,
       playing: playerState?.playing ?? false,
       speed: playerState?.speed ?? this.preferences.speed,
-      cameraDistanceScale:
-        playerState?.cameraDistanceScale ?? this.preferences.cameraDistanceScale,
+      cameraDistanceScale: playerState?.cameraDistanceScale ?? this.preferences.cameraDistanceScale,
       customCameraSettings:
-        playerState?.customCameraSettings ??
-        this.preferences.customCameraSettings,
-      cameraViewMode:
-        playerState?.cameraViewMode ?? this.preferences.cameraViewMode,
-      attachedPlayerId:
-        playerState?.attachedPlayerId ?? this.preferences.attachedPlayerId,
-      ballCamEnabled:
-        playerState?.ballCamEnabled ?? this.preferences.ballCamEnabled,
+        playerState?.customCameraSettings ?? this.preferences.customCameraSettings,
+      cameraViewMode: playerState?.cameraViewMode ?? this.preferences.cameraViewMode,
+      attachedPlayerId: playerState?.attachedPlayerId ?? this.preferences.attachedPlayerId,
+      ballCamEnabled: playerState?.ballCamEnabled ?? this.preferences.ballCamEnabled,
       boostPickupAnimationEnabled:
-        playerState?.boostPickupAnimationEnabled ??
-        this.preferences.boostPickupAnimationEnabled,
+        playerState?.boostPickupAnimationEnabled ?? this.preferences.boostPickupAnimationEnabled,
       skipPostGoalTransitionsEnabled:
         playerState?.skipPostGoalTransitionsEnabled ??
         this.preferences.skipPostGoalTransitionsEnabled,
-      skipKickoffsEnabled:
-        playerState?.skipKickoffsEnabled ??
-        this.preferences.skipKickoffsEnabled,
+      skipKickoffsEnabled: playerState?.skipKickoffsEnabled ?? this.preferences.skipKickoffsEnabled,
     };
   }
 
@@ -1074,9 +1009,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 
   private prefetchNearbyReplays(index: number): void {
-    this.replayCache.preload(
-      resolvePolicySources(this.items, index, this.preloadPolicy)
-    );
+    this.replayCache.preload(resolvePolicySources(this.items, index, this.preloadPolicy));
   }
 
   private attachPlayer(resolvedItem: ResolvedPlaylistItem): void {
@@ -1084,7 +1017,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
 
     const replay = resolvedItem.replay.replay;
     const attachedPlayerId = replay.players.some(
-      (player) => player.id === this.preferences.attachedPlayerId
+      (player) => player.id === this.preferences.attachedPlayerId,
     )
       ? this.preferences.attachedPlayerId
       : null;
@@ -1101,10 +1034,8 @@ export class ReplayPlaylistPlayer extends EventTarget {
       initialCameraViewMode: this.preferences.cameraViewMode,
       initialAttachedPlayerId: attachedPlayerId,
       initialBallCamEnabled: this.preferences.ballCamEnabled,
-      initialBoostPickupAnimationEnabled:
-        this.preferences.boostPickupAnimationEnabled,
-      initialSkipPostGoalTransitionsEnabled:
-        this.preferences.skipPostGoalTransitionsEnabled,
+      initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
+      initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
       initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
       plugins: this.options.plugins,
     });

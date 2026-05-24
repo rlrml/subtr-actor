@@ -15,7 +15,7 @@ function ensureWasmBindingsPlugin() {
       ensureWasmPackageFresh({
         force,
         log: (message: string) => console.log(message),
-      })
+      }),
     );
     return rebuild;
   };
@@ -37,9 +37,7 @@ function ensureWasmBindingsPlugin() {
           await queueRebuild(true);
           server.ws.send({ type: "full-reload" });
         } catch (error: unknown) {
-          server.config.logger.error(
-            error instanceof Error ? error.message : String(error)
-          );
+          server.config.logger.error(error instanceof Error ? error.message : String(error));
         }
       };
 
@@ -60,13 +58,13 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: useLocalAliases
         ? {
-          "@colonelpanic8/subtr-actor": path.resolve(
-            import.meta.dirname,
-            "../pkg/rl_replay_subtr_actor.js",
-          ),
-          "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
-          three: path.resolve(import.meta.dirname, "node_modules/three"),
-        }
+            "@colonelpanic8/subtr-actor": path.resolve(
+              import.meta.dirname,
+              "../pkg/rl_replay_subtr_actor.js",
+            ),
+            "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+            three: path.resolve(import.meta.dirname, "node_modules/three"),
+          }
         : undefined,
     },
     server: {
@@ -81,9 +79,7 @@ export default defineConfig(({ command, mode }) => {
       rollupOptions: {
         // Site builds need the wasm package bundled into workers, while the
         // published library keeps it external for downstream consumers.
-        external: siteBuild
-          ? []
-          : ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+        external: siteBuild ? [] : ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
       },
     },
     optimizeDeps: {
@@ -91,21 +87,21 @@ export default defineConfig(({ command, mode }) => {
     },
     build: siteBuild
       ? {
-        outDir: path.resolve(import.meta.dirname, "dist"),
-        emptyOutDir: true,
-      }
+          outDir: path.resolve(import.meta.dirname, "dist"),
+          emptyOutDir: true,
+        }
       : {
-        outDir: path.resolve(import.meta.dirname, "dist"),
-        emptyOutDir: true,
-        lib: {
-          entry: path.resolve(import.meta.dirname, "src/lib.ts"),
-          name: "SubtrActorStatEvaluationPlayer",
-          fileName: "index",
-          formats: ["es"],
+          outDir: path.resolve(import.meta.dirname, "dist"),
+          emptyOutDir: true,
+          lib: {
+            entry: path.resolve(import.meta.dirname, "src/lib.ts"),
+            name: "SubtrActorStatEvaluationPlayer",
+            fileName: "index",
+            formats: ["es"],
+          },
+          rollupOptions: {
+            external: ["@colonelpanic8/subtr-actor", "subtr-actor-player", "three"],
+          },
         },
-        rollupOptions: {
-          external: ["@colonelpanic8/subtr-actor", "subtr-actor-player", "three"],
-        },
-      },
   };
 });

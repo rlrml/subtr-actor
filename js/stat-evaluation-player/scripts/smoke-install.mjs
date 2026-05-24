@@ -17,14 +17,10 @@ function run(command, args, cwd) {
 }
 
 async function packTarball(cwd, packDir) {
-  const packOutput = execFileSync(
-    "npm",
-    ["pack", "--json", "--pack-destination", packDir],
-    {
-      cwd,
-      encoding: "utf8",
-    },
-  );
+  const packOutput = execFileSync("npm", ["pack", "--json", "--pack-destination", packDir], {
+    cwd,
+    encoding: "utf8",
+  });
   const [{ filename }] = JSON.parse(packOutput);
   return path.join(packDir, filename);
 }
@@ -36,9 +32,7 @@ async function main() {
   const playerPackage = JSON.parse(
     await readFile(path.resolve(jsDir, "player", "package.json"), "utf8"),
   );
-  const scratchDir = await mkdtemp(
-    path.join(os.tmpdir(), "subtr-actor-stats-player-smoke-"),
-  );
+  const scratchDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-stats-player-smoke-"));
   let playerPublishDir = null;
   let statsPublishDir = null;
 
@@ -131,16 +125,16 @@ async function main() {
     await writeFile(
       path.join(sourceDir, "main.ts"),
       [
-        'import {',
-        '  buildTimeInZoneTimelineRanges,',
-        '  createStatsFrameLookup,',
-        '  mountStatEvaluationPlayer,',
-        '  type StatEvaluationPlayerHandle,',
-        '  type StatsTimeline,',
+        "import {",
+        "  buildTimeInZoneTimelineRanges,",
+        "  createStatsFrameLookup,",
+        "  mountStatEvaluationPlayer,",
+        "  type StatEvaluationPlayerHandle,",
+        "  type StatsTimeline,",
         `} from "${sourcePackage.name}";`,
         "",
         'const root = document.getElementById("app");',
-        'if (!(root instanceof HTMLElement)) {',
+        "if (!(root instanceof HTMLElement)) {",
         '  throw new Error("Missing app root");',
         "}",
         "",

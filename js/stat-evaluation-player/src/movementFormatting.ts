@@ -17,19 +17,21 @@ const BREAKDOWN_CLASS_METADATA: Record<
 > = {
   speed_band: {
     valueOrder: ["slow", "boost", "supersonic"],
-    formatValue: (value) => ({
-      slow: "Slow",
-      boost: "Boost",
-      supersonic: "Supersonic",
-    }[value] ?? value),
+    formatValue: (value) =>
+      ({
+        slow: "Slow",
+        boost: "Boost",
+        supersonic: "Supersonic",
+      })[value] ?? value,
   },
   height_band: {
     valueOrder: ["ground", "low_air", "high_air"],
-    formatValue: (value) => ({
-      ground: "Ground",
-      low_air: "Low air",
-      high_air: "High air",
-    }[value] ?? value),
+    formatValue: (value) =>
+      ({
+        ground: "Ground",
+        low_air: "Low air",
+        high_air: "High air",
+      })[value] ?? value,
   },
 };
 
@@ -49,11 +51,7 @@ function normalizeBreakdownClasses(
   return result;
 }
 
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
+function formatNumber(value: number | undefined, digits = 1, suffix = ""): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -61,11 +59,7 @@ function formatNumber(
   return `${value.toFixed(digits)}${suffix}`;
 }
 
-function formatTimeShare(
-  value: number | undefined,
-  total: number | undefined,
-  digits = 1,
-): string {
+function formatTimeShare(value: number | undefined, total: number | undefined, digits = 1): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -74,7 +68,7 @@ function formatTimeShare(
     return `${value.toFixed(digits)}s`;
   }
 
-  return `${value.toFixed(digits)}s (${(value * 100 / total).toFixed(digits)}%)`;
+  return `${value.toFixed(digits)}s (${((value * 100) / total).toFixed(digits)}%)`;
 }
 
 function escapeHtml(value: string): string {
@@ -165,10 +159,12 @@ function renderMovementBreakdownRows(
 
   return [...groups.values()]
     .sort((left, right) => compareBreakdownValues(left.values, right.values, breakdownClasses))
-    .map((entry) => renderStatRow(
-      formatBreakdownLabel(entry.values, breakdownClasses),
-      formatTimeShare(entry.total, trackedTime),
-    ))
+    .map((entry) =>
+      renderStatRow(
+        formatBreakdownLabel(entry.values, breakdownClasses),
+        formatTimeShare(entry.total, trackedTime),
+      ),
+    )
     .join("");
 }
 
@@ -177,17 +173,14 @@ export function renderMovementStats(
   options: MovementRenderOptions = {},
 ): string {
   const trackedTime = movement?.tracked_time;
-  const averageSpeed = movement && trackedTime && trackedTime > 0
-    ? movement.speed_integral / trackedTime
-    : trackedTime === 0
-      ? 0
-      : undefined;
+  const averageSpeed =
+    movement && trackedTime && trackedTime > 0
+      ? movement.speed_integral / trackedTime
+      : trackedTime === 0
+        ? 0
+        : undefined;
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
-  const breakdownRows = renderMovementBreakdownRows(
-    movement,
-    breakdownClasses,
-    trackedTime,
-  );
+  const breakdownRows = renderMovementBreakdownRows(movement, breakdownClasses, trackedTime);
 
   return `
     ${renderStatRow("Tracked", formatNumber(trackedTime, 1, "s"))}

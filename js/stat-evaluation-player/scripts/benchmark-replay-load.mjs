@@ -372,9 +372,9 @@ async function runChromeBenchmark({ url, chrome, headless, timeoutMs }) {
       }, timeoutMs);
 
       cdp.on("Runtime.consoleAPICalled", (params) => {
-        const values = (params.args ?? []).map((arg) => arg.value).filter((value) =>
-          typeof value === "string"
-        );
+        const values = (params.args ?? [])
+          .map((arg) => arg.value)
+          .filter((value) => typeof value === "string");
         for (const value of values) {
           consoleMessages.push(value);
           if (value.startsWith(resultPrefix) && !settled) {
@@ -424,9 +424,9 @@ function summarize(results) {
   }
 
   const average = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  const stageNames = Array.from(new Set(
-    okResults.flatMap((result) => result.stageTimings.map((stage) => stage.stage)),
-  ));
+  const stageNames = Array.from(
+    new Set(okResults.flatMap((result) => result.stageTimings.map((stage) => stage.stage))),
+  );
 
   return {
     runs: okResults.length,
@@ -436,7 +436,7 @@ function summarize(results) {
       const durations = okResults.flatMap((result) =>
         result.stageTimings
           .filter((stage) => stage.stage === stageName)
-          .map((stage) => stage.durationMs)
+          .map((stage) => stage.durationMs),
       );
       return {
         stage: stageName,

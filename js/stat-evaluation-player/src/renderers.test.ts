@@ -9,10 +9,7 @@ import {
   renderWavedashStats,
   renderWhiffStats,
 } from "./stat-modules/renderers.ts";
-import {
-  createPlayerStatsSnapshot,
-  createPositioningStats,
-} from "./testStatsTimeline.ts";
+import { createPlayerStatsSnapshot, createPositioningStats } from "./testStatsTimeline.ts";
 
 test("relative positioning renderer shows times and derives percentages from accumulated times", () => {
   const positioning = createPositioningStats({

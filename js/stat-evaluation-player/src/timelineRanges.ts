@@ -1,12 +1,5 @@
-import type {
-  ReplayBoostPadSize,
-  ReplayModel,
-  ReplayTimelineRange,
-} from "subtr-actor-player";
-import type {
-  PlayerStatsSnapshot,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
+import type { PlayerStatsSnapshot, StatsTimeline } from "./statsTimeline.ts";
 import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
@@ -53,9 +46,7 @@ export interface BoostPickupTimelineRangeOptions {
   playerIds?: Iterable<string>;
 }
 
-function getPressureNeutralZoneHalfWidthY(
-  timeline: StatsTimeline,
-): number {
+function getPressureNeutralZoneHalfWidthY(timeline: StatsTimeline): number {
   const configured = timeline.config?.pressure_neutral_zone_half_width_y;
   if (typeof configured === "number" && Number.isFinite(configured)) {
     return Math.max(0, configured);
@@ -84,14 +75,15 @@ function teamTimelineColor(isTeamZero: boolean | null | undefined): string | nul
 }
 
 function mechanicShortLabel(kind: string): string {
-  return MECHANIC_SHORT_LABELS[kind] ?? (
-    kind
+  return (
+    MECHANIC_SHORT_LABELS[kind] ??
+    (kind
       .split(/[_-]+/)
       .filter((part) => part.length > 0)
       .map((part) => part.slice(0, 1).toUpperCase())
       .join("")
       .slice(0, 3) ||
-    "M"
+      "M")
   );
 }
 
@@ -104,10 +96,11 @@ export function buildMechanicTimelineRanges(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter((event) =>
-      isVisibleMechanicKind(event.kind) &&
-      event.timing.type === "span" &&
-      (!enabled || enabled.has(event.kind))
+    .filter(
+      (event) =>
+        isVisibleMechanicKind(event.kind) &&
+        event.timing.type === "span" &&
+        (!enabled || enabled.has(event.kind)),
     )
     .map((event): ReplayTimelineRange => {
       if (event.timing.type !== "span") {
@@ -157,9 +150,9 @@ function resolvePressureHalfControlState(
 ): PressureHalfControlState | null {
   const ballY = replay?.ballFrames[frameNumber]?.position?.y;
   if (
-    typeof ballY === "number"
-    && Number.isFinite(ballY)
-    && Math.abs(ballY) <= neutralZoneHalfWidthY + DELTA_EPSILON
+    typeof ballY === "number" &&
+    Number.isFinite(ballY) &&
+    Math.abs(ballY) <= neutralZoneHalfWidthY + DELTA_EPSILON
   ) {
     return "neutral";
   }
@@ -240,7 +233,10 @@ export function buildPossessionTimelineRanges(
     let nextRange: ReplayTimelineRange | null = null;
     const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
 
-    if (deltaTeamZero > deltaTeamOne + DELTA_EPSILON && deltaTeamZero > deltaNeutral + DELTA_EPSILON) {
+    if (
+      deltaTeamZero > deltaTeamOne + DELTA_EPSILON &&
+      deltaTeamZero > deltaNeutral + DELTA_EPSILON
+    ) {
       nextRange = {
         id: `possession:team_zero:${startTime.toFixed(3)}`,
         startTime,
@@ -251,7 +247,10 @@ export function buildPossessionTimelineRanges(
         color: "rgba(59, 130, 246, 0.88)",
         isTeamZero: true,
       };
-    } else if (deltaTeamOne > deltaTeamZero + DELTA_EPSILON && deltaTeamOne > deltaNeutral + DELTA_EPSILON) {
+    } else if (
+      deltaTeamOne > deltaTeamZero + DELTA_EPSILON &&
+      deltaTeamOne > deltaNeutral + DELTA_EPSILON
+    ) {
       nextRange = {
         id: `possession:team_one:${startTime.toFixed(3)}`,
         startTime,
@@ -359,22 +358,14 @@ function buildReplayBoostPickupTimelineRanges(
   options: BoostPickupTimelineRangeOptions = {},
 ): ReplayTimelineRange[] {
   const enabledPadTypes = padTypesFromOptions(options);
-  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? [
-    "both",
-  ]);
-  const enabledActivities = new Set<BoostPickupActivity>(options.activities ?? [
-    "active",
-    "inactive",
-    "unknown",
-  ]);
-  const enabledFieldHalves = new Set<BoostPickupFieldHalf>(options.fieldHalves ?? [
-    "own",
-    "opponent",
-    "unknown",
-  ]);
-  const enabledPlayerIds = options.playerIds
-    ? new Set(options.playerIds)
-    : null;
+  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? ["both"]);
+  const enabledActivities = new Set<BoostPickupActivity>(
+    options.activities ?? ["active", "inactive", "unknown"],
+  );
+  const enabledFieldHalves = new Set<BoostPickupFieldHalf>(
+    options.fieldHalves ?? ["own", "opponent", "unknown"],
+  );
+  const enabledPlayerIds = options.playerIds ? new Set(options.playerIds) : null;
   if (
     enabledPadTypes.size === 0 ||
     !enabledComparisons.has("both") ||
@@ -385,9 +376,7 @@ function buildReplayBoostPickupTimelineRanges(
     return [];
   }
 
-  const playerTeams = new Map(
-    replay.players.map((player) => [player.id, player.isTeamZero]),
-  );
+  const playerTeams = new Map(replay.players.map((player) => [player.id, player.isTeamZero]));
   const ranges: ReplayTimelineRange[] = [];
 
   for (const pad of replay.boostPads) {
@@ -410,7 +399,7 @@ function buildReplayBoostPickupTimelineRanges(
       const startTime = Math.max(0, getReplayFrameTime(replay, event.frame, event.time));
       const sizeLabel = pad.size === "big" ? "Big" : "Small";
       const playerLabel = event.playerName ? `${event.playerName} ` : "";
-      const isTeamZero = event.playerId ? playerTeams.get(event.playerId) ?? null : null;
+      const isTeamZero = event.playerId ? (playerTeams.get(event.playerId) ?? null) : null;
       ranges.push({
         id: `boost-pickup:${pad.index}:${event.frame}:${eventIndex}`,
         startTime,
@@ -433,9 +422,7 @@ function buildReplayBoostPickupTimelineRanges(
   });
 }
 
-function padTypesFromOptions(
-  options: BoostPickupTimelineRangeOptions,
-): Set<BoostPickupPadType> {
+function padTypesFromOptions(options: BoostPickupTimelineRangeOptions): Set<BoostPickupPadType> {
   if (options.padTypes) {
     return new Set(options.padTypes);
   }
@@ -508,22 +495,14 @@ export function buildBoostPickupTimelineRanges(
   }
 
   const enabledPadTypes = padTypesFromOptions(options);
-  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? [
-    "both",
-  ]);
-  const enabledActivities = new Set<BoostPickupActivity>(options.activities ?? [
-    "active",
-    "inactive",
-    "unknown",
-  ]);
-  const enabledFieldHalves = new Set<BoostPickupFieldHalf>(options.fieldHalves ?? [
-    "own",
-    "opponent",
-    "unknown",
-  ]);
-  const enabledPlayerIds = options.playerIds
-    ? new Set(options.playerIds)
-    : null;
+  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? ["both"]);
+  const enabledActivities = new Set<BoostPickupActivity>(
+    options.activities ?? ["active", "inactive", "unknown"],
+  );
+  const enabledFieldHalves = new Set<BoostPickupFieldHalf>(
+    options.fieldHalves ?? ["own", "opponent", "unknown"],
+  );
+  const enabledPlayerIds = options.playerIds ? new Set(options.playerIds) : null;
   if (
     enabledPadTypes.size === 0 ||
     enabledComparisons.size === 0 ||
@@ -534,17 +513,17 @@ export function buildBoostPickupTimelineRanges(
     return [];
   }
 
-  const playerNames = new Map(
-    (replay?.players ?? []).map((player) => [player.id, player.name]),
-  );
+  const playerNames = new Map((replay?.players ?? []).map((player) => [player.id, player.name]));
   return events
     .filter((event) => {
       const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
-      return enabledPadTypes.has(event.pad_type) &&
+      return (
+        enabledPadTypes.has(event.pad_type) &&
         enabledComparisons.has(event.comparison) &&
         enabledActivities.has(event.activity) &&
         enabledFieldHalves.has(event.field_half) &&
-        (!enabledPlayerIds || enabledPlayerIds.has(playerId));
+        (!enabledPlayerIds || enabledPlayerIds.has(playerId))
+      );
     })
     .map((event, index): ReplayTimelineRange => {
       const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
@@ -560,15 +539,14 @@ export function buildBoostPickupTimelineRanges(
         laneLabel: "Boost Pickups",
         label: `${playerName} ${comparisonLabel} ${padLabel} boost pickup`,
         shortLabel: boostPickupShortLabel(event.comparison, event.pad_type),
-        color: teamTimelineColor(event.is_team_0) ??
+        color:
+          teamTimelineColor(event.is_team_0) ??
           (event.comparison === "both"
-            ? (
-              event.pad_type === "big"
-                ? BOOST_PICKUP_COLORS.big
-                : event.pad_type === "small"
-                  ? BOOST_PICKUP_COLORS.small
-                  : BOOST_PICKUP_COMPARISON_COLORS.both
-            )
+            ? event.pad_type === "big"
+              ? BOOST_PICKUP_COLORS.big
+              : event.pad_type === "small"
+                ? BOOST_PICKUP_COLORS.small
+                : BOOST_PICKUP_COMPARISON_COLORS.both
             : BOOST_PICKUP_COMPARISON_COLORS[event.comparison]),
         isTeamZero: event.is_team_0,
       };
@@ -616,9 +594,7 @@ function getPlayerZoneColor(spec: PlayerZoneSpec, isTeamZero: boolean): string {
 
   const isOwnTeamColor = spec.relativeColor === "own";
   const shouldUseBlue = isOwnTeamColor ? isTeamZero : !isTeamZero;
-  return shouldUseBlue
-    ? "rgba(89, 195, 255, 0.74)"
-    : "rgba(255, 193, 92, 0.78)";
+  return shouldUseBlue ? "rgba(89, 195, 255, 0.74)" : "rgba(255, 193, 92, 0.78)";
 }
 
 function playerIdToString(playerId: Record<string, unknown>): string {
@@ -627,10 +603,7 @@ function playerIdToString(playerId: Record<string, unknown>): string {
   return `${kind}:${normalizedValue}`;
 }
 
-function extractPlayerStatValue(
-  player: PlayerStatsSnapshot,
-  spec: PlayerZoneSpec,
-): number {
+function extractPlayerStatValue(player: PlayerStatsSnapshot, spec: PlayerZoneSpec): number {
   const positioning = player.positioning as Record<string, unknown> | undefined;
   if (!positioning) {
     return 0;
@@ -724,10 +697,7 @@ function resolveRangeBounds(
   };
 }
 
-function mergeRange(
-  ranges: ReplayTimelineRange[],
-  nextRange: ReplayTimelineRange | null,
-): void {
+function mergeRange(ranges: ReplayTimelineRange[], nextRange: ReplayTimelineRange | null): void {
   if (!nextRange) {
     return;
   }

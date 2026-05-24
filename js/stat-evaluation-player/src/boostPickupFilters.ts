@@ -1,7 +1,4 @@
-import type {
-  BoostPickupAnimationPickup,
-  ReplayModel,
-} from "subtr-actor-player";
+import type { BoostPickupAnimationPickup, ReplayModel } from "subtr-actor-player";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -57,9 +54,9 @@ const BOOST_PICKUP_PAD_TYPE_OPTIONS = [
   { value: "ambiguous", label: "Ambiguous pads" },
 ] satisfies Array<BoostPickupFilterOption<BoostPickupPadType>>;
 
-const BOOST_PICKUP_COMPARISON_OPTIONS = [
-  { value: "both", label: "Pickup events" },
-] satisfies Array<BoostPickupFilterOption<BoostPickupComparison>>;
+const BOOST_PICKUP_COMPARISON_OPTIONS = [{ value: "both", label: "Pickup events" }] satisfies Array<
+  BoostPickupFilterOption<BoostPickupComparison>
+>;
 
 const BOOST_PICKUP_ACTIVITY_OPTIONS = [
   { value: "active", label: "Active play" },
@@ -89,16 +86,18 @@ export function getBoostPickupAnimationTimelineMatch(
     return null;
   }
 
-  return comparisonEvents.find((event) => {
-    const playerId = playerIdToString(event.player_id);
-    const reportedFrame = event.reported_frame ?? event.frame;
-    return (
-      playerId === pickup.player.id &&
-      event.comparison === "both" &&
-      reportedFrame === pickup.event.frame &&
-      isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
-    );
-  }) ?? null;
+  return (
+    comparisonEvents.find((event) => {
+      const playerId = playerIdToString(event.player_id);
+      const reportedFrame = event.reported_frame ?? event.frame;
+      return (
+        playerId === pickup.player.id &&
+        event.comparison === "both" &&
+        reportedFrame === pickup.event.frame &&
+        isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
+      );
+    }) ?? null
+  );
 }
 
 export function hasBoostPickupAnimationTimelineMatch(
@@ -258,9 +257,7 @@ export function createBoostPickupFilterController(
       "input[data-boost-pickup-player-id]",
     )) {
       const playerId = checkbox.dataset.boostPickupPlayerId;
-      checkbox.checked = playerId
-        ? activePlayerIds?.has(playerId) ?? true
-        : false;
+      checkbox.checked = playerId ? (activePlayerIds?.has(playerId) ?? true) : false;
     }
 
     if (pickupReadoutEl) {
@@ -268,10 +265,7 @@ export function createBoostPickupFilterController(
     }
   }
 
-  function isFilterValueActive(
-    filterKey: string | undefined,
-    value: string | undefined,
-  ): boolean {
+  function isFilterValueActive(filterKey: string | undefined, value: string | undefined): boolean {
     if (!value) {
       return false;
     }
@@ -293,7 +287,8 @@ export function createBoostPickupFilterController(
   function getPickupReadout(replay: ReplayModel | null): string {
     const playerCount = replay?.players.length ?? 0;
     const visiblePlayerCount = activePlayerIds ? activePlayerIds.size : playerCount;
-    const hidden = activePadTypes.size === 0 ||
+    const hidden =
+      activePadTypes.size === 0 ||
       activeComparisons.size === 0 ||
       activeActivities.size === 0 ||
       activeFieldHalves.size === 0 ||
@@ -319,24 +314,25 @@ export function createBoostPickupFilterController(
     }
 
     if ((lastStatsTimeline?.events.boost_pickups ?? []).length === 0) {
-      return activePadTypes.has(pickup.pad.size) &&
+      return (
+        activePadTypes.has(pickup.pad.size) &&
         activeComparisons.has("both") &&
         activeActivities.has("unknown") &&
-        activeFieldHalves.has("unknown");
+        activeFieldHalves.has("unknown")
+      );
     }
 
-    const matchedEvent = getBoostPickupAnimationTimelineMatch(
-      pickup,
-      lastStatsTimeline,
-    );
+    const matchedEvent = getBoostPickupAnimationTimelineMatch(pickup, lastStatsTimeline);
     if (!matchedEvent) {
       return false;
     }
 
-    return activePadTypes.has(matchedEvent.pad_type) &&
+    return (
+      activePadTypes.has(matchedEvent.pad_type) &&
       activeComparisons.has(matchedEvent.comparison) &&
       activeActivities.has(matchedEvent.activity) &&
-      activeFieldHalves.has(matchedEvent.field_half);
+      activeFieldHalves.has(matchedEvent.field_half)
+    );
   }
 
   function setActiveValues<T extends string>(
@@ -376,22 +372,13 @@ export function createBoostPickupFilterController(
     }
     const record = config as Record<string, unknown>;
     setActiveValues(activePadTypes, BOOST_PICKUP_PAD_TYPE_OPTIONS, record.padTypes);
-    setActiveValues(
-      activeComparisons,
-      BOOST_PICKUP_COMPARISON_OPTIONS,
-      record.comparisons,
-    );
+    setActiveValues(activeComparisons, BOOST_PICKUP_COMPARISON_OPTIONS, record.comparisons);
     setActiveValues(activeActivities, BOOST_PICKUP_ACTIVITY_OPTIONS, record.activities);
-    setActiveValues(
-      activeFieldHalves,
-      BOOST_PICKUP_FIELD_HALF_OPTIONS,
-      record.fieldHalves,
-    );
+    setActiveValues(activeFieldHalves, BOOST_PICKUP_FIELD_HALF_OPTIONS, record.fieldHalves);
     activePlayerIds = Array.isArray(record.playerIds)
       ? new Set(record.playerIds.filter((id): id is string => typeof id === "string"))
       : null;
-    preserveConfiguredPlayerIdsForNextReplay = lastReplay === null &&
-      activePlayerIds !== null;
+    preserveConfiguredPlayerIdsForNextReplay = lastReplay === null && activePlayerIds !== null;
     syncSettingsUi(lastReplay);
     runtime.refreshTimelineRanges?.();
     runtime.rerenderCurrentState?.();
@@ -448,12 +435,7 @@ export function createBoostPickupFilterController(
         const grid = document.createElement("div");
         grid.className = "boost-pickup-filter-grid";
         grid.append(
-          createFilterGroup(
-            "Pad type",
-            BOOST_PICKUP_PAD_TYPE_OPTIONS,
-            activePadTypes,
-            "pad-type",
-          ),
+          createFilterGroup("Pad type", BOOST_PICKUP_PAD_TYPE_OPTIONS, activePadTypes, "pad-type"),
           createFilterGroup(
             "Activity",
             BOOST_PICKUP_ACTIVITY_OPTIONS,

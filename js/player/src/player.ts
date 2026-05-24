@@ -1,10 +1,5 @@
 import * as THREE from "three";
-import {
-  createReplayScene,
-  updateBoostMeter,
-  type DemoIndicator,
-  type ReplayScene,
-} from "./scene";
+import { createReplayScene, updateBoostMeter, type DemoIndicator, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
@@ -69,9 +64,7 @@ type FreeCameraTransition = {
 };
 
 function finiteSetting(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeCustomCameraSettings(
@@ -143,11 +136,7 @@ export class ReplayPlayer extends EventTarget {
   private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
-  constructor(
-    container: HTMLElement,
-    replay: ReplayModel,
-    options: ReplayPlayerOptions = {}
-  ) {
+  constructor(container: HTMLElement, replay: ReplayModel, options: ReplayPlayerOptions = {}) {
     super();
     this.container = container;
     this.replay = replay;
@@ -159,20 +148,17 @@ export class ReplayPlayer extends EventTarget {
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
     this.cameraDistanceScale = Math.max(
       0.25,
-      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE
+      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
     );
-    this.customCameraSettings = normalizeCustomCameraSettings(
-      options.initialCustomCameraSettings
-    );
+    this.customCameraSettings = normalizeCustomCameraSettings(options.initialCustomCameraSettings);
     this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
-    this.cameraViewMode = options.initialCameraViewMode ??
+    this.cameraViewMode =
+      options.initialCameraViewMode ??
       (this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE);
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
     this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
-    this.boostPickupAnimationEnabled =
-      options.initialBoostPickupAnimationEnabled ?? true;
-    this.skipPostGoalTransitionsEnabled =
-      options.initialSkipPostGoalTransitionsEnabled ?? true;
+    this.boostPickupAnimationEnabled = options.initialBoostPickupAnimationEnabled ?? true;
+    this.skipPostGoalTransitionsEnabled = options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
@@ -257,10 +243,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   setFreeCameraPreset(preset: ReplayFreeCameraPreset): void {
-    const { fov, position, target, up } = getFreeCameraPreset(
-      preset,
-      this.fieldScale,
-    );
+    const { fov, position, target, up } = getFreeCameraPreset(preset, this.fieldScale);
     this.cameraViewMode = DEFAULT_CAMERA_VIEW_MODE;
     this.freeCameraTransition = {
       position,
@@ -368,9 +351,7 @@ export class ReplayPlayer extends EventTarget {
       this.cameraDistanceScale = Math.max(0.25, nextState.cameraDistanceScale);
     }
     if (nextState.customCameraSettings !== undefined) {
-      this.customCameraSettings = normalizeCustomCameraSettings(
-        nextState.customCameraSettings,
-      );
+      this.customCameraSettings = normalizeCustomCameraSettings(nextState.customCameraSettings);
     }
     if (nextState.cameraViewMode !== undefined) {
       this.cameraViewMode = nextState.cameraViewMode;
@@ -378,9 +359,7 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.attachedPlayerId !== undefined) {
       this.attachedPlayerId = nextState.attachedPlayerId;
       if (nextState.cameraViewMode === undefined) {
-        this.cameraViewMode = this.attachedPlayerId
-          ? "follow"
-          : DEFAULT_CAMERA_VIEW_MODE;
+        this.cameraViewMode = this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE;
       }
     }
     if (nextState.ballCamEnabled !== undefined) {
@@ -395,22 +374,16 @@ export class ReplayPlayer extends EventTarget {
       }
     }
     if (nextState.boostPickupAnimationEnabled !== undefined) {
-      this.boostPickupAnimationEnabled =
-        nextState.boostPickupAnimationEnabled;
+      this.boostPickupAnimationEnabled = nextState.boostPickupAnimationEnabled;
     }
     if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
-      this.skipPostGoalTransitionsEnabled =
-        nextState.skipPostGoalTransitionsEnabled;
+      this.skipPostGoalTransitionsEnabled = nextState.skipPostGoalTransitionsEnabled;
     }
     if (nextState.skipKickoffsEnabled !== undefined) {
       this.skipKickoffsEnabled = nextState.skipKickoffsEnabled;
     }
     if (nextState.currentTime !== undefined) {
-      this.currentTime = THREE.MathUtils.clamp(
-        nextState.currentTime,
-        0,
-        this.getPlaybackEndTime()
-      );
+      this.currentTime = THREE.MathUtils.clamp(nextState.currentTime, 0, this.getPlaybackEndTime());
     }
     if (nextState.playing !== undefined && nextState.playing !== this.playing) {
       if (nextState.playing) {
@@ -468,8 +441,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   getTimelineSegments(): ReplayPlayerTimelineSegment[] {
-    const cacheKey =
-      `${this.skipPostGoalTransitionsEnabled}:${this.skipKickoffsEnabled}`;
+    const cacheKey = `${this.skipPostGoalTransitionsEnabled}:${this.skipKickoffsEnabled}`;
     if (this.timelineSegmentsCacheKey === cacheKey) {
       return this.timelineSegmentsCache;
     }
@@ -481,15 +453,13 @@ export class ReplayPlayer extends EventTarget {
       this.replay.duration -
         this.timelineSegmentsCache.reduce(
           (total, segment) => total + (segment.endTime - segment.startTime),
-          0
-        )
+          0,
+        ),
     );
     return this.timelineSegmentsCache;
   }
 
-  projectReplayTimeToTimeline(
-    replayTime: number
-  ): ReplayPlayerTimelineProjection {
+  projectReplayTimeToTimeline(replayTime: number): ReplayPlayerTimelineProjection {
     return projectReplayTimeToTimeline(
       this.replay.duration,
       this.getTimelineSegments(),
@@ -507,10 +477,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   private getPlaybackEndTime(): number {
-    return getReplayPlaybackEndTime(
-      this.replay.duration,
-      this.getTimelineSegments(),
-    );
+    return getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments());
   }
 
   subscribe(listener: ReplayPlayerListener): () => void {
@@ -614,7 +581,7 @@ export class ReplayPlayer extends EventTarget {
     const nextTime = THREE.MathUtils.clamp(
       this.playbackStartedTime + elapsedSeconds * this.speed,
       0,
-      this.getPlaybackEndTime()
+      this.getPlaybackEndTime(),
     );
     const timeChanged = nextTime !== this.currentTime;
     this.currentTime = nextTime;
@@ -649,12 +616,11 @@ export class ReplayPlayer extends EventTarget {
     const frameWindow = getFrameWindow(this.replay, this.currentTime);
     const frameIndex = frameWindow.frameIndex;
     const ballFrame = this.replay.ballFrames[frameIndex] ?? null;
-    const nextBallFrame =
-      this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
+    const nextBallFrame = this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
     const interpolatedBallPosition = interpolatePosition(
       ballFrame?.position ?? null,
       nextBallFrame?.position ?? null,
-      frameWindow.alpha
+      frameWindow.alpha,
     );
     const ballPosition = interpolatedBallPosition
       ? worldPosition(interpolatedBallPosition, this.fieldScale)
@@ -663,15 +629,13 @@ export class ReplayPlayer extends EventTarget {
 
     if (interpolatedBallPosition) {
       this.sceneState.ballMesh.visible = true;
-      this.sceneState.ballMesh.position.copy(
-        rootPosition(interpolatedBallPosition)
-      );
+      this.sceneState.ballMesh.position.copy(rootPosition(interpolatedBallPosition));
       if (ballFrame?.rotation) {
         this.sceneState.ballMesh.quaternion.set(
           ballFrame.rotation.x,
           ballFrame.rotation.y,
           ballFrame.rotation.z,
-          ballFrame.rotation.w
+          ballFrame.rotation.w,
         );
       } else {
         this.sceneState.ballMesh.quaternion.identity();
@@ -709,7 +673,7 @@ export class ReplayPlayer extends EventTarget {
       interpolatedPosition = interpolatePosition(
         frame?.position ?? null,
         nextFrame?.position ?? null,
-        frameWindow.alpha
+        frameWindow.alpha,
       );
       if (!interpolatedPosition) {
         mesh.visible = false;
@@ -743,11 +707,7 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(
-          player.id,
-          demoIndicator ?? null,
-          interpolatedPosition,
-        );
+        this.updateDemoIndicator(player.id, demoIndicator ?? null, interpolatedPosition);
         renderPlayers.push({
           track: player,
           mesh,
@@ -767,12 +727,7 @@ export class ReplayPlayer extends EventTarget {
       renderPosition = interpolatedPosition;
       mesh.position.copy(rootPosition(interpolatedPosition));
       if (frame?.rotation) {
-        mesh.quaternion.set(
-          frame.rotation.x,
-          frame.rotation.y,
-          frame.rotation.z,
-          frame.rotation.w
-        );
+        mesh.quaternion.set(frame.rotation.x, frame.rotation.y, frame.rotation.z, frame.rotation.w);
       } else {
         mesh.quaternion.identity();
       }
@@ -782,14 +737,12 @@ export class ReplayPlayer extends EventTarget {
       boostFraction = THREE.MathUtils.lerp(
         currentBoostFraction,
         nextBoostFraction,
-        frameWindow.alpha
+        frameWindow.alpha,
       );
 
       if (boostTrail) {
         const boostActive =
-          (frameWindow.alpha >= 0.5
-            ? nextFrame?.boostActive
-            : frame?.boostActive) ??
+          (frameWindow.alpha >= 0.5 ? nextFrame?.boostActive : frame?.boostActive) ??
           frame?.boostActive ??
           nextFrame?.boostActive ??
           false;
@@ -798,7 +751,7 @@ export class ReplayPlayer extends EventTarget {
           boostActive,
           boostFraction,
           this.currentTime,
-          playerIndex
+          playerIndex,
         );
       }
 
@@ -811,9 +764,9 @@ export class ReplayPlayer extends EventTarget {
             THREE.MathUtils.lerp(
               frame?.boostAmount ?? 0,
               nextFrame?.boostAmount ?? frame?.boostAmount ?? 0,
-              frameWindow.alpha
+              frameWindow.alpha,
             ),
-            this.sceneState.camera
+            this.sceneState.camera,
           );
         } else {
           boostMeter.group.visible = false;
@@ -870,15 +823,12 @@ export class ReplayPlayer extends EventTarget {
       ballFrame,
       nextBallFrame,
       ballPosition,
-      renderPlayers
+      renderPlayers,
     );
     for (const entry of this.plugins) {
       entry.plugin.beforeRender?.(renderContext);
     }
-    this.sceneState.renderer.render(
-      this.sceneState.scene,
-      this.sceneState.camera
-    );
+    this.sceneState.renderer.render(this.sceneState.scene, this.sceneState.camera);
   }
 
   private skipPastKickoffIfNeeded(now?: number): boolean {
@@ -893,8 +843,8 @@ export class ReplayPlayer extends EventTarget {
     }
 
     const nextLiveFrame = this.replay.frames.find(
-      (candidate, index) => index > frameIndex
-        && isLiveGameplayFrame(candidate, this.liveGameState)
+      (candidate, index) =>
+        index > frameIndex && isLiveGameplayFrame(candidate, this.liveGameState),
     );
     if (!nextLiveFrame || nextLiveFrame.time === this.currentTime) {
       return false;
@@ -914,25 +864,29 @@ export class ReplayPlayer extends EventTarget {
 
     const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
     const frame = this.replay.frames[frameIndex];
-    if (!frame || !isPostGoalTransitionFrame(
-      this.replay,
-      frame,
-      frameIndex,
-      this.liveGameState,
-      this.kickoffGameState,
-    )) {
+    if (
+      !frame ||
+      !isPostGoalTransitionFrame(
+        this.replay,
+        frame,
+        frameIndex,
+        this.liveGameState,
+        this.kickoffGameState,
+      )
+    ) {
       return false;
     }
 
     const nextFrame = this.replay.frames.find(
       (candidate, index) =>
-        index > frameIndex && !isPostGoalTransitionFrame(
+        index > frameIndex &&
+        !isPostGoalTransitionFrame(
           this.replay,
           candidate,
           index,
           this.liveGameState,
           this.kickoffGameState,
-        )
+        ),
     );
     if (!nextFrame) {
       let startIndex = frameIndex;
@@ -974,13 +928,9 @@ export class ReplayPlayer extends EventTarget {
 
   private getActiveMetadata(
     frameIndex: number,
-    currentTime: number
+    currentTime: number,
   ): ReplayPlayerActiveMetadata | null {
-    return getKickoffCountdownMetadata(
-      this.replay,
-      frameIndex,
-      currentTime,
-    );
+    return getKickoffCountdownMetadata(this.replay, frameIndex, currentTime);
   }
 
   private computeTimelineSegments(): ReplayPlayerTimelineSegment[] {
@@ -995,10 +945,9 @@ export class ReplayPlayer extends EventTarget {
 
   private installPlugin(
     definition: ReplayPlayerPluginDefinition,
-    renderAfterSetup: boolean
+    renderAfterSetup: boolean,
   ): () => void {
-    const plugin =
-      typeof definition === "function" ? definition() : definition;
+    const plugin = typeof definition === "function" ? definition() : definition;
 
     if (this.plugins.some((entry) => entry.plugin.id === plugin.id)) {
       throw new Error(`Replay player plugin "${plugin.id}" is already installed`);
@@ -1034,9 +983,7 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
-  private createPluginStateContext(
-    state: ReplayPlayerState
-  ): ReplayPlayerPluginStateContext {
+  private createPluginStateContext(state: ReplayPlayerState): ReplayPlayerPluginStateContext {
     return {
       ...this.createPluginContext(),
       state,
@@ -1048,7 +995,7 @@ export class ReplayPlayer extends EventTarget {
     ballFrame: ReplayModel["ballFrames"][number] | null,
     nextBallFrame: ReplayModel["ballFrames"][number] | null,
     ballPosition: Vec3 | null,
-    players: ReplayPlayerRenderTrackContext[]
+    players: ReplayPlayerRenderTrackContext[],
   ): ReplayPlayerRenderContext {
     return {
       ...this.createPluginStateContext(this.getState()),
@@ -1117,11 +1064,7 @@ export class ReplayPlayer extends EventTarget {
     indicator.label.quaternion.copy(this.sceneState.camera.quaternion);
     indicator.label.scale.setScalar(1 + 0.04 * Math.sin(phase + 1.3));
 
-    const opacity = THREE.MathUtils.clamp(
-      1 - age / DEMO_INDICATOR_DURATION_SECONDS,
-      0.28,
-      1,
-    );
+    const opacity = THREE.MathUtils.clamp(1 - age / DEMO_INDICATOR_DURATION_SECONDS, 0.28, 1);
     for (const node of [indicator.ring, indicator.label]) {
       const material = node.material;
       if (material instanceof THREE.Material) {
@@ -1135,7 +1078,7 @@ export class ReplayPlayer extends EventTarget {
     boostActive: boolean,
     boostFraction: number,
     time: number,
-    playerIndex: number
+    playerIndex: number,
   ): void {
     if (!boostActive) {
       boostTrail.visible = false;

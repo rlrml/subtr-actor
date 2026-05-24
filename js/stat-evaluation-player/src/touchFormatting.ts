@@ -24,21 +24,23 @@ const BREAKDOWN_CLASS_METADATA: Record<
   kind: {
     label: "Kind",
     valueOrder: ["dribble", "control", "medium_hit", "hard_hit"],
-    formatValue: (value) => ({
-      dribble: "Dribble",
-      control: "Control",
-      medium_hit: "Medium",
-      hard_hit: "Hard",
-    }[value] ?? value),
+    formatValue: (value) =>
+      ({
+        dribble: "Dribble",
+        control: "Control",
+        medium_hit: "Medium",
+        hard_hit: "Hard",
+      })[value] ?? value,
   },
   height_band: {
     label: "Height",
     valueOrder: ["ground", "low_air", "high_air"],
-    formatValue: (value) => ({
-      ground: "Ground",
-      low_air: "Low air",
-      high_air: "High air",
-    }[value] ?? value),
+    formatValue: (value) =>
+      ({
+        ground: "Ground",
+        low_air: "Low air",
+        high_air: "High air",
+      })[value] ?? value,
   },
 };
 
@@ -166,10 +168,12 @@ function renderTouchBreakdownRows(
 
   return [...groups.values()]
     .sort((left, right) => compareBreakdownValues(left.values, right.values, breakdownClasses))
-    .map((entry) => renderStatRow(
-      formatBreakdownLabel(entry.values, breakdownClasses),
-      formatInteger(entry.count),
-    ))
+    .map((entry) =>
+      renderStatRow(
+        formatBreakdownLabel(entry.values, breakdownClasses),
+        formatInteger(entry.count),
+      ),
+    )
     .join("");
 }
 
@@ -211,8 +215,9 @@ export function renderTouchStats(
 ): string {
   const breakdownClasses = normalizeBreakdownClasses(options.breakdownClasses);
   const snapshotEntries = labeledEntriesFromTouchSnapshot(touch);
-  const breakdownRows = renderTouchBreakdownRows(snapshotEntries, breakdownClasses)
-    || renderTouchBreakdownFallbackRows(touch, breakdownClasses);
+  const breakdownRows =
+    renderTouchBreakdownRows(snapshotEntries, breakdownClasses) ||
+    renderTouchBreakdownFallbackRows(touch, breakdownClasses);
 
   return `
     ${renderStatRow("Touches", formatInteger(touch?.touch_count))}

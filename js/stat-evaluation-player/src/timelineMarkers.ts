@@ -1,18 +1,7 @@
-import type {
-  ReplayModel,
-  ReplayTimelineEvent,
-  ReplayTimelineEventKind,
-} from "subtr-actor-player";
-import {
-  buildFiftyFiftyMarkers,
-} from "./fiftyFiftyOverlay.ts";
-import {
-  buildCeilingShotMarkers,
-} from "./ceilingShotOverlay.ts";
-import {
-  buildTouchMarkers,
-  playerIdToString,
-} from "./touchOverlay.ts";
+import type { ReplayModel, ReplayTimelineEvent, ReplayTimelineEventKind } from "subtr-actor-player";
+import { buildFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
+import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
+import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
 import type { MechanicEvent, StatsTimeline } from "./statsTimeline.ts";
 
 const BLUE_TIMELINE_COLOR = "#3b82f6";
@@ -52,24 +41,26 @@ export function formatMechanicKind(kind: string): string {
 }
 
 function mechanicShortLabel(kind: string): string {
-  return MECHANIC_SHORT_LABELS[kind] ?? (
-    kind
+  return (
+    MECHANIC_SHORT_LABELS[kind] ??
+    (kind
       .split(/[_-]+/)
       .filter((part) => part.length > 0)
       .map((part) => part.slice(0, 1).toUpperCase())
       .join("")
       .slice(0, 3) ||
-    "M"
+      "M")
   );
 }
 
 export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
-  return [...new Set(
-    (statsTimeline?.events.mechanics ?? [])
-      .filter((event) => isVisibleMechanicKind(event.kind))
-      .map((event) => event.kind),
-  )]
-    .sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+  return [
+    ...new Set(
+      (statsTimeline?.events.mechanics ?? [])
+        .filter((event) => isVisibleMechanicKind(event.kind))
+        .map((event) => event.kind),
+    ),
+  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
 }
 
 export function isVisibleMechanicKind(kind: string): boolean {
@@ -85,10 +76,11 @@ export function buildMechanicTimelineEvents(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter((event): event is MechanicEvent & { timing: { type: "moment" } } =>
-      isVisibleMechanicKind(event.kind) &&
-      event.timing.type === "moment" &&
-      (!enabled || enabled.has(event.kind))
+    .filter(
+      (event): event is MechanicEvent & { timing: { type: "moment" } } =>
+        isVisibleMechanicKind(event.kind) &&
+        event.timing.type === "moment" &&
+        (!enabled || enabled.has(event.kind)),
     )
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
@@ -195,11 +187,12 @@ export function buildFiftyFiftyTimelineEvents(
     label: marker.label,
     shortLabel: marker.label.startsWith("Kickoff 50/50") ? "KO" : "50",
     isTeamZero: marker.winnerIsTeamZero,
-    color: marker.winnerIsTeamZero === null
-      ? NEUTRAL_TIMELINE_COLOR
-      : marker.winnerIsTeamZero
-        ? BLUE_TIMELINE_COLOR
-        : ORANGE_TIMELINE_COLOR,
+    color:
+      marker.winnerIsTeamZero === null
+        ? NEUTRAL_TIMELINE_COLOR
+        : marker.winnerIsTeamZero
+          ? BLUE_TIMELINE_COLOR
+          : ORANGE_TIMELINE_COLOR,
   }));
 }
 
@@ -223,9 +216,8 @@ export function buildMustyFlickTimelineEvents(
       }
 
       const eventFrame = player.musty_flick?.last_musty_frame ?? frame.frame_number;
-      const eventTime = replay.frames[eventFrame]?.time
-        ?? player.musty_flick?.last_musty_time
-        ?? frame.time;
+      const eventTime =
+        replay.frames[eventFrame]?.time ?? player.musty_flick?.last_musty_time ?? frame.time;
 
       for (let index = 0; index < delta; index += 1) {
         events.push({
@@ -267,9 +259,8 @@ export function buildFlickTimelineEvents(
       }
 
       const eventFrame = player.flick?.last_flick_frame ?? frame.frame_number;
-      const eventTime = replay.frames[eventFrame]?.time
-        ?? player.flick?.last_flick_time
-        ?? frame.time;
+      const eventTime =
+        replay.frames[eventFrame]?.time ?? player.flick?.last_flick_time ?? frame.time;
 
       for (let index = 0; index < delta; index += 1) {
         events.push({
@@ -393,10 +384,7 @@ export function buildDodgeResetTimelineEvents(
       previousOnBallCounts.set(playerId, currentOnBallCount);
 
       const delta = Math.max(0, currentCount - previousCount);
-      const onBallDelta = Math.min(
-        delta,
-        Math.max(0, currentOnBallCount - previousOnBallCount),
-      );
+      const onBallDelta = Math.min(delta, Math.max(0, currentOnBallCount - previousOnBallCount));
 
       for (let index = 0; index < delta; index += 1) {
         const sequence = currentCount - delta + index + 1;
@@ -453,7 +441,7 @@ export function buildSpeedFlipTimelineEvents(
   return statsTimeline.events.speed_flip.map((event) => {
     const playerId = event.player ? playerIdToString(event.player) : null;
     const playerName = playerId
-      ? replay.players.find((player) => player.id === playerId)?.name ?? playerId
+      ? (replay.players.find((player) => player.id === playerId)?.name ?? playerId)
       : "Unknown";
     const eventTime = replay.frames[event.frame]?.time ?? event.time;
     const qualityPercent = Math.round(event.confidence * 100);
@@ -532,8 +520,8 @@ export function buildBumpTimelineEvents(
   return statsTimeline.events.bump.map((event, index) => {
     const initiatorId = playerIdToString(event.initiator);
     const victimId = playerIdToString(event.victim);
-    const initiatorName = replay.players.find((player) => player.id === initiatorId)?.name
-      ?? initiatorId;
+    const initiatorName =
+      replay.players.find((player) => player.id === initiatorId)?.name ?? initiatorId;
     const victimName = replay.players.find((player) => player.id === victimId)?.name ?? victimId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
     const confidencePercent = Math.round(event.confidence * 100);
@@ -553,9 +541,7 @@ export function buildBumpTimelineEvents(
   });
 }
 
-function getWhiffShortLabel(
-  event: StatsTimeline["events"]["whiff"][number],
-): string {
+function getWhiffShortLabel(event: StatsTimeline["events"]["whiff"][number]): string {
   if (event.dodge_active) {
     return "DW";
   }
@@ -565,9 +551,7 @@ function getWhiffShortLabel(
   return "W";
 }
 
-function getWhiffKindLabel(
-  event: StatsTimeline["events"]["whiff"][number],
-): string {
+function getWhiffKindLabel(event: StatsTimeline["events"]["whiff"][number]): string {
   const labels = [event.aerial ? "aerial" : "grounded"];
   if (event.dodge_active) {
     labels.push("dodge");

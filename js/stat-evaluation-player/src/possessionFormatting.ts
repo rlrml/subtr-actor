@@ -6,18 +6,14 @@ interface PossessionRenderOptions {
   breakdownClasses?: PossessionBreakdownClass[];
   labelPerspective:
     | {
-      kind: "shared";
-    }
+        kind: "shared";
+      }
     | {
-      kind: "team";
-    };
+        kind: "team";
+      };
 }
 
-function formatNumber(
-  value: number | undefined,
-  digits = 1,
-  suffix = "",
-): string {
+function formatNumber(value: number | undefined, digits = 1, suffix = ""): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -43,11 +39,7 @@ function formatPercentage(
   return `${((numerator * 100) / denominator).toFixed(digits)}%`;
 }
 
-function formatTimeShare(
-  value: number | undefined,
-  total: number | undefined,
-  digits = 1,
-): string {
+function formatTimeShare(value: number | undefined, total: number | undefined, digits = 1): string {
   if (value === undefined || Number.isNaN(value)) {
     return "?";
   }
@@ -148,9 +140,10 @@ function compareBreakdownValues(
   labelPerspective: PossessionRenderOptions["labelPerspective"],
 ): number {
   for (const className of classes) {
-    const valueOrder = className === "possession_state"
-      ? getOrderedPossessionStates(labelPerspective)
-      : getOrderedFieldThirds(labelPerspective);
+    const valueOrder =
+      className === "possession_state"
+        ? getOrderedPossessionStates(labelPerspective)
+        : getOrderedFieldThirds(labelPerspective);
     const leftIndex = valueOrder.indexOf(left[className]);
     const rightIndex = valueOrder.indexOf(right[className]);
     const normalizedLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
@@ -178,9 +171,7 @@ function formatBreakdownLabel(
     return formatValue(className, values[className]);
   }
 
-  return classes
-    .map((className) => formatValue(className, values[className]))
-    .join(" / ");
+  return classes.map((className) => formatValue(className, values[className])).join(" / ");
 }
 
 function renderPossessionBreakdownRows(
@@ -212,7 +203,9 @@ function renderPossessionBreakdownRows(
         continue;
       }
 
-      const key = breakdownClasses.map((className) => `${className}:${values[className]}`).join("|");
+      const key = breakdownClasses
+        .map((className) => `${className}:${values[className]}`)
+        .join("|");
       const existing = groups.get(key);
       if (existing) {
         existing.total += entry.value;
@@ -222,7 +215,11 @@ function renderPossessionBreakdownRows(
     }
   }
 
-  if (groups.size === 0 && breakdownClasses.length === 1 && breakdownClasses[0] === "possession_state") {
+  if (
+    groups.size === 0 &&
+    breakdownClasses.length === 1 &&
+    breakdownClasses[0] === "possession_state"
+  ) {
     const totals = new Map<string, number>();
     if (possession) {
       totals.set("own", possession.possession_time);
@@ -230,30 +227,33 @@ function renderPossessionBreakdownRows(
       totals.set("opponent", possession.opponent_possession_time);
     }
 
-    if (!getOrderedPossessionStates(labelPerspective).some((state) => (totals.get(state) ?? 0) > 0)) {
+    if (
+      !getOrderedPossessionStates(labelPerspective).some((state) => (totals.get(state) ?? 0) > 0)
+    ) {
       return "";
     }
 
     return getOrderedPossessionStates(labelPerspective)
       .filter((state) => totals.has(state))
-      .map((state) => renderStatRow(
-        formatPossessionStateLabel(state, labelPerspective),
-        formatTimeShare(totals.get(state), trackedTime),
-      ))
+      .map((state) =>
+        renderStatRow(
+          formatPossessionStateLabel(state, labelPerspective),
+          formatTimeShare(totals.get(state), trackedTime),
+        ),
+      )
       .join("");
   }
 
   return [...groups.values()]
-    .sort((left, right) => compareBreakdownValues(
-      left.values,
-      right.values,
-      breakdownClasses,
-      labelPerspective,
-    ))
-    .map((entry) => renderStatRow(
-      formatBreakdownLabel(entry.values, breakdownClasses, labelPerspective),
-      formatTimeShare(entry.total, trackedTime),
-    ))
+    .sort((left, right) =>
+      compareBreakdownValues(left.values, right.values, breakdownClasses, labelPerspective),
+    )
+    .map((entry) =>
+      renderStatRow(
+        formatBreakdownLabel(entry.values, breakdownClasses, labelPerspective),
+        formatTimeShare(entry.total, trackedTime),
+      ),
+    )
     .join("");
 }
 

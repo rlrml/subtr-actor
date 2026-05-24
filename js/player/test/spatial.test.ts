@@ -92,8 +92,5 @@ test("ball cam stays behind the attached player when the ball is ahead", () => {
     desiredCameraPosition.x < 0,
     "expected ball cam to keep the camera behind the player, not between the car and ball",
   );
-  assert.ok(
-    desiredLookTarget.x > 0,
-    "expected ball cam to keep looking toward the ball",
-  );
+  assert.ok(desiredLookTarget.x > 0, "expected ball cam to keep looking toward the ball");
 });

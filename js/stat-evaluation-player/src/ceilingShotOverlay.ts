@@ -246,7 +246,7 @@ export class CeilingShotOverlay {
       const age = Math.max(0, currentTime - marker.time);
       const life = Math.max(0, 1 - age / this.decaySeconds);
       const view = this.ensureView(marker);
-      const opacity = 0.14 + 0.60 * life;
+      const opacity = 0.14 + 0.6 * life;
       const scale = 0.94 + (1 - life) * 0.18;
 
       view.ringMaterial.opacity = opacity;
@@ -258,11 +258,9 @@ export class CeilingShotOverlay {
       );
       view.ring.scale.setScalar(scale + marker.quality * 0.08);
 
-      this.worldPosition.set(
-        marker.touchPosition.x,
-        marker.touchPosition.y,
-        marker.touchPosition.z,
-      ).add(this.labelOffset);
+      this.worldPosition
+        .set(marker.touchPosition.x, marker.touchPosition.y, marker.touchPosition.z)
+        .add(this.labelOffset);
       const visible = projectToContainer(
         this.worldPosition,
         this.scene.camera,
@@ -303,11 +301,8 @@ export class CeilingShotOverlay {
       return existing;
     }
 
-    const color = marker.quality >= 0.8
-      ? HIGH_CONFIDENCE_COLOR
-      : marker.isTeamZero
-        ? BLUE_COLOR
-        : ORANGE_COLOR;
+    const color =
+      marker.quality >= 0.8 ? HIGH_CONFIDENCE_COLOR : marker.isTeamZero ? BLUE_COLOR : ORANGE_COLOR;
 
     const ringMaterial = new THREE.MeshBasicMaterial({
       color,
@@ -328,11 +323,7 @@ export class CeilingShotOverlay {
         marker.ceilingContactPosition.y,
         marker.ceilingContactPosition.z,
       ),
-      new THREE.Vector3(
-        marker.touchPosition.x,
-        marker.touchPosition.y,
-        marker.touchPosition.z,
-      ),
+      new THREE.Vector3(marker.touchPosition.x, marker.touchPosition.y, marker.touchPosition.z),
     ]);
     const beamMaterial = new THREE.LineBasicMaterial({
       color,

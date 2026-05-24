@@ -46,7 +46,4 @@ generatedPackage.types = "rl_replay_subtr_actor.d.ts";
 generatedPackage.sideEffects = ["./snippets/*"];
 generatedPackage.publishConfig = { access: "public" };
 
-await writeFile(
-  generatedPackagePath,
-  `${JSON.stringify(generatedPackage, null, 2)}\n`
-);
+await writeFile(generatedPackagePath, `${JSON.stringify(generatedPackage, null, 2)}\n`);

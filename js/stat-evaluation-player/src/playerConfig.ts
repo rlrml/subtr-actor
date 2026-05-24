@@ -12,7 +12,6 @@ export type StatsWindowKind =
   | "team"
   | "all-players"
   | "all-teams"
-  | "mechanics-overview"
   | "goals-overview"
   | "ad-hoc";
 
@@ -127,10 +126,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
 function base64UrlToBytes(value: string): Uint8Array {
@@ -145,9 +141,7 @@ function base64UrlToBytes(value: string): Uint8Array {
 }
 
 export function encodeStatsPlayerConfig(config: StatsPlayerConfig): string {
-  return bytesToBase64Url(
-    deflateSync(strToU8(JSON.stringify(config)), { level: 9 }),
-  );
+  return bytesToBase64Url(deflateSync(strToU8(JSON.stringify(config)), { level: 9 }));
 }
 
 export function decodeStatsPlayerConfig(value: string): StatsPlayerConfig {
@@ -156,9 +150,7 @@ export function decodeStatsPlayerConfig(value: string): StatsPlayerConfig {
     parsed = JSON.parse(strFromU8(inflateSync(base64UrlToBytes(value))));
   } catch (error) {
     throw new Error(
-      `Invalid stats player config: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Invalid stats player config: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -169,9 +161,7 @@ export function getStatsPlayerConfigFromLocation(
   location: Pick<Location, "search" | "hash">,
 ): StatsPlayerConfig | null {
   const snapshot = getStatsPlayerConfigParamSnapshot(location);
-  return snapshot.selectedValue
-    ? decodeStatsPlayerConfig(snapshot.selectedValue)
-    : null;
+  return snapshot.selectedValue ? decodeStatsPlayerConfig(snapshot.selectedValue) : null;
 }
 
 export function getStatsPlayerConfigParamSnapshot(
@@ -181,16 +171,13 @@ export function getStatsPlayerConfigParamSnapshot(
   const searchParams = new URLSearchParams(location.search);
   const hashValues = hashParams.getAll(STATS_PLAYER_CONFIG_PARAM);
   const searchValues = searchParams.getAll(STATS_PLAYER_CONFIG_PARAM);
-  const selectedSource = hashValues[0]
-    ? "hash"
-    : searchValues[0]
-      ? "search"
-      : null;
-  const selectedValue = selectedSource === "hash"
-    ? hashValues[0]
-    : selectedSource === "search"
-      ? searchValues[0]
-      : null;
+  const selectedSource = hashValues[0] ? "hash" : searchValues[0] ? "search" : null;
+  const selectedValue =
+    selectedSource === "hash"
+      ? hashValues[0]
+      : selectedSource === "search"
+        ? searchValues[0]
+        : null;
 
   return {
     search: location.search,
@@ -209,15 +196,13 @@ export function isStatsPlayerConfigDebugEnabled(
 ): boolean {
   const searchParams = new URLSearchParams(location.search);
   const hashParams = new URLSearchParams(getHashParamText(location.hash));
-  const value = searchParams.get(STATS_PLAYER_CONFIG_DEBUG_PARAM) ??
+  const value =
+    searchParams.get(STATS_PLAYER_CONFIG_DEBUG_PARAM) ??
     hashParams.get(STATS_PLAYER_CONFIG_DEBUG_PARAM);
   return value === "" || value === "1" || value === "true";
 }
 
-export function setStatsPlayerConfigOnUrl(
-  url: URL,
-  config: StatsPlayerConfig,
-): URL {
+export function setStatsPlayerConfigOnUrl(url: URL, config: StatsPlayerConfig): URL {
   const next = new URL(url.href);
   const hashParams = new URLSearchParams(getHashParamText(next.hash));
   hashParams.set(STATS_PLAYER_CONFIG_PARAM, encodeStatsPlayerConfig(config));
@@ -295,18 +280,15 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   const config: {
     -readonly [K in keyof PlayerCameraConfig]?: PlayerCameraConfig[K];
   } = {};
-  const mode = value.mode === "follow"
-    ? "follow"
-    : value.mode === "free"
-      ? "free"
-      : undefined;
-  const freePreset = value.freePreset === "overhead"
-    ? "overhead"
-    : value.freePreset === "side"
-      ? "side"
-      : value.freePreset === null
-        ? null
-        : undefined;
+  const mode = value.mode === "follow" ? "follow" : value.mode === "free" ? "free" : undefined;
+  const freePreset =
+    value.freePreset === "overhead"
+      ? "overhead"
+      : value.freePreset === "side"
+        ? "side"
+        : value.freePreset === null
+          ? null
+          : undefined;
   const attachedPlayerId = stringOrNull(value.attachedPlayerId);
   const distanceScale = finiteNumber(value.distanceScale);
   const ballCam = booleanValue(value.ballCam);
@@ -381,8 +363,7 @@ function normalizeStatsWindows(value: unknown): StatsWindowConfig[] {
   }
   return value
     .map((item): StatsWindowConfig | null => {
-      if (!isRecord(item) || typeof item.id !== "string" ||
-        !isStatsWindowKind(item.kind)) {
+      if (!isRecord(item) || typeof item.id !== "string" || !isStatsWindowKind(item.kind)) {
         return null;
       }
       return {
@@ -430,15 +411,26 @@ function normalizePlacement(value: unknown): WindowPlacementConfig {
 }
 
 function isSingletonWindowId(value: unknown): value is SingletonWindowId {
-  return value === "camera" || value === "playback" || value === "recording" ||
-    value === "mechanics" || value === "mechanics-review" ||
-    value === "boost-pickups" || value === "touch-controls";
+  return (
+    value === "camera" ||
+    value === "playback" ||
+    value === "recording" ||
+    value === "mechanics" ||
+    value === "mechanics-review" ||
+    value === "boost-pickups" ||
+    value === "touch-controls"
+  );
 }
 
 function isStatsWindowKind(value: unknown): value is StatsWindowKind {
-  return value === "player" || value === "team" || value === "all-players" ||
-    value === "all-teams" || value === "mechanics-overview" ||
-    value === "goals-overview" || value === "ad-hoc";
+  return (
+    value === "player" ||
+    value === "team" ||
+    value === "all-players" ||
+    value === "all-teams" ||
+    value === "goals-overview" ||
+    value === "ad-hoc"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -19,10 +19,7 @@ function isRecordOfUnknown(value: unknown): value is Record<string, unknown> {
   return isObject(value);
 }
 
-function parsePlaybackBound(
-  value: unknown,
-  path: string
-): PlaybackBound {
+function parsePlaybackBound(value: unknown, path: string): PlaybackBound {
   if (!isObject(value)) {
     throw new Error(`${path} must be an object`);
   }
@@ -42,10 +39,7 @@ function parsePlaybackBound(
   };
 }
 
-function parseManifestReplay(
-  value: unknown,
-  index: number
-): PlaylistManifestReplay {
+function parseManifestReplay(value: unknown, index: number): PlaylistManifestReplay {
   const path = `manifest.replays[${index}]`;
   if (!isObject(value)) {
     throw new Error(`${path} must be an object`);
@@ -72,19 +66,12 @@ function parseManifestReplay(
     id: value.id,
     path: replayPath,
     label: typeof value.label === "string" ? value.label : value.id,
-    locator: parseManifestReplayLocator(
-      value.locator,
-      `${path}.locator`,
-      replayPath
-    ),
+    locator: parseManifestReplayLocator(value.locator, `${path}.locator`, replayPath),
     meta: value.meta ?? {},
   };
 }
 
-function parseManifestItem(
-  value: unknown,
-  index: number
-): PlaylistManifestItem {
+function parseManifestItem(value: unknown, index: number): PlaylistManifestItem {
   const path = `manifest.items[${index}]`;
   if (!isObject(value)) {
     throw new Error(`${path} must be an object`);
@@ -103,9 +90,10 @@ function parseManifestItem(
   }
 
   return {
-    id: typeof value.id === "string" && value.id.trim() !== ""
-      ? value.id
-      : `${value.replay}:${index}`,
+    id:
+      typeof value.id === "string" && value.id.trim() !== ""
+        ? value.id
+        : `${value.replay}:${index}`,
     replay: value.replay,
     start: parsePlaybackBound(value.start, `${path}.start`),
     end: parsePlaybackBound(value.end, `${path}.end`),
@@ -117,12 +105,10 @@ function parseManifestItem(
 function parseManifestReplayLocator(
   value: unknown,
   path: string,
-  fallbackPath: string
+  fallbackPath: string,
 ): PlaylistManifestReplayLocator {
   if (value === undefined) {
-    return fallbackPath
-      ? { kind: "path", path: fallbackPath }
-      : { kind: "inline" };
+    return fallbackPath ? { kind: "path", path: fallbackPath } : { kind: "inline" };
   }
 
   if (!isObject(value)) {
@@ -166,24 +152,16 @@ function parsePlaybackOptions(value: unknown): PlaylistManifestPlaybackOptions {
     throw new Error('manifest.playback.advanceMode must be "auto" or "manual"');
   }
 
-  if (
-    value.endMode !== undefined &&
-    value.endMode !== "stop" &&
-    value.endMode !== "loop"
-  ) {
+  if (value.endMode !== undefined && value.endMode !== "stop" && value.endMode !== "loop") {
     throw new Error('manifest.playback.endMode must be "stop" or "loop"');
   }
 
-  if (
-    value.advanceOnEnd !== undefined &&
-    typeof value.advanceOnEnd !== "boolean"
-  ) {
+  if (value.advanceOnEnd !== undefined && typeof value.advanceOnEnd !== "boolean") {
     throw new Error("manifest.playback.advanceOnEnd must be a boolean");
   }
 
   return {
-    advanceMode: value.advanceMode ??
-      (value.advanceOnEnd === true ? "auto" : "manual"),
+    advanceMode: value.advanceMode ?? (value.advanceOnEnd === true ? "auto" : "manual"),
     endMode: value.endMode ?? "stop",
   };
 }
@@ -225,9 +203,7 @@ export function parsePlaylistManifest(manifest: unknown): PlaylistManifest {
   };
 }
 
-export async function loadPlaylistManifestFromFile(
-  file: Blob
-): Promise<PlaylistManifest> {
+export async function loadPlaylistManifestFromFile(file: Blob): Promise<PlaylistManifest> {
   const text = await file.text();
   let parsed: unknown;
   try {
@@ -236,7 +212,7 @@ export async function loadPlaylistManifestFromFile(
     throw new Error(
       `Failed to parse playlist manifest JSON: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
   }
 
@@ -248,10 +224,10 @@ export function resolvePlaylistItemsFromManifest(
   resolveReplaySource: (context: {
     replayId: string;
     replay?: PlaylistManifestReplay;
-  }) => ReplaySource
+  }) => ReplaySource,
 ): PlaylistItem[] {
   const replaysById = new Map<string, PlaylistManifestReplay>(
-    (manifest.replays ?? []).map((replay) => [replay.id, replay])
+    (manifest.replays ?? []).map((replay) => [replay.id, replay]),
   );
 
   return manifest.items.map((item) => {

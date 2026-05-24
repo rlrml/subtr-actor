@@ -11,32 +11,32 @@ import {
   merge,
   type DeepPartial,
 } from "./statsSnapshotFactories.ts";
-export {
-  createPlayerStatsSnapshot,
-  createTeamStatsSnapshot,
-} from "./statsSnapshotFactories.ts";
+export { createPlayerStatsSnapshot, createTeamStatsSnapshot } from "./statsSnapshotFactories.ts";
 
 export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEvents {
-  return merge<StatsEvents>({
-    timeline: [],
-    mechanics: [],
-    goal_context: [],
-    backboard: [],
-    ceiling_shot: [],
-    double_tap: [],
-    fifty_fifty: [],
-    one_timer: [],
-    pass: [],
-    goal_tags: [],
-    rush: [],
-    speed_flip: [],
-    half_flip: [],
-    half_volley: [],
-    wavedash: [],
-    whiff: [],
-    boost_pickups: [],
-    bump: [],
-  }, overrides);
+  return merge<StatsEvents>(
+    {
+      timeline: [],
+      mechanics: [],
+      goal_context: [],
+      backboard: [],
+      ceiling_shot: [],
+      double_tap: [],
+      fifty_fifty: [],
+      one_timer: [],
+      pass: [],
+      goal_tags: [],
+      rush: [],
+      speed_flip: [],
+      half_flip: [],
+      half_volley: [],
+      wavedash: [],
+      whiff: [],
+      boost_pickups: [],
+      bump: [],
+    },
+    overrides,
+  );
 }
 
 export function createTouchStats(
@@ -58,87 +58,96 @@ export function createPositioningStats(
 }
 
 export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFrame {
-  const merged = merge<StatsFrame>({
-    frame_number: 0,
-    time: 0,
-    dt: 0,
-    seconds_remaining: null,
-    game_state: null,
-    gameplay_phase: "unknown",
-    is_live_play: true,
-    team_zero: createTeamStatsSnapshot(),
-    team_one: createTeamStatsSnapshot(),
-    players: [],
-  }, overrides);
+  const merged = merge<StatsFrame>(
+    {
+      frame_number: 0,
+      time: 0,
+      dt: 0,
+      seconds_remaining: null,
+      game_state: null,
+      gameplay_phase: "unknown",
+      is_live_play: true,
+      team_zero: createTeamStatsSnapshot(),
+      team_one: createTeamStatsSnapshot(),
+      players: [],
+    },
+    overrides,
+  );
 
   merged.team_zero = createTeamStatsSnapshot(merged.team_zero as DeepPartial<TeamStatsSnapshot>);
   merged.team_one = createTeamStatsSnapshot(merged.team_one as DeepPartial<TeamStatsSnapshot>);
   merged.players = merged.players.map((player) =>
-    createPlayerStatsSnapshot(player as DeepPartial<PlayerStatsSnapshot>));
+    createPlayerStatsSnapshot(player as DeepPartial<PlayerStatsSnapshot>),
+  );
   return merged;
 }
 
 export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): StatsTimeline {
-  const merged = merge<StatsTimeline>({
-    config: {
-      most_back_forward_threshold_y: 0,
-      level_ball_depth_margin: 0,
-      pressure_neutral_zone_half_width_y: 0,
-      rotation_role_depth_margin: 0,
-      rotation_first_man_ambiguity_margin: 0,
-      rotation_first_man_debounce_seconds: 0,
-      rush_max_start_y: 0,
-      rush_attack_support_distance_y: 0,
-      rush_defender_distance_y: 0,
-      rush_min_possession_retained_seconds: 0,
-      aerial_goal_min_ball_z: 0,
-      high_aerial_goal_min_ball_z: 0,
-      long_distance_goal_max_attacking_y: 0,
-      own_half_goal_max_attacking_y: 0,
-      empty_net_min_defender_y_margin: 0,
-      empty_net_min_defender_distance: 0,
-      empty_net_max_touch_attacking_y: 0,
-      flick_goal_max_event_to_goal_seconds: 0,
-      one_timer_goal_max_event_to_goal_seconds: 0,
-      air_dribble_goal_max_end_to_goal_seconds: 0,
-      flip_reset_goal_max_event_to_goal_seconds: 0,
-      half_volley_max_bounce_to_touch_seconds: 0,
-      half_volley_min_ball_speed: 0,
-      half_volley_goal_max_touch_to_goal_seconds: 0,
-      half_volley_goal_min_goal_alignment: 0,
+  const merged = merge<StatsTimeline>(
+    {
+      config: {
+        most_back_forward_threshold_y: 0,
+        level_ball_depth_margin: 0,
+        pressure_neutral_zone_half_width_y: 0,
+        rotation_role_depth_margin: 0,
+        rotation_first_man_ambiguity_margin: 0,
+        rotation_first_man_debounce_seconds: 0,
+        rush_max_start_y: 0,
+        rush_attack_support_distance_y: 0,
+        rush_defender_distance_y: 0,
+        rush_min_possession_retained_seconds: 0,
+        aerial_goal_min_ball_z: 0,
+        high_aerial_goal_min_ball_z: 0,
+        long_distance_goal_max_attacking_y: 0,
+        own_half_goal_max_attacking_y: 0,
+        empty_net_min_defender_y_margin: 0,
+        empty_net_min_defender_distance: 0,
+        empty_net_max_touch_attacking_y: 0,
+        flick_goal_max_event_to_goal_seconds: 0,
+        one_timer_goal_max_event_to_goal_seconds: 0,
+        air_dribble_goal_max_end_to_goal_seconds: 0,
+        flip_reset_goal_max_event_to_goal_seconds: 0,
+        half_volley_max_bounce_to_touch_seconds: 0,
+        half_volley_min_ball_speed: 0,
+        half_volley_goal_max_touch_to_goal_seconds: 0,
+        half_volley_goal_min_goal_alignment: 0,
+      },
+      replay_meta: {
+        team_zero: [],
+        team_one: [],
+        all_headers: [],
+      },
+      events: createStatsEvents(),
+      frames: [],
     },
-    replay_meta: {
-      team_zero: [],
-      team_one: [],
-      all_headers: [],
-    },
-    events: createStatsEvents(),
-    frames: [],
-  }, overrides);
+    overrides,
+  );
 
   merged.events = createStatsEvents(merged.events as DeepPartial<StatsEvents>);
   merged.frames = merged.frames.map((frame) => createStatsFrame(frame as DeepPartial<StatsFrame>));
   return merged;
 }
 
-export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> & {
-  timeline_events?: StatsEvents["timeline"];
-  backboard_events?: StatsEvents["backboard"];
-  ceiling_shot_events?: StatsEvents["ceiling_shot"];
-  double_tap_events?: StatsEvents["double_tap"];
-  fifty_fifty_events?: StatsEvents["fifty_fifty"];
-  one_timer_events?: StatsEvents["one_timer"];
-  pass_events?: StatsEvents["pass"];
-  goal_tag_events?: StatsEvents["goal_tags"];
-  mechanic_events?: StatsEvents["mechanics"];
-  rush_events?: StatsEvents["rush"];
-  speed_flip_events?: StatsEvents["speed_flip"];
-  half_flip_events?: StatsEvents["half_flip"];
-  half_volley_events?: StatsEvents["half_volley"];
-  wavedash_events?: StatsEvents["wavedash"];
-  whiff_events?: StatsEvents["whiff"];
-  boost_pickups?: StatsEvents["boost_pickups"];
-} = {}): StatsTimeline {
+export function createLegacyStatsTimeline(
+  overrides: DeepPartial<StatsTimeline> & {
+    timeline_events?: StatsEvents["timeline"];
+    backboard_events?: StatsEvents["backboard"];
+    ceiling_shot_events?: StatsEvents["ceiling_shot"];
+    double_tap_events?: StatsEvents["double_tap"];
+    fifty_fifty_events?: StatsEvents["fifty_fifty"];
+    one_timer_events?: StatsEvents["one_timer"];
+    pass_events?: StatsEvents["pass"];
+    goal_tag_events?: StatsEvents["goal_tags"];
+    mechanic_events?: StatsEvents["mechanics"];
+    rush_events?: StatsEvents["rush"];
+    speed_flip_events?: StatsEvents["speed_flip"];
+    half_flip_events?: StatsEvents["half_flip"];
+    half_volley_events?: StatsEvents["half_volley"];
+    wavedash_events?: StatsEvents["wavedash"];
+    whiff_events?: StatsEvents["whiff"];
+    boost_pickups?: StatsEvents["boost_pickups"];
+  } = {},
+): StatsTimeline {
   return createStatsTimeline({
     ...overrides,
     events: {

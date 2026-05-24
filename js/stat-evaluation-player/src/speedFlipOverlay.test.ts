@@ -2,10 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "subtr-actor-player";
-import {
-  buildSpeedFlipMarkers,
-  getVisibleSpeedFlipMarkers,
-} from "./speedFlipOverlay.ts";
+import { buildSpeedFlipMarkers, getVisibleSpeedFlipMarkers } from "./speedFlipOverlay.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("buildSpeedFlipMarkers uses replay-normalized frame time and player names", () => {

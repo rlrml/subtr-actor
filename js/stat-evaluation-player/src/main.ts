@@ -21,17 +21,10 @@ import type {
 import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
-import {
-  createStatModules,
-  getTeamClass,
-  RELATIVE_POSITIONING_MODULE_ID,
-} from "./statModules.ts";
+import { createStatModules, getTeamClass, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
-import {
-  createStatsFrameLookup,
-  getStatsFrameForReplayFrame,
-} from "./statsTimeline.ts";
+import { createStatsFrameLookup, getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import {
   applyConfigAdapterSnapshot,
   getConfigAdapterSnapshot,
@@ -43,11 +36,7 @@ import type {
   StatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
-import {
-  createStatRegistry,
-  type StatDefinition,
-  type StatScopeKind,
-} from "./statRegistry.ts";
+import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import {
   countEnabledTimelineEvents,
@@ -55,17 +44,10 @@ import {
   filterReplayTimelineEvents,
   formatMechanicKind,
   getMechanicKinds,
-  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
-import {
-  formatReplayLoadProgress,
-  loadReplayBundleInWorker,
-} from "./replayLoader.ts";
-import {
-  getReplayFetchRequestFromSearch,
-  type ReplayFetchRequest,
-} from "./replayUrl.ts";
+import { formatReplayLoadProgress, loadReplayBundleInWorker } from "./replayLoader.ts";
+import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
 import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
@@ -90,10 +72,7 @@ import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
-const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
-  "free",
-  "follow",
-];
+const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
 let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
@@ -124,24 +103,27 @@ const boostPickupFilters = createBoostPickupFilterController({
   },
 });
 
-const MODULES = createStatModules({
-  rerenderCurrentState() {
-    if (!replayPlayer) {
-      return;
-    }
+const MODULES = createStatModules(
+  {
+    rerenderCurrentState() {
+      if (!replayPlayer) {
+        return;
+      }
 
-    const state = replayPlayer.getState();
-    renderStatsWindows(state.frameIndex);
+      const state = replayPlayer.getState();
+      renderStatsWindows(state.frameIndex);
+    },
+    refreshTimelineRanges() {
+      syncTimelineRanges();
+    },
+    requestConfigSync() {
+      scheduleConfigUrlUpdate();
+    },
   },
-  refreshTimelineRanges() {
-    syncTimelineRanges();
+  {
+    boostPickupFilters,
   },
-  requestConfigSync() {
-    scheduleConfigUrlUpdate();
-  },
-}, {
-  boostPickupFilters,
-});
+);
 
 let activeModules: StatModule[] = [];
 let activeTimelineEventModuleIds = new Set<string>();
@@ -365,15 +347,6 @@ function getActiveModuleIds(): Set<string> {
   ]);
 }
 
-function getActiveModuleSignature(): string {
-  return [
-    `events=${[...activeTimelineEventModuleIds].sort().join(",")}`,
-    `ranges=${[...activeTimelineRangeModuleIds].sort().join(",")}`,
-    `mechanics=${[...activeMechanicTimelineKinds].sort().join(",")}`,
-    `effects=${[...activeRenderEffectModuleIds].sort().join(",")}`,
-  ].join("|");
-}
-
 function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
   return kind === "events"
     ? activeTimelineEventModuleIds
@@ -382,8 +355,7 @@ function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
       : activeRenderEffectModuleIds;
 }
 
-function clearRenderCaches(): void {
-}
+function clearRenderCaches(): void {}
 
 function getModuleContext(): StatModuleContext | null {
   if (!replayPlayer || !statsTimeline || !statsFrameLookup) {
@@ -439,11 +411,7 @@ function teardownActiveModules(): void {
   clearRenderCaches();
 }
 
-function toggleCapability(
-  id: string,
-  kind: ModuleCapabilityKind,
-  enabled: boolean,
-): void {
+function toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boolean): void {
   const activeIds = getActiveCapabilityIds(kind);
   if (enabled) {
     activeIds.add(id);
@@ -590,17 +558,14 @@ function renderTimelineEventCount(): void {
     activeMechanicTimelineKinds,
   ).length;
 
-  eventsReadout.textContent = `${countEnabledTimelineEvents(
-    activeTimelineEventModuleIds,
-    replayPlayer.replay,
-    statsTimeline,
-  ) + mechanicEventCount + mechanicRangeCount}`;
+  eventsReadout.textContent = `${
+    countEnabledTimelineEvents(activeTimelineEventModuleIds, replayPlayer.replay, statsTimeline) +
+    mechanicEventCount +
+    mechanicRangeCount
+  }`;
 }
 
-function mustElement<T extends HTMLElement>(
-  root: ParentNode,
-  selector: string,
-): T {
+function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
   const element = root.querySelector(selector);
   if (!(element instanceof HTMLElement)) {
     throw new Error(`Missing element for selector: ${selector}`);
@@ -610,8 +575,7 @@ function mustElement<T extends HTMLElement>(
 }
 
 function getElementWindowId(element: HTMLElement): string | null {
-  return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ??
-    null;
+  return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ?? null;
 }
 
 function getCurrentViewportSize(): ConfigViewportSize {
@@ -645,14 +609,8 @@ function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
   };
 }
 
-function applyWindowPlacement(
-  windowEl: HTMLElement,
-  placement: WindowPlacementConfig,
-): void {
-  const mapped = mapWindowPlacementToViewport(
-    placement,
-    getCurrentViewportSize(),
-  );
+function applyWindowPlacement(windowEl: HTMLElement, placement: WindowPlacementConfig): void {
+  const mapped = mapWindowPlacementToViewport(placement, getCurrentViewportSize());
   windowEl.style.setProperty("--window-x", `${mapped.x}px`);
   windowEl.style.setProperty("--window-y", `${mapped.y}px`);
   windowEl.hidden = !placement.visible;
@@ -678,23 +636,21 @@ function getSingletonWindowConfigs(): SingletonWindowConfig[] {
 }
 
 function getConfigAdapters(): StatsPlayerConfigAdapter[] {
-  return MODULES
-    .filter((mod) => mod.getConfig || mod.applyConfig)
-    .map((mod) => {
-      const adapter: StatsPlayerConfigAdapter = {
-        id: mod.id,
-      };
-      if (mod.id === "boost") {
-        adapter.aliases = ["boost-pickup-animation"];
-      }
-      if (mod.getConfig) {
-        adapter.getConfig = () => mod.getConfig?.();
-      }
-      if (mod.applyConfig) {
-        adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
-      }
-      return adapter;
-    });
+  return MODULES.filter((mod) => mod.getConfig || mod.applyConfig).map((mod) => {
+    const adapter: StatsPlayerConfigAdapter = {
+      id: mod.id,
+    };
+    if (mod.id === "boost") {
+      adapter.aliases = ["boost-pickup-animation"];
+    }
+    if (mod.getConfig) {
+      adapter.getConfig = () => mod.getConfig?.();
+    }
+    if (mod.applyConfig) {
+      adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
+    }
+    return adapter;
+  });
 }
 
 function getModuleConfigSnapshot(): Record<string, unknown> {
@@ -831,9 +787,7 @@ function logStatsPlayerConfigLoadDebug(
 function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
   const root = appRoot ?? document;
   for (const windowConfig of config.singletonWindows) {
-    const element = root.querySelector<HTMLElement>(
-      `[data-window-id="${windowConfig.id}"]`,
-    );
+    const element = root.querySelector<HTMLElement>(`[data-window-id="${windowConfig.id}"]`);
     if (element) {
       applyWindowPlacement(element, windowConfig.placement);
     }
@@ -895,8 +849,8 @@ function watchGoalReplay(time: number, scorerId: string | null): void {
     activeMechanicsReview.currentClip = null;
   }
 
-  const canFollowScorer = scorerId !== null &&
-    replayPlayer.replay.players.some((player) => player.id === scorerId);
+  const canFollowScorer =
+    scorerId !== null && replayPlayer.replay.players.some((player) => player.id === scorerId);
   if (canFollowScorer) {
     replayPlayer.setAttachedPlayer(scorerId);
     replayPlayer.setCameraViewMode("follow");
@@ -937,20 +891,14 @@ function bringWindowToFront(windowEl: HTMLElement): void {
 }
 
 function showWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(
-    appRoot ?? document,
-    `[data-window-id="${id}"]`,
-  );
+  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
   windowEl.hidden = false;
   bringWindowToFront(windowEl);
   scheduleConfigUrlUpdate();
 }
 
 function toggleWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(
-    appRoot ?? document,
-    `[data-window-id="${id}"]`,
-  );
+  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
   windowEl.hidden = !windowEl.hidden;
   if (!windowEl.hidden) {
     bringWindowToFront(windowEl);
@@ -959,10 +907,7 @@ function toggleWindow(id: SingletonWindowId): void {
 }
 
 function hideWindow(id: string): void {
-  const windowEl = mustElement<HTMLElement>(
-    appRoot ?? document,
-    `[data-window-id="${id}"]`,
-  );
+  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
   windowEl.hidden = true;
   scheduleConfigUrlUpdate();
 }
@@ -979,56 +924,61 @@ function openReplayFilePicker(): void {
 }
 
 function isInteractiveDragTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest(
-    "button, input, select, textarea, option, label, a, [data-no-drag]",
-  ));
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("button, input, select, textarea, option, label, a, [data-no-drag]"))
+  );
 }
 
 function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
-  root.addEventListener("pointerdown", (event) => {
-    if (!(event.target instanceof HTMLElement) || isInteractiveDragTarget(event.target)) {
-      return;
-    }
+  root.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!(event.target instanceof HTMLElement) || isInteractiveDragTarget(event.target)) {
+        return;
+      }
 
-    const windowEl = event.target.closest<HTMLElement>("[data-window-id]");
-    if (!windowEl || windowEl.hidden) {
-      return;
-    }
+      const windowEl = event.target.closest<HTMLElement>("[data-window-id]");
+      if (!windowEl || windowEl.hidden) {
+        return;
+      }
 
-    bringWindowToFront(windowEl);
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const rect = windowEl.getBoundingClientRect();
-    const pointerId = event.pointerId;
+      bringWindowToFront(windowEl);
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const rect = windowEl.getBoundingClientRect();
+      const pointerId = event.pointerId;
 
-    windowEl.setPointerCapture(pointerId);
-    event.preventDefault();
+      windowEl.setPointerCapture(pointerId);
+      event.preventDefault();
 
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      const nextX = Math.max(
-        8,
-        Math.min(window.innerWidth - 120, rect.left + moveEvent.clientX - startX),
-      );
-      const nextY = Math.max(
-        8,
-        Math.min(window.innerHeight - 100, rect.top + moveEvent.clientY - startY),
-      );
-      windowEl.style.setProperty("--window-x", `${nextX}px`);
-      windowEl.style.setProperty("--window-y", `${nextY}px`);
-    };
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        const nextX = Math.max(
+          8,
+          Math.min(window.innerWidth - 120, rect.left + moveEvent.clientX - startX),
+        );
+        const nextY = Math.max(
+          8,
+          Math.min(window.innerHeight - 100, rect.top + moveEvent.clientY - startY),
+        );
+        windowEl.style.setProperty("--window-x", `${nextX}px`);
+        windowEl.style.setProperty("--window-y", `${nextY}px`);
+      };
 
-    const onPointerUp = () => {
-      windowEl.releasePointerCapture(pointerId);
-      windowEl.removeEventListener("pointermove", onPointerMove);
-      windowEl.removeEventListener("pointerup", onPointerUp);
-      windowEl.removeEventListener("pointercancel", onPointerUp);
-      scheduleConfigUrlUpdate();
-    };
+      const onPointerUp = () => {
+        windowEl.releasePointerCapture(pointerId);
+        windowEl.removeEventListener("pointermove", onPointerMove);
+        windowEl.removeEventListener("pointerup", onPointerUp);
+        windowEl.removeEventListener("pointercancel", onPointerUp);
+        scheduleConfigUrlUpdate();
+      };
 
-    windowEl.addEventListener("pointermove", onPointerMove);
-    windowEl.addEventListener("pointerup", onPointerUp);
-    windowEl.addEventListener("pointercancel", onPointerUp);
-  }, { signal });
+      windowEl.addEventListener("pointermove", onPointerMove);
+      windowEl.addEventListener("pointerup", onPointerUp);
+      windowEl.addEventListener("pointercancel", onPointerUp);
+    },
+    { signal },
+  );
 }
 
 function renderModuleSummary(): void {
@@ -1044,25 +994,19 @@ function renderModuleSummary(): void {
     }
 
     if (mod.getTimelineEvents) {
-      timelineToggles.push(renderCapabilityToggle(
-        mod.id,
-        getCapabilityLabel(mod, "events"),
-        "events",
-      ));
+      timelineToggles.push(
+        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
+      );
     }
     if (mod.getTimelineRanges) {
-      timelineToggles.push(renderCapabilityToggle(
-        mod.id,
-        getCapabilityLabel(mod, "ranges"),
-        "ranges",
-      ));
+      timelineToggles.push(
+        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "ranges"), "ranges"),
+      );
     }
     if (hasRenderEffect) {
-      inGameVisualizationToggles.push(renderCapabilityToggle(
-        mod.id,
-        getCapabilityLabel(mod, "effects"),
-        "effects",
-      ));
+      inGameVisualizationToggles.push(
+        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "effects"), "effects"),
+      );
     }
   }
 
@@ -1244,19 +1188,19 @@ function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
 
   const replays = Array.isArray(value.replays)
     ? value.replays
-      .map((rawReplay): MechanicsReviewReplay | null => {
-        if (!isRecord(rawReplay) || typeof rawReplay.id !== "string") {
-          return null;
-        }
-        return {
-          id: rawReplay.id,
-          path: typeof rawReplay.path === "string" ? rawReplay.path : undefined,
-          label: typeof rawReplay.label === "string" ? rawReplay.label : undefined,
-          locator: isRecord(rawReplay.locator) ? rawReplay.locator : undefined,
-          meta: isRecord(rawReplay.meta) ? rawReplay.meta : undefined,
-        };
-      })
-      .filter((replay): replay is MechanicsReviewReplay => replay !== null)
+        .map((rawReplay): MechanicsReviewReplay | null => {
+          if (!isRecord(rawReplay) || typeof rawReplay.id !== "string") {
+            return null;
+          }
+          return {
+            id: rawReplay.id,
+            path: typeof rawReplay.path === "string" ? rawReplay.path : undefined,
+            label: typeof rawReplay.label === "string" ? rawReplay.label : undefined,
+            locator: isRecord(rawReplay.locator) ? rawReplay.locator : undefined,
+            meta: isRecord(rawReplay.meta) ? rawReplay.meta : undefined,
+          };
+        })
+        .filter((replay): replay is MechanicsReviewReplay => replay !== null)
     : undefined;
 
   return {
@@ -1274,9 +1218,7 @@ function parseMechanicsReviewPlaylistJson(text: string): MechanicsReviewPlaylist
     parsed = JSON.parse(text);
   } catch (error) {
     throw new Error(
-      `Invalid review playlist JSON: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Invalid review playlist JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   return parseMechanicsReviewPlaylist(parsed);
@@ -1284,11 +1226,13 @@ function parseMechanicsReviewPlaylistJson(text: string): MechanicsReviewPlaylist
 
 function getMechanicsReviewUrlFromLocation(): string | null {
   const params = new URLSearchParams(window.location.search);
-  return params.get("reviewPlaylist")?.trim() ||
+  return (
+    params.get("reviewPlaylist")?.trim() ||
     params.get("review")?.trim() ||
     params.get("playlist")?.trim() ||
     params.get("playlistUrl")?.trim() ||
-    null;
+    null
+  );
 }
 
 function isLikelyLocalFilePath(path: string): boolean {
@@ -1314,12 +1258,19 @@ function getMechanicsReviewReplayPath(
   if (replay?.path) {
     return replay.path;
   }
-  if (isRecord(replay?.locator) && replay.locator.kind === "path" &&
-    typeof replay.locator.path === "string") {
+  if (
+    isRecord(replay?.locator) &&
+    replay.locator.kind === "path" &&
+    typeof replay.locator.path === "string"
+  ) {
     return replay.locator.path;
   }
-  if (/^https?:\/\//i.test(item.replay) || item.replay.startsWith("/") ||
-    item.replay.startsWith("/@fs/") || item.replay.startsWith("path:")) {
+  if (
+    /^https?:\/\//i.test(item.replay) ||
+    item.replay.startsWith("/") ||
+    item.replay.startsWith("/@fs/") ||
+    item.replay.startsWith("path:")
+  ) {
     return item.replay;
   }
   throw new Error(`Review replay "${item.replay}" does not include a loadable path.`);
@@ -1331,7 +1282,11 @@ function getMechanicsReviewReplayLabel(
 ): string {
   const replay = review.replaysById.get(item.replay);
   const rawPath = replay?.path ?? getMechanicsReviewReplayPath(item, review);
-  const fileName = rawPath.replace(/^path:/, "").split("/").filter(Boolean).pop();
+  const fileName = rawPath
+    .replace(/^path:/, "")
+    .split("/")
+    .filter(Boolean)
+    .pop();
   return replay?.label ?? fileName ?? "review replay";
 }
 
@@ -1363,9 +1318,9 @@ function getMechanicsReviewBoundTime(bound: MechanicsReviewPlaybackBound): numbe
     return bound.value;
   }
   const frameIndex = Math.max(0, Math.trunc(bound.value));
-  return replayPlayer?.replay.frames[frameIndex]?.time ??
-    replayPlayer?.replay.frames.at(-1)?.time ??
-    0;
+  return (
+    replayPlayer?.replay.frames[frameIndex]?.time ?? replayPlayer?.replay.frames.at(-1)?.time ?? 0
+  );
 }
 
 function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
@@ -1388,8 +1343,7 @@ function getMechanicsReviewPlayerName(item: MechanicsReviewItem): string {
   }
   const playerId = getMechanicsReviewPlayerId(item);
   return playerId
-    ? replayPlayer?.replay.players.find((player) => player.id === playerId)?.name ??
-      playerId
+    ? (replayPlayer?.replay.players.find((player) => player.id === playerId)?.name ?? playerId)
     : "--";
 }
 
@@ -1397,15 +1351,11 @@ function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
   if (typeof item.meta?.mechanicLabel === "string" && item.meta.mechanicLabel.trim()) {
     return item.meta.mechanicLabel;
   }
-  return typeof item.meta?.mechanic === "string"
-    ? formatMechanicKind(item.meta.mechanic)
-    : "--";
+  return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";
 }
 
 function formatMechanicsReviewStatus(value: unknown): string {
-  return typeof value === "string" && value.trim()
-    ? value.replaceAll("_", " ")
-    : "unreviewed";
+  return typeof value === "string" && value.trim() ? value.replaceAll("_", " ") : "unreviewed";
 }
 
 function getMechanicsReviewDecisionEndpoint(item: MechanicsReviewItem | null): string | null {
@@ -1415,12 +1365,9 @@ function getMechanicsReviewDecisionEndpoint(item: MechanicsReviewItem | null): s
   if (typeof item.meta?.reviewEndpoint === "string" && item.meta.reviewEndpoint) {
     return item.meta.reviewEndpoint;
   }
-  const eventId = typeof item.meta?.eventId === "string" && item.meta.eventId
-    ? item.meta.eventId
-    : item.id;
-  return eventId
-    ? `/api/v1/mechanics/events/${encodeURIComponent(eventId)}/reviews`
-    : null;
+  const eventId =
+    typeof item.meta?.eventId === "string" && item.meta.eventId ? item.meta.eventId : item.id;
+  return eventId ? `/api/v1/mechanics/events/${encodeURIComponent(eventId)}/reviews` : null;
 }
 
 function mechanicsReviewAuthHeaders(): Record<string, string> {
@@ -1445,29 +1392,24 @@ function renderMechanicsReviewWindow(): void {
 
   const review = activeMechanicsReview;
   const items = review?.manifest.items ?? [];
-  const item = review ? items[review.currentIndex] ?? null : null;
+  const item = review ? (items[review.currentIndex] ?? null) : null;
   const hasItems = items.length > 0;
 
   mechanicsReviewCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
-  mechanicsReviewIndex.textContent = hasItems && review
-    ? `${review.currentIndex + 1} / ${items.length}`
-    : "0 / 0";
+  mechanicsReviewIndex.textContent =
+    hasItems && review ? `${review.currentIndex + 1} / ${items.length}` : "0 / 0";
   mechanicsReviewTitle.textContent = item
     ? getMechanicsReviewItemLabel(item, review?.currentIndex ?? 0)
     : "No candidate selected";
-  mechanicsReviewMechanic.textContent = item
-    ? getMechanicsReviewMechanicLabel(item)
-    : "--";
-  mechanicsReviewPlayer.textContent = item
-    ? getMechanicsReviewPlayerName(item)
-    : "--";
+  mechanicsReviewMechanic.textContent = item ? getMechanicsReviewMechanicLabel(item) : "--";
+  mechanicsReviewPlayer.textContent = item ? getMechanicsReviewPlayerName(item) : "--";
   mechanicsReviewReason.textContent = item?.meta?.reason ?? "--";
   mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;
   mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;
-  mechanicsReviewNext.disabled = !review || review.loading ||
-    review.currentIndex >= items.length - 1;
-  const decisionDisabled = !review || review.loading ||
-    getMechanicsReviewDecisionEndpoint(item) === null;
+  mechanicsReviewNext.disabled =
+    !review || review.loading || review.currentIndex >= items.length - 1;
+  const decisionDisabled =
+    !review || review.loading || getMechanicsReviewDecisionEndpoint(item) === null;
   mechanicsReviewConfirm.disabled = decisionDisabled;
   mechanicsReviewReject.disabled = decisionDisabled;
   mechanicsReviewUncertain.disabled = decisionDisabled;
@@ -1524,9 +1466,7 @@ async function loadMechanicsReviewPlaylist(
     currentClip: null,
   };
   setMechanicsReviewStatus(
-    manifest.label
-      ? `Loaded ${manifest.label}.`
-      : `Loaded review playlist.`,
+    manifest.label ? `Loaded ${manifest.label}.` : `Loaded review playlist.`,
   );
   renderMechanicsReviewWindow();
 
@@ -1576,8 +1516,7 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
       replayPlayer?.getState().duration ?? Number.POSITIVE_INFINITY,
       Math.max(startTime, getMechanicsReviewBoundTime(item.end)),
     );
-    if (!Number.isFinite(startTime) || !Number.isFinite(endTime) ||
-      endTime <= startTime) {
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
       throw new Error("Review item has an empty playback range.");
     }
 
@@ -1595,15 +1534,11 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
       playing: false,
       skipPostGoalTransitionsEnabled: false,
     });
-    setMechanicsReviewStatus(
-      `${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`,
-    );
+    setMechanicsReviewStatus(`${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`);
   } catch (error) {
     console.error("Failed to activate mechanics review item:", error);
     review.currentClip = null;
-    setMechanicsReviewStatus(
-      error instanceof Error ? error.message : "Failed to load review item",
-    );
+    setMechanicsReviewStatus(error instanceof Error ? error.message : "Failed to load review item");
   } finally {
     review.loading = false;
     renderMechanicsReviewWindow();
@@ -1646,7 +1581,7 @@ async function submitMechanicsReviewDecision(
   if (!response.ok) {
     let message = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
     try {
-      const body = await response.json() as { error?: unknown };
+      const body = (await response.json()) as { error?: unknown };
       if (typeof body.error === "string") {
         message = body.error;
       }
@@ -1688,10 +1623,7 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
   return true;
 }
 
-function renderModuleSummaryGroup(
-  title: string,
-  items: HTMLButtonElement[],
-): HTMLElement {
+function renderModuleSummaryGroup(title: string, items: HTMLButtonElement[]): HTMLElement {
   const group = document.createElement("section");
   group.className = "module-summary-group";
 
@@ -1706,10 +1638,7 @@ function renderModuleSummaryGroup(
   return group;
 }
 
-function getCapabilityLabel(
-  mod: StatModule,
-  kind: ModuleCapabilityKind,
-): string {
+function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string {
   const timelineLabels: Record<string, string> = {
     "absolute-positioning:ranges": "Position zones",
     "backboard:events": "Backboard",
@@ -1827,34 +1756,19 @@ function getStatById(statId: string): StatDefinition | null {
 }
 
 function getCurrentStatsFrame(frameIndex: number): StatsFrame | null {
-  return statsFrameLookup
-    ? getStatsFrameForReplayFrame(statsFrameLookup, frameIndex)
-    : null;
+  return statsFrameLookup ? getStatsFrameForReplayFrame(statsFrameLookup, frameIndex) : null;
 }
 
-function getTeamSnapshot(
-  frame: StatsFrame,
-  team: TeamScope,
-): TeamStatsSnapshot | null {
-  return team === "blue" ? frame.team_zero ?? null : frame.team_one ?? null;
+function getTeamSnapshot(frame: StatsFrame, team: TeamScope): TeamStatsSnapshot | null {
+  return team === "blue" ? (frame.team_zero ?? null) : (frame.team_one ?? null);
 }
 
 function getTeamLabel(team: TeamScope): string {
   return team === "blue" ? "Blue" : "Orange";
 }
 
-function getPlayerLabel(playerId: string | null): string {
-  if (!playerId || !replayPlayer) {
-    return "Select player";
-  }
-  return replayPlayer.replay.players.find((player) => player.id === playerId)
-    ?.name ?? "Unknown player";
-}
-
 function getPlayerTeamClass(playerId: string | null | undefined): string | null {
-  const player = replayPlayer?.replay.players.find((candidate) =>
-    candidate.id === playerId
-  );
+  const player = replayPlayer?.replay.players.find((candidate) => candidate.id === playerId);
   return player ? getTeamClass(player.isTeamZero) : null;
 }
 
@@ -1868,9 +1782,7 @@ function appendGroupedPlayerOptions(
 ): void {
   const players = replayPlayer?.replay.players ?? [];
   for (const team of ["blue", "orange"] as const) {
-    const teamPlayers = players.filter((player) =>
-      player.isTeamZero === (team === "blue")
-    );
+    const teamPlayers = players.filter((player) => player.isTeamZero === (team === "blue"));
     if (teamPlayers.length === 0) {
       continue;
     }
@@ -1921,8 +1833,6 @@ function getStatsWindowTitle(kind: StatsWindowKind): string {
       return "All players stats";
     case "all-teams":
       return "All teams stats";
-    case "mechanics-overview":
-      return "Mechanics counts";
     case "goals-overview":
       return "Goal labels";
     case "ad-hoc":
@@ -1935,7 +1845,7 @@ function hasStatsWindowScopeSelector(kind: StatsWindowKind): boolean {
 }
 
 function hasStatsWindowStatPicker(kind: StatsWindowKind): boolean {
-  return kind !== "mechanics-overview" && kind !== "goals-overview";
+  return kind !== "goals-overview";
 }
 
 function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
@@ -1946,7 +1856,6 @@ function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null
     case "team":
     case "all-teams":
       return "team";
-    case "mechanics-overview":
     case "goals-overview":
       return null;
     case "ad-hoc":
@@ -1969,8 +1878,7 @@ function renderStatsWindows(
   for (const statsWindow of statsWindows.values()) {
     if (
       options.preserveOpenPickers &&
-      (statsWindow.pickerOpen ||
-        statsWindow.element.contains(document.activeElement))
+      (statsWindow.pickerOpen || statsWindow.element.contains(document.activeElement))
     ) {
       continue;
     }
@@ -1978,10 +1886,7 @@ function renderStatsWindows(
   }
 }
 
-function createStatsWindow(
-  kind: StatsWindowKind,
-  config?: StatsWindowConfig,
-): StatsWindowState {
+function createStatsWindow(kind: StatsWindowKind, config?: StatsWindowConfig): StatsWindowState {
   const id = config?.id ?? `stats-${nextStatsWindowId++}`;
   const idNumber = Number.parseInt(id.replace(/^stats-/, ""), 10);
   if (Number.isFinite(idNumber)) {
@@ -2024,11 +1929,12 @@ function createStatsWindow(
   const state: StatsWindowState = {
     id,
     kind,
-    entries: config?.entries.map((entry) => ({
-      key: `${id}:${entry.statId}:${entry.targetId ?? "scope"}`,
-      statId: entry.statId,
-      targetId: entry.targetId,
-    })) ?? [],
+    entries:
+      config?.entries.map((entry) => ({
+        key: `${id}:${entry.statId}:${entry.targetId ?? "scope"}`,
+        statId: entry.statId,
+        targetId: entry.targetId,
+      })) ?? [],
     playerId: config?.playerId ?? replayPlayer?.replay.players[0]?.id ?? null,
     team: config?.team ?? "blue",
     pickerOpen: false,
@@ -2068,7 +1974,8 @@ function renderStatsWindow(
   frameIndex = replayPlayer?.getState().frameIndex ?? 0,
 ): void {
   const activeElement = document.activeElement;
-  const searchFocused = activeElement instanceof HTMLInputElement &&
+  const searchFocused =
+    activeElement instanceof HTMLInputElement &&
     activeElement.dataset.statsWindowSearch === statsWindow.id;
   const searchSelectionStart = searchFocused ? activeElement.selectionStart : null;
   const searchSelectionEnd = searchFocused ? activeElement.selectionEnd : null;
@@ -2088,11 +1995,7 @@ function renderStatsWindow(
       `input[data-stats-window-search="${statsWindow.id}"]`,
     );
     searchInput?.focus({ preventScroll: true });
-    if (
-      searchInput &&
-      searchSelectionStart !== null &&
-      searchSelectionEnd !== null
-    ) {
+    if (searchInput && searchSelectionStart !== null && searchSelectionEnd !== null) {
       searchInput.setSelectionRange(
         searchSelectionStart,
         searchSelectionEnd,
@@ -2131,12 +2034,7 @@ function renderStatsWindowScope(statsWindow: StatsWindowState): void {
   } else {
     select.append(
       new Option("Blue", "blue", statsWindow.team === "blue", statsWindow.team === "blue"),
-      new Option(
-        "Orange",
-        "orange",
-        statsWindow.team === "orange",
-        statsWindow.team === "orange",
-      ),
+      new Option("Orange", "orange", statsWindow.team === "orange", statsWindow.team === "orange"),
     );
     select.value = statsWindow.team ?? "blue";
     select.addEventListener("change", () => {
@@ -2235,10 +2133,7 @@ function renderStatsWindowPickerList(
   const scopeDefinitions = allowedScope
     ? statRegistry.filter((definition) => definition.scope === allowedScope)
     : statRegistry;
-  const definitions = getStatDefinitionSearchMatches(
-    scopeDefinitions,
-    statsWindow.query,
-  );
+  const definitions = getStatDefinitionSearchMatches(scopeDefinitions, statsWindow.query);
 
   const groupByCategory = new Map<string, StatDefinition[]>();
   for (const definition of definitions) {
@@ -2268,7 +2163,8 @@ function renderStatsWindowPickerList(
     item.type = "button";
     item.className = "stats-window-picker-item";
     item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;
-    item.disabled = statsWindow.kind !== "ad-hoc" &&
+    item.disabled =
+      statsWindow.kind !== "ad-hoc" &&
       statsWindow.entries.some((entry) => entry.statId === definition.id);
     activateButton(item, () => {
       addStatToWindow(statsWindow, definition);
@@ -2281,23 +2177,18 @@ function renderStatsWindowPickerList(
   if (definitions.length === 0) {
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
-    empty.textContent = statRegistry.length === 0
-      ? "No stats available."
-      : "No matching stats.";
+    empty.textContent = statRegistry.length === 0 ? "No stats available." : "No matching stats.";
     list.append(empty);
   }
 }
 
-function addStatToWindow(
-  statsWindow: StatsWindowState,
-  definition: StatDefinition,
-): void {
-  const targetId = statsWindow.kind === "ad-hoc"
-    ? getDefaultAdHocTargetId(definition)
-    : undefined;
-  if (statsWindow.entries.some((entry) =>
-    entry.statId === definition.id && entry.targetId === targetId
-  )) {
+function addStatToWindow(statsWindow: StatsWindowState, definition: StatDefinition): void {
+  const targetId = statsWindow.kind === "ad-hoc" ? getDefaultAdHocTargetId(definition) : undefined;
+  if (
+    statsWindow.entries.some(
+      (entry) => entry.statId === definition.id && entry.targetId === targetId,
+    )
+  ) {
     return;
   }
   statsWindow.entries.push({
@@ -2321,14 +2212,7 @@ function removeStatFromWindow(statsWindow: StatsWindowState, entryKey: string): 
   }
 }
 
-function renderStatsWindowEntries(
-  statsWindow: StatsWindowState,
-  frameIndex: number,
-): void {
-  if (statsWindow.kind === "mechanics-overview") {
-    renderMechanicsOverviewStats(statsWindow);
-    return;
-  }
+function renderStatsWindowEntries(statsWindow: StatsWindowState, frameIndex: number): void {
   if (statsWindow.kind === "goals-overview") {
     renderGoalLabelsOverview(statsWindow);
     return;
@@ -2338,9 +2222,9 @@ function renderStatsWindowEntries(
   const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
   const entries = statsWindow.entries
     .map((entry) => ({ entry, definition: getStatById(entry.statId) }))
-    .filter((item): item is { entry: SelectedStatEntry; definition: StatDefinition } =>
-      item.definition !== null &&
-      (!allowedScope || item.definition.scope === allowedScope)
+    .filter(
+      (item): item is { entry: SelectedStatEntry; definition: StatDefinition } =>
+        item.definition !== null && (!allowedScope || item.definition.scope === allowedScope),
     );
 
   if (entries.length === 0) {
@@ -2369,115 +2253,20 @@ function renderStatsWindowEntries(
   }
   if (statsWindow.kind === "player") {
     const player = statsWindow.playerId
-      ? frame.players.find((candidate) =>
-        playerIdToString(candidate.player_id) === statsWindow.playerId
-      ) ?? null
+      ? (frame.players.find(
+          (candidate) => playerIdToString(candidate.player_id) === statsWindow.playerId,
+        ) ?? null)
       : null;
     renderScopedStatList(statsWindow, player, entries);
     return;
   }
   if (statsWindow.kind === "team") {
-    renderScopedStatList(
-      statsWindow,
-      getTeamSnapshot(frame, statsWindow.team ?? "blue"),
-      entries,
-    );
+    renderScopedStatList(statsWindow, getTeamSnapshot(frame, statsWindow.team ?? "blue"), entries);
     return;
   }
   if (statsWindow.kind === "ad-hoc") {
     renderAdHocStats(statsWindow, frame, entries);
   }
-}
-
-function renderMechanicsOverviewStats(statsWindow: StatsWindowState): void {
-  const timeline = statsTimeline;
-  const replay = replayPlayer?.replay ?? null;
-  if (!timeline || !replay) {
-    appendStatsWindowEmpty(statsWindow, "Load a replay to show mechanics.");
-    return;
-  }
-
-  const players = replay.players;
-  const playerNames = new Map(players.map((player) => [player.id, player.name]));
-  const playerTeams = new Map(players.map((player) => [player.id, player.isTeamZero]));
-  const mechanics = getMechanicKinds(timeline);
-  if (mechanics.length === 0) {
-    appendStatsWindowEmpty(statsWindow, "No mechanic events loaded.");
-    return;
-  }
-
-  const counts = new Map<string, number>();
-  const teamCounts = new Map<string, number>();
-  for (const event of timeline.events.mechanics ?? []) {
-    if (!isVisibleMechanicKind(event.kind)) {
-      continue;
-    }
-    const playerId = playerIdToString(event.player_id);
-    const playerKey = `${event.kind}:${playerId}`;
-    counts.set(playerKey, (counts.get(playerKey) ?? 0) + 1);
-    const teamKey = `${event.kind}:${event.is_team_0 ? "blue" : "orange"}`;
-    teamCounts.set(teamKey, (teamCounts.get(teamKey) ?? 0) + 1);
-    if (!playerNames.has(playerId)) {
-      playerNames.set(playerId, playerId);
-      playerTeams.set(playerId, event.is_team_0);
-    }
-  }
-
-  const allPlayerIds = [
-    ...players.map((player) => player.id),
-    ...[...playerNames.keys()].filter((playerId) =>
-      !players.some((player) => player.id === playerId)
-    ),
-  ];
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "stats-overview-table-wrap";
-  const table = document.createElement("table");
-  table.className = "stats-overview-table mechanics-count-table";
-  const thead = document.createElement("thead");
-  const header = document.createElement("tr");
-  for (const label of ["Mechanic", "Blue", "Orange", ...allPlayerIds.map((id) =>
-    playerNames.get(id) ?? id
-  )]) {
-    const cell = document.createElement("th");
-    cell.scope = "col";
-    cell.textContent = label;
-    header.append(cell);
-  }
-  thead.append(header);
-
-  const tbody = document.createElement("tbody");
-  for (const mechanic of mechanics) {
-    const row = document.createElement("tr");
-    const label = document.createElement("th");
-    label.scope = "row";
-    label.textContent = formatMechanicKind(mechanic);
-    row.append(label);
-
-    for (const team of ["blue", "orange"] as const) {
-      const cell = document.createElement("td");
-      cell.className = `stats-overview-count ${getTeamScopeClass(team)}`;
-      cell.textContent = String(teamCounts.get(`${mechanic}:${team}`) ?? 0);
-      row.append(cell);
-    }
-
-    for (const playerId of allPlayerIds) {
-      const cell = document.createElement("td");
-      const team = playerTeams.get(playerId);
-      if (team !== undefined) {
-        cell.className = `stats-overview-count ${getTeamClass(team)}`;
-      } else {
-        cell.className = "stats-overview-count";
-      }
-      cell.textContent = String(counts.get(`${mechanic}:${playerId}`) ?? 0);
-      row.append(cell);
-    }
-    tbody.append(row);
-  }
-
-  table.append(thead, tbody);
-  wrapper.append(table);
-  statsWindow.body.append(wrapper);
 }
 
 function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
@@ -2488,8 +2277,9 @@ function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
     return;
   }
 
-  const goalContexts = [...(timeline.events.goal_context ?? [])]
-    .sort((left, right) => left.time - right.time);
+  const goalContexts = [...(timeline.events.goal_context ?? [])].sort(
+    (left, right) => left.time - right.time,
+  );
   const tagsByGoalIndex = new Map<number, typeof timeline.events.goal_tags>();
   for (const tag of timeline.events.goal_tags ?? []) {
     const group = tagsByGoalIndex.get(tag.goal_index) ?? [];
@@ -2497,8 +2287,8 @@ function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
     tagsByGoalIndex.set(tag.goal_index, group);
   }
   for (const group of tagsByGoalIndex.values()) {
-    group.sort((left, right) =>
-      left.kind.localeCompare(right.kind) || right.confidence - left.confidence
+    group.sort(
+      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
     );
   }
 
@@ -2522,12 +2312,9 @@ function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
     const scorer = context?.scorer ?? firstTag?.scorer ?? null;
     const scorerId = scorer ? playerIdToString(scorer) : null;
     const scorerName = scorer
-      ? replay.players.find((player) => player.id === scorerId)?.name ??
-        scorerId
+      ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
       : "Unknown scorer";
-    const isTeamZero = context?.scoring_team_is_team_0 ??
-      firstTag?.scoring_team_is_team_0 ??
-      null;
+    const isTeamZero = context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
 
     const item = document.createElement("section");
     item.className = "goal-label-item";
@@ -2613,12 +2400,14 @@ function renderScopedStatList(
   const list = document.createElement("div");
   list.className = "stats-window-stat-list";
   for (const { entry, definition } of entries) {
-    list.append(renderStatRow(
-      statsWindow,
-      entry,
-      definition,
-      target ? definition.format(definition.read(target)) : "--",
-    ));
+    list.append(
+      renderStatRow(
+        statsWindow,
+        entry,
+        definition,
+        target ? definition.format(definition.read(target)) : "--",
+      ),
+    );
   }
   statsWindow.body.append(list);
 }
@@ -2631,9 +2420,7 @@ function renderAllPlayersStats(
   const list = document.createElement("div");
   list.className = "stats-window-team-list";
   for (const team of ["blue", "orange"] as const) {
-    const players = frame.players.filter((player) =>
-      player.is_team_0 === (team === "blue")
-    );
+    const players = frame.players.filter((player) => player.is_team_0 === (team === "blue"));
     if (players.length === 0) {
       continue;
     }
@@ -2660,12 +2447,9 @@ function renderAllPlayersStats(
       title.textContent = player.name;
       section.append(title);
       for (const { entry, definition } of entries) {
-        section.append(renderStatRow(
-          statsWindow,
-          entry,
-          definition,
-          definition.format(definition.read(player)),
-        ));
+        section.append(
+          renderStatRow(statsWindow, entry, definition, definition.format(definition.read(player))),
+        );
       }
       playerList.append(section);
     }
@@ -2691,12 +2475,14 @@ function renderAllTeamsStats(
     title.textContent = getTeamLabel(team);
     section.append(title);
     for (const { entry, definition } of entries) {
-      section.append(renderStatRow(
-        statsWindow,
-        entry,
-        definition,
-        snapshot ? definition.format(definition.read(snapshot)) : "--",
-      ));
+      section.append(
+        renderStatRow(
+          statsWindow,
+          entry,
+          definition,
+          snapshot ? definition.format(definition.read(snapshot)) : "--",
+        ),
+      );
     }
     list.append(section);
   }
@@ -2712,12 +2498,14 @@ function renderAdHocStats(
   list.className = "stats-window-stat-list";
   for (const { entry, definition } of entries) {
     const target = getAdHocTarget(frame, definition, entry.targetId);
-    list.append(renderStatRow(
-      statsWindow,
-      entry,
-      definition,
-      target ? definition.format(definition.read(target)) : "--",
-    ));
+    list.append(
+      renderStatRow(
+        statsWindow,
+        entry,
+        definition,
+        target ? definition.format(definition.read(target)) : "--",
+      ),
+    );
   }
   statsWindow.body.append(list);
 }
@@ -2728,9 +2516,11 @@ function getAdHocTarget(
   targetId: string | undefined,
 ): PlayerStatsSnapshot | TeamStatsSnapshot | null {
   if (definition.scope === "player") {
-    return frame.players.find((player) =>
-      playerIdToString(player.player_id) === targetId
-    ) ?? frame.players[0] ?? null;
+    return (
+      frame.players.find((player) => playerIdToString(player.player_id) === targetId) ??
+      frame.players[0] ??
+      null
+    );
   }
   return getTeamSnapshot(frame, targetId === "orange" ? "orange" : "blue");
 }
@@ -2758,28 +2548,24 @@ function renderStatRow(
     } else {
       targetSelect.append(
         new Option("Blue", "blue", entry.targetId === "blue", entry.targetId === "blue"),
-        new Option(
-          "Orange",
-          "orange",
-          entry.targetId === "orange",
-          entry.targetId === "orange",
-        ),
+        new Option("Orange", "orange", entry.targetId === "orange", entry.targetId === "orange"),
       );
     }
     targetSelect.value = entry.targetId ?? "";
     targetSelect.addEventListener("change", () => {
       const nextTargetId = targetSelect.value;
-      if (statsWindow.entries.some((candidate) =>
-        candidate !== entry &&
-        candidate.statId === entry.statId &&
-        candidate.targetId === nextTargetId
-      )) {
+      if (
+        statsWindow.entries.some(
+          (candidate) =>
+            candidate !== entry &&
+            candidate.statId === entry.statId &&
+            candidate.targetId === nextTargetId,
+        )
+      ) {
         renderStatsWindow(statsWindow);
         return;
       }
-      const index = statsWindow.entries.findIndex((candidate) =>
-        candidate.key === entry.key
-      );
+      const index = statsWindow.entries.findIndex((candidate) => candidate.key === entry.key);
       if (index >= 0) {
         statsWindow.entries[index] = {
           key: `${statsWindow.id}:${entry.statId}:${nextTargetId}`,
@@ -2808,11 +2594,7 @@ function renderStatRow(
   return row;
 }
 
-function formatSetting(
-  value: number | undefined,
-  suffix = "",
-  digits = 0,
-): string {
+function formatSetting(value: number | undefined, suffix = "", digits = 0): string {
   if (value === undefined || Number.isNaN(value)) {
     return "--";
   }
@@ -2832,16 +2614,15 @@ function getFallbackCameraSettings(): Required<CameraSettings> {
   };
 }
 
-function getAttachedPlayerCameraSettings(
-  attachedPlayerId: string | null,
-): CameraSettings | null {
+function getAttachedPlayerCameraSettings(attachedPlayerId: string | null): CameraSettings | null {
   if (!replayPlayer || attachedPlayerId === null) {
     return null;
   }
 
-  return replayPlayer.replay.players.find(
-    (candidate) => candidate.id === attachedPlayerId,
-  )?.cameraSettings ?? null;
+  return (
+    replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId)
+      ?.cameraSettings ?? null
+  );
 }
 
 function getEffectiveCameraSettings(state: ReplayPlayerState): CameraSettings {
@@ -2899,11 +2680,7 @@ function syncCustomCameraSettingControls(settings: CameraSettings): void {
   customCameraDistanceReadout.textContent = formatSetting(distance, "", 0);
   customCameraStiffnessReadout.textContent = formatSetting(stiffness, "", 2);
   customCameraSwivelSpeedReadout.textContent = formatSetting(swivelSpeed, "", 1);
-  customCameraTransitionSpeedReadout.textContent = formatSetting(
-    transitionSpeed,
-    "",
-    2,
-  );
+  customCameraTransitionSpeedReadout.textContent = formatSetting(transitionSpeed, "", 2);
 }
 
 function setTransportEnabled(enabled: boolean): void {
@@ -2915,9 +2692,7 @@ function setTransportEnabled(enabled: boolean): void {
   syncCameraModeButtons(enabled ? replayPlayer?.getState() : undefined);
 }
 
-function getCameraViewButton(
-  mode: ReplayCameraViewMode,
-): HTMLButtonElement {
+function getCameraViewButton(mode: ReplayCameraViewMode): HTMLButtonElement {
   switch (mode) {
     case "free":
       return cameraViewFreeButton;
@@ -2949,14 +2724,13 @@ function syncCameraModeButtons(state?: ReplayPlayerState): void {
 
 function syncCameraControlAvailability(state?: ReplayPlayerState): void {
   syncCameraModeButtons(state);
-  const hasAttachedCamera = replayPlayer !== null &&
+  const hasAttachedCamera =
+    replayPlayer !== null &&
     state?.cameraViewMode === "follow" &&
     (state.attachedPlayerId ?? null) !== null;
   cameraDistance.disabled = !hasAttachedCamera;
   customCameraSettings.disabled = !hasAttachedCamera;
-  setCameraSettingControlsEnabled(
-    hasAttachedCamera && state?.customCameraSettings !== null,
-  );
+  setCameraSettingControlsEnabled(hasAttachedCamera && state?.customCameraSettings !== null);
   ballCam.disabled = !hasAttachedCamera;
 }
 
@@ -2966,10 +2740,7 @@ function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
 
   for (const player of players) {
     attachedPlayer.append(
-      new Option(
-        `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`,
-        player.id,
-      ),
+      new Option(`${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`, player.id),
     );
   }
 }
@@ -3068,9 +2839,7 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
     return;
   }
 
-  const player = replayPlayer.replay.players.find(
-    (candidate) => candidate.id === attachedPlayerId,
-  );
+  const player = replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId);
   if (!player) {
     cameraProfileReadout.textContent = "Unknown";
     cameraFovReadout.textContent = "--";
@@ -3082,22 +2851,13 @@ function renderCameraProfile(state?: ReplayPlayerState): void {
   }
 
   const cameraSettings = getEffectiveCameraSettings(state);
-  cameraProfileReadout.textContent = state.customCameraSettings === null
-    ? player.name
-    : `${player.name} custom`;
+  cameraProfileReadout.textContent =
+    state.customCameraSettings === null ? player.name : `${player.name} custom`;
   cameraFovReadout.textContent = formatSetting(cameraSettings.fov, "", 0);
   cameraHeightReadout.textContent = formatSetting(cameraSettings.height, "", 0);
   cameraPitchReadout.textContent = formatSetting(cameraSettings.pitch, "", 0);
-  cameraBaseDistanceReadout.textContent = formatSetting(
-    cameraSettings.distance,
-    "",
-    0,
-  );
-  cameraStiffnessReadout.textContent = formatSetting(
-    cameraSettings.stiffness,
-    "",
-    2,
-  );
+  cameraBaseDistanceReadout.textContent = formatSetting(cameraSettings.distance, "", 0);
+  cameraStiffnessReadout.textContent = formatSetting(cameraSettings.stiffness, "", 2);
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
@@ -3127,9 +2887,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
 }
 
-function includeBoostPickupAnimationPickup(
-  pickup: BoostPickupAnimationPickup,
-): boolean {
+function includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): boolean {
   return boostPickupFilters.includePickup(pickup);
 }
 
@@ -3156,12 +2914,9 @@ function createRemoteReplaySource(
         signal,
       });
       if (!response.ok) {
-        const statusText = response.statusText
-          ? ` ${response.statusText}`
-          : "";
+        const statusText = response.statusText ? ` ${response.statusText}` : "";
         const authHint =
-          request.kind === "ballchasing" &&
-            [401, 403, 404].includes(response.status)
+          request.kind === "ballchasing" && [401, 403, 404].includes(response.status)
             ? ". The replay may be private, unavailable, or not downloadable without a Ballchasing session"
             : "";
         throw new Error(
@@ -3232,14 +2987,12 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 
     replayPlayer = new ReplayPlayer(viewport, replay, {
       initialPlaybackRate: config?.playback.rate,
-      initialCameraDistanceScale:
-        config?.camera.distanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
+      initialCameraDistanceScale: config?.camera.distanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
       initialCustomCameraSettings: config?.camera.customSettings ?? null,
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
       initialCameraViewMode: config?.camera.mode,
       initialBallCamEnabled: config?.camera.ballCam ?? false,
-      initialBoostPickupAnimationEnabled:
-        config?.overlays.boostPickupAnimation ?? false,
+      initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
       plugins: [
@@ -3268,8 +3021,7 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
     emptyState.hidden = true;
     statusReadout.textContent = `Loaded ${source.name}`;
     loadedReplayName = source.name;
-    playersReadout.textContent = replay.players.map((player) => player.name)
-      .join(", ");
+    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
     renderTimelineEventCount();
     renderMechanicsTimelineControls();
@@ -3295,15 +3047,10 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 function loadReplayFromLocation(signal: AbortSignal): void {
   let replayRequest: ReplayFetchRequest | null;
   try {
-    replayRequest = getReplayFetchRequestFromSearch(
-      window.location.search,
-      window.location.href,
-    );
+    replayRequest = getReplayFetchRequestFromSearch(window.location.search, window.location.href);
   } catch (error) {
     console.error("Invalid replay URL:", error);
-    statusReadout.textContent = error instanceof Error
-      ? error.message
-      : "Invalid replay URL";
+    statusReadout.textContent = error instanceof Error ? error.message : "Invalid replay URL";
     return;
   }
 
@@ -3311,22 +3058,17 @@ function loadReplayFromLocation(signal: AbortSignal): void {
     return;
   }
 
-  void loadReplay(createRemoteReplaySource(replayRequest, signal)).catch(
-    (error) => {
-      if (signal.aborted) {
-        return;
-      }
-      console.error("Failed to load replay URL:", error);
-      statusReadout.textContent = error instanceof Error
-        ? error.message
-        : "Failed to load replay URL";
-    },
-  );
+  void loadReplay(createRemoteReplaySource(replayRequest, signal)).catch((error) => {
+    if (signal.aborted) {
+      return;
+    }
+    console.error("Failed to load replay URL:", error);
+    statusReadout.textContent =
+      error instanceof Error ? error.message : "Failed to load replay URL";
+  });
 }
 
-export function mountStatEvaluationPlayer(
-  root: HTMLElement,
-): StatEvaluationPlayerHandle {
+export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
   root.innerHTML = getAppTemplate(DEFAULT_CAMERA_DISTANCE_SCALE);
@@ -3345,154 +3087,55 @@ export function mountStatEvaluationPlayer(
     root,
     "#mechanics-timeline-window-body",
   );
-  mechanicsReviewFile = mustElement<HTMLInputElement>(
-    root,
-    "#mechanics-review-file",
-  );
-  mechanicsReviewUrl = mustElement<HTMLInputElement>(
-    root,
-    "#mechanics-review-url",
-  );
-  mechanicsReviewLoadUrl = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-load-url",
-  );
-  mechanicsReviewStatus = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-status",
-  );
-  mechanicsReviewIndex = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-index",
-  );
-  mechanicsReviewTitle = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-title",
-  );
-  mechanicsReviewMechanic = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-mechanic",
-  );
-  mechanicsReviewPlayer = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-player",
-  );
-  mechanicsReviewReason = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-reason",
-  );
-  mechanicsReviewPrev = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-prev",
-  );
-  mechanicsReviewReplay = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-replay",
-  );
-  mechanicsReviewNext = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-next",
-  );
-  mechanicsReviewConfirm = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-confirm",
-  );
-  mechanicsReviewReject = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-reject",
-  );
-  mechanicsReviewUncertain = mustElement<HTMLButtonElement>(
-    root,
-    "#mechanics-review-uncertain",
-  );
-  mechanicsReviewCount = mustElement<HTMLElement>(
-    root,
-    "#mechanics-review-count",
-  );
-  mechanicsReviewList = mustElement<HTMLDivElement>(
-    root,
-    "#mechanics-review-list",
-  );
+  mechanicsReviewFile = mustElement<HTMLInputElement>(root, "#mechanics-review-file");
+  mechanicsReviewUrl = mustElement<HTMLInputElement>(root, "#mechanics-review-url");
+  mechanicsReviewLoadUrl = mustElement<HTMLButtonElement>(root, "#mechanics-review-load-url");
+  mechanicsReviewStatus = mustElement<HTMLElement>(root, "#mechanics-review-status");
+  mechanicsReviewIndex = mustElement<HTMLElement>(root, "#mechanics-review-index");
+  mechanicsReviewTitle = mustElement<HTMLElement>(root, "#mechanics-review-title");
+  mechanicsReviewMechanic = mustElement<HTMLElement>(root, "#mechanics-review-mechanic");
+  mechanicsReviewPlayer = mustElement<HTMLElement>(root, "#mechanics-review-player");
+  mechanicsReviewReason = mustElement<HTMLElement>(root, "#mechanics-review-reason");
+  mechanicsReviewPrev = mustElement<HTMLButtonElement>(root, "#mechanics-review-prev");
+  mechanicsReviewReplay = mustElement<HTMLButtonElement>(root, "#mechanics-review-replay");
+  mechanicsReviewNext = mustElement<HTMLButtonElement>(root, "#mechanics-review-next");
+  mechanicsReviewConfirm = mustElement<HTMLButtonElement>(root, "#mechanics-review-confirm");
+  mechanicsReviewReject = mustElement<HTMLButtonElement>(root, "#mechanics-review-reject");
+  mechanicsReviewUncertain = mustElement<HTMLButtonElement>(root, "#mechanics-review-uncertain");
+  mechanicsReviewCount = mustElement<HTMLElement>(root, "#mechanics-review-count");
+  mechanicsReviewList = mustElement<HTMLDivElement>(root, "#mechanics-review-list");
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
     root,
     "#boost-pickup-filters-window-body",
   );
-  touchControlsWindowBody = mustElement<HTMLDivElement>(
-    root,
-    "#touch-controls-window-body",
-  );
+  touchControlsWindowBody = mustElement<HTMLDivElement>(root, "#touch-controls-window-body");
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
-  cameraViewFreeButton = mustElement<HTMLButtonElement>(
-    root,
-    "#camera-view-free",
-  );
-  cameraViewFollowButton = mustElement<HTMLButtonElement>(
-    root,
-    "#camera-view-follow",
-  );
-  cameraViewOverheadButton = mustElement<HTMLButtonElement>(
-    root,
-    "#camera-view-overhead",
-  );
+  cameraViewFreeButton = mustElement<HTMLButtonElement>(root, "#camera-view-free");
+  cameraViewFollowButton = mustElement<HTMLButtonElement>(root, "#camera-view-follow");
+  cameraViewOverheadButton = mustElement<HTMLButtonElement>(root, "#camera-view-overhead");
   cameraViewSideButton = mustElement<HTMLButtonElement>(root, "#camera-view-side");
   cameraDistance = mustElement<HTMLInputElement>(root, "#camera-distance");
-  cameraDistanceReadout = mustElement<HTMLElement>(
-    root,
-    "#camera-distance-readout",
-  );
-  customCameraSettings = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-settings",
-  );
-  cameraSettingsControls = mustElement<HTMLDivElement>(
-    root,
-    "#camera-settings-controls",
-  );
+  cameraDistanceReadout = mustElement<HTMLElement>(root, "#camera-distance-readout");
+  customCameraSettings = mustElement<HTMLInputElement>(root, "#custom-camera-settings");
+  cameraSettingsControls = mustElement<HTMLDivElement>(root, "#camera-settings-controls");
   customCameraFov = mustElement<HTMLInputElement>(root, "#custom-camera-fov");
-  customCameraHeight = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-height",
-  );
+  customCameraHeight = mustElement<HTMLInputElement>(root, "#custom-camera-height");
   customCameraPitch = mustElement<HTMLInputElement>(root, "#custom-camera-pitch");
-  customCameraDistance = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-distance",
-  );
-  customCameraStiffness = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-stiffness",
-  );
-  customCameraSwivelSpeed = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-swivel-speed",
-  );
+  customCameraDistance = mustElement<HTMLInputElement>(root, "#custom-camera-distance");
+  customCameraStiffness = mustElement<HTMLInputElement>(root, "#custom-camera-stiffness");
+  customCameraSwivelSpeed = mustElement<HTMLInputElement>(root, "#custom-camera-swivel-speed");
   customCameraTransitionSpeed = mustElement<HTMLInputElement>(
     root,
     "#custom-camera-transition-speed",
   );
-  customCameraFovReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-fov-readout",
-  );
-  customCameraHeightReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-height-readout",
-  );
-  customCameraPitchReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-pitch-readout",
-  );
-  customCameraDistanceReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-distance-readout",
-  );
-  customCameraStiffnessReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-stiffness-readout",
-  );
+  customCameraFovReadout = mustElement<HTMLElement>(root, "#custom-camera-fov-readout");
+  customCameraHeightReadout = mustElement<HTMLElement>(root, "#custom-camera-height-readout");
+  customCameraPitchReadout = mustElement<HTMLElement>(root, "#custom-camera-pitch-readout");
+  customCameraDistanceReadout = mustElement<HTMLElement>(root, "#custom-camera-distance-readout");
+  customCameraStiffnessReadout = mustElement<HTMLElement>(root, "#custom-camera-stiffness-readout");
   customCameraSwivelSpeedReadout = mustElement<HTMLElement>(
     root,
     "#custom-camera-swivel-speed-readout",
@@ -3507,49 +3150,25 @@ export function mountStatEvaluationPlayer(
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
   frameReadout = mustElement<HTMLElement>(root, "#frame-readout");
   durationReadout = mustElement<HTMLElement>(root, "#duration-readout");
-  playbackStatusReadout = mustElement<HTMLElement>(
-    root,
-    "#playback-status-readout",
-  );
+  playbackStatusReadout = mustElement<HTMLElement>(root, "#playback-status-readout");
   statusReadout = mustElement<HTMLElement>(root, "#status-readout");
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
-  cameraProfileReadout = mustElement<HTMLElement>(
-    root,
-    "#camera-profile-readout",
-  );
+  cameraProfileReadout = mustElement<HTMLElement>(root, "#camera-profile-readout");
   cameraFovReadout = mustElement<HTMLElement>(root, "#camera-fov-readout");
   cameraHeightReadout = mustElement<HTMLElement>(root, "#camera-height-readout");
   cameraPitchReadout = mustElement<HTMLElement>(root, "#camera-pitch-readout");
-  cameraBaseDistanceReadout = mustElement<HTMLElement>(
-    root,
-    "#camera-base-distance-readout",
-  );
-  cameraStiffnessReadout = mustElement<HTMLElement>(
-    root,
-    "#camera-stiffness-readout",
-  );
-  skipPostGoalTransitions = mustElement<HTMLInputElement>(
-    root,
-    "#skip-post-goal-transitions",
-  );
+  cameraBaseDistanceReadout = mustElement<HTMLElement>(root, "#camera-base-distance-readout");
+  cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
+  skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   recordingFps = mustElement<HTMLInputElement>(root, "#recording-fps");
-  recordingPlaybackRate = mustElement<HTMLSelectElement>(
-    root,
-    "#recording-playback-rate",
-  );
+  recordingPlaybackRate = mustElement<HTMLSelectElement>(root, "#recording-playback-rate");
   recordingStart = mustElement<HTMLButtonElement>(root, "#recording-start");
-  recordingFullReplay = mustElement<HTMLButtonElement>(
-    root,
-    "#recording-full-replay",
-  );
+  recordingFullReplay = mustElement<HTMLButtonElement>(root, "#recording-full-replay");
   recordingStop = mustElement<HTMLButtonElement>(root, "#recording-stop");
-  recordingDownload = mustElement<HTMLButtonElement>(
-    root,
-    "#recording-download",
-  );
+  recordingDownload = mustElement<HTMLButtonElement>(root, "#recording-download");
   recordingClear = mustElement<HTMLButtonElement>(root, "#recording-clear");
   recordingStatus = mustElement<HTMLElement>(root, "#recording-status");
   recordingElapsed = mustElement<HTMLElement>(root, "#recording-elapsed");
@@ -3564,17 +3183,12 @@ export function mountStatEvaluationPlayer(
   } catch (error) {
     configLoadError = error;
     console.error("Invalid stats player config:", error);
-    statusReadout.textContent = error instanceof Error
-      ? error.message
-      : "Invalid stats player config";
+    statusReadout.textContent =
+      error instanceof Error ? error.message : "Invalid stats player config";
     initialUrlConfig = null;
   }
   if (configDebugEnabled) {
-    logStatsPlayerConfigLoadDebug(
-      configParamSnapshot,
-      initialUrlConfig,
-      configLoadError,
-    );
+    logStatsPlayerConfigLoadDebug(configParamSnapshot, initialUrlConfig, configLoadError);
   }
 
   const listeners = new AbortController();
@@ -3637,18 +3251,26 @@ export function mountStatEvaluationPlayer(
     }
   }
 
-  launcherToggle.addEventListener("click", () => {
-    setLauncherOpen(launcherMenu.hidden);
-  }, { signal: listeners.signal });
+  launcherToggle.addEventListener(
+    "click",
+    () => {
+      setLauncherOpen(launcherMenu.hidden);
+    },
+    { signal: listeners.signal },
+  );
 
-  root.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) {
-      return;
-    }
-    if (!event.target.closest(".top-chrome")) {
-      setLauncherOpen(false);
-    }
-  }, { signal: listeners.signal });
+  root.addEventListener(
+    "click",
+    (event) => {
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+      if (!event.target.closest(".top-chrome")) {
+        setLauncherOpen(false);
+      }
+    },
+    { signal: listeners.signal },
+  );
 
   loadReplayAction.addEventListener("click", openReplayFilePicker, {
     signal: listeners.signal,
@@ -3658,182 +3280,248 @@ export function mountStatEvaluationPlayer(
   });
 
   root.querySelectorAll<HTMLElement>("[data-window-toggle]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.windowToggle as SingletonWindowId | undefined;
-      if (id) {
-        toggleWindow(id);
-        setLauncherOpen(false);
-      }
-    }, { signal: listeners.signal });
+    button.addEventListener(
+      "click",
+      () => {
+        const id = button.dataset.windowToggle as SingletonWindowId | undefined;
+        if (id) {
+          toggleWindow(id);
+          setLauncherOpen(false);
+        }
+      },
+      { signal: listeners.signal },
+    );
   });
 
   root.querySelectorAll<HTMLElement>("[data-window-hide]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.windowHide ?? getElementWindowId(button);
-      if (id) {
-        hideWindow(id);
-      }
-    }, { signal: listeners.signal });
+    button.addEventListener(
+      "click",
+      () => {
+        const id = button.dataset.windowHide ?? getElementWindowId(button);
+        if (id) {
+          hideWindow(id);
+        }
+      },
+      { signal: listeners.signal },
+    );
   });
 
   root.querySelectorAll<HTMLElement>("[data-create-stats-window]").forEach((button) => {
-    button.addEventListener("click", () => {
-      createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);
-    }, { signal: listeners.signal });
+    button.addEventListener(
+      "click",
+      () => {
+        createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);
+      },
+      { signal: listeners.signal },
+    );
   });
 
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
+  fileInput.addEventListener(
+    "change",
+    async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
 
-    try {
-      if (activeMechanicsReview) {
-        activeMechanicsReview.currentClip = null;
-        activeMechanicsReview.currentReplayId = null;
-        renderMechanicsReviewWindow();
+      try {
+        if (activeMechanicsReview) {
+          activeMechanicsReview.currentClip = null;
+          activeMechanicsReview.currentReplayId = null;
+          renderMechanicsReviewWindow();
+        }
+        await loadReplay(createFileReplaySource(file));
+      } catch (error) {
+        console.error("Failed to load replay:", error);
+        statusReadout.textContent =
+          error instanceof Error ? error.message : "Failed to load replay";
       }
-      await loadReplay(createFileReplaySource(file));
-    } catch (error) {
-      console.error("Failed to load replay:", error);
-      statusReadout.textContent =
-        error instanceof Error ? error.message : "Failed to load replay";
-    }
-  }, { signal: listeners.signal });
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewFile.addEventListener("change", async () => {
-    const file = mechanicsReviewFile.files?.[0];
-    if (!file) return;
+  mechanicsReviewFile.addEventListener(
+    "change",
+    async () => {
+      const file = mechanicsReviewFile.files?.[0];
+      if (!file) return;
 
-    try {
-      const manifest = parseMechanicsReviewPlaylistJson(await file.text());
-      await loadMechanicsReviewPlaylist(manifest, null);
-    } catch (error) {
-      console.error("Failed to load mechanics review playlist:", error);
-      setMechanicsReviewStatus(
-        error instanceof Error
-          ? error.message
-          : "Failed to load mechanics review playlist",
-      );
-    } finally {
-      mechanicsReviewFile.value = "";
-    }
-  }, { signal: listeners.signal });
+      try {
+        const manifest = parseMechanicsReviewPlaylistJson(await file.text());
+        await loadMechanicsReviewPlaylist(manifest, null);
+      } catch (error) {
+        console.error("Failed to load mechanics review playlist:", error);
+        setMechanicsReviewStatus(
+          error instanceof Error ? error.message : "Failed to load mechanics review playlist",
+        );
+      } finally {
+        mechanicsReviewFile.value = "";
+      }
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewLoadUrl.addEventListener("click", () => {
-    void loadMechanicsReviewPlaylistFromUrl(mechanicsReviewUrl.value.trim())
-      .catch((error) => {
+  mechanicsReviewLoadUrl.addEventListener(
+    "click",
+    () => {
+      void loadMechanicsReviewPlaylistFromUrl(mechanicsReviewUrl.value.trim()).catch((error) => {
         console.error("Failed to load mechanics review playlist URL:", error);
         setMechanicsReviewStatus(
-          error instanceof Error
-            ? error.message
-            : "Failed to load mechanics review playlist URL",
+          error instanceof Error ? error.message : "Failed to load mechanics review playlist URL",
         );
       });
-  }, { signal: listeners.signal });
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewPrev.addEventListener("click", () => {
-    const review = activeMechanicsReview;
-    if (review) {
-      void activateMechanicsReviewItem(Math.max(0, review.currentIndex - 1));
-    }
-  }, { signal: listeners.signal });
+  mechanicsReviewPrev.addEventListener(
+    "click",
+    () => {
+      const review = activeMechanicsReview;
+      if (review) {
+        void activateMechanicsReviewItem(Math.max(0, review.currentIndex - 1));
+      }
+    },
+    { signal: listeners.signal },
+  );
 
   mechanicsReviewReplay.addEventListener("click", replayMechanicsReviewClip, {
     signal: listeners.signal,
   });
 
-  mechanicsReviewNext.addEventListener("click", () => {
-    const review = activeMechanicsReview;
-    if (review) {
-      void activateMechanicsReviewItem(
-        Math.min(review.manifest.items.length - 1, review.currentIndex + 1),
-      );
-    }
-  }, { signal: listeners.signal });
+  mechanicsReviewNext.addEventListener(
+    "click",
+    () => {
+      const review = activeMechanicsReview;
+      if (review) {
+        void activateMechanicsReviewItem(
+          Math.min(review.manifest.items.length - 1, review.currentIndex + 1),
+        );
+      }
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewConfirm.addEventListener("click", () => {
-    void submitMechanicsReviewDecision("confirmed");
-  }, { signal: listeners.signal });
+  mechanicsReviewConfirm.addEventListener(
+    "click",
+    () => {
+      void submitMechanicsReviewDecision("confirmed");
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewReject.addEventListener("click", () => {
-    void submitMechanicsReviewDecision("rejected");
-  }, { signal: listeners.signal });
+  mechanicsReviewReject.addEventListener(
+    "click",
+    () => {
+      void submitMechanicsReviewDecision("rejected");
+    },
+    { signal: listeners.signal },
+  );
 
-  mechanicsReviewUncertain.addEventListener("click", () => {
-    void submitMechanicsReviewDecision("uncertain");
-  }, { signal: listeners.signal });
+  mechanicsReviewUncertain.addEventListener(
+    "click",
+    () => {
+      void submitMechanicsReviewDecision("uncertain");
+    },
+    { signal: listeners.signal },
+  );
 
-  togglePlayback.addEventListener("click", () => {
-    replayPlayer?.togglePlayback();
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  togglePlayback.addEventListener(
+    "click",
+    () => {
+      replayPlayer?.togglePlayback();
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  playbackRate.addEventListener("change", () => {
-    replayPlayer?.setPlaybackRate(Number(playbackRate.value));
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  playbackRate.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setPlaybackRate(Number(playbackRate.value));
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  recordingStart.addEventListener("click", () => {
-    if (!canvasRecorder) {
-      return;
-    }
-    try {
-      const { fps } = getRecordingOptions();
-      canvasRecorder.start({ fps });
+  recordingStart.addEventListener(
+    "click",
+    () => {
+      if (!canvasRecorder) {
+        return;
+      }
+      try {
+        const { fps } = getRecordingOptions();
+        canvasRecorder.start({ fps });
+        syncRecordingWindow();
+      } catch (error) {
+        console.error("Failed to start recording:", error);
+        statusReadout.textContent =
+          error instanceof Error ? error.message : "Failed to start recording";
+        syncRecordingWindow(canvasRecorder.getStatus());
+      }
+    },
+    { signal: listeners.signal },
+  );
+
+  recordingFullReplay.addEventListener(
+    "click",
+    () => {
+      if (!canvasRecorder) {
+        return;
+      }
+      const { fps, playbackRate } = getRecordingOptions();
+      void canvasRecorder
+        .recordFullReplay({
+          fps,
+          playbackRate,
+          restorePlaybackState: true,
+        })
+        .catch((error) => {
+          console.error("Failed to record replay:", error);
+          statusReadout.textContent =
+            error instanceof Error ? error.message : "Failed to record replay";
+          syncRecordingWindow(canvasRecorder?.getStatus() ?? null);
+        });
       syncRecordingWindow();
-    } catch (error) {
-      console.error("Failed to start recording:", error);
-      statusReadout.textContent = error instanceof Error
-        ? error.message
-        : "Failed to start recording";
-      syncRecordingWindow(canvasRecorder.getStatus());
-    }
-  }, { signal: listeners.signal });
+    },
+    { signal: listeners.signal },
+  );
 
-  recordingFullReplay.addEventListener("click", () => {
-    if (!canvasRecorder) {
-      return;
-    }
-    const { fps, playbackRate } = getRecordingOptions();
-    void canvasRecorder.recordFullReplay({
-      fps,
-      playbackRate,
-      restorePlaybackState: true,
-    }).catch((error) => {
-      console.error("Failed to record replay:", error);
-      statusReadout.textContent = error instanceof Error
-        ? error.message
-        : "Failed to record replay";
-      syncRecordingWindow(canvasRecorder?.getStatus() ?? null);
-    });
-    syncRecordingWindow();
-  }, { signal: listeners.signal });
-
-  recordingStop.addEventListener("click", () => {
-    void canvasRecorder?.stop().catch((error) => {
-      console.error("Failed to stop recording:", error);
-      statusReadout.textContent = error instanceof Error
-        ? error.message
-        : "Failed to stop recording";
-    });
-    syncRecordingWindow();
-  }, { signal: listeners.signal });
-
-  recordingDownload.addEventListener("click", () => {
-    const blob = canvasRecorder?.getRecording();
-    if (blob) {
-      downloadRecording(blob);
-    }
-  }, { signal: listeners.signal });
-
-  recordingClear.addEventListener("click", () => {
-    try {
-      canvasRecorder?.clear();
+  recordingStop.addEventListener(
+    "click",
+    () => {
+      void canvasRecorder?.stop().catch((error) => {
+        console.error("Failed to stop recording:", error);
+        statusReadout.textContent =
+          error instanceof Error ? error.message : "Failed to stop recording";
+      });
       syncRecordingWindow();
-    } catch (error) {
-      console.error("Failed to clear recording:", error);
-    }
-  }, { signal: listeners.signal });
+    },
+    { signal: listeners.signal },
+  );
+
+  recordingDownload.addEventListener(
+    "click",
+    () => {
+      const blob = canvasRecorder?.getRecording();
+      if (blob) {
+        downloadRecording(blob);
+      }
+    },
+    { signal: listeners.signal },
+  );
+
+  recordingClear.addEventListener(
+    "click",
+    () => {
+      try {
+        canvasRecorder?.clear();
+        syncRecordingWindow();
+      } catch (error) {
+        console.error("Failed to clear recording:", error);
+      }
+    },
+    { signal: listeners.signal },
+  );
 
   recordingFps.addEventListener("change", scheduleConfigUrlUpdate, {
     signal: listeners.signal,
@@ -3842,18 +3530,26 @@ export function mountStatEvaluationPlayer(
     signal: listeners.signal,
   });
 
-  cameraDistance.addEventListener("input", () => {
-    replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  cameraDistance.addEventListener(
+    "input",
+    () => {
+      replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  customCameraSettings.addEventListener("change", () => {
-    cameraSettingsControls.hidden = !customCameraSettings.checked;
-    replayPlayer?.setCustomCameraSettings(
-      customCameraSettings.checked ? readCustomCameraSettings() : null,
-    );
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  customCameraSettings.addEventListener(
+    "change",
+    () => {
+      cameraSettingsControls.hidden = !customCameraSettings.checked;
+      replayPlayer?.setCustomCameraSettings(
+        customCameraSettings.checked ? readCustomCameraSettings() : null,
+      );
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
   for (const input of [
     customCameraFov,
@@ -3864,60 +3560,94 @@ export function mountStatEvaluationPlayer(
     customCameraSwivelSpeed,
     customCameraTransitionSpeed,
   ]) {
-    input.addEventListener("input", () => {
-      const settings = readCustomCameraSettings();
-      syncCustomCameraSettingControls(settings);
-      replayPlayer?.setCustomCameraSettings(settings);
-      scheduleConfigUrlUpdate();
-    }, { signal: listeners.signal });
+    input.addEventListener(
+      "input",
+      () => {
+        const settings = readCustomCameraSettings();
+        syncCustomCameraSettingControls(settings);
+        replayPlayer?.setCustomCameraSettings(settings);
+        scheduleConfigUrlUpdate();
+      },
+      { signal: listeners.signal },
+    );
   }
 
-  attachedPlayer.addEventListener("change", () => {
-    replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
-    lastFreeCameraPreset = null;
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  attachedPlayer.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
+      lastFreeCameraPreset = null;
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  cameraViewFreeButton.addEventListener("click", () => {
-    replayPlayer?.setCameraViewMode("free");
-    lastFreeCameraPreset = null;
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  cameraViewFreeButton.addEventListener(
+    "click",
+    () => {
+      replayPlayer?.setCameraViewMode("free");
+      lastFreeCameraPreset = null;
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  cameraViewFollowButton.addEventListener("click", () => {
-    replayPlayer?.setCameraViewMode("follow");
-    lastFreeCameraPreset = null;
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  cameraViewFollowButton.addEventListener(
+    "click",
+    () => {
+      replayPlayer?.setCameraViewMode("follow");
+      lastFreeCameraPreset = null;
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  cameraViewOverheadButton.addEventListener("click", () => {
-    replayPlayer?.setFreeCameraPreset("overhead");
-    lastFreeCameraPreset = "overhead";
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  cameraViewOverheadButton.addEventListener(
+    "click",
+    () => {
+      replayPlayer?.setFreeCameraPreset("overhead");
+      lastFreeCameraPreset = "overhead";
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  cameraViewSideButton.addEventListener("click", () => {
-    replayPlayer?.setFreeCameraPreset("side");
-    lastFreeCameraPreset = "side";
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  cameraViewSideButton.addEventListener(
+    "click",
+    () => {
+      replayPlayer?.setFreeCameraPreset("side");
+      lastFreeCameraPreset = "side";
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  ballCam.addEventListener("change", () => {
-    replayPlayer?.setBallCamEnabled(ballCam.checked);
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  ballCam.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setBallCamEnabled(ballCam.checked);
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  skipPostGoalTransitions.addEventListener("change", () => {
-    replayPlayer?.setSkipPostGoalTransitionsEnabled(
-      skipPostGoalTransitions.checked,
-    );
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  skipPostGoalTransitions.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setSkipPostGoalTransitionsEnabled(skipPostGoalTransitions.checked);
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
-  skipKickoffs.addEventListener("change", () => {
-    replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
-    scheduleConfigUrlUpdate();
-  }, { signal: listeners.signal });
+  skipKickoffs.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
 
   renderModuleSummary();
   renderModuleSettings();

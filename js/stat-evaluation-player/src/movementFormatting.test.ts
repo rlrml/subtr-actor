@@ -4,44 +4,47 @@ import assert from "node:assert/strict";
 import { renderMovementStats } from "./movementFormatting.ts";
 
 test("renderMovementStats shows movement-time breakdowns for selected classes", () => {
-  const html = renderMovementStats({
-    tracked_time: 6,
-    total_distance: 1234,
-    speed_integral: 6000,
-    time_slow_speed: 0,
-    time_boost_speed: 0,
-    time_supersonic_speed: 0,
-    time_on_ground: 0,
-    time_low_air: 0,
-    time_high_air: 0,
-    labeled_tracked_time: {
-      entries: [
-        {
-          labels: [
-            { key: "speed_band", value: "slow" },
-            { key: "height_band", value: "ground" },
-          ],
-          value: 2,
-        },
-        {
-          labels: [
-            { key: "speed_band", value: "boost" },
-            { key: "height_band", value: "low_air" },
-          ],
-          value: 1.5,
-        },
-        {
-          labels: [
-            { key: "speed_band", value: "supersonic" },
-            { key: "height_band", value: "high_air" },
-          ],
-          value: 2.5,
-        },
-      ],
+  const html = renderMovementStats(
+    {
+      tracked_time: 6,
+      total_distance: 1234,
+      speed_integral: 6000,
+      time_slow_speed: 0,
+      time_boost_speed: 0,
+      time_supersonic_speed: 0,
+      time_on_ground: 0,
+      time_low_air: 0,
+      time_high_air: 0,
+      labeled_tracked_time: {
+        entries: [
+          {
+            labels: [
+              { key: "speed_band", value: "slow" },
+              { key: "height_band", value: "ground" },
+            ],
+            value: 2,
+          },
+          {
+            labels: [
+              { key: "speed_band", value: "boost" },
+              { key: "height_band", value: "low_air" },
+            ],
+            value: 1.5,
+          },
+          {
+            labels: [
+              { key: "speed_band", value: "supersonic" },
+              { key: "height_band", value: "high_air" },
+            ],
+            value: 2.5,
+          },
+        ],
+      },
     },
-  }, {
-    breakdownClasses: ["speed_band", "height_band"],
-  });
+    {
+      breakdownClasses: ["speed_band", "height_band"],
+    },
+  );
 
   assert.match(html, /Tracked<\/span><span class="value">6\.0s/);
   assert.match(html, /Distance<\/span><span class="value">1234 uu/);

@@ -15,10 +15,7 @@ interface BoostPadMeshes {
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   core: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   cooldown: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  orb: THREE.Mesh<
-    THREE.BufferGeometry,
-    THREE.MeshBasicMaterial | THREE.MeshPhongMaterial
-  >;
+  orb: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial | THREE.MeshPhongMaterial>;
   glow: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 }
 
@@ -52,9 +49,7 @@ function padOrbBottomClearance(pad: ReplayBoostPad): number {
 }
 
 function padOrbCenterZ(pad: ReplayBoostPad): number {
-  return (
-    PAD_SURFACE_Z_OFFSET + padOrbBottomClearance(pad) + padOrbRadius(pad)
-  );
+  return PAD_SURFACE_Z_OFFSET + padOrbBottomClearance(pad) + padOrbRadius(pad);
 }
 
 function padLightCenterZ(pad: ReplayBoostPad): number {
@@ -93,7 +88,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
       opacity: 0.92,
       side: THREE.DoubleSide,
       depthWrite: false,
-    })
+    }),
   );
   configureOverlayMaterial(ring.material);
   ring.position.z = PAD_SURFACE_Z_OFFSET;
@@ -109,7 +104,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
       opacity: 0.3,
       side: THREE.DoubleSide,
       depthWrite: false,
-    })
+    }),
   );
   configureOverlayMaterial(core.material);
   core.position.z = PAD_SURFACE_Z_OFFSET + 0.5;
@@ -125,7 +120,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
       opacity: 0.22,
       side: THREE.DoubleSide,
       depthWrite: false,
-    })
+    }),
   );
   configureOverlayMaterial(cooldown.material);
   cooldown.position.z = PAD_SURFACE_Z_OFFSET + 1;
@@ -155,7 +150,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
           side: THREE.DoubleSide,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
-        })
+        }),
   );
   orb.position.z = padLightCenterZ(pad);
   orb.renderOrder = 23;
@@ -173,7 +168,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-    })
+    }),
   );
   glow.position.z = padGlowCenterZ(pad);
   glow.renderOrder = 24;
@@ -185,7 +180,7 @@ function createPadMeshes(pad: ReplayBoostPad): BoostPadMeshes {
 
 function boostPadAvailableState(
   pad: ReplayBoostPad,
-  currentTime: number
+  currentTime: number,
 ): {
   available: boolean;
   progress: number;
@@ -207,9 +202,7 @@ function boostPadAvailableState(
     return { available: true, progress: 1 };
   }
 
-  const nextAvailable = pad.events
-    .slice(lastEventIndex + 1)
-    .find((event) => event.available);
+  const nextAvailable = pad.events.slice(lastEventIndex + 1).find((event) => event.available);
   if (!nextAvailable || nextAvailable.time <= lastEvent.time) {
     return { available: false, progress: 0 };
   }
@@ -219,7 +212,7 @@ function boostPadAvailableState(
     progress: THREE.MathUtils.clamp(
       (currentTime - lastEvent.time) / (nextAvailable.time - lastEvent.time),
       0,
-      1
+      1,
     ),
   };
 }
@@ -228,18 +221,13 @@ function updatePadMeshes(
   meshes: BoostPadMeshes,
   pad: ReplayBoostPad,
   currentTime: number,
-  showCooldownProgress: boolean
+  showCooldownProgress: boolean,
 ): void {
   const { available, progress } = boostPadAvailableState(pad, currentTime);
   const isBigPad = pad.size === "big";
   const pulse = 0.92 + 0.08 * Math.sin(currentTime * 6 + pad.index * 0.45);
-  const orbPulse =
-    0.96 +
-    0.04 *
-      Math.sin(currentTime * (isBigPad ? 4.8 : 7.2) + pad.index * 0.37);
-  const hover = isBigPad
-    ? Math.sin(currentTime * 2.2 + pad.index * 0.61) * 18
-    : 0;
+  const orbPulse = 0.96 + 0.04 * Math.sin(currentTime * (isBigPad ? 4.8 : 7.2) + pad.index * 0.37);
+  const hover = isBigPad ? Math.sin(currentTime * 2.2 + pad.index * 0.61) * 18 : 0;
   const lightZ = padLightCenterZ(pad) + hover;
   const glowZ = padGlowCenterZ(pad) + hover;
 
@@ -258,12 +246,9 @@ function updatePadMeshes(
     meshes.orb.visible = true;
     meshes.glow.visible = true;
     meshes.orb.material.opacity = isBigPad ? 0.96 : 0.9;
-    meshes.glow.material.opacity =
-      (isBigPad ? 0.2 : 0.16) + (orbPulse - 0.96);
+    meshes.glow.material.opacity = (isBigPad ? 0.2 : 0.16) + (orbPulse - 0.96);
     meshes.orb.scale.setScalar(orbPulse);
-    meshes.glow.scale.setScalar(
-      isBigPad ? 1.02 + (orbPulse - 0.96) * 2 : 1
-    );
+    meshes.glow.scale.setScalar(isBigPad ? 1.02 + (orbPulse - 0.96) * 2 : 1);
     return;
   }
 
@@ -284,7 +269,7 @@ function updatePadMeshes(
 }
 
 export function createBoostPadOverlayPlugin(
-  options: BoostPadOverlayPluginOptions = {}
+  options: BoostPadOverlayPluginOptions = {},
 ): ReplayPlayerPlugin {
   const showCooldownProgress = options.showCooldownProgress ?? true;
 
@@ -312,12 +297,7 @@ export function createBoostPadOverlayPlugin(
       if (!meshes) {
         continue;
       }
-      updatePadMeshes(
-        meshes,
-        pad,
-        context.state.currentTime,
-        showCooldownProgress
-      );
+      updatePadMeshes(meshes, pad, context.state.currentTime, showCooldownProgress);
     }
   }
 

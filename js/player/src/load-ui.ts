@@ -85,9 +85,7 @@ function ensureStyles(): void {
 }
 
 export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
-  const percent = progress.progress === undefined
-    ? null
-    : Math.round(progress.progress * 100);
+  const percent = progress.progress === undefined ? null : Math.round(progress.progress * 100);
 
   if (progress.stage === "processing") {
     if (percent === null || progress.totalFrames === undefined) {
@@ -192,8 +190,7 @@ export function createReplayLoadOverlay(
   return {
     update(progress) {
       panel.dataset.state = "loading";
-      status.textContent = options.formatProgress?.(progress)
-        ?? formatReplayLoadProgress(progress);
+      status.textContent = options.formatProgress?.(progress) ?? formatReplayLoadProgress(progress);
       setProgressWidth(progress.progress);
       meta.textContent = formatReplayLoadProgressMeta(progress);
     },
