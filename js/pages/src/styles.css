@@ -381,10 +381,14 @@ input {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  align-items: baseline;
+  align-items: center;
   padding: 0.85rem 0.9rem;
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
+}
+
+.stats-report-goal-heading {
+  min-width: 0;
 }
 
 .stats-report-goal-card h2,
@@ -397,12 +401,30 @@ input {
   font-size: 1rem;
 }
 
-.stats-report-goal-card > header span {
+.stats-report-goal-heading span {
+  display: block;
+  margin-top: 0.14rem;
   overflow: hidden;
   color: var(--muted);
-  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stats-report-goal-watch {
+  flex: 0 0 auto;
+  padding: 0.34rem 0.58rem;
+  border: 1px solid rgba(101, 214, 173, 0.34);
+  border-radius: var(--ui-radius-md);
+  background: rgba(101, 214, 173, 0.14);
+  color: #d7ffef;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.stats-report-goal-watch:hover {
+  border-color: rgba(101, 214, 173, 0.52);
+  background: rgba(101, 214, 173, 0.22);
 }
 
 .stats-report-goal-tags {
@@ -572,10 +594,6 @@ input {
 
   .stats-report-goal-card > header {
     display: grid;
-  }
-
-  .stats-report-goal-card > header span {
-    text-align: left;
   }
 
   .stats-report-detail-list {

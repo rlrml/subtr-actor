@@ -10,6 +10,11 @@ import {
   type StatScopeKind,
 } from "../../stat-evaluation-player/src/statRegistry.ts";
 import { formatMechanicKind } from "../../stat-evaluation-player/src/timelineMarkers.ts";
+import {
+  setStatsPlayerConfigOnUrl,
+  STATS_PLAYER_CONFIG_VERSION,
+  type StatsPlayerConfig,
+} from "../../stat-evaluation-player/src/playerConfig.ts";
 import { playerIdToString } from "../../stat-evaluation-player/src/touchOverlay.ts";
 import type {
   PlayerStatsSnapshot,
@@ -28,6 +33,7 @@ type GoalContextPosition = NonNullable<GoalContextEvent["ball_position"]>;
 
 interface ReportState {
   fileName: string;
+  replayUrl: URL | null;
   statsTimeline: StatsTimeline;
 }
 
@@ -175,6 +181,62 @@ function formatTime(seconds: number | null | undefined): string {
   const minutes = Math.floor(clamped / 60);
   const remainingSeconds = clamped - minutes * 60;
   return `${minutes}:${remainingSeconds.toFixed(1).padStart(4, "0")}`;
+}
+
+function getPlayerUrlForGoal(
+  replayUrl: URL | null,
+  goalTime: number | null | undefined,
+  scorer: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!replayUrl || goalTime == null || !Number.isFinite(goalTime)) {
+    return null;
+  }
+
+  const scorerId = remoteIdKey(scorer);
+  const playerUrl = new URL("../", window.location.href);
+  playerUrl.searchParams.set("replayUrl", replayUrl.href);
+  return setStatsPlayerConfigOnUrl(
+    playerUrl,
+    getGoalWatchPlayerConfig(goalTime, scorerId),
+  ).href;
+}
+
+function getGoalWatchPlayerConfig(
+  goalTime: number,
+  scorerId: string | null,
+): StatsPlayerConfig {
+  return {
+    version: STATS_PLAYER_CONFIG_VERSION,
+    playback: {
+      currentTime: Math.max(0, goalTime - 4),
+      playing: true,
+      rate: 1,
+      skipPostGoalTransitions: false,
+      skipKickoffs: false,
+    },
+    camera: scorerId
+      ? {
+        mode: "follow",
+        attachedPlayerId: scorerId,
+        ballCam: true,
+      }
+      : {
+        mode: "free",
+      },
+    overlays: {
+      timelineEvents: ["core"],
+      timelineRanges: [],
+      mechanics: [],
+      renderEffects: [],
+      followedPlayerHud: false,
+      boostPads: true,
+      boostPickupAnimation: false,
+    },
+    recording: {},
+    singletonWindows: [],
+    statsWindows: [],
+    moduleConfigs: {},
+  };
 }
 
 function formatBoostPerMinute(raw: number, trackedTime: number): string {
@@ -698,6 +760,7 @@ function renderGoalPlayerContextTable(finalFrame: StatsFrame, players: GoalPlaye
 
 function renderGoalCard(
   finalFrame: StatsFrame,
+  replayUrl: URL | null,
   goalIndex: number,
   context: GoalContextEvent | null,
   tags: GoalTagEvent[],
@@ -707,18 +770,31 @@ function renderGoalCard(
   const scorer = context?.scorer ?? firstTag?.scorer ?? null;
   const time = context?.time ?? firstTag?.time ?? null;
   const frame = context?.frame ?? firstTag?.frame ?? null;
+  const watchHref = getPlayerUrlForGoal(replayUrl, time, scorer);
   const card = el("section", { className: "stats-report-goal-card" });
   if (scoringTeamIsTeamZero !== null) {
     card.dataset.team = scoringTeamIsTeamZero ? "blue" : "orange";
   }
 
   const header = el("header");
-  header.append(
+  const heading = el("div", { className: "stats-report-goal-heading" });
+  heading.append(
     el("h2", { text: `Goal ${goalIndex + 1}` }),
     el("span", {
       text: `${teamLabel(scoringTeamIsTeamZero)} - ${playerNameForId(finalFrame, scorer)} - ${formatTime(time)}`,
     }),
   );
+  header.append(heading);
+  if (watchHref) {
+    const watchLink = el("a", {
+      className: "stats-report-goal-watch",
+      text: "Watch",
+    });
+    watchLink.setAttribute("href", watchHref);
+    watchLink.setAttribute("target", "_blank");
+    watchLink.setAttribute("rel", "noreferrer");
+    header.append(watchLink);
+  }
   card.append(header);
   card.append(renderGoalTagChips(tags));
 
@@ -826,6 +902,7 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
   for (const goalIndex of goalIndexes) {
     list.append(renderGoalCard(
       finalFrame,
+      state.replayUrl,
       goalIndex,
       goalContexts[goalIndex] ?? null,
       tagsByGoalIndex.get(goalIndex) ?? [],
@@ -1312,6 +1389,7 @@ async function loadReplayBytes(
   root: HTMLElement,
   bytes: Uint8Array,
   fileName: string,
+  replayUrl: URL | null,
 ): Promise<void> {
   renderLoading(root, `Loading ${fileName}...`);
   const bundle = await loadReplayBundleInWorker(bytes, {
@@ -1321,13 +1399,19 @@ async function loadReplayBytes(
   });
   renderReport(root, {
     fileName,
+    replayUrl,
     statsTimeline: bundle.statsTimeline,
   });
 }
 
 async function loadReplayFile(root: HTMLElement, file: File): Promise<void> {
   try {
-    await loadReplayBytes(root, new Uint8Array(await file.arrayBuffer()), file.name);
+    await loadReplayBytes(
+      root,
+      new Uint8Array(await file.arrayBuffer()),
+      file.name,
+      null,
+    );
   } catch (error) {
     renderLoading(root, error instanceof Error ? error.message : String(error));
   }
@@ -1342,7 +1426,12 @@ async function loadReplayUrl(root: HTMLElement, replayUrl: string): Promise<void
     }
     const pathname = new URL(replayUrl, window.location.href).pathname;
     const fileName = decodeURIComponent(pathname.split("/").pop() || "remote replay");
-    await loadReplayBytes(root, new Uint8Array(await response.arrayBuffer()), fileName);
+    await loadReplayBytes(
+      root,
+      new Uint8Array(await response.arrayBuffer()),
+      fileName,
+      response.url ? new URL(response.url) : new URL(replayUrl, window.location.href),
+    );
   } catch (error) {
     renderLoading(root, error instanceof Error ? error.message : String(error));
   }

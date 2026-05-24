@@ -1123,12 +1123,20 @@ input {
 
 .goal-label-actions {
   justify-self: end;
+  display: flex;
+  gap: 0.28rem;
 }
 
 .goal-label-actions button {
   min-height: 1.8rem;
   padding: 0.2rem 0.48rem;
   font-size: 0.72rem;
+}
+
+.goal-label-actions .goal-label-watch {
+  border-color: rgba(101, 214, 173, 0.36);
+  background: rgba(101, 214, 173, 0.18);
+  color: #d7ffef;
 }
 
 .panel {

@@ -62,6 +62,7 @@ export interface SingletonWindowConfig {
 
 export interface PlayerPlaybackConfig {
   readonly currentTime?: number;
+  readonly playing?: boolean;
   readonly rate?: number;
   readonly skipPostGoalTransitions?: boolean;
   readonly skipKickoffs?: boolean;
@@ -280,6 +281,7 @@ function normalizePlaybackConfig(value: unknown): PlayerPlaybackConfig {
   }
   return {
     currentTime: finiteNumber(value.currentTime),
+    playing: booleanValue(value.playing),
     rate: finiteNumber(value.rate),
     skipPostGoalTransitions: booleanValue(value.skipPostGoalTransitions),
     skipKickoffs: booleanValue(value.skipKickoffs),

@@ -15,6 +15,7 @@ const CONFIG: StatsPlayerConfig = {
   version: 1,
   playback: {
     currentTime: 42.5,
+    playing: true,
     rate: 1.5,
     skipPostGoalTransitions: true,
     skipKickoffs: false,

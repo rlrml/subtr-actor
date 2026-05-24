@@ -89,6 +89,7 @@ import {
 import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
+const GOAL_WATCH_LEAD_SECONDS = 4;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = [
   "free",
   "follow",
@@ -716,6 +717,7 @@ function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
   const state = replayPlayer?.getState();
   return {
     currentTime: state?.currentTime,
+    playing: state?.playing,
     rate: state?.speed ?? Number(playbackRate?.value ?? 1),
     skipPostGoalTransitions: replayPlayer
       ? state?.skipPostGoalTransitionsEnabled
@@ -865,6 +867,7 @@ function getReplayPlayerStatePatchFromConfig(
 ): Parameters<ReplayPlayer["setState"]>[0] {
   return {
     currentTime: playback.currentTime,
+    playing: playback.playing,
     speed: playback.rate,
     cameraDistanceScale: camera.distanceScale,
     customCameraSettings: camera.customSettings,
@@ -875,6 +878,34 @@ function getReplayPlayerStatePatchFromConfig(
     skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
     skipKickoffsEnabled: playback.skipKickoffs,
   };
+}
+
+function watchGoalReplay(time: number, scorerId: string | null): void {
+  if (!replayPlayer || !Number.isFinite(time)) {
+    return;
+  }
+
+  if (activeMechanicsReview) {
+    activeMechanicsReview.currentClip = null;
+  }
+
+  const canFollowScorer = scorerId !== null &&
+    replayPlayer.replay.players.some((player) => player.id === scorerId);
+  if (canFollowScorer) {
+    replayPlayer.setAttachedPlayer(scorerId);
+    replayPlayer.setCameraViewMode("follow");
+    lastFreeCameraPreset = null;
+  }
+
+  skipPostGoalTransitions.checked = false;
+  skipKickoffs.checked = false;
+  replayPlayer.setState({
+    currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
+    playing: true,
+    skipPostGoalTransitionsEnabled: false,
+    skipKickoffsEnabled: false,
+  });
+  scheduleConfigUrlUpdate();
 }
 
 function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
@@ -2399,9 +2430,10 @@ function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
     const firstTag = tags[0] ?? null;
     const time = context?.time ?? firstTag?.time ?? 0;
     const scorer = context?.scorer ?? firstTag?.scorer ?? null;
+    const scorerId = scorer ? playerIdToString(scorer) : null;
     const scorerName = scorer
-      ? replay.players.find((player) => player.id === playerIdToString(scorer))?.name ??
-        playerIdToString(scorer)
+      ? replay.players.find((player) => player.id === scorerId)?.name ??
+        scorerId
       : "Unknown scorer";
     const isTeamZero = context?.scoring_team_is_team_0 ??
       firstTag?.scoring_team_is_team_0 ??
@@ -2438,13 +2470,28 @@ function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
 
     const actions = document.createElement("div");
     actions.className = "goal-label-actions";
+    const watch = document.createElement("button");
+    watch.type = "button";
+    watch.className = "goal-label-watch";
+    watch.textContent = "Watch";
+    watch.addEventListener("click", () => {
+      watchGoalReplay(time, scorerId);
+    });
     const jump = document.createElement("button");
     jump.type = "button";
-    jump.textContent = "Go";
+    jump.textContent = "Cue";
     jump.addEventListener("click", () => {
-      replayPlayer?.seek(Math.max(0, time - 2));
+      replayPlayer?.setState({
+        currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
+        playing: false,
+        skipPostGoalTransitionsEnabled: false,
+        skipKickoffsEnabled: false,
+      });
+      skipPostGoalTransitions.checked = false;
+      skipKickoffs.checked = false;
+      scheduleConfigUrlUpdate();
     });
-    actions.append(jump);
+    actions.append(watch, jump);
 
     item.append(header, labels, actions);
     list.append(item);
