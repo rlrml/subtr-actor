@@ -219,6 +219,27 @@ fn own_half_goal_rejects_stale_scorer_touch() {
 }
 
 #[test]
+fn own_half_goal_uses_scoring_team_orientation() {
+    let team_zero_own_half = goal_with_touch(true, position(0.0, -100.0, 120.0), Vec::new());
+    let team_zero_opposing_half = goal_with_touch(true, position(0.0, 100.0, 120.0), Vec::new());
+    let team_one_own_half = goal_with_touch(false, position(0.0, 100.0, 120.0), Vec::new());
+    let team_one_opposing_half = goal_with_touch(false, position(0.0, -100.0, 120.0), Vec::new());
+
+    let calculator = OwnHalfGoalCalculator::new();
+
+    assert_eq!(
+        tag_kinds(&calculator.tag_goals(&[team_zero_own_half])),
+        vec![GoalTagKind::OwnHalfGoal]
+    );
+    assert!(calculator.tag_goals(&[team_zero_opposing_half]).is_empty());
+    assert_eq!(
+        tag_kinds(&calculator.tag_goals(&[team_one_own_half])),
+        vec![GoalTagKind::OwnHalfGoal]
+    );
+    assert!(calculator.tag_goals(&[team_one_opposing_half]).is_empty());
+}
+
+#[test]
 fn long_distance_goal_does_not_require_own_half_touch() {
     let goal = goal_with_touch(true, position(0.0, 800.0, 120.0), Vec::new());
 

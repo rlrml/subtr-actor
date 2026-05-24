@@ -21,22 +21,6 @@ impl TouchStateCalculator {
         Self::default()
     }
 
-    fn should_emit_candidate(&self, candidate: &TouchEvent) -> bool {
-        const SAME_PLAYER_TOUCH_COOLDOWN_FRAMES: usize = 7;
-
-        let Some(previous_touch) = self.current_last_touch.as_ref() else {
-            return true;
-        };
-
-        let same_player =
-            previous_touch.player.is_some() && previous_touch.player == candidate.player;
-        if !same_player {
-            return true;
-        }
-
-        candidate.frame.saturating_sub(previous_touch.frame) >= SAME_PLAYER_TOUCH_COOLDOWN_FRAMES
-    }
-
     fn prune_recent_touch_candidates(&mut self, current_frame: usize) {
         const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
 
@@ -282,9 +266,6 @@ impl TouchStateCalculator {
             self.prune_recent_touch_candidates(frame.frame_number);
             self.update_recent_touch_candidates(frame, ball, players);
             self.confirmed_touch_events(frame, ball, players, events)
-                .into_iter()
-                .filter(|candidate| self.should_emit_candidate(candidate))
-                .collect()
         } else {
             self.current_last_touch = None;
             self.recent_touch_candidates.clear();
@@ -311,3 +292,7 @@ impl TouchStateCalculator {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "touch_state_tests.rs"]
+mod tests;
