@@ -16,6 +16,7 @@ import type {
   ReplayFreeCameraPreset,
   ReplayPlayerState,
   ReplayPlayerTrack,
+  PlaylistManifestPage,
   TimelineOverlayPlugin,
 } from "subtr-actor-player";
 import { getAppTemplate } from "./appTemplate.ts";
@@ -303,6 +304,7 @@ interface MechanicsReviewPlaylist {
   label?: string;
   replays?: MechanicsReviewReplay[];
   items: MechanicsReviewItem[];
+  page?: PlaylistManifestPage;
   playback?: unknown;
   meta?: unknown;
 }
@@ -1162,6 +1164,52 @@ function parseMechanicsReviewBound(value: unknown): MechanicsReviewPlaybackBound
   return null;
 }
 
+function parseOptionalMechanicsReviewPageInteger(
+  value: unknown,
+  field: string,
+): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    !Number.isFinite(value) ||
+    value < 0
+  ) {
+    throw new Error(`Review playlist page ${field} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function parseOptionalMechanicsReviewPageString(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`Review playlist page ${field} must be a string.`);
+  }
+  return value;
+}
+
+function parseMechanicsReviewPage(value: unknown): PlaylistManifestPage | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    throw new Error("Review playlist page must be an object.");
+  }
+
+  return {
+    next: parseOptionalMechanicsReviewPageString(value.next, "next"),
+    previous: parseOptionalMechanicsReviewPageString(value.previous, "previous"),
+    total: parseOptionalMechanicsReviewPageInteger(value.total, "total"),
+    count: parseOptionalMechanicsReviewPageInteger(value.count, "count"),
+    limit: parseOptionalMechanicsReviewPageInteger(value.limit, "limit"),
+    offset: parseOptionalMechanicsReviewPageInteger(value.offset, "offset"),
+  };
+}
+
 function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
   if (!isRecord(value) || !Array.isArray(value.items)) {
     throw new Error("Review playlist must contain an items array.");
@@ -1207,6 +1255,7 @@ function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
     label: typeof value.label === "string" ? value.label : undefined,
     replays,
     items,
+    page: parseMechanicsReviewPage(value.page),
     playback: value.playback,
     meta: value.meta,
   };

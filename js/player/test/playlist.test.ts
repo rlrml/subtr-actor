@@ -37,6 +37,53 @@ test("playlist manifests preserve generic playback policy", () => {
   });
 });
 
+test("playlist manifests preserve optional page metadata", () => {
+  const manifest = parsePlaylistManifest({
+    page: {
+      next: "/api/playlists/example?page=2",
+      previous: null,
+      total: 250,
+      count: 100,
+      limit: 100,
+      offset: 0,
+    },
+    items: [],
+  });
+
+  assert.deepEqual(manifest.page, {
+    next: "/api/playlists/example?page=2",
+    previous: undefined,
+    total: 250,
+    count: 100,
+    limit: 100,
+    offset: 0,
+  });
+});
+
+test("playlist manifests reject invalid page metadata", () => {
+  assert.throws(
+    () =>
+      parsePlaylistManifest({
+        page: {
+          total: -1,
+        },
+        items: [],
+      }),
+    /manifest\.page\.total/,
+  );
+
+  assert.throws(
+    () =>
+      parsePlaylistManifest({
+        page: {
+          next: 1,
+        },
+        items: [],
+      }),
+    /manifest\.page\.next/,
+  );
+});
+
 test("playlist manifests reject invalid playback policies", () => {
   assert.throws(
     () =>
