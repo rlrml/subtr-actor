@@ -23,7 +23,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
         })
         .collect();
 
-    assert_eq!(labeled_touch_stats.len(), 12);
+    assert_eq!(labeled_touch_stats.len(), 9);
     assert_eq!(
         labeled_touch_stats
             .iter()
@@ -63,7 +63,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
                 stat.descriptor.labels
                     == vec![
                         StatLabel::new("height_band", "ground"),
-                        StatLabel::new("kind", "dribble"),
+                        StatLabel::new("kind", "control"),
                     ]
             })
             .unwrap()

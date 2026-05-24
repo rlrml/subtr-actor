@@ -12,12 +12,6 @@ impl StatFieldProvider for TouchStats {
         ));
         visitor(ExportedStat::unsigned(
             "touch",
-            "dribble_touch_count",
-            StatUnit::Count,
-            self.dribble_touch_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
             "control_touch_count",
             StatUnit::Count,
             self.control_touch_count,

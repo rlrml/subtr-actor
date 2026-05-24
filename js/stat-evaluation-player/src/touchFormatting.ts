@@ -23,10 +23,9 @@ const BREAKDOWN_CLASS_METADATA: Record<
 > = {
   kind: {
     label: "Kind",
-    valueOrder: ["dribble", "control", "medium_hit", "hard_hit"],
+    valueOrder: ["control", "medium_hit", "hard_hit"],
     formatValue: (value) =>
       ({
-        dribble: "Dribble",
         control: "Control",
         medium_hit: "Medium",
         hard_hit: "Hard",
@@ -188,7 +187,6 @@ function renderTouchBreakdownFallbackRows(
   const [className] = breakdownClasses;
   if (className === "kind") {
     return [
-      renderStatRow("Dribble", formatInteger(touch.dribble_touch_count)),
       renderStatRow("Control", formatInteger(touch.control_touch_count)),
       renderStatRow("Medium", formatInteger(touch.medium_hit_count)),
       renderStatRow("Hard", formatInteger(touch.hard_hit_count)),

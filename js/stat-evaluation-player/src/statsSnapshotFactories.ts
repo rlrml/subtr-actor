@@ -364,7 +364,6 @@ export function createPlayerStatsSnapshot(
       },
       touch: {
         touch_count: 0,
-        dribble_touch_count: 0,
         control_touch_count: 0,
         medium_hit_count: 0,
         hard_hit_count: 0,

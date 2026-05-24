@@ -13,7 +13,7 @@ test("renderTouchStats shows only total and selected breakdown rows", () => {
         entries: [
           {
             labels: [
-              { key: "kind", value: "dribble" },
+              { key: "kind", value: "control" },
               { key: "height_band", value: "ground" },
             ],
             count: 2,
@@ -48,7 +48,7 @@ test("renderTouchStats shows only total and selected breakdown rows", () => {
   );
 
   assert.match(html, /Touches<\/span><span class="value">8/);
-  assert.match(html, /Dribble \/ Ground<\/span><span class="value">2/);
+  assert.match(html, /Control \/ Ground<\/span><span class="value">2/);
   assert.match(html, /Control \/ Low air<\/span><span class="value">1/);
   assert.match(html, /Medium \/ Ground<\/span><span class="value">3/);
   assert.match(html, /Hard \/ High air<\/span><span class="value">2/);
@@ -70,7 +70,7 @@ test("renderTouchStats defaults to total touches when no classes are selected", 
   assert.match(html, /Ball advanced<\/span><span class="value">150 uu/);
   assert.match(html, /Ball traveled<\/span><span class="value">240 uu/);
   assert.match(html, /Ball retreated<\/span><span class="value">30 uu/);
-  assert.doesNotMatch(html, /Dribble<\/span>/);
+  assert.doesNotMatch(html, /Control<\/span>/);
   assert.doesNotMatch(html, /Ground<\/span>/);
 });
 
@@ -83,7 +83,7 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
         entries: [
           {
             labels: [
-              { key: "kind", value: "dribble" },
+              { key: "kind", value: "control" },
               { key: "height_band", value: "ground" },
             ],
             count: 2,
@@ -124,7 +124,7 @@ test("renderTouchStats falls back to typed labeled counts for combined breakdown
         entries: [
           {
             labels: [
-              { key: "kind", value: "dribble" },
+              { key: "kind", value: "control" },
               { key: "height_band", value: "ground" },
             ],
             count: 1,
@@ -151,7 +151,7 @@ test("renderTouchStats falls back to typed labeled counts for combined breakdown
     },
   );
 
-  assert.match(html, /Dribble \/ Ground<\/span><span class="value">1/);
+  assert.match(html, /Control \/ Ground<\/span><span class="value">1/);
   assert.match(html, /Control \/ Low air<\/span><span class="value">1/);
   assert.match(html, /Hard \/ High air<\/span><span class="value">2/);
 });
@@ -160,7 +160,6 @@ test("renderTouchStats falls back to legacy counts for single-class breakdowns",
   const html = renderTouchStats(
     createTouchStats({
       touch_count: 7,
-      dribble_touch_count: 2,
       control_touch_count: 1,
       medium_hit_count: 3,
       hard_hit_count: 1,

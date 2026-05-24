@@ -6,23 +6,17 @@ const AERIAL_TOUCH_MIN_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TouchKind {
-    Dribble,
     Control,
     MediumHit,
     HardHit,
 }
 
-const ALL_TOUCH_KINDS: [TouchKind; 4] = [
-    TouchKind::Dribble,
-    TouchKind::Control,
-    TouchKind::MediumHit,
-    TouchKind::HardHit,
-];
+const ALL_TOUCH_KINDS: [TouchKind; 3] =
+    [TouchKind::Control, TouchKind::MediumHit, TouchKind::HardHit];
 
 impl TouchKind {
     fn as_label(self) -> StatLabel {
         let value = match self {
-            Self::Dribble => "dribble",
             Self::Control => "control",
             Self::MediumHit => "medium_hit",
             Self::HardHit => "hard_hit",
@@ -47,7 +41,6 @@ impl TouchClassification {
 #[ts(export)]
 pub struct TouchStats {
     pub touch_count: u32,
-    pub dribble_touch_count: u32,
     pub control_touch_count: u32,
     pub medium_hit_count: u32,
     pub hard_hit_count: u32,
@@ -160,17 +153,10 @@ impl TouchCalculator {
         ball_speed_change: f32,
         controlled_touch_kind: Option<BallCarryKind>,
     ) -> TouchClassification {
-        let kind = if let Some(controlled_touch_kind) = controlled_touch_kind {
-            match controlled_touch_kind {
-                BallCarryKind::Carry => TouchKind::Dribble,
-                BallCarryKind::AirDribble => TouchKind::Control,
-            }
-        } else if ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
-            if height_band.is_airborne() {
-                TouchKind::Control
-            } else {
-                TouchKind::Dribble
-            }
+        let kind = if controlled_touch_kind.is_some()
+            || ball_speed_change <= SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD
+        {
+            TouchKind::Control
         } else if ball_speed_change < HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD {
             TouchKind::MediumHit
         } else {
@@ -203,7 +189,6 @@ impl TouchCalculator {
         }
 
         match classification.kind {
-            TouchKind::Dribble => stats.dribble_touch_count += 1,
             TouchKind::Control => stats.control_touch_count += 1,
             TouchKind::MediumHit => stats.medium_hit_count += 1,
             TouchKind::HardHit => stats.hard_hit_count += 1,

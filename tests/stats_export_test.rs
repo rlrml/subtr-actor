@@ -338,8 +338,7 @@ fn test_dodge_reset_stats_export_includes_on_ball_count() {
 fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
     let stats = TouchStats {
         touch_count: 7,
-        dribble_touch_count: 2,
-        control_touch_count: 1,
+        control_touch_count: 3,
         medium_hit_count: 3,
         hard_hit_count: 1,
         aerial_touch_count: 2,
@@ -356,12 +355,8 @@ fn test_touch_stats_export_includes_classification_and_ball_speed_fields() {
     let fields = stats.stat_fields();
 
     assert_eq!(
-        find_field(&fields, "touch", "dribble_touch_count").value,
-        StatValue::Unsigned(2)
-    );
-    assert_eq!(
         find_field(&fields, "touch", "control_touch_count").value,
-        StatValue::Unsigned(1)
+        StatValue::Unsigned(3)
     );
     assert_eq!(
         find_field(&fields, "touch", "medium_hit_count").value,

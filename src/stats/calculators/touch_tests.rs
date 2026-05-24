@@ -169,12 +169,12 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
 
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.touch_count, 1);
-    assert_eq!(stats.dribble_touch_count, 0);
+    assert_eq!(stats.control_touch_count, 0);
     assert_eq!(stats.medium_hit_count, 1);
 }
 
 #[test]
-fn controlled_ground_carry_touch_counts_as_dribble_despite_medium_impulse() {
+fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();
 
@@ -208,10 +208,10 @@ fn controlled_ground_carry_touch_counts_as_dribble_despite_medium_impulse() {
 
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.touch_count, 1);
-    assert_eq!(stats.dribble_touch_count, 1);
+    assert_eq!(stats.control_touch_count, 1);
     assert_eq!(stats.medium_hit_count, 0);
     assert_eq!(
-        stats.touch_count_with_labels(&[StatLabel::new("kind", "dribble")]),
+        stats.touch_count_with_labels(&[StatLabel::new("kind", "control")]),
         1
     );
 }
