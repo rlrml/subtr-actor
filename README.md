@@ -203,6 +203,7 @@ These are useful when working through the Python or JavaScript bindings:
 - JavaScript package README: [js/README.md](./js/README.md)
 - JavaScript player README: [js/player/README.md](./js/player/README.md)
 - Example app: [js/example/README.md](./js/example/README.md)
+- Statistic confidence: [docs/stat-confidence.md](./docs/stat-confidence.md)
 - Release notes and process: [docs/RELEASING.md](./docs/RELEASING.md)
 
 ## Development
