@@ -4,6 +4,19 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.7 - 2026-05-24
+
+- Add inferred bump, rotation, half-volley, goal-tag, goal air-time, and air
+  dribble stat coverage, including richer goal watch actions and mechanic
+  review decisions in the stats views.
+- Add shot metadata to shot stat timeline events and preserve the matching
+  JavaScript stats-player normalization.
+- Improve stats-player analysis graph rendering and color player charts by
+  team.
+- Restore CI release metadata and stats timeline fixtures, and refresh the
+  GitHub Pages Nix npm dependency hash.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.7`.
+
 ## v0.7.6 - 2026-05-23
 
 - Keep demoed players understandable in the replay player by hiding absent car
