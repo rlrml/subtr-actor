@@ -54,6 +54,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         fifty_fifty: FiftyFiftyTeamStats::default(),
         possession: PossessionTeamStats::default(),
         pressure: PressureTeamStats::default(),
+        rotation: RotationTeamStats::default(),
         rush: RushTeamStats::default(),
         core: CoreTeamStats::default(),
         backboard: BackboardTeamStats::default(),
@@ -63,6 +64,8 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         ball_carry: BallCarryStats::default(),
         air_dribble: AirDribbleStats::default(),
         boost: BoostStats::default(),
+        bump: BumpTeamStats::default(),
+        half_volley: HalfVolleyTeamStats::default(),
         movement: MovementStats::default(),
         powerslide: PowerslideStats::default(),
         demo: DemoTeamStats::default(),
@@ -285,6 +288,11 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
+            rotation_role_depth_margin: RotationCalculatorConfig::default().role_depth_margin,
+            rotation_first_man_ambiguity_margin: RotationCalculatorConfig::default()
+                .first_man_ambiguity_margin,
+            rotation_first_man_debounce_seconds: RotationCalculatorConfig::default()
+                .first_man_debounce_seconds,
             rush_max_start_y: RushCalculatorConfig::default().max_start_y,
             rush_attack_support_distance_y: RushCalculatorConfig::default()
                 .attack_support_distance_y,
@@ -310,6 +318,13 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .max_end_to_goal_seconds,
             flip_reset_goal_max_event_to_goal_seconds: FlipResetGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
+            half_volley_max_bounce_to_touch_seconds: HalfVolleyCalculatorConfig::default()
+                .max_bounce_to_touch_seconds,
+            half_volley_min_ball_speed: HalfVolleyCalculatorConfig::default().min_ball_speed,
+            half_volley_goal_max_touch_to_goal_seconds: HalfVolleyGoalCalculatorConfig::default()
+                .max_touch_to_goal_seconds,
+            half_volley_goal_min_goal_alignment: HalfVolleyGoalCalculatorConfig::default()
+                .min_goal_alignment,
         },
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
@@ -330,9 +345,11 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             rush: Vec::new(),
             speed_flip: Vec::new(),
             half_flip: Vec::new(),
+            half_volley: Vec::new(),
             wavedash: Vec::new(),
             whiff: Vec::new(),
             boost_pickups: Vec::new(),
+            bump: Vec::new(),
         },
         frames: vec![
             ReplayStatsFrame {

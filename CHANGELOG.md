@@ -4,6 +4,15 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.6 - 2026-05-23
+
+- Keep demoed players understandable in the replay player by hiding absent car
+  meshes while showing a short-lived demo respawn indicator at the victim
+  location.
+- Mark carried player frame gaps as not present during JavaScript replay
+  normalization and include demo victim locations in timeline events.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.6`.
+
 ## v0.7.5 - 2026-05-23
 
 - Use the stats `TouchState` attribution stream for goal context, pass,
