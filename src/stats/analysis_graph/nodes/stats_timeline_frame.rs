@@ -43,6 +43,7 @@ impl StatsTimelineFrameNode {
         let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
         let pressure = ctx.get::<PressureCalculator>()?;
+        let rotation = ctx.get::<RotationCalculator>()?;
         let rush = ctx.get::<RushCalculator>()?;
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let backboard = ctx.get::<BackboardCalculator>()?;
@@ -59,6 +60,11 @@ impl StatsTimelineFrameNode {
             fifty_fifty: fifty_fifty.stats().for_team(is_team_zero),
             possession: possession.stats().for_team(is_team_zero),
             pressure: pressure.stats().for_team(is_team_zero),
+            rotation: if is_team_zero {
+                rotation.team_zero_stats().clone()
+            } else {
+                rotation.team_one_stats().clone()
+            },
             rush: rush.stats().for_team(is_team_zero),
             core: if is_team_zero {
                 match_stats.team_zero_stats()
@@ -260,6 +266,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            rotation: ctx
+                .get::<RotationCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             powerslide: ctx
                 .get::<PowerslideCalculator>()?
                 .player_stats()
@@ -308,6 +320,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             fifty_fifty_dependency(),
             possession_dependency(),
             pressure_dependency(),
+            rotation_dependency(),
             rush_dependency(),
             touch_dependency(),
             whiff_dependency(),

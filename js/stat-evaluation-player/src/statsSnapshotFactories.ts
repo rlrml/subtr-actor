@@ -78,6 +78,10 @@ export function createTeamStatsSnapshot(
       neutral_time: 0,
       labeled_time: { entries: [] },
     },
+    rotation: {
+      first_man_changes_for_team: 0,
+      rotation_count: 0,
+    },
     rush: {
       count: 0,
       two_v_one_count: 0,
@@ -453,6 +457,21 @@ export function createPlayerStatsSnapshot(
       time_level_with_ball: 0,
       time_in_front_of_ball: 0,
       times_caught_ahead_of_play_on_conceded_goals: 0,
+    },
+    rotation: {
+      active_game_time: 0,
+      tracked_time: 0,
+      time_first_man: 0,
+      time_second_man: 0,
+      time_third_man: 0,
+      time_ambiguous_role: 0,
+      time_behind_play: 0,
+      time_level_with_play: 0,
+      time_ahead_of_play: 0,
+      became_first_man_count: 0,
+      lost_first_man_count: 0,
+      current_role_state: "unknown",
+      current_depth_state: "unknown",
     },
     powerslide: {
       total_duration: 0,

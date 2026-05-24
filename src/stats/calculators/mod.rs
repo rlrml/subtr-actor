@@ -72,6 +72,8 @@ pub mod powerslide;
 pub use powerslide::*;
 pub mod pressure;
 pub use pressure::*;
+pub mod rotation;
+pub use rotation::*;
 pub mod rush;
 pub use rush::*;
 pub mod settings;

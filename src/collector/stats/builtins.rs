@@ -331,6 +331,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "fifty_fifty",
         "possession",
         "pressure",
+        "rotation",
         "rush",
         "touch",
         "whiff",
@@ -491,6 +492,14 @@ pub(crate) fn builtin_module_json(
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
                 stats: calculator.stats(),
+            })
+        }
+        "rotation" => {
+            let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
             })
         }
         "rush" => {
@@ -704,6 +713,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: calculator.stats(),
             })?
         }
+        "rotation" => {
+            let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "rush" => {
             let calculator = graph_state::<RushCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
@@ -859,6 +876,14 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+            }))?)
+        }
+        "rotation" => {
+            let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "role_depth_margin": calculator.config().role_depth_margin,
+                "first_man_ambiguity_margin": calculator.config().first_man_ambiguity_margin,
+                "first_man_debounce_seconds": calculator.config().first_man_debounce_seconds,
             }))?)
         }
         "rush" => {

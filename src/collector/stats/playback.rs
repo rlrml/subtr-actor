@@ -445,6 +445,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_config(&self) -> StatsTimelineConfig {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let rotation_config = self.config.get("rotation").and_then(Value::as_object);
+        let rotation_defaults = RotationCalculatorConfig::default();
         let rush_config = self.config.get("rush").and_then(Value::as_object);
         let rush_defaults = RushCalculatorConfig::default();
         let aerial_goal_config = self.config.get("aerial_goal").and_then(Value::as_object);
@@ -482,6 +484,18 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
                 .unwrap_or(PressureCalculatorConfig::default().neutral_zone_half_width_y),
+            rotation_role_depth_margin: rotation_config
+                .and_then(|config| config.get("role_depth_margin"))
+                .and_then(json_f32)
+                .unwrap_or(rotation_defaults.role_depth_margin),
+            rotation_first_man_ambiguity_margin: rotation_config
+                .and_then(|config| config.get("first_man_ambiguity_margin"))
+                .and_then(json_f32)
+                .unwrap_or(rotation_defaults.first_man_ambiguity_margin),
+            rotation_first_man_debounce_seconds: rotation_config
+                .and_then(|config| config.get("first_man_debounce_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(rotation_defaults.first_man_debounce_seconds),
             rush_max_start_y: rush_config
                 .and_then(|config| config.get("rush_max_start_y"))
                 .and_then(json_f32)
@@ -556,6 +570,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_config_value(&self) -> SubtrActorResult<Value> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let rotation_config = self.config.get("rotation").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
         let aerial_goal_config = self.config.get("aerial_goal").and_then(Value::as_object);
         let high_aerial_goal_config = self
@@ -613,6 +628,32 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     ),
             )?,
         );
+        let rotation_defaults = RotationCalculatorConfig::default();
+        for (key, default_value) in [
+            (
+                "rotation_role_depth_margin",
+                rotation_defaults.role_depth_margin,
+            ),
+            (
+                "rotation_first_man_ambiguity_margin",
+                rotation_defaults.first_man_ambiguity_margin,
+            ),
+            (
+                "rotation_first_man_debounce_seconds",
+                rotation_defaults.first_man_debounce_seconds,
+            ),
+        ] {
+            let source_key = key.strip_prefix("rotation_").unwrap_or(key);
+            config.insert(
+                key.to_owned(),
+                serialize_to_json_value(
+                    &rotation_config
+                        .and_then(|config| config.get(source_key))
+                        .and_then(Value::as_f64)
+                        .unwrap_or(default_value as f64),
+                )?,
+            );
+        }
         let rush_defaults = RushCalculatorConfig::default();
         config.insert(
             "rush_max_start_y".to_owned(),
@@ -818,6 +859,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             pressure: self
                 .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
                 .for_team(is_team_zero),
+            rotation: self.frame_team_stat_or_default_typed(frame, "rotation", team_key)?,
             rush: self
                 .frame_stats_or_default_typed::<RushStats>(frame, "rush")?
                 .for_team(is_team_zero),
@@ -930,6 +972,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "positioning",
                 &player_key,
             )?,
+            rotation: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "rotation",
+                &player_key,
+            )?,
             powerslide: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "powerslide",
@@ -976,6 +1023,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
                     .for_team(is_team_zero),
             )?,
+        );
+        team.insert(
+            "rotation".to_owned(),
+            self.frame_team_stat_or_default::<RotationTeamStats>(frame, "rotation", team_key),
         );
         team.insert(
             "rush".to_owned(),
@@ -1225,6 +1276,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<PositioningStats>(
                 frame,
                 "positioning",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "rotation".to_owned(),
+            self.frame_player_stat_or_default_by_key::<RotationPlayerStats>(
+                frame,
+                "rotation",
                 &player_key,
             )?,
         );

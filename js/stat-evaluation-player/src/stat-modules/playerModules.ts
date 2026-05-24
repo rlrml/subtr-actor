@@ -44,6 +44,7 @@ import {
   renderOneTimerStats,
   renderPassStats,
   renderPowerslideStats,
+  renderRotationStats,
   renderSpeedFlipStats,
   renderWavedashStats,
   renderWhiffStats,
@@ -978,6 +979,15 @@ export function createPowerslideModule(): StatModule {
     getTimelineEvents(ctx) {
       return buildPowerslideTimelineEvents(ctx.statsTimeline, ctx.replay);
     },
+  });
+}
+
+export function createRotationModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "rotation",
+    label: "Rotation",
+    select: (player) => player.rotation,
+    render: (rotation) => renderRotationStats(rotation),
   });
 }
 

@@ -43,12 +43,16 @@ impl StatsTimelineCollector {
     }
 
     fn timeline_config(&self) -> StatsTimelineConfig {
+        let rotation_defaults = RotationCalculatorConfig::default();
         StatsTimelineConfig {
             most_back_forward_threshold_y: PositioningCalculatorConfig::default()
                 .most_back_forward_threshold_y,
             level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
+            rotation_role_depth_margin: rotation_defaults.role_depth_margin,
+            rotation_first_man_ambiguity_margin: rotation_defaults.first_man_ambiguity_margin,
+            rotation_first_man_debounce_seconds: rotation_defaults.first_man_debounce_seconds,
             rush_max_start_y: RushCalculatorConfig::default().max_start_y,
             rush_attack_support_distance_y: RushCalculatorConfig::default()
                 .attack_support_distance_y,

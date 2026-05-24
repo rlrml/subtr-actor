@@ -21,6 +21,7 @@ mod positioning;
 mod possession;
 mod powerslide;
 mod pressure;
+mod rotation;
 mod rush;
 mod speed_flip;
 mod touch;

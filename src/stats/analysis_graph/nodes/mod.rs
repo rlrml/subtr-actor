@@ -9,8 +9,8 @@ use crate::stats::calculators::{
     MatchStatsCalculator, MovementCalculator, MustyFlickCalculator, OneTimerCalculator,
     OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PlayerFrameState,
     PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
-    PowerslideCalculator, PressureCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator,
-    TouchState, WavedashCalculator, WhiffCalculator,
+    PowerslideCalculator, PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    TouchCalculator, TouchState, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -45,6 +45,7 @@ pub(crate) mod possession;
 pub(crate) mod possession_state;
 pub(crate) mod powerslide;
 pub(crate) mod pressure;
+pub(crate) mod rotation;
 pub(crate) mod rush;
 pub(crate) mod settings;
 pub(crate) mod speed_flip;
@@ -122,6 +123,8 @@ pub use possession_state::PossessionStateNode;
 pub use powerslide::PowerslideNode;
 #[allow(unused_imports)]
 pub use pressure::PressureNode;
+#[allow(unused_imports)]
+pub use rotation::RotationNode;
 #[allow(unused_imports)]
 pub use rush::RushNode;
 #[allow(unused_imports)]
@@ -267,6 +270,10 @@ pub(crate) fn possession_dependency() -> AnalysisDependency {
 
 pub(crate) fn pressure_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<PressureCalculator>(pressure::boxed_default)
+}
+
+pub(crate) fn rotation_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<RotationCalculator>(rotation::boxed_default)
 }
 
 pub(crate) fn rush_dependency() -> AnalysisDependency {
