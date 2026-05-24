@@ -31,6 +31,7 @@ impl AnalysisNode for TouchNode {
         vec![
             frame_info_dependency(),
             ball_frame_state_dependency(),
+            player_frame_state_dependency(),
             player_vertical_state_dependency(),
             touch_state_dependency(),
             possession_state_dependency(),
@@ -44,6 +45,7 @@ impl AnalysisNode for TouchNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
             ctx.get::<PlayerVerticalState>()?,
             touch_state,
             ctx.get::<PossessionState>()?,
