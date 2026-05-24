@@ -145,6 +145,20 @@ function getTargets(frame: StatsFrame, scope: StatScopeKind): StatsTarget[] {
   return scope === "player" ? frame.players : [frame.team_zero, frame.team_one];
 }
 
+function getPlayerTeamColor(player: PlayerStatsSnapshot): string {
+  return player.is_team_0 ? TEAM_COLORS[0]! : TEAM_COLORS[1]!;
+}
+
+function getChartTargetColor(
+  target: StatsTarget,
+  scope: StatScopeKind,
+  index: number,
+): string {
+  return scope === "player"
+    ? getPlayerTeamColor(target as PlayerStatsSnapshot)
+    : TEAM_COLORS[index % TEAM_COLORS.length]!;
+}
+
 function getFinalFrame(statsTimeline: StatsTimeline): StatsFrame | null {
   return statsTimeline.frames.at(-1) ?? null;
 }
@@ -354,9 +368,7 @@ function getChartRows(definition: StatDefinition, finalFrame: StatsFrame): Numbe
     .map((target, index) => ({
       label: targetName(target, definition.scope, index),
       value: readNumber(definition, target) ?? 0,
-      color: definition.scope === "team"
-        ? TEAM_COLORS[index % TEAM_COLORS.length]!
-        : CHART_COLORS[index % CHART_COLORS.length]!,
+      color: getChartTargetColor(target, definition.scope, index),
     }))
     .filter((row) => row.value > 0);
 }
@@ -955,7 +967,7 @@ function renderBoostPage(
           value: player.boost.tracked_time > 0
             ? toBoostDisplayUnits(player.boost.amount_used) / player.boost.tracked_time * 60
             : 0,
-          color: CHART_COLORS[index % CHART_COLORS.length]!,
+          color: getPlayerTeamColor(player),
           formatted: formatBoostPerMinute(player.boost.amount_used, player.boost.tracked_time),
         })),
         (value) => `${Number(value.toFixed(1))}/min`,
