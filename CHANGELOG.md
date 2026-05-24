@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.8 - 2026-05-24
+
+- Collapse the separate dribble-touch bucket into `touch.control_touch_count`
+  so controlled ground carries and airborne control touches share one metric.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.8`.
+
 ## v0.7.7 - 2026-05-24
 
 - Add inferred bump, rotation, half-volley, goal-tag, goal air-time, and air
