@@ -87,6 +87,7 @@ export type {
   PlaylistLoadSource,
   PlaylistManifest,
   PlaylistManifestItem,
+  PlaylistManifestPage,
   PlaylistManifestPlaybackOptions,
   PlaylistManifestReplay,
   PlaylistManifestReplayLocator,

@@ -11,6 +11,7 @@ export type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
 export type { PlaylistEndMode } from "./generated/PlaylistEndMode";
 export type { PlaylistManifest } from "./generated/PlaylistManifest";
 export type { PlaylistManifestItem } from "./generated/PlaylistManifestItem";
+export type { PlaylistManifestPage } from "./generated/PlaylistManifestPage";
 export type { PlaylistManifestReplay } from "./generated/PlaylistManifestReplay";
 export type { PlaylistManifestReplayLocator } from "./generated/PlaylistManifestReplayLocator";
 export type { PlaylistPlaybackOptions as PlaylistManifestPlaybackOptions } from "./generated/PlaylistPlaybackOptions";
