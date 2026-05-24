@@ -221,6 +221,32 @@ dd {
   background: #243a61;
 }
 
+.review-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.confirm-button {
+  border-color: #4fbd86;
+  background: #1f4b35;
+}
+
+.reject-button {
+  border-color: #d66f6f;
+  background: #54282d;
+}
+
+.review-status {
+  min-height: 20px;
+  color: #aeb8c6;
+  font-size: 12px;
+}
+
+.review-status.error {
+  color: #ffb4b4;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

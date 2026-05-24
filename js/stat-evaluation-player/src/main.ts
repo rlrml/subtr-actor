@@ -189,6 +189,9 @@ let mechanicsReviewReason!: HTMLElement;
 let mechanicsReviewPrev!: HTMLButtonElement;
 let mechanicsReviewReplay!: HTMLButtonElement;
 let mechanicsReviewNext!: HTMLButtonElement;
+let mechanicsReviewConfirm!: HTMLButtonElement;
+let mechanicsReviewReject!: HTMLButtonElement;
+let mechanicsReviewUncertain!: HTMLButtonElement;
 let mechanicsReviewCount!: HTMLElement;
 let mechanicsReviewList!: HTMLDivElement;
 let boostPickupFiltersWindowBody!: HTMLDivElement;
@@ -292,11 +295,14 @@ interface MechanicsReviewReplay {
 
 interface MechanicsReviewItemMeta {
   confidence?: number | null;
+  eventId?: string;
   mechanic?: string;
   mechanicLabel?: string;
   playerId?: string;
   playerName?: string | null;
   reason?: string;
+  reviewEndpoint?: string;
+  reviewStatus?: string | null;
   target?: Record<string, unknown>;
   followupGoal?: unknown;
   [key: string]: unknown;
@@ -1280,8 +1286,13 @@ function getMechanicsReviewUrlFromLocation(): string | null {
   const params = new URLSearchParams(window.location.search);
   return params.get("reviewPlaylist")?.trim() ||
     params.get("review")?.trim() ||
+    params.get("playlist")?.trim() ||
     params.get("playlistUrl")?.trim() ||
     null;
+}
+
+function isLikelyLocalFilePath(path: string): boolean {
+  return /^\/(?:home|Users|tmp|var\/tmp|mnt|media|run\/user|nix\/store)\//.test(path);
 }
 
 function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): string {
@@ -1290,7 +1301,7 @@ function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): str
     return path;
   }
   if (path.startsWith("/")) {
-    return `/@fs${path}`;
+    return isLikelyLocalFilePath(path) ? `/@fs${path}` : path;
   }
   return sourceUrl ? new URL(path, sourceUrl).href : path;
 }
@@ -1391,6 +1402,36 @@ function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
     : "--";
 }
 
+function formatMechanicsReviewStatus(value: unknown): string {
+  return typeof value === "string" && value.trim()
+    ? value.replaceAll("_", " ")
+    : "unreviewed";
+}
+
+function getMechanicsReviewDecisionEndpoint(item: MechanicsReviewItem | null): string | null {
+  if (!item) {
+    return null;
+  }
+  if (typeof item.meta?.reviewEndpoint === "string" && item.meta.reviewEndpoint) {
+    return item.meta.reviewEndpoint;
+  }
+  const eventId = typeof item.meta?.eventId === "string" && item.meta.eventId
+    ? item.meta.eventId
+    : item.id;
+  return eventId
+    ? `/api/v1/mechanics/events/${encodeURIComponent(eventId)}/reviews`
+    : null;
+}
+
+function mechanicsReviewAuthHeaders(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const token =
+    params.get("reviewToken") ??
+    params.get("token") ??
+    window.localStorage.getItem("rocket_sense_access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 function setMechanicsReviewStatus(message: string): void {
   if (mechanicsReviewStatus) {
     mechanicsReviewStatus.textContent = message;
@@ -1425,6 +1466,11 @@ function renderMechanicsReviewWindow(): void {
   mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;
   mechanicsReviewNext.disabled = !review || review.loading ||
     review.currentIndex >= items.length - 1;
+  const decisionDisabled = !review || review.loading ||
+    getMechanicsReviewDecisionEndpoint(item) === null;
+  mechanicsReviewConfirm.disabled = decisionDisabled;
+  mechanicsReviewReject.disabled = decisionDisabled;
+  mechanicsReviewUncertain.disabled = decisionDisabled;
 
   mechanicsReviewList.replaceChildren();
   if (!review || items.length === 0) {
@@ -1449,7 +1495,10 @@ function renderMechanicsReviewWindow(): void {
     title.textContent = getMechanicsReviewItemLabel(candidate, index);
 
     const meta = document.createElement("strong");
-    meta.textContent = getMechanicsReviewMechanicLabel(candidate);
+    meta.textContent = [
+      getMechanicsReviewMechanicLabel(candidate),
+      formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
+    ].join(" · ");
 
     button.append(title, meta);
     mechanicsReviewList.append(button);
@@ -1571,6 +1620,47 @@ function replayMechanicsReviewClip(): void {
     playing: true,
     skipPostGoalTransitionsEnabled: false,
   });
+}
+
+async function submitMechanicsReviewDecision(
+  status: "confirmed" | "rejected" | "uncertain",
+): Promise<void> {
+  const review = activeMechanicsReview;
+  const item = review?.manifest.items[review.currentIndex] ?? null;
+  const endpoint = getMechanicsReviewDecisionEndpoint(item);
+  if (!review || !item || !endpoint) {
+    setMechanicsReviewStatus("Current review item has no review endpoint.");
+    return;
+  }
+
+  setMechanicsReviewStatus(`Submitting ${formatMechanicsReviewStatus(status)}...`);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...mechanicsReviewAuthHeaders(),
+    },
+    credentials: "same-origin",
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    let message = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
+    try {
+      const body = await response.json() as { error?: unknown };
+      if (typeof body.error === "string") {
+        message = body.error;
+      }
+    } catch {
+      // Keep the HTTP status fallback.
+    }
+    setMechanicsReviewStatus(`Review failed: ${message}`);
+    return;
+  }
+
+  item.meta = item.meta ?? {};
+  item.meta.reviewStatus = status;
+  setMechanicsReviewStatus(`Marked ${formatMechanicsReviewStatus(status)}.`);
+  renderMechanicsReviewWindow();
 }
 
 function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
@@ -3303,6 +3393,18 @@ export function mountStatEvaluationPlayer(
     root,
     "#mechanics-review-next",
   );
+  mechanicsReviewConfirm = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-confirm",
+  );
+  mechanicsReviewReject = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-reject",
+  );
+  mechanicsReviewUncertain = mustElement<HTMLButtonElement>(
+    root,
+    "#mechanics-review-uncertain",
+  );
   mechanicsReviewCount = mustElement<HTMLElement>(
     root,
     "#mechanics-review-count",
@@ -3647,6 +3749,18 @@ export function mountStatEvaluationPlayer(
         Math.min(review.manifest.items.length - 1, review.currentIndex + 1),
       );
     }
+  }, { signal: listeners.signal });
+
+  mechanicsReviewConfirm.addEventListener("click", () => {
+    void submitMechanicsReviewDecision("confirmed");
+  }, { signal: listeners.signal });
+
+  mechanicsReviewReject.addEventListener("click", () => {
+    void submitMechanicsReviewDecision("rejected");
+  }, { signal: listeners.signal });
+
+  mechanicsReviewUncertain.addEventListener("click", () => {
+    void submitMechanicsReviewDecision("uncertain");
   }, { signal: listeners.signal });
 
   togglePlayback.addEventListener("click", () => {

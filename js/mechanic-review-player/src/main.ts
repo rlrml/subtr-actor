@@ -18,6 +18,7 @@ import {
 
 type CandidateMeta = {
   itemId?: string;
+  eventId?: string;
   mechanic?: string;
   mechanicLabel?: string;
   detector?: string;
@@ -36,6 +37,8 @@ type CandidateMeta = {
     setupStartFrame?: number;
     eventFrame?: number;
   };
+  reviewEndpoint?: string;
+  reviewStatus?: string | null;
   event?: unknown;
 };
 
@@ -57,6 +60,10 @@ const timeReadout = requireElement<HTMLDivElement>("time-readout");
 const previousButton = requireElement<HTMLButtonElement>("previous");
 const playButton = requireElement<HTMLButtonElement>("play");
 const nextButton = requireElement<HTMLButtonElement>("next");
+const confirmButton = requireElement<HTMLButtonElement>("confirm");
+const rejectButton = requireElement<HTMLButtonElement>("reject");
+const uncertainButton = requireElement<HTMLButtonElement>("uncertain");
+const reviewStatus = requireElement<HTMLDivElement>("review-status");
 const advanceMode = requireElement<HTMLSelectElement>("advance-mode");
 const endMode = requireElement<HTMLSelectElement>("end-mode");
 const speedSelect = requireElement<HTMLSelectElement>("speed");
@@ -92,16 +99,29 @@ function formatConfidence(value: unknown): string {
     : "-";
 }
 
+function formatReviewStatus(value: unknown): string {
+  return typeof value === "string" && value.trim()
+    ? value.replaceAll("_", " ")
+    : "unreviewed";
+}
+
 function mechanicLabel(meta: CandidateMeta): string {
   return meta.mechanicLabel ?? meta.mechanic?.replaceAll("_", " ") ?? "-";
+}
+
+function isLikelyLocalFilePath(path: string): boolean {
+  return /^\/(?:home|Users|tmp|var\/tmp|mnt|media|run\/user|nix\/store)\//.test(path);
 }
 
 function resolveReplayFetchUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
+  if (path.startsWith("/@fs/")) {
+    return path;
+  }
   if (path.startsWith("/")) {
-    return `/@fs${path}`;
+    return isLikelyLocalFilePath(path) ? `/@fs${path}` : path;
   }
   if (activeManifestUrl) {
     return new URL(path, activeManifestUrl).href;
@@ -214,6 +234,70 @@ function updatePlaylistSelection(index: number) {
   active?.scrollIntoView({ block: "nearest" });
 }
 
+function reviewAuthHeaders(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const token =
+    params.get("reviewToken") ??
+    params.get("token") ??
+    window.localStorage.getItem("rocket_sense_access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function activeReviewEndpoint(): string | null {
+  const item = reviewPlayer?.getState().item ?? null;
+  const meta = candidateMeta(item);
+  if (typeof meta.reviewEndpoint === "string" && meta.reviewEndpoint) {
+    return meta.reviewEndpoint;
+  }
+  if (typeof meta.eventId === "string" && meta.eventId) {
+    return `/api/v1/mechanics/events/${encodeURIComponent(meta.eventId)}/reviews`;
+  }
+  return null;
+}
+
+async function submitReview(status: "confirmed" | "rejected" | "uncertain") {
+  const player = reviewPlayer;
+  const item = player?.getState().item ?? null;
+  const endpoint = activeReviewEndpoint();
+  if (!player || !item || !endpoint) {
+    reviewStatus.textContent = "Current item has no review endpoint.";
+    reviewStatus.classList.add("error");
+    return;
+  }
+
+  reviewStatus.textContent = `Submitting ${formatReviewStatus(status)}...`;
+  reviewStatus.classList.remove("error");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...reviewAuthHeaders(),
+    },
+    credentials: "same-origin",
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const body = await response.json() as { error?: unknown };
+      if (typeof body.error === "string") {
+        message = body.error;
+      }
+    } catch {
+      // Keep the HTTP status fallback.
+    }
+    reviewStatus.textContent = `Review failed: ${message}`;
+    reviewStatus.classList.add("error");
+    return;
+  }
+
+  const meta = candidateMeta(item);
+  meta.reviewStatus = status;
+  reviewStatus.textContent = `Marked ${formatReviewStatus(status)}.`;
+  reviewStatus.classList.remove("error");
+  renderState(player.getState());
+}
+
 async function loadPlaylistUrl(url: string) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -253,6 +337,8 @@ function renderState(state: ReplayPlaylistPlayerState) {
   candidateReplay.textContent = item?.replay.id ?? "-";
   candidateReason.textContent = meta.reason ?? "-";
   eventJson.textContent = JSON.stringify(meta.event ?? meta.target ?? {}, null, 2);
+  reviewStatus.textContent = `Review: ${formatReviewStatus(meta.reviewStatus)}`;
+  reviewStatus.classList.remove("error");
   updatePlaylistSelection(state.itemIndex);
 
   if (!scrubbing) {
@@ -266,6 +352,9 @@ function renderState(state: ReplayPlaylistPlayerState) {
   nextButton.disabled =
     state.itemCount === 0 ||
     (state.itemIndex >= state.itemCount - 1 && state.endMode !== "loop");
+  confirmButton.disabled = state.itemCount === 0 || activeReviewEndpoint() === null;
+  rejectButton.disabled = confirmButton.disabled;
+  uncertainButton.disabled = confirmButton.disabled;
   scrubber.disabled = !state.ready || state.duration <= 0;
 
   if (state.error) {
@@ -319,6 +408,18 @@ nextButton.addEventListener("click", async () => {
 
 playButton.addEventListener("click", () => {
   reviewPlayer?.togglePlayback();
+});
+
+confirmButton.addEventListener("click", () => {
+  void submitReview("confirmed");
+});
+
+rejectButton.addEventListener("click", () => {
+  void submitReview("rejected");
+});
+
+uncertainButton.addEventListener("click", () => {
+  void submitReview("uncertain");
 });
 
 advanceMode.addEventListener("change", () => {

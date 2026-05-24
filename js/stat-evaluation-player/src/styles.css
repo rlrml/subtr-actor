@@ -419,6 +419,7 @@ input {
 }
 
 .mechanics-review-actions,
+.mechanics-review-decision-actions,
 .mechanics-review-list-header {
   display: flex;
   align-items: center;
@@ -426,8 +427,17 @@ input {
   gap: var(--ui-gap-sm);
 }
 
-.mechanics-review-actions button {
+.mechanics-review-actions button,
+.mechanics-review-decision-actions button {
   flex: 1 1 0;
+}
+
+#mechanics-review-confirm {
+  border-color: rgba(76, 175, 120, 0.52);
+}
+
+#mechanics-review-reject {
+  border-color: rgba(220, 95, 95, 0.58);
 }
 
 .mechanics-review-list-header {
