@@ -11,6 +11,7 @@ const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
 const GOAL_CONTEXT_BOOST_LEADUP_SECONDS: f32 = 5.0;
+const BALL_GROUND_CONTACT_MAX_Z: f32 = BALL_RADIUS_Z + 5.0;
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalAfterKickoffStats {
@@ -73,6 +74,63 @@ impl GoalAfterKickoffStats {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalBallAirTimeStats {
+    pub goal_ball_air_time_sample_count: u32,
+    pub cumulative_goal_ball_air_time: f32,
+    pub last_goal_ball_air_time: Option<f32>,
+    #[serde(default, skip_serializing)]
+    goal_ball_air_times: Vec<f32>,
+}
+
+impl GoalBallAirTimeStats {
+    pub fn goal_ball_air_times(&self) -> &[f32] {
+        &self.goal_ball_air_times
+    }
+
+    pub fn record_goal(&mut self, ball_air_time: f32) {
+        let clamped_time = ball_air_time.max(0.0);
+        self.goal_ball_air_time_sample_count += 1;
+        self.cumulative_goal_ball_air_time += clamped_time;
+        self.last_goal_ball_air_time = Some(clamped_time);
+        self.goal_ball_air_times.push(clamped_time);
+    }
+
+    pub fn average_goal_ball_air_time(&self) -> f32 {
+        if self.goal_ball_air_time_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_goal_ball_air_time / self.goal_ball_air_time_sample_count as f32
+        }
+    }
+
+    pub fn median_goal_ball_air_time(&self) -> f32 {
+        if self.goal_ball_air_times.is_empty() {
+            return 0.0;
+        }
+
+        let mut sorted_times = self.goal_ball_air_times.clone();
+        sorted_times.sort_by(|a, b| a.total_cmp(b));
+        let midpoint = sorted_times.len() / 2;
+        if sorted_times.len().is_multiple_of(2) {
+            (sorted_times[midpoint - 1] + sorted_times[midpoint]) * 0.5
+        } else {
+            sorted_times[midpoint]
+        }
+    }
+
+    fn merge(&mut self, other: &Self) {
+        self.goal_ball_air_time_sample_count += other.goal_ball_air_time_sample_count;
+        self.cumulative_goal_ball_air_time += other.cumulative_goal_ball_air_time;
+        self.last_goal_ball_air_time = other
+            .last_goal_ball_air_time
+            .or(self.last_goal_ball_air_time);
+        self.goal_ball_air_times
+            .extend(other.goal_ball_air_times.iter().copied());
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GoalBuildupKind {
     CounterAttack,
@@ -132,6 +190,8 @@ pub struct PlayerScoringContextStats {
     pub goal_after_kickoff: GoalAfterKickoffStats,
     #[serde(flatten)]
     pub goal_buildup: GoalBuildupStats,
+    #[serde(default, flatten)]
+    pub goal_ball_air_time: GoalBallAirTimeStats,
 }
 
 impl PlayerScoringContextStats {
@@ -170,6 +230,10 @@ impl PlayerScoringContextStats {
         self.cumulative_scoring_goal_last_touch_position_y += position.y;
         self.cumulative_scoring_goal_last_touch_position_z += position.z;
         self.last_scoring_goal_last_touch_position = Some(position);
+    }
+
+    fn record_goal_ball_air_time(&mut self, ball_air_time: f32) {
+        self.goal_ball_air_time.record_goal(ball_air_time);
     }
 
     fn average_boost_on_goals_against(&self) -> f32 {
@@ -322,6 +386,18 @@ impl CorePlayerStats {
         self.scoring_context
             .average_scoring_goal_last_touch_position_z()
     }
+
+    pub fn average_goal_ball_air_time(&self) -> f32 {
+        self.scoring_context
+            .goal_ball_air_time
+            .average_goal_ball_air_time()
+    }
+
+    pub fn median_goal_ball_air_time(&self) -> f32 {
+        self.scoring_context
+            .goal_ball_air_time
+            .median_goal_ball_air_time()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -331,6 +407,8 @@ pub struct TeamScoringContextStats {
     pub goal_after_kickoff: GoalAfterKickoffStats,
     #[serde(flatten)]
     pub goal_buildup: GoalBuildupStats,
+    #[serde(default, flatten)]
+    pub goal_ball_air_time: GoalBallAirTimeStats,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -364,6 +442,18 @@ impl CoreTeamStats {
         self.scoring_context
             .goal_after_kickoff
             .median_goal_time_after_kickoff()
+    }
+
+    pub fn average_goal_ball_air_time(&self) -> f32 {
+        self.scoring_context
+            .goal_ball_air_time
+            .average_goal_ball_air_time()
+    }
+
+    pub fn median_goal_ball_air_time(&self) -> f32 {
+        self.scoring_context
+            .goal_ball_air_time
+            .median_goal_ball_air_time()
     }
 }
 
@@ -445,6 +535,7 @@ pub struct GoalContextEvent {
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub defending_team_most_back_player: Option<PlayerId>,
     pub ball_position: Option<GoalContextPosition>,
+    pub ball_air_time_before_goal: Option<f32>,
     pub scorer_last_touch: Option<GoalTouchContext>,
     pub players: Vec<GoalPlayerContext>,
 }
@@ -488,6 +579,7 @@ pub struct MatchStatsCalculator {
     goal_context_events: Vec<GoalContextEvent>,
     last_touch_context_by_player: HashMap<PlayerId, GoalTouchContext>,
     boost_leadup_samples_by_player: HashMap<PlayerId, VecDeque<BoostLeadupSample>>,
+    last_ball_ground_contact_time: Option<f32>,
 }
 
 impl MatchStatsCalculator {
@@ -535,11 +627,20 @@ impl MatchStatsCalculator {
                     .goal_buildup
                     .merge(&player_stats.scoring_context.goal_buildup);
                 stats
+                    .scoring_context
+                    .goal_ball_air_time
+                    .merge(&player_stats.scoring_context.goal_ball_air_time);
+                stats
             });
         stats
             .scoring_context
             .goal_after_kickoff
             .goal_times
+            .sort_by(|left, right| left.total_cmp(right));
+        stats
+            .scoring_context
+            .goal_ball_air_time
+            .goal_ball_air_times
             .sort_by(|left, right| left.total_cmp(right));
         stats
     }
@@ -721,6 +822,20 @@ impl MatchStatsCalculator {
             .retain(|_, samples| !samples.is_empty());
     }
 
+    fn update_ball_ground_contact(&mut self, frame: &FrameInfo, ball: &BallFrameState) {
+        if ball
+            .position()
+            .is_some_and(|position| position.z <= BALL_GROUND_CONTACT_MAX_Z)
+        {
+            self.last_ball_ground_contact_time = Some(frame.time);
+        }
+    }
+
+    fn ball_air_time_before_goal(&self, goal_time: f32) -> Option<f32> {
+        self.last_ball_ground_contact_time
+            .map(|ground_contact_time| (goal_time - ground_contact_time).max(0.0))
+    }
+
     fn boost_leadup_for_player(&self, player_id: &PlayerId) -> Option<BoostLeadupStats> {
         let samples = self.boost_leadup_samples_by_player.get(player_id)?;
         if samples.is_empty() {
@@ -777,6 +892,7 @@ impl MatchStatsCalculator {
         scoring_team_most_back_player: Option<&PlayerId>,
         defending_team_most_back_player: Option<&PlayerId>,
         scorer_last_touch: Option<&GoalTouchContext>,
+        ball_air_time_before_goal: Option<f32>,
     ) {
         if let Some(player_id) = scoring_team_most_back_player {
             self.player_stats
@@ -819,6 +935,13 @@ impl MatchStatsCalculator {
                     .scoring_context
                     .record_scoring_goal_last_touch_position(touch_position);
             }
+            if let Some(ball_air_time_before_goal) = ball_air_time_before_goal {
+                self.player_stats
+                    .entry(scorer.clone())
+                    .or_default()
+                    .scoring_context
+                    .record_goal_ball_air_time(ball_air_time_before_goal);
+            }
         }
     }
 
@@ -840,6 +963,7 @@ impl MatchStatsCalculator {
                 .and_then(|player_id| self.last_touch_context_by_player.get(player_id))
                 .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
                 .cloned();
+            let ball_air_time_before_goal = self.ball_air_time_before_goal(goal_event.time);
 
             self.record_goal_context_stats(
                 players,
@@ -847,6 +971,7 @@ impl MatchStatsCalculator {
                 scoring_team_most_back_player.as_ref(),
                 defending_team_most_back_player.as_ref(),
                 scorer_last_touch.as_ref(),
+                ball_air_time_before_goal,
             );
 
             self.goal_context_events.push(GoalContextEvent {
@@ -857,6 +982,7 @@ impl MatchStatsCalculator {
                 scoring_team_most_back_player: scoring_team_most_back_player.clone(),
                 defending_team_most_back_player: defending_team_most_back_player.clone(),
                 ball_position,
+                ball_air_time_before_goal,
                 scorer_last_touch,
                 players: self.goal_player_contexts(
                     players,
@@ -969,12 +1095,14 @@ impl MatchStatsCalculator {
     ) -> SubtrActorResult<()> {
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
+        self.update_ball_ground_contact(frame, ball);
         if live_play_state.is_live_play {
             self.record_goal_buildup_sample(frame, ball);
             self.update_boost_leadup_samples(frame, players);
         } else if events.goal_events.is_empty() {
             self.last_touch_context_by_player.clear();
             self.boost_leadup_samples_by_player.clear();
+            self.last_ball_ground_contact_time = None;
         }
         self.update_last_touch_contexts(ball, players, &touch_state.touch_events);
         self.record_goal_context_events(ball, players, events);
@@ -1152,3 +1280,7 @@ impl MatchStatsCalculator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "match_stats_tests.rs"]
+mod tests;

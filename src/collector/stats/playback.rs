@@ -1700,6 +1700,12 @@ fn normalize_core_player_stats_snapshot(value: &mut Value) -> SubtrActorResult<(
         "average_scoring_goal_last_touch_position_z",
         "scoring_goal_last_touch_position_sample_count",
     )?;
+    insert_cumulative_from_average(
+        object,
+        "cumulative_goal_ball_air_time",
+        "average_goal_ball_air_time",
+        "goal_ball_air_time_sample_count",
+    )?;
 
     if let Value::Object(defaults) = default_json_value::<CorePlayerStats>() {
         for (field, default_value) in defaults {
@@ -1911,6 +1917,7 @@ fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent>
             object.get("defending_team_most_back_player"),
         )?,
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
+        ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
         scorer_last_touch: match object.get("scorer_last_touch") {
             None | Some(Value::Null) => None,
             Some(value) => Some(parse_goal_touch_context(value)?),

@@ -145,6 +145,26 @@ impl StatFieldProvider for CorePlayerStats {
         ));
         visitor(ExportedStat::unsigned(
             "core",
+            "goal_ball_air_time_sample_count",
+            StatUnit::Count,
+            self.scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_time_sample_count,
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "average_goal_ball_air_time",
+            StatUnit::Seconds,
+            self.average_goal_ball_air_time(),
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "median_goal_ball_air_time",
+            StatUnit::Seconds,
+            self.median_goal_ball_air_time(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
             "kickoff_goal_count",
             StatUnit::Count,
             self.scoring_context.goal_after_kickoff.kickoff_goal_count,
@@ -239,6 +259,26 @@ impl StatFieldProvider for CoreTeamStats {
             "median_goal_time_after_kickoff",
             StatUnit::Seconds,
             self.median_goal_time_after_kickoff(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
+            "goal_ball_air_time_sample_count",
+            StatUnit::Count,
+            self.scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_time_sample_count,
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "average_goal_ball_air_time",
+            StatUnit::Seconds,
+            self.average_goal_ball_air_time(),
+        ));
+        visitor(ExportedStat::float(
+            "core",
+            "median_goal_ball_air_time",
+            StatUnit::Seconds,
+            self.median_goal_ball_air_time(),
         ));
         visitor(ExportedStat::unsigned(
             "core",

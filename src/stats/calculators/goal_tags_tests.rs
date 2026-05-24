@@ -52,6 +52,7 @@ fn goal_with_touch(
         scoring_team_most_back_player: None,
         defending_team_most_back_player: None,
         ball_position: Some(touch_position),
+        ball_air_time_before_goal: None,
         scorer_last_touch: Some(scorer_touch(touch_position, players.clone())),
         players,
     }

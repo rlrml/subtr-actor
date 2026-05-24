@@ -131,6 +131,12 @@ struct CoreTeamStatsSnapshot {
     medium_goal_count: u32,
     long_goal_count: u32,
     goal_times: Vec<f32>,
+    goal_ball_air_time_sample_count: u32,
+    cumulative_goal_ball_air_time: f32,
+    average_goal_ball_air_time: f32,
+    median_goal_ball_air_time: f32,
+    last_goal_ball_air_time: Option<f32>,
+    goal_ball_air_times: Vec<f32>,
     counter_attack_goal_count: u32,
     sustained_pressure_goal_count: u32,
     other_buildup_goal_count: u32,
@@ -152,6 +158,25 @@ impl From<CoreTeamStats> for CoreTeamStatsSnapshot {
                 .scoring_context
                 .goal_after_kickoff
                 .goal_times()
+                .to_vec(),
+            goal_ball_air_time_sample_count: stats
+                .scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_time_sample_count,
+            cumulative_goal_ball_air_time: stats
+                .scoring_context
+                .goal_ball_air_time
+                .cumulative_goal_ball_air_time,
+            average_goal_ball_air_time: stats.average_goal_ball_air_time(),
+            median_goal_ball_air_time: stats.median_goal_ball_air_time(),
+            last_goal_ball_air_time: stats
+                .scoring_context
+                .goal_ball_air_time
+                .last_goal_ball_air_time,
+            goal_ball_air_times: stats
+                .scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_times()
                 .to_vec(),
             counter_attack_goal_count: stats.scoring_context.goal_buildup.counter_attack_goal_count,
             sustained_pressure_goal_count: stats
@@ -205,6 +230,12 @@ struct CorePlayerStatsSnapshot {
     medium_goal_count: u32,
     long_goal_count: u32,
     goal_times: Vec<f32>,
+    goal_ball_air_time_sample_count: u32,
+    cumulative_goal_ball_air_time: f32,
+    average_goal_ball_air_time: f32,
+    median_goal_ball_air_time: f32,
+    last_goal_ball_air_time: Option<f32>,
+    goal_ball_air_times: Vec<f32>,
     counter_attack_goal_count: u32,
     sustained_pressure_goal_count: u32,
     other_buildup_goal_count: u32,
@@ -292,6 +323,25 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
                 .scoring_context
                 .goal_after_kickoff
                 .goal_times()
+                .to_vec(),
+            goal_ball_air_time_sample_count: stats
+                .scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_time_sample_count,
+            cumulative_goal_ball_air_time: stats
+                .scoring_context
+                .goal_ball_air_time
+                .cumulative_goal_ball_air_time,
+            average_goal_ball_air_time: stats.average_goal_ball_air_time(),
+            median_goal_ball_air_time: stats.median_goal_ball_air_time(),
+            last_goal_ball_air_time: stats
+                .scoring_context
+                .goal_ball_air_time
+                .last_goal_ball_air_time,
+            goal_ball_air_times: stats
+                .scoring_context
+                .goal_ball_air_time
+                .goal_ball_air_times()
                 .to_vec(),
             counter_attack_goal_count: stats.scoring_context.goal_buildup.counter_attack_goal_count,
             sustained_pressure_goal_count: stats
