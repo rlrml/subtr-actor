@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.10 - 2026-05-24
+
+- Emit consecutive same-player touch candidates without the previous short
+  cooldown, preserving rapid touch-state changes for downstream stats.
+- Fix own-half goal tagging so team orientation is applied from the scoring
+  team perspective.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.10`.
+
 ## v0.7.8 - 2026-05-24
 
 - Collapse the separate dribble-touch bucket into `touch.control_touch_count`
