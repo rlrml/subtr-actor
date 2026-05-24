@@ -13,6 +13,7 @@ mod double_tap;
 mod fifty_fifty;
 mod flick;
 mod half_flip;
+mod half_volley;
 mod movement;
 mod musty_flick;
 mod one_timer;

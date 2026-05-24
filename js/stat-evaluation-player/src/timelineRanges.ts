@@ -35,6 +35,7 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   double_tap: "DT",
   flick: "F",
   half_flip: "HF",
+  half_volley: "HV",
   musty_flick: "M",
   one_timer: "OT",
   pass: "P",

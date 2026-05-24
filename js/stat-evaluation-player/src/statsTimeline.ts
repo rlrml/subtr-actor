@@ -23,6 +23,7 @@ import type { StatsTimelineConfig } from "./generated/StatsTimelineConfig.ts";
 import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generated/TeamStatsSnapshot.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
 import type { HalfFlipEvent } from "./generated/HalfFlipEvent.ts";
+import type { HalfVolleyEvent } from "./generated/HalfVolleyEvent.ts";
 import type { WavedashEvent } from "./generated/WavedashEvent.ts";
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 
@@ -51,6 +52,7 @@ export type {
   StatsTimelineConfig,
   TimelineEvent,
   HalfFlipEvent,
+  HalfVolleyEvent,
   WavedashEvent,
   WhiffEvent,
   BoostPickupComparisonEvent,

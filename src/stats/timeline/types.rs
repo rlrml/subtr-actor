@@ -25,6 +25,10 @@ pub struct StatsTimelineConfig {
     pub one_timer_goal_max_event_to_goal_seconds: f32,
     pub air_dribble_goal_max_end_to_goal_seconds: f32,
     pub flip_reset_goal_max_event_to_goal_seconds: f32,
+    pub half_volley_max_bounce_to_touch_seconds: f32,
+    pub half_volley_min_ball_speed: f32,
+    pub half_volley_goal_max_touch_to_goal_seconds: f32,
+    pub half_volley_goal_min_goal_alignment: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -60,6 +64,7 @@ pub struct ReplayStatsTimelineEvents {
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
     pub half_flip: Vec<HalfFlipEvent>,
+    pub half_volley: Vec<HalfVolleyEvent>,
     pub wavedash: Vec<WavedashEvent>,
     pub whiff: Vec<WhiffEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
@@ -125,6 +130,7 @@ pub struct TeamStatsSnapshot {
     pub air_dribble: AirDribbleStats,
     pub boost: BoostStats,
     pub bump: BumpTeamStats,
+    pub half_volley: HalfVolleyTeamStats,
     pub movement: MovementStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoTeamStats,
@@ -146,6 +152,7 @@ pub struct PlayerStatsSnapshot {
     pub fifty_fifty: FiftyFiftyPlayerStats,
     pub speed_flip: SpeedFlipStats,
     pub half_flip: HalfFlipStats,
+    pub half_volley: HalfVolleyPlayerStats,
     pub wavedash: WavedashStats,
     pub touch: TouchStats,
     pub whiff: WhiffStats,

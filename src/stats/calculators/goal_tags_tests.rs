@@ -161,6 +161,20 @@ fn dodge_refreshed_event(time: f32, frame: usize, player: PlayerId) -> DodgeRefr
     }
 }
 
+fn half_volley_event(time: f32, frame: usize, player: PlayerId) -> HalfVolleyEvent {
+    HalfVolleyEvent {
+        time,
+        frame,
+        player,
+        is_team_0: true,
+        bounce_time: time - 0.2,
+        bounce_frame: frame.saturating_sub(2),
+        bounce_to_touch_seconds: 0.2,
+        ball_speed: 1600.0,
+        goal_alignment: 0.8,
+    }
+}
+
 #[test]
 fn high_aerial_goal_also_gets_aerial_goal_tag() {
     let goal = goal_with_touch(true, position(0.0, 1500.0, 900.0), Vec::new());
@@ -382,4 +396,45 @@ fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipReset));
+}
+
+#[test]
+fn half_volley_goal_tags_scorer_last_touch_after_floor_bounce() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let calculator = HalfVolleyGoalCalculator::new();
+    let half_volleys = vec![half_volley_event(9.5, 95, player_id(1))];
+
+    let events = calculator.tag_goals(&[goal], &half_volleys);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::HalfVolleyGoal]);
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::HalfVolley));
+}
+
+#[test]
+fn half_volley_goal_requires_the_scorer_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let calculator = HalfVolleyGoalCalculator::new();
+    let half_volleys = vec![half_volley_event(9.4, 94, player_id(1))];
+
+    let events = calculator.tag_goals(&[goal], &half_volleys);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn half_volley_goal_rejects_stale_touches() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let calculator = HalfVolleyGoalCalculator::with_config(HalfVolleyGoalCalculatorConfig {
+        max_touch_to_goal_seconds: 0.3,
+        ..HalfVolleyGoalCalculatorConfig::default()
+    });
+    let half_volleys = vec![half_volley_event(9.5, 95, player_id(1))];
+
+    let events = calculator.tag_goals(&[goal], &half_volleys);
+
+    assert!(events.is_empty());
 }

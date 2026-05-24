@@ -13,6 +13,8 @@ const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
+const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -27,6 +29,7 @@ pub enum GoalTagKind {
     OneTimerGoal,
     AirDribbleGoal,
     FlipResetGoal,
+    HalfVolleyGoal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -40,6 +43,7 @@ pub enum GoalTagEvidenceKind {
     OneTimer,
     AirDribble,
     FlipReset,
+    HalfVolley,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -204,6 +208,22 @@ impl Default for FlipResetGoalCalculatorConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct HalfVolleyGoalCalculatorConfig {
+    pub max_touch_to_goal_seconds: f32,
+    pub min_goal_alignment: f32,
+}
+
+impl Default for HalfVolleyGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_touch_to_goal_seconds: DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS,
+            min_goal_alignment: DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct GoalTaggingContext<'a> {
     goal_index: usize,
@@ -264,6 +284,12 @@ pub struct FlipResetGoalCalculator {
     events: Vec<GoalTagEvent>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct HalfVolleyGoalCalculator {
+    config: HalfVolleyGoalCalculatorConfig,
+    events: Vec<GoalTagEvent>,
+}
+
 macro_rules! impl_goal_tag_calculator {
     ($calculator:ident, $config:ident) => {
         impl Default for $calculator {
@@ -304,6 +330,33 @@ impl_goal_tag_calculator!(FlickGoalCalculator, FlickGoalCalculatorConfig);
 impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
+
+impl Default for HalfVolleyGoalCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HalfVolleyGoalCalculator {
+    pub fn new() -> Self {
+        Self::with_config(HalfVolleyGoalCalculatorConfig::default())
+    }
+
+    pub fn with_config(config: HalfVolleyGoalCalculatorConfig) -> Self {
+        Self {
+            config,
+            events: Vec::new(),
+        }
+    }
+
+    pub fn config(&self) -> &HalfVolleyGoalCalculatorConfig {
+        &self.config
+    }
+
+    pub fn events(&self) -> &[GoalTagEvent] {
+        &self.events
+    }
+}
 
 impl AerialGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
@@ -507,6 +560,74 @@ impl FlipResetGoalCalculator {
             GoalTagKind::FlipResetGoal,
             self.config.max_event_to_goal_seconds,
         )
+    }
+}
+
+impl HalfVolleyGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        half_volley: &HalfVolleyCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events = self.tag_goals(match_stats.goal_context_events(), half_volley.events());
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        half_volley_events: &[HalfVolleyEvent],
+    ) -> Vec<GoalTagEvent> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index, goal };
+            let Some(candidate) = self.tag_goals_by_half_volley_event(goal, half_volley_events)
+            else {
+                continue;
+            };
+
+            tags.push(goal_tag_with_modifiers(
+                ctx,
+                GoalTagKind::HalfVolleyGoal,
+                1.0,
+                mechanic_goal_modifiers(goal, &candidate.player),
+                mechanic_goal_evidence(goal, half_volley_evidence(candidate)),
+            ));
+        }
+        tags
+    }
+
+    fn tag_goals_by_half_volley_event<'a>(
+        &self,
+        goal: &GoalContextEvent,
+        half_volley_events: &'a [HalfVolleyEvent],
+    ) -> Option<&'a HalfVolleyEvent> {
+        half_volley_events
+            .iter()
+            .filter(|candidate| self.candidate_matches_goal(candidate, goal))
+            .max_by(|left, right| {
+                left.time
+                    .total_cmp(&right.time)
+                    .then_with(|| left.frame.cmp(&right.frame))
+            })
+    }
+
+    fn candidate_matches_goal(&self, candidate: &HalfVolleyEvent, goal: &GoalContextEvent) -> bool {
+        const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+
+        if candidate.is_team_0 != goal.scoring_team_is_team_0
+            || candidate.time > goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+            || candidate.frame > goal.frame
+            || goal.time - candidate.time > self.config.max_touch_to_goal_seconds
+            || candidate.goal_alignment < self.config.min_goal_alignment
+        {
+            return false;
+        }
+
+        let Some(touch) = goal.scorer_last_touch.as_ref() else {
+            return false;
+        };
+        touch.player == candidate.player && touch.frame == candidate.frame
     }
 }
 
@@ -791,6 +912,15 @@ fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
         time: event.end_time,
         frame: event.end_frame,
         player: Some(event.player_id.clone()),
+    }
+}
+
+fn half_volley_evidence(candidate: &HalfVolleyEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::HalfVolley,
+        time: candidate.time,
+        frame: candidate.frame,
+        player: Some(candidate.player.clone()),
     }
 }
 

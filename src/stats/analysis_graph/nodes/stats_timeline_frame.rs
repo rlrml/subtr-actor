@@ -53,6 +53,7 @@ impl StatsTimelineFrameNode {
         let ball_carry = ctx.get::<BallCarryCalculator>()?;
         let boost = ctx.get::<BoostCalculator>()?;
         let bump = ctx.get::<BumpCalculator>()?;
+        let half_volley = ctx.get::<HalfVolleyCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let powerslide = ctx.get::<PowerslideCalculator>()?;
         let demo = ctx.get::<DemoCalculator>()?;
@@ -110,6 +111,11 @@ impl StatsTimelineFrameNode {
                 bump.team_zero_stats().clone()
             } else {
                 bump.team_one_stats().clone()
+            },
+            half_volley: if is_team_zero {
+                half_volley.team_zero_stats().clone()
+            } else {
+                half_volley.team_one_stats().clone()
             },
             movement: if is_team_zero {
                 movement.team_zero_stats().clone()
@@ -254,6 +260,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            half_volley: ctx
+                .get::<HalfVolleyCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             movement: ctx
                 .get::<MovementCalculator>()?
                 .player_stats()
@@ -333,6 +345,7 @@ impl AnalysisNode for StatsTimelineFrameNode {
             ball_carry_dependency(),
             boost_dependency(),
             bump_dependency(),
+            half_volley_dependency(),
             movement_dependency(),
             positioning_dependency(),
             powerslide_dependency(),

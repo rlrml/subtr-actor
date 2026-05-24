@@ -112,6 +112,11 @@ export function createTeamStatsSnapshot(
       total_ball_speed: 0,
       fastest_ball_speed: 0,
     },
+    half_volley: {
+      count: 0,
+      total_ball_speed: 0,
+      fastest_ball_speed: 0,
+    },
     pass: {
       completed_pass_count: 0,
       total_pass_distance: 0,
@@ -326,6 +331,16 @@ export function createPlayerStatsSnapshot(
       last_quality: null,
       best_quality: 0,
       cumulative_quality: 0,
+    },
+    half_volley: {
+      count: 0,
+      total_ball_speed: 0,
+      fastest_ball_speed: 0,
+      is_last_half_volley: false,
+      last_half_volley_time: null,
+      last_half_volley_frame: null,
+      time_since_last_half_volley: null,
+      frames_since_last_half_volley: null,
     },
     wavedash: {
       count: 0,

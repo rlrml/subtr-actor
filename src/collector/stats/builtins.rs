@@ -318,6 +318,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "ceiling_shot",
         "double_tap",
         "one_timer",
+        "half_volley",
         "pass",
         "aerial_goal",
         "high_aerial_goal",
@@ -328,6 +329,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "one_timer_goal",
         "air_dribble_goal",
         "flip_reset_goal",
+        "half_volley_goal",
         "fifty_fifty",
         "possession",
         "pressure",
@@ -411,6 +413,15 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "half_volley" => {
+            let calculator = graph_state::<HalfVolleyCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
         "pass" => {
             let calculator = graph_state::<PassCalculator>(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
@@ -470,6 +481,12 @@ pub(crate) fn builtin_module_json(
         }
         "flip_reset_goal" => {
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "half_volley_goal" => {
+            let calculator = graph_state::<HalfVolleyGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -683,6 +700,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "half_volley" => {
+            let calculator = graph_state::<HalfVolleyCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
         "pass" => {
             let calculator = graph_state::<PassCalculator>(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -693,7 +718,9 @@ pub(crate) fn builtin_snapshot_frame_json(
         }
         "aerial_goal" | "high_aerial_goal" | "long_distance_goal" | "own_half_goal"
         | "empty_net_goal" | "flick_goal" | "one_timer_goal" | "air_dribble_goal"
-        | "flip_reset_goal" => serialize_to_json_value(&serde_json::json!({}))?,
+        | "flip_reset_goal" | "half_volley_goal" => {
+            serialize_to_json_value(&serde_json::json!({}))?
+        }
         "fifty_fifty" => {
             let calculator = graph_state::<FiftyFiftyCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsWithPlayerStatsExport {
@@ -949,6 +976,20 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "flip_reset_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "half_volley_goal" => {
+            let calculator = graph_state::<HalfVolleyGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "half_volley_goal_max_touch_to_goal_seconds": calculator.config().max_touch_to_goal_seconds,
+                "half_volley_goal_min_goal_alignment": calculator.config().min_goal_alignment,
+            }))?)
+        }
+        "half_volley" => {
+            let calculator = graph_state::<HalfVolleyCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "half_volley_max_bounce_to_touch_seconds": calculator.config().max_bounce_to_touch_seconds,
+                "half_volley_min_ball_speed": calculator.config().min_ball_speed,
             }))?)
         }
         "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"

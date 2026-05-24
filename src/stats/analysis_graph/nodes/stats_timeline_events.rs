@@ -45,9 +45,11 @@ impl_analysis_node! {
         one_timer_goal_dependency(),
         air_dribble_goal_dependency(),
         flip_reset_goal_dependency(),
+        half_volley_goal_dependency(),
         rush_dependency(),
         speed_flip_dependency(),
         half_flip_dependency(),
+        half_volley_dependency(),
         wavedash_dependency(),
         whiff_dependency(),
         boost_dependency(),
@@ -75,9 +77,11 @@ impl_analysis_node! {
         one_timer_goal: OneTimerGoalCalculator,
         air_dribble_goal: AirDribbleGoalCalculator,
         flip_reset_goal: FlipResetGoalCalculator,
+        half_volley_goal: HalfVolleyGoalCalculator,
         rush: RushCalculator,
         speed_flip: SpeedFlipCalculator,
         half_flip: HalfFlipCalculator,
+        half_volley: HalfVolleyCalculator,
         wavedash: WavedashCalculator,
         whiff: WhiffCalculator,
         boost: BoostCalculator,
@@ -97,6 +101,7 @@ impl_analysis_node! {
             one_timer_goal.events(),
             air_dribble_goal.events(),
             flip_reset_goal.events(),
+            half_volley_goal.events(),
         ]);
 
         node.state.events = ReplayStatsTimelineEvents {
@@ -112,6 +117,7 @@ impl_analysis_node! {
                 pass,
                 speed_flip,
                 half_flip,
+                half_volley,
                 wavedash,
             ),
             goal_context: match_stats.goal_context_events().to_vec(),
@@ -125,6 +131,7 @@ impl_analysis_node! {
             rush: rush.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
             half_flip: half_flip.events().to_vec(),
+            half_volley: half_volley.events().to_vec(),
             wavedash: wavedash.events().to_vec(),
             whiff: whiff.events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
@@ -189,6 +196,7 @@ fn build_mechanic_events(
     pass: &PassCalculator,
     speed_flip: &SpeedFlipCalculator,
     half_flip: &HalfFlipCalculator,
+    half_volley: &HalfVolleyCalculator,
     wavedash: &WavedashCalculator,
 ) -> Vec<MechanicEvent> {
     let mut events = Vec::new();
@@ -313,6 +321,17 @@ fn build_mechanic_events(
     for (index, event) in half_flip.events().iter().enumerate() {
         events.push(moment_mechanic_event(
             "half_flip",
+            index,
+            event.frame,
+            event.time,
+            event.player.clone(),
+            event.is_team_0,
+        ));
+    }
+
+    for (index, event) in half_volley.events().iter().enumerate() {
+        events.push(moment_mechanic_event(
+            "half_volley",
             index,
             event.frame,
             event.time,

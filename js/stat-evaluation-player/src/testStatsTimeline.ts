@@ -31,6 +31,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     rush: [],
     speed_flip: [],
     half_flip: [],
+    half_volley: [],
     wavedash: [],
     whiff: [],
     boost_pickups: [],
@@ -101,6 +102,10 @@ export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): Sta
       one_timer_goal_max_event_to_goal_seconds: 0,
       air_dribble_goal_max_end_to_goal_seconds: 0,
       flip_reset_goal_max_event_to_goal_seconds: 0,
+      half_volley_max_bounce_to_touch_seconds: 0,
+      half_volley_min_ball_speed: 0,
+      half_volley_goal_max_touch_to_goal_seconds: 0,
+      half_volley_goal_min_goal_alignment: 0,
     },
     replay_meta: {
       team_zero: [],
@@ -129,6 +134,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
   rush_events?: StatsEvents["rush"];
   speed_flip_events?: StatsEvents["speed_flip"];
   half_flip_events?: StatsEvents["half_flip"];
+  half_volley_events?: StatsEvents["half_volley"];
   wavedash_events?: StatsEvents["wavedash"];
   whiff_events?: StatsEvents["whiff"];
   boost_pickups?: StatsEvents["boost_pickups"];
@@ -149,6 +155,7 @@ export function createLegacyStatsTimeline(overrides: DeepPartial<StatsTimeline> 
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
       half_flip: overrides.half_flip_events ?? overrides.events?.half_flip ?? [],
+      half_volley: overrides.half_volley_events ?? overrides.events?.half_volley ?? [],
       wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],

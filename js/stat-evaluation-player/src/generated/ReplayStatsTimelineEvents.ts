@@ -8,6 +8,7 @@ import type { FiftyFiftyEvent } from "./FiftyFiftyEvent.ts";
 import type { GoalContextEvent } from "./GoalContextEvent.ts";
 import type { GoalTagEvent } from "./GoalTagEvent.ts";
 import type { HalfFlipEvent } from "./HalfFlipEvent.ts";
+import type { HalfVolleyEvent } from "./HalfVolleyEvent.ts";
 import type { MechanicEvent } from "./MechanicEvent.ts";
 import type { OneTimerEvent } from "./OneTimerEvent.ts";
 import type { PassEvent } from "./PassEvent.ts";
@@ -17,4 +18,4 @@ import type { TimelineEvent } from "./TimelineEvent.ts";
 import type { WavedashEvent } from "./WavedashEvent.ts";
 import type { WhiffEvent } from "./WhiffEvent.ts";
 
-export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, mechanics: Array<MechanicEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, one_timer: Array<OneTimerEvent>, pass: Array<PassEvent>, goal_tags: Array<GoalTagEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, half_flip: Array<HalfFlipEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, bump: Array<BumpEvent>, };
+export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, mechanics: Array<MechanicEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, one_timer: Array<OneTimerEvent>, pass: Array<PassEvent>, goal_tags: Array<GoalTagEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, half_flip: Array<HalfFlipEvent>, half_volley: Array<HalfVolleyEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, bump: Array<BumpEvent>, };

@@ -168,6 +168,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "one_timer_goal",
             "air_dribble_goal",
             "flip_reset_goal",
+            "half_volley_goal",
         ] {
             events.extend(self.module_player_events(
                 module_name,
@@ -286,6 +287,21 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.is_team_0,
             ));
         }
+        for (index, value) in self
+            .module_array("half_volley", "events")
+            .iter()
+            .enumerate()
+        {
+            let event = parse_half_volley_event(value)?;
+            events.push(moment_mechanic_event(
+                "half_volley",
+                index,
+                event.frame,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
         for (index, value) in self.module_array("wavedash", "events").iter().enumerate() {
             let event = parse_wavedash_event(value)?;
             events.push(span_mechanic_event(
@@ -322,6 +338,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "one_timer_goal",
             "air_dribble_goal",
             "flip_reset_goal",
+            "half_volley_goal",
         ] {
             events.extend(self.module_array(module_name, "events"));
         }
@@ -368,6 +385,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_speed_flip_event,
             )?,
             half_flip: self.module_player_events("half_flip", "events", parse_half_flip_event)?,
+            half_volley: self.module_player_events(
+                "half_volley",
+                "events",
+                parse_half_volley_event,
+            )?,
             wavedash: self.module_player_events("wavedash", "events", parse_wavedash_event)?,
             whiff: self.module_player_events("whiff", "events", parse_whiff_event)?,
             boost_pickups: self.module_player_events(
@@ -424,6 +446,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("half_flip", "events")),
         );
         events.insert(
+            "half_volley".to_owned(),
+            Value::Array(self.module_array("half_volley", "events")),
+        );
+        events.insert(
             "wavedash".to_owned(),
             Value::Array(self.module_array("wavedash", "events")),
         );
@@ -469,6 +495,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let flip_reset_goal_config = self
             .config
             .get("flip_reset_goal")
+            .and_then(Value::as_object);
+        let half_volley_config = self.config.get("half_volley").and_then(Value::as_object);
+        let half_volley_goal_config = self
+            .config
+            .get("half_volley_goal")
             .and_then(Value::as_object);
 
         StatsTimelineConfig {
@@ -564,6 +595,22 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flip_reset_goal_max_event_to_touch_seconds",
             )
             .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            half_volley_max_bounce_to_touch_seconds: half_volley_config
+                .and_then(|config| config.get("half_volley_max_bounce_to_touch_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(HalfVolleyCalculatorConfig::default().max_bounce_to_touch_seconds),
+            half_volley_min_ball_speed: half_volley_config
+                .and_then(|config| config.get("half_volley_min_ball_speed"))
+                .and_then(json_f32)
+                .unwrap_or(HalfVolleyCalculatorConfig::default().min_ball_speed),
+            half_volley_goal_max_touch_to_goal_seconds: half_volley_goal_config
+                .and_then(|config| config.get("half_volley_goal_max_touch_to_goal_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(HalfVolleyGoalCalculatorConfig::default().max_touch_to_goal_seconds),
+            half_volley_goal_min_goal_alignment: half_volley_goal_config
+                .and_then(|config| config.get("half_volley_goal_min_goal_alignment"))
+                .and_then(json_f32)
+                .unwrap_or(HalfVolleyGoalCalculatorConfig::default().min_goal_alignment),
         }
     }
 
@@ -592,6 +639,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let flip_reset_goal_config = self
             .config
             .get("flip_reset_goal")
+            .and_then(Value::as_object);
+        let half_volley_config = self.config.get("half_volley").and_then(Value::as_object);
+        let half_volley_goal_config = self
+            .config
+            .get("half_volley_goal")
             .and_then(Value::as_object);
 
         let mut config = Map::new();
@@ -747,6 +799,26 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flip_reset_goal_max_event_to_goal_seconds",
                 FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
+            (
+                half_volley_config,
+                "half_volley_max_bounce_to_touch_seconds",
+                HalfVolleyCalculatorConfig::default().max_bounce_to_touch_seconds,
+            ),
+            (
+                half_volley_config,
+                "half_volley_min_ball_speed",
+                HalfVolleyCalculatorConfig::default().min_ball_speed,
+            ),
+            (
+                half_volley_goal_config,
+                "half_volley_goal_max_touch_to_goal_seconds",
+                HalfVolleyGoalCalculatorConfig::default().max_touch_to_goal_seconds,
+            ),
+            (
+                half_volley_goal_config,
+                "half_volley_goal_min_goal_alignment",
+                HalfVolleyGoalCalculatorConfig::default().min_goal_alignment,
+            ),
         ] {
             config.insert(
                 key.to_owned(),
@@ -872,6 +944,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             air_dribble: self.frame_team_stat_or_default_typed(frame, "air_dribble", team_key)?,
             boost: self.frame_team_stat_or_default_typed(frame, "boost", team_key)?,
             bump: self.frame_team_stat_or_default_typed(frame, "bump", team_key)?,
+            half_volley: self.frame_team_stat_or_default_typed(frame, "half_volley", team_key)?,
             movement: self.frame_team_stat_or_default_typed(frame, "movement", team_key)?,
             powerslide: self.frame_team_stat_or_default_typed(frame, "powerslide", team_key)?,
             demo: self.frame_team_stat_or_default_typed(frame, "demo", team_key)?,
@@ -961,6 +1034,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             )?,
             boost: self.frame_player_stat_or_default_typed_by_key(frame, "boost", &player_key)?,
             bump: self.frame_player_stat_or_default_typed_by_key(frame, "bump", &player_key)?,
+            half_volley: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "half_volley",
+                &player_key,
+            )?,
             movement: self.frame_player_stat_or_default_with_by_key(
                 frame,
                 "movement",
@@ -1073,6 +1151,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_team_stat_or_default::<BumpTeamStats>(frame, "bump", team_key),
         );
         team.insert(
+            "half_volley".to_owned(),
+            self.frame_team_stat_or_default::<HalfVolleyTeamStats>(frame, "half_volley", team_key),
+        );
+        team.insert(
             "movement".to_owned(),
             self.frame_team_stat_or_default::<MovementStats>(frame, "movement", team_key),
         );
@@ -1178,6 +1260,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<HalfFlipStats>(
                 frame,
                 "half_flip",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "half_volley".to_owned(),
+            self.frame_player_stat_or_default_by_key::<HalfVolleyPlayerStats>(
+                frame,
+                "half_volley",
                 &player_key,
             )?,
         );
@@ -1901,6 +1991,21 @@ fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {
         pass_duration: json_required_f32(object, "pass_duration")?,
         pass_travel_distance: json_required_f32(object, "pass_travel_distance")?,
         pass_advance_distance: json_required_f32(object, "pass_advance_distance")?,
+        ball_speed: json_required_f32(object, "ball_speed")?,
+        goal_alignment: json_required_f32(object, "goal_alignment")?,
+    })
+}
+
+fn parse_half_volley_event(value: &Value) -> SubtrActorResult<HalfVolleyEvent> {
+    let object = json_object(value, "half volley event")?;
+    Ok(HalfVolleyEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        bounce_time: json_required_f32(object, "bounce_time")?,
+        bounce_frame: json_required_usize(object, "bounce_frame")?,
+        bounce_to_touch_seconds: json_required_f32(object, "bounce_to_touch_seconds")?,
         ball_speed: json_required_f32(object, "ball_speed")?,
         goal_alignment: json_required_f32(object, "goal_alignment")?,
     })

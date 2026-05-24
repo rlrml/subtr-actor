@@ -78,6 +78,13 @@ impl StatsTimelineCollector {
                 .max_end_to_goal_seconds,
             flip_reset_goal_max_event_to_goal_seconds: FlipResetGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
+            half_volley_max_bounce_to_touch_seconds: HalfVolleyCalculatorConfig::default()
+                .max_bounce_to_touch_seconds,
+            half_volley_min_ball_speed: HalfVolleyCalculatorConfig::default().min_ball_speed,
+            half_volley_goal_max_touch_to_goal_seconds: HalfVolleyGoalCalculatorConfig::default()
+                .max_touch_to_goal_seconds,
+            half_volley_goal_min_goal_alignment: HalfVolleyGoalCalculatorConfig::default()
+                .min_goal_alignment,
         }
     }
 

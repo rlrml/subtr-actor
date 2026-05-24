@@ -26,6 +26,7 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   flick: "F",
   flip_reset: "FR",
   half_flip: "HF",
+  half_volley: "HV",
   musty_flick: "M",
   one_timer: "OT",
   pass: "P",

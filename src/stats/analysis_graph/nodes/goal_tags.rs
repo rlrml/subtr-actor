@@ -131,6 +131,47 @@ mechanic_goal_tag_node!(
     DodgeResetCalculator
 );
 
+pub struct HalfVolleyGoalNode {
+    calculator: HalfVolleyGoalCalculator,
+}
+
+impl HalfVolleyGoalNode {
+    pub fn new() -> Self {
+        Self {
+            calculator: HalfVolleyGoalCalculator::new(),
+        }
+    }
+}
+
+impl Default for HalfVolleyGoalNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AnalysisNode for HalfVolleyGoalNode {
+    type State = HalfVolleyGoalCalculator;
+
+    fn name(&self) -> &'static str {
+        "half_volley_goal"
+    }
+
+    fn dependencies(&self) -> NodeDependencies {
+        vec![match_stats_dependency(), half_volley_dependency()]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.update(
+            ctx.get::<MatchStatsCalculator>()?,
+            ctx.get::<HalfVolleyCalculator>()?,
+        )
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.calculator
+    }
+}
+
 pub(crate) fn boxed_aerial_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(AerialGoalNode::new())
 }
@@ -165,4 +206,8 @@ pub(crate) fn boxed_air_dribble_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_flip_reset_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(FlipResetGoalNode::new())
+}
+
+pub(crate) fn boxed_half_volley_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(HalfVolleyGoalNode::new())
 }
