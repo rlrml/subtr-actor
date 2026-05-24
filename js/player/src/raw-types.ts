@@ -14,6 +14,7 @@ import type { RemoteIdTs as GeneratedRemoteIdTs } from "./generated/RemoteIdTs.t
 import type { ReplayData as GeneratedReplayData } from "./generated/ReplayData.ts";
 import type { ResolvedBoostPad as GeneratedResolvedBoostPad } from "./generated/ResolvedBoostPad.ts";
 import type { RigidBodyTs as GeneratedRigidBodyTs } from "./generated/RigidBodyTs.ts";
+import type { ShotEventMetadata as GeneratedShotEventMetadata } from "./generated/ShotEventMetadata.ts";
 import type { Vector3fTs as GeneratedVector3fTs } from "./generated/Vector3fTs.ts";
 
 export type RawVec3 = GeneratedVector3fTs;
@@ -32,6 +33,7 @@ export type RawPlayerStatEventKind = GeneratedPlayerStatEventKind;
 export type RawDemolishInfo = GeneratedDemolishInfo;
 export type RawGoalEvent = GeneratedGoalEvent;
 export type RawPlayerStatEvent = GeneratedPlayerStatEvent;
+export type RawShotEventMetadata = GeneratedShotEventMetadata;
 export type RawBoostPadEvent = GeneratedBoostPadEvent;
 export type RawBoostPad = GeneratedResolvedBoostPad;
 export type RawReplayFramesData = GeneratedReplayData;

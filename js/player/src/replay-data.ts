@@ -1104,6 +1104,8 @@ function playerStatTimelineEvent(
     shortLabel,
     playerId,
     playerName,
+    location: event.shot?.ball_position ?? null,
+    shot: event.shot ?? null,
     isTeamZero: event.is_team_0,
   };
 }

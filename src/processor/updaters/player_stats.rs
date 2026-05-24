@@ -39,6 +39,9 @@ impl<'a> ReplayProcessor<'a> {
             let delta = new_value - previous_value;
             self.player_stat_counters
                 .insert((player_id.clone(), kind), new_value);
+            let shot = (kind == PlayerStatEventKind::Shot)
+                .then(|| self.shot_event_metadata(frame.time, &player_id, is_team_0))
+                .flatten();
             for _ in 0..delta.max(0) {
                 let event = PlayerStatEvent {
                     time: frame.time,
@@ -46,6 +49,7 @@ impl<'a> ReplayProcessor<'a> {
                     player: player_id.clone(),
                     is_team_0,
                     kind,
+                    shot: shot.clone(),
                 };
                 self.current_frame_player_stat_events.push(event.clone());
                 self.player_stat_events.push(event);
@@ -53,5 +57,22 @@ impl<'a> ReplayProcessor<'a> {
         }
 
         Ok(())
+    }
+
+    fn shot_event_metadata(
+        &self,
+        time: f32,
+        player_id: &PlayerId,
+        is_team_0: bool,
+    ) -> Option<ShotEventMetadata> {
+        let ball_body = self.get_interpolated_ball_rigid_body(time, 0.0).ok()?;
+        let player_body = self
+            .get_interpolated_player_rigid_body(player_id, time, 0.0)
+            .ok();
+        Some(ShotEventMetadata::from_rigid_bodies(
+            is_team_0,
+            &ball_body,
+            player_body.as_ref(),
+        ))
     }
 }

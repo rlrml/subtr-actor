@@ -289,6 +289,40 @@ test("normalization includes victim location on demo timeline events", () => {
   assert.deepEqual(demoEvent?.location, { x: 120, y: -300, z: 17 });
 });
 
+test("normalization carries shot metadata onto shot timeline events", () => {
+  const raw = buildReplayData(3, 2);
+  const shot = {
+    ball_position: { x: 10, y: 1200, z: 93 },
+    ball_velocity: { x: 0, y: 1800, z: 0 },
+    ball_speed: 1800,
+    player_position: { x: 10, y: 1000, z: 17 },
+    player_velocity: { x: 0, y: 1200, z: 0 },
+    player_speed: 1200,
+    player_distance_to_ball: 214,
+    target_goal_position: { x: 0, y: 5120, z: 93 },
+    distance_to_goal_center: 3920,
+    distance_to_goal_line: 3920,
+    ball_goal_alignment: 1,
+    ball_speed_toward_goal: 1800,
+  };
+  raw.player_stat_events = [
+    {
+      time: 10.1,
+      frame: 1,
+      player: { Steam: "blue-player-0" },
+      is_team_0: true,
+      kind: "Shot",
+      shot,
+    },
+  ];
+
+  const replay = normalizeReplayData(raw);
+  const shotEvent = replay.timelineEvents.find((event) => event.kind === "shot");
+
+  assert.deepEqual(shotEvent?.location, shot.ball_position);
+  assert.deepEqual(shotEvent?.shot, shot);
+});
+
 test("async normalization yields at configured frame progress intervals", async () => {
   let yieldCount = 0;
   const raw = buildReplayData(24);

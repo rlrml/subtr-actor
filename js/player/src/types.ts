@@ -1,5 +1,5 @@
 import type { Group, Object3D } from "three";
-import type { RawReplayFramesData } from "./raw-types";
+import type { RawReplayFramesData, RawShotEventMetadata } from "./raw-types";
 import type { ReplayScene } from "./scene";
 import type { ReplayPlayer } from "./player";
 import type { PlaybackBound } from "./generated/PlaybackBound";
@@ -34,6 +34,7 @@ export type {
   RawReplayFramesData,
   RawRigidBody,
   RawRotation,
+  RawShotEventMetadata,
   RawVec3,
 } from "./raw-types";
 
@@ -139,6 +140,7 @@ export interface ReplayTimelineEvent {
   secondaryPlayerId?: string | null;
   secondaryPlayerName?: string | null;
   location?: Vec3 | null;
+  shot?: RawShotEventMetadata | null;
   isTeamZero?: boolean | null;
   color?: string;
 }
