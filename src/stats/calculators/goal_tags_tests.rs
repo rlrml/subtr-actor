@@ -150,6 +150,7 @@ fn air_dribble_event(
         average_vertical_gap: 120.0,
         average_speed: 700.0,
         touch_count: 0,
+        air_touch_count: 0,
         air_dribble_origin: (kind == BallCarryKind::AirDribble)
             .then_some(AirDribbleOrigin::GroundToAir),
     }

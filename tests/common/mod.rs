@@ -2,7 +2,10 @@ use std::path::Path;
 
 use serde::Serialize;
 use serde_json::Value;
-use subtr_actor::{CoreTeamStats, ReplayStatsFrame, ReplayStatsTimeline, TeamStatsSnapshot};
+use subtr_actor::{
+    CoreTeamStats, MechanicEvent, MechanicEventPropertyValue, MechanicTiming, ReplayStatsFrame,
+    ReplayStatsTimeline, TeamStatsSnapshot,
+};
 
 pub fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -13,6 +16,96 @@ pub fn parse_replay(path: &str) -> boxcars::Replay {
         .must_parse_network_data()
         .parse()
         .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
+}
+
+#[allow(dead_code)]
+pub fn mechanic_event_time_span(event: &MechanicEvent) -> (f32, f32) {
+    match event.timing {
+        MechanicTiming::Moment { time, .. } => (time, time),
+        MechanicTiming::Span {
+            start_time,
+            end_time,
+            ..
+        } => (start_time, end_time),
+    }
+}
+
+#[allow(dead_code)]
+pub fn mechanic_event_player_name<'a>(
+    timeline: &'a ReplayStatsTimeline,
+    event: &MechanicEvent,
+) -> Option<&'a str> {
+    timeline
+        .replay_meta
+        .player_order()
+        .find(|player| player.remote_id == event.player_id)
+        .map(|player| player.name.as_str())
+}
+
+#[allow(dead_code)]
+pub fn assert_mechanic_event_roughly_at<'a>(
+    timeline: &'a ReplayStatsTimeline,
+    kind: &str,
+    player_name: &str,
+    expected_start_time: f32,
+    expected_end_time: f32,
+    tolerance_seconds: f32,
+) -> &'a MechanicEvent {
+    let event = timeline.events.mechanics.iter().find(|event| {
+        if event.kind != kind {
+            return false;
+        }
+        if mechanic_event_player_name(timeline, event) != Some(player_name) {
+            return false;
+        }
+        let (start_time, end_time) = mechanic_event_time_span(event);
+        (start_time - expected_start_time).abs() <= tolerance_seconds
+            && (end_time - expected_end_time).abs() <= tolerance_seconds
+    });
+
+    event.unwrap_or_else(|| {
+        let candidates = timeline
+            .events
+            .mechanics
+            .iter()
+            .filter(|event| event.kind == kind)
+            .map(|event| {
+                let (start_time, end_time) = mechanic_event_time_span(event);
+                let player = mechanic_event_player_name(timeline, event).unwrap_or("<unknown>");
+                format!("{kind} by {player} at {start_time:.3}-{end_time:.3}s")
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        panic!(
+            "expected {kind} by {player_name} around \
+             {expected_start_time:.3}-{expected_end_time:.3}s (+/- {tolerance_seconds:.3}s); \
+             candidates: [{candidates}]"
+        );
+    })
+}
+
+#[allow(dead_code)]
+pub fn mechanic_event_text_property<'a>(event: &'a MechanicEvent, key: &str) -> Option<&'a str> {
+    event.properties.iter().find_map(|property| {
+        (property.key == key)
+            .then_some(&property.value)
+            .and_then(|value| match value {
+                MechanicEventPropertyValue::Text(value) => Some(value.as_str()),
+                _ => None,
+            })
+    })
+}
+
+#[allow(dead_code)]
+pub fn mechanic_event_unsigned_property(event: &MechanicEvent, key: &str) -> Option<u32> {
+    event.properties.iter().find_map(|property| {
+        (property.key == key)
+            .then_some(&property.value)
+            .and_then(|value| match value {
+                MechanicEventPropertyValue::Unsigned(value) => Some(*value),
+                _ => None,
+            })
+    })
 }
 
 #[allow(dead_code)]

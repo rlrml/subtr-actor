@@ -143,6 +143,7 @@ pub struct BallCarryEvent {
     pub average_vertical_gap: f32,
     pub average_speed: f32,
     pub touch_count: u32,
+    pub air_touch_count: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub air_dribble_origin: Option<AirDribbleOrigin>,
 }
@@ -222,6 +223,10 @@ impl BallCarryCalculator {
             });
         }
 
+        if player_is_on_wall(player_position) {
+            return None;
+        }
+
         if !(BALL_CARRY_MIN_BALL_Z..=BALL_CARRY_MAX_BALL_Z).contains(&ball_position.z) {
             return None;
         }
@@ -251,9 +256,65 @@ impl BallCarryCalculator {
     ) -> bool {
         ball_position.z >= AIR_DRIBBLE_MIN_BALL_Z
             && player_position.z >= AIR_DRIBBLE_MIN_PLAYER_Z
+            && !player_is_on_wall(player_position)
             && horizontal_gap <= AIR_DRIBBLE_MAX_HORIZONTAL_GAP
             && (-AIR_DRIBBLE_MAX_BELOW_CAR_GAP..=AIR_DRIBBLE_MAX_ABOVE_CAR_GAP)
                 .contains(&vertical_gap)
+    }
+
+    fn is_air_touch_position(player_position: glam::Vec3) -> bool {
+        player_position.z > PLAYER_GROUND_Z_THRESHOLD && !player_is_on_wall(player_position)
+    }
+
+    pub(crate) fn kind_requires_airborne(kind: BallCarryKind) -> bool {
+        kind == BallCarryKind::AirDribble
+    }
+
+    pub(crate) fn control_player_statuses(
+        players: &PlayerFrameState,
+    ) -> Vec<ContinuousBallControlPlayerStatus> {
+        players
+            .players
+            .iter()
+            .filter_map(|player| {
+                Some(ContinuousBallControlPlayerStatus {
+                    player_id: player.player_id.clone(),
+                    is_airborne: Self::is_air_touch_position(player.position()?),
+                })
+            })
+            .collect()
+    }
+
+    pub(crate) fn control_touches(
+        touch_state: &TouchState,
+        players: &PlayerFrameState,
+    ) -> Vec<ContinuousBallControlTouch> {
+        touch_state
+            .touch_events
+            .iter()
+            .filter_map(|touch| {
+                let player_id = touch.player.clone()?;
+                let player = players
+                    .players
+                    .iter()
+                    .find(|player| player.player_id == player_id)?;
+                Some(ContinuousBallControlTouch {
+                    player_id,
+                    is_airborne: Self::is_air_touch_position(player.position()?),
+                })
+            })
+            .collect()
+    }
+
+    fn is_valid_air_dribble_sequence(
+        sequence: &CompletedBallControlSequence<BallCarryKind>,
+    ) -> bool {
+        const AIR_DRIBBLE_MIN_TOUCHES: u32 = 3;
+        const AIR_DRIBBLE_MIN_AIR_TOUCHES: u32 = 2;
+
+        sequence.kind != BallCarryKind::AirDribble
+            || (sequence.touch_count >= AIR_DRIBBLE_MIN_TOUCHES
+                && sequence.air_touch_count >= AIR_DRIBBLE_MIN_AIR_TOUCHES)
     }
 
     pub(crate) fn min_duration_for_kind(kind: BallCarryKind) -> f32 {
@@ -285,10 +346,16 @@ impl BallCarryCalculator {
             .find(|player| &player.player_id == player_id)
             .and_then(|player| {
                 Self::carry_frame_sample(player, ball).map(|sample| {
+                    let air_touch_count = if Self::is_air_touch_position(sample.player_position) {
+                        touch_count
+                    } else {
+                        0
+                    };
                     ContinuousBallControlCandidate {
                         player_id: player.player_id.clone(),
                         is_team_0: player.is_team_0,
                         touch_count,
+                        air_touch_count,
                         sample,
                     }
                 })
@@ -330,6 +397,7 @@ impl BallCarryCalculator {
             average_vertical_gap: sequence.average_vertical_gap,
             average_speed: sequence.average_speed,
             touch_count: sequence.touch_count,
+            air_touch_count: sequence.air_touch_count,
             air_dribble_origin,
         }
     }
@@ -410,6 +478,9 @@ impl BallCarryCalculator {
             .skip(self.processed_control_sequence_count)
             .cloned()
         {
+            if !Self::is_valid_air_dribble_sequence(&sequence) {
+                continue;
+            }
             self.record_carry_event(Self::event_from_sequence(sequence));
         }
         self.processed_control_sequence_count = control_state.completed_sequences.len();

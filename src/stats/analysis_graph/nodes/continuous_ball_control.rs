@@ -42,20 +42,26 @@ impl AnalysisNode for ContinuousBallControlNode {
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let frame = ctx.get::<FrameInfo>()?;
         let touch_state = ctx.get::<TouchState>()?;
+        let players = ctx.get::<PlayerFrameState>()?;
         let candidate = if frame.dt > 0.0 {
             BallCarryCalculator::control_candidate(
                 ctx.get::<BallFrameState>()?,
-                ctx.get::<PlayerFrameState>()?,
+                players,
                 ctx.get::<LivePlayState>()?.is_live_play,
                 touch_state,
             )
         } else {
             None
         };
+        let player_statuses = BallCarryCalculator::control_player_statuses(players);
+        let touches = BallCarryCalculator::control_touches(touch_state, players);
         self.state.completed_sequences.extend(self.tracker.update(
             frame,
             candidate,
+            &player_statuses,
+            &touches,
             BallCarryCalculator::min_duration_for_kind,
+            BallCarryCalculator::kind_requires_airborne,
         ));
         Ok(())
     }

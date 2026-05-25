@@ -159,6 +159,10 @@ const AIR_DRIBBLE_MAX_HORIZONTAL_GAP: f32 = BALL_RADIUS_Z * 3.0;
 const AIR_DRIBBLE_MAX_ABOVE_CAR_GAP: f32 = 360.0;
 const AIR_DRIBBLE_MAX_BELOW_CAR_GAP: f32 = 100.0;
 const AIR_DRIBBLE_MIN_DURATION: f32 = 0.8;
+const WALL_CONTACT_MIN_PLAYER_Z: f32 = 120.0;
+const SIDE_WALL_CONTACT_ABS_X: f32 = 3600.0;
+const BACK_WALL_CONTACT_ABS_Y: f32 = 5000.0;
+const BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X: f32 = 900.0;
 const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
 const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 236.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
@@ -330,6 +334,14 @@ fn normalized_y(is_team_0: bool, position: glam::Vec3) -> f32 {
 
 fn is_enemy_side(is_team_0: bool, position: glam::Vec3) -> bool {
     normalized_y(is_team_0, position) > BOOST_PAD_MIDFIELD_TOLERANCE_Y
+}
+
+fn player_is_on_wall(position: glam::Vec3) -> bool {
+    let is_side_wall = position.x.abs() >= SIDE_WALL_CONTACT_ABS_X;
+    let is_back_wall = position.y.abs() >= BACK_WALL_CONTACT_ABS_Y
+        && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X;
+
+    position.z >= WALL_CONTACT_MIN_PLAYER_Z && (is_side_wall || is_back_wall)
 }
 
 fn standard_soccar_boost_pad_position(index: usize) -> glam::Vec3 {
