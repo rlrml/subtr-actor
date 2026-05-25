@@ -53,6 +53,7 @@ fn goal_with_touch(
         defending_team_most_back_player: None,
         ball_position: Some(touch_position),
         ball_air_time_before_goal: None,
+        goal_buildup: GoalBuildupKind::Other,
         scorer_last_touch: Some(scorer_touch(touch_position, players.clone())),
         players,
     }
@@ -74,11 +75,13 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
     let long_distance = LongDistanceGoalCalculator::new();
     let own_half = OwnHalfGoalCalculator::new();
     let empty_net = EmptyNetGoalCalculator::new();
+    let counter_attack = CounterAttackGoalCalculator::new();
     let aerial_events = aerial.tag_goals(goals);
     let high_aerial_events = high_aerial.tag_goals(goals);
     let long_distance_events = long_distance.tag_goals(goals);
     let own_half_events = own_half.tag_goals(goals);
     let empty_net_events = empty_net.tag_goals(goals);
+    let counter_attack_events = counter_attack.tag_goals(goals);
 
     combined_goal_tag_events(&[
         &aerial_events,
@@ -86,6 +89,7 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
         &long_distance_events,
         &own_half_events,
         &empty_net_events,
+        &counter_attack_events,
     ])
 }
 
@@ -298,6 +302,29 @@ fn empty_net_goal_rejects_goal_mouth_scrambles() {
     let events = all_goal_tag_events(&[goal]);
 
     assert!(!tag_kinds(&events).contains(&GoalTagKind::EmptyNetGoal));
+}
+
+#[test]
+fn counter_attack_goal_tags_goal_with_counter_attack_buildup() {
+    let mut goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
+    goal.goal_buildup = GoalBuildupKind::CounterAttack;
+
+    let events = CounterAttackGoalCalculator::new().tag_goals(&[goal]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::CounterAttackGoal]);
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::GoalBuildup));
+}
+
+#[test]
+fn counter_attack_goal_rejects_other_buildup() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
+
+    let events = CounterAttackGoalCalculator::new().tag_goals(&[goal]);
+
+    assert!(events.is_empty());
 }
 
 #[test]

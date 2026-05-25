@@ -2,7 +2,7 @@ pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
     BallCarryCalculator, BallFrameState, BoostCalculator, BumpCalculator, CeilingShotCalculator,
-    CenterCalculator, ContinuousBallControlState, DemoCalculator, DodgeResetCalculator,
+    CenterCalculator, ContinuousBallControlState, CounterAttackGoalCalculator, DemoCalculator, DodgeResetCalculator,
     DoubleTapCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState,
     FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
     GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
@@ -97,7 +97,7 @@ pub use frame_info::FrameInfoNode;
 pub use gameplay_state::GameplayStateNode;
 #[allow(unused_imports)]
 pub use goal_tags::{
-    AerialGoalNode, AirDribbleGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode,
+    AerialGoalNode, AirDribbleGoalNode, CounterAttackGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode,
     HalfVolleyGoalNode, HighAerialGoalNode, LongDistanceGoalNode, OneTimerGoalNode,
     OwnHalfGoalNode,
 };
@@ -238,6 +238,12 @@ pub(crate) fn own_half_goal_dependency() -> AnalysisDependency {
 
 pub(crate) fn empty_net_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<EmptyNetGoalCalculator>(goal_tags::boxed_empty_net_goal)
+}
+
+pub(crate) fn counter_attack_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<CounterAttackGoalCalculator>(
+        goal_tags::boxed_counter_attack_goal,
+    )
 }
 
 pub(crate) fn flick_goal_dependency() -> AnalysisDependency {

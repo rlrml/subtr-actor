@@ -5,8 +5,8 @@ const GOAL_AFTER_KICKOFF_BUCKET_SHORT_MAX_SECONDS: f32 = 20.0;
 const GOAL_AFTER_KICKOFF_BUCKET_MEDIUM_MAX_SECONDS: f32 = 40.0;
 const GOAL_BUILDUP_LOOKBACK_SECONDS: f32 = 12.0;
 const COUNTER_ATTACK_MAX_ATTACK_SECONDS: f32 = 4.0;
-const COUNTER_ATTACK_MIN_DEFENSIVE_HALF_SECONDS: f32 = 6.0;
-const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 2.5;
+const COUNTER_ATTACK_MIN_DEFENSIVE_HALF_SECONDS: f32 = 4.0;
+const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 1.0;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
@@ -131,10 +131,13 @@ impl GoalBallAirTimeStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GoalBuildupKind {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GoalBuildupKind {
     CounterAttack,
     SustainedPressure,
+    #[default]
     Other,
 }
 
@@ -536,6 +539,8 @@ pub struct GoalContextEvent {
     pub defending_team_most_back_player: Option<PlayerId>,
     pub ball_position: Option<GoalContextPosition>,
     pub ball_air_time_before_goal: Option<f32>,
+    #[serde(default)]
+    pub goal_buildup: GoalBuildupKind,
     pub scorer_last_touch: Option<GoalTouchContext>,
     pub players: Vec<GoalPlayerContext>,
 }
@@ -544,6 +549,7 @@ pub struct GoalContextEvent {
 struct PendingGoalEvent {
     event: GoalEvent,
     time_after_kickoff: Option<f32>,
+    goal_buildup: GoalBuildupKind,
 }
 
 #[derive(Debug, Clone)]
@@ -551,6 +557,12 @@ struct GoalBuildupSample {
     time: f32,
     dt: f32,
     ball_y: f32,
+}
+
+#[derive(Debug, Clone)]
+struct GoalBuildupPressureEvent {
+    time: f32,
+    is_team_0: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -576,6 +588,7 @@ pub struct MatchStatsCalculator {
     kickoff_waiting_for_first_touch: bool,
     active_kickoff_touch_time: Option<f32>,
     goal_buildup_samples: Vec<GoalBuildupSample>,
+    goal_buildup_pressure_events: Vec<GoalBuildupPressureEvent>,
     goal_context_events: Vec<GoalContextEvent>,
     last_touch_context_by_player: HashMap<PlayerId, GoalTouchContext>,
     boost_leadup_samples_by_player: HashMap<PlayerId, VecDeque<BoostLeadupSample>>,
@@ -964,6 +977,8 @@ impl MatchStatsCalculator {
                 .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
                 .cloned();
             let ball_air_time_before_goal = self.ball_air_time_before_goal(goal_event.time);
+            let goal_buildup =
+                self.classify_goal_buildup(goal_event.time, goal_event.scoring_team_is_team_0);
 
             self.record_goal_context_stats(
                 players,
@@ -983,6 +998,7 @@ impl MatchStatsCalculator {
                 defending_team_most_back_player: defending_team_most_back_player.clone(),
                 ball_position,
                 ball_air_time_before_goal,
+                goal_buildup,
                 scorer_last_touch,
                 players: self.goal_player_contexts(
                     players,
@@ -996,6 +1012,8 @@ impl MatchStatsCalculator {
 
     fn prune_goal_buildup_samples(&mut self, current_time: f32) {
         self.goal_buildup_samples
+            .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
+        self.goal_buildup_pressure_events
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
     }
 
@@ -1013,6 +1031,19 @@ impl MatchStatsCalculator {
         });
     }
 
+    fn record_goal_buildup_pressure_events(&mut self, events: &FrameEventsState) {
+        self.goal_buildup_pressure_events.extend(
+            events
+                .player_stat_events
+                .iter()
+                .filter(|event| event.kind == PlayerStatEventKind::Shot)
+                .map(|event| GoalBuildupPressureEvent {
+                    time: event.time,
+                    is_team_0: event.is_team_0,
+                }),
+        );
+    }
+
     fn classify_goal_buildup(
         &self,
         goal_time: f32,
@@ -1021,6 +1052,7 @@ impl MatchStatsCalculator {
         let relevant_samples: Vec<_> = self
             .goal_buildup_samples
             .iter()
+            .filter(|entry| entry.time <= goal_time)
             .filter(|entry| goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS)
             .collect();
         if relevant_samples.is_empty() {
@@ -1065,9 +1097,17 @@ impl MatchStatsCalculator {
             }
         }
 
-        if current_attack_time <= COUNTER_ATTACK_MAX_ATTACK_SECONDS
-            && defensive_half_time >= COUNTER_ATTACK_MIN_DEFENSIVE_HALF_SECONDS
-            && defensive_third_time >= COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS
+        let opponent_shot_in_lookback = self.goal_buildup_pressure_events.iter().any(|entry| {
+            entry.time <= goal_time
+                && goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS
+                && entry.is_team_0 != scoring_team_is_team_0
+        });
+        let has_defensive_pressure_signal = defensive_half_time
+            >= COUNTER_ATTACK_MIN_DEFENSIVE_HALF_SECONDS
+            || defensive_third_time >= COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS
+            || opponent_shot_in_lookback;
+
+        if current_attack_time <= COUNTER_ATTACK_MAX_ATTACK_SECONDS && has_defensive_pressure_signal
         {
             GoalBuildupKind::CounterAttack
         } else if current_attack_time >= SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS
@@ -1098,6 +1138,7 @@ impl MatchStatsCalculator {
         self.update_ball_ground_contact(frame, ball);
         if live_play_state.is_live_play {
             self.record_goal_buildup_sample(frame, ball);
+            self.record_goal_buildup_pressure_events(events);
             self.update_boost_leadup_samples(frame, players);
         } else if events.goal_events.is_empty() {
             self.last_touch_context_by_player.clear();
@@ -1106,15 +1147,19 @@ impl MatchStatsCalculator {
         }
         self.update_last_touch_contexts(ball, players, &touch_state.touch_events);
         self.record_goal_context_events(ball, players, events);
-        self.pending_goal_events
-            .extend(events.goal_events.iter().cloned().map(|event| {
-                PendingGoalEvent {
-                    time_after_kickoff: self
-                        .active_kickoff_touch_time
-                        .map(|kickoff_touch_time| (event.time - kickoff_touch_time).max(0.0)),
-                    event,
-                }
-            }));
+        let pending_goal_events: Vec<_> = events
+            .goal_events
+            .iter()
+            .cloned()
+            .map(|event| PendingGoalEvent {
+                time_after_kickoff: self
+                    .active_kickoff_touch_time
+                    .map(|kickoff_touch_time| (event.time - kickoff_touch_time).max(0.0)),
+                goal_buildup: self.classify_goal_buildup(event.time, event.scoring_team_is_team_0),
+                event,
+            })
+            .collect();
+        self.pending_goal_events.extend(pending_goal_events);
         let mut processor_event_counts: HashMap<(PlayerId, TimelineEventKind), i32> =
             HashMap::new();
         for event in &events.player_stat_events {
@@ -1211,6 +1256,10 @@ impl MatchStatsCalculator {
                         .as_ref()
                         .map(|event| event.event.time)
                         .unwrap_or(frame.time);
+                    let goal_buildup = pending_goal_event
+                        .as_ref()
+                        .map(|event| event.goal_buildup)
+                        .unwrap_or_else(|| self.classify_goal_buildup(goal_time, player.is_team_0));
                     let time_after_kickoff = pending_goal_event
                         .and_then(|event| event.time_after_kickoff)
                         .or_else(|| {
@@ -1226,7 +1275,7 @@ impl MatchStatsCalculator {
                     current_stats
                         .scoring_context
                         .goal_buildup
-                        .record(self.classify_goal_buildup(goal_time, player.is_team_0));
+                        .record(goal_buildup);
                     self.timeline.push(TimelineEvent {
                         time: goal_time,
                         kind: TimelineEventKind::Goal,

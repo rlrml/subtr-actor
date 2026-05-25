@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BumpCalculator,
-    CenterCalculator, EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator,
+    CenterCalculator, CounterAttackGoalCalculator, EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator,
     FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
     HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
     OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PlayerVerticalState,
@@ -27,7 +27,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 51);
+    assert_eq!(names.len(), 52);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -51,6 +51,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("long_distance_goal"));
     assert!(names.contains("own_half_goal"));
     assert!(names.contains("empty_net_goal"));
+    assert!(names.contains("counter_attack_goal"));
     assert!(names.contains("flick_goal"));
     assert!(names.contains("one_timer_goal"));
     assert!(names.contains("air_dribble_goal"));
@@ -81,6 +82,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<LongDistanceGoalCalculator>().is_some());
     assert!(graph.state::<OwnHalfGoalCalculator>().is_some());
     assert!(graph.state::<EmptyNetGoalCalculator>().is_some());
+    assert!(graph.state::<CounterAttackGoalCalculator>().is_some());
     assert!(graph.state::<FlickGoalCalculator>().is_some());
     assert!(graph.state::<OneTimerGoalCalculator>().is_some());
     assert!(graph.state::<AirDribbleGoalCalculator>().is_some());

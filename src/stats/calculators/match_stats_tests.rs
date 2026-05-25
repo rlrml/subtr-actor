@@ -59,6 +59,18 @@ fn goal_event(time: f32, frame: usize, scorer: PlayerId) -> GoalEvent {
     }
 }
 
+fn buildup_sample(time: f32, ball_y: f32) -> GoalBuildupSample {
+    GoalBuildupSample {
+        time,
+        dt: 1.0,
+        ball_y,
+    }
+}
+
+fn shot_pressure(time: f32, is_team_0: bool) -> GoalBuildupPressureEvent {
+    GoalBuildupPressureEvent { time, is_team_0 }
+}
+
 fn update(
     calculator: &mut MatchStatsCalculator,
     frame: FrameInfo,
@@ -165,5 +177,58 @@ fn leaves_goal_ball_air_time_empty_without_observed_ground_contact() {
             .goal_ball_air_time
             .goal_ball_air_time_sample_count,
         0
+    );
+}
+
+#[test]
+fn counter_attack_buildup_accepts_defensive_half_pressure_without_defensive_third_time() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = vec![
+        buildup_sample(2.0, -500.0),
+        buildup_sample(3.0, -500.0),
+        buildup_sample(4.0, -500.0),
+        buildup_sample(5.0, -500.0),
+        buildup_sample(6.0, 600.0),
+        buildup_sample(7.0, 600.0),
+        buildup_sample(8.0, 600.0),
+        buildup_sample(9.0, 600.0),
+    ];
+
+    assert_eq!(
+        calculator.classify_goal_buildup(10.0, true),
+        GoalBuildupKind::CounterAttack
+    );
+}
+
+#[test]
+fn counter_attack_buildup_accepts_opponent_shot_as_pressure_signal() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = vec![
+        buildup_sample(6.0, 600.0),
+        buildup_sample(7.0, 600.0),
+        buildup_sample(8.0, 600.0),
+        buildup_sample(9.0, 600.0),
+    ];
+    calculator.goal_buildup_pressure_events = vec![shot_pressure(7.5, false)];
+
+    assert_eq!(
+        calculator.classify_goal_buildup(10.0, true),
+        GoalBuildupKind::CounterAttack
+    );
+}
+
+#[test]
+fn counter_attack_buildup_requires_a_defensive_pressure_signal() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = vec![
+        buildup_sample(6.0, 600.0),
+        buildup_sample(7.0, 600.0),
+        buildup_sample(8.0, 600.0),
+        buildup_sample(9.0, 600.0),
+    ];
+
+    assert_eq!(
+        calculator.classify_goal_buildup(10.0, true),
+        GoalBuildupKind::Other
     );
 }

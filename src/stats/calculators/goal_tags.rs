@@ -25,6 +25,7 @@ pub enum GoalTagKind {
     LongDistanceGoal,
     OwnHalfGoal,
     EmptyNetGoal,
+    CounterAttackGoal,
     FlickGoal,
     OneTimerGoal,
     AirDribbleGoal,
@@ -39,6 +40,7 @@ pub enum GoalTagEvidenceKind {
     GoalContext,
     ScorerLastTouch,
     DefenderPosition,
+    GoalBuildup,
     Flick,
     OneTimer,
     AirDribble,
@@ -261,6 +263,11 @@ pub struct EmptyNetGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CounterAttackGoalCalculator {
+    events: Vec<GoalTagEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FlickGoalCalculator {
     config: FlickGoalCalculatorConfig,
     events: Vec<GoalTagEvent>,
@@ -330,6 +337,22 @@ impl_goal_tag_calculator!(FlickGoalCalculator, FlickGoalCalculatorConfig);
 impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
+
+impl Default for CounterAttackGoalCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CounterAttackGoalCalculator {
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    pub fn events(&self) -> &[GoalTagEvent] {
+        &self.events
+    }
+}
 
 impl Default for HalfVolleyGoalCalculator {
     fn default() -> Self {
@@ -474,6 +497,29 @@ impl EmptyNetGoalCalculator {
             tags.push(goal_tag(ctx, GoalTagKind::EmptyNetGoal, 1.0, evidence));
         }
         tags
+    }
+}
+
+impl CounterAttackGoalCalculator {
+    pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
+        self.events = self.tag_goals(match_stats.goal_context_events());
+        Ok(())
+    }
+
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+        goals
+            .iter()
+            .enumerate()
+            .filter(|(_, goal)| goal.goal_buildup == GoalBuildupKind::CounterAttack)
+            .map(|(goal_index, goal)| {
+                goal_tag(
+                    GoalTaggingContext { goal_index, goal },
+                    GoalTagKind::CounterAttackGoal,
+                    1.0,
+                    vec![goal_buildup_evidence(goal), goal_context_evidence(goal)],
+                )
+            })
+            .collect()
     }
 }
 
@@ -894,6 +940,15 @@ fn defender_evidence(player: &GoalPlayerContext, goal: &GoalContextEvent) -> Goa
         time: goal.time,
         frame: goal.frame,
         player: Some(player.player.clone()),
+    }
+}
+
+fn goal_buildup_evidence(goal: &GoalContextEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::GoalBuildup,
+        time: goal.time,
+        frame: goal.frame,
+        player: goal.scorer.clone(),
     }
 }
 

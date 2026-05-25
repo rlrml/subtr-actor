@@ -164,6 +164,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "long_distance_goal",
             "own_half_goal",
             "empty_net_goal",
+            "counter_attack_goal",
             "flick_goal",
             "one_timer_goal",
             "air_dribble_goal",
@@ -347,6 +348,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "long_distance_goal",
             "own_half_goal",
             "empty_net_goal",
+            "counter_attack_goal",
             "flick_goal",
             "one_timer_goal",
             "air_dribble_goal",
@@ -1936,6 +1938,11 @@ fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent>
         )?,
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
         ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
+        goal_buildup: object
+            .get("goal_buildup")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         scorer_last_touch: match object.get("scorer_last_touch") {
             None | Some(Value::Null) => None,
             Some(value) => Some(parse_goal_touch_context(value)?),

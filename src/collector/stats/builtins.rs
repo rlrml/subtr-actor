@@ -376,6 +376,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "long_distance_goal",
         "own_half_goal",
         "empty_net_goal",
+        "counter_attack_goal",
         "flick_goal",
         "one_timer_goal",
         "air_dribble_goal",
@@ -517,6 +518,12 @@ pub(crate) fn builtin_module_json(
         }
         "empty_net_goal" => {
             let calculator = graph_state::<EmptyNetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "counter_attack_goal" => {
+            let calculator = graph_state::<CounterAttackGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -785,7 +792,7 @@ pub(crate) fn builtin_snapshot_frame_json(
             })?
         }
         "aerial_goal" | "high_aerial_goal" | "long_distance_goal" | "own_half_goal"
-        | "empty_net_goal" | "flick_goal" | "one_timer_goal" | "air_dribble_goal"
+        | "empty_net_goal" | "counter_attack_goal" | "flick_goal" | "one_timer_goal" | "air_dribble_goal"
         | "flip_reset_goal" | "half_volley_goal" => {
             serialize_to_json_value(&serde_json::json!({}))?
         }
@@ -1063,7 +1070,7 @@ pub(crate) fn builtin_snapshot_config_json(
         "core" | "backboard" | "ceiling_shot" | "center" | "double_tap" | "one_timer" | "pass"
         | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
         | "half_flip" | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
-        | "bump" | "movement" | "powerslide" | "demo" => None,
+        | "bump" | "movement" | "powerslide" | "demo" | "counter_attack_goal" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),
