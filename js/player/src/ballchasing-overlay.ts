@@ -153,14 +153,14 @@ function ensureStyles(): void {
     }
 
     .sap-bc-team-hud-blue {
-      right: calc(50% + 0.35rem);
+      right: calc(50% + 2.7rem);
       flex-direction: row;
       justify-content: flex-end;
       border-bottom: 2px solid ${TEAM_BLUE};
     }
 
     .sap-bc-team-hud-orange {
-      left: calc(50% + 0.35rem);
+      left: calc(50% + 2.7rem);
       flex-direction: row;
       justify-content: flex-start;
       border-bottom: 2px solid ${TEAM_ORANGE};

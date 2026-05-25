@@ -2751,21 +2751,10 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
 
   const header = document.createElement("div");
   header.className = "scoreboard-scoreline";
-  const bluePlayers = replay.players.filter((player) => player.isTeamZero);
-  const orangePlayers = replay.players.filter((player) => !player.isTeamZero);
-
-  const score = document.createElement("div");
-  score.className = "scoreboard-game-score";
-  score.append(
+  header.append(
     createScoreboardGoalValue(frame.team_zero?.core.goals, true),
     createScoreboardDivider(),
     createScoreboardGoalValue(frame.team_one?.core.goals, false),
-  );
-
-  header.replaceChildren(
-    createScoreboardTeamNames("Blue", bluePlayers, true),
-    score,
-    createScoreboardTeamNames("Orange", orangePlayers, false),
   );
 
   scoreboardWindowBody.append(header);
@@ -2786,31 +2775,6 @@ function createScoreboardGoalValue(
   score.className = `scoreboard-goal-value ${getTeamClass(isTeamZero)}`;
   score.textContent = formatScoreboardInteger(goals);
   return score;
-}
-
-function createScoreboardTeamNames(
-  label: string,
-  players: ReplayPlayerTrack[],
-  isTeamZero: boolean,
-): HTMLElement {
-  const team = document.createElement("div");
-  team.className = `scoreboard-team-summary ${getTeamClass(isTeamZero)}`;
-
-  const name = document.createElement("span");
-  name.className = "scoreboard-team-label";
-  name.textContent = label;
-
-  const playerList = document.createElement("span");
-  playerList.className = "scoreboard-player-list";
-  if (players.length === 0) {
-    playerList.textContent = "No players";
-  } else {
-    playerList.textContent = players.map((player) => player.name).join(" / ");
-    playerList.title = players.map((player) => player.name).join(", ");
-  }
-
-  team.append(name, playerList);
-  return team;
 }
 
 function renderTouchControlsWindow(): void {
