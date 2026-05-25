@@ -15,6 +15,27 @@ pub struct FrameInput {
 }
 
 impl FrameInput {
+    /// Builds a frame input from already-materialized frame component states.
+    ///
+    /// Replay callers should usually use [`FrameInput::timeline`] or
+    /// [`FrameInput::aggregate`]. Live callers can construct these same
+    /// component states directly from their sampled game state.
+    pub fn from_parts(
+        frame_info: FrameInfo,
+        gameplay_state: GameplayState,
+        ball_frame_state: BallFrameState,
+        player_frame_state: PlayerFrameState,
+        frame_events_state: FrameEventsState,
+    ) -> Self {
+        Self {
+            frame_info,
+            gameplay_state,
+            ball_frame_state,
+            player_frame_state,
+            frame_events_state,
+        }
+    }
+
     pub fn timeline(
         processor: &dyn ProcessorView,
         frame_number: usize,

@@ -3,8 +3,11 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    BallFrameState, BallSample, FrameInfo, GameplayState, HalfFlipCalculator, PlayerFrameState,
-    PlayerSample, SpeedFlipCalculator, WavedashCalculator,
+    stats::analysis_graph::{graph_with_all_analysis_nodes, AnalysisGraph},
+    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemolishInfo,
+    DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
+    GoalEvent, HalfFlipCalculator, LivePlayState, PlayerFrameState, PlayerSample, PlayerStatEvent,
+    PlayerStatEventKind, SpeedFlipCalculator, TouchEvent, TouchStateCalculator, WavedashCalculator,
 };
 
 #[repr(C)]
@@ -62,7 +65,80 @@ pub struct SaPlayerFrame {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaTouchEvent {
+    pub player_index: u32,
+    pub has_player: u8,
+    pub is_team_0: u8,
+    pub closest_approach_distance: f32,
+    pub has_closest_approach_distance: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaDodgeRefreshedEvent {
+    pub player_index: u32,
+    pub is_team_0: u8,
+    pub counter_value: i32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaBoostPadEventKind {
+    PickedUp = 1,
+    Available = 2,
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct SaBoostPadEvent {
+    pub pad_id: u32,
+    pub kind: SaBoostPadEventKind,
+    pub sequence: u8,
+    pub player_index: u32,
+    pub has_player: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaGoalEvent {
+    pub scoring_team_is_team_0: u8,
+    pub player_index: u32,
+    pub has_player: u8,
+    pub team_zero_score: i32,
+    pub has_team_zero_score: u8,
+    pub team_one_score: i32,
+    pub has_team_one_score: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaPlayerStatEventKind {
+    Shot = 1,
+    Save = 2,
+    Assist = 3,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SaPlayerStatEvent {
+    pub player_index: u32,
+    pub is_team_0: u8,
+    pub kind: SaPlayerStatEventKind,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaDemolishEvent {
+    pub attacker_index: u32,
+    pub victim_index: u32,
+    pub attacker_velocity: SaVec3,
+    pub victim_velocity: SaVec3,
+    pub victim_location: SaVec3,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SaLiveFrame {
     pub frame_number: u64,
     pub time: f32,
@@ -80,6 +156,18 @@ pub struct SaLiveFrame {
     pub ball: SaRigidBody,
     pub players: *const SaPlayerFrame,
     pub player_count: usize,
+    pub touches: *const SaTouchEvent,
+    pub touch_count: usize,
+    pub dodge_refreshes: *const SaDodgeRefreshedEvent,
+    pub dodge_refresh_count: usize,
+    pub boost_pad_events: *const SaBoostPadEvent,
+    pub boost_pad_event_count: usize,
+    pub goals: *const SaGoalEvent,
+    pub goal_count: usize,
+    pub player_stat_events: *const SaPlayerStatEvent,
+    pub player_stat_event_count: usize,
+    pub demolishes: *const SaDemolishEvent,
+    pub demolish_count: usize,
 }
 
 #[repr(C)]
@@ -101,15 +189,32 @@ pub struct SaMechanicEvent {
     pub confidence: f32,
 }
 
-#[derive(Debug, Default)]
 pub struct SaEngine {
-    speed_flip: SpeedFlipCalculator,
-    half_flip: HalfFlipCalculator,
-    wavedash: WavedashCalculator,
+    graph: AnalysisGraph,
+    live_events: SaLiveEventGenerator,
     last_speed_flip_count: usize,
     last_half_flip_count: usize,
     last_wavedash_count: usize,
     pending_events: Vec<SaMechanicEvent>,
+}
+
+impl Default for SaEngine {
+    fn default() -> Self {
+        Self {
+            graph: graph_with_all_analysis_nodes(),
+            live_events: SaLiveEventGenerator::default(),
+            last_speed_flip_count: 0,
+            last_half_flip_count: 0,
+            last_wavedash_count: 0,
+            pending_events: Vec::new(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct SaLiveEventGenerator {
+    touch_state: TouchStateCalculator,
+    dodge_refresh_counters: Vec<(RemoteId, i32)>,
 }
 
 fn vec3(value: SaVec3) -> Vector3f {
@@ -148,6 +253,43 @@ fn player_index(id: &RemoteId) -> u32 {
         RemoteId::SplitScreen(index) => *index,
         _ => 0,
     }
+}
+
+struct SaFrameEventSlices<'a> {
+    touches: &'a [SaTouchEvent],
+    dodge_refreshes: &'a [SaDodgeRefreshedEvent],
+    boost_pad_events: &'a [SaBoostPadEvent],
+    goals: &'a [SaGoalEvent],
+    player_stat_events: &'a [SaPlayerStatEvent],
+    demolishes: &'a [SaDemolishEvent],
+}
+
+unsafe fn checked_slice<'a, T>(items: *const T, count: usize) -> Result<&'a [T], ()> {
+    if items.is_null() && count != 0 {
+        return Err(());
+    }
+    if count == 0 {
+        Ok(&[])
+    } else {
+        Ok(slice::from_raw_parts(items, count))
+    }
+}
+
+unsafe fn frame_event_slices(frame: &SaLiveFrame) -> Result<SaFrameEventSlices<'_>, ()> {
+    Ok(SaFrameEventSlices {
+        touches: checked_slice(frame.touches, frame.touch_count)?,
+        dodge_refreshes: checked_slice(frame.dodge_refreshes, frame.dodge_refresh_count)?,
+        boost_pad_events: checked_slice(frame.boost_pad_events, frame.boost_pad_event_count)?,
+        goals: checked_slice(frame.goals, frame.goal_count)?,
+        player_stat_events: checked_slice(frame.player_stat_events, frame.player_stat_event_count)?,
+        demolishes: checked_slice(frame.demolishes, frame.demolish_count)?,
+    })
+}
+
+fn find_counter(counters: &[(RemoteId, i32)], player_id: &RemoteId) -> Option<i32> {
+    counters
+        .iter()
+        .find_map(|(id, value)| (id == player_id).then_some(*value))
 }
 
 fn frame_info(frame: &SaLiveFrame) -> FrameInfo {
@@ -212,42 +354,299 @@ fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
     }
 }
 
+fn live_play_state(frame: &SaLiveFrame) -> LivePlayState {
+    let is_live_play = frame.live_play != 0;
+    LivePlayState {
+        gameplay_phase: if is_live_play {
+            GameplayPhase::ActivePlay
+        } else {
+            GameplayPhase::Unknown
+        },
+        is_live_play,
+    }
+}
+
+fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
+    events
+        .iter()
+        .map(|event| TouchEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            team_is_team_0: event.is_team_0 != 0,
+            player: (event.has_player != 0).then_some(player_id(event.player_index)),
+            closest_approach_distance: (event.has_closest_approach_distance != 0)
+                .then_some(event.closest_approach_distance),
+        })
+        .collect()
+}
+
+fn explicit_dodge_refreshed_events(
+    frame: &FrameInfo,
+    events: &[SaDodgeRefreshedEvent],
+) -> Vec<DodgeRefreshedEvent> {
+    events
+        .iter()
+        .map(|event| DodgeRefreshedEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            player: player_id(event.player_index),
+            is_team_0: event.is_team_0 != 0,
+            counter_value: event.counter_value,
+        })
+        .collect()
+}
+
+fn explicit_boost_pad_events(frame: &FrameInfo, events: &[SaBoostPadEvent]) -> Vec<BoostPadEvent> {
+    events
+        .iter()
+        .map(|event| BoostPadEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            pad_id: event.pad_id.to_string(),
+            player: (event.has_player != 0).then_some(player_id(event.player_index)),
+            kind: match event.kind {
+                SaBoostPadEventKind::PickedUp => BoostPadEventKind::PickedUp {
+                    sequence: event.sequence,
+                },
+                SaBoostPadEventKind::Available => BoostPadEventKind::Available,
+            },
+        })
+        .collect()
+}
+
+fn explicit_goal_events(frame: &FrameInfo, events: &[SaGoalEvent]) -> Vec<GoalEvent> {
+    events
+        .iter()
+        .map(|event| GoalEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
+            player: (event.has_player != 0).then_some(player_id(event.player_index)),
+            team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
+            team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
+        })
+        .collect()
+}
+
+fn explicit_player_stat_events(
+    frame: &FrameInfo,
+    events: &[SaPlayerStatEvent],
+) -> Vec<PlayerStatEvent> {
+    events
+        .iter()
+        .map(|event| PlayerStatEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            player: player_id(event.player_index),
+            is_team_0: event.is_team_0 != 0,
+            kind: match event.kind {
+                SaPlayerStatEventKind::Shot => PlayerStatEventKind::Shot,
+                SaPlayerStatEventKind::Save => PlayerStatEventKind::Save,
+                SaPlayerStatEventKind::Assist => PlayerStatEventKind::Assist,
+            },
+            shot: None,
+        })
+        .collect()
+}
+
+fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Vec<DemolishInfo> {
+    events
+        .iter()
+        .map(|event| DemolishInfo {
+            time: frame.time,
+            seconds_remaining: frame.seconds_remaining.unwrap_or_default(),
+            frame: frame.frame_number,
+            attacker: player_id(event.attacker_index),
+            victim: player_id(event.victim_index),
+            attacker_velocity: vec3(event.attacker_velocity),
+            victim_velocity: vec3(event.victim_velocity),
+            victim_location: vec3(event.victim_location),
+        })
+        .collect()
+}
+
+fn infer_dodge_refreshed_events(
+    frame: &FrameInfo,
+    ball: &BallFrameState,
+    players: &PlayerFrameState,
+    touch_events: &[subtr_actor::TouchEvent],
+    counters: &mut Vec<(RemoteId, i32)>,
+) -> Vec<DodgeRefreshedEvent> {
+    const MIN_PLAYER_HEIGHT: f32 = 95.0;
+    const MIN_BALL_HEIGHT: f32 = 80.0;
+    const MAX_CENTER_DISTANCE: f32 = 180.0;
+    const MAX_LOCAL_VERTICAL_OFFSET: f32 = 140.0;
+
+    let Some(ball) = ball.sample() else {
+        return Vec::new();
+    };
+    let ball_position = subtr_actor::vec_to_glam(&ball.rigid_body.location);
+    if ball_position.z < MIN_BALL_HEIGHT {
+        return Vec::new();
+    }
+
+    let mut events = Vec::new();
+    for touch in touch_events {
+        let Some(player_id) = touch.player.as_ref() else {
+            continue;
+        };
+        let Some(player) = players
+            .players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+        else {
+            continue;
+        };
+        let Some(player_rigid_body) = player.rigid_body.as_ref() else {
+            continue;
+        };
+
+        let player_position = subtr_actor::vec_to_glam(&player_rigid_body.location);
+        if player_position.z < MIN_PLAYER_HEIGHT {
+            continue;
+        }
+
+        let relative_ball_position = ball_position - player_position;
+        if !relative_ball_position.is_finite()
+            || relative_ball_position.length() > MAX_CENTER_DISTANCE
+        {
+            continue;
+        }
+
+        let player_rotation = subtr_actor::quat_to_glam(&player_rigid_body.rotation);
+        let local_ball_position = player_rotation.inverse() * relative_ball_position;
+        if local_ball_position.z > MAX_LOCAL_VERTICAL_OFFSET {
+            continue;
+        }
+
+        let previous = find_counter(counters, player_id).unwrap_or(0);
+        let counter_value = previous + 1;
+        if let Some((_, value)) = counters.iter_mut().find(|(id, _)| id == player_id) {
+            *value = counter_value;
+        } else {
+            counters.push((player_id.clone(), counter_value));
+        }
+        events.push(DodgeRefreshedEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            player: player_id.clone(),
+            is_team_0: player.is_team_0,
+            counter_value,
+        });
+    }
+
+    events
+}
+
+impl SaLiveEventGenerator {
+    fn frame_events(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        live_play: &LivePlayState,
+        explicit_events: &SaFrameEventSlices<'_>,
+    ) -> FrameEventsState {
+        let empty_events = FrameEventsState::default();
+        let touch_state = self
+            .touch_state
+            .update(frame, ball, players, &empty_events, live_play);
+        let mut touch_events = explicit_touch_events(frame, explicit_events.touches);
+        touch_events.extend(touch_state.touch_events);
+        let dodge_refreshed_events = infer_dodge_refreshed_events(
+            frame,
+            ball,
+            players,
+            &touch_events,
+            &mut self.dodge_refresh_counters,
+        );
+        let mut dodge_refreshed_events =
+            explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes)
+                .into_iter()
+                .chain(dodge_refreshed_events)
+                .collect::<Vec<_>>();
+        dodge_refreshed_events.sort_by_key(|event| event.counter_value);
+
+        FrameEventsState {
+            demo_events: explicit_demolish_events(frame, explicit_events.demolishes),
+            boost_pad_events: explicit_boost_pad_events(frame, explicit_events.boost_pad_events),
+            touch_events,
+            dodge_refreshed_events,
+            player_stat_events: explicit_player_stat_events(
+                frame,
+                explicit_events.player_stat_events,
+            ),
+            goal_events: explicit_goal_events(frame, explicit_events.goals),
+            ..FrameEventsState::default()
+        }
+    }
+}
+
+fn frame_input(
+    engine: &mut SaEngine,
+    frame: &SaLiveFrame,
+    sampled_players: &[SaPlayerFrame],
+    explicit_events: &SaFrameEventSlices<'_>,
+) -> FrameInput {
+    let frame_info = frame_info(frame);
+    let ball = ball_state(frame);
+    let players = player_state(sampled_players);
+    let live_play = live_play_state(frame);
+    let frame_events =
+        engine
+            .live_events
+            .frame_events(&frame_info, &ball, &players, &live_play, explicit_events);
+    FrameInput::from_parts(
+        frame_info,
+        gameplay_state(frame, sampled_players),
+        ball,
+        players,
+        frame_events,
+    )
+}
+
 fn push_new_events(engine: &mut SaEngine) {
-    for event in &engine.speed_flip.events()[engine.last_speed_flip_count..] {
-        engine.pending_events.push(SaMechanicEvent {
-            kind: SaMechanicKind::SpeedFlip,
-            player_index: player_index(&event.player),
-            is_team_0: event.is_team_0 as u8,
-            frame_number: event.frame as u64,
-            time: event.time,
-            confidence: event.confidence,
-        });
+    if let Some(speed_flip) = engine.graph.state::<SpeedFlipCalculator>() {
+        for event in &speed_flip.events()[engine.last_speed_flip_count..] {
+            engine.pending_events.push(SaMechanicEvent {
+                kind: SaMechanicKind::SpeedFlip,
+                player_index: player_index(&event.player),
+                is_team_0: event.is_team_0 as u8,
+                frame_number: event.frame as u64,
+                time: event.time,
+                confidence: event.confidence,
+            });
+        }
+        engine.last_speed_flip_count = speed_flip.events().len();
     }
-    engine.last_speed_flip_count = engine.speed_flip.events().len();
 
-    for event in &engine.half_flip.events()[engine.last_half_flip_count..] {
-        engine.pending_events.push(SaMechanicEvent {
-            kind: SaMechanicKind::HalfFlip,
-            player_index: player_index(&event.player),
-            is_team_0: event.is_team_0 as u8,
-            frame_number: event.frame as u64,
-            time: event.time,
-            confidence: event.confidence,
-        });
+    if let Some(half_flip) = engine.graph.state::<HalfFlipCalculator>() {
+        for event in &half_flip.events()[engine.last_half_flip_count..] {
+            engine.pending_events.push(SaMechanicEvent {
+                kind: SaMechanicKind::HalfFlip,
+                player_index: player_index(&event.player),
+                is_team_0: event.is_team_0 as u8,
+                frame_number: event.frame as u64,
+                time: event.time,
+                confidence: event.confidence,
+            });
+        }
+        engine.last_half_flip_count = half_flip.events().len();
     }
-    engine.last_half_flip_count = engine.half_flip.events().len();
 
-    for event in &engine.wavedash.events()[engine.last_wavedash_count..] {
-        engine.pending_events.push(SaMechanicEvent {
-            kind: SaMechanicKind::Wavedash,
-            player_index: player_index(&event.player),
-            is_team_0: event.is_team_0 as u8,
-            frame_number: event.frame as u64,
-            time: event.time,
-            confidence: event.confidence,
-        });
+    if let Some(wavedash) = engine.graph.state::<WavedashCalculator>() {
+        for event in &wavedash.events()[engine.last_wavedash_count..] {
+            engine.pending_events.push(SaMechanicEvent {
+                kind: SaMechanicKind::Wavedash,
+                player_index: player_index(&event.player),
+                is_team_0: event.is_team_0 as u8,
+                frame_number: event.frame as u64,
+                time: event.time,
+                confidence: event.confidence,
+            });
+        }
+        engine.last_wavedash_count = wavedash.events().len();
     }
-    engine.last_wavedash_count = engine.wavedash.events().len();
 }
 
 /// Creates an opaque live-analysis engine.
@@ -315,30 +714,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     } else {
         slice::from_raw_parts(frame.players, frame.player_count)
     };
-    let frame_info = frame_info(frame);
-    let gameplay = gameplay_state(frame, players);
-    let ball = ball_state(frame);
-    let players_state = player_state(players);
-    let live_play = frame.live_play != 0;
-    if engine
-        .speed_flip
-        .update_parts(&frame_info, &gameplay, &ball, &players_state, live_play)
-        .is_err()
-    {
-        return -2;
-    }
-    if engine
-        .half_flip
-        .update(&frame_info, &players_state, live_play)
-        .is_err()
-    {
-        return -2;
-    }
-    if engine
-        .wavedash
-        .update(&frame_info, &players_state, live_play)
-        .is_err()
-    {
+    let Ok(explicit_events) = frame_event_slices(frame) else {
+        return -1;
+    };
+    let frame_input = frame_input(engine, frame, players, &explicit_events);
+    if engine.graph.evaluate_with_state(&frame_input).is_err() {
         return -2;
     }
 
@@ -393,6 +773,58 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
 mod tests {
     use super::*;
 
+    fn rigid_body(location: SaVec3, linear_velocity: SaVec3) -> SaRigidBody {
+        SaRigidBody {
+            location,
+            rotation: SaQuat::default(),
+            linear_velocity,
+            angular_velocity: SaVec3::default(),
+            has_linear_velocity: 1,
+            has_angular_velocity: 1,
+            sleeping: 0,
+        }
+    }
+
+    fn live_frame(frame_number: u64, ball: SaRigidBody, players: &[SaPlayerFrame]) -> SaLiveFrame {
+        SaLiveFrame {
+            frame_number,
+            time: frame_number as f32 * 0.1,
+            dt: 0.1,
+            seconds_remaining: 299,
+            has_seconds_remaining: 1,
+            game_state: 0,
+            has_game_state: 0,
+            kickoff_countdown_time: 0,
+            has_kickoff_countdown_time: 0,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_ball: 1,
+            ball,
+            players: players.as_ptr(),
+            player_count: players.len(),
+            ..SaLiveFrame::default()
+        }
+    }
+
+    fn player_at_index(player_index: u32, is_team_0: bool, location: SaVec3) -> SaPlayerFrame {
+        SaPlayerFrame {
+            player_index,
+            is_team_0: is_team_0 as u8,
+            has_rigid_body: 1,
+            rigid_body: rigid_body(location, SaVec3::default()),
+            boost_amount: 33.0,
+            last_boost_amount: 33.0,
+            boost_active: 0,
+            dodge_active: 0,
+            powerslide_active: 0,
+        }
+    }
+
+    fn player_at(location: SaVec3) -> SaPlayerFrame {
+        player_at_index(0, true, location)
+    }
+
     #[test]
     fn accepts_null_players_when_count_is_zero() {
         let engine = subtr_actor_bakkesmod_engine_create();
@@ -413,6 +845,7 @@ mod tests {
             ball: SaRigidBody::default(),
             players: ptr::null(),
             player_count: 0,
+            ..SaLiveFrame::default()
         };
 
         let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
@@ -441,7 +874,297 @@ mod tests {
             ball: SaRigidBody::default(),
             players: ptr::null(),
             player_count: 1,
+            ..SaLiveFrame::default()
         };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, -1);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_updates_analysis_graph_state() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            seconds_remaining: 299,
+            has_seconds_remaining: 1,
+            game_state: 0,
+            has_game_state: 0,
+            kickoff_countdown_time: 0,
+            has_kickoff_countdown_time: 0,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_ball: 0,
+            ball: SaRigidBody::default(),
+            players: ptr::null(),
+            player_count: 0,
+            ..SaLiveFrame::default()
+        };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, 0);
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_info = engine_ref
+            .graph
+            .state::<FrameInfo>()
+            .expect("full analysis graph should expose frame info state");
+        assert_eq!(frame_info.frame_number, 7);
+        assert_eq!(frame_info.seconds_remaining, Some(299));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_generates_live_touch_events_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 92.75,
+        })];
+        let first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        let second = live_frame(
+            2,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3 {
+                    x: 300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            ),
+            &players,
+        );
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert_eq!(frame_events.touch_events[0].frame, 2);
+        assert_eq!(
+            frame_events.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_generates_live_dodge_refreshed_events_for_airborne_ball_touches() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 180.0,
+        })];
+        let first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        let second = live_frame(
+            2,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3 {
+                    x: 300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            ),
+            &players,
+        );
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
+        assert_eq!(
+            frame_events.dodge_refreshed_events[0].player,
+            RemoteId::SplitScreen(0)
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 12.0,
+            has_closest_approach_distance: 1,
+        }];
+        let dodge_refreshes = [SaDodgeRefreshedEvent {
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 3,
+        }];
+        let boost_pad_events = [SaBoostPadEvent {
+            pad_id: 34,
+            kind: SaBoostPadEventKind::PickedUp,
+            sequence: 2,
+            player_index: 0,
+            has_player: 1,
+        }];
+        let goals = [SaGoalEvent {
+            scoring_team_is_team_0: 1,
+            player_index: 0,
+            has_player: 1,
+            team_zero_score: 1,
+            has_team_zero_score: 1,
+            team_one_score: 0,
+            has_team_one_score: 1,
+        }];
+        let player_stat_events = [SaPlayerStatEvent {
+            player_index: 0,
+            is_team_0: 1,
+            kind: SaPlayerStatEventKind::Shot,
+        }];
+        let demolishes = [SaDemolishEvent {
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+        frame.dodge_refreshes = dodge_refreshes.as_ptr();
+        frame.dodge_refresh_count = dodge_refreshes.len();
+        frame.boost_pad_events = boost_pad_events.as_ptr();
+        frame.boost_pad_event_count = boost_pad_events.len();
+        frame.goals = goals.as_ptr();
+        frame.goal_count = goals.len();
+        frame.player_stat_events = player_stat_events.as_ptr();
+        frame.player_stat_event_count = player_stat_events.len();
+        frame.demolishes = demolishes.as_ptr();
+        frame.demolish_count = demolishes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
+        assert_eq!(frame_events.boost_pad_events.len(), 1);
+        assert_eq!(frame_events.goal_events.len(), 1);
+        assert_eq!(frame_events.player_stat_events.len(), 1);
+        assert_eq!(frame_events.demo_events.len(), 1);
+        assert_eq!(frame_events.boost_pad_events[0].pad_id, "34");
+        assert_eq!(frame_events.goal_events[0].team_zero_score, Some(1));
+        assert_eq!(frame_events.demo_events[0].victim, RemoteId::SplitScreen(1));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn rejects_null_explicit_event_pointer_when_count_is_nonzero() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let mut frame = SaLiveFrame {
+            frame_number: 1,
+            live_play: 1,
+            ..SaLiveFrame::default()
+        };
+        frame.touch_count = 1;
 
         let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
 

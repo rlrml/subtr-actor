@@ -44,6 +44,63 @@ typedef struct SaPlayerFrame {
   uint8_t powerslide_active;
 } SaPlayerFrame;
 
+typedef struct SaTouchEvent {
+  uint32_t player_index;
+  uint8_t has_player;
+  uint8_t is_team_0;
+  float closest_approach_distance;
+  uint8_t has_closest_approach_distance;
+} SaTouchEvent;
+
+typedef struct SaDodgeRefreshedEvent {
+  uint32_t player_index;
+  uint8_t is_team_0;
+  int32_t counter_value;
+} SaDodgeRefreshedEvent;
+
+typedef enum SaBoostPadEventKind {
+  SaBoostPadEventKindPickedUp = 1,
+  SaBoostPadEventKindAvailable = 2,
+} SaBoostPadEventKind;
+
+typedef struct SaBoostPadEvent {
+  uint32_t pad_id;
+  SaBoostPadEventKind kind;
+  uint8_t sequence;
+  uint32_t player_index;
+  uint8_t has_player;
+} SaBoostPadEvent;
+
+typedef struct SaGoalEvent {
+  uint8_t scoring_team_is_team_0;
+  uint32_t player_index;
+  uint8_t has_player;
+  int32_t team_zero_score;
+  uint8_t has_team_zero_score;
+  int32_t team_one_score;
+  uint8_t has_team_one_score;
+} SaGoalEvent;
+
+typedef enum SaPlayerStatEventKind {
+  SaPlayerStatEventKindShot = 1,
+  SaPlayerStatEventKindSave = 2,
+  SaPlayerStatEventKindAssist = 3,
+} SaPlayerStatEventKind;
+
+typedef struct SaPlayerStatEvent {
+  uint32_t player_index;
+  uint8_t is_team_0;
+  SaPlayerStatEventKind kind;
+} SaPlayerStatEvent;
+
+typedef struct SaDemolishEvent {
+  uint32_t attacker_index;
+  uint32_t victim_index;
+  SaVec3 attacker_velocity;
+  SaVec3 victim_velocity;
+  SaVec3 victim_location;
+} SaDemolishEvent;
+
 typedef struct SaLiveFrame {
   uint64_t frame_number;
   float time;
@@ -61,6 +118,18 @@ typedef struct SaLiveFrame {
   SaRigidBody ball;
   const SaPlayerFrame *players;
   size_t player_count;
+  const SaTouchEvent *touches;
+  size_t touch_count;
+  const SaDodgeRefreshedEvent *dodge_refreshes;
+  size_t dodge_refresh_count;
+  const SaBoostPadEvent *boost_pad_events;
+  size_t boost_pad_event_count;
+  const SaGoalEvent *goals;
+  size_t goal_count;
+  const SaPlayerStatEvent *player_stat_events;
+  size_t player_stat_event_count;
+  const SaDemolishEvent *demolishes;
+  size_t demolish_count;
 } SaLiveFrame;
 
 typedef enum SaMechanicKind {
