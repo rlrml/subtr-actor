@@ -679,12 +679,13 @@ fn frame_input(
         engine
             .live_events
             .frame_events(&frame_info, &ball, &players, &live_play, explicit_events);
-    FrameInput::from_parts(
+    FrameInput::from_parts_with_live_play_state(
         frame_info,
         gameplay_state(frame, sampled_players),
         ball,
         players,
         frame_events,
+        live_play,
     )
 }
 
@@ -1231,6 +1232,32 @@ mod tests {
         assert_eq!(gameplay.current_score(), Some((2, 1)));
         assert_eq!(gameplay.possession_team_is_team_0, Some(true));
         assert_eq!(gameplay.scored_on_team_is_team_0, Some(false));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_uses_explicit_live_play_state_for_analysis_graph() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 0,
+            ..SaLiveFrame::default()
+        };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, 0);
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let live_play = engine_ref
+            .graph
+            .state::<LivePlayState>()
+            .expect("full analysis graph should expose live play state");
+        assert_eq!(live_play.gameplay_phase, GameplayPhase::Unknown);
+        assert!(!live_play.is_live_play);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

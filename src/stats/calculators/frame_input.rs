@@ -2,7 +2,7 @@ use crate::*;
 
 use super::{
     BallFrameState, BallSample, DemoEventSample, FrameEventsState, FrameInfo, GameplayState,
-    PlayerFrameState, PlayerSample,
+    LivePlayState, PlayerFrameState, PlayerSample,
 };
 
 #[derive(Debug, Clone)]
@@ -12,6 +12,7 @@ pub struct FrameInput {
     ball_frame_state: BallFrameState,
     player_frame_state: PlayerFrameState,
     frame_events_state: FrameEventsState,
+    live_play_state: Option<LivePlayState>,
 }
 
 impl FrameInput {
@@ -33,6 +34,30 @@ impl FrameInput {
             ball_frame_state,
             player_frame_state,
             frame_events_state,
+            live_play_state: None,
+        }
+    }
+
+    /// Builds a frame input with an explicitly sampled live-play state.
+    ///
+    /// Replay processing should let the graph derive live play from replicated
+    /// gameplay fields. Live callers can use this when the host integration has
+    /// a stronger source of truth for whether analysis should run on a frame.
+    pub fn from_parts_with_live_play_state(
+        frame_info: FrameInfo,
+        gameplay_state: GameplayState,
+        ball_frame_state: BallFrameState,
+        player_frame_state: PlayerFrameState,
+        frame_events_state: FrameEventsState,
+        live_play_state: LivePlayState,
+    ) -> Self {
+        Self {
+            frame_info,
+            gameplay_state,
+            ball_frame_state,
+            player_frame_state,
+            frame_events_state,
+            live_play_state: Some(live_play_state),
         }
     }
 
@@ -48,6 +73,7 @@ impl FrameInput {
             ball_frame_state: Self::build_ball_frame_state(processor, current_time),
             player_frame_state: Self::build_player_frame_state(processor, current_time),
             frame_events_state: Self::build_current_frame_events_state(processor),
+            live_play_state: None,
         }
     }
 
@@ -76,6 +102,7 @@ impl FrameInput {
                 last_player_stat_event_count,
                 last_goal_event_count,
             ),
+            live_play_state: None,
         }
     }
 
@@ -230,5 +257,9 @@ impl FrameInput {
 
     pub fn frame_events_state(&self) -> FrameEventsState {
         self.frame_events_state.clone()
+    }
+
+    pub fn live_play_state(&self) -> Option<LivePlayState> {
+        self.live_play_state.clone()
     }
 }
