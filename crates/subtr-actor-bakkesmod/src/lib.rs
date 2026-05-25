@@ -13,14 +13,14 @@ use subtr_actor::{
         STATS_TIMELINE_MECHANIC_KINDS,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
-    FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState,
-    MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample,
-    PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame,
-    ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
-    TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishAttribute, DemolishInfo,
+    DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
+    GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind,
+    LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta,
+    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
+    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -393,6 +393,14 @@ fn vec3(value: SaVec3) -> Vector3f {
     }
 }
 
+fn zero_vec3() -> Vector3f {
+    Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    }
+}
+
 fn quat(value: SaQuat) -> Quaternion {
     Quaternion {
         x: value.x,
@@ -421,6 +429,41 @@ fn player_index(id: &RemoteId) -> u32 {
         RemoteId::SplitScreen(index) => *index,
         _ => 0,
     }
+}
+
+fn live_car_actor_id(id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
+    let Some(index) = SaLiveProcessorView::player_index(id) else {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "live player id",
+        });
+    };
+    let Ok(index) = i32::try_from(index) else {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "live player id",
+        });
+    };
+    Ok(boxcars::ActorId(index))
+}
+
+fn live_demolish_attribute(
+    attacker: &PlayerId,
+    victim: &PlayerId,
+    demolish: Option<&DemolishInfo>,
+) -> SubtrActorResult<DemolishAttribute> {
+    Ok(DemolishAttribute::Fx(boxcars::DemolishFx {
+        custom_demo_flag: false,
+        custom_demo_id: 0,
+        attacker_flag: true,
+        attacker: live_car_actor_id(attacker)?,
+        victim_flag: true,
+        victim: live_car_actor_id(victim)?,
+        attack_velocity: demolish
+            .map(|demolish| demolish.attacker_velocity)
+            .unwrap_or_else(zero_vec3),
+        victim_velocity: demolish
+            .map(|demolish| demolish.victim_velocity)
+            .unwrap_or_else(zero_vec3),
+    }))
 }
 
 struct SaFrameEventSlices<'a> {
@@ -688,11 +731,22 @@ impl ProcessorView for SaLiveProcessorView<'_> {
     }
 
     fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
-        Err(SubtrActorError::new(
-            SubtrActorErrorVariant::NoMatchingPlayerId {
-                actor_id: *actor_id,
-            },
-        ))
+        let Some(index) = u32::try_from(actor_id.0).ok() else {
+            return Err(SubtrActorError::new(
+                SubtrActorErrorVariant::NoMatchingPlayerId {
+                    actor_id: *actor_id,
+                },
+            ));
+        };
+        self.players
+            .iter()
+            .find(|player| player.player_index == index)
+            .map(|player| player_id(player.player_index))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::NoMatchingPlayerId {
+                    actor_id: *actor_id,
+                })
+            })
     }
 
     fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
@@ -782,8 +836,35 @@ impl ProcessorView for SaLiveProcessorView<'_> {
             })
     }
 
-    fn get_active_demos(&self) -> SubtrActorResult<Vec<subtr_actor::DemolishAttribute>> {
-        Ok(Vec::new())
+    fn get_active_demos(&self) -> SubtrActorResult<Vec<DemolishAttribute>> {
+        let mut seen = HashSet::new();
+        let mut demos = Vec::new();
+        for sample in &self.events.active_demos {
+            if !seen.insert((sample.attacker.clone(), sample.victim.clone())) {
+                continue;
+            }
+            let demolish = self.events.demo_events.iter().find(|demolish| {
+                demolish.attacker == sample.attacker && demolish.victim == sample.victim
+            });
+            demos.push(live_demolish_attribute(
+                &sample.attacker,
+                &sample.victim,
+                demolish,
+            )?);
+        }
+        if demos.is_empty() {
+            for demolish in &self.events.demo_events {
+                if !seen.insert((demolish.attacker.clone(), demolish.victim.clone())) {
+                    continue;
+                }
+                demos.push(live_demolish_attribute(
+                    &demolish.attacker,
+                    &demolish.victim,
+                    Some(demolish),
+                )?);
+            }
+        }
+        Ok(demos)
     }
 
     fn demolishes(&self) -> &[DemolishInfo] {
@@ -3974,6 +4055,162 @@ mod tests {
         assert_eq!(view.get_jump_active(&player_id).unwrap(), 1);
         assert_eq!(view.get_double_jump_active(&player_id).unwrap(), 1);
         assert_eq!(view.get_dodge_active(&player_id).unwrap(), 1);
+    }
+
+    #[test]
+    fn live_processor_view_resolves_demo_car_actor_ids() {
+        let players = [
+            player_at_index(
+                2,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                5,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = live_frame(
+            7,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        let frame_info = frame_info(&frame);
+        let demo_events = explicit_demolish_events(
+            &frame_info,
+            &[SaDemolishEvent {
+                attacker_index: 2,
+                victim_index: 5,
+                attacker_velocity: SaVec3 {
+                    x: 2300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: SaVec3::default(),
+                victim_location: SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                active_duration_seconds: 0.25,
+            }],
+        );
+        let view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState {
+                active_demos: vec![DemoEventSample {
+                    attacker: RemoteId::SplitScreen(2),
+                    victim: RemoteId::SplitScreen(5),
+                }],
+                demo_events,
+                ..FrameEventsState::default()
+            },
+        );
+
+        let active_demos = view.get_active_demos().unwrap();
+        assert_eq!(active_demos.len(), 1);
+        assert_eq!(
+            view.get_player_id_from_car_id(&active_demos[0].attacker_actor_id())
+                .unwrap(),
+            RemoteId::SplitScreen(2)
+        );
+        assert_eq!(
+            view.get_player_id_from_car_id(&active_demos[0].victim_actor_id())
+                .unwrap(),
+            RemoteId::SplitScreen(5)
+        );
+        assert_eq!(active_demos[0].attacker_velocity().x, 2300.0);
+    }
+
+    #[test]
+    fn live_frame_input_can_build_active_demos_from_processor_view() {
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = live_frame(
+            7,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        let frame_info = frame_info(&frame);
+        let demo_events = explicit_demolish_events(
+            &frame_info,
+            &[SaDemolishEvent {
+                attacker_index: 0,
+                victim_index: 1,
+                attacker_velocity: SaVec3 {
+                    x: 2300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: SaVec3::default(),
+                victim_location: SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                active_duration_seconds: 0.25,
+            }],
+        );
+        let view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState {
+                demo_events,
+                ..FrameEventsState::default()
+            },
+        );
+
+        let input = FrameInput::timeline_with_live_play_state(
+            &view,
+            7,
+            frame.time,
+            frame.dt,
+            LivePlayState {
+                gameplay_phase: GameplayPhase::ActivePlay,
+                is_live_play: true,
+            },
+        );
+
+        let frame_events = input.frame_events_state();
+        assert_eq!(frame_events.active_demos.len(), 1);
+        assert_eq!(
+            frame_events.active_demos[0].attacker,
+            RemoteId::SplitScreen(0)
+        );
+        assert_eq!(
+            frame_events.active_demos[0].victim,
+            RemoteId::SplitScreen(1)
+        );
     }
 
     #[test]
