@@ -24,6 +24,7 @@ pub struct MustyFlickEvent {
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
+    pub aerial: bool,
     pub dodge_time: f32,
     pub dodge_frame: usize,
     pub time_since_dodge: f32,
@@ -293,6 +294,7 @@ impl MustyFlickCalculator {
             frame: touch_event.frame,
             player: player.player_id.clone(),
             is_team_0: player.is_team_0,
+            aerial: player_position.z >= MUSTY_AERIAL_HEIGHT,
             dodge_time: dodge_start.time,
             dodge_frame: dodge_start.frame,
             time_since_dodge,
@@ -336,10 +338,7 @@ impl MustyFlickCalculator {
             };
 
             let stats = self.player_stats.entry(player_id.clone()).or_default();
-            let aerial = player
-                .position()
-                .is_some_and(|position| position.z >= MUSTY_AERIAL_HEIGHT);
-            stats.record_event(&event, aerial);
+            stats.record_event(&event, event.aerial);
             stats.is_last_musty = true;
             stats.time_since_last_musty = Some((frame.time - event.time).max(0.0));
             stats.frames_since_last_musty = Some(frame.frame_number.saturating_sub(event.frame));

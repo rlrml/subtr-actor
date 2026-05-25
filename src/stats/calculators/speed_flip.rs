@@ -17,6 +17,8 @@ const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 pub struct SpeedFlipEvent {
     pub time: f32,
     pub frame: usize,
+    pub resolved_time: f32,
+    pub resolved_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
@@ -482,6 +484,8 @@ impl SpeedFlipCalculator {
         Some(SpeedFlipEvent {
             time: candidate.start_time,
             frame: candidate.start_frame,
+            resolved_time: candidate.latest_time,
+            resolved_frame: candidate.latest_frame,
             player: player_id.clone(),
             is_team_0: candidate.is_team_0,
             time_since_kickoff_start,

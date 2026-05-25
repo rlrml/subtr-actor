@@ -1,5 +1,17 @@
 use super::*;
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DodgeResetEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub counter_value: i32,
+    pub on_ball: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeResetStats {
@@ -10,6 +22,7 @@ pub struct DodgeResetStats {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     player_stats: HashMap<PlayerId, DodgeResetStats>,
+    events: Vec<DodgeResetEvent>,
     on_ball_events: Vec<DodgeRefreshedEvent>,
 }
 
@@ -20,6 +33,10 @@ impl DodgeResetCalculator {
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
         &self.player_stats
+    }
+
+    pub fn events(&self) -> &[DodgeResetEvent] {
+        &self.events
     }
 
     pub fn on_ball_events(&self) -> &[DodgeRefreshedEvent] {
@@ -81,6 +98,14 @@ impl DodgeResetCalculator {
                 stats.on_ball_count += 1;
                 self.on_ball_events.push(event.clone());
             }
+            self.events.push(DodgeResetEvent {
+                time: event.time,
+                frame: event.frame,
+                player: event.player.clone(),
+                is_team_0: event.is_team_0,
+                counter_value: event.counter_value,
+                on_ball,
+            });
         }
         Ok(())
     }

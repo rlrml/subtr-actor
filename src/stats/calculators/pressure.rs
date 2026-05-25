@@ -10,13 +10,16 @@ enum PressureHalfLabel {
 }
 
 impl PressureHalfLabel {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::TeamZeroSide => "team_zero_side",
             Self::TeamOneSide => "team_one_side",
             Self::Neutral => "neutral",
-        };
-        StatLabel::new("field_half", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("field_half", self.as_label_value())
     }
 }
 
@@ -98,6 +101,15 @@ pub struct PressureTeamStats {
     pub labeled_time: LabeledFloatSums,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PressureEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub dt: f32,
+    pub field_half: String,
+}
+
 fn team_relative_pressure_label(label: &StatLabel, is_team_zero: bool) -> StatLabel {
     match (label.key, label.value) {
         ("field_half", "team_zero_side") => StatLabel::new(
@@ -137,6 +149,7 @@ impl Default for PressureCalculatorConfig {
 pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     stats: PressureStats,
+    events: Vec<PressureEvent>,
 }
 
 impl PressureCalculator {
@@ -153,6 +166,10 @@ impl PressureCalculator {
 
     pub fn stats(&self) -> &PressureStats {
         &self.stats
+    }
+
+    pub fn events(&self) -> &[PressureEvent] {
+        &self.events
     }
 
     pub fn config(&self) -> &PressureCalculatorConfig {
@@ -216,6 +233,12 @@ impl PressureCalculator {
                 PressureHalfLabel::TeamOneSide
             };
             Self::apply_pressure_time(&mut self.stats, half, frame.dt);
+            self.events.push(PressureEvent {
+                time: frame.time,
+                frame: frame.frame_number,
+                dt: frame.dt,
+                field_half: half.as_label_value().to_owned(),
+            });
         }
         Ok(())
     }

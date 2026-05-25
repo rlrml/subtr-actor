@@ -460,6 +460,26 @@ impl CoreTeamStats {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct CorePlayerStatsEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub stats: CorePlayerStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct CoreTeamStatsEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub is_team_0: bool,
+    pub stats: CoreTeamStats,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub enum TimelineEventKind {
@@ -582,6 +602,11 @@ pub struct MatchStatsCalculator {
     player_stats: HashMap<PlayerId, CorePlayerStats>,
     player_teams: HashMap<PlayerId, bool>,
     previous_player_stats: HashMap<PlayerId, CorePlayerStats>,
+    last_emitted_player_stats: HashMap<PlayerId, CorePlayerStats>,
+    last_emitted_team_zero_stats: CoreTeamStats,
+    last_emitted_team_one_stats: CoreTeamStats,
+    core_player_events: Vec<CorePlayerStatsEvent>,
+    core_team_events: Vec<CoreTeamStatsEvent>,
     timeline: Vec<TimelineEvent>,
     pending_goal_events: Vec<PendingGoalEvent>,
     previous_team_scores: Option<(i32, i32)>,
@@ -610,6 +635,14 @@ impl MatchStatsCalculator {
 
     pub fn goal_context_events(&self) -> &[GoalContextEvent] {
         &self.goal_context_events
+    }
+
+    pub fn core_player_events(&self) -> &[CorePlayerStatsEvent] {
+        &self.core_player_events
+    }
+
+    pub fn core_team_events(&self) -> &[CoreTeamStatsEvent] {
+        &self.core_team_events
     }
 
     pub fn team_zero_stats(&self) -> CoreTeamStats {
@@ -673,6 +706,48 @@ impl MatchStatsCalculator {
                 player_id: Some(player_id.clone()),
                 is_team_0: Some(is_team_0),
             });
+        }
+    }
+
+    fn emit_core_stats_events(&mut self, frame: &FrameInfo) {
+        for (player_id, stats) in &self.player_stats {
+            if self.last_emitted_player_stats.get(player_id) == Some(stats) {
+                continue;
+            }
+            let Some(is_team_0) = self.player_teams.get(player_id).copied() else {
+                continue;
+            };
+            self.core_player_events.push(CorePlayerStatsEvent {
+                time: frame.time,
+                frame: frame.frame_number,
+                player: player_id.clone(),
+                is_team_0,
+                stats: stats.clone(),
+            });
+            self.last_emitted_player_stats
+                .insert(player_id.clone(), stats.clone());
+        }
+
+        let team_zero_stats = self.team_zero_stats();
+        if team_zero_stats != self.last_emitted_team_zero_stats {
+            self.core_team_events.push(CoreTeamStatsEvent {
+                time: frame.time,
+                frame: frame.frame_number,
+                is_team_0: true,
+                stats: team_zero_stats.clone(),
+            });
+            self.last_emitted_team_zero_stats = team_zero_stats;
+        }
+
+        let team_one_stats = self.team_one_stats();
+        if team_one_stats != self.last_emitted_team_one_stats {
+            self.core_team_events.push(CoreTeamStatsEvent {
+                time: frame.time,
+                frame: frame.frame_number,
+                is_team_0: false,
+                stats: team_one_stats.clone(),
+            });
+            self.last_emitted_team_one_stats = team_one_stats;
         }
     }
 
@@ -1325,6 +1400,7 @@ impl MatchStatsCalculator {
                 .partial_cmp(&b.time)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        self.emit_core_stats_events(frame);
 
         Ok(())
     }

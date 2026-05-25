@@ -372,6 +372,8 @@ fn whiff_event(aerial: bool, dodge_active: bool, closest_approach_distance: f32)
         kind: WhiffEventKind::Whiff,
         time: 1.0,
         frame: 10,
+        resolved_time: 1.0,
+        resolved_frame: 10,
         player: boxcars::RemoteId::Steam(1),
         is_team_0: true,
         closest_approach_distance,

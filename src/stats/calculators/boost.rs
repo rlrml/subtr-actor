@@ -151,6 +151,47 @@ pub struct BoostPickupComparisonEvent {
     pub boost_after: Option<f32>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum BoostLedgerTransactionKind {
+    Collected,
+    Stolen,
+    Overfill,
+    Respawn,
+    Used,
+    UsedAllocation,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct BoostLedgerEvent {
+    pub frame: usize,
+    pub time: f32,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub transaction: BoostLedgerTransactionKind,
+    pub amount: f32,
+    pub count: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<StatLabel>,
+    pub boost_before: Option<f32>,
+    pub boost_after: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct BoostStateEvent {
+    pub frame: usize,
+    pub time: f32,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub boost_amount: f32,
+    pub boost_before: Option<f32>,
+}
+
 impl BoostStats {
     pub fn average_boost_amount(&self) -> f32 {
         if self.tracked_time == 0.0 {
@@ -284,6 +325,8 @@ pub struct BoostCalculator {
     last_pickup_times: HashMap<String, f32>,
     pending_inferred_pickups: VecDeque<PendingBoostPickupEvent>,
     pickup_comparison_events: Vec<BoostPickupComparisonEvent>,
+    ledger_events: Vec<BoostLedgerEvent>,
+    state_events: Vec<BoostStateEvent>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
@@ -298,14 +341,26 @@ struct BoostInvariantWarningKey {
     kind: BoostInvariantKind,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BoostLedgerContext {
+    frame: usize,
+    time: f32,
+    boost_before: Option<f32>,
+    boost_after: Option<f32>,
+}
+
 #[derive(Debug, Clone)]
 struct PendingBoostPickup {
+    frame: usize,
+    time: f32,
     player_id: PlayerId,
     is_team_0: bool,
     previous_boost_amount: f32,
     pre_applied_collected_amount: f32,
     pre_applied_pad_size: Option<BoostPadSize>,
     player_position: glam::Vec3,
+    boost_before: Option<f32>,
+    boost_after: Option<f32>,
 }
 
 impl BoostCalculator {
@@ -336,6 +391,26 @@ impl BoostCalculator {
 
     pub fn pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
         &self.pickup_comparison_events
+    }
+
+    pub fn ledger_events(&self) -> &[BoostLedgerEvent] {
+        &self.ledger_events
+    }
+
+    pub fn state_events(&self) -> &[BoostStateEvent] {
+        &self.state_events
+    }
+
+    fn record_ledger_event(&mut self, event: BoostLedgerEvent) {
+        if event.amount <= 0.0 && event.count == 0 {
+            return;
+        }
+
+        self.ledger_events.push(event);
+    }
+
+    fn record_state_event(&mut self, event: BoostStateEvent) {
+        self.state_events.push(event);
     }
 
     fn estimated_pad_position(&self, pad_id: &str) -> Option<glam::Vec3> {
@@ -689,6 +764,51 @@ impl BoostCalculator {
             team_stats.overfill_from_stolen += overfill;
         }
 
+        self.record_ledger_event(BoostLedgerEvent {
+            frame: pending_pickup.frame,
+            time: pending_pickup.time,
+            player_id: pending_pickup.player_id.clone(),
+            is_team_0: pending_pickup.is_team_0,
+            transaction: BoostLedgerTransactionKind::Collected,
+            amount: collected_amount_delta,
+            count: 1,
+            labels: collected_labels.into_iter().collect(),
+            boost_before: pending_pickup.boost_before,
+            boost_after: pending_pickup.boost_after,
+        });
+        if stolen {
+            let stolen_labels = [
+                boost_transaction_label("stolen"),
+                boost_pad_size_label(Some(pad_size)),
+                boost_activity_label(BoostPickupActivity::Active),
+                boost_field_half_label(field_half),
+            ];
+            self.record_ledger_event(BoostLedgerEvent {
+                frame: pending_pickup.frame,
+                time: pending_pickup.time,
+                player_id: pending_pickup.player_id.clone(),
+                is_team_0: pending_pickup.is_team_0,
+                transaction: BoostLedgerTransactionKind::Stolen,
+                amount: collected_amount,
+                count: 1,
+                labels: stolen_labels.into_iter().collect(),
+                boost_before: pending_pickup.boost_before,
+                boost_after: pending_pickup.boost_after,
+            });
+        }
+        self.record_ledger_event(BoostLedgerEvent {
+            frame: pending_pickup.frame,
+            time: pending_pickup.time,
+            player_id: pending_pickup.player_id.clone(),
+            is_team_0: pending_pickup.is_team_0,
+            transaction: BoostLedgerTransactionKind::Overfill,
+            amount: overfill,
+            count: 0,
+            labels: overfill_labels.into_iter().collect(),
+            boost_before: pending_pickup.boost_before,
+            boost_after: pending_pickup.boost_after,
+        });
+
         field_half
     }
 
@@ -705,6 +825,7 @@ impl BoostCalculator {
 
     fn apply_pickup_collected_amount(
         &mut self,
+        ledger_context: BoostLedgerContext,
         player_id: &PlayerId,
         is_team_0: bool,
         amount: f32,
@@ -731,15 +852,28 @@ impl BoostCalculator {
         stats.add_labeled_amount(collected_labels.clone(), amount);
         team_stats.add_labeled_amount(collected_labels.clone(), amount);
         stats.increment_labeled_count(collected_labels.clone());
-        team_stats.increment_labeled_count(collected_labels);
+        team_stats.increment_labeled_count(collected_labels.clone());
         if let Some(pad_size) = pad_size {
             Self::apply_collected_bucket_amount(stats, pad_size, amount);
             Self::apply_collected_bucket_amount(team_stats, pad_size, amount);
         }
+        self.record_ledger_event(BoostLedgerEvent {
+            frame: ledger_context.frame,
+            time: ledger_context.time,
+            player_id: player_id.clone(),
+            is_team_0,
+            transaction: BoostLedgerTransactionKind::Collected,
+            amount,
+            count: 0,
+            labels: collected_labels.into_iter().collect(),
+            boost_before: ledger_context.boost_before,
+            boost_after: ledger_context.boost_after,
+        });
     }
 
     fn apply_inactive_pickup(
         &mut self,
+        ledger_context: BoostLedgerContext,
         player_id: &PlayerId,
         is_team_0: bool,
         amount: f32,
@@ -762,7 +896,7 @@ impl BoostCalculator {
         stats.add_labeled_amount(collected_labels.clone(), amount);
         team_stats.add_labeled_amount(collected_labels.clone(), amount);
         stats.increment_labeled_count(collected_labels.clone());
-        team_stats.increment_labeled_count(collected_labels);
+        team_stats.increment_labeled_count(collected_labels.clone());
         match pad_size {
             BoostPadSize::Big => {
                 stats.big_pads_collected_inactive += 1;
@@ -773,9 +907,27 @@ impl BoostCalculator {
                 team_stats.small_pads_collected_inactive += 1;
             }
         }
+        self.record_ledger_event(BoostLedgerEvent {
+            frame: ledger_context.frame,
+            time: ledger_context.time,
+            player_id: player_id.clone(),
+            is_team_0,
+            transaction: BoostLedgerTransactionKind::Collected,
+            amount,
+            count: 1,
+            labels: collected_labels.into_iter().collect(),
+            boost_before: ledger_context.boost_before,
+            boost_after: ledger_context.boost_after,
+        });
     }
 
-    fn apply_respawn_amount(&mut self, player_id: &PlayerId, is_team_0: bool, amount: f32) {
+    fn apply_respawn_amount(
+        &mut self,
+        ledger_context: BoostLedgerContext,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        amount: f32,
+    ) {
         if amount <= 0.0 {
             return;
         }
@@ -790,7 +942,19 @@ impl BoostCalculator {
         team_stats.amount_respawned += amount;
         let respawn_labels = [boost_transaction_label("respawn")];
         stats.add_labeled_amount(respawn_labels.clone(), amount);
-        team_stats.add_labeled_amount(respawn_labels, amount);
+        team_stats.add_labeled_amount(respawn_labels.clone(), amount);
+        self.record_ledger_event(BoostLedgerEvent {
+            frame: ledger_context.frame,
+            time: ledger_context.time,
+            player_id: player_id.clone(),
+            is_team_0,
+            transaction: BoostLedgerTransactionKind::Respawn,
+            amount,
+            count: 0,
+            labels: respawn_labels.into_iter().collect(),
+            boost_before: ledger_context.boost_before,
+            boost_after: ledger_context.boost_after,
+        });
     }
 
     fn warn_for_boost_invariant_violations(
@@ -1247,6 +1411,20 @@ impl BoostCalculator {
                 }
             }
             if track_boost_levels {
+                let boost_before = if boost_levels_resumed_this_sample {
+                    None
+                } else {
+                    Some(previous_boost_amount)
+                };
+                self.record_state_event(BoostStateEvent {
+                    frame: frame.frame_number,
+                    time: frame.time,
+                    player_id: player.player_id.clone(),
+                    is_team_0: player.is_team_0,
+                    boost_amount,
+                    boost_before,
+                });
+
                 let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
                 let time_zero_boost = frame.dt
                     * Self::interval_fraction_in_boost_range(
@@ -1338,7 +1516,17 @@ impl BoostCalculator {
                 self.pending_demo_respawns.remove(&player.player_id);
             }
             if respawn_amount > 0.0 {
-                self.apply_respawn_amount(&player.player_id, player.is_team_0, respawn_amount);
+                self.apply_respawn_amount(
+                    BoostLedgerContext {
+                        frame: frame.frame_number,
+                        time: frame.time,
+                        boost_before: Some(previous_boost_amount),
+                        boost_after: Some(boost_amount),
+                    },
+                    &player.player_id,
+                    player.is_team_0,
+                    respawn_amount,
+                );
             }
             respawn_amounts_by_player.insert(player.player_id.clone(), respawn_amount);
 
@@ -1385,6 +1573,12 @@ impl BoostCalculator {
                             continue;
                         }
                         self.apply_inactive_pickup(
+                            BoostLedgerContext {
+                                frame: event.frame,
+                                time: event.time,
+                                boost_before: Some(previous_boost_amount),
+                                boost_after: player.boost_amount,
+                            },
                             player_id,
                             player.is_team_0,
                             collected_amount,
@@ -1478,18 +1672,28 @@ impl BoostCalculator {
                         })
                         .flatten();
                     self.apply_pickup_collected_amount(
+                        BoostLedgerContext {
+                            frame: event.frame,
+                            time: event.time,
+                            boost_before: Some(previous_boost_amount),
+                            boost_after: player.boost_amount,
+                        },
                         player_id,
                         player.is_team_0,
                         pre_applied_collected_amount,
                         pre_applied_pad_size,
                     );
                     let pending_pickup = PendingBoostPickup {
+                        frame: event.frame,
+                        time: event.time,
                         player_id: player_id.clone(),
                         is_team_0: player.is_team_0,
                         previous_boost_amount,
                         pre_applied_collected_amount,
                         pre_applied_pad_size,
                         player_position: player.position().unwrap_or(glam::Vec3::ZERO),
+                        boost_before: Some(previous_boost_amount),
+                        boost_after: player.boost_amount,
                     };
 
                     let pad_size = self
@@ -1551,6 +1755,12 @@ impl BoostCalculator {
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
+            let boost_before = self
+                .previous_boost_amounts
+                .get(&player.player_id)
+                .copied()
+                .or(player.last_boost_amount);
+            let mut used_ledger_event = None;
             let stats = self
                 .player_stats
                 .entry(player.player_id.clone())
@@ -1593,6 +1803,18 @@ impl BoostCalculator {
                     ];
                     stats.add_labeled_amount(used_labels.clone(), amount_used_delta);
                     team_stats.add_labeled_amount(used_labels.clone(), amount_used_delta);
+                    used_ledger_event = Some(BoostLedgerEvent {
+                        frame: frame.frame_number,
+                        time: frame.time,
+                        player_id: player.player_id.clone(),
+                        is_team_0: player.is_team_0,
+                        transaction: BoostLedgerTransactionKind::UsedAllocation,
+                        amount: amount_used_delta,
+                        count: 0,
+                        labels: used_labels.into_iter().collect(),
+                        boost_before,
+                        boost_after: Some(boost_amount),
+                    });
                     if vertical_state.is_grounded(&player.player_id) {
                         stats.amount_used_while_grounded += amount_used_delta;
                         team_stats.amount_used_while_grounded += amount_used_delta;
@@ -1608,9 +1830,24 @@ impl BoostCalculator {
             }
             stats.amount_used = amount_used;
             let amount_used_delta = amount_used - previous_amount_used;
+            if let Some(event) = used_ledger_event {
+                self.record_ledger_event(event);
+            }
             if amount_used_delta <= 0.0 {
                 continue;
             }
+            self.record_ledger_event(BoostLedgerEvent {
+                frame: frame.frame_number,
+                time: frame.time,
+                player_id: player.player_id.clone(),
+                is_team_0: player.is_team_0,
+                transaction: BoostLedgerTransactionKind::Used,
+                amount: amount_used_delta,
+                count: 0,
+                labels: [boost_transaction_label("used")].into_iter().collect(),
+                boost_before,
+                boost_after: Some(boost_amount),
+            });
             if player.is_team_0 {
                 team_zero_used += amount_used_delta;
             } else {

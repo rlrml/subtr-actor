@@ -1,5 +1,16 @@
 use super::*;
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PowerslideEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub active: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PowerslideStats {
@@ -23,6 +34,7 @@ pub struct PowerslideCalculator {
     team_zero_stats: PowerslideStats,
     team_one_stats: PowerslideStats,
     last_active: HashMap<PlayerId, bool>,
+    events: Vec<PowerslideEvent>,
 }
 
 impl PowerslideCalculator {
@@ -40,6 +52,10 @@ impl PowerslideCalculator {
 
     pub fn team_one_stats(&self) -> &PowerslideStats {
         &self.team_one_stats
+    }
+
+    pub fn events(&self) -> &[PowerslideEvent] {
+        &self.events
     }
 
     fn is_effective_powerslide(player: &PlayerSample) -> bool {
@@ -81,6 +97,16 @@ impl PowerslideCalculator {
             if live_play && effective_powerslide && !previous_active {
                 stats.press_count += 1;
                 team_stats.press_count += 1;
+            }
+
+            if effective_powerslide != previous_active {
+                self.events.push(PowerslideEvent {
+                    time: frame.time,
+                    frame: frame.frame_number,
+                    player: player.player_id.clone(),
+                    is_team_0: player.is_team_0,
+                    active: effective_powerslide,
+                });
             }
 
             self.last_active

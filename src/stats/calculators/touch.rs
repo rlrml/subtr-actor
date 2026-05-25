@@ -32,24 +32,30 @@ const ALL_TOUCH_DODGE_STATES: [TouchDodgeState; 2] =
     [TouchDodgeState::NoDodge, TouchDodgeState::Dodge];
 
 impl TouchKind {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::Control => "control",
             Self::MediumHit => "medium_hit",
             Self::HardHit => "hard_hit",
-        };
-        StatLabel::new("kind", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("kind", self.as_label_value())
     }
 }
 
 impl TouchSurface {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::Ground => "ground",
             Self::Air => "air",
             Self::Wall => "wall",
-        };
-        StatLabel::new("surface", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("surface", self.as_label_value())
     }
 }
 
@@ -62,12 +68,15 @@ impl TouchDodgeState {
         }
     }
 
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::NoDodge => "no_dodge",
             Self::Dodge => "dodge",
-        };
-        StatLabel::new("dodge_state", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("dodge_state", self.as_label_value())
     }
 }
 
@@ -183,6 +192,48 @@ impl TouchStats {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TouchStatsEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub kind: String,
+    pub height_band: String,
+    pub surface: String,
+    pub dodge_state: String,
+    pub ball_speed_change: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TouchBallMovementEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub travel_distance: f32,
+    pub advance_distance: f32,
+    pub retreat_distance: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TouchLastTouchEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
+    pub is_team_0: bool,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    pub player: Option<PlayerId>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 struct PendingFiftyFiftyMovement {
     start_frame: usize,
@@ -193,6 +244,9 @@ struct PendingFiftyFiftyMovement {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     player_stats: HashMap<PlayerId, TouchStats>,
+    events: Vec<TouchStatsEvent>,
+    ball_movement_events: Vec<TouchBallMovementEvent>,
+    last_touch_events: Vec<TouchLastTouchEvent>,
     current_last_touch_player: Option<PlayerId>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
@@ -206,6 +260,18 @@ impl TouchCalculator {
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
         &self.player_stats
+    }
+
+    pub fn events(&self) -> &[TouchStatsEvent] {
+        &self.events
+    }
+
+    pub fn ball_movement_events(&self) -> &[TouchBallMovementEvent] {
+        &self.ball_movement_events
+    }
+
+    pub fn last_touch_events(&self) -> &[TouchLastTouchEvent] {
+        &self.last_touch_events
     }
 
     fn ball_speed_change(
@@ -373,6 +439,19 @@ impl TouchCalculator {
                 ball_speed_change,
                 controlled_touch_kind,
             );
+            self.events.push(TouchStatsEvent {
+                time: touch_event.time,
+                frame: touch_event.frame,
+                sample_time: frame.time,
+                sample_frame: frame.frame_number,
+                player: player_id.clone(),
+                is_team_0: touch_event.team_is_team_0,
+                kind: classification.kind.as_label_value().to_owned(),
+                height_band: classification.height_band.as_label().value.to_owned(),
+                surface: classification.surface.as_label_value().to_owned(),
+                dodge_state: classification.dodge_state.as_label_value().to_owned(),
+                ball_speed_change,
+            });
             let stats = self.player_stats.entry(player_id.clone()).or_default();
             stats.touch_count += 1;
             Self::apply_touch_classification(stats, classification);
@@ -387,6 +466,14 @@ impl TouchCalculator {
         }
 
         if let Some(last_touch) = touch_events.last() {
+            self.last_touch_events.push(TouchLastTouchEvent {
+                time: last_touch.time,
+                frame: last_touch.frame,
+                sample_time: frame.time,
+                sample_frame: frame.frame_number,
+                is_team_0: last_touch.team_is_team_0,
+                player: last_touch.player.clone(),
+            });
             self.current_last_touch_player = last_touch.player.clone();
         }
 
@@ -399,6 +486,8 @@ impl TouchCalculator {
 
     fn apply_ball_movement_credit(
         &mut self,
+        frame: usize,
+        time: f32,
         player_id: &PlayerId,
         team_is_team_0: bool,
         delta: glam::Vec3,
@@ -406,13 +495,24 @@ impl TouchCalculator {
     ) {
         let team_forward_sign = if team_is_team_0 { 1.0 } else { -1.0 };
         let advance_distance = delta.y * team_forward_sign;
+        let (advance_distance, retreat_distance) = if advance_distance >= 0.0 {
+            (advance_distance, 0.0)
+        } else {
+            (0.0, -advance_distance)
+        };
+        self.ball_movement_events.push(TouchBallMovementEvent {
+            time,
+            frame,
+            player: player_id.clone(),
+            is_team_0: team_is_team_0,
+            travel_distance,
+            advance_distance,
+            retreat_distance,
+        });
         let stats = self.player_stats.entry(player_id.clone()).or_default();
         stats.total_ball_travel_distance += travel_distance;
-        if advance_distance >= 0.0 {
-            stats.total_ball_advance_distance += advance_distance;
-        } else {
-            stats.total_ball_retreat_distance += -advance_distance;
-        }
+        stats.total_ball_advance_distance += advance_distance;
+        stats.total_ball_retreat_distance += retreat_distance;
     }
 
     fn resolved_fifty_fifty_winner(event: &FiftyFiftyEvent) -> Option<(&PlayerId, bool)> {
@@ -462,17 +562,29 @@ impl TouchCalculator {
 
         let team_forward_sign = if team_is_team_0 { 1.0 } else { -1.0 };
         let advance_distance = pending.y_delta * team_forward_sign;
+        let (advance_distance, retreat_distance) = if advance_distance >= 0.0 {
+            (advance_distance, 0.0)
+        } else {
+            (0.0, -advance_distance)
+        };
+        self.ball_movement_events.push(TouchBallMovementEvent {
+            time: event.resolve_time,
+            frame: event.resolve_frame,
+            player: player_id.clone(),
+            is_team_0: team_is_team_0,
+            travel_distance: pending.travel_distance,
+            advance_distance,
+            retreat_distance,
+        });
         let stats = self.player_stats.entry(player_id.clone()).or_default();
         stats.total_ball_travel_distance += pending.travel_distance;
-        if advance_distance >= 0.0 {
-            stats.total_ball_advance_distance += advance_distance;
-        } else {
-            stats.total_ball_retreat_distance += -advance_distance;
-        }
+        stats.total_ball_advance_distance += advance_distance;
+        stats.total_ball_retreat_distance += retreat_distance;
     }
 
     fn credit_ball_movement(
         &mut self,
+        frame: &FrameInfo,
         ball: &BallFrameState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
@@ -522,7 +634,14 @@ impl TouchCalculator {
             return;
         };
 
-        self.apply_ball_movement_credit(player_id, team_is_team_0, delta, travel_distance);
+        self.apply_ball_movement_credit(
+            frame.frame_number,
+            frame.time,
+            player_id,
+            team_is_team_0,
+            delta,
+            travel_distance,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -553,7 +672,7 @@ impl TouchCalculator {
             vertical_state,
             &touch_state.touch_events,
         );
-        self.credit_ball_movement(ball, possession_state, fifty_fifty_state, live_play);
+        self.credit_ball_movement(frame, ball, possession_state, fifty_fifty_state, live_play);
         self.previous_ball_velocity = ball.velocity();
 
         if let Some(player_id) = touch_state.last_touch_player.as_ref() {

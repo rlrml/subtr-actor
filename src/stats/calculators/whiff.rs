@@ -31,6 +31,8 @@ pub struct WhiffEvent {
     pub kind: WhiffEventKind,
     pub time: f32,
     pub frame: usize,
+    pub resolved_time: f32,
+    pub resolved_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
@@ -331,6 +333,8 @@ impl WhiffCalculator {
             kind,
             time,
             frame: frame_number,
+            resolved_time: frame.time,
+            resolved_frame: frame.frame_number,
             player: candidate.player.clone(),
             is_team_0: candidate.is_team_0,
             closest_approach_distance: candidate.closest_approach_distance,

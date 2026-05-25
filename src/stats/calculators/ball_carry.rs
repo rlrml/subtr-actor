@@ -68,8 +68,10 @@ impl BallCarryStats {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BallCarryEvent {
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub is_team_0: bool,
     pub kind: BallCarryKind,

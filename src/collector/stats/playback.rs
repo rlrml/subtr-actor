@@ -269,7 +269,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ));
         }
         for (index, value) in self
-            .module_array("dodge_reset", "events")
+            .module_array("dodge_reset", "on_ball_events")
             .iter()
             .enumerate()
         {
@@ -414,6 +414,38 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_typed(&self) -> SubtrActorResult<ReplayStatsTimelineEvents> {
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
+            core_player: self.module_player_events(
+                "core",
+                "player_events",
+                parse_core_player_stats_event,
+            )?,
+            core_team: self.module_player_events(
+                "core",
+                "team_events",
+                parse_core_team_stats_event,
+            )?,
+            possession: self.module_player_events(
+                "possession",
+                "events",
+                parse_possession_event,
+            )?,
+            pressure: self.module_player_events("pressure", "events", parse_pressure_event)?,
+            movement: self.module_player_events("movement", "events", parse_movement_event)?,
+            positioning: self.module_player_events(
+                "positioning",
+                "events",
+                parse_positioning_event,
+            )?,
+            rotation_player: self.module_player_events(
+                "rotation",
+                "player_events",
+                parse_rotation_player_event,
+            )?,
+            rotation_team: self.module_player_events(
+                "rotation",
+                "team_events",
+                parse_rotation_team_event,
+            )?,
             mechanics: self.mechanic_events_typed()?,
             goal_context: self.module_player_events(
                 "core",
@@ -437,6 +469,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_wall_aerial_shot_event,
             )?,
             center: self.module_player_events("center", "events", parse_center_event)?,
+            flick: self.module_player_events("flick", "events", parse_flick_event)?,
+            musty_flick: self.module_player_events(
+                "musty_flick",
+                "events",
+                parse_musty_flick_event,
+            )?,
+            dodge_reset: self.module_player_events(
+                "dodge_reset",
+                "events",
+                parse_dodge_reset_event,
+            )?,
             double_tap: self.module_player_events(
                 "double_tap",
                 "events",
@@ -449,6 +492,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_fifty_fifty_event,
             )?,
             pass: self.module_player_events("pass", "events", parse_pass_event)?,
+            ball_carry: self.module_player_events(
+                "ball_carry",
+                "events",
+                parse_ball_carry_event,
+            )?,
             goal_tags: self.goal_tag_events_typed()?,
             rush: self.module_typed_array("rush", "events")?,
             speed_flip: self.module_player_events(
@@ -464,11 +512,29 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             )?,
             wavedash: self.module_player_events("wavedash", "events", parse_wavedash_event)?,
             whiff: self.module_player_events("whiff", "events", parse_whiff_event)?,
+            powerslide: self.module_player_events(
+                "powerslide",
+                "events",
+                parse_powerslide_event,
+            )?,
+            touch: self.module_player_events("touch", "events", parse_touch_stats_event)?,
+            touch_ball_movement: self.module_player_events(
+                "touch",
+                "ball_movement_events",
+                parse_touch_ball_movement_event,
+            )?,
+            touch_last_touch: self.module_player_events(
+                "touch",
+                "last_touch_events",
+                parse_touch_last_touch_event,
+            )?,
             boost_pickups: self.module_player_events(
                 "boost",
                 "events",
                 parse_boost_pickup_comparison_event,
             )?,
+            boost_ledger: Vec::new(),
+            boost_state: Vec::new(),
             bump: self.module_player_events("bump", "events", parse_bump_event)?,
         })
     }
@@ -476,6 +542,38 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_event_sets_value(&self) -> Value {
         let mut events = Map::new();
         events.insert("timeline".to_owned(), Value::Array(self.timeline_events()));
+        events.insert(
+            "core_player".to_owned(),
+            Value::Array(self.module_array("core", "player_events")),
+        );
+        events.insert(
+            "core_team".to_owned(),
+            Value::Array(self.module_array("core", "team_events")),
+        );
+        events.insert(
+            "possession".to_owned(),
+            Value::Array(self.module_array("possession", "events")),
+        );
+        events.insert(
+            "pressure".to_owned(),
+            Value::Array(self.module_array("pressure", "events")),
+        );
+        events.insert(
+            "movement".to_owned(),
+            Value::Array(self.module_array("movement", "events")),
+        );
+        events.insert(
+            "positioning".to_owned(),
+            Value::Array(self.module_array("positioning", "events")),
+        );
+        events.insert(
+            "rotation_player".to_owned(),
+            Value::Array(self.module_array("rotation", "player_events")),
+        );
+        events.insert(
+            "rotation_team".to_owned(),
+            Value::Array(self.module_array("rotation", "team_events")),
+        );
         events.insert("mechanics".to_owned(), Value::Array(Vec::new()));
         events.insert(
             "backboard".to_owned(),
@@ -542,9 +640,23 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("whiff", "events")),
         );
         events.insert(
+            "touch".to_owned(),
+            Value::Array(self.module_array("touch", "events")),
+        );
+        events.insert(
+            "touch_ball_movement".to_owned(),
+            Value::Array(self.module_array("touch", "ball_movement_events")),
+        );
+        events.insert(
+            "touch_last_touch".to_owned(),
+            Value::Array(self.module_array("touch", "last_touch_events")),
+        );
+        events.insert(
             "boost_pickups".to_owned(),
             Value::Array(self.module_array("boost", "events")),
         );
+        events.insert("boost_ledger".to_owned(), Value::Array(Vec::new()));
+        events.insert("boost_state".to_owned(), Value::Array(Vec::new()));
         events.insert(
             "bump".to_owned(),
             Value::Array(self.module_array("bump", "events")),
@@ -2001,6 +2113,218 @@ fn parse_dodge_reset_mechanic_event(
     ))
 }
 
+fn parse_dodge_reset_event(value: &Value) -> SubtrActorResult<DodgeResetEvent> {
+    let object = json_object(value, "dodge reset event")?;
+    Ok(DodgeResetEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        counter_value: json_required_i32(object, "counter_value")?,
+        on_ball: json_required_bool(object, "on_ball")?,
+    })
+}
+
+fn parse_powerslide_event(value: &Value) -> SubtrActorResult<PowerslideEvent> {
+    let object = json_object(value, "powerslide event")?;
+    Ok(PowerslideEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        active: json_required_bool(object, "active")?,
+    })
+}
+
+fn parse_core_player_stats_event(value: &Value) -> SubtrActorResult<CorePlayerStatsEvent> {
+    let object = json_object(value, "core player stats event")?;
+    Ok(CorePlayerStatsEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        stats: decode_core_player_stats_value(json_required_value(object, "stats")?.clone())?,
+    })
+}
+
+fn parse_core_team_stats_event(value: &Value) -> SubtrActorResult<CoreTeamStatsEvent> {
+    let object = json_object(value, "core team stats event")?;
+    Ok(CoreTeamStatsEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        stats: decode_json_value(json_required_value(object, "stats")?.clone())?,
+    })
+}
+
+fn parse_possession_event(value: &Value) -> SubtrActorResult<PossessionEvent> {
+    let object = json_object(value, "possession event")?;
+    Ok(PossessionEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        dt: json_required_f32(object, "dt")?,
+        possession_state: json_required_str(object, "possession_state")?.to_owned(),
+        field_third: match object.get("field_third") {
+            None | Some(Value::Null) => None,
+            Some(_) => Some(json_required_str(object, "field_third")?.to_owned()),
+        },
+    })
+}
+
+fn parse_pressure_event(value: &Value) -> SubtrActorResult<PressureEvent> {
+    let object = json_object(value, "pressure event")?;
+    Ok(PressureEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        dt: json_required_f32(object, "dt")?,
+        field_half: json_required_str(object, "field_half")?.to_owned(),
+    })
+}
+
+fn parse_movement_event(value: &Value) -> SubtrActorResult<MovementEvent> {
+    let object = json_object(value, "movement event")?;
+    Ok(MovementEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        dt: json_required_f32(object, "dt")?,
+        speed: json_required_f32(object, "speed")?,
+        distance: json_required_f32(object, "distance")?,
+        speed_band: json_required_str(object, "speed_band")?.to_owned(),
+        height_band: json_required_str(object, "height_band")?.to_owned(),
+    })
+}
+
+fn parse_positioning_event(value: &Value) -> SubtrActorResult<PositioningEvent> {
+    let object = json_object(value, "positioning event")?;
+    Ok(PositioningEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        active_game_time: json_required_f32(object, "active_game_time")?,
+        tracked_time: json_required_f32(object, "tracked_time")?,
+        sum_distance_to_teammates: json_required_f32(object, "sum_distance_to_teammates")?,
+        sum_distance_to_ball: json_required_f32(object, "sum_distance_to_ball")?,
+        sum_distance_to_ball_has_possession: json_required_f32(
+            object,
+            "sum_distance_to_ball_has_possession",
+        )?,
+        time_has_possession: json_required_f32(object, "time_has_possession")?,
+        sum_distance_to_ball_no_possession: json_required_f32(
+            object,
+            "sum_distance_to_ball_no_possession",
+        )?,
+        time_no_possession: json_required_f32(object, "time_no_possession")?,
+        time_demolished: json_required_f32(object, "time_demolished")?,
+        time_no_teammates: json_required_f32(object, "time_no_teammates")?,
+        time_most_back: json_required_f32(object, "time_most_back")?,
+        time_most_forward: json_required_f32(object, "time_most_forward")?,
+        time_mid_role: json_required_f32(object, "time_mid_role")?,
+        time_other_role: json_required_f32(object, "time_other_role")?,
+        time_defensive_zone: json_required_f32(object, "time_defensive_third")?,
+        time_neutral_zone: json_required_f32(object, "time_neutral_third")?,
+        time_offensive_zone: json_required_f32(object, "time_offensive_third")?,
+        time_defensive_half: json_required_f32(object, "time_defensive_half")?,
+        time_offensive_half: json_required_f32(object, "time_offensive_half")?,
+        time_closest_to_ball: json_required_f32(object, "time_closest_to_ball")?,
+        time_farthest_from_ball: json_required_f32(object, "time_farthest_from_ball")?,
+        time_behind_ball: json_required_f32(object, "time_behind_ball")?,
+        time_level_with_ball: json_required_f32(object, "time_level_with_ball")?,
+        time_in_front_of_ball: json_required_f32(object, "time_in_front_of_ball")?,
+        times_caught_ahead_of_play_on_conceded_goals: json_required_usize(
+            object,
+            "times_caught_ahead_of_play_on_conceded_goals",
+        )? as u32,
+    })
+}
+
+fn parse_rotation_player_event(value: &Value) -> SubtrActorResult<RotationPlayerEvent> {
+    let object = json_object(value, "rotation player event")?;
+    Ok(RotationPlayerEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        active_game_time: json_required_f32(object, "active_game_time")?,
+        tracked_time: json_required_f32(object, "tracked_time")?,
+        time_first_man: json_required_f32(object, "time_first_man")?,
+        time_second_man: json_required_f32(object, "time_second_man")?,
+        time_third_man: json_required_f32(object, "time_third_man")?,
+        time_ambiguous_role: json_required_f32(object, "time_ambiguous_role")?,
+        time_behind_play: json_required_f32(object, "time_behind_play")?,
+        time_level_with_play: json_required_f32(object, "time_level_with_play")?,
+        time_ahead_of_play: json_required_f32(object, "time_ahead_of_play")?,
+        became_first_man_count: json_required_usize(object, "became_first_man_count")? as u32,
+        lost_first_man_count: json_required_usize(object, "lost_first_man_count")? as u32,
+        current_role_state: decode_json_value(
+            json_required_value(object, "current_role_state")?.clone(),
+        )?,
+        current_depth_state: decode_json_value(
+            json_required_value(object, "current_depth_state")?.clone(),
+        )?,
+    })
+}
+
+fn parse_rotation_team_event(value: &Value) -> SubtrActorResult<RotationTeamEvent> {
+    let object = json_object(value, "rotation team event")?;
+    Ok(RotationTeamEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        first_man_changes_for_team: json_required_usize(object, "first_man_changes_for_team")?
+            as u32,
+        rotation_count: json_required_usize(object, "rotation_count")? as u32,
+    })
+}
+
+fn parse_touch_stats_event(value: &Value) -> SubtrActorResult<TouchStatsEvent> {
+    let object = json_object(value, "touch stats event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(TouchStatsEvent {
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        kind: json_required_str(object, "kind")?.to_owned(),
+        height_band: json_required_str(object, "height_band")?.to_owned(),
+        surface: json_required_str(object, "surface")?.to_owned(),
+        dodge_state: json_required_str(object, "dodge_state")?.to_owned(),
+        ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+    })
+}
+
+fn parse_touch_ball_movement_event(value: &Value) -> SubtrActorResult<TouchBallMovementEvent> {
+    let object = json_object(value, "touch ball movement event")?;
+    Ok(TouchBallMovementEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        travel_distance: json_required_f32(object, "travel_distance")?,
+        advance_distance: json_required_f32(object, "advance_distance")?,
+        retreat_distance: json_required_f32(object, "retreat_distance")?,
+    })
+}
+
+fn parse_touch_last_touch_event(value: &Value) -> SubtrActorResult<TouchLastTouchEvent> {
+    let object = json_object(value, "touch last-touch event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(TouchLastTouchEvent {
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        player: json_optional_remote_id(object.get("player"))?,
+    })
+}
+
 fn parse_flick_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
     let object = json_object(value, "flick mechanic event")?;
     Ok(span_mechanic_event(
@@ -2013,6 +2337,30 @@ fn parse_flick_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<M
         json_required_remote_id(object, "player")?,
         json_required_bool(object, "is_team_0")?,
     ))
+}
+
+fn parse_flick_event(value: &Value) -> SubtrActorResult<FlickEvent> {
+    let object = json_object(value, "flick event")?;
+    Ok(FlickEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        dodge_time: json_required_f32(object, "dodge_time")?,
+        dodge_frame: json_required_usize(object, "dodge_frame")?,
+        time_since_dodge: json_required_f32(object, "time_since_dodge")?,
+        setup_start_time: json_required_f32(object, "setup_start_time")?,
+        setup_start_frame: json_required_usize(object, "setup_start_frame")?,
+        setup_duration: json_required_f32(object, "setup_duration")?,
+        setup_touch_count: json_required_usize(object, "setup_touch_count")? as u32,
+        average_horizontal_gap: json_required_f32(object, "average_horizontal_gap")?,
+        average_vertical_gap: json_required_f32(object, "average_vertical_gap")?,
+        ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+        ball_impulse: json_required_vec3(object, "ball_impulse")?,
+        impulse_away_alignment: json_required_f32(object, "impulse_away_alignment")?,
+        vertical_impulse: json_required_f32(object, "vertical_impulse")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
 }
 
 fn parse_musty_flick_mechanic_event(
@@ -2030,6 +2378,27 @@ fn parse_musty_flick_mechanic_event(
         json_required_remote_id(object, "player")?,
         json_required_bool(object, "is_team_0")?,
     ))
+}
+
+fn parse_musty_flick_event(value: &Value) -> SubtrActorResult<MustyFlickEvent> {
+    let object = json_object(value, "musty flick event")?;
+    Ok(MustyFlickEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        aerial: json_required_bool(object, "aerial")?,
+        dodge_time: json_required_f32(object, "dodge_time")?,
+        dodge_frame: json_required_usize(object, "dodge_frame")?,
+        time_since_dodge: json_required_f32(object, "time_since_dodge")?,
+        confidence: json_required_f32(object, "confidence")?,
+        local_ball_position: json_required_vec3(object, "local_ball_position")?,
+        rear_alignment: json_required_f32(object, "rear_alignment")?,
+        top_alignment: json_required_f32(object, "top_alignment")?,
+        forward_approach_speed: json_required_f32(object, "forward_approach_speed")?,
+        pitch_rate: json_required_f32(object, "pitch_rate")?,
+        ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+    })
 }
 
 fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent> {
@@ -2244,6 +2613,63 @@ fn parse_pass_kind(value: Option<&Value>) -> SubtrActorResult<PassKind> {
     }
 }
 
+fn parse_ball_carry_event(value: &Value) -> SubtrActorResult<BallCarryEvent> {
+    let object = json_object(value, "ball carry event")?;
+    Ok(BallCarryEvent {
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        kind: parse_ball_carry_kind(json_required_str(object, "kind")?)?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        end_frame: json_required_usize(object, "end_frame")?,
+        start_time: json_required_f32(object, "start_time")?,
+        end_time: json_required_f32(object, "end_time")?,
+        duration: json_required_f32(object, "duration")?,
+        straight_line_distance: json_required_f32(object, "straight_line_distance")?,
+        path_distance: json_required_f32(object, "path_distance")?,
+        average_horizontal_gap: json_required_f32(object, "average_horizontal_gap")?,
+        average_vertical_gap: json_required_f32(object, "average_vertical_gap")?,
+        average_speed: json_required_f32(object, "average_speed")?,
+        touch_count: json_required_usize(object, "touch_count")? as u32,
+        air_touch_count: json_required_usize(object, "air_touch_count")? as u32,
+        air_dribble_origin: parse_air_dribble_origin(object.get("air_dribble_origin"))?,
+    })
+}
+
+fn parse_ball_carry_kind(kind: &str) -> SubtrActorResult<BallCarryKind> {
+    match kind {
+        "carry" => Ok(BallCarryKind::Carry),
+        "air_dribble" => Ok(BallCarryKind::AirDribble),
+        other => Err(SubtrActorError::new(
+            SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Unknown ball carry kind '{other}'"
+            )),
+        )),
+    }
+}
+
+fn parse_air_dribble_origin(value: Option<&Value>) -> SubtrActorResult<Option<AirDribbleOrigin>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let origin = value.as_str().ok_or_else(|| {
+        SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+            "Expected optional JSON field 'air_dribble_origin' to be a string".to_owned(),
+        ))
+    })?;
+    match origin {
+        "ground_to_air" => Ok(Some(AirDribbleOrigin::GroundToAir)),
+        "wall_to_air" => Ok(Some(AirDribbleOrigin::WallToAir)),
+        other => Err(SubtrActorError::new(
+            SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Unknown air dribble origin '{other}'"
+            )),
+        )),
+    }
+}
+
 fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {
     let object = json_object(value, "one timer event")?;
     Ok(OneTimerEvent {
@@ -2329,9 +2755,13 @@ fn parse_fifty_fifty_event(value: &Value) -> SubtrActorResult<FiftyFiftyEvent> {
 
 fn parse_speed_flip_event(value: &Value) -> SubtrActorResult<SpeedFlipEvent> {
     let object = json_object(value, "speed flip event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(SpeedFlipEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        resolved_time: json_optional_f32(object.get("resolved_time"))?.unwrap_or(time),
+        resolved_frame: json_optional_usize(object.get("resolved_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         time_since_kickoff_start: json_required_f32(object, "time_since_kickoff_start")?,
@@ -2388,6 +2818,8 @@ fn parse_wavedash_event(value: &Value) -> SubtrActorResult<WavedashEvent> {
 
 fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
     let object = json_object(value, "whiff event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(WhiffEvent {
         kind: match object.get("kind").and_then(Value::as_str) {
             None | Some("whiff") => WhiffEventKind::Whiff,
@@ -2400,8 +2832,10 @@ fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
                 );
             }
         },
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        resolved_time: json_optional_f32(object.get("resolved_time"))?.unwrap_or(time),
+        resolved_frame: json_optional_usize(object.get("resolved_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         closest_approach_distance: json_required_f32(object, "closest_approach_distance")?,
@@ -2537,6 +2971,20 @@ fn json_required_usize(
         .ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
                 "Expected JSON field '{field}' to be an unsigned integer"
+            )))
+        })
+}
+
+fn json_required_i32(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<i32> {
+    json_required_value(object, field)?
+        .as_i64()
+        .map(|number| number as i32)
+        .ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}' to be a signed integer"
             )))
         })
 }

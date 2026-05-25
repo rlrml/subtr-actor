@@ -113,6 +113,8 @@ impl StatsTimelineCollector {
             .unwrap_or_default();
         if let Some(boost) = self.graph.state::<BoostCalculator>() {
             events.boost_pickups = boost.pickup_comparison_events().to_vec();
+            events.boost_ledger = boost.ledger_events().to_vec();
+            events.boost_state = boost.state_events().to_vec();
         }
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
