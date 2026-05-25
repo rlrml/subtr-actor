@@ -1,0 +1,15 @@
+[package]
+name = "subtr-actor-bakkesmod"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+description = "C ABI for feeding BakkesMod live Rocket League samples into subtr-actor mechanics detectors"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+boxcars.workspace = true
+subtr-actor = { path = "../..", version = "0.7.13" }

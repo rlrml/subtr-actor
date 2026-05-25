@@ -8,6 +8,10 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    bakkesmod-sdk = {
+      url = "github:bakkesmodorg/BakkesModSDK/479e8f571cf554b25f4eeb64d611dec4133edcaf";
+      flake = false;
+    };
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,6 +35,7 @@
       nixpkgs,
       flake-utils,
       fenix,
+      bakkesmod-sdk,
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
@@ -69,6 +74,7 @@
           pytest = [ ];
           wheel = [ ];
         };
+        mingw = pkgs.pkgsCross.mingwW64;
         shellPackages = [
           pythonEnv
           pkgs.uv
@@ -161,6 +167,33 @@
             unset PYTHONPATH
             export REPO_ROOT=$(git rev-parse --show-toplevel)
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath shellPackages}:${pkgs.stdenv.cc.cc.lib.outPath}/lib:/run/opengl-driver/lib/:''${LD_LIBRARY_PATH:-}"
+          '';
+        };
+        devShells.bakkesmod = pkgs.mkShell {
+          packages = shellPackages ++ [
+            mingw.stdenv.cc
+            pkgs.cmake
+            pkgs.file
+            pkgs.ninja
+            pkgs.python3
+          ];
+
+          env = {
+            UV_PYTHON_DOWNLOADS = "never";
+            MCFGTHREAD_INCLUDE = "${mingw.windows.mcfgthreads.dev}/include";
+            MCFGTHREAD_LIB = "${mingw.windows.mcfgthreads}/lib";
+          };
+
+          shellHook = ''
+            unset PYTHONPATH
+            export REPO_ROOT=$(git rev-parse --show-toplevel)
+            export BAKKESMODSDK_DIR="''${BAKKESMODSDK_DIR:-${bakkesmod-sdk}}"
+            export BAKKESMOD_SDK_DIR="''${BAKKESMOD_SDK_DIR:-$BAKKESMODSDK_DIR}"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath shellPackages}:${pkgs.stdenv.cc.cc.lib.outPath}/lib:/run/opengl-driver/lib/:''${LD_LIBRARY_PATH:-}"
+            echo "subtr-actor BakkesMod shell"
+            echo "  Rust ABI: cargo build -p subtr-actor-bakkesmod --release"
+            echo "  SDK:      $BAKKESMODSDK_DIR"
+            echo "  C++ note: MinGW can smoke-compile headers, but SDK linking generally needs MSVC."
           '';
         };
       }
