@@ -498,6 +498,8 @@ pub enum TimelineEventKind {
 #[ts(export)]
 pub struct TimelineEvent {
     pub time: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame: Option<usize>,
     pub kind: TimelineEventKind,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
@@ -928,6 +930,7 @@ impl MatchStatsCalculator {
     fn emit_timeline_events(
         &mut self,
         time: f32,
+        frame: Option<usize>,
         kind: TimelineEventKind,
         player_id: &PlayerId,
         is_team_0: bool,
@@ -936,6 +939,7 @@ impl MatchStatsCalculator {
         for _ in 0..delta.max(0) {
             self.timeline.push(TimelineEvent {
                 time,
+                frame,
                 kind,
                 player_id: Some(player_id.clone()),
                 is_team_0: Some(is_team_0),
@@ -1516,6 +1520,7 @@ impl MatchStatsCalculator {
             };
             self.timeline.push(TimelineEvent {
                 time: event.time,
+                frame: Some(event.frame),
                 kind,
                 player_id: Some(event.player.clone()),
                 is_team_0: Some(event.is_team_0),
@@ -1570,6 +1575,7 @@ impl MatchStatsCalculator {
             if shot_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Shot,
                     &player.player_id,
                     player.is_team_0,
@@ -1579,6 +1585,7 @@ impl MatchStatsCalculator {
             if save_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Save,
                     &player.player_id,
                     player.is_team_0,
@@ -1588,6 +1595,7 @@ impl MatchStatsCalculator {
             if assist_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Assist,
                     &player.player_id,
                     player.is_team_0,
@@ -1628,6 +1636,10 @@ impl MatchStatsCalculator {
                         .as_ref()
                         .map(|event| event.goal_buildup)
                         .unwrap_or_else(|| self.classify_goal_buildup(goal_time, player.is_team_0));
+                    let goal_frame = pending_goal_event
+                        .as_ref()
+                        .map(|event| event.event.frame)
+                        .unwrap_or(frame.frame_number);
                     let time_after_kickoff = pending_goal_event
                         .and_then(|event| event.time_after_kickoff)
                         .or_else(|| {
@@ -1646,6 +1658,7 @@ impl MatchStatsCalculator {
                         .record(goal_buildup);
                     self.timeline.push(TimelineEvent {
                         time: goal_time,
+                        frame: Some(goal_frame),
                         kind: TimelineEventKind::Goal,
                         player_id: Some(player.player_id.clone()),
                         is_team_0: Some(player.is_team_0),

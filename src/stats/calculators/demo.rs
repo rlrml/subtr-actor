@@ -119,12 +119,14 @@ impl DemoCalculator {
 
         self.timeline.push(TimelineEvent {
             time,
+            frame: Some(frame_number),
             kind: TimelineEventKind::Kill,
             player_id: Some(attacker.clone()),
             is_team_0: self.player_teams.get(attacker).copied(),
         });
         self.timeline.push(TimelineEvent {
             time,
+            frame: Some(frame_number),
             kind: TimelineEventKind::Death,
             player_id: Some(victim.clone()),
             is_team_0: self.player_teams.get(victim).copied(),

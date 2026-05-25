@@ -1000,7 +1000,7 @@ fn push_demo_events_from_timeline(
                 kind: SaMechanicKind::Demo,
                 player_id: player_id.clone(),
                 is_team_0,
-                frame_number: 0,
+                frame_number: event.frame.unwrap_or(0),
                 time: event.time,
                 confidence: 1.0,
             },
@@ -2276,12 +2276,14 @@ mod tests {
             timeline: vec![
                 TimelineEvent {
                     time: 1.35,
+                    frame: Some(13),
                     kind: TimelineEventKind::Kill,
                     player_id: Some(RemoteId::SplitScreen(0)),
                     is_team_0: Some(true),
                 },
                 TimelineEvent {
                     time: 1.35,
+                    frame: Some(13),
                     kind: TimelineEventKind::Death,
                     player_id: Some(RemoteId::SplitScreen(1)),
                     is_team_0: Some(false),
@@ -2322,6 +2324,7 @@ mod tests {
         assert_eq!(pending_events[3].confidence, 0.42);
         assert_eq!(pending_events[4].kind, SaMechanicKind::Demo);
         assert_eq!(pending_events[4].time, 1.35);
+        assert_eq!(pending_events[4].frame_number, 13);
         assert_eq!(pending_events[4].player_index, 0);
         assert_eq!(pending_events[5].kind, SaMechanicKind::SpeedFlip);
 
