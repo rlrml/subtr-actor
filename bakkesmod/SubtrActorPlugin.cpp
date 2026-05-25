@@ -635,7 +635,7 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_verify_graph",
       [this](std::vector<std::string> params) { verifyGraphRuntime(params); },
-      "Calls the live graph outputs and representative analysis nodes, logging byte sizes. "
+      "Calls the live graph outputs and every builtin analysis node, logging byte sizes. "
       "Pass 'finish' to flush delayed graph events first.",
       PERMISSION_ALL);
   hookGameEvents();

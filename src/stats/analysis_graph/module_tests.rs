@@ -177,6 +177,19 @@ fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
             "builtin analysis node should expose non-null JSON: {name}"
         );
     }
+    for alias in builtin_analysis_node_aliases() {
+        let value = builtin_analysis_node_json(alias.alias, &graph).unwrap_or_else(|_| {
+            panic!(
+                "builtin analysis node alias should serialize: {} -> {}",
+                alias.alias, alias.node_name
+            )
+        });
+        assert!(
+            !value.is_null(),
+            "builtin analysis node alias should expose non-null JSON: {}",
+            alias.alias
+        );
+    }
     let all_nodes = builtin_analysis_nodes_json(&graph)
         .expect("all builtin analysis nodes should serialize together");
     let all_nodes = all_nodes
