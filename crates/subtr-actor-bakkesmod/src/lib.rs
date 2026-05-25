@@ -7565,7 +7565,13 @@ mod tests {
         );
         let previous_events = sample_events(1, 0.0);
         let between_sample_events = sample_events(2, 0.5);
-        let current_events = FrameEventsState::default();
+        let current_events = FrameEventsState {
+            active_demos: vec![DemoEventSample {
+                attacker: RemoteId::SplitScreen(0),
+                victim: RemoteId::SplitScreen(1),
+            }],
+            ..FrameEventsState::default()
+        };
         let mut event_history = SaLiveEventHistory::default();
         event_history.append_frame_events(&previous_events);
         event_history.append_frame_events(&between_sample_events);
@@ -7577,6 +7583,7 @@ mod tests {
         assert_eq!(view.dodge_refreshed_events().len(), 2);
         assert_eq!(view.player_stat_events().len(), 2);
         assert_eq!(view.goal_events().len(), 2);
+        assert_eq!(view.current_frame_active_demo_events().len(), 1);
         assert_eq!(view.current_frame_demolish_events().len(), 0);
         assert_eq!(view.current_frame_boost_pad_events().len(), 0);
         assert_eq!(view.current_frame_touch_events().len(), 0);
@@ -7587,6 +7594,11 @@ mod tests {
         let aggregate_input =
             FrameInput::aggregate(&view, 3, frame.time, frame.dt, 1, 1, 1, 1, 1, 1);
         let aggregate_events = aggregate_input.frame_events_state();
+        assert_eq!(aggregate_events.active_demos.len(), 1);
+        assert_eq!(
+            aggregate_events.active_demos[0].attacker,
+            RemoteId::SplitScreen(0)
+        );
         assert_eq!(aggregate_events.demo_events[0].frame, 2);
         assert_eq!(aggregate_events.boost_pad_events[0].frame, 2);
         assert_eq!(aggregate_events.touch_events[0].frame, 2);
