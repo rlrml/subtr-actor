@@ -375,6 +375,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
 
   PriWrapper pri = car.GetPRI();
   if (!pri.IsNull()) {
+    playerIndex = stablePlayerIndexForPri(pri, playerIndex);
+    player.player_index = playerIndex;
     player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
     player.has_match_stats = 1;
     player.match_goals = pri.GetMatchGoals();
@@ -414,10 +416,13 @@ void SubtrActorPlugin::resetLiveState() {
   lastBoostAmounts.clear();
   carPlayerIndices.clear();
   priPlayerIndices.clear();
+  uniqueIdPlayerIndices.clear();
+  stablePriPlayerIndices.clear();
   lastPlayerStats.clear();
   boostPadIds.clear();
   boostPadSequences.clear();
   lastTouch.reset();
+  nextPlayerIndex = 0;
   nextBoostPadId = 1;
   messages.clear();
 }
@@ -635,12 +640,41 @@ std::optional<uint32_t> SubtrActorPlugin::playerIndexForNearestCar(
 
     const float distance = (car.GetLocation() - actorLocation).magnitude();
     if (distance <= bestDistance) {
-      bestDistance = distance;
-      bestIndex = static_cast<uint32_t>(i);
+      if (auto playerIndex = playerIndexForCar(car)) {
+        bestDistance = distance;
+        bestIndex = *playerIndex;
+      }
     }
   }
 
   return bestIndex;
+}
+
+uint32_t SubtrActorPlugin::stablePlayerIndexForPri(PriWrapper pri, uint32_t fallbackIndex) {
+  if (pri.IsNull()) {
+    return fallbackIndex;
+  }
+
+  const std::string uniqueId = pri.GetbBot() != 0 ? "" : pri.GetUniqueIdWrapper().GetIdString();
+  if (!uniqueId.empty()) {
+    const auto existing = uniqueIdPlayerIndices.find(uniqueId);
+    if (existing != uniqueIdPlayerIndices.end()) {
+      return existing->second;
+    }
+
+    const uint32_t playerIndex = nextPlayerIndex++;
+    uniqueIdPlayerIndices[uniqueId] = playerIndex;
+    return playerIndex;
+  }
+
+  const auto existing = stablePriPlayerIndices.find(pri.memory_address);
+  if (existing != stablePriPlayerIndices.end()) {
+    return existing->second;
+  }
+
+  const uint32_t playerIndex = nextPlayerIndex++;
+  stablePriPlayerIndices[pri.memory_address] = playerIndex;
+  return playerIndex;
 }
 
 uint32_t SubtrActorPlugin::boostPadId(uintptr_t pickupAddress) {

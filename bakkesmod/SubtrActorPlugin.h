@@ -76,10 +76,13 @@ private:
   std::unordered_map<uint32_t, float> lastBoostAmounts;
   std::unordered_map<uintptr_t, uint32_t> carPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> priPlayerIndices;
+  std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
+  std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
   std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
   std::optional<TouchAttribution> lastTouch;
+  uint32_t nextPlayerIndex = 0;
   uint32_t nextBoostPadId = 1;
   std::deque<OverlayMessage> messages;
 
@@ -105,6 +108,7 @@ private:
   std::optional<uint32_t> playerIndexForCar(CarWrapper car);
   std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
   std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
+  uint32_t stablePlayerIndexForPri(PriWrapper pri, uint32_t fallbackIndex);
   uint32_t boostPadId(uintptr_t pickupAddress);
   void sampleTeamScores(ServerWrapper server, SaLiveFrame &frame);
   void sampleTeamScores(ServerWrapper server, SaGoalEvent &goal);
