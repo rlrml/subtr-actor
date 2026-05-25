@@ -81,7 +81,10 @@ test("getReplayFetchRequestFromSearch falls back to replay URL parameters", () =
 
   assert.equal(request?.kind, "url");
   assert.equal(request?.url.href, GITHUB_REPLAY_URL);
-  assert.equal(request?.name, "replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
+  assert.equal(
+    request?.name,
+    "replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
+  );
 });
 
 test("getReplayFileNameFromUrl derives a readable name", () => {
