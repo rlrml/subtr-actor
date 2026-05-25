@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <fstream>
 #include <format>
 
 BAKKESMOD_PLUGIN(
@@ -217,6 +218,11 @@ void SubtrActorPlugin::onLoad() {
 
   gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) { render(canvas); });
   gameWrapper->HookEvent(TICK_EVENT, [this](std::string eventName) { tick(eventName); });
+  cvarManager->registerNotifier(
+      "subtr_actor_dump_graph",
+      [this](std::vector<std::string> params) { dumpGraphJson(params); },
+      "Writes the current subtr-actor graph events and frame JSON snapshots",
+      PERMISSION_ALL);
   hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
@@ -914,6 +920,60 @@ void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal)
       goal.has_team_one_score = 1;
     }
   }
+}
+
+std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {
+  if (!engine || !len || !write) {
+    return {};
+  }
+
+  const size_t byteCount = len(engine);
+  if (byteCount == 0) {
+    return {};
+  }
+
+  std::string buffer(byteCount, '\0');
+  const size_t written =
+      write(engine, reinterpret_cast<uint8_t *>(buffer.data()), buffer.size());
+  buffer.resize(written);
+  return buffer;
+}
+
+void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: graph dump requested before engine was loaded");
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(
+        std::format("subtr-actor: failed to create graph dump directory: {}", error.message()));
+    return;
+  }
+
+  const std::string eventsJson = readJsonBuffer(eventsJsonLen, writeEventsJson);
+  const std::string frameJson = readJsonBuffer(frameJsonLen, writeFrameJson);
+  const std::filesystem::path eventsPath = outputDirectory / "graph-events.json";
+  const std::filesystem::path framePath = outputDirectory / "graph-frame.json";
+
+  std::ofstream eventsFile(eventsPath, std::ios::binary);
+  eventsFile.write(eventsJson.data(), static_cast<std::streamsize>(eventsJson.size()));
+  std::ofstream frameFile(framePath, std::ios::binary);
+  frameFile.write(frameJson.data(), static_cast<std::streamsize>(frameJson.size()));
+
+  if (!eventsFile || !frameFile) {
+    cvarManager->log("subtr-actor: failed to write graph JSON snapshots");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote graph JSON snapshots to {} and {}",
+      eventsPath.string(),
+      framePath.string()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

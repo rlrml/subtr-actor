@@ -31,15 +31,17 @@ public:
   void onUnload() override;
 
 private:
+  using JsonLen = size_t (*)(const SaEngine *);
+  using WriteJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
   using EngineCreate = SaEngine *(*)();
   using EngineDestroy = void (*)(SaEngine *);
   using EngineReset = void (*)(SaEngine *);
   using EngineFinish = int32_t (*)(SaEngine *);
   using ProcessFrame = int32_t (*)(SaEngine *, const SaLiveFrame *);
-  using EventsJsonLen = size_t (*)(const SaEngine *);
-  using WriteEventsJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
-  using FrameJsonLen = size_t (*)(const SaEngine *);
-  using WriteFrameJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
+  using EventsJsonLen = JsonLen;
+  using WriteEventsJson = WriteJson;
+  using FrameJsonLen = JsonLen;
+  using WriteFrameJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
 
   struct OverlayMessage {
@@ -105,6 +107,8 @@ private:
   void unloadRustLibrary();
   void tick(std::string eventName);
   void render(CanvasWrapper canvas);
+  std::string readJsonBuffer(JsonLen len, WriteJson write);
+  void dumpGraphJson(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
   void drainPendingEvents();
   SaLiveFrame sampleFrame();

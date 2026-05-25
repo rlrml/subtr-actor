@@ -8,6 +8,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   stats snapshot as JSON.
 - `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
+  The `subtr_actor_dump_graph` console command writes the current full timeline
+  event bundle and current frame stats snapshot to BakkesMod's `data/subtr-actor`
+  directory as JSON.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
