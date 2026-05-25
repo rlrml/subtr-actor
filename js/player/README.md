@@ -30,8 +30,8 @@ Transient replay semantics are exposed the same way. `ReplayPlayerState` and
 for semantic kickoff countdown data (`{ kind: "kickoff-countdown", ... }`)
 without imposing any built-in overlay or styling.
 
-The package does not assume any specific UI. The demo app under `js/example/`
-is the reference consumer in this repository.
+The package does not assume any specific UI. The stats player under
+`js/stat-evaluation-player/` is the primary in-repository consumer.
 
 Replay loading follows the same model. The library exposes:
 
