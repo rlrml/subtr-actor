@@ -174,8 +174,8 @@ const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
     id: "core",
     label: "Shots, saves, assists",
     buildEvents(ctx) {
-      return ctx.replay.timelineEvents.filter((event) =>
-        event.kind === "shot" || event.kind === "save" || event.kind === "assist",
+      return ctx.replay.timelineEvents.filter(
+        (event) => event.kind === "shot" || event.kind === "save" || event.kind === "assist",
       );
     },
   },
@@ -1181,11 +1181,7 @@ function renderEventTimelineControls(): void {
     label: source.label,
     count: ctx ? source.buildEvents(ctx).length : 0,
   }));
-  const eventSourceIds = [
-    ...replayEventSources,
-    ...moduleEventSources,
-    ...extraEventSources,
-  ]
+  const eventSourceIds = [...replayEventSources, ...moduleEventSources, ...extraEventSources]
     .filter((source) => source.count > 0)
     .map((source) => source.id);
 
