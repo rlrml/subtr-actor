@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
+use clap::Parser;
 use serde::Serialize;
 use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay, BoostCalculator,
@@ -52,6 +53,18 @@ struct PickupRecord<'a> {
     inferred_time: Option<f32>,
     boost_before: Option<f32>,
     boost_after: Option<f32>,
+}
+
+#[derive(Debug, Parser)]
+#[command(about = "Print boost-pickup discrepancy events as JSONL.")]
+struct Args {
+    /// Include all pickup comparison events, not just discrepancies.
+    #[arg(long = "all")]
+    include_all: bool,
+
+    /// Replay path or fixture name to inspect.
+    #[arg(value_name = "replay-path-or-fixture-name", num_args = 1..)]
+    replay_args: Vec<String>,
 }
 
 fn parse_replay(path: &Path) -> anyhow::Result<boxcars::Replay> {
@@ -192,20 +205,10 @@ fn print_pickups_jsonl(
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut include_all = false;
-    let mut replay_args = Vec::new();
-    for arg in std::env::args().skip(1) {
-        match arg.as_str() {
-            "--all" => include_all = true,
-            _ => replay_args.push(arg),
-        }
-    }
-    if replay_args.is_empty() {
-        bail!(
-            "Usage: boost_pickup_discrepancies [--all] <replay-path-or-fixture-name> \
-             [<replay-path-or-fixture-name> ...]"
-        );
-    }
+    let Args {
+        include_all,
+        replay_args,
+    } = Args::parse();
 
     for arg in replay_args {
         let replay_path = resolve_replay_path(&arg);

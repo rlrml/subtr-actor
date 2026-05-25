@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use clap::{Parser, ValueEnum};
 use subtr_actor::{evaluate_replay_plausibility, Collector, PlayerFrame, ReplayDataCollector};
 use subtr_actor::{ReplayProcessor, TimeAdvance};
 
@@ -541,7 +542,8 @@ impl Collector for LegacyRotationProbe {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[value(rename_all = "kebab-case")]
 enum ProbeCommand {
     Metadata,
     Plausibility,
@@ -551,17 +553,6 @@ enum ProbeCommand {
 }
 
 impl ProbeCommand {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "metadata" => Some(Self::Metadata),
-            "plausibility" => Some(Self::Plausibility),
-            "legacy-rotation" => Some(Self::LegacyRotation),
-            "demolition" => Some(Self::Demolition),
-            "vector-ranges" => Some(Self::VectorRanges),
-            _ => None,
-        }
-    }
-
     fn default_path(self) -> &'static str {
         match self {
             Self::Demolition => DEFAULT_DEMOLITION_REPLAY_PATH,
@@ -572,18 +563,22 @@ impl ProbeCommand {
     }
 }
 
+#[derive(Debug, Parser)]
+#[command(about = "Probe replay metadata, plausibility, rotation, demolition, and vector ranges.")]
+struct Args {
+    /// Probe to run.
+    command: ProbeCommand,
+
+    /// Replay path. Defaults to a built-in fixture for the selected probe.
+    replay_path: Option<String>,
+}
+
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let Some(command_text) = args.next() else {
-        print_usage_and_exit();
-    };
-    let Some(command) = ProbeCommand::parse(&command_text) else {
-        eprintln!("unknown subcommand: {command_text}");
-        print_usage_and_exit();
-    };
-    let path = args
-        .next()
-        .unwrap_or_else(|| command.default_path().to_string());
+    let Args {
+        command,
+        replay_path,
+    } = Args::parse();
+    let path = replay_path.unwrap_or_else(|| command.default_path().to_string());
 
     match command {
         ProbeCommand::Metadata => print_metadata(&path),
@@ -592,13 +587,6 @@ fn main() {
         ProbeCommand::Demolition => print_demolition(&path),
         ProbeCommand::VectorRanges => print_vector_ranges(&path),
     }
-}
-
-fn print_usage_and_exit() -> ! {
-    eprintln!(
-        "usage: replay_probe <metadata|plausibility|legacy-rotation|demolition|vector-ranges> [replay_path]"
-    );
-    std::process::exit(2);
 }
 
 fn parse_replay(path: &str) -> boxcars::Replay {

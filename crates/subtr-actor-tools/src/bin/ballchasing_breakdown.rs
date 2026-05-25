@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use clap::Parser;
 use serde::Serialize;
 use serde_json::Value;
 use subtr_actor_tools::ballchasing::{
@@ -22,6 +23,19 @@ struct OutputReport {
     mismatch_count: usize,
     mismatches: Vec<String>,
     deltas: Vec<NumericDelta>,
+}
+
+#[derive(Debug, Parser)]
+#[command(about = "Compare a replay against exported Ballchasing JSON with numeric deltas.")]
+struct Args {
+    /// Replay file to compare.
+    replay_path: PathBuf,
+
+    /// Ballchasing JSON path to compare against.
+    ballchasing_json_path: PathBuf,
+
+    /// Optional output directory for comparison artifacts.
+    output_dir: Option<PathBuf>,
 }
 
 fn collect_numeric_deltas(
@@ -69,14 +83,11 @@ fn collect_numeric_deltas(
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut args = std::env::args_os().skip(1);
-    let replay_path = args.next().map(PathBuf::from).context(
-        "Usage: ballchasing_breakdown <replay-path> <ballchasing-json-path> [output-dir]",
-    )?;
-    let json_path = args.next().map(PathBuf::from).context(
-        "Usage: ballchasing_breakdown <replay-path> <ballchasing-json-path> [output-dir]",
-    )?;
-    let output_dir = args.next().map(PathBuf::from);
+    let Args {
+        replay_path,
+        ballchasing_json_path: json_path,
+        output_dir,
+    } = Args::parse();
 
     let breakdown = compare_replay_against_ballchasing_json_with_breakdown(
         &replay_path,

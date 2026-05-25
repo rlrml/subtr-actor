@@ -11,6 +11,7 @@ description = "Ad-hoc diagnostics and Ballchasing comparison tooling for subtr-a
 [dependencies]
 anyhow = "1.0.98"
 boxcars.workspace = true
+clap = { version = "4.5.53", features = ["derive"] }
 float-ord = ">=0.3.2, <1.0.0"
 glam = ">=0.31.0, <1.0.0"
 ndarray = ">=0.17.2, <1.0.0"

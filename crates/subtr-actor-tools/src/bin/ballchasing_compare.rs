@@ -1,4 +1,5 @@
 use anyhow::{bail, Context};
+use clap::Parser;
 use reqwest::blocking::Client;
 use serde_json::Value;
 use subtr_actor_tools::ballchasing::{
@@ -16,12 +17,15 @@ fn normalize_replay_id(input: &str) -> &str {
         .unwrap_or(input)
 }
 
+#[derive(Debug, Parser)]
+#[command(about = "Compare subtr-actor replay stats against Ballchasing stats.")]
+struct Args {
+    /// Ballchasing replay id or URL to compare.
+    replay_id: String,
+}
+
 fn main() -> anyhow::Result<()> {
-    let replay_id = std::env::args()
-        .nth(1)
-        .context(
-            "Usage: cargo run -p subtr-actor-tools --bin ballchasing_compare -- <ballchasing-replay-id-or-url>",
-        )?;
+    let Args { replay_id } = Args::parse();
     let api_key = std::env::var("BALLCHASING_API_KEY")
         .context("BALLCHASING_API_KEY must be set to fetch Ballchasing replay data")?;
     let replay_id = normalize_replay_id(&replay_id);

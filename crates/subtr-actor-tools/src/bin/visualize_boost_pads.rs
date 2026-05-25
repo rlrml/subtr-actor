@@ -1,7 +1,7 @@
-use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+use clap::Parser;
 use subtr_actor::{standard_soccar_boost_pad_layout, BoostPadSize};
 
 const FIELD_HALF_WIDTH: f32 = 4096.0;
@@ -31,8 +31,12 @@ fn svg_fill(size: BoostPadSize) -> &'static str {
     }
 }
 
-fn default_output_path() -> PathBuf {
-    PathBuf::from("target/boost_pad_layout.svg")
+#[derive(Debug, Parser)]
+#[command(about = "Render the standard Soccar boost pad layout as SVG.")]
+struct Args {
+    /// Output SVG path.
+    #[arg(default_value = "target/boost_pad_layout.svg")]
+    output_path: PathBuf,
 }
 
 fn render_svg() -> String {
@@ -83,10 +87,7 @@ fn render_svg() -> String {
 }
 
 fn main() {
-    let output_path = env::args_os()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(default_output_path);
+    let Args { output_path } = Args::parse();
 
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).expect("failed to create output directory");

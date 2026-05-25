@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::{bail, Context};
+use anyhow::Context;
+use clap::Parser;
 use serde::Serialize;
 use subtr_actor::{GameplayPhase, PlayerId, ReplayMeta, ReplayStatsFrame, StatsTimelineCollector};
 
@@ -45,11 +46,16 @@ struct DetectedSpeedFlip {
     max_speed: f32,
 }
 
+#[derive(Debug, Parser)]
+#[command(about = "Audit speed-flip detections during replay kickoffs.")]
+struct Args {
+    /// Replay paths to audit.
+    #[arg(value_name = "replay", num_args = 1..)]
+    paths: Vec<String>,
+}
+
 fn main() -> anyhow::Result<()> {
-    let paths: Vec<String> = std::env::args().skip(1).collect();
-    if paths.is_empty() {
-        bail!("usage: speed_flip_kickoff_audit <replay> [<replay> ...]");
-    }
+    let Args { paths } = Args::parse();
 
     let mut replays = Vec::new();
     for path in paths {

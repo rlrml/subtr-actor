@@ -1,10 +1,19 @@
 use subtr_actor::*;
 
-use std::env;
+use std::path::PathBuf;
+
+use clap::Parser;
+
+#[derive(Debug, Parser)]
+#[command(about = "Print feature min/max summaries for a replay-derived ndarray.")]
+struct Args {
+    /// Replay path to summarize.
+    replay_path: PathBuf,
+}
 
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    let data = std::fs::read(&args[1]).unwrap();
+    let Args { replay_path } = Args::parse();
+    let data = std::fs::read(&replay_path).unwrap();
     let parsing = boxcars::ParserBuilder::new(&data[..])
         .always_check_crc()
         .must_parse_network_data()
