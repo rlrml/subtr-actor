@@ -118,14 +118,8 @@ clippy:
 # Version bump (requires version as argument)
 # Updates workspace version and subtr-actor dependency in bindings, tags and pushes
 bump version:
-    sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' Cargo.toml
-    sed -i 's/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/' python/pyproject.toml
-    sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/package.json
-    sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/player/package.json
-    sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "{{version}}"/' js/stat-evaluation-player/package.json
-    sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' js/Cargo.toml
-    sed -i '/\[dependencies\.subtr-actor\]/,/^\[/{s/version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "{{version}}"/}' python/Cargo.toml
-    {{nix_develop}} cargo metadata --format-version 1 > /dev/null
+    python3 scripts/sync_release_versions.py "{{version}}"
+    python3 scripts/check_release_versions.py
     git add -A
     git commit -m "Bump version to {{version}}"
     git tag -a "v{{version}}" -m "Release v{{version}}"

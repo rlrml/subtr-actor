@@ -69,6 +69,7 @@
           pytest = [ ];
           wheel = [ ];
         };
+        projectVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
         shellPackages = [
           pythonEnv
           pkgs.uv
@@ -84,7 +85,7 @@
         packages.python-env = pythonEnv;
         packages.js-web-wasm = rustPlatform.buildRustPackage {
           pname = "subtr-actor-js-web-wasm";
-          version = "0.8.6";
+          version = projectVersion;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = [
@@ -109,14 +110,11 @@
         };
         packages.js-stats-player-pages = pkgs.buildNpmPackage rec {
           pname = "subtr-actor-js-pages";
-          version = "0.8.6";
+          version = projectVersion;
           src = ./.;
           npmRoot = "js/stat-evaluation-player";
-          npmDeps = pkgs.fetchNpmDeps {
-            inherit pname version;
-            src = ./js/stat-evaluation-player;
-            hash = "sha256-T3Dt7nkyEVgg0gApGocV8FNBD+gmZDapGTVI+q2/2PY=";
-          };
+          npmDeps = pkgs.importNpmLock { npmRoot = ./js/stat-evaluation-player; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
           preBuild = ''
             rm -rf js/pkg
             mkdir -p js/pkg

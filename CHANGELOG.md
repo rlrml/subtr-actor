@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.9 - 2026-05-25
+
+- Remove the manually refreshed GitHub Pages npm dependency hash by deriving
+  Pages build dependencies from the stats-player `package-lock.json`.
+- Read the Nix JavaScript package versions from the Cargo workspace version so
+  release bumps do not leave Pages package metadata stale.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.9`.
+
 ## v0.8.8 - 2026-05-25
 
 - Move the compact stats evaluation scoreboard into the same top HUD row as the
