@@ -3443,6 +3443,54 @@ mod tests {
         }
     }
 
+    fn live_events_json_value(engine: *const SaEngine) -> serde_json::Value {
+        let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_events_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("events json should be valid")
+    }
+
+    fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
+        let mut engine = SaEngine::default();
+        let players = unsafe {
+            if frame.player_count == 0 {
+                &[]
+            } else {
+                slice::from_raw_parts(frame.players, frame.player_count)
+            }
+        };
+        let explicit_events = unsafe { frame_event_slices(frame) }
+            .expect("test frame explicit event pointers should be valid");
+        sync_live_replay_meta(&mut engine, players)
+            .expect("test frame replay metadata should initialize");
+
+        let mut graph = graph_with_all_analysis_nodes();
+        graph
+            .on_replay_meta(
+                engine
+                    .live_replay_meta
+                    .as_ref()
+                    .expect("direct graph replay meta should exist"),
+            )
+            .expect("direct graph should accept replay metadata");
+        let frame_input = frame_input(&mut engine, frame, players, &explicit_events);
+        graph
+            .evaluate_with_state(&frame_input)
+            .expect("direct graph should evaluate live frame input");
+        graph.finish().expect("direct graph should finish");
+        let events = graph
+            .state::<StatsTimelineEventsState>()
+            .expect("direct graph should expose timeline events")
+            .events
+            .clone();
+        let bytes = serde_json::to_vec(&events).expect("direct graph events should serialize");
+        serde_json::from_slice(&bytes).expect("direct graph events json should be valid")
+    }
+
     #[test]
     fn accepts_null_players_when_count_is_zero() {
         let engine = subtr_actor_bakkesmod_engine_create();
@@ -4888,6 +4936,127 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 12.0,
+            has_closest_approach_distance: 1,
+        }];
+        let goals = [SaGoalEvent {
+            scoring_team_is_team_0: 1,
+            player_index: 0,
+            has_player: 1,
+            team_zero_score: 1,
+            has_team_zero_score: 1,
+            team_one_score: 0,
+            has_team_one_score: 1,
+        }];
+        let player_stat_events = [SaPlayerStatEvent {
+            player_index: 0,
+            is_team_0: 1,
+            kind: SaPlayerStatEventKind::Shot,
+            has_shot_ball: 1,
+            shot_ball: rigid_body(
+                SaVec3 {
+                    x: 300.0,
+                    y: 100.0,
+                    z: 120.0,
+                },
+                SaVec3 {
+                    x: 1000.0,
+                    y: 500.0,
+                    z: 100.0,
+                },
+            ),
+            has_shot_player: 1,
+            shot_player: rigid_body(
+                SaVec3 {
+                    x: 240.0,
+                    y: 90.0,
+                    z: 92.75,
+                },
+                SaVec3 {
+                    x: 800.0,
+                    y: 300.0,
+                    z: 0.0,
+                },
+            ),
+        }];
+        let demolishes = [SaDemolishEvent {
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+            active_duration_seconds: 0.25,
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+        frame.goals = goals.as_ptr();
+        frame.goal_count = goals.len();
+        frame.player_stat_events = player_stat_events.as_ptr();
+        frame.player_stat_event_count = player_stat_events.len();
+        frame.demolishes = demolishes.as_ptr();
+        frame.demolish_count = demolishes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        assert_eq!(
+            live_events_json_value(engine),
+            direct_full_graph_events_json_value(&frame),
+            "BakkesMod ABI exported events should match the shared full analysis graph for the same live frame input"
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
