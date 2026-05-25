@@ -115,6 +115,39 @@ test("renderTouchStats aggregates labeled rows by the selected class", () => {
   assert.match(html, /High air<\/span><span class="value">3/);
 });
 
+test("renderTouchStats can break touches down by dodge state", () => {
+  const html = renderTouchStats(
+    createTouchStats({
+      touch_count: 5,
+      is_last_touch: false,
+      labeled_touch_counts: {
+        entries: [
+          {
+            labels: [
+              { key: "kind", value: "medium_hit" },
+              { key: "dodge_state", value: "dodge" },
+            ],
+            count: 2,
+          },
+          {
+            labels: [
+              { key: "kind", value: "hard_hit" },
+              { key: "dodge_state", value: "no_dodge" },
+            ],
+            count: 3,
+          },
+        ],
+      },
+    }),
+    {
+      breakdownClasses: ["dodge_state"],
+    },
+  );
+
+  assert.match(html, /No dodge<\/span><span class="value">3/);
+  assert.match(html, /Dodge<\/span><span class="value">2/);
+});
+
 test("renderTouchStats falls back to typed labeled counts for combined breakdowns", () => {
   const html = renderTouchStats(
     createTouchStats({

@@ -1,6 +1,6 @@
 import type { PlayerStatsSnapshot, StatLabel } from "./statsTimeline.ts";
 
-export type TouchBreakdownClass = "kind" | "height_band";
+export type TouchBreakdownClass = "kind" | "height_band" | "dodge_state";
 
 interface TouchRenderOptions {
   breakdownClasses?: TouchBreakdownClass[];
@@ -39,6 +39,15 @@ const BREAKDOWN_CLASS_METADATA: Record<
         ground: "Ground",
         low_air: "Low air",
         high_air: "High air",
+      })[value] ?? value,
+  },
+  dodge_state: {
+    label: "Dodge",
+    valueOrder: ["no_dodge", "dodge"],
+    formatValue: (value) =>
+      ({
+        no_dodge: "No dodge",
+        dodge: "Dodge",
       })[value] ?? value,
   },
 };

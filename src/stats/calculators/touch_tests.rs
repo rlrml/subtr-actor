@@ -72,6 +72,14 @@ fn vertical_state(player_id: &PlayerId, height: f32) -> PlayerVerticalState {
 }
 
 fn player_frame_state(player_id: &PlayerId, position: glam::Vec3) -> PlayerFrameState {
+    player_frame_state_with_dodge_active(player_id, position, false)
+}
+
+fn player_frame_state_with_dodge_active(
+    player_id: &PlayerId,
+    position: glam::Vec3,
+    dodge_active: bool,
+) -> PlayerFrameState {
     PlayerFrameState {
         players: vec![PlayerSample {
             player_id: player_id.clone(),
@@ -80,7 +88,7 @@ fn player_frame_state(player_id: &PlayerId, position: glam::Vec3) -> PlayerFrame
             boost_amount: None,
             last_boost_amount: None,
             boost_active: false,
-            dodge_active: false,
+            dodge_active,
             powerslide_active: false,
             match_goals: None,
             match_assists: None,
@@ -171,6 +179,55 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
     assert_eq!(stats.touch_count, 1);
     assert_eq!(stats.control_touch_count, 0);
     assert_eq!(stats.medium_hit_count, 1);
+    assert_eq!(stats.dodge_hit_count(), 0);
+}
+
+#[test]
+fn dodge_active_hit_counts_as_dodge_hit() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(0),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &TouchState::default(),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            true,
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 500.0, 0.0)),
+            &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, true),
+            &vertical_state(&player_id, 0.0),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            true,
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.touch_count, 1);
+    assert_eq!(stats.medium_hit_count, 1);
+    assert_eq!(stats.dodge_touch_count(), 1);
+    assert_eq!(stats.dodge_hit_count(), 1);
+    assert_eq!(
+        stats.touch_count_with_labels(&[StatLabel::new("dodge_state", "dodge")]),
+        1
+    );
+    assert_eq!(
+        stats.touch_count_with_labels(&[
+            StatLabel::new("kind", "medium_hit"),
+            StatLabel::new("dodge_state", "dodge"),
+        ]),
+        1
+    );
 }
 
 #[test]
