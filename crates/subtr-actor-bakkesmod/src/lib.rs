@@ -4685,6 +4685,50 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
+        let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
+        assert!(json_len > 0);
+        let mut event_json_bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_events_json(
+                engine,
+                event_json_bytes.as_mut_ptr(),
+                event_json_bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        let event_json: serde_json::Value =
+            serde_json::from_slice(&event_json_bytes).expect("events json should be valid");
+        let timeline = event_json["timeline"]
+            .as_array()
+            .expect("events json timeline should be an array");
+        assert!(
+            timeline
+                .iter()
+                .any(|event| event["kind"] == serde_json::json!("Shot")
+                    && event["frame"] == serde_json::json!(1)),
+            "explicit live shot events should be serialized through the full graph"
+        );
+        assert!(
+            timeline
+                .iter()
+                .any(|event| event["kind"] == serde_json::json!("Kill")
+                    && event["frame"] == serde_json::json!(1)),
+            "explicit live demolish events should serialize attacker kill timeline events"
+        );
+        assert!(
+            timeline
+                .iter()
+                .any(|event| event["kind"] == serde_json::json!("Death")
+                    && event["frame"] == serde_json::json!(1)),
+            "explicit live demolish events should serialize victim death timeline events"
+        );
+        let goal_context = event_json["goal_context"]
+            .as_array()
+            .expect("events json goal_context should be an array");
+        assert_eq!(goal_context.len(), 1);
+        assert_eq!(goal_context[0]["frame"], serde_json::json!(1));
+        assert_eq!(goal_context[0]["scoring_team_is_team_0"], true);
+
         let mut drained_event_buffer = [SaMechanicEvent {
             kind: SaMechanicKind::Shot,
             player_index: 0,
@@ -4754,6 +4798,28 @@ mod tests {
         assert_eq!(goal_context_events[0].has_scorer, 1);
         assert_eq!(goal_context_events[0].scorer_index, 0);
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
+        let mut event_json_bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_events_json(
+                engine,
+                event_json_bytes.as_mut_ptr(),
+                event_json_bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        let finalized_event_json: serde_json::Value = serde_json::from_slice(&event_json_bytes)
+            .expect("finalized events json should be valid");
+        let finalized_timeline = finalized_event_json["timeline"]
+            .as_array()
+            .expect("finalized events json timeline should be an array");
+        assert!(
+            finalized_timeline
+                .iter()
+                .any(|event| event["kind"] == serde_json::json!("Goal")
+                    && event["frame"] == serde_json::json!(1)),
+            "explicit live goal events should serialize finalized goal timeline events"
+        );
         let finalized_count = unsafe {
             subtr_actor_bakkesmod_drain_events(
                 engine,
