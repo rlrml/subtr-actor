@@ -12,11 +12,11 @@ use subtr_actor::{
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
-    FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalEvent,
-    LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo, PlayerSample,
-    PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsTimelineEvents, ShotEventMetadata,
-    TimelineEvent, TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent,
-    WhiffEventKind,
+    FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
+    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsTimelineEvents,
+    ShotEventMetadata, TimelineEvent, TimelineEventKind, TouchEvent, TouchState,
+    TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -223,6 +223,7 @@ pub enum SaMechanicKind {
     Backboard = 19,
     BoostPickup = 20,
     Demo = 21,
+    FiftyFifty = 22,
 }
 
 #[repr(C)]
@@ -1008,6 +1009,44 @@ fn push_demo_events_from_timeline(
     }
 }
 
+fn push_fifty_fifty_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    fifty_fifty: &[FiftyFiftyEvent],
+) {
+    for (index, event) in fifty_fifty.iter().enumerate() {
+        let Some(winning_team_is_team_0) = event.winning_team_is_team_0 else {
+            continue;
+        };
+        let Some(player_id) = (if winning_team_is_team_0 {
+            event.team_zero_player.as_ref()
+        } else {
+            event.team_one_player.as_ref()
+        }) else {
+            continue;
+        };
+
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "fifty_fifty:{}:{}:{}:{index}",
+                    event.start_frame,
+                    event.resolve_frame,
+                    player_index(player_id)
+                ),
+                kind: SaMechanicKind::FiftyFifty,
+                player_id: player_id.clone(),
+                is_team_0: winning_team_is_team_0,
+                frame_number: event.resolve_frame,
+                time: event.resolve_time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -1023,6 +1062,11 @@ fn push_drainable_events_from_timeline(
     );
     push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
     push_demo_events_from_timeline(pending_events, emitted_mechanic_ids, &events.timeline);
+    push_fifty_fifty_events_from_timeline(
+        pending_events,
+        emitted_mechanic_ids,
+        &events.fifty_fifty,
+    );
     pending_events.sort_by(|left, right| {
         left.time
             .total_cmp(&right.time)
@@ -1427,6 +1471,28 @@ mod tests {
             inferred_time: None,
             boost_before: Some(20.0),
             boost_after: Some(100.0),
+        }
+    }
+
+    fn fifty_fifty_event(
+        start_frame: usize,
+        resolve_frame: usize,
+        resolve_time: f32,
+    ) -> FiftyFiftyEvent {
+        FiftyFiftyEvent {
+            start_time: 1.0,
+            start_frame,
+            resolve_time,
+            resolve_frame,
+            is_kickoff: false,
+            team_zero_player: Some(RemoteId::SplitScreen(0)),
+            team_one_player: Some(RemoteId::SplitScreen(1)),
+            team_zero_position: [0.0, 0.0, 0.0],
+            team_one_position: [100.0, 0.0, 0.0],
+            midpoint: [50.0, 0.0, 0.0],
+            plane_normal: [1.0, 0.0, 0.0],
+            winning_team_is_team_0: Some(false),
+            possession_team_is_team_0: Some(false),
         }
     }
 
@@ -2299,6 +2365,7 @@ mod tests {
             whiff: vec![whiff_event(12, 1.2, 0)],
             boost_pickups: vec![boost_pickup_event(125, 1.25)],
             bump: vec![bump_event(13, 1.3, 0.42)],
+            fifty_fifty: vec![fifty_fifty_event(9, 14, 1.4)],
             ..ReplayStatsTimelineEvents::default()
         };
 
@@ -2308,7 +2375,7 @@ mod tests {
             &timeline_events,
         );
 
-        assert_eq!(pending_events.len(), 6);
+        assert_eq!(pending_events.len(), 7);
         assert_eq!(pending_events[0].kind, SaMechanicKind::Backboard);
         assert_eq!(pending_events[0].frame_number, 11);
         assert_eq!(pending_events[0].player_index, 0);
@@ -2326,7 +2393,11 @@ mod tests {
         assert_eq!(pending_events[4].time, 1.35);
         assert_eq!(pending_events[4].frame_number, 13);
         assert_eq!(pending_events[4].player_index, 0);
-        assert_eq!(pending_events[5].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_events[5].kind, SaMechanicKind::FiftyFifty);
+        assert_eq!(pending_events[5].frame_number, 14);
+        assert_eq!(pending_events[5].player_index, 1);
+        assert_eq!(pending_events[5].is_team_0, 0);
+        assert_eq!(pending_events[6].kind, SaMechanicKind::SpeedFlip);
 
         pending_events.clear();
         push_drainable_events_from_timeline(
