@@ -23,6 +23,8 @@ constexpr char BOOST_SPAWNED_EVENT[] = "Function TAGame.VehiclePickup_TA.EventSp
 constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventGoalScored";
 constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
+constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
+constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
 
 int moduleAnchor = 0;
 
@@ -42,6 +44,61 @@ struct GoalScoredParams {
 struct CarDemolishedParams {
   uintptr_t demolisher;
 };
+
+struct StandardBoostPad {
+  uint32_t id;
+  Vector location;
+};
+
+const std::array<StandardBoostPad, 34> STANDARD_BOOST_PADS{{
+    {1, {0.0f, -4240.0f, 70.0f}},
+    {2, {0.0f, 4240.0f, 70.0f}},
+    {3, {-1792.0f, -4184.0f, 70.0f}},
+    {4, {1792.0f, -4184.0f, 70.0f}},
+    {5, {-1792.0f, 4184.0f, 70.0f}},
+    {6, {1792.0f, 4184.0f, 70.0f}},
+    {7, {-3072.0f, -4096.0f, 73.0f}},
+    {8, {3072.0f, -4096.0f, 73.0f}},
+    {9, {-3072.0f, 4096.0f, 73.0f}},
+    {10, {3072.0f, 4096.0f, 73.0f}},
+    {11, {-940.0f, -3308.0f, 70.0f}},
+    {12, {940.0f, -3308.0f, 70.0f}},
+    {13, {-940.0f, 3308.0f, 70.0f}},
+    {14, {940.0f, 3308.0f, 70.0f}},
+    {15, {0.0f, -2816.0f, 70.0f}},
+    {16, {0.0f, 2816.0f, 70.0f}},
+    {17, {-3584.0f, -2484.0f, 70.0f}},
+    {18, {3584.0f, -2484.0f, 70.0f}},
+    {19, {-3584.0f, 2484.0f, 70.0f}},
+    {20, {3584.0f, 2484.0f, 70.0f}},
+    {21, {-1788.0f, -2300.0f, 70.0f}},
+    {22, {1788.0f, -2300.0f, 70.0f}},
+    {23, {-1788.0f, 2300.0f, 70.0f}},
+    {24, {1788.0f, 2300.0f, 70.0f}},
+    {25, {-2048.0f, -1036.0f, 70.0f}},
+    {26, {2048.0f, -1036.0f, 70.0f}},
+    {27, {-2048.0f, 1036.0f, 70.0f}},
+    {28, {2048.0f, 1036.0f, 70.0f}},
+    {29, {0.0f, -1024.0f, 70.0f}},
+    {30, {0.0f, 1024.0f, 70.0f}},
+    {31, {-3584.0f, 0.0f, 73.0f}},
+    {32, {3584.0f, 0.0f, 73.0f}},
+    {33, {-1024.0f, 0.0f, 70.0f}},
+    {34, {1024.0f, 0.0f, 70.0f}},
+}};
+
+std::optional<uint32_t> nearestStandardBoostPadId(Vector location) {
+  std::optional<uint32_t> bestId;
+  float bestDistance = STANDARD_BOOST_PAD_MATCH_RADIUS;
+  for (const auto &pad : STANDARD_BOOST_PADS) {
+    const float distance = (location - pad.location).magnitude();
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      bestId = pad.id;
+    }
+  }
+  return bestId;
+}
 
 SaVec3 toSaVec3(Vector value) {
   return SaVec3{value.X, value.Y, value.Z};
@@ -481,7 +538,7 @@ void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventK
   }
 
   SaBoostPadEvent event{};
-  event.pad_id = boostPadId(pickup.memory_address);
+  event.pad_id = boostPadId(pickup);
   event.kind = kind;
   if (kind == SaBoostPadEventKindPickedUp) {
     event.sequence = ++boostPadSequences[pickup.memory_address];
@@ -677,13 +734,20 @@ uint32_t SubtrActorPlugin::stablePlayerIndexForPri(PriWrapper pri, uint32_t fall
   return playerIndex;
 }
 
-uint32_t SubtrActorPlugin::boostPadId(uintptr_t pickupAddress) {
+uint32_t SubtrActorPlugin::boostPadId(ActorWrapper pickup) {
+  if (!pickup.IsNull()) {
+    if (auto standardPadId = nearestStandardBoostPadId(pickup.GetLocation())) {
+      return *standardPadId;
+    }
+  }
+
+  const uintptr_t pickupAddress = pickup.memory_address;
   const auto existing = boostPadIds.find(pickupAddress);
   if (existing != boostPadIds.end()) {
     return existing->second;
   }
 
-  const uint32_t id = nextBoostPadId++;
+  const uint32_t id = NON_STANDARD_BOOST_PAD_ID_START + nextBoostPadId++;
   boostPadIds[pickupAddress] = id;
   return id;
 }
