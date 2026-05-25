@@ -8,7 +8,8 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    builtin_stats_graph_snapshot_json, builtin_stats_module_json, builtin_stats_module_names,
+    builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
+    builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
     default_stats_timeline_config,
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
@@ -1959,6 +1960,41 @@ unsafe fn serialize_named_stats_module(
     }
 }
 
+unsafe fn serialize_named_stats_module_frame(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+) -> Vec<u8> {
+    let Some(engine) = engine.as_ref() else {
+        return Vec::new();
+    };
+    let Some(module_name) = c_string_arg(module_name) else {
+        return Vec::new();
+    };
+    let Some(replay_meta) = engine.live_replay_meta.as_ref() else {
+        return Vec::new();
+    };
+    match builtin_stats_module_frame_json(&module_name, &engine.graph, replay_meta) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
+unsafe fn serialize_named_stats_module_config(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+) -> Vec<u8> {
+    let Some(engine) = engine.as_ref() else {
+        return Vec::new();
+    };
+    let Some(module_name) = c_string_arg(module_name) else {
+        return Vec::new();
+    };
+    match builtin_stats_module_config_json(&module_name, &engine.graph) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
 fn live_graph_output_bytes<'a>(engine: &'a SaEngine, output_name: &str) -> Option<&'a [u8]> {
     match output_name {
         "events" => Some(&engine.events_json),
@@ -2385,6 +2421,96 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_json(
         return 0;
     }
     let bytes = serialize_named_stats_module(engine, module_name);
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of one named builtin stats module frame JSON payload.
+///
+/// Known modules with no per-frame snapshot return JSON `null`; unknown modules
+/// and invalid inputs return length `0`.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`. `module_name` must be a valid
+/// null-terminated UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_module_frame_json_len(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+) -> usize {
+    serialize_named_stats_module_frame(engine, module_name).len()
+}
+
+#[no_mangle]
+/// Writes one named builtin stats module frame JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_stats_module_frame_json_len` first to size the
+/// destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `module_name` must be a valid
+/// null-terminated UTF-8 string. `out_bytes` must point to writable storage for
+/// at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_frame_json(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let bytes = serialize_named_stats_module_frame(engine, module_name);
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of one named builtin stats module config JSON payload.
+///
+/// Known modules with no snapshot config return JSON `null`; unknown modules and
+/// invalid inputs return length `0`.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`. `module_name` must be a valid
+/// null-terminated UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_module_config_json_len(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+) -> usize {
+    serialize_named_stats_module_config(engine, module_name).len()
+}
+
+#[no_mangle]
+/// Writes one named builtin stats module config JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_stats_module_config_json_len` first to size the
+/// destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `module_name` must be a valid
+/// null-terminated UTF-8 string. `out_bytes` must point to writable storage for
+/// at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_config_json(
+    engine: *const SaEngine,
+    module_name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let bytes = serialize_named_stats_module_config(engine, module_name);
     let count = max_bytes.min(bytes.len());
     ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
@@ -3670,6 +3796,52 @@ mod tests {
         };
         assert_eq!(written, json_len);
         serde_json::from_slice(&bytes).expect("stats module json should be valid")
+    }
+
+    fn live_stats_module_frame_json_value(
+        engine: *const SaEngine,
+        module_name: &str,
+    ) -> serde_json::Value {
+        let module_name =
+            std::ffi::CString::new(module_name).expect("module name should not contain nul bytes");
+        let json_len = unsafe {
+            subtr_actor_bakkesmod_stats_module_frame_json_len(engine, module_name.as_ptr())
+        };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_stats_module_frame_json(
+                engine,
+                module_name.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("stats module frame json should be valid")
+    }
+
+    fn live_stats_module_config_json_value(
+        engine: *const SaEngine,
+        module_name: &str,
+    ) -> serde_json::Value {
+        let module_name =
+            std::ffi::CString::new(module_name).expect("module name should not contain nul bytes");
+        let json_len = unsafe {
+            subtr_actor_bakkesmod_stats_module_config_json_len(engine, module_name.as_ptr())
+        };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_stats_module_config_json(
+                engine,
+                module_name.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("stats module config json should be valid")
     }
 
     fn live_graph_output_json_value(
@@ -6070,6 +6242,116 @@ mod tests {
         );
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_stats_module_json_len(engine, ptr::null()) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 0.0,
+            has_closest_approach_distance: 1,
+        }];
+        let players_by_frame = (1..=12)
+            .map(|frame_number| {
+                [player_at(SaVec3 {
+                    x: frame_number as f32 * 20.0,
+                    y: 0.0,
+                    z: 20.0,
+                })]
+            })
+            .collect::<Vec<_>>();
+        let mut frames = Vec::new();
+        for (offset, players) in players_by_frame.iter().enumerate() {
+            let frame_number = offset as u64 + 1;
+            let mut frame = live_frame(
+                frame_number,
+                rigid_body(
+                    SaVec3 {
+                        x: frame_number as f32 * 20.0,
+                        y: 0.0,
+                        z: 120.0,
+                    },
+                    SaVec3::default(),
+                ),
+                players,
+            );
+            frame.has_live_play = 1;
+            if frame_number == 1 {
+                frame.touches = touches.as_ptr();
+                frame.touch_count = touches.len();
+            }
+            frames.push(frame);
+        }
+
+        for frame in &frames {
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, frame) },
+                0
+            );
+        }
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        let stats = live_stats_json_value(engine);
+        let config = stats["config"]
+            .as_object()
+            .expect("stats json should expose a config object");
+        let frame_modules = stats["frame"]["modules"]
+            .as_object()
+            .expect("stats json should expose frame modules");
+        for module_name in builtin_stats_module_names() {
+            assert_eq!(
+                live_stats_module_frame_json_value(engine, module_name),
+                frame_modules
+                    .get(*module_name)
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
+                "named BakkesMod stats module frame ABI should match full stats frame module {module_name}"
+            );
+            assert_eq!(
+                live_stats_module_config_json_value(engine, module_name),
+                config
+                    .get(*module_name)
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
+                "named BakkesMod stats module config ABI should match full stats config module {module_name}"
+            );
+        }
+
+        let unknown = std::ffi::CString::new("not_a_module").unwrap();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_stats_module_frame_json_len(engine, unknown.as_ptr()) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_stats_module_config_json_len(engine, unknown.as_ptr()) },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_write_stats_module_frame_json(
+                    engine,
+                    unknown.as_ptr(),
+                    ptr::null_mut(),
+                    10,
+                )
+            },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_write_stats_module_config_json(
+                    engine,
+                    unknown.as_ptr(),
+                    ptr::null_mut(),
+                    10,
+                )
+            },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };

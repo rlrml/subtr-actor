@@ -281,6 +281,22 @@ size_t subtr_actor_bakkesmod_write_stats_module_json(
     const char *module_name,
     uint8_t *out_bytes,
     size_t max_bytes);
+size_t subtr_actor_bakkesmod_stats_module_frame_json_len(
+    const SaEngine *engine,
+    const char *module_name);
+size_t subtr_actor_bakkesmod_write_stats_module_frame_json(
+    const SaEngine *engine,
+    const char *module_name,
+    uint8_t *out_bytes,
+    size_t max_bytes);
+size_t subtr_actor_bakkesmod_stats_module_config_json_len(
+    const SaEngine *engine,
+    const char *module_name);
+size_t subtr_actor_bakkesmod_write_stats_module_config_json(
+    const SaEngine *engine,
+    const char *module_name,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_graph_output_json_len(
     const SaEngine *engine,
     const char *output_name);

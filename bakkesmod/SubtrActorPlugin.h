@@ -50,6 +50,10 @@ private:
   using WriteStatsJson = WriteJson;
   using StatsModuleJsonLen = NamedJsonLen;
   using WriteStatsModuleJson = WriteNamedJson;
+  using StatsModuleFrameJsonLen = NamedJsonLen;
+  using WriteStatsModuleFrameJson = WriteNamedJson;
+  using StatsModuleConfigJsonLen = NamedJsonLen;
+  using WriteStatsModuleConfigJson = WriteNamedJson;
   using GraphOutputJsonLen = NamedJsonLen;
   using WriteGraphOutputJson = WriteNamedJson;
   using GraphInfoJsonLen = JsonLen;
@@ -93,6 +97,10 @@ private:
   WriteStatsJson writeStatsJson = nullptr;
   StatsModuleJsonLen statsModuleJsonLen = nullptr;
   WriteStatsModuleJson writeStatsModuleJson = nullptr;
+  StatsModuleFrameJsonLen statsModuleFrameJsonLen = nullptr;
+  WriteStatsModuleFrameJson writeStatsModuleFrameJson = nullptr;
+  StatsModuleConfigJsonLen statsModuleConfigJsonLen = nullptr;
+  WriteStatsModuleConfigJson writeStatsModuleConfigJson = nullptr;
   GraphOutputJsonLen graphOutputJsonLen = nullptr;
   WriteGraphOutputJson writeGraphOutputJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
@@ -141,6 +149,8 @@ private:
       const std::string &name);
   void dumpGraphJson(std::vector<std::string> params);
   void dumpStatsModuleJson(std::vector<std::string> params);
+  void dumpStatsModuleFrameJson(std::vector<std::string> params);
+  void dumpStatsModuleConfigJson(std::vector<std::string> params);
   void dumpGraphOutputJson(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);

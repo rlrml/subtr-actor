@@ -16,6 +16,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   The `subtr_actor_dump_stats_module <module_name> [finish]` console command
   writes one graph-backed builtin stats module by name, using the module names
   reported in `graph-info.json`.
+  The `subtr_actor_dump_stats_module_frame <module_name> [finish]` and
+  `subtr_actor_dump_stats_module_config <module_name> [finish]` commands write
+  the same module-keyed frame snapshot and config surfaces by name.
   The `subtr_actor_dump_graph_output <output_name> [finish]` console command
   writes one named graph output (`events`, `frame`, `timeline`, `stats`, or
   `graph_info`) using the output names reported in `graph-info.json`.

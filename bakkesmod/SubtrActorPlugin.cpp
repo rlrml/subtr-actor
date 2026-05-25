@@ -510,6 +510,18 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_dump_stats_module <module_name> [finish]",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
+      "subtr_actor_dump_stats_module_frame",
+      [this](std::vector<std::string> params) { dumpStatsModuleFrameJson(params); },
+      "Writes one named graph-backed stats module frame JSON. Usage: "
+      "subtr_actor_dump_stats_module_frame <module_name> [finish]",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_dump_stats_module_config",
+      [this](std::vector<std::string> params) { dumpStatsModuleConfigJson(params); },
+      "Writes one named graph-backed stats module config JSON. Usage: "
+      "subtr_actor_dump_stats_module_config <module_name> [finish]",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
       "subtr_actor_dump_graph_output",
       [this](std::vector<std::string> params) { dumpGraphOutputJson(params); },
       "Writes one named graph output JSON. Usage: "
@@ -627,6 +639,14 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_module_json_len"));
   writeStatsModuleJson = reinterpret_cast<WriteStatsModuleJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_module_json"));
+  statsModuleFrameJsonLen = reinterpret_cast<StatsModuleFrameJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_module_frame_json_len"));
+  writeStatsModuleFrameJson = reinterpret_cast<WriteStatsModuleFrameJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_module_frame_json"));
+  statsModuleConfigJsonLen = reinterpret_cast<StatsModuleConfigJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_module_config_json_len"));
+  writeStatsModuleConfigJson = reinterpret_cast<WriteStatsModuleConfigJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_module_config_json"));
   graphOutputJsonLen = reinterpret_cast<GraphOutputJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_output_json_len"));
   writeGraphOutputJson = reinterpret_cast<WriteGraphOutputJson>(
@@ -645,9 +665,11 @@ bool SubtrActorPlugin::loadRustLibrary() {
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
       !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
-      !statsModuleJsonLen || !writeStatsModuleJson || !graphOutputJsonLen ||
-      !writeGraphOutputJson || !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents ||
-      !drainTeamEvents || !drainGoalContextEvents) {
+      !statsModuleJsonLen || !writeStatsModuleJson || !statsModuleFrameJsonLen ||
+      !writeStatsModuleFrameJson || !statsModuleConfigJsonLen ||
+      !writeStatsModuleConfigJson || !graphOutputJsonLen || !writeGraphOutputJson ||
+      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents ||
+      !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -684,6 +706,10 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeStatsJson = nullptr;
   statsModuleJsonLen = nullptr;
   writeStatsModuleJson = nullptr;
+  statsModuleFrameJsonLen = nullptr;
+  writeStatsModuleFrameJson = nullptr;
+  statsModuleConfigJsonLen = nullptr;
+  writeStatsModuleConfigJson = nullptr;
   graphOutputJsonLen = nullptr;
   writeGraphOutputJson = nullptr;
   graphInfoJsonLen = nullptr;
@@ -1558,6 +1584,144 @@ void SubtrActorPlugin::dumpStatsModuleJson(std::vector<std::string> params) {
 
   cvarManager->log(std::format(
       "subtr-actor: wrote stats module '{}' JSON{}: {} ({} bytes)",
+      moduleName,
+      shouldFinish ? " after finish" : "",
+      modulePath.string(),
+      moduleJson.size()));
+}
+
+void SubtrActorPlugin::dumpStatsModuleFrameJson(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: stats module frame dump requested before engine was loaded");
+    return;
+  }
+  if (params.size() < 2) {
+    cvarManager->log(
+        "subtr-actor: usage: subtr_actor_dump_stats_module_frame <module_name> [finish]");
+    return;
+  }
+
+  const std::string moduleName = params[1];
+  const bool shouldFinish =
+      std::find_if(params.begin() + 2, params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log(
+          "subtr-actor: stats module frame dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(std::format(
+          "subtr-actor: graph finish failed before stats module frame dump: {}",
+          finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  const std::string moduleJson =
+      readNamedJsonBuffer(statsModuleFrameJsonLen, writeStatsModuleFrameJson, moduleName);
+  if (moduleJson.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: stats module '{}' frame was unavailable or produced empty JSON",
+        moduleName));
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(std::format(
+        "subtr-actor: failed to create stats module frame dump directory: {}",
+        error.message()));
+    return;
+  }
+
+  const std::filesystem::path modulePath =
+      outputDirectory / std::format("graph-module-frame-{}.json", safeModuleFileStem(moduleName));
+  std::ofstream moduleFile(modulePath, std::ios::binary);
+  moduleFile.write(moduleJson.data(), static_cast<std::streamsize>(moduleJson.size()));
+  if (!moduleFile) {
+    cvarManager->log("subtr-actor: failed to write stats module frame JSON snapshot");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote stats module '{}' frame JSON{}: {} ({} bytes)",
+      moduleName,
+      shouldFinish ? " after finish" : "",
+      modulePath.string(),
+      moduleJson.size()));
+}
+
+void SubtrActorPlugin::dumpStatsModuleConfigJson(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: stats module config dump requested before engine was loaded");
+    return;
+  }
+  if (params.size() < 2) {
+    cvarManager->log(
+        "subtr-actor: usage: subtr_actor_dump_stats_module_config <module_name> [finish]");
+    return;
+  }
+
+  const std::string moduleName = params[1];
+  const bool shouldFinish =
+      std::find_if(params.begin() + 2, params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log(
+          "subtr-actor: stats module config dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(std::format(
+          "subtr-actor: graph finish failed before stats module config dump: {}",
+          finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  const std::string moduleJson =
+      readNamedJsonBuffer(statsModuleConfigJsonLen, writeStatsModuleConfigJson, moduleName);
+  if (moduleJson.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: stats module '{}' config was unavailable or produced empty JSON",
+        moduleName));
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(std::format(
+        "subtr-actor: failed to create stats module config dump directory: {}",
+        error.message()));
+    return;
+  }
+
+  const std::filesystem::path modulePath =
+      outputDirectory / std::format("graph-module-config-{}.json", safeModuleFileStem(moduleName));
+  std::ofstream moduleFile(modulePath, std::ios::binary);
+  moduleFile.write(moduleJson.data(), static_cast<std::streamsize>(moduleJson.size()));
+  if (!moduleFile) {
+    cvarManager->log("subtr-actor: failed to write stats module config JSON snapshot");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote stats module '{}' config JSON{}: {} ({} bytes)",
       moduleName,
       shouldFinish ? " after finish" : "",
       modulePath.string(),

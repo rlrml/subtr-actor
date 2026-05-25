@@ -789,6 +789,21 @@ pub fn builtin_stats_module_json(
     builtin_module_json(module_name, graph)
 }
 
+pub fn builtin_stats_module_frame_json(
+    module_name: &str,
+    graph: &AnalysisGraph,
+    replay_meta: &ReplayMeta,
+) -> SubtrActorResult<Value> {
+    Ok(builtin_snapshot_frame_json(module_name, graph, replay_meta)?.unwrap_or(Value::Null))
+}
+
+pub fn builtin_stats_module_config_json(
+    module_name: &str,
+    graph: &AnalysisGraph,
+) -> SubtrActorResult<Value> {
+    Ok(builtin_snapshot_config_json(module_name, graph)?.unwrap_or(Value::Null))
+}
+
 pub(crate) fn builtin_snapshot_frame_json(
     module_name: &str,
     graph: &AnalysisGraph,
