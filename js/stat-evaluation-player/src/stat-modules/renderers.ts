@@ -334,6 +334,66 @@ export function renderCeilingShotStats(
   `;
 }
 
+export function renderWallAerialStats(
+  wallAerial: PlayerStatsSnapshot["wall_aerial"] | undefined,
+): string {
+  const averageConfidence =
+    wallAerial && wallAerial.count > 0
+      ? wallAerial.cumulative_confidence / wallAerial.count
+      : undefined;
+  const averageConfidencePercent = percentageFromUnit(averageConfidence);
+  const averageSetup =
+    wallAerial && wallAerial.count > 0
+      ? wallAerial.cumulative_setup_duration / wallAerial.count
+      : undefined;
+  const averageTakeoffToTouch =
+    wallAerial && wallAerial.count > 0
+      ? wallAerial.cumulative_takeoff_to_touch_time / wallAerial.count
+      : undefined;
+  const averageTouchHeight =
+    wallAerial && wallAerial.count > 0
+      ? wallAerial.cumulative_touch_height / wallAerial.count
+      : undefined;
+
+  return `
+    <div class="stat-row"><span class="label">Plays</span><span class="value">${formatInteger(wallAerial?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(wallAerial?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(percentageFromUnit(wallAerial?.last_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidencePercent, 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg setup</span><span class="value">${formatNumber(averageSetup, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg takeoff</span><span class="value">${formatNumber(averageTakeoffToTouch, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg height</span><span class="value">${formatNumber(averageTouchHeight, 0)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(wallAerial?.time_since_last_wall_aerial), 2, "s")}</span></div>
+  `;
+}
+
+export function renderWallAerialShotStats(
+  wallAerialShot: PlayerStatsSnapshot["wall_aerial_shot"] | undefined,
+): string {
+  const averageConfidence =
+    wallAerialShot && wallAerialShot.count > 0
+      ? wallAerialShot.cumulative_confidence / wallAerialShot.count
+      : undefined;
+  const averageTakeoffToShot =
+    wallAerialShot && wallAerialShot.count > 0
+      ? wallAerialShot.cumulative_takeoff_to_shot_time / wallAerialShot.count
+      : undefined;
+  const averageShotHeight =
+    wallAerialShot && wallAerialShot.count > 0
+      ? wallAerialShot.cumulative_shot_height / wallAerialShot.count
+      : undefined;
+
+  return `
+    <div class="stat-row"><span class="label">Shots</span><span class="value">${formatInteger(wallAerialShot?.count)}</span></div>
+    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(wallAerialShot?.high_confidence_count)}</span></div>
+    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(percentageFromUnit(wallAerialShot?.last_confidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(percentageFromUnit(averageConfidence), 0, "%")}</span></div>
+    <div class="stat-row"><span class="label">Avg takeoff</span><span class="value">${formatNumber(averageTakeoffToShot, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Avg height</span><span class="value">${formatNumber(averageShotHeight, 0)}</span></div>
+    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(wallAerialShot?.time_since_last_wall_aerial_shot), 2, "s")}</span></div>
+  `;
+}
+
 export function renderBallCarryStats(
   ballCarry: PlayerStatsSnapshot["ball_carry"] | undefined,
 ): string {

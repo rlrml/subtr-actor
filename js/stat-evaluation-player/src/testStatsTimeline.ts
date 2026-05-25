@@ -21,6 +21,8 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       goal_context: [],
       backboard: [],
       ceiling_shot: [],
+      wall_aerial: [],
+      wall_aerial_shot: [],
       center: [],
       double_tap: [],
       fifty_fifty: [],
@@ -134,6 +136,8 @@ export function createLegacyStatsTimeline(
     timeline_events?: StatsEvents["timeline"];
     backboard_events?: StatsEvents["backboard"];
     ceiling_shot_events?: StatsEvents["ceiling_shot"];
+    wall_aerial_events?: StatsEvents["wall_aerial"];
+    wall_aerial_shot_events?: StatsEvents["wall_aerial_shot"];
     center_events?: StatsEvents["center"];
     double_tap_events?: StatsEvents["double_tap"];
     fifty_fifty_events?: StatsEvents["fifty_fifty"];
@@ -159,6 +163,9 @@ export function createLegacyStatsTimeline(
       mechanics: overrides.mechanic_events ?? overrides.events?.mechanics ?? [],
       backboard: overrides.backboard_events ?? overrides.events?.backboard ?? [],
       ceiling_shot: overrides.ceiling_shot_events ?? overrides.events?.ceiling_shot ?? [],
+      wall_aerial: overrides.wall_aerial_events ?? overrides.events?.wall_aerial ?? [],
+      wall_aerial_shot:
+        overrides.wall_aerial_shot_events ?? overrides.events?.wall_aerial_shot ?? [],
       center: overrides.center_events ?? overrides.events?.center ?? [],
       double_tap: overrides.double_tap_events ?? overrides.events?.double_tap ?? [],
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],

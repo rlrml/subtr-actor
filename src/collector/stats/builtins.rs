@@ -366,6 +366,8 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "core",
         "backboard",
         "ceiling_shot",
+        "wall_aerial",
+        "wall_aerial_shot",
         "center",
         "double_tap",
         "one_timer",
@@ -442,6 +444,20 @@ pub(crate) fn builtin_module_json(
         }
         "ceiling_shot" => {
             let calculator = graph_state::<CeilingShotCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "wall_aerial" => {
+            let calculator = graph_state::<WallAerialCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "wall_aerial_shot" => {
+            let calculator = graph_state::<WallAerialShotCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.events(),
@@ -747,6 +763,18 @@ pub(crate) fn builtin_snapshot_frame_json(
         }
         "ceiling_shot" => {
             let calculator = graph_state::<CeilingShotCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
+        "wall_aerial" => {
+            let calculator = graph_state::<WallAerialCalculator>(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
+        "wall_aerial_shot" => {
+            let calculator = graph_state::<WallAerialShotCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
@@ -1067,10 +1095,32 @@ pub(crate) fn builtin_snapshot_config_json(
                 "half_volley_min_ball_speed": calculator.config().min_ball_speed,
             }))?)
         }
-        "core" | "backboard" | "ceiling_shot" | "center" | "double_tap" | "one_timer" | "pass"
-        | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
-        | "half_flip" | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
-        | "bump" | "movement" | "powerslide" | "demo" | "counter_attack_goal" => None,
+        "core"
+        | "backboard"
+        | "ceiling_shot"
+        | "wall_aerial"
+        | "wall_aerial_shot"
+        | "center"
+        | "double_tap"
+        | "one_timer"
+        | "pass"
+        | "fifty_fifty"
+        | "possession"
+        | "touch"
+        | "whiff"
+        | "wavedash"
+        | "speed_flip"
+        | "half_flip"
+        | "flick"
+        | "musty_flick"
+        | "dodge_reset"
+        | "ball_carry"
+        | "counter_attack_goal"
+        | "boost"
+        | "bump"
+        | "movement"
+        | "powerslide"
+        | "demo" => None,
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),

@@ -11,7 +11,7 @@ use crate::stats::calculators::{
     OwnHalfGoalCalculator, PassCalculator, PlayerFrameState, PlayerVerticalState,
     PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
     PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator,
-    TouchState, WavedashCalculator, WhiffCalculator,
+    TouchState, WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -56,6 +56,8 @@ pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
 pub(crate) mod touch;
 pub(crate) mod touch_state;
+pub(crate) mod wall_aerial;
+pub(crate) mod wall_aerial_shot;
 pub(crate) mod wavedash;
 pub(crate) mod whiff;
 
@@ -147,6 +149,10 @@ pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
+#[allow(unused_imports)]
+pub use wall_aerial::WallAerialNode;
+#[allow(unused_imports)]
+pub use wall_aerial_shot::WallAerialShotNode;
 #[allow(unused_imports)]
 pub use wavedash::WavedashNode;
 #[allow(unused_imports)]
@@ -304,6 +310,14 @@ pub(crate) fn rush_dependency() -> AnalysisDependency {
 
 pub(crate) fn touch_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<TouchCalculator>(touch::boxed_default)
+}
+
+pub(crate) fn wall_aerial_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<WallAerialCalculator>(wall_aerial::boxed_default)
+}
+
+pub(crate) fn wall_aerial_shot_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<WallAerialShotCalculator>(wall_aerial_shot::boxed_default)
 }
 
 pub(crate) fn whiff_dependency() -> AnalysisDependency {

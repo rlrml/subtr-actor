@@ -21,6 +21,8 @@ import {
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   buildWavedashTimelineEvents,
+  buildWallAerialTimelineEvents,
+  buildWallAerialShotTimelineEvents,
   buildWhiffTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
@@ -151,6 +153,112 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
       kind: "ceiling-shot",
       label: "Blue ceiling shot 84%",
       shortLabel: "CS",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    wall_aerial_events: [
+      {
+        time: 2.1,
+        frame: 2,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        wall: "side",
+        wall_contact_time: 1,
+        wall_contact_frame: 1,
+        takeoff_time: 1.4,
+        takeoff_frame: 1,
+        time_since_takeoff: 0.7,
+        wall_contact_position: [4096, -400, 220],
+        takeoff_position: [4090, -420, 280],
+        player_position: [3200, -600, 760],
+        ball_position: [3160, -650, 920],
+        setup_start_time: 0.6,
+        setup_start_frame: 0,
+        setup_duration: 0.4,
+        ball_speed: 1500,
+        ball_speed_change: 320,
+        goal_alignment: 0.72,
+        confidence: 0.86,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildWallAerialTimelineEvents(statsTimeline, replay), [
+    {
+      id: "wall-aerial:2:Steam:blue-id:0",
+      time: 2.25,
+      frame: 2,
+      kind: "wall-aerial",
+      label: "Blue wall aerial 86% | side wall",
+      shortLabel: "WA",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    wall_aerial_shot_events: [
+      {
+        time: 2.1,
+        frame: 2,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        wall: "side",
+        wall_contact_time: 1,
+        wall_contact_frame: 1,
+        takeoff_time: 1.4,
+        takeoff_frame: 1,
+        time_since_takeoff: 0.7,
+        wall_contact_position: [4096, -400, 220],
+        takeoff_position: [4090, -420, 280],
+        player_position: [3200, -600, 760],
+        ball_position: [3160, -650, 920],
+        ball_speed: 1500,
+        goal_alignment: 0.72,
+        confidence: 0.74,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildWallAerialShotTimelineEvents(statsTimeline, replay), [
+    {
+      id: "wall-aerial-shot:2:Steam:blue-id:0",
+      time: 2.25,
+      frame: 2,
+      kind: "wall-aerial-shot",
+      label: "Blue wall aerial shot 74% | side wall",
+      shortLabel: "WS",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,
@@ -1016,6 +1124,52 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         confidence: 0.84,
       },
     ],
+    wall_aerial_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        wall: "side",
+        wall_contact_time: 0.8,
+        wall_contact_frame: 0,
+        takeoff_time: 1,
+        takeoff_frame: 1,
+        time_since_takeoff: 0.2,
+        wall_contact_position: [4096, -300, 220],
+        takeoff_position: [4070, -330, 300],
+        player_position: [3600, -500, 820],
+        ball_position: [3700, -520, 900],
+        setup_start_time: 0.4,
+        setup_start_frame: 0,
+        setup_duration: 0.4,
+        ball_speed: 1400,
+        ball_speed_change: 260,
+        goal_alignment: 0.69,
+        confidence: 0.74,
+      },
+    ],
+    wall_aerial_shot_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        wall: "side",
+        wall_contact_time: 0.8,
+        wall_contact_frame: 0,
+        takeoff_time: 1,
+        takeoff_frame: 1,
+        time_since_takeoff: 0.2,
+        wall_contact_position: [4096, -300, 220],
+        takeoff_position: [4070, -330, 300],
+        player_position: [3600, -500, 820],
+        ball_position: [3700, -520, 900],
+        ball_speed: 1400,
+        goal_alignment: 0.69,
+        confidence: 0.74,
+      },
+    ],
     double_tap_events: [
       {
         time: 1.1,
@@ -1302,11 +1456,11 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
   );
   assert.equal(
     countEnabledTimelineEvents(
-      ["core", "fifty-fifty", "rush", "musty-flick", "ceiling-shot"],
+      ["core", "fifty-fifty", "rush", "musty-flick", "ceiling-shot", "wall-aerial"],
       replay,
       statsTimeline,
     ),
-    5,
+    6,
   );
   assert.equal(
     countEnabledTimelineEvents(
@@ -1317,6 +1471,8 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "musty-flick",
         "backboard",
         "ceiling-shot",
+        "wall-aerial",
+        "wall-aerial-shot",
         "center",
         "double-tap",
         "goal-context",
@@ -1337,6 +1493,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    22,
+    24,
   );
 });

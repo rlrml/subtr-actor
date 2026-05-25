@@ -210,6 +210,50 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.is_team_0,
             ));
         }
+        for (index, value) in self
+            .module_array("wall_aerial", "events")
+            .iter()
+            .enumerate()
+        {
+            let event = parse_wall_aerial_event(value)?;
+            let mut mechanic_event = span_mechanic_event(
+                "wall_aerial",
+                index,
+                event.wall_contact_frame,
+                event.frame,
+                event.wall_contact_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            );
+            mechanic_event.properties = vec![mechanic_event_text_property(
+                "wall",
+                event.wall.as_label_value(),
+            )];
+            events.push(mechanic_event);
+        }
+        for (index, value) in self
+            .module_array("wall_aerial_shot", "events")
+            .iter()
+            .enumerate()
+        {
+            let event = parse_wall_aerial_shot_event(value)?;
+            let mut mechanic_event = span_mechanic_event(
+                "wall_aerial_shot",
+                index,
+                event.wall_contact_frame,
+                event.frame,
+                event.wall_contact_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            );
+            mechanic_event.properties = vec![mechanic_event_text_property(
+                "wall",
+                event.wall.as_label_value(),
+            )];
+            events.push(mechanic_event);
+        }
         for (index, value) in self.module_array("center", "events").iter().enumerate() {
             let event = parse_center_event(value)?;
             events.push(span_mechanic_event(
@@ -380,6 +424,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_ceiling_shot_event,
             )?,
+            wall_aerial: self.module_player_events(
+                "wall_aerial",
+                "events",
+                parse_wall_aerial_event,
+            )?,
+            wall_aerial_shot: self.module_player_events(
+                "wall_aerial_shot",
+                "events",
+                parse_wall_aerial_shot_event,
+            )?,
             center: self.module_player_events("center", "events", parse_center_event)?,
             double_tap: self.module_player_events(
                 "double_tap",
@@ -428,6 +482,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "ceiling_shot".to_owned(),
             Value::Array(self.module_array("ceiling_shot", "events")),
+        );
+        events.insert(
+            "wall_aerial".to_owned(),
+            Value::Array(self.module_array("wall_aerial", "events")),
+        );
+        events.insert(
+            "wall_aerial_shot".to_owned(),
+            Value::Array(self.module_array("wall_aerial_shot", "events")),
         );
         events.insert(
             "center".to_owned(),
@@ -992,6 +1054,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "ceiling_shot",
                 &player_key,
             )?,
+            wall_aerial: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "wall_aerial",
+                &player_key,
+            )?,
+            wall_aerial_shot: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "wall_aerial_shot",
+                &player_key,
+            )?,
             double_tap: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "double_tap",
@@ -1232,6 +1304,22 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<CeilingShotStats>(
                 frame,
                 "ceiling_shot",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "wall_aerial".to_owned(),
+            self.frame_player_stat_or_default_by_key::<WallAerialStats>(
+                frame,
+                "wall_aerial",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "wall_aerial_shot".to_owned(),
+            self.frame_player_stat_or_default_by_key::<WallAerialShotStats>(
+                frame,
+                "wall_aerial_shot",
                 &player_key,
             )?,
         );
@@ -2014,6 +2102,56 @@ fn parse_ceiling_shot_event(value: &Value) -> SubtrActorResult<CeilingShotEvent>
         forward_alignment: json_required_f32(object, "forward_alignment")?,
         forward_approach_speed: json_required_f32(object, "forward_approach_speed")?,
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_wall_aerial_event(value: &Value) -> SubtrActorResult<WallAerialEvent> {
+    let object = json_object(value, "wall aerial event")?;
+    Ok(WallAerialEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        wall: decode_json_value(json_required_value(object, "wall")?.clone())?,
+        wall_contact_time: json_required_f32(object, "wall_contact_time")?,
+        wall_contact_frame: json_required_usize(object, "wall_contact_frame")?,
+        takeoff_time: json_required_f32(object, "takeoff_time")?,
+        takeoff_frame: json_required_usize(object, "takeoff_frame")?,
+        time_since_takeoff: json_required_f32(object, "time_since_takeoff")?,
+        wall_contact_position: json_required_vec3(object, "wall_contact_position")?,
+        takeoff_position: json_required_vec3(object, "takeoff_position")?,
+        player_position: json_required_vec3(object, "player_position")?,
+        ball_position: json_required_vec3(object, "ball_position")?,
+        setup_start_time: json_required_f32(object, "setup_start_time")?,
+        setup_start_frame: json_required_usize(object, "setup_start_frame")?,
+        setup_duration: json_required_f32(object, "setup_duration")?,
+        ball_speed: json_required_f32(object, "ball_speed")?,
+        ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+        goal_alignment: json_required_f32(object, "goal_alignment")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_wall_aerial_shot_event(value: &Value) -> SubtrActorResult<WallAerialShotEvent> {
+    let object = json_object(value, "wall aerial shot event")?;
+    Ok(WallAerialShotEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        wall: decode_json_value(json_required_value(object, "wall")?.clone())?,
+        wall_contact_time: json_required_f32(object, "wall_contact_time")?,
+        wall_contact_frame: json_required_usize(object, "wall_contact_frame")?,
+        takeoff_time: json_required_f32(object, "takeoff_time")?,
+        takeoff_frame: json_required_usize(object, "takeoff_frame")?,
+        time_since_takeoff: json_required_f32(object, "time_since_takeoff")?,
+        wall_contact_position: json_required_vec3(object, "wall_contact_position")?,
+        takeoff_position: json_required_vec3(object, "takeoff_position")?,
+        player_position: json_required_vec3(object, "player_position")?,
+        ball_position: json_required_vec3(object, "ball_position")?,
+        ball_speed: json_optional_f32(object.get("ball_speed"))?,
+        goal_alignment: json_optional_f32(object.get("goal_alignment"))?,
         confidence: json_required_f32(object, "confidence")?,
     })
 }

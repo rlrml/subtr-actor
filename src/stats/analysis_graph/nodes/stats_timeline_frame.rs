@@ -164,6 +164,18 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            wall_aerial: ctx
+                .get::<WallAerialCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            wall_aerial_shot: ctx
+                .get::<WallAerialShotCalculator>()?
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             double_tap: ctx
                 .get::<DoubleTapCalculator>()?
                 .player_stats()
@@ -326,6 +338,8 @@ impl AnalysisNode for StatsTimelineFrameNode {
             match_stats_dependency(),
             backboard_dependency(),
             ceiling_shot_dependency(),
+            wall_aerial_dependency(),
+            wall_aerial_shot_dependency(),
             double_tap_dependency(),
             one_timer_dependency(),
             pass_dependency(),

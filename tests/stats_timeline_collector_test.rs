@@ -337,6 +337,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             goal_context: Vec::new(),
             backboard: Vec::new(),
             ceiling_shot: Vec::new(),
+            wall_aerial: Vec::new(),
+            wall_aerial_shot: Vec::new(),
             center: Vec::new(),
             double_tap: Vec::new(),
             fifty_fifty: Vec::new(),

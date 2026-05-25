@@ -24,6 +24,8 @@ import {
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   buildWavedashTimelineEvents,
+  buildWallAerialTimelineEvents,
+  buildWallAerialShotTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
@@ -49,6 +51,8 @@ import {
   renderRotationStats,
   renderSpeedFlipStats,
   renderWavedashStats,
+  renderWallAerialStats,
+  renderWallAerialShotStats,
   renderWhiffStats,
 } from "./renderers.ts";
 import {
@@ -199,6 +203,86 @@ export function createCeilingShotModule(): StatModule {
   };
 }
 
+export function createWallAerialModule(): StatModule {
+  return {
+    id: "wall-aerial",
+    label: "Wall Aerial",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildWallAerialTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+      if (!statsFrame) return "";
+
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderWallAerialStats(player.wall_aerial),
+          player.wall_aerial?.is_last_wall_aerial
+            ? '<span class="role-indicator role-forward">Last Wall Aerial</span>'
+            : "",
+        ),
+      );
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderWallAerialStats(player.wall_aerial);
+    },
+  };
+}
+
+export function createWallAerialShotModule(): StatModule {
+  return {
+    id: "wall-aerial-shot",
+    label: "Wall Aerial Shot",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineEvents(ctx) {
+      return buildWallAerialShotTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+      if (!statsFrame) return "";
+
+      return renderGroupedPlayerCards(statsFrame.players, (player) =>
+        renderPlayerCard(
+          player.name,
+          player.is_team_0,
+          renderWallAerialShotStats(player.wall_aerial_shot),
+          player.wall_aerial_shot?.is_last_wall_aerial_shot
+            ? '<span class="role-indicator role-forward">Last Wall Aerial Shot</span>'
+            : "",
+        ),
+      );
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      if (!player) return "";
+
+      return renderWallAerialShotStats(player.wall_aerial_shot);
+    },
+  };
+}
+
 export function createBallCarryModule(): StatModule {
   return createPlayerStatsModule({
     id: "ball-carry",
@@ -223,7 +307,7 @@ export function createAirDribbleModule(): StatModule {
 export function createDodgeResetModule(): StatModule {
   return createPlayerStatsModule({
     id: "dodge-reset",
-    label: "Dodge Reset",
+    label: "Dodge Refresh",
     select: (player) => player.dodge_reset,
     render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
     getTimelineEvents(ctx) {

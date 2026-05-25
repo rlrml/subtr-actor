@@ -16,7 +16,9 @@ import type { PassEvent } from "./PassEvent.ts";
 import type { RushEvent } from "./RushEvent.ts";
 import type { SpeedFlipEvent } from "./SpeedFlipEvent.ts";
 import type { TimelineEvent } from "./TimelineEvent.ts";
+import type { WallAerialEvent } from "./WallAerialEvent.ts";
+import type { WallAerialShotEvent } from "./WallAerialShotEvent.ts";
 import type { WavedashEvent } from "./WavedashEvent.ts";
 import type { WhiffEvent } from "./WhiffEvent.ts";
 
-export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, mechanics: Array<MechanicEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, center: Array<CenterEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, one_timer: Array<OneTimerEvent>, pass: Array<PassEvent>, goal_tags: Array<GoalTagEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, half_flip: Array<HalfFlipEvent>, half_volley: Array<HalfVolleyEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, bump: Array<BumpEvent>, };
+export type ReplayStatsTimelineEvents = { timeline: Array<TimelineEvent>, mechanics: Array<MechanicEvent>, goal_context: Array<GoalContextEvent>, backboard: Array<BackboardBounceEvent>, ceiling_shot: Array<CeilingShotEvent>, wall_aerial: Array<WallAerialEvent>, wall_aerial_shot: Array<WallAerialShotEvent>, center: Array<CenterEvent>, double_tap: Array<DoubleTapEvent>, fifty_fifty: Array<FiftyFiftyEvent>, one_timer: Array<OneTimerEvent>, pass: Array<PassEvent>, goal_tags: Array<GoalTagEvent>, rush: Array<RushEvent>, speed_flip: Array<SpeedFlipEvent>, half_flip: Array<HalfFlipEvent>, half_volley: Array<HalfVolleyEvent>, wavedash: Array<WavedashEvent>, whiff: Array<WhiffEvent>, boost_pickups: Array<BoostPickupComparisonEvent>, bump: Array<BumpEvent>, };

@@ -27,6 +27,8 @@ mod rotation;
 mod rush;
 mod speed_flip;
 mod touch;
+mod wall_aerial;
+mod wall_aerial_shot;
 mod wavedash;
 mod whiff;
 

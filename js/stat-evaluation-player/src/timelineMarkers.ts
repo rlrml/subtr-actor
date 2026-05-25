@@ -20,6 +20,8 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   one_timer: "OT",
   pass: "P",
   speed_flip: "SF",
+  wall_aerial: "WA",
+  wall_aerial_shot: "WS",
   wavedash: "WD",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
@@ -343,6 +345,58 @@ export function buildCeilingShotTimelineEvents(
     isTeamZero: marker.isTeamZero,
     color: marker.isTeamZero ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
   }));
+}
+
+export function buildWallAerialTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.wall_aerial.map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = getReplayPlayerName(replay, playerId);
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const qualityPercent = Math.round(event.confidence * 100);
+    const wallLabel = formatMechanicKind(event.wall).toLowerCase();
+
+    return {
+      id: `wall-aerial:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "wall-aerial",
+      label: `${playerName} wall aerial ${qualityPercent}% | ${wallLabel} wall`,
+      shortLabel: "WA",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
+export function buildWallAerialShotTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.wall_aerial_shot.map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = getReplayPlayerName(replay, playerId);
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const qualityPercent = Math.round(event.confidence * 100);
+    const wallLabel = formatMechanicKind(event.wall).toLowerCase();
+
+    return {
+      id: `wall-aerial-shot:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "wall-aerial-shot",
+      label: `${playerName} wall aerial shot ${qualityPercent}% | ${wallLabel} wall`,
+      shortLabel: "WS",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
 }
 
 export function buildDoubleTapTimelineEvents(
@@ -791,6 +845,14 @@ export function countEnabledTimelineEvents(
 
   if (active.has("ceiling-shot")) {
     count += buildCeilingShotTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("wall-aerial")) {
+    count += buildWallAerialTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("wall-aerial-shot")) {
+    count += buildWallAerialShotTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("double-tap")) {

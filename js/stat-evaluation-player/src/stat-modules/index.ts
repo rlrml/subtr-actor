@@ -26,6 +26,8 @@ import {
   createSpeedFlipModule,
   createTouchModule,
   createWavedashModule,
+  createWallAerialModule,
+  createWallAerialShotModule,
   createWhiffModule,
 } from "./playerModules.ts";
 import {
@@ -54,6 +56,8 @@ export function createStatModules(
     createCoreModule(),
     createBackboardModule(),
     createCeilingShotModule(),
+    createWallAerialModule(),
+    createWallAerialShotModule(),
     createDoubleTapModule(),
     createOneTimerModule(),
     createPassModule(),

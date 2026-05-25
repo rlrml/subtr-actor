@@ -37,6 +37,8 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "rotation" => Some(nodes::rotation::boxed_default()),
         "rush" => Some(nodes::rush::boxed_default()),
         "touch" => Some(nodes::touch::boxed_default()),
+        "wall_aerial" => Some(nodes::wall_aerial::boxed_default()),
+        "wall_aerial_shot" => Some(nodes::wall_aerial_shot::boxed_default()),
         "whiff" => Some(nodes::whiff::boxed_default()),
         "wavedash" => Some(nodes::wavedash::boxed_default()),
         "speed_flip" => Some(nodes::speed_flip::boxed_default()),
@@ -151,6 +153,8 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::half_volley::boxed_default(),
         nodes::wavedash::boxed_default(),
         nodes::touch::boxed_default(),
+        nodes::wall_aerial::boxed_default(),
+        nodes::wall_aerial_shot::boxed_default(),
         nodes::whiff::boxed_default(),
     ]
 }

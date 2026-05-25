@@ -29,6 +29,8 @@ impl_analysis_node! {
         backboard_dependency(),
         ball_carry_dependency(),
         ceiling_shot_dependency(),
+        wall_aerial_dependency(),
+        wall_aerial_shot_dependency(),
         center_dependency(),
         dodge_reset_dependency(),
         double_tap_dependency(),
@@ -63,6 +65,8 @@ impl_analysis_node! {
         backboard: BackboardCalculator,
         ball_carry: BallCarryCalculator,
         ceiling_shot: CeilingShotCalculator,
+        wall_aerial: WallAerialCalculator,
+        wall_aerial_shot: WallAerialShotCalculator,
         center: CenterCalculator,
         dodge_reset: DodgeResetCalculator,
         double_tap: DoubleTapCalculator,
@@ -114,6 +118,8 @@ impl_analysis_node! {
             mechanics: build_mechanic_events(
                 ball_carry,
                 ceiling_shot,
+                wall_aerial,
+                wall_aerial_shot,
                 center,
                 dodge_reset,
                 double_tap,
@@ -129,6 +135,8 @@ impl_analysis_node! {
             goal_context: match_stats.goal_context_events().to_vec(),
             backboard: backboard.events().to_vec(),
             ceiling_shot: ceiling_shot.events().to_vec(),
+            wall_aerial: wall_aerial.events().to_vec(),
+            wall_aerial_shot: wall_aerial_shot.events().to_vec(),
             center: center.events().to_vec(),
             double_tap: double_tap.events().to_vec(),
             one_timer: one_timer.events().to_vec(),
@@ -228,6 +236,8 @@ fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<MechanicE
 fn build_mechanic_events(
     ball_carry: &BallCarryCalculator,
     ceiling_shot: &CeilingShotCalculator,
+    wall_aerial: &WallAerialCalculator,
+    wall_aerial_shot: &WallAerialShotCalculator,
     center: &CenterCalculator,
     dodge_reset: &DodgeResetCalculator,
     double_tap: &DoubleTapCalculator,
@@ -272,6 +282,42 @@ fn build_mechanic_events(
             event.player.clone(),
             event.is_team_0,
         ));
+    }
+
+    for (index, event) in wall_aerial.events().iter().enumerate() {
+        let mut mechanic_event = span_mechanic_event(
+            "wall_aerial",
+            index,
+            event.wall_contact_frame,
+            event.frame,
+            event.wall_contact_time,
+            event.time,
+            event.player.clone(),
+            event.is_team_0,
+        );
+        mechanic_event.properties = vec![mechanic_event_text_property(
+            "wall",
+            event.wall.as_label_value(),
+        )];
+        events.push(mechanic_event);
+    }
+
+    for (index, event) in wall_aerial_shot.events().iter().enumerate() {
+        let mut mechanic_event = span_mechanic_event(
+            "wall_aerial_shot",
+            index,
+            event.wall_contact_frame,
+            event.frame,
+            event.wall_contact_time,
+            event.time,
+            event.player.clone(),
+            event.is_team_0,
+        );
+        mechanic_event.properties = vec![mechanic_event_text_property(
+            "wall",
+            event.wall.as_label_value(),
+        )];
+        events.push(mechanic_event);
     }
 
     for (index, event) in center.events().iter().enumerate() {
