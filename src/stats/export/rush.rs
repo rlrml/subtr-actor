@@ -88,5 +88,18 @@ impl StatFieldProvider for RushStats {
             StatUnit::Count,
             self.team_one_three_v_three_count,
         ));
+        for entry in self.complete_labeled_rush_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "rush",
+                "rush_count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "rush_test.rs"]
+mod tests;

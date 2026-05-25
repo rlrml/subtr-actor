@@ -23,6 +23,16 @@ pub struct RushEvent {
     pub defenders: usize,
 }
 
+impl RushEvent {
+    fn labels(&self) -> [StatLabel; 3] {
+        [
+            rush_team_label(self.is_team_0),
+            rush_attackers_label(self.attackers),
+            rush_defenders_label(self.defenders),
+        ]
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct ActiveRush {
     start_time: f32,
@@ -39,6 +49,40 @@ impl ActiveRush {
     fn retained_possession_time(&self) -> f32 {
         (self.last_time - self.start_time).max(0.0)
     }
+}
+
+const RUSH_ATTACKER_COUNTS: [usize; 2] = [2, 3];
+const RUSH_DEFENDER_COUNTS: [usize; 3] = [1, 2, 3];
+
+fn rush_team_label(is_team_0: bool) -> StatLabel {
+    if is_team_0 {
+        StatLabel::new("team", "team_zero")
+    } else {
+        StatLabel::new("team", "team_one")
+    }
+}
+
+fn rush_attackers_label(attackers: usize) -> StatLabel {
+    StatLabel::new(
+        "attackers",
+        match attackers {
+            2 => "2",
+            3 => "3",
+            _ => "other",
+        },
+    )
+}
+
+fn rush_defenders_label(defenders: usize) -> StatLabel {
+    StatLabel::new(
+        "defenders",
+        match defenders {
+            1 => "1",
+            2 => "2",
+            3 => "3",
+            _ => "other",
+        },
+    )
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,33 +120,78 @@ pub struct RushStats {
     pub team_one_three_v_one_count: u32,
     pub team_one_three_v_two_count: u32,
     pub team_one_three_v_three_count: u32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_rush_counts: LabeledCounts,
 }
 
 impl RushStats {
-    fn record(&mut self, attacking_team_is_team_0: bool, attackers: usize, defenders: usize) {
-        if attacking_team_is_team_0 {
-            self.team_zero_count += 1;
-            match (attackers, defenders) {
-                (2, 1) => self.team_zero_two_v_one_count += 1,
-                (2, 2) => self.team_zero_two_v_two_count += 1,
-                (2, 3) => self.team_zero_two_v_three_count += 1,
-                (3, 1) => self.team_zero_three_v_one_count += 1,
-                (3, 2) => self.team_zero_three_v_two_count += 1,
-                (3, 3) => self.team_zero_three_v_three_count += 1,
-                _ => {}
-            }
-        } else {
-            self.team_one_count += 1;
-            match (attackers, defenders) {
-                (2, 1) => self.team_one_two_v_one_count += 1,
-                (2, 2) => self.team_one_two_v_two_count += 1,
-                (2, 3) => self.team_one_two_v_three_count += 1,
-                (3, 1) => self.team_one_three_v_one_count += 1,
-                (3, 2) => self.team_one_three_v_two_count += 1,
-                (3, 3) => self.team_one_three_v_three_count += 1,
-                _ => {}
-            }
-        }
+    fn record(&mut self, event: &RushEvent) {
+        self.labeled_rush_counts.increment(event.labels());
+        self.sync_legacy_counts();
+    }
+
+    pub fn rush_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_rush_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_rush_counts(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = [true, false]
+            .into_iter()
+            .flat_map(|is_team_0| {
+                RUSH_ATTACKER_COUNTS.into_iter().flat_map(move |attackers| {
+                    RUSH_DEFENDER_COUNTS.into_iter().map(move |defenders| {
+                        let mut labels = vec![
+                            rush_team_label(is_team_0),
+                            rush_attackers_label(attackers),
+                            rush_defenders_label(defenders),
+                        ];
+                        labels.sort();
+                        LabeledCountEntry {
+                            count: self.labeled_rush_counts.count_exact(&labels),
+                            labels,
+                        }
+                    })
+                })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledCounts { entries }
+    }
+
+    pub fn with_complete_labeled_rush_counts(mut self) -> Self {
+        self.labeled_rush_counts = self.complete_labeled_rush_counts();
+        self
+    }
+
+    fn team_count(&self, is_team_zero: bool) -> u32 {
+        self.rush_count_with_labels(&[rush_team_label(is_team_zero)])
+    }
+
+    fn matchup_count(&self, is_team_zero: bool, attackers: usize, defenders: usize) -> u32 {
+        self.rush_count_with_labels(&[
+            rush_team_label(is_team_zero),
+            rush_attackers_label(attackers),
+            rush_defenders_label(defenders),
+        ])
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.team_zero_count = self.team_count(true);
+        self.team_zero_two_v_one_count = self.matchup_count(true, 2, 1);
+        self.team_zero_two_v_two_count = self.matchup_count(true, 2, 2);
+        self.team_zero_two_v_three_count = self.matchup_count(true, 2, 3);
+        self.team_zero_three_v_one_count = self.matchup_count(true, 3, 1);
+        self.team_zero_three_v_two_count = self.matchup_count(true, 3, 2);
+        self.team_zero_three_v_three_count = self.matchup_count(true, 3, 3);
+        self.team_one_count = self.team_count(false);
+        self.team_one_two_v_one_count = self.matchup_count(false, 2, 1);
+        self.team_one_two_v_two_count = self.matchup_count(false, 2, 2);
+        self.team_one_two_v_three_count = self.matchup_count(false, 2, 3);
+        self.team_one_three_v_one_count = self.matchup_count(false, 3, 1);
+        self.team_one_three_v_two_count = self.matchup_count(false, 3, 2);
+        self.team_one_three_v_three_count = self.matchup_count(false, 3, 3);
     }
 
     pub fn for_team(&self, is_team_zero: bool) -> RushTeamStats {
@@ -182,11 +271,15 @@ impl RushCalculator {
             return;
         }
 
-        self.stats.record(
-            active_rush.is_team_0,
-            active_rush.attackers,
-            active_rush.defenders,
-        );
+        self.stats.record(&RushEvent {
+            start_time: active_rush.start_time,
+            start_frame: active_rush.start_frame,
+            end_time: active_rush.last_time,
+            end_frame: active_rush.last_frame,
+            is_team_0: active_rush.is_team_0,
+            attackers: active_rush.attackers,
+            defenders: active_rush.defenders,
+        });
         active_rush.counted = true;
     }
 
@@ -379,3 +472,7 @@ impl RushCalculator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "rush_tests.rs"]
+mod tests;
