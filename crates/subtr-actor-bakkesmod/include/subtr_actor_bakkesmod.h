@@ -91,6 +91,10 @@ typedef struct SaPlayerStatEvent {
   uint32_t player_index;
   uint8_t is_team_0;
   SaPlayerStatEventKind kind;
+  uint8_t has_shot_ball;
+  SaRigidBody shot_ball;
+  uint8_t has_shot_player;
+  SaRigidBody shot_player;
 } SaPlayerStatEvent;
 
 typedef struct SaDemolishEvent {

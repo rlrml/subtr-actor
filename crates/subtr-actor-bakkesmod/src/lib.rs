@@ -7,7 +7,8 @@ use subtr_actor::{
     BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo,
     DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalEvent, HalfFlipCalculator, LivePlayState, PlayerFrameState, PlayerSample, PlayerStatEvent,
-    PlayerStatEventKind, SpeedFlipCalculator, TouchEvent, TouchStateCalculator, WavedashCalculator,
+    PlayerStatEventKind, ShotEventMetadata, SpeedFlipCalculator, TouchEvent, TouchStateCalculator,
+    WavedashCalculator,
 };
 
 #[repr(C)]
@@ -125,6 +126,10 @@ pub struct SaPlayerStatEvent {
     pub player_index: u32,
     pub is_team_0: u8,
     pub kind: SaPlayerStatEventKind,
+    pub has_shot_ball: u8,
+    pub shot_ball: SaRigidBody,
+    pub has_shot_player: u8,
+    pub shot_player: SaRigidBody,
 }
 
 #[repr(C)]
@@ -444,9 +449,23 @@ fn explicit_player_stat_events(
                 SaPlayerStatEventKind::Save => PlayerStatEventKind::Save,
                 SaPlayerStatEventKind::Assist => PlayerStatEventKind::Assist,
             },
-            shot: None,
+            shot: shot_event_metadata(event),
         })
         .collect()
+}
+
+fn shot_event_metadata(event: &SaPlayerStatEvent) -> Option<ShotEventMetadata> {
+    if event.kind != SaPlayerStatEventKind::Shot || event.has_shot_ball == 0 {
+        return None;
+    }
+
+    let ball_body = rigid_body(event.shot_ball);
+    let player_body = (event.has_shot_player != 0).then(|| rigid_body(event.shot_player));
+    Some(ShotEventMetadata::from_rigid_bodies(
+        event.is_team_0 != 0,
+        &ball_body,
+        player_body.as_ref(),
+    ))
 }
 
 fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Vec<DemolishInfo> {
@@ -1109,6 +1128,32 @@ mod tests {
             player_index: 0,
             is_team_0: 1,
             kind: SaPlayerStatEventKind::Shot,
+            has_shot_ball: 1,
+            shot_ball: rigid_body(
+                SaVec3 {
+                    x: 300.0,
+                    y: 100.0,
+                    z: 120.0,
+                },
+                SaVec3 {
+                    x: 1000.0,
+                    y: 500.0,
+                    z: 100.0,
+                },
+            ),
+            has_shot_player: 1,
+            shot_player: rigid_body(
+                SaVec3 {
+                    x: 240.0,
+                    y: 90.0,
+                    z: 92.75,
+                },
+                SaVec3 {
+                    x: 800.0,
+                    y: 300.0,
+                    z: 0.0,
+                },
+            ),
         }];
         let demolishes = [SaDemolishEvent {
             attacker_index: 0,
@@ -1169,6 +1214,15 @@ mod tests {
         assert_eq!(frame_events.active_demos.len(), 1);
         assert_eq!(frame_events.boost_pad_events[0].pad_id, "34");
         assert_eq!(frame_events.goal_events[0].team_zero_score, Some(1));
+        assert_eq!(
+            frame_events.player_stat_events[0]
+                .shot
+                .as_ref()
+                .expect("shot metadata should be populated")
+                .ball_position
+                .x,
+            300.0
+        );
         assert_eq!(frame_events.demo_events[0].victim, RemoteId::SplitScreen(1));
         assert_eq!(
             frame_events.active_demos[0].victim,

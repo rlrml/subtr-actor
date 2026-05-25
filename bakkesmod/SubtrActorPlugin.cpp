@@ -529,11 +529,27 @@ void SubtrActorPlugin::recordPlayerStatDeltas(
 
   auto pushStats = [&](int previous, int next, SaPlayerStatEventKind kind) {
     for (int i = previous; i < next; i += 1) {
-      pendingPlayerStatEvents.push_back(SaPlayerStatEvent{
-          playerIndex,
-          isTeam0,
-          kind,
-      });
+      SaPlayerStatEvent event{};
+      event.player_index = playerIndex;
+      event.is_team_0 = isTeam0;
+      event.kind = kind;
+      if (kind == SaPlayerStatEventKindShot) {
+        ServerWrapper server = gameWrapper->GetGameEventAsServer();
+        if (!server.IsNull()) {
+          BallWrapper ball = server.GetBall();
+          if (!ball.IsNull()) {
+            event.has_shot_ball = 1;
+            event.shot_ball = sampleRigidBody(ball);
+          }
+        }
+
+        CarWrapper car = pri.GetCar();
+        if (!car.IsNull()) {
+          event.has_shot_player = 1;
+          event.shot_player = sampleRigidBody(car);
+        }
+      }
+      pendingPlayerStatEvents.push_back(event);
     }
   };
   pushStats(it->second.shots, current.shots, SaPlayerStatEventKindShot);
