@@ -151,6 +151,7 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "touch",
 ]);
 const TOUCH_MODULE_ID = "touch";
+const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
 const MECHANIC_BACKED_EVENT_MODULE_IDS = new Set([
   "ball-carry",
@@ -1476,7 +1477,7 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
 function getEventPlaylistSelectedSourceIds(sources: EventPlaylistSource[]): Set<string> {
   const sourceIds = sources.map((source) => source.id);
   if (eventPlaylistActiveSourceIds === null) {
-    return new Set(sourceIds);
+    return new Set(sourceIds.filter((id) => !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS.has(id)));
   }
   return new Set(sourceIds.filter((id) => eventPlaylistActiveSourceIds?.has(id)));
 }
@@ -1570,7 +1571,7 @@ function renderEventPlaylistWindow(): void {
   allButton.type = "button";
   allButton.textContent = "All";
   allButton.addEventListener("click", () => {
-    eventPlaylistActiveSourceIds = null;
+    eventPlaylistActiveSourceIds = new Set(sources.map((source) => source.id));
     eventPlaylistLastActiveKey = null;
     renderEventPlaylistWindow();
     const state = replayPlayer?.getState();
