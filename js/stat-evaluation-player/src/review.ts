@@ -7,11 +7,7 @@ import {
   type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import { getReplayFetchRequestFromSearch } from "./replayUrl.ts";
-import {
-  mountStatsReport,
-  type StatsReportData,
-  type StatsReportHandle,
-} from "./report.ts";
+import { mountStatsReport, type StatsReportData, type StatsReportHandle } from "./report.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 
@@ -32,7 +28,10 @@ export interface ReplayReviewMountOptions {
 export interface ReplayReviewHandle {
   readonly root: HTMLElement;
   setMode(mode: ReplayReviewMode): void;
-  setProvider(provider: ReplayReviewDataProvider | null, options?: { mode?: ReplayReviewMode }): void;
+  setProvider(
+    provider: ReplayReviewDataProvider | null,
+    options?: { mode?: ReplayReviewMode },
+  ): void;
   destroy(): void;
 }
 
@@ -205,7 +204,7 @@ export function mountReplayReview(
     if (!statsTimelinePromise) {
       statsTimelinePromise = provider.getStatsTimeline
         ? provider.getStatsTimeline(setProgressStatus)
-        : getBundle()?.then((bundle) => bundle.statsTimeline) ?? null;
+        : (getBundle()?.then((bundle) => bundle.statsTimeline) ?? null);
     }
     return statsTimelinePromise;
   };

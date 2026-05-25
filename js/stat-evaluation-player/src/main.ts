@@ -1438,7 +1438,12 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
     }))
     .filter((source) => source.events.length > 0);
 
-  return [...getEventPlaylistReplaySources(ctx), ...moduleSources, ...extraSources, ...mechanicSources];
+  return [
+    ...getEventPlaylistReplaySources(ctx),
+    ...moduleSources,
+    ...extraSources,
+    ...mechanicSources,
+  ];
 }
 
 function getEventPlaylistSelectedSourceIds(sources: EventPlaylistSource[]): Set<string> {
@@ -1662,10 +1667,7 @@ function renderEventPlaylistWindow(): void {
   eventPlaylistWindowBody.append(toolbar, list);
 }
 
-function getEventPlaylistActiveItem(
-  list: HTMLElement,
-  currentTime: number,
-): HTMLElement | null {
+function getEventPlaylistActiveItem(list: HTMLElement, currentTime: number): HTMLElement | null {
   const items = [...list.querySelectorAll<HTMLElement>(".event-playlist-item")];
   if (items.length === 0) {
     return null;
