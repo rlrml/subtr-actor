@@ -44,6 +44,8 @@ private:
   using WriteFrameJson = WriteJson;
   using TimelineJsonLen = JsonLen;
   using WriteTimelineJson = WriteJson;
+  using StatsJsonLen = JsonLen;
+  using WriteStatsJson = WriteJson;
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
@@ -79,6 +81,8 @@ private:
   WriteFrameJson writeFrameJson = nullptr;
   TimelineJsonLen timelineJsonLen = nullptr;
   WriteTimelineJson writeTimelineJson = nullptr;
+  StatsJsonLen statsJsonLen = nullptr;
+  WriteStatsJson writeStatsJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
   DrainEvents drainEvents = nullptr;

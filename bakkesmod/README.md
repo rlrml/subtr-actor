@@ -5,12 +5,13 @@ This is an early BakkesMod integration spike. It is intentionally split into:
 - `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames,
   evaluates the shared `subtr-actor` analysis graph, drains normalized mechanic
   events for overlay use, and exposes the live graph metadata, timeline, event
-  bundle, and current frame stats snapshot as JSON.
+  bundle, graph-backed stats modules, and current frame stats snapshot as JSON.
 - `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
   The `subtr_actor_dump_graph` console command writes the current graph
-  metadata, full timeline payload, event bundle, and current frame stats snapshot
-  to BakkesMod's `data/subtr-actor` directory as JSON.
+  metadata, full timeline payload, event bundle, graph-backed stats modules, and
+  current frame stats snapshot to BakkesMod's `data/subtr-actor` directory as
+  JSON.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
@@ -28,6 +29,9 @@ events, dodge-refresh transitions, and control state:
 - the full live `ReplayStatsTimeline` payload through
   `subtr_actor_bakkesmod_timeline_json_len` and
   `subtr_actor_bakkesmod_write_timeline_json`
+- the shared `StatsCollector` module-keyed stats surface through
+  `subtr_actor_bakkesmod_stats_json_len` and
+  `subtr_actor_bakkesmod_write_stats_json`
 - the resolved graph DAG and builtin node registry through
   `subtr_actor_bakkesmod_graph_info_json_len` and
   `subtr_actor_bakkesmod_write_graph_info_json`

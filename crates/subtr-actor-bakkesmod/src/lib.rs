@@ -6,7 +6,7 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    default_stats_timeline_config,
+    builtin_stats_graph_snapshot_json, default_stats_timeline_config,
     stats::analysis_graph::{
         builtin_analysis_node_names, graph_with_all_analysis_nodes, AnalysisGraph,
         StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
@@ -250,6 +250,7 @@ pub struct SaEngine {
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
     timeline_json: Vec<u8>,
+    stats_json: Vec<u8>,
     graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
@@ -269,6 +270,7 @@ impl Default for SaEngine {
             events_json: Vec::new(),
             frame_json: Vec::new(),
             timeline_json: Vec::new(),
+            stats_json: Vec::new(),
             graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
@@ -1168,6 +1170,13 @@ fn serialize_live_timeline(
     .unwrap_or_default()
 }
 
+fn serialize_stats_graph_snapshot(engine: &SaEngine) -> Vec<u8> {
+    match builtin_stats_graph_snapshot_json(&engine.graph, engine.live_replay_meta.as_ref()) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
 fn refresh_timeline_graph_views(engine: &mut SaEngine) {
     let Some(events) = engine
         .graph
@@ -1177,6 +1186,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         engine.events_json.clear();
         engine.frame_json.clear();
         engine.timeline_json.clear();
+        engine.stats_json.clear();
         return;
     };
     push_drainable_events_from_timeline(
@@ -1197,6 +1207,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         events,
         engine.timeline_frames.clone(),
     );
+    engine.stats_json = serialize_stats_graph_snapshot(engine);
 }
 
 /// Creates an opaque live-analysis engine.
@@ -1453,6 +1464,52 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
 
     let count = max_bytes.min(engine.timeline_json.len());
     ptr::copy_nonoverlapping(engine.timeline_json.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of the current serialized live stats snapshot.
+///
+/// The JSON payload exposes the same builtin stats module surface as
+/// `StatsCollector`: selected module names, snapshot config, aggregate module
+/// JSON, and the current module-keyed frame snapshot when replay metadata and
+/// frame state are available.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_json_len(engine: *const SaEngine) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.stats_json.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the current serialized live stats snapshot into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_stats_json_len` first to size the destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let count = max_bytes.min(engine.stats_json.len());
+    ptr::copy_nonoverlapping(engine.stats_json.as_ptr(), out_bytes, count);
     count
 }
 
@@ -1888,6 +1945,7 @@ mod tests {
         assert!(unsafe { subtr_actor_bakkesmod_events_json_len(engine) } > 0);
         assert!(unsafe { subtr_actor_bakkesmod_frame_json_len(engine) } > 0);
         assert!(unsafe { subtr_actor_bakkesmod_timeline_json_len(engine) } > 0);
+        assert!(unsafe { subtr_actor_bakkesmod_stats_json_len(engine) } > 0);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
@@ -2098,6 +2156,74 @@ mod tests {
         assert_eq!(frames[1]["frame_number"], 10);
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_timeline_json(engine, ptr::null_mut(), 10) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn exposes_stats_collector_module_json_after_processing_frame() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let blue_name = std::ffi::CString::new("Blue Live").unwrap();
+        let mut players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: -100.0,
+                y: -200.0,
+                z: 92.75,
+            },
+        )];
+        players[0].player_name = blue_name.as_ptr();
+        let frame = SaLiveFrame {
+            frame_number: 9,
+            time: 1.75,
+            dt: 0.016,
+            seconds_remaining: 298,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            players: players.as_ptr(),
+            player_count: players.len(),
+            ..SaLiveFrame::default()
+        };
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+        let json_len = unsafe { subtr_actor_bakkesmod_stats_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_stats_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("stats json should be valid");
+        let module_names = value["module_names"]
+            .as_array()
+            .expect("module names should be an array");
+        assert!(module_names.iter().any(|name| name == "core"));
+        assert!(module_names.iter().any(|name| name == "ball_carry"));
+        assert!(module_names.iter().any(|name| name == "demo"));
+        assert!(value["config"].get("positioning").is_some());
+        assert!(value["modules"].get("core").is_some());
+        assert!(value["modules"].get("boost").is_some());
+        assert!(value["modules"].get("demo").is_some());
+        assert_eq!(value["frame"]["frame_number"], 9);
+        assert_eq!(
+            value["frame"]["modules"]["core"]["player_stats"]
+                .as_array()
+                .expect("core frame player stats should be an array")
+                .len(),
+            1
+        );
+        assert!(value["frame"]["modules"].get("boost").is_some());
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_write_stats_json(engine, ptr::null_mut(), 10) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };

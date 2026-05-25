@@ -328,6 +328,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_timeline_json_len"));
   writeTimelineJson = reinterpret_cast<WriteTimelineJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_timeline_json"));
+  statsJsonLen = reinterpret_cast<StatsJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_json_len"));
+  writeStatsJson = reinterpret_cast<WriteStatsJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_json"));
   graphInfoJsonLen = reinterpret_cast<GraphInfoJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
@@ -337,8 +341,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
 
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
-      !timelineJsonLen || !writeTimelineJson || !graphInfoJsonLen || !writeGraphInfoJson ||
-      !drainEvents) {
+      !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
+      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -371,6 +375,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeFrameJson = nullptr;
   timelineJsonLen = nullptr;
   writeTimelineJson = nullptr;
+  statsJsonLen = nullptr;
+  writeStatsJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
@@ -977,10 +983,12 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
   const std::string eventsJson = readJsonBuffer(eventsJsonLen, writeEventsJson);
   const std::string frameJson = readJsonBuffer(frameJsonLen, writeFrameJson);
   const std::string timelineJson = readJsonBuffer(timelineJsonLen, writeTimelineJson);
+  const std::string statsJson = readJsonBuffer(statsJsonLen, writeStatsJson);
   const std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
   const std::filesystem::path eventsPath = outputDirectory / "graph-events.json";
   const std::filesystem::path framePath = outputDirectory / "graph-frame.json";
   const std::filesystem::path timelinePath = outputDirectory / "graph-timeline.json";
+  const std::filesystem::path statsPath = outputDirectory / "graph-stats.json";
   const std::filesystem::path graphInfoPath = outputDirectory / "graph-info.json";
 
   std::ofstream eventsFile(eventsPath, std::ios::binary);
@@ -989,19 +997,22 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
   frameFile.write(frameJson.data(), static_cast<std::streamsize>(frameJson.size()));
   std::ofstream timelineFile(timelinePath, std::ios::binary);
   timelineFile.write(timelineJson.data(), static_cast<std::streamsize>(timelineJson.size()));
+  std::ofstream statsFile(statsPath, std::ios::binary);
+  statsFile.write(statsJson.data(), static_cast<std::streamsize>(statsJson.size()));
   std::ofstream graphInfoFile(graphInfoPath, std::ios::binary);
   graphInfoFile.write(graphInfoJson.data(), static_cast<std::streamsize>(graphInfoJson.size()));
 
-  if (!eventsFile || !frameFile || !timelineFile || !graphInfoFile) {
+  if (!eventsFile || !frameFile || !timelineFile || !statsFile || !graphInfoFile) {
     cvarManager->log("subtr-actor: failed to write graph JSON snapshots");
     return;
   }
 
   cvarManager->log(std::format(
-      "subtr-actor: wrote graph JSON snapshots to {}, {}, {}, and {}",
+      "subtr-actor: wrote graph JSON snapshots to {}, {}, {}, {}, and {}",
       eventsPath.string(),
       framePath.string(),
       timelinePath.string(),
+      statsPath.string(),
       graphInfoPath.string()));
 }
 
