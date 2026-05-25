@@ -118,6 +118,8 @@ acceptance check for live graph callability and event-generation parity.
 3. Exercise live events that should be visible to the graph: touch the ball,
    pick up a boost pad, score a goal, and trigger a demolition when possible.
    Overlay labels should appear for drainable graph events.
+   If the console logs `subtr-actor: live frame processing failed`, the plugin
+   preserves queued BakkesMod events and retries them on the next sampled frame.
 4. Dump the complete live graph surface:
 
    ```text

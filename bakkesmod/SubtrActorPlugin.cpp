@@ -896,11 +896,13 @@ void SubtrActorPlugin::tick(std::string) {
 
   SaLiveFrame frame = sampleFrame();
   const int32_t processResult = processFrame(engine, &frame);
-  clearPendingFrameEvents();
   if (processResult != 0) {
+    cvarManager->log(
+        std::format("subtr-actor: live frame processing failed: {}", processResult));
     return;
   }
 
+  clearPendingFrameEvents();
   drainPendingEvents();
 }
 
