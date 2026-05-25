@@ -10,9 +10,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
 - `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
   The `subtr_actor_dump_graph` console command writes the current graph
-  metadata, full timeline payload, event bundle, graph-backed stats modules, and
-  current frame stats snapshot to BakkesMod's `data/subtr-actor` directory as
-  JSON.
+  metadata, full timeline payload, event bundle, graph-backed stats modules, all
+  analysis-node outputs, and current frame stats snapshot to BakkesMod's
+  `data/subtr-actor` directory as JSON.
   The `subtr_actor_dump_stats_module <module_name> [finish]` console command
   writes one graph-backed builtin stats module by name, using the module names
   reported in `graph-info.json`.
@@ -20,8 +20,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   `subtr_actor_dump_stats_module_config <module_name> [finish]` commands write
   the same module-keyed frame snapshot and config surfaces by name.
   The `subtr_actor_dump_graph_output <output_name> [finish]` console command
-  writes one named graph output (`events`, `frame`, `timeline`, `stats`, or
-  `graph_info`) using the output names reported in `graph-info.json`.
+  writes one named graph output (`events`, `frame`, `timeline`, `stats`,
+  `analysis_nodes`, or `graph_info`) using the output names reported in
+  `graph-info.json`.
   The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
   writes one graph-backed builtin analysis node by name, using the node names
   reported in `graph-info.json`.
@@ -49,6 +50,9 @@ events, dodge-refresh transitions, and control state:
 - the shared `StatsCollector` module-keyed stats surface through
   `subtr_actor_bakkesmod_stats_json_len` and
   `subtr_actor_bakkesmod_write_stats_json`
+- the full builtin analysis-node output map through the `analysis_nodes` named
+  graph output, using `subtr_actor_bakkesmod_graph_output_json_len` and
+  `subtr_actor_bakkesmod_write_graph_output_json`
 - the resolved graph DAG, builtin node registry, and stats module registry through
   `subtr_actor_bakkesmod_graph_info_json_len` and
   `subtr_actor_bakkesmod_write_graph_info_json`

@@ -26,6 +26,9 @@ constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.Event
 constexpr char BOOST_SPAWNED_EVENT[] = "Function TAGame.VehiclePickup_TA.EventSpawned";
 constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventGoalScored";
 constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
+constexpr char GRAPH_OUTPUT_USAGE[] =
+    "subtr_actor_dump_graph_output "
+    "<events|frame|timeline|stats|analysis_nodes|graph_info> [finish]";
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
@@ -500,7 +503,7 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_dump_graph",
       [this](std::vector<std::string> params) { dumpGraphJson(params); },
-      "Writes graph metadata, timeline, events, frame, and stats JSON. "
+      "Writes graph metadata, timeline, events, frame, stats, and analysis node JSON. "
       "Pass 'finish' to flush delayed graph events first.",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
@@ -524,8 +527,7 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_dump_graph_output",
       [this](std::vector<std::string> params) { dumpGraphOutputJson(params); },
-      "Writes one named graph output JSON. Usage: "
-      "subtr_actor_dump_graph_output <events|frame|timeline|stats|graph_info> [finish]",
+      std::string("Writes one named graph output JSON. Usage: ") + GRAPH_OUTPUT_USAGE,
       PERMISSION_ALL);
   cvarManager->registerNotifier(
       "subtr_actor_dump_analysis_node",
@@ -1499,11 +1501,14 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   const std::string frameJson = readJsonBuffer(frameJsonLen, writeFrameJson);
   const std::string timelineJson = readJsonBuffer(timelineJsonLen, writeTimelineJson);
   const std::string statsJson = readJsonBuffer(statsJsonLen, writeStatsJson);
+  const std::string analysisNodesJson =
+      readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "analysis_nodes");
   const std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
   const std::filesystem::path eventsPath = outputDirectory / "graph-events.json";
   const std::filesystem::path framePath = outputDirectory / "graph-frame.json";
   const std::filesystem::path timelinePath = outputDirectory / "graph-timeline.json";
   const std::filesystem::path statsPath = outputDirectory / "graph-stats.json";
+  const std::filesystem::path analysisNodesPath = outputDirectory / "graph-analysis-nodes.json";
   const std::filesystem::path graphInfoPath = outputDirectory / "graph-info.json";
 
   std::ofstream eventsFile(eventsPath, std::ios::binary);
@@ -1514,17 +1519,21 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   timelineFile.write(timelineJson.data(), static_cast<std::streamsize>(timelineJson.size()));
   std::ofstream statsFile(statsPath, std::ios::binary);
   statsFile.write(statsJson.data(), static_cast<std::streamsize>(statsJson.size()));
+  std::ofstream analysisNodesFile(analysisNodesPath, std::ios::binary);
+  analysisNodesFile.write(
+      analysisNodesJson.data(), static_cast<std::streamsize>(analysisNodesJson.size()));
   std::ofstream graphInfoFile(graphInfoPath, std::ios::binary);
   graphInfoFile.write(graphInfoJson.data(), static_cast<std::streamsize>(graphInfoJson.size()));
 
-  if (!eventsFile || !frameFile || !timelineFile || !statsFile || !graphInfoFile) {
+  if (!eventsFile || !frameFile || !timelineFile || !statsFile || !analysisNodesFile ||
+      !graphInfoFile) {
     cvarManager->log("subtr-actor: failed to write graph JSON snapshots");
     return;
   }
 
   cvarManager->log(std::format(
       "subtr-actor: wrote graph JSON snapshots{}: {} ({} bytes), {} ({} bytes), "
-      "{} ({} bytes), {} ({} bytes), {} ({} bytes)",
+      "{} ({} bytes), {} ({} bytes), {} ({} bytes), {} ({} bytes)",
       shouldFinish ? " after finish" : "",
       eventsPath.string(),
       eventsJson.size(),
@@ -1534,6 +1543,8 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
       timelineJson.size(),
       statsPath.string(),
       statsJson.size(),
+      analysisNodesPath.string(),
+      analysisNodesJson.size(),
       graphInfoPath.string(),
       graphInfoJson.size()));
 }
@@ -1746,8 +1757,7 @@ void SubtrActorPlugin::dumpGraphOutputJson(std::vector<std::string> params) {
     return;
   }
   if (params.size() < 2) {
-    cvarManager->log(
-        "subtr-actor: usage: subtr_actor_dump_graph_output <output_name> [finish]");
+    cvarManager->log(std::format("subtr-actor: usage: {}", GRAPH_OUTPUT_USAGE));
     return;
   }
 
