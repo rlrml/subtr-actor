@@ -6,8 +6,8 @@ use crate::{
     FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
     HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
     OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
-    PlayerVerticalState, PossessionState, RotationCalculator, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator,
+    PossessionState, RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator, PlayerVerticalState,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -195,4 +195,22 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<AirDribbleGoalCalculator>().is_some());
     assert!(graph.state::<FlipResetGoalCalculator>().is_some());
     assert!(graph.state::<HalfVolleyGoalCalculator>().is_some());
+}
+
+#[test]
+fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
+    let replay = parse_replay("assets/rlcs.replay");
+    let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
+        .expect("full graph should evaluate a real replay");
+    let graph_events = graph
+        .state::<StatsTimelineEventsState>()
+        .expect("full graph should expose stats timeline events")
+        .events
+        .clone();
+
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("stats timeline collector should evaluate the same replay");
+
+    assert_eq!(graph_events, timeline.events);
 }
