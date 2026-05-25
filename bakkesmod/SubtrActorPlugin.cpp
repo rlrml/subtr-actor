@@ -25,6 +25,7 @@ constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
+constexpr uint64_t DODGE_REFRESH_TOUCH_FRAME_WINDOW = 2;
 
 int moduleAnchor = 0;
 
@@ -484,6 +485,7 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
     recordPlayerStatDeltas(pri, playerIndex, player.is_team_0);
   }
   carPlayerIndices[car.memory_address] = playerIndex;
+  recordDodgeRefreshFromJumpState(car, playerIndex, player.is_team_0);
 
   player.has_rigid_body = 1;
   player.rigid_body = sampleRigidBody(car);
@@ -515,6 +517,9 @@ void SubtrActorPlugin::resetLiveState() {
   uniqueIdPlayerIndices.clear();
   stablePriPlayerIndices.clear();
   lastPlayerStats.clear();
+  lastDoubleJumped.clear();
+  lastBallTouchFrames.clear();
+  dodgeRefreshCounters.clear();
   boostPadIds.clear();
   boostPadSequences.clear();
   lastTouch.reset();
@@ -567,8 +572,41 @@ void SubtrActorPlugin::recordTouch(CarWrapper car) {
         event.player_index,
         event.is_team_0,
     };
+    lastBallTouchFrames[event.player_index] = frameNumber;
   }
   pendingTouches.push_back(event);
+}
+
+void SubtrActorPlugin::recordDodgeRefreshFromJumpState(
+    CarWrapper car,
+    uint32_t playerIndex,
+    uint8_t isTeam0) {
+  if (car.IsNull()) {
+    return;
+  }
+
+  const bool doubleJumped = car.GetbDoubleJumped() != 0;
+  const bool canJump = car.GetbCanJump() != 0;
+  const bool onGround = car.GetbOnGround() != 0 || car.IsOnGround();
+  const auto previousDoubleJumped = lastDoubleJumped.find(playerIndex);
+  const bool hadSpentDodge =
+      previousDoubleJumped != lastDoubleJumped.end() && previousDoubleJumped->second;
+  lastDoubleJumped[playerIndex] = doubleJumped;
+
+  const auto touchFrame = lastBallTouchFrames.find(playerIndex);
+  const bool recentlyTouchedBall =
+      touchFrame != lastBallTouchFrames.end() &&
+      frameNumber >= touchFrame->second &&
+      frameNumber - touchFrame->second <= DODGE_REFRESH_TOUCH_FRAME_WINDOW;
+  if (!hadSpentDodge || doubleJumped || !canJump || onGround || !recentlyTouchedBall) {
+    return;
+  }
+
+  SaDodgeRefreshedEvent event{};
+  event.player_index = playerIndex;
+  event.is_team_0 = isTeam0;
+  event.counter_value = ++dodgeRefreshCounters[playerIndex];
+  pendingDodgeRefreshes.push_back(event);
 }
 
 void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind) {

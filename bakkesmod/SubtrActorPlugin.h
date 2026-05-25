@@ -87,6 +87,9 @@ private:
   std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
+  std::unordered_map<uint32_t, bool> lastDoubleJumped;
+  std::unordered_map<uint32_t, uint64_t> lastBallTouchFrames;
+  std::unordered_map<uint32_t, int32_t> dodgeRefreshCounters;
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
   std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
   std::optional<TouchAttribution> lastTouch;
@@ -109,6 +112,7 @@ private:
   void clearPendingFrameEvents();
   void attachPendingFrameEvents(SaLiveFrame &frame);
   void recordTouch(CarWrapper car);
+  void recordDodgeRefreshFromJumpState(CarWrapper car, uint32_t playerIndex, uint8_t isTeam0);
   void recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind);
   void recordGoal(ServerWrapper server, GoalWrapper goal);
   void recordDemolish(CarWrapper victim, ActorWrapper demolisher);

@@ -12,7 +12,7 @@ This is an early BakkesMod integration spike. It is intentionally split into:
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
 mechanics whose first pass can work from live kinematics, explicit BakkesMod
-events, and control state:
+events, dodge-refresh transitions, and control state:
 
 - speed flip
 - half flip
