@@ -28,6 +28,7 @@ import {
   buildWhiffTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
+  getMechanicTimelineEventModuleIds,
   getReplayTimelineEventKinds,
 } from "./timelineMarkers.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
@@ -178,6 +179,146 @@ test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
   );
 });
 
+test("getMechanicTimelineEventModuleIds only includes generic mechanic-owned module markers", () => {
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "ball_carry:1:3:0",
+        kind: "ball_carry",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+      {
+        id: "double_tap:1:3:0",
+        kind: "double_tap",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+      {
+        id: "wall_aerial:2:5:0",
+        kind: "wall_aerial",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 2,
+          end_frame: 5,
+          start_time: 2,
+          end_time: 5,
+        },
+        properties: [],
+      },
+      {
+        id: "center:3:6:0",
+        kind: "center",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 3,
+          end_frame: 6,
+          start_time: 3,
+          end_time: 6,
+        },
+        properties: [],
+      },
+      {
+        id: "wavedash:4:0",
+        kind: "wavedash",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "moment",
+          frame: 4,
+          time: 4,
+        },
+        properties: [],
+      },
+    ],
+  });
+
+  assert.deepEqual([...getMechanicTimelineEventModuleIds(statsTimeline)], [
+    "center",
+    "double-tap",
+    "wall-aerial",
+  ]);
+});
+
+test("countEnabledTimelineEvents ignores module markers owned by mechanic events", () => {
+  const replay = {
+    timelineEvents: [],
+    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "wall_aerial:2:5:0",
+        kind: "wall_aerial",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 2,
+          end_frame: 5,
+          start_time: 2,
+          end_time: 5,
+        },
+        properties: [],
+      },
+    ],
+    wall_aerial_events: [
+      {
+        time: 5,
+        frame: 5,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        wall: "side",
+        wall_contact_time: 2,
+        wall_contact_frame: 2,
+        takeoff_time: 3,
+        takeoff_frame: 3,
+        time_since_takeoff: 2,
+        wall_contact_position: [4096, -300, 220],
+        takeoff_position: [4070, -330, 300],
+        player_position: [3600, -500, 820],
+        ball_position: [3700, -520, 900],
+        setup_start_time: 1,
+        setup_start_frame: 1,
+        setup_duration: 1,
+        ball_speed: 1400,
+        ball_speed_change: 260,
+        goal_alignment: 0.69,
+        confidence: 0.74,
+      },
+    ],
+  });
+
+  assert.equal(countEnabledTimelineEvents(["wall-aerial"], replay, statsTimeline), 0);
+});
+
 test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
   const replay = {
     frames: Array.from({ length: 41 }, (_, time) => ({ time })),
@@ -322,8 +463,8 @@ test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeli
       time: 2.25,
       frame: 2,
       kind: "wall-aerial",
-      label: "Blue wall aerial 86% | side wall",
-      shortLabel: "WA",
+      label: "Blue wall-to-air setup 86% | side wall",
+      shortLabel: "W2A",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,

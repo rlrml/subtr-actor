@@ -2,11 +2,16 @@ use super::*;
 
 const WALL_AERIAL_MIN_CONTROL_DURATION: f32 = 0.30;
 const WALL_AERIAL_MAX_CONTROL_BALL_DISTANCE: f32 = 380.0;
-const WALL_AERIAL_MAX_TAKEOFF_TO_TOUCH_SECONDS: f32 = 1.60;
+const WALL_AERIAL_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS: f32 = 1.25;
+const WALL_AERIAL_MAX_TAKEOFF_TO_TOUCH_SECONDS: f32 = 2.25;
+const WALL_AERIAL_MIN_SECONDS_BETWEEN_ATTEMPTS: f32 = 3.0;
 pub(crate) const WALL_AERIAL_MAX_TAKEOFF_TO_SHOT_SECONDS: f32 = 1.80;
 pub(crate) const WALL_AERIAL_MIN_TOUCH_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
-pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = BALL_RADIUS_Z + 45.0;
-const WALL_AERIAL_MIN_BALL_SPEED_CHANGE: f32 = 80.0;
+const WALL_AERIAL_SETUP_SIDE_WALL_START_ABS_X: f32 = 3200.0;
+const WALL_AERIAL_SETUP_BACK_WALL_START_ABS_Y: f32 = 4600.0;
+const WALL_AERIAL_MIN_CONTINUATION_PLAYER_Z: f32 = 300.0;
+pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = 400.0;
+const WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE: f32 = 80.0;
 pub(crate) const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
@@ -36,6 +41,21 @@ pub(crate) fn wall_aerial_wall_for_position(position: glam::Vec3) -> Option<Wall
         return Some(WallAerialWall::Back);
     }
     if position.x.abs() >= SIDE_WALL_CONTACT_ABS_X {
+        return Some(WallAerialWall::Side);
+    }
+    None
+}
+
+fn wall_aerial_setup_wall_for_position(position: glam::Vec3) -> Option<WallAerialWall> {
+    if position.z < WALL_CONTACT_MIN_PLAYER_Z {
+        return None;
+    }
+    if position.y.abs() >= WALL_AERIAL_SETUP_BACK_WALL_START_ABS_Y
+        && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X
+    {
+        return Some(WallAerialWall::Back);
+    }
+    if position.x.abs() >= WALL_AERIAL_SETUP_SIDE_WALL_START_ABS_X {
         return Some(WallAerialWall::Side);
     }
     None
@@ -197,6 +217,7 @@ pub struct WallAerialCalculator {
     active_wall_controls: HashMap<PlayerId, ActiveWallControl>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
     armed_aerials: HashMap<PlayerId, ArmedWallAerial>,
+    recent_event_times: HashMap<PlayerId, f32>,
     previous_ball_velocity: Option<glam::Vec3>,
     current_last_wall_aerial_player: Option<PlayerId>,
 }
@@ -238,7 +259,7 @@ impl WallAerialCalculator {
             .iter()
             .find(|player| &player.player_id == player_id)?;
         let player_position = player.position()?;
-        let wall = wall_aerial_wall_for_position(player_position)?;
+        let wall = wall_aerial_setup_wall_for_position(player_position)?;
         if player_position.distance(ball_position) > WALL_AERIAL_MAX_CONTROL_BALL_DISTANCE {
             return None;
         }
@@ -311,11 +332,17 @@ impl WallAerialCalculator {
             let Some(position) = player.position() else {
                 continue;
             };
-            if let Some(wall) = wall_aerial_wall_for_position(position) {
+            let setup_wall = wall_aerial_setup_wall_for_position(position);
+            if let Some(wall) = setup_wall {
                 let controlled_setup = self
                     .active_wall_controls
                     .get(&player.player_id)
-                    .and_then(Self::completed_setup);
+                    .and_then(Self::completed_setup)
+                    .or_else(|| {
+                        self.recent_wall_contacts
+                            .get(&player.player_id)
+                            .and_then(|contact| contact.controlled_setup.clone())
+                    });
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),
                     RecentWallContact {
@@ -328,7 +355,9 @@ impl WallAerialCalculator {
                         controlled_setup,
                     },
                 );
-                continue;
+                if player_is_on_wall(position) {
+                    continue;
+                }
             }
 
             if position.z < WALL_AERIAL_MIN_TOUCH_PLAYER_Z {
@@ -336,13 +365,23 @@ impl WallAerialCalculator {
                 continue;
             }
 
-            let Some(contact) = self.recent_wall_contacts.get(&player.player_id).cloned() else {
+            let Some(contact) = self.recent_wall_contacts.remove(&player.player_id) else {
                 continue;
             };
+            if frame.time - contact.time > WALL_AERIAL_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS {
+                continue;
+            }
             let Some(controlled_setup) = contact.controlled_setup.clone() else {
                 continue;
             };
             if self.armed_aerials.contains_key(&player.player_id) {
+                continue;
+            }
+            if self
+                .recent_event_times
+                .get(&player.player_id)
+                .is_some_and(|time| frame.time - time < WALL_AERIAL_MIN_SECONDS_BETWEEN_ATTEMPTS)
+            {
                 continue;
             }
             self.armed_aerials.insert(
@@ -420,14 +459,13 @@ impl WallAerialCalculator {
         if ball_position.z < WALL_AERIAL_MIN_TOUCH_BALL_Z {
             return None;
         }
+        if player_position.z < WALL_AERIAL_MIN_CONTINUATION_PLAYER_Z {
+            return None;
+        }
         let time_since_takeoff = touch.time - armed.takeoff_time;
         if !(0.0..=WALL_AERIAL_MAX_TAKEOFF_TO_TOUCH_SECONDS).contains(&time_since_takeoff) {
             return None;
         }
-        if ball_speed_change < WALL_AERIAL_MIN_BALL_SPEED_CHANGE {
-            return None;
-        }
-
         let setup = &armed.controlled_setup;
         let confidence = 0.30
             + 0.20
@@ -452,7 +490,7 @@ impl WallAerialCalculator {
             + 0.16
                 * wall_aerial_normalize_score(
                     ball_speed_change,
-                    WALL_AERIAL_MIN_BALL_SPEED_CHANGE,
+                    WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE,
                     900.0,
                 );
 
@@ -504,6 +542,8 @@ impl WallAerialCalculator {
         stats.cumulative_touch_height += event.player_position[2];
 
         self.current_last_wall_aerial_player = Some(event.player.clone());
+        self.recent_event_times
+            .insert(event.player.clone(), event.time);
         self.events.push(event);
     }
 
@@ -520,6 +560,7 @@ impl WallAerialCalculator {
             self.active_wall_controls.clear();
             self.recent_wall_contacts.clear();
             self.armed_aerials.clear();
+            self.recent_event_times.clear();
             self.previous_ball_velocity = ball.velocity();
             self.current_last_wall_aerial_player = None;
             return Ok(());

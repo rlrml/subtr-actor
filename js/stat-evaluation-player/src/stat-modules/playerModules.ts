@@ -206,7 +206,7 @@ export function createCeilingShotModule(): StatModule {
 export function createWallAerialModule(): StatModule {
   return {
     id: "wall-aerial",
-    label: "Wall Aerial",
+    label: "Wall-to-Air Setup",
 
     setup() {},
 
@@ -228,7 +228,7 @@ export function createWallAerialModule(): StatModule {
           player.is_team_0,
           renderWallAerialStats(player.wall_aerial),
           player.wall_aerial?.is_last_wall_aerial
-            ? '<span class="role-indicator role-forward">Last Wall Aerial</span>'
+            ? '<span class="role-indicator role-forward">Last Wall-to-Air Setup</span>'
             : "",
         ),
       );

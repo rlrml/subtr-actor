@@ -48,6 +48,10 @@ import {
   formatMechanicKind,
   buildGoalTagTimelineEvents,
   getMechanicKinds,
+  getMechanicTimelineEventKinds,
+  getMechanicTimelineEventModuleIds,
+  getNonMechanicTimelineEventModuleIds,
+  mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 import {
@@ -152,17 +156,6 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
 const TOUCH_MODULE_ID = "touch";
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
-const MECHANIC_BACKED_EVENT_MODULE_IDS = new Set([
-  "ball-carry",
-  "ceiling-shot",
-  "double-tap",
-  "flick",
-  "half-flip",
-  "musty-flick",
-  "one-timer",
-  "pass",
-  "speed-flip",
-]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -461,6 +454,10 @@ function getActiveModuleIds(): Set<string> {
   ]);
 }
 
+function getActiveTimelineEventModuleIds(): Set<string> {
+  return getNonMechanicTimelineEventModuleIds(activeTimelineEventModuleIds, statsTimeline);
+}
+
 function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
   return kind === "events"
     ? activeTimelineEventModuleIds
@@ -510,6 +507,15 @@ function setupActiveModules(): void {
   syncTimelineEvents();
   syncTimelineRanges();
   clearRenderCaches();
+}
+
+function migrateMechanicBackedTimelineEventSelections(): void {
+  for (const kind of getMechanicTimelineEventKinds(statsTimeline)) {
+    const moduleId = mechanicKindToModuleId(kind);
+    if (activeTimelineEventModuleIds.delete(moduleId)) {
+      activeMechanicTimelineKinds.add(kind);
+    }
+  }
 }
 
 function teardownActiveModules(): void {
@@ -593,9 +599,10 @@ function syncTimelineEvents(): void {
   if (!timelineOverlay || !ctx) {
     return;
   }
+  const activeEventModuleIds = getActiveTimelineEventModuleIds();
 
   for (const mod of activeModules) {
-    if (!activeTimelineEventModuleIds.has(mod.id)) {
+    if (!activeEventModuleIds.has(mod.id)) {
       continue;
     }
     const events = mod.getTimelineEvents?.(ctx);
@@ -938,6 +945,7 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   activeTimelineEventModuleIds = new Set(config.overlays.timelineEvents);
   activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
   activeMechanicTimelineKinds = new Set(config.overlays.mechanics);
+  migrateMechanicBackedTimelineEventSelections();
   activeRenderEffectModuleIds = new Set(config.overlays.renderEffects);
   boostPadOverlayEnabled = config.overlays.boostPads;
   skipPostGoalTransitions.checked =
@@ -1152,6 +1160,7 @@ function renderModuleSummary(): void {
 
   const timelineToggles: HTMLButtonElement[] = [];
   const inGameVisualizationToggles: HTMLButtonElement[] = [];
+  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
 
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -1159,7 +1168,7 @@ function renderModuleSummary(): void {
       continue;
     }
 
-    if (mod.getTimelineEvents) {
+    if (mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id)) {
       timelineToggles.push(
         renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
       );
@@ -1225,13 +1234,10 @@ function renderEventTimelineControls(): void {
   for (const event of statsTimeline?.events.mechanics ?? []) {
     mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
   }
-  const mechanicModuleIds = new Set(kinds.map((kind) => kind.replaceAll("_", "-")));
+  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
 
   const moduleEventSources = MODULES.filter(
-    (mod) =>
-      mod.getTimelineEvents &&
-      !MECHANIC_BACKED_EVENT_MODULE_IDS.has(mod.id) &&
-      !mechanicModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
   ).map((mod) => ({
     id: mod.id,
     label: mod.label,
@@ -1435,12 +1441,9 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
   }
 
   const visibleMechanicKinds = getMechanicKinds(ctx.statsTimeline);
-  const mechanicModuleIds = new Set(visibleMechanicKinds.map((kind) => kind.replaceAll("_", "-")));
+  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(ctx.statsTimeline);
   const moduleSources = MODULES.filter(
-    (mod) =>
-      mod.getTimelineEvents &&
-      !MECHANIC_BACKED_EVENT_MODULE_IDS.has(mod.id) &&
-      !mechanicModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
   )
     .map((mod) => ({
       id: `module:${mod.id}`,
@@ -4031,6 +4034,7 @@ async function loadReplayBundleForDisplay(
     statsTimeline = loadedReplay.statsTimeline;
     statsFrameLookup = createStatsFrameLookup(statsTimeline);
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
+    migrateMechanicBackedTimelineEventSelections();
 
     timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",

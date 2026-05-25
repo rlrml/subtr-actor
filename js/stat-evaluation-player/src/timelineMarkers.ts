@@ -26,6 +26,20 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
 const RANGE_ONLY_MECHANIC_KINDS = new Set(["air_dribble", "ball_carry"]);
+const GENERIC_MECHANIC_EVENT_MODULE_IDS = new Set([
+  "center",
+  "ceiling-shot",
+  "double-tap",
+  "flick",
+  "half-flip",
+  "half-volley",
+  "musty-flick",
+  "one-timer",
+  "pass",
+  "speed-flip",
+  "wall-aerial",
+  "wall-aerial-shot",
+]);
 
 function getReplayPlayerName(replay: ReplayModel, playerId: string): string {
   return replay.players.find((player) => player.id === playerId)?.name ?? playerId;
@@ -72,6 +86,32 @@ export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] 
 
 export function isVisibleMechanicKind(kind: string): boolean {
   return !HIDDEN_MECHANIC_KINDS.has(kind);
+}
+
+export function getMechanicTimelineEventKinds(statsTimeline: StatsTimeline | null): string[] {
+  return getMechanicKinds(statsTimeline).filter(
+    (kind) =>
+      !RANGE_ONLY_MECHANIC_KINDS.has(kind) &&
+      GENERIC_MECHANIC_EVENT_MODULE_IDS.has(mechanicKindToModuleId(kind)),
+  );
+}
+
+export function mechanicKindToModuleId(kind: string): string {
+  return kind.replaceAll("_", "-");
+}
+
+export function getMechanicTimelineEventModuleIds(
+  statsTimeline: StatsTimeline | null,
+): Set<string> {
+  return new Set(getMechanicTimelineEventKinds(statsTimeline).map(mechanicKindToModuleId));
+}
+
+export function getNonMechanicTimelineEventModuleIds(
+  moduleIds: Iterable<string>,
+  statsTimeline: StatsTimeline | null,
+): Set<string> {
+  const mechanicModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  return new Set([...moduleIds].filter((moduleId) => !mechanicModuleIds.has(moduleId)));
 }
 
 export function buildMechanicTimelineEvents(
@@ -374,8 +414,8 @@ export function buildWallAerialTimelineEvents(
       time: eventTime,
       frame: event.frame,
       kind: "wall-aerial",
-      label: `${playerName} wall aerial ${qualityPercent}% | ${wallLabel} wall`,
-      shortLabel: "WA",
+      label: `${playerName} wall-to-air setup ${qualityPercent}% | ${wallLabel} wall`,
+      shortLabel: "W2A",
       playerId,
       playerName,
       isTeamZero: event.is_team_0,
@@ -861,7 +901,7 @@ export function countEnabledTimelineEvents(
   replay: ReplayModel,
   statsTimeline: StatsTimeline,
 ): number {
-  const active = new Set(activeModuleIds);
+  const active = getNonMechanicTimelineEventModuleIds(activeModuleIds, statsTimeline);
   let count = filterReplayTimelineEvents(replay, active).length;
 
   if (active.has("fifty-fifty")) {
