@@ -183,6 +183,11 @@ void subtr_actor_bakkesmod_engine_destroy(SaEngine *engine);
 void subtr_actor_bakkesmod_engine_reset(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame *frame);
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_write_events_json(
+    const SaEngine *engine,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_drain_events(
     SaEngine *engine,
     SaMechanicEvent *out_events,

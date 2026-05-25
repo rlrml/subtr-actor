@@ -228,6 +228,7 @@ pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
     emitted_mechanic_ids: HashSet<String>,
+    events_json: Vec<u8>,
     pending_events: Vec<SaMechanicEvent>,
 }
 
@@ -239,6 +240,7 @@ impl Default for SaEngine {
             graph,
             live_events: SaLiveEventGenerator::default(),
             emitted_mechanic_ids: HashSet::new(),
+            events_json: Vec::new(),
             pending_events: Vec::new(),
         }
     }
@@ -727,8 +729,9 @@ fn push_mechanic_events_from_timeline(
     }
 }
 
-fn push_new_events(engine: &mut SaEngine) {
+fn refresh_timeline_event_views(engine: &mut SaEngine) {
     let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
+        engine.events_json.clear();
         return;
     };
     push_mechanic_events_from_timeline(
@@ -736,6 +739,7 @@ fn push_new_events(engine: &mut SaEngine) {
         &mut engine.emitted_mechanic_ids,
         &timeline_events.events.mechanics,
     );
+    engine.events_json = serde_json::to_vec(&timeline_events.events).unwrap_or_default();
 }
 
 /// Creates an opaque live-analysis engine.
@@ -811,7 +815,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
         return -2;
     }
 
-    push_new_events(engine);
+    refresh_timeline_event_views(engine);
     0
 }
 
@@ -829,6 +833,50 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
         .as_ref()
         .map(|engine| engine.pending_events.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of the current serialized graph event bundle.
+///
+/// The JSON payload is a `ReplayStatsTimelineEvents` value produced by the live
+/// analysis graph after the most recent successful frame.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_events_json_len(engine: *const SaEngine) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.events_json.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the current serialized graph event bundle into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_events_json_len` first to size the destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let count = max_bytes.min(engine.events_json.len());
+    ptr::copy_nonoverlapping(engine.events_json.as_ptr(), out_bytes, count);
+    count
 }
 
 #[no_mangle]
@@ -1041,6 +1089,49 @@ mod tests {
         assert_eq!(gameplay.current_score(), Some((2, 1)));
         assert_eq!(gameplay.possession_team_is_team_0, Some(true));
         assert_eq!(gameplay.scored_on_team_is_team_0, Some(false));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn exposes_full_timeline_events_json_after_processing_frame() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            seconds_remaining: 299,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            players: ptr::null(),
+            player_count: 0,
+            ..SaLiveFrame::default()
+        };
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+        let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_events_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("events json should be valid");
+        assert!(value.get("timeline").is_some());
+        assert!(value.get("mechanics").is_some());
+        assert!(value.get("goal_context").is_some());
+        assert!(value.get("boost_pickups").is_some());
+        assert!(value.get("bump").is_some());
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_write_events_json(engine, ptr::null_mut(), 10) },
+            0
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

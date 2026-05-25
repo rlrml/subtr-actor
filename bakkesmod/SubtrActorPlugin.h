@@ -34,6 +34,8 @@ private:
   using EngineDestroy = void (*)(SaEngine *);
   using EngineReset = void (*)(SaEngine *);
   using ProcessFrame = int32_t (*)(SaEngine *, const SaLiveFrame *);
+  using EventsJsonLen = size_t (*)(const SaEngine *);
+  using WriteEventsJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
 
   struct OverlayMessage {
@@ -60,6 +62,8 @@ private:
   EngineDestroy engineDestroy = nullptr;
   EngineReset engineReset = nullptr;
   ProcessFrame processFrame = nullptr;
+  EventsJsonLen eventsJsonLen = nullptr;
+  WriteEventsJson writeEventsJson = nullptr;
   DrainEvents drainEvents = nullptr;
 
   uint64_t frameNumber = 0;

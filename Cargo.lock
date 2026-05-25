@@ -1272,6 +1272,7 @@ name = "subtr-actor-bakkesmod"
 version = "0.8.6"
 dependencies = [
  "boxcars",
+ "serde_json",
  "subtr-actor",
 ]
 
