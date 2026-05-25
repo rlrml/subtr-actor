@@ -1267,13 +1267,21 @@ impl SaLiveEventGenerator {
         let live_play = explicit_live_play
             .unwrap_or_else(|| self.live_play_tracker.state_parts(gameplay, &base_events));
 
-        let empty_events = FrameEventsState::default();
-        let touch_state = self
-            .touch_state
-            .update(frame, ball, players, &empty_events, &live_play);
-        let mut touch_events = explicit_touch_events(frame, explicit_events.touches);
-        if touch_events.is_empty() {
-            touch_events.extend(touch_state.touch_events);
+        let explicit_touch_events = explicit_touch_events(frame, explicit_events.touches);
+        let has_explicit_touch_events = !explicit_touch_events.is_empty();
+        let explicit_dodge_refreshed_events =
+            explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
+        let touch_tracker_events = FrameEventsState {
+            touch_events: explicit_touch_events,
+            dodge_refreshed_events: explicit_dodge_refreshed_events.clone(),
+            ..FrameEventsState::default()
+        };
+        let touch_state =
+            self.touch_state
+                .update(frame, ball, players, &touch_tracker_events, &live_play);
+        let mut touch_events = touch_state.touch_events;
+        if touch_events.is_empty() && has_explicit_touch_events {
+            touch_events = touch_tracker_events.touch_events.clone();
         }
         let inferred_dodge_refreshed_events = infer_dodge_refreshed_events(
             frame,
@@ -1282,8 +1290,6 @@ impl SaLiveEventGenerator {
             &touch_events,
             &mut self.dodge_refresh_counters,
         );
-        let explicit_dodge_refreshed_events =
-            explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
         let explicit_dodge_refresh_keys = explicit_dodge_refreshed_events
             .iter()
             .map(|event| (event.player.clone(), event.frame))
@@ -5634,6 +5640,63 @@ mod tests {
         assert_eq!(
             frame_events.dodge_refreshed_events[0].player,
             RemoteId::SplitScreen(0)
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn explicit_dodge_refreshed_events_feed_live_touch_state() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 180.0,
+        })];
+        let dodge_refreshes = [SaDodgeRefreshedEvent {
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 7,
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.dodge_refreshes = dodge_refreshes.as_ptr();
+        frame.dodge_refresh_count = dodge_refreshes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert_eq!(
+            frame_events.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
+        );
+        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
+
+        let touch_state = engine_ref
+            .graph
+            .state::<TouchState>()
+            .expect("full analysis graph should expose touch state");
+        assert_eq!(touch_state.touch_events.len(), 1);
+        assert_eq!(
+            touch_state.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
