@@ -37,14 +37,6 @@ constexpr std::array<const char *, 6> VERIFY_GRAPH_OUTPUTS{
     "analysis_nodes",
     "graph_info",
 };
-constexpr std::array<const char *, 6> VERIFY_ANALYSIS_NODES{
-    "frame_info",
-    "frame_events_state",
-    "live_play",
-    "match_stats",
-    "stats_timeline_frame",
-    "stats_timeline_events",
-};
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
@@ -54,6 +46,95 @@ constexpr int GAME_STATE_KICKOFF_COUNTDOWN = 55;
 constexpr int GAME_STATE_GOAL_SCORED_REPLAY = 86;
 
 int moduleAnchor = 0;
+
+void skipJsonWhitespace(const std::string &json, size_t &offset) {
+  while (offset < json.size() &&
+         std::isspace(static_cast<unsigned char>(json[offset])) != 0) {
+    ++offset;
+  }
+}
+
+std::optional<std::string> parseJsonString(const std::string &json, size_t &offset) {
+  if (offset >= json.size() || json[offset] != '"') {
+    return std::nullopt;
+  }
+  ++offset;
+  std::string value;
+  while (offset < json.size()) {
+    const char ch = json[offset++];
+    if (ch == '"') {
+      return value;
+    }
+    if (ch != '\\') {
+      value.push_back(ch);
+      continue;
+    }
+    if (offset >= json.size()) {
+      return std::nullopt;
+    }
+    const char escaped = json[offset++];
+    switch (escaped) {
+    case '"':
+    case '\\':
+    case '/':
+      value.push_back(escaped);
+      break;
+    case 'b':
+      value.push_back('\b');
+      break;
+    case 'f':
+      value.push_back('\f');
+      break;
+    case 'n':
+      value.push_back('\n');
+      break;
+    case 'r':
+      value.push_back('\r');
+      break;
+    case 't':
+      value.push_back('\t');
+      break;
+    default:
+      return std::nullopt;
+    }
+  }
+  return std::nullopt;
+}
+
+std::vector<std::string> parseJsonStringArray(const std::string &json) {
+  size_t offset = 0;
+  std::vector<std::string> values;
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '[') {
+    return {};
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  if (offset < json.size() && json[offset] == ']') {
+    return values;
+  }
+
+  while (offset < json.size()) {
+    auto value = parseJsonString(json, offset);
+    if (!value) {
+      return {};
+    }
+    values.push_back(*value);
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == ']') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      return offset == json.size() ? values : std::vector<std::string>{};
+    }
+    return {};
+  }
+  return {};
+}
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
 static_assert(sizeof(SaPlayerStatEventKind) == 4);
@@ -685,6 +766,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_analysis_node_json_len"));
   writeAnalysisNodeJson = reinterpret_cast<WriteAnalysisNodeJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_analysis_node_json"));
+  analysisNodeNamesJsonLen = reinterpret_cast<AnalysisNodeNamesJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_analysis_node_names_json_len"));
+  writeAnalysisNodeNamesJson = reinterpret_cast<WriteAnalysisNodeNamesJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_analysis_node_names_json"));
   graphInfoJsonLen = reinterpret_cast<GraphInfoJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
@@ -702,8 +787,9 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !statsModuleJsonLen || !writeStatsModuleJson || !statsModuleFrameJsonLen ||
       !writeStatsModuleFrameJson || !statsModuleConfigJsonLen ||
       !writeStatsModuleConfigJson || !graphOutputJsonLen || !writeGraphOutputJson ||
-      !analysisNodeJsonLen || !writeAnalysisNodeJson || !graphInfoJsonLen ||
-      !writeGraphInfoJson || !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
+      !analysisNodeJsonLen || !writeAnalysisNodeJson || !analysisNodeNamesJsonLen ||
+      !writeAnalysisNodeNamesJson || !graphInfoJsonLen || !writeGraphInfoJson ||
+      !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -748,6 +834,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeGraphOutputJson = nullptr;
   analysisNodeJsonLen = nullptr;
   writeAnalysisNodeJson = nullptr;
+  analysisNodeNamesJsonLen = nullptr;
+  writeAnalysisNodeNamesJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
@@ -1947,7 +2035,16 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         outputJson.size()));
   }
 
-  for (const char *nodeName : VERIFY_ANALYSIS_NODES) {
+  const std::string nodeNamesJson =
+      readJsonBuffer(analysisNodeNamesJsonLen, writeAnalysisNodeNamesJson);
+  const std::vector<std::string> nodeNames = parseJsonStringArray(nodeNamesJson);
+  if (nodeNames.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not read builtin analysis node names");
+  }
+
+  for (const std::string &nodeName : nodeNames) {
     const std::string nodeJson =
         readNamedJsonBuffer(analysisNodeJsonLen, writeAnalysisNodeJson, nodeName);
     if (nodeJson.empty()) {
@@ -1960,6 +2057,11 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         "subtr-actor: analysis node '{}' callable ({} bytes)",
         nodeName,
         nodeJson.size()));
+  }
+  if (!nodeNames.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: verified {} builtin analysis nodes by name",
+        nodeNames.size()));
   }
 
   cvarManager->log(ok

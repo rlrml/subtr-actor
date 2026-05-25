@@ -1969,6 +1969,13 @@ unsafe fn serialize_named_analysis_node(
     }
 }
 
+fn serialize_analysis_node_names(engine: *const SaEngine) -> Vec<u8> {
+    if engine.is_null() {
+        return Vec::new();
+    }
+    serde_json::to_vec(builtin_analysis_node_names()).unwrap_or_default()
+}
+
 unsafe fn c_string_arg(value: *const c_char) -> Option<String> {
     if value.is_null() {
         return None;
@@ -2652,6 +2659,47 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
     max_bytes: usize,
 ) -> usize {
     let bytes = serialize_named_analysis_node(engine, node_name);
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of the builtin analysis-node name registry.
+///
+/// The payload is a JSON string array containing every supported name for
+/// `subtr_actor_bakkesmod_analysis_node_json_len`.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_names_json_len(
+    engine: *const SaEngine,
+) -> usize {
+    serialize_analysis_node_names(engine).len()
+}
+
+#[no_mangle]
+/// Writes the builtin analysis-node name registry into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_analysis_node_names_json_len` first to size the
+/// destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_names_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let bytes = serialize_analysis_node_names(engine);
     if out_bytes.is_null() || max_bytes == 0 {
         return 0;
     }
@@ -3969,6 +4017,21 @@ mod tests {
         };
         assert_eq!(written, json_len);
         serde_json::from_slice(&bytes).expect("analysis node json should be valid")
+    }
+
+    fn live_analysis_node_names_json_value(engine: *const SaEngine) -> serde_json::Value {
+        let json_len = unsafe { subtr_actor_bakkesmod_analysis_node_names_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_analysis_node_names_json(
+                engine,
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("analysis node names json should be valid")
     }
 
     fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
@@ -6824,6 +6887,11 @@ mod tests {
         }
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
 
+        assert_eq!(
+            live_analysis_node_names_json_value(engine),
+            serde_json::json!(builtin_analysis_node_names()),
+            "live ABI should expose the same node-name registry used by named node calls"
+        );
         for node_name in builtin_analysis_node_names() {
             let value = live_analysis_node_json_value(engine, node_name);
             assert!(
@@ -6869,6 +6937,16 @@ mod tests {
         );
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_analysis_node_json_len(engine, ptr::null()) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_analysis_node_names_json_len(ptr::null()) },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_write_analysis_node_names_json(engine, ptr::null_mut(), 10)
+            },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };

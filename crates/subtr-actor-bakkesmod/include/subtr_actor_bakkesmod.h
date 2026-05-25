@@ -313,6 +313,12 @@ size_t subtr_actor_bakkesmod_write_analysis_node_json(
     const char *node_name,
     uint8_t *out_bytes,
     size_t max_bytes);
+size_t subtr_actor_bakkesmod_analysis_node_names_json_len(
+    const SaEngine *engine);
+size_t subtr_actor_bakkesmod_write_analysis_node_names_json(
+    const SaEngine *engine,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_graph_info_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_graph_info_json(
     const SaEngine *engine,

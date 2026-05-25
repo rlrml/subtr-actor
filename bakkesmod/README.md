@@ -27,9 +27,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   writes one graph-backed builtin analysis node by name, using the node names
   reported in `graph-info.json`.
   The `subtr_actor_verify_graph [finish]` console command calls the fixed graph
-  outputs plus representative analysis nodes from the loaded plugin runtime and
-  logs byte sizes, giving a quick in-game check that the graph surface is
-  callable after at least one live frame has been processed.
+  outputs plus every builtin analysis node by name from the loaded plugin
+  runtime and logs byte sizes, giving a quick in-game check that the graph
+  surface is callable after at least one live frame has been processed.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
@@ -111,9 +111,8 @@ acceptance check for live graph callability and event-generation parity.
 
    The BakkesMod console should log `subtr-actor: graph verification passed`
    along with nonzero byte sizes for `events`, `frame`, `timeline`, `stats`,
-   `analysis_nodes`, `graph_info`, `frame_info`, `frame_events_state`,
-   `live_play`, `match_stats`, `stats_timeline_frame`, and
-   `stats_timeline_events`.
+   `analysis_nodes`, `graph_info`, and every name reported by
+   `builtin_analysis_node_names`.
 3. Exercise live events that should be visible to the graph: touch the ball,
    pick up a boost pad, score a goal, and trigger a demolition when possible.
    Overlay labels should appear for drainable graph events.

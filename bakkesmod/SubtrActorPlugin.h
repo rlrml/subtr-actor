@@ -58,6 +58,8 @@ private:
   using WriteGraphOutputJson = WriteNamedJson;
   using AnalysisNodeJsonLen = NamedJsonLen;
   using WriteAnalysisNodeJson = WriteNamedJson;
+  using AnalysisNodeNamesJsonLen = JsonLen;
+  using WriteAnalysisNodeNamesJson = WriteJson;
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
@@ -107,6 +109,8 @@ private:
   WriteGraphOutputJson writeGraphOutputJson = nullptr;
   AnalysisNodeJsonLen analysisNodeJsonLen = nullptr;
   WriteAnalysisNodeJson writeAnalysisNodeJson = nullptr;
+  AnalysisNodeNamesJsonLen analysisNodeNamesJsonLen = nullptr;
+  WriteAnalysisNodeNamesJson writeAnalysisNodeNamesJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
   DrainEvents drainEvents = nullptr;
