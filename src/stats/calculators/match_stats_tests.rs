@@ -59,6 +59,17 @@ fn goal_event(time: f32, frame: usize, scorer: PlayerId) -> GoalEvent {
     }
 }
 
+fn unattributed_goal_event(time: f32, frame: usize) -> GoalEvent {
+    GoalEvent {
+        time,
+        frame,
+        scoring_team_is_team_0: true,
+        player: None,
+        team_zero_score: Some(1),
+        team_one_score: Some(0),
+    }
+}
+
 fn buildup_sample(time: f32, ball_y: f32) -> GoalBuildupSample {
     GoalBuildupSample {
         time,
@@ -103,6 +114,48 @@ fn update(
             &TouchState::default(),
         )
         .unwrap();
+}
+
+#[test]
+fn fills_missing_goal_context_scorer_from_goal_delta() {
+    let scorer = PlayerId::Steam(1);
+    let mut calculator = MatchStatsCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(0, 0.0),
+        ball(BALL_GROUND_CONTACT_MAX_Z),
+        0,
+        Vec::new(),
+    );
+    update(
+        &mut calculator,
+        frame(1, 1.0),
+        ball(BALL_GROUND_CONTACT_MAX_Z + 200.0),
+        0,
+        Vec::new(),
+    );
+    update(
+        &mut calculator,
+        frame(2, 2.5),
+        ball(BALL_GROUND_CONTACT_MAX_Z + 300.0),
+        1,
+        vec![unattributed_goal_event(2.5, 2)],
+    );
+
+    assert_eq!(
+        calculator.goal_context_events()[0].scorer,
+        Some(scorer.clone())
+    );
+    let scorer_stats = calculator.player_stats().get(&scorer).unwrap();
+    assert_eq!(
+        scorer_stats
+            .scoring_context
+            .goal_ball_air_time
+            .goal_ball_air_time_sample_count,
+        1
+    );
+    assert_eq!(scorer_stats.average_goal_ball_air_time(), 2.5);
 }
 
 #[test]

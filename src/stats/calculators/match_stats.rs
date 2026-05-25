@@ -797,6 +797,7 @@ struct PendingGoalEvent {
     event: GoalEvent,
     time_after_kickoff: Option<f32>,
     goal_buildup: GoalBuildupKind,
+    ball_air_time_before_goal: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -1328,6 +1329,32 @@ impl MatchStatsCalculator {
         }
     }
 
+    fn fill_missing_goal_context_scorer(
+        &mut self,
+        goal_event: &GoalEvent,
+        scorer: &PlayerId,
+    ) -> Option<GoalTouchContext> {
+        if goal_event.player.is_some() {
+            return None;
+        }
+
+        let scorer_last_touch = self
+            .last_touch_context_by_player
+            .get(scorer)
+            .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
+            .cloned();
+        if let Some(context) = self.goal_context_events.iter_mut().rev().find(|context| {
+            context.frame == goal_event.frame
+                && context.time == goal_event.time
+                && context.scoring_team_is_team_0 == goal_event.scoring_team_is_team_0
+                && context.scorer.is_none()
+        }) {
+            context.scorer = Some(scorer.clone());
+            context.scorer_last_touch = scorer_last_touch.clone();
+        }
+        scorer_last_touch
+    }
+
     fn prune_goal_buildup_samples(&mut self, current_time: f32) {
         self.goal_buildup_samples
             .retain(|entry| current_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS);
@@ -1474,6 +1501,7 @@ impl MatchStatsCalculator {
                     .active_kickoff_touch_time
                     .map(|kickoff_touch_time| (event.time - kickoff_touch_time).max(0.0)),
                 goal_buildup: self.classify_goal_buildup(event.time, event.scoring_team_is_team_0),
+                ball_air_time_before_goal: self.ball_air_time_before_goal(event.time),
                 event,
             })
             .collect();
@@ -1570,6 +1598,28 @@ impl MatchStatsCalculator {
                 for _ in 0..goal_delta.max(0) {
                     let pending_goal_event =
                         self.take_pending_goal_event(&player.player_id, player.is_team_0);
+                    if let Some(pending_goal_event) = pending_goal_event.as_ref() {
+                        if pending_goal_event.event.player.is_none() {
+                            let scorer_last_touch = self.fill_missing_goal_context_scorer(
+                                &pending_goal_event.event,
+                                &player.player_id,
+                            );
+                            if let Some(touch_position) =
+                                scorer_last_touch.and_then(|touch| touch.ball_position)
+                            {
+                                current_stats
+                                    .scoring_context
+                                    .record_scoring_goal_last_touch_position(touch_position);
+                            }
+                            if let Some(ball_air_time_before_goal) =
+                                pending_goal_event.ball_air_time_before_goal
+                            {
+                                current_stats
+                                    .scoring_context
+                                    .record_goal_ball_air_time(ball_air_time_before_goal);
+                            }
+                        }
+                    }
                     let goal_time = pending_goal_event
                         .as_ref()
                         .map(|event| event.event.time)
