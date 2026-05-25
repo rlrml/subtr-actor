@@ -228,6 +228,70 @@ fn rewrites_misattributed_goal_context_scorer_from_goal_delta() {
 }
 
 #[test]
+fn finish_flushes_attributed_goal_without_goal_counter_delta() {
+    let scorer = PlayerId::Steam(1);
+    let mut calculator = MatchStatsCalculator::new();
+    let mut scorer_sample = player(scorer.clone(), true, 0);
+    scorer_sample.match_goals = None;
+
+    calculator
+        .update_parts(
+            &frame(1, 1.5),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                team_zero_score: Some(1),
+                team_one_score: Some(0),
+                ..GameplayState::default()
+            },
+            &ball(BALL_GROUND_CONTACT_MAX_Z + 200.0),
+            &PlayerFrameState {
+                players: vec![scorer_sample],
+            },
+            &FrameEventsState {
+                goal_events: vec![goal_event(1.5, 1, scorer.clone())],
+                ..FrameEventsState::default()
+            },
+            &LivePlayState {
+                gameplay_phase: GameplayPhase::ActivePlay,
+                is_live_play: true,
+            },
+            &TouchState::default(),
+        )
+        .unwrap();
+
+    assert!(calculator
+        .timeline()
+        .iter()
+        .all(|event| event.kind != TimelineEventKind::Goal));
+
+    calculator.finish().unwrap();
+
+    assert_eq!(
+        calculator
+            .timeline()
+            .iter()
+            .filter(|event| event.kind == TimelineEventKind::Goal)
+            .count(),
+        1
+    );
+    assert_eq!(
+        calculator
+            .timeline()
+            .iter()
+            .find(|event| event.kind == TimelineEventKind::Goal)
+            .and_then(|event| event.player_id.as_ref()),
+        Some(&scorer)
+    );
+    assert_eq!(
+        calculator
+            .player_stats()
+            .get(&scorer)
+            .map(|stats| stats.goals),
+        Some(1)
+    );
+}
+
+#[test]
 fn records_goal_ball_air_time_from_last_ground_contact() {
     let scorer = PlayerId::Steam(1);
     let mut calculator = MatchStatsCalculator::new();
