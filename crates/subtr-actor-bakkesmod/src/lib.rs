@@ -4025,7 +4025,7 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
-        let mut drained_events = [SaMechanicEvent {
+        let mut drained_event_buffer = [SaMechanicEvent {
             kind: SaMechanicKind::Shot,
             player_index: 0,
             is_team_0: 0,
@@ -4036,11 +4036,11 @@ mod tests {
         let drained_count = unsafe {
             subtr_actor_bakkesmod_drain_events(
                 engine,
-                drained_events.as_mut_ptr(),
-                drained_events.len(),
+                drained_event_buffer.as_mut_ptr(),
+                drained_event_buffer.len(),
             )
         };
-        let drained_events = &drained_events[..drained_count];
+        let drained_events = &drained_event_buffer[..drained_count];
         assert!(
             drained_events.iter().any(|event| {
                 event.kind == SaMechanicKind::Shot
@@ -4064,6 +4064,51 @@ mod tests {
                     && event.frame_number == 1
             }),
             "explicit live demolish events should drain victim death events through the full graph"
+        );
+        let mut goal_context_events = [SaGoalContextEvent {
+            frame_number: 0,
+            time: 0.0,
+            scoring_team_is_team_0: 0,
+            has_scorer: 0,
+            scorer_index: 0,
+            has_scoring_team_most_back_player: 0,
+            scoring_team_most_back_player_index: 0,
+            has_defending_team_most_back_player: 0,
+            defending_team_most_back_player_index: 0,
+            has_ball_position: 0,
+            ball_position: SaVec3::default(),
+            has_ball_air_time_before_goal: 0,
+            ball_air_time_before_goal: 0.0,
+            goal_buildup: SaGoalBuildupKind::Other,
+        }; 4];
+        let goal_context_count = unsafe {
+            subtr_actor_bakkesmod_drain_goal_context_events(
+                engine,
+                goal_context_events.as_mut_ptr(),
+                goal_context_events.len(),
+            )
+        };
+        assert_eq!(goal_context_count, 1);
+        assert_eq!(goal_context_events[0].frame_number, 1);
+        assert_eq!(goal_context_events[0].scoring_team_is_team_0, 1);
+        assert_eq!(goal_context_events[0].has_scorer, 1);
+        assert_eq!(goal_context_events[0].scorer_index, 0);
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        let finalized_count = unsafe {
+            subtr_actor_bakkesmod_drain_events(
+                engine,
+                drained_event_buffer.as_mut_ptr(),
+                drained_event_buffer.len(),
+            )
+        };
+        let finalized_events = &drained_event_buffer[..finalized_count];
+        assert!(
+            finalized_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Goal
+                    && event.player_index == 0
+                    && event.frame_number == 1
+            }),
+            "explicit live goal events should drain finalized goal events through the full graph"
         );
         assert_eq!(player_frame.players[1].match_goals, Some(1));
         assert_eq!(player_frame.players[1].match_assists, Some(2));
