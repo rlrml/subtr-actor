@@ -4,10 +4,11 @@ const BUMP_MAX_SAMPLE_DT: f32 = 0.18;
 const BUMP_MAX_CONTACT_DISTANCE: f32 = 230.0;
 const BUMP_MAX_VERTICAL_GAP: f32 = 190.0;
 const BUMP_MIN_CLOSING_SPEED: f32 = 420.0;
-const BUMP_MIN_VICTIM_IMPULSE: f32 = 90.0;
+const BUMP_MIN_VICTIM_IMPULSE: f32 = 180.0;
 const BUMP_MIN_DIRECTIONAL_SCORE: f32 = 650.0;
 const BUMP_MIN_SCORE_MARGIN: f32 = 175.0;
 const BUMP_REPEAT_FRAME_WINDOW: usize = 10;
+const BUMP_FIFTY_FIFTY_SUPPRESSION_WINDOW_SECONDS: f32 = 0.35;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -112,6 +113,23 @@ impl BumpCalculator {
         events: &FrameEventsState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.update_with_fifty_fifty_state(
+            frame,
+            players,
+            events,
+            &FiftyFiftyState::default(),
+            live_play,
+        )
+    }
+
+    pub fn update_with_fifty_fifty_state(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        fifty_fifty_state: &FiftyFiftyState,
+        live_play: bool,
+    ) -> SubtrActorResult<()> {
         for player in &players.players {
             self.player_teams
                 .insert(player.player_id.clone(), player.is_team_0);
@@ -123,7 +141,7 @@ impl BumpCalculator {
         }
 
         if frame.dt > 0.0 && frame.dt <= BUMP_MAX_SAMPLE_DT {
-            self.detect_bumps(frame, players, events);
+            self.detect_bumps(frame, players, events, fifty_fifty_state);
         }
 
         self.previous_players = players
@@ -147,6 +165,7 @@ impl BumpCalculator {
         frame: &FrameInfo,
         players: &PlayerFrameState,
         frame_events: &FrameEventsState,
+        fifty_fifty_state: &FiftyFiftyState,
     ) {
         let current_players: Vec<_> = players
             .players
@@ -166,6 +185,15 @@ impl BumpCalculator {
                 let (right, right_body, previous_right_body) = current_players[right_index];
 
                 if self.is_recent_demo_pair(frame_events, &left.player_id, &right.player_id) {
+                    continue;
+                }
+
+                if Self::is_recent_fifty_fifty_pair(
+                    frame,
+                    fifty_fifty_state,
+                    &left.player_id,
+                    &right.player_id,
+                ) {
                     continue;
                 }
 
@@ -308,6 +336,73 @@ impl BumpCalculator {
             (&demo.attacker == left && &demo.victim == right)
                 || (&demo.attacker == right && &demo.victim == left)
         })
+    }
+
+    fn is_recent_fifty_fifty_pair(
+        frame: &FrameInfo,
+        fifty_fifty_state: &FiftyFiftyState,
+        left: &PlayerId,
+        right: &PlayerId,
+    ) -> bool {
+        if fifty_fifty_state
+            .active_event
+            .as_ref()
+            .is_some_and(|event| Self::active_fifty_fifty_matches_pair(event, left, right))
+        {
+            return true;
+        }
+
+        fifty_fifty_state
+            .resolved_events
+            .iter()
+            .any(|event| Self::resolved_fifty_fifty_matches_pair(event, left, right))
+            || fifty_fifty_state
+                .last_resolved_event
+                .as_ref()
+                .is_some_and(|event| {
+                    frame.time - event.resolve_time <= BUMP_FIFTY_FIFTY_SUPPRESSION_WINDOW_SECONDS
+                        && Self::resolved_fifty_fifty_matches_pair(event, left, right)
+                })
+    }
+
+    fn active_fifty_fifty_matches_pair(
+        event: &ActiveFiftyFifty,
+        left: &PlayerId,
+        right: &PlayerId,
+    ) -> bool {
+        Self::optional_player_pair_matches(
+            event.team_zero_player.as_ref(),
+            event.team_one_player.as_ref(),
+            left,
+            right,
+        )
+    }
+
+    fn resolved_fifty_fifty_matches_pair(
+        event: &FiftyFiftyEvent,
+        left: &PlayerId,
+        right: &PlayerId,
+    ) -> bool {
+        Self::optional_player_pair_matches(
+            event.team_zero_player.as_ref(),
+            event.team_one_player.as_ref(),
+            left,
+            right,
+        )
+    }
+
+    fn optional_player_pair_matches(
+        team_zero_player: Option<&PlayerId>,
+        team_one_player: Option<&PlayerId>,
+        left: &PlayerId,
+        right: &PlayerId,
+    ) -> bool {
+        matches!(
+            (team_zero_player, team_one_player),
+            (Some(team_zero_player), Some(team_one_player))
+                if (team_zero_player == left && team_one_player == right)
+                    || (team_zero_player == right && team_one_player == left)
+        )
     }
 
     fn should_count_bump(
