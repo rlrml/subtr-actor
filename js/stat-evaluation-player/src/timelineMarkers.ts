@@ -2,7 +2,7 @@ import type { ReplayModel, ReplayTimelineEvent, ReplayTimelineEventKind } from "
 import { buildFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
 import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
-import type { MechanicEvent, StatsTimeline } from "./statsTimeline.ts";
+import type { StatsTimeline } from "./statsTimeline.ts";
 
 const BLUE_TIMELINE_COLOR = "#3b82f6";
 const ORANGE_TIMELINE_COLOR = "#f59e0b";
@@ -82,9 +82,7 @@ export function buildMechanicTimelineEvents(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter(
-      (event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)),
-    )
+    .filter((event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)))
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
       const playerName = playerNames.get(playerId) ?? playerId;

@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.4 - 2026-05-25
+
+- Fix the GitHub Pages Nix build by refreshing the stats-player npm dependency
+  hash after the generated stats-player bindings update.
+- Keep the stats-player package smoke install fixture in sync with new timeline
+  config fields and wall aerial event collections.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.4`.
+
 ## v0.8.3 - 2026-05-25
 
 - Keep mechanics review clips from inheriting kickoff skipping, so kickoff-adjacent

@@ -2521,9 +2521,7 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
       skipPostGoalTransitionsEnabled: false,
       skipKickoffsEnabled: false,
     });
-    setMechanicsReviewStatus(
-      `Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`,
-    );
+    setMechanicsReviewStatus(`Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`);
   } catch (error) {
     console.error("Failed to activate mechanics review item:", error);
     review.currentClip = null;
@@ -2735,19 +2733,11 @@ function formatScoreboardInteger(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}` : "--";
 }
 
-function getScoreboardPlayerStats(
-  frame: StatsFrame,
-  playerId: string,
-): PlayerStatsSnapshot | null {
-  return (
-    frame.players.find((player) => playerIdToString(player.player_id) === playerId) ?? null
-  );
+function getScoreboardPlayerStats(frame: StatsFrame, playerId: string): PlayerStatsSnapshot | null {
+  return frame.players.find((player) => playerIdToString(player.player_id) === playerId) ?? null;
 }
 
-function createScoreboardPlayerRow(
-  frame: StatsFrame,
-  player: ReplayPlayerTrack,
-): HTMLElement {
+function createScoreboardPlayerRow(frame: StatsFrame, player: ReplayPlayerTrack): HTMLElement {
   const stats = getScoreboardPlayerStats(frame, player.id);
   const row = document.createElement("div");
   row.className = `scoreboard-player-row ${getTeamClass(player.isTeamZero)}`;
@@ -2809,8 +2799,14 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
   const teams = document.createElement("div");
   teams.className = "scoreboard-teams";
   teams.append(
-    createScoreboardTeam(frame, replay.players.filter((player) => player.isTeamZero)),
-    createScoreboardTeam(frame, replay.players.filter((player) => !player.isTeamZero)),
+    createScoreboardTeam(
+      frame,
+      replay.players.filter((player) => player.isTeamZero),
+    ),
+    createScoreboardTeam(
+      frame,
+      replay.players.filter((player) => !player.isTeamZero),
+    ),
   );
 
   scoreboardWindowBody.append(header, teams);
