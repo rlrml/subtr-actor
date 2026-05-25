@@ -111,8 +111,9 @@ acceptance check for live graph callability and event-generation parity.
 
    The BakkesMod console should log `subtr-actor: graph verification passed`
    along with nonzero byte sizes for `events`, `frame`, `timeline`, `stats`,
-   `analysis_nodes`, `graph_info`, and every name reported by the callable
-   analysis-node name registry.
+   `analysis_nodes`, `graph_info`, every graph output name reported by
+   `graph_info`, and every name reported by the callable analysis-node name
+   registry.
 3. Exercise live events that should be visible to the graph: touch the ball,
    pick up a boost pad, score a goal, and trigger a demolition when possible.
    Overlay labels should appear for drainable graph events.

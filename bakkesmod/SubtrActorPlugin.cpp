@@ -101,23 +101,25 @@ std::optional<std::string> parseJsonString(const std::string &json, size_t &offs
   return std::nullopt;
 }
 
-std::vector<std::string> parseJsonStringArray(const std::string &json) {
-  size_t offset = 0;
+std::optional<std::vector<std::string>> parseJsonStringArrayValue(
+    const std::string &json,
+    size_t &offset) {
   std::vector<std::string> values;
   skipJsonWhitespace(json, offset);
   if (offset >= json.size() || json[offset] != '[') {
-    return {};
+    return std::nullopt;
   }
   ++offset;
   skipJsonWhitespace(json, offset);
   if (offset < json.size() && json[offset] == ']') {
+    ++offset;
     return values;
   }
 
   while (offset < json.size()) {
     auto value = parseJsonString(json, offset);
     if (!value) {
-      return {};
+      return std::nullopt;
     }
     values.push_back(*value);
     skipJsonWhitespace(json, offset);
@@ -128,12 +130,39 @@ std::vector<std::string> parseJsonStringArray(const std::string &json) {
     }
     if (offset < json.size() && json[offset] == ']') {
       ++offset;
-      skipJsonWhitespace(json, offset);
-      return offset == json.size() ? values : std::vector<std::string>{};
+      return values;
     }
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+std::vector<std::string> parseJsonStringArray(const std::string &json) {
+  size_t offset = 0;
+  auto values = parseJsonStringArrayValue(json, offset);
+  if (!values) {
     return {};
   }
-  return {};
+  skipJsonWhitespace(json, offset);
+  return offset == json.size() ? *values : std::vector<std::string>{};
+}
+
+std::vector<std::string> parseJsonStringArrayProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  const std::string needle = std::format("\"{}\"", propertyName);
+  size_t offset = json.find(needle);
+  if (offset == std::string::npos) {
+    return {};
+  }
+  offset += needle.size();
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != ':') {
+    return {};
+  }
+  ++offset;
+  auto values = parseJsonStringArrayValue(json, offset);
+  return values.value_or(std::vector<std::string>{});
 }
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
@@ -2020,7 +2049,20 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   }
 
   bool ok = true;
-  for (const char *outputName : VERIFY_GRAPH_OUTPUTS) {
+  const std::string graphInfoJson =
+      readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "graph_info");
+  std::vector<std::string> outputNames =
+      parseJsonStringArrayProperty(graphInfoJson, "graph_output_names");
+  if (outputNames.empty()) {
+    if (!graphInfoJson.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not read graph output names from graph_info");
+    }
+    outputNames.assign(VERIFY_GRAPH_OUTPUTS.begin(), VERIFY_GRAPH_OUTPUTS.end());
+  }
+
+  for (const std::string &outputName : outputNames) {
     const std::string outputJson =
         readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, outputName);
     if (outputJson.empty()) {
@@ -2033,6 +2075,11 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         "subtr-actor: graph output '{}' callable ({} bytes)",
         outputName,
         outputJson.size()));
+  }
+  if (!outputNames.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: verified {} graph outputs by name",
+        outputNames.size()));
   }
 
   const std::string nodeNamesJson =
