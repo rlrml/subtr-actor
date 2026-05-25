@@ -46,6 +46,44 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File .\bakkesmod\build-windows.ps1
 
+      - name: Verify live graph surface in plugin artifacts
+        shell: pwsh
+        run: |
+          $pluginDll = "bakkesmod/build/Release/SubtrActorPlugin.dll"
+          $rustDll = "bakkesmod/build/Release/subtr_actor_bakkesmod.dll"
+
+          foreach ($path in @($pluginDll, $rustDll)) {
+            if (-not (Test-Path $path)) {
+              throw "Expected artifact not found: $path"
+            }
+          }
+
+          function Read-ArtifactText([string]$Path) {
+            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $Path))
+            return [System.Text.Encoding]::ASCII.GetString($bytes)
+          }
+
+          function Assert-Contains([string]$Text, [string]$Needle, [string]$Label) {
+            if (-not $Text.Contains($Needle)) {
+              throw "Missing $Label in built artifact: $Needle"
+            }
+          }
+
+          $pluginText = Read-ArtifactText $pluginDll
+          Assert-Contains $pluginText "subtr_actor_verify_graph" "BakkesMod graph verification command"
+          Assert-Contains $pluginText "subtr_actor_dump_graph_output <events|frame|timeline|stats|analysis_nodes|graph_info> [finish]" "graph output command usage"
+          Assert-Contains $pluginText "graph-analysis-nodes.json" "bulk analysis-node dump filename"
+          Assert-Contains $pluginText "analysis_nodes" "analysis_nodes graph output name"
+
+          $rustText = Read-ArtifactText $rustDll
+          Assert-Contains $rustText "subtr_actor_bakkesmod_graph_output_json_len" "graph output length export"
+          Assert-Contains $rustText "subtr_actor_bakkesmod_write_graph_output_json" "graph output write export"
+          Assert-Contains $rustText "subtr_actor_bakkesmod_analysis_node_json_len" "analysis node length export"
+          Assert-Contains $rustText "subtr_actor_bakkesmod_write_analysis_node_json" "analysis node write export"
+          Assert-Contains $rustText "builtin_analysis_node_names" "builtin analysis-node registry"
+          Assert-Contains $rustText "analysis_nodes" "analysis_nodes graph output"
+          Assert-Contains $rustText "stats_timeline_events" "stats timeline analysis node"
+
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
         with:
