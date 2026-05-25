@@ -298,11 +298,15 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_events_json_len"));
   writeEventsJson = reinterpret_cast<WriteEventsJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_events_json"));
+  frameJsonLen = reinterpret_cast<FrameJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_frame_json_len"));
+  writeFrameJson = reinterpret_cast<WriteFrameJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_frame_json"));
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
 
   if (!engineCreate || !engineDestroy || !engineReset || !processFrame || !eventsJsonLen ||
-      !writeEventsJson || !drainEvents) {
+      !writeEventsJson || !frameJsonLen || !writeFrameJson || !drainEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -327,6 +331,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   processFrame = nullptr;
   eventsJsonLen = nullptr;
   writeEventsJson = nullptr;
+  frameJsonLen = nullptr;
+  writeFrameJson = nullptr;
   drainEvents = nullptr;
 }
 

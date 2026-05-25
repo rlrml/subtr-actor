@@ -2,18 +2,26 @@
 
 This is an early BakkesMod integration spike. It is intentionally split into:
 
-- `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames and
-  emits mechanics detected by `subtr-actor` calculators.
+- `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames,
+  evaluates the shared `subtr-actor` analysis graph, drains normalized mechanic
+  events for overlay use, and exposes the current graph event bundle plus frame
+  stats snapshot as JSON.
 - `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
-mechanics whose first pass can work from live kinematics and control state:
+mechanics whose first pass can work from live kinematics, explicit BakkesMod
+events, and control state:
 
 - speed flip
 - half flip
 - wavedash
+- the normalized analysis-graph mechanics/events available through
+  `subtr_actor_bakkesmod_events_json_len`,
+  `subtr_actor_bakkesmod_write_events_json`,
+  `subtr_actor_bakkesmod_frame_json_len`, and
+  `subtr_actor_bakkesmod_write_frame_json`
 
 ## Windows build outline
 

@@ -6,12 +6,13 @@ use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
     stats::analysis_graph::{
         graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
-        StatsTimelineEventsState,
+        StatsTimelineEventsState, StatsTimelineFrameNode, StatsTimelineFrameState,
     },
     BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo,
     DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerSample,
-    PlayerStatEvent, PlayerStatEventKind, ShotEventMetadata, TouchEvent, TouchStateCalculator,
+    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ShotEventMetadata, TouchEvent,
+    TouchStateCalculator,
 };
 
 #[repr(C)]
@@ -227,20 +228,27 @@ pub struct SaMechanicEvent {
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
+    live_replay_meta_initialized: bool,
+    live_replay_meta_signature: Vec<(RemoteId, bool)>,
     emitted_mechanic_ids: HashSet<String>,
     events_json: Vec<u8>,
+    frame_json: Vec<u8>,
     pending_events: Vec<SaMechanicEvent>,
 }
 
 impl Default for SaEngine {
     fn default() -> Self {
         let mut graph = graph_with_all_analysis_nodes();
+        graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
         graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
         Self {
             graph,
             live_events: SaLiveEventGenerator::default(),
+            live_replay_meta_initialized: false,
+            live_replay_meta_signature: Vec::new(),
             emitted_mechanic_ids: HashSet::new(),
             events_json: Vec::new(),
+            frame_json: Vec::new(),
             pending_events: Vec::new(),
         }
     }
@@ -672,6 +680,59 @@ fn frame_input(
     )
 }
 
+fn live_player_name(player_id: &RemoteId) -> String {
+    match player_id {
+        RemoteId::SplitScreen(index) => format!("Player {index}"),
+        _ => format!("{player_id:?}"),
+    }
+}
+
+fn live_replay_meta_signature(players: &PlayerFrameState) -> Vec<(RemoteId, bool)> {
+    players
+        .players
+        .iter()
+        .map(|player| (player.player_id.clone(), player.is_team_0))
+        .collect()
+}
+
+fn live_replay_meta(players: &PlayerFrameState) -> ReplayMeta {
+    let mut team_zero = Vec::new();
+    let mut team_one = Vec::new();
+    for player in &players.players {
+        let info = PlayerInfo {
+            remote_id: player.player_id.clone(),
+            stats: None,
+            name: live_player_name(&player.player_id),
+        };
+        if player.is_team_0 {
+            team_zero.push(info);
+        } else {
+            team_one.push(info);
+        }
+    }
+    ReplayMeta {
+        team_zero,
+        team_one,
+        all_headers: Vec::new(),
+    }
+}
+
+fn sync_live_replay_meta(
+    engine: &mut SaEngine,
+    players: &PlayerFrameState,
+) -> subtr_actor::SubtrActorResult<()> {
+    let signature = live_replay_meta_signature(players);
+    if engine.live_replay_meta_initialized && engine.live_replay_meta_signature == signature {
+        return Ok(());
+    }
+
+    let replay_meta = live_replay_meta(players);
+    engine.graph.on_replay_meta(&replay_meta)?;
+    engine.live_replay_meta_initialized = true;
+    engine.live_replay_meta_signature = signature;
+    Ok(())
+}
+
 fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
     match kind {
         "air_dribble" => Some(SaMechanicKind::AirDribble),
@@ -729,9 +790,10 @@ fn push_mechanic_events_from_timeline(
     }
 }
 
-fn refresh_timeline_event_views(engine: &mut SaEngine) {
+fn refresh_timeline_graph_views(engine: &mut SaEngine) {
     let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
         engine.events_json.clear();
+        engine.frame_json.clear();
         return;
     };
     push_mechanic_events_from_timeline(
@@ -740,6 +802,13 @@ fn refresh_timeline_event_views(engine: &mut SaEngine) {
         &timeline_events.events.mechanics,
     );
     engine.events_json = serde_json::to_vec(&timeline_events.events).unwrap_or_default();
+
+    engine.frame_json = engine
+        .graph
+        .state::<StatsTimelineFrameState>()
+        .and_then(|state| state.frame.as_ref())
+        .and_then(|frame| serde_json::to_vec(frame).ok())
+        .unwrap_or_default();
 }
 
 /// Creates an opaque live-analysis engine.
@@ -811,11 +880,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
         return -1;
     };
     let frame_input = frame_input(engine, frame, players, &explicit_events);
+    if sync_live_replay_meta(engine, &frame_input.player_frame_state()).is_err() {
+        return -2;
+    }
     if engine.graph.evaluate_with_state(&frame_input).is_err() {
         return -2;
     }
 
-    refresh_timeline_event_views(engine);
+    refresh_timeline_graph_views(engine);
     0
 }
 
@@ -876,6 +948,50 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
 
     let count = max_bytes.min(engine.events_json.len());
     ptr::copy_nonoverlapping(engine.events_json.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of the current serialized graph frame snapshot.
+///
+/// The JSON payload is a `ReplayStatsFrame` value produced by the live analysis
+/// graph after the most recent successful frame.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_frame_json_len(engine: *const SaEngine) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.frame_json.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the current serialized graph frame snapshot into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_frame_json_len` first to size the destination buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let count = max_bytes.min(engine.frame_json.len());
+    ptr::copy_nonoverlapping(engine.frame_json.as_ptr(), out_bytes, count);
     count
 }
 
@@ -1130,6 +1246,74 @@ mod tests {
         assert!(value.get("bump").is_some());
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_events_json(engine, ptr::null_mut(), 10) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn exposes_current_timeline_frame_json_after_processing_frame() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: -100.0,
+                    y: -200.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 100.0,
+                    y: 200.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = SaLiveFrame {
+            frame_number: 9,
+            time: 1.75,
+            dt: 0.016,
+            seconds_remaining: 298,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            players: players.as_ptr(),
+            player_count: players.len(),
+            ..SaLiveFrame::default()
+        };
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+        let json_len = unsafe { subtr_actor_bakkesmod_frame_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_frame_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("frame json should be valid");
+        assert_eq!(value["frame_number"], 9);
+        assert_eq!(value["seconds_remaining"], 298);
+        assert_eq!(value["gameplay_phase"], "active_play");
+        assert_eq!(value["players"].as_array().expect("players array").len(), 2);
+        assert_eq!(value["players"][0]["name"], "Player 0");
+        assert_eq!(value["players"][0]["is_team_0"], true);
+        assert_eq!(value["players"][1]["name"], "Player 1");
+        assert_eq!(value["players"][1]["is_team_0"], false);
+        assert!(value.get("team_zero").is_some());
+        assert!(value.get("team_one").is_some());
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_write_frame_json(engine, ptr::null_mut(), 10) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
