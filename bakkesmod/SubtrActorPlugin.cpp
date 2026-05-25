@@ -422,6 +422,7 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
 
 void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) {
   sampledPlayers.clear();
+  sampledPlayerNames.clear();
   carPlayerIndices.clear();
   priPlayerIndices.clear();
 
@@ -430,6 +431,7 @@ void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) 
     if (!cars.IsNull()) {
       const int carCount = cars.Count();
       sampledPlayers.reserve(static_cast<size_t>(std::max(0, carCount)));
+      sampledPlayerNames.reserve(static_cast<size_t>(std::max(0, carCount)));
       for (int i = 0; i < carCount; i += 1) {
         CarWrapper car = cars.Get(i);
         if (!car.IsNull()) {
@@ -440,6 +442,8 @@ void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) 
   }
 
   if (sampledPlayers.empty() && !localCar.IsNull()) {
+    sampledPlayers.reserve(1);
+    sampledPlayerNames.reserve(1);
     sampledPlayers.push_back(samplePlayer(localCar, 0));
   }
 }
@@ -474,6 +478,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   if (!pri.IsNull()) {
     playerIndex = stablePlayerIndexForPri(pri, playerIndex);
     player.player_index = playerIndex;
+    sampledPlayerNames.push_back(pri.GetPlayerName().ToString());
+    player.player_name = sampledPlayerNames.back().c_str();
     player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
     player.has_match_stats = 1;
     player.match_goals = pri.GetMatchGoals();
@@ -510,6 +516,7 @@ void SubtrActorPlugin::resetLiveState() {
   frameNumber = 0;
   lastTime = 0.0f;
   sampledPlayers.clear();
+  sampledPlayerNames.clear();
   clearPendingFrameEvents();
   lastBoostAmounts.clear();
   carPlayerIndices.clear();

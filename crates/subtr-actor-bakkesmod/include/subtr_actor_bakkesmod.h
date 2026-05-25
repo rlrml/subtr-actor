@@ -34,6 +34,7 @@ typedef struct SaRigidBody {
 
 typedef struct SaPlayerFrame {
   uint32_t player_index;
+  const char *player_name;
   uint8_t is_team_0;
   uint8_t has_rigid_body;
   SaRigidBody rigid_body;

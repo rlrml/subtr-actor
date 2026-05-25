@@ -12,6 +12,7 @@
 #pragma comment(lib, "pluginsdk.lib")
 
 #include "bakkesmod/plugin/bakkesmodplugin.h"
+#include "bakkesmod/wrappers/Engine/UnrealStringWrapper.h"
 #include "bakkesmod/wrappers/arraywrapper.h"
 #include "bakkesmod/wrappers/Engine/ActorWrapper.h"
 #include "bakkesmod/wrappers/GameObject/BallWrapper.h"
@@ -75,6 +76,7 @@ private:
   bool loaded = false;
   bool wasInGame = false;
   std::vector<SaPlayerFrame> sampledPlayers;
+  std::vector<std::string> sampledPlayerNames;
   std::vector<SaTouchEvent> pendingTouches;
   std::vector<SaDodgeRefreshedEvent> pendingDodgeRefreshes;
   std::vector<SaBoostPadEvent> pendingBoostPadEvents;

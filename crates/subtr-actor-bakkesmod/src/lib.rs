@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 
@@ -59,6 +61,7 @@ pub struct SaRigidBody {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SaPlayerFrame {
     pub player_index: u32,
+    pub player_name: *const c_char,
     pub is_team_0: u8,
     pub has_rigid_body: u8,
     pub rigid_body: SaRigidBody,
@@ -229,7 +232,7 @@ pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
     live_replay_meta_initialized: bool,
-    live_replay_meta_signature: Vec<(RemoteId, bool)>,
+    live_replay_meta_signature: Vec<(RemoteId, bool, Option<String>)>,
     emitted_mechanic_ids: HashSet<String>,
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
@@ -685,31 +688,48 @@ fn frame_input(
     )
 }
 
-fn live_player_name(player_id: &RemoteId) -> String {
+fn player_name(player: &SaPlayerFrame) -> Option<String> {
+    if player.player_name.is_null() {
+        return None;
+    }
+    let name = unsafe { CStr::from_ptr(player.player_name) }
+        .to_string_lossy()
+        .trim()
+        .to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
+fn default_live_player_name(player_id: &RemoteId) -> String {
     match player_id {
         RemoteId::SplitScreen(index) => format!("Player {index}"),
         _ => format!("{player_id:?}"),
     }
 }
 
-fn live_replay_meta_signature(players: &PlayerFrameState) -> Vec<(RemoteId, bool)> {
+fn live_replay_meta_signature(players: &[SaPlayerFrame]) -> Vec<(RemoteId, bool, Option<String>)> {
     players
-        .players
         .iter()
-        .map(|player| (player.player_id.clone(), player.is_team_0))
+        .map(|player| {
+            (
+                player_id(player.player_index),
+                player.is_team_0 != 0,
+                player_name(player),
+            )
+        })
         .collect()
 }
 
-fn live_replay_meta(players: &PlayerFrameState) -> ReplayMeta {
+fn live_replay_meta(players: &[SaPlayerFrame]) -> ReplayMeta {
     let mut team_zero = Vec::new();
     let mut team_one = Vec::new();
-    for player in &players.players {
+    for player in players {
+        let player_id = player_id(player.player_index);
         let info = PlayerInfo {
-            remote_id: player.player_id.clone(),
+            remote_id: player_id.clone(),
             stats: None,
-            name: live_player_name(&player.player_id),
+            name: player_name(player).unwrap_or_else(|| default_live_player_name(&player_id)),
         };
-        if player.is_team_0 {
+        if player.is_team_0 != 0 {
             team_zero.push(info);
         } else {
             team_one.push(info);
@@ -724,7 +744,7 @@ fn live_replay_meta(players: &PlayerFrameState) -> ReplayMeta {
 
 fn sync_live_replay_meta(
     engine: &mut SaEngine,
-    players: &PlayerFrameState,
+    players: &[SaPlayerFrame],
 ) -> subtr_actor::SubtrActorResult<()> {
     let signature = live_replay_meta_signature(players);
     if engine.live_replay_meta_initialized && engine.live_replay_meta_signature == signature {
@@ -885,7 +905,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
         return -1;
     };
     let frame_input = frame_input(engine, frame, players, &explicit_events);
-    if sync_live_replay_meta(engine, &frame_input.player_frame_state()).is_err() {
+    if sync_live_replay_meta(engine, players).is_err() {
         return -2;
     }
     if engine.graph.evaluate_with_state(&frame_input).is_err() {
@@ -1068,6 +1088,7 @@ mod tests {
     fn player_at_index(player_index: u32, is_team_0: bool, location: SaVec3) -> SaPlayerFrame {
         SaPlayerFrame {
             player_index,
+            player_name: ptr::null(),
             is_team_0: is_team_0 as u8,
             has_rigid_body: 1,
             rigid_body: rigid_body(location, SaVec3::default()),
@@ -1259,7 +1280,9 @@ mod tests {
     #[test]
     fn exposes_current_timeline_frame_json_after_processing_frame() {
         let engine = subtr_actor_bakkesmod_engine_create();
-        let players = [
+        let blue_name = std::ffi::CString::new("Blue Live").unwrap();
+        let orange_name = std::ffi::CString::new("Orange Live").unwrap();
+        let mut players = [
             player_at_index(
                 0,
                 true,
@@ -1279,6 +1302,8 @@ mod tests {
                 },
             ),
         ];
+        players[0].player_name = blue_name.as_ptr();
+        players[1].player_name = orange_name.as_ptr();
         let frame = SaLiveFrame {
             frame_number: 9,
             time: 1.75,
@@ -1311,9 +1336,9 @@ mod tests {
         assert_eq!(value["seconds_remaining"], 298);
         assert_eq!(value["gameplay_phase"], "active_play");
         assert_eq!(value["players"].as_array().expect("players array").len(), 2);
-        assert_eq!(value["players"][0]["name"], "Player 0");
+        assert_eq!(value["players"][0]["name"], "Blue Live");
         assert_eq!(value["players"][0]["is_team_0"], true);
-        assert_eq!(value["players"][1]["name"], "Player 1");
+        assert_eq!(value["players"][1]["name"], "Orange Live");
         assert_eq!(value["players"][1]["is_team_0"], false);
         assert!(value.get("team_zero").is_some());
         assert!(value.get("team_one").is_some());
