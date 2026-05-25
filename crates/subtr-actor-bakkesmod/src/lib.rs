@@ -2470,6 +2470,67 @@ mod tests {
         panic!("did not find enum {enum_name} in checked-in header");
     }
 
+    fn header_struct_fields(struct_name: &str) -> Vec<String> {
+        let header = checked_in_header_text();
+        let start = format!("typedef struct {struct_name} {{");
+        let end = format!("}} {struct_name};");
+        let mut in_struct = false;
+        let mut fields = Vec::new();
+        for line in header.lines() {
+            let line = line.trim();
+            if line == start {
+                in_struct = true;
+                continue;
+            }
+            if in_struct && line == end {
+                return fields;
+            }
+            if !in_struct || line.is_empty() {
+                continue;
+            }
+
+            let Some(field) = line.split_whitespace().last() else {
+                continue;
+            };
+            fields.push(
+                field
+                    .trim_end_matches(';')
+                    .trim_start_matches('*')
+                    .to_owned(),
+            );
+        }
+        panic!("did not find struct {struct_name} in checked-in header");
+    }
+
+    fn rust_struct_fields(struct_name: &str) -> Vec<String> {
+        let source = include_str!("lib.rs");
+        let start = format!("pub struct {struct_name} {{");
+        let mut in_struct = false;
+        let mut fields = Vec::new();
+        for line in source.lines() {
+            let line = line.trim();
+            if line == start {
+                in_struct = true;
+                continue;
+            }
+            if in_struct && line == "}" {
+                return fields;
+            }
+            if !in_struct || line.is_empty() {
+                continue;
+            }
+
+            let Some(field) = line.strip_prefix("pub ") else {
+                continue;
+            };
+            let Some((name, _)) = field.split_once(':') else {
+                continue;
+            };
+            fields.push(name.to_owned());
+        }
+        panic!("did not find struct {struct_name} in Rust source");
+    }
+
     fn header_exported_function_names() -> BTreeSet<String> {
         checked_in_header_text()
             .lines()
@@ -2502,6 +2563,36 @@ mod tests {
 
     #[test]
     fn checked_in_header_matches_event_abi_enums() {
+        assert_eq!(
+            header_enum_values("SaBoostPadEventKind"),
+            BTreeMap::from([
+                (
+                    "SaBoostPadEventKindPickedUp".to_owned(),
+                    SaBoostPadEventKind::PickedUp as i32,
+                ),
+                (
+                    "SaBoostPadEventKindAvailable".to_owned(),
+                    SaBoostPadEventKind::Available as i32,
+                ),
+            ])
+        );
+        assert_eq!(
+            header_enum_values("SaPlayerStatEventKind"),
+            BTreeMap::from([
+                (
+                    "SaPlayerStatEventKindShot".to_owned(),
+                    SaPlayerStatEventKind::Shot as i32,
+                ),
+                (
+                    "SaPlayerStatEventKindSave".to_owned(),
+                    SaPlayerStatEventKind::Save as i32,
+                ),
+                (
+                    "SaPlayerStatEventKindAssist".to_owned(),
+                    SaPlayerStatEventKind::Assist as i32,
+                ),
+            ])
+        );
         assert_eq!(
             header_enum_values("SaMechanicKind"),
             BTreeMap::from([
@@ -2677,6 +2768,32 @@ mod tests {
             header_exported_function_names(),
             rust_exported_function_names()
         );
+    }
+
+    #[test]
+    fn checked_in_header_matches_event_abi_struct_fields() {
+        for struct_name in [
+            "SaVec3",
+            "SaQuat",
+            "SaRigidBody",
+            "SaPlayerFrame",
+            "SaTouchEvent",
+            "SaDodgeRefreshedEvent",
+            "SaBoostPadEvent",
+            "SaGoalEvent",
+            "SaPlayerStatEvent",
+            "SaDemolishEvent",
+            "SaLiveFrame",
+            "SaMechanicEvent",
+            "SaTeamEvent",
+            "SaGoalContextEvent",
+        ] {
+            assert_eq!(
+                header_struct_fields(struct_name),
+                rust_struct_fields(struct_name),
+                "checked-in header field order should match Rust repr(C) struct {struct_name}"
+            );
+        }
     }
 
     fn rigid_body(location: SaVec3, linear_velocity: SaVec3) -> SaRigidBody {
