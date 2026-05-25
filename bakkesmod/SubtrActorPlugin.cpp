@@ -489,7 +489,8 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_dump_graph",
       [this](std::vector<std::string> params) { dumpGraphJson(params); },
-      "Writes the current subtr-actor graph metadata, timeline, events, and frame JSON snapshots",
+      "Writes graph metadata, timeline, events, frame, and stats JSON. "
+      "Pass 'finish' to flush delayed graph events first.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -1329,10 +1330,28 @@ std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {
   return buffer;
 }
 
-void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
+void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   if (!loaded || !engine) {
     cvarManager->log("subtr-actor: graph dump requested before engine was loaded");
     return;
+  }
+
+  const bool shouldFinish =
+      std::find_if(params.begin(), params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log("subtr-actor: graph dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(
+          std::format("subtr-actor: graph finish failed before dump: {}", finishResult));
+      return;
+    }
+    drainPendingEvents();
   }
 
   const std::filesystem::path outputDirectory =
@@ -1373,12 +1392,19 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
   }
 
   cvarManager->log(std::format(
-      "subtr-actor: wrote graph JSON snapshots to {}, {}, {}, {}, and {}",
+      "subtr-actor: wrote graph JSON snapshots{}: {} ({} bytes), {} ({} bytes), "
+      "{} ({} bytes), {} ({} bytes), {} ({} bytes)",
+      shouldFinish ? " after finish" : "",
       eventsPath.string(),
+      eventsJson.size(),
       framePath.string(),
+      frameJson.size(),
       timelinePath.string(),
+      timelineJson.size(),
       statsPath.string(),
-      graphInfoPath.string()));
+      statsJson.size(),
+      graphInfoPath.string(),
+      graphInfoJson.size()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {
