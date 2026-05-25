@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.2 - 2026-05-25
+
+- Make mechanics review clip selection start playback immediately after loading
+  and avoid re-enforcing the end boundary once the clip is already paused.
+- Show clip timing, event timing, preroll, and postroll details in the mechanics
+  review panel.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.2`.
+
 ## v0.8.1 - 2026-05-25
 
 - Fix the GitHub Pages Nix build by refreshing the stats-player Pages package

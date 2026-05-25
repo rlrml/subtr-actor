@@ -14,7 +14,7 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
 
     assert!(
         timeline.events.double_tap.iter().any(|event| {
-            (event.backboard_time - 174.0366).abs() < 0.05 && (event.time - 174.4810).abs() < 0.05
+            (event.backboard_time - 174.0366).abs() < 0.05 && (event.time - 174.481).abs() < 0.05
         }),
         "expected raw double tap event before the third goal"
     );
@@ -26,7 +26,7 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
                         start_time,
                         end_time,
                         ..
-                    } => (start_time - 174.0366).abs() < 0.05 && (end_time - 174.4810).abs() < 0.05,
+                    } => (start_time - 174.0366).abs() < 0.05 && (end_time - 174.481).abs() < 0.05,
                     subtr_actor::MechanicTiming::Moment { .. } => false,
                 }
         }),

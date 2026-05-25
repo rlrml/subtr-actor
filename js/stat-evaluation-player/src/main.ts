@@ -264,6 +264,8 @@ let mechanicsReviewIndex!: HTMLElement;
 let mechanicsReviewTitle!: HTMLElement;
 let mechanicsReviewMechanic!: HTMLElement;
 let mechanicsReviewPlayer!: HTMLElement;
+let mechanicsReviewClip!: HTMLElement;
+let mechanicsReviewEvent!: HTMLElement;
 let mechanicsReviewReason!: HTMLElement;
 let mechanicsReviewPrev!: HTMLButtonElement;
 let mechanicsReviewReplay!: HTMLButtonElement;
@@ -1979,6 +1981,84 @@ function getMechanicsReviewBoundTime(bound: MechanicsReviewPlaybackBound): numbe
   );
 }
 
+function formatMechanicsReviewTime(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}s` : "--";
+}
+
+function formatMechanicsReviewBound(bound: MechanicsReviewPlaybackBound): string {
+  return bound.kind === "time"
+    ? formatMechanicsReviewTime(bound.value)
+    : `frame ${Math.trunc(bound.value)}`;
+}
+
+function getMechanicsReviewTargetNumber(
+  item: MechanicsReviewItem,
+  key: "startTime" | "endTime" | "eventTime",
+): number | null {
+  if (!isRecord(item.meta?.target)) {
+    return null;
+  }
+  const value = item.meta.target[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getMechanicsReviewTargetFrame(
+  item: MechanicsReviewItem,
+  key: "startFrame" | "endFrame" | "eventFrame",
+): number | null {
+  if (!isRecord(item.meta?.target)) {
+    return null;
+  }
+  const value = item.meta.target[key];
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
+}
+
+function formatMechanicsReviewClipDetails(item: MechanicsReviewItem): string {
+  const clipStart = item.start.kind === "time" ? item.start.value : null;
+  const clipEnd = item.end.kind === "time" ? item.end.value : null;
+  const parts = [
+    `${formatMechanicsReviewBound(item.start)} to ${formatMechanicsReviewBound(item.end)}`,
+  ];
+  if (clipStart !== null && clipEnd !== null) {
+    parts.push(`${Math.max(0, clipEnd - clipStart).toFixed(1)}s clip`);
+  }
+  const targetStart =
+    getMechanicsReviewTargetNumber(item, "startTime") ??
+    getMechanicsReviewTargetNumber(item, "eventTime");
+  const targetEnd =
+    getMechanicsReviewTargetNumber(item, "endTime") ??
+    getMechanicsReviewTargetNumber(item, "eventTime");
+  if (clipStart !== null && targetStart !== null) {
+    parts.push(`${Math.max(0, targetStart - clipStart).toFixed(1)}s preroll`);
+  }
+  if (clipEnd !== null && targetEnd !== null) {
+    parts.push(`${Math.max(0, clipEnd - targetEnd).toFixed(1)}s postroll`);
+  }
+  return parts.join(" · ");
+}
+
+function formatMechanicsReviewEventDetails(item: MechanicsReviewItem): string {
+  const eventTime = getMechanicsReviewTargetNumber(item, "eventTime");
+  const startTime = getMechanicsReviewTargetNumber(item, "startTime");
+  const endTime = getMechanicsReviewTargetNumber(item, "endTime");
+  const eventFrame = getMechanicsReviewTargetFrame(item, "eventFrame");
+  const startFrame = getMechanicsReviewTargetFrame(item, "startFrame");
+  const endFrame = getMechanicsReviewTargetFrame(item, "endFrame");
+  const time =
+    startTime !== null && endTime !== null && Math.abs(endTime - startTime) > 0.001
+      ? `${formatMechanicsReviewTime(startTime)} to ${formatMechanicsReviewTime(endTime)}`
+      : formatMechanicsReviewTime(eventTime ?? startTime ?? endTime);
+  const frame =
+    startFrame !== null && endFrame !== null && endFrame !== startFrame
+      ? `frames ${startFrame}-${endFrame}`
+      : eventFrame !== null
+        ? `frame ${eventFrame}`
+        : startFrame !== null
+          ? `frame ${startFrame}`
+          : null;
+  return [time, frame].filter((part) => part && part !== "--").join(" · ") || "--";
+}
+
 function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
   return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;
 }
@@ -2295,6 +2375,8 @@ function renderMechanicsReviewWindow(): void {
     : "No candidate selected";
   mechanicsReviewMechanic.textContent = item ? getMechanicsReviewMechanicLabel(item) : "--";
   mechanicsReviewPlayer.textContent = item ? getMechanicsReviewPlayerName(item) : "--";
+  mechanicsReviewClip.textContent = item ? formatMechanicsReviewClipDetails(item) : "--";
+  mechanicsReviewEvent.textContent = item ? formatMechanicsReviewEventDetails(item) : "--";
   mechanicsReviewReason.textContent = item?.meta?.reason ?? "--";
   mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;
   mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;
@@ -2432,10 +2514,12 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
     review.currentClip = { startTime, endTime };
     replayPlayer?.setState({
       currentTime: startTime,
-      playing: false,
+      playing: true,
       skipPostGoalTransitionsEnabled: false,
     });
-    setMechanicsReviewStatus(`${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`);
+    setMechanicsReviewStatus(
+      `Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`,
+    );
   } catch (error) {
     console.error("Failed to activate mechanics review item:", error);
     review.currentClip = null;
@@ -2506,7 +2590,7 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
   }
 
   const beforeStart = state.currentTime < clip.startTime - 0.1;
-  const atOrPastEnd = state.currentTime >= clip.endTime - 0.025;
+  const atOrPastEnd = state.playing && state.currentTime >= clip.endTime - 0.025;
   if (!beforeStart && !atOrPastEnd) {
     return false;
   }
@@ -2518,6 +2602,9 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
       playing: false,
       skipPostGoalTransitionsEnabled: false,
     });
+    if (atOrPastEnd) {
+      setMechanicsReviewStatus(`Finished clip at ${clip.endTime.toFixed(2)}s`);
+    }
   } finally {
     mechanicsReviewBoundaryGuard = false;
   }
@@ -4030,6 +4117,8 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewTitle = mustElement<HTMLElement>(root, "#mechanics-review-title");
   mechanicsReviewMechanic = mustElement<HTMLElement>(root, "#mechanics-review-mechanic");
   mechanicsReviewPlayer = mustElement<HTMLElement>(root, "#mechanics-review-player");
+  mechanicsReviewClip = mustElement<HTMLElement>(root, "#mechanics-review-clip");
+  mechanicsReviewEvent = mustElement<HTMLElement>(root, "#mechanics-review-event");
   mechanicsReviewReason = mustElement<HTMLElement>(root, "#mechanics-review-reason");
   mechanicsReviewPrev = mustElement<HTMLButtonElement>(root, "#mechanics-review-prev");
   mechanicsReviewReplay = mustElement<HTMLButtonElement>(root, "#mechanics-review-replay");

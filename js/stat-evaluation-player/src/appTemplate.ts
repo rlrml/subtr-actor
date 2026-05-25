@@ -415,6 +415,14 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                     <dt>Player</dt>
                     <dd id="mechanics-review-player">--</dd>
                   </div>
+                  <div>
+                    <dt>Clip</dt>
+                    <dd id="mechanics-review-clip">--</dd>
+                  </div>
+                  <div>
+                    <dt>Event</dt>
+                    <dd id="mechanics-review-event">--</dd>
+                  </div>
                   <div class="mechanics-review-wide">
                     <dt>Reason</dt>
                     <dd id="mechanics-review-reason">--</dd>
