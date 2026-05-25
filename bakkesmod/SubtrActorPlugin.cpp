@@ -829,7 +829,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
 
 void SubtrActorPlugin::unloadRustLibrary() {
   if (engine && engineFinish) {
-    engineFinish(engine);
+    finishAndDrainPendingEvents("plugin unload");
   }
   if (engine && engineDestroy) {
     engineDestroy(engine);
@@ -879,9 +879,7 @@ void SubtrActorPlugin::tick(std::string) {
 
   if (!gameWrapper->IsInGame()) {
     if (wasInGame && engineReset) {
-      if (engineFinish && engineFinish(engine) == 0) {
-        drainPendingEvents();
-      }
+      finishAndDrainPendingEvents("game exit");
       engineReset(engine);
       resetLiveState();
     }
@@ -2169,6 +2167,24 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   cvarManager->log(ok
                        ? "subtr-actor: graph verification passed"
                        : "subtr-actor: graph verification failed; enter gameplay/replay and try again");
+}
+
+bool SubtrActorPlugin::finishAndDrainPendingEvents(std::string_view context) {
+  if (!engine || !engineFinish) {
+    return false;
+  }
+
+  const int32_t finishResult = engineFinish(engine);
+  if (finishResult != 0) {
+    cvarManager->log(std::format(
+        "subtr-actor: live graph finalization failed during {}: {}",
+        context,
+        finishResult));
+    return false;
+  }
+
+  drainPendingEvents();
+  return true;
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

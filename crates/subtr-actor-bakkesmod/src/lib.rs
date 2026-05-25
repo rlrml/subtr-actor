@@ -6611,6 +6611,52 @@ mod tests {
     }
 
     #[test]
+    fn live_abi_accepts_frames_after_finish_for_mid_game_dumps() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let first_frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            seconds_remaining: 299,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_live_play: 1,
+            ..SaLiveFrame::default()
+        };
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first_frame) },
+            0
+        );
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        assert_eq!(live_frame_json_value(engine)["frame_number"], 7);
+
+        let second_frame = SaLiveFrame {
+            frame_number: 8,
+            time: 1.516,
+            dt: 0.016,
+            seconds_remaining: 298,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_live_play: 1,
+            ..SaLiveFrame::default()
+        };
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second_frame) },
+            0
+        );
+
+        let value = live_frame_json_value(engine);
+        assert_eq!(value["frame_number"], 8);
+        assert_eq!(value["seconds_remaining"], 298);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
     fn live_abi_timeline_json_matches_direct_full_graph_across_finish() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {

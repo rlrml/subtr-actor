@@ -76,6 +76,7 @@ jobs:
           Assert-Contains $pluginText "verified {} builtin stats modules by name" "BakkesMod stats module registry verification"
           Assert-Contains $pluginText "callable analysis node registry matches graph_info" "BakkesMod callable node registry consistency"
           Assert-Contains $pluginText "live frame processing failed" "BakkesMod live frame processing diagnostics"
+          Assert-Contains $pluginText "live graph finalization failed during plugin unload" "BakkesMod unload finalization diagnostics"
           Assert-Contains $pluginText "subtr_actor_dump_graph_output <events|frame|timeline|stats|analysis_nodes|graph_info> [finish]" "graph output command usage"
           Assert-Contains $pluginText "graph-analysis-nodes.json" "bulk analysis-node dump filename"
           Assert-Contains $pluginText "analysis_nodes" "analysis_nodes graph output name"

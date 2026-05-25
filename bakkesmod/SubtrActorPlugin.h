@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <windows.h>
@@ -165,6 +166,7 @@ private:
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);
+  bool finishAndDrainPendingEvents(std::string_view context);
   void drainPendingEvents();
   SaLiveFrame sampleFrame();
   void samplePlayers(ServerWrapper server, CarWrapper localCar);
