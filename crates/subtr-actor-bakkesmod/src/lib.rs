@@ -6,6 +6,7 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
+    default_stats_timeline_config,
     stats::analysis_graph::{
         graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
         StatsTimelineEventsState, StatsTimelineFrameNode, StatsTimelineFrameState,
@@ -14,9 +15,9 @@ use subtr_actor::{
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
     FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
-    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsTimelineEvents,
-    ShotEventMetadata, TimelineEvent, TimelineEventKind, TouchEvent, TouchState,
-    TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsFrame,
+    ReplayStatsTimeline, ReplayStatsTimelineEvents, ShotEventMetadata, TimelineEvent,
+    TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -241,10 +242,13 @@ pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
     live_replay_meta_initialized: bool,
+    live_replay_meta: Option<ReplayMeta>,
     live_replay_meta_signature: Vec<(RemoteId, bool, Option<String>)>,
     emitted_mechanic_ids: HashSet<String>,
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
+    timeline_json: Vec<u8>,
+    timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
 }
 
@@ -257,10 +261,13 @@ impl Default for SaEngine {
             graph,
             live_events: SaLiveEventGenerator::default(),
             live_replay_meta_initialized: false,
+            live_replay_meta: None,
             live_replay_meta_signature: Vec::new(),
             emitted_mechanic_ids: HashSet::new(),
             events_json: Vec::new(),
             frame_json: Vec::new(),
+            timeline_json: Vec::new(),
+            timeline_frames: Vec::new(),
             pending_events: Vec::new(),
         }
     }
@@ -783,6 +790,7 @@ fn sync_live_replay_meta(
     let replay_meta = live_replay_meta(players);
     engine.graph.on_replay_meta(&replay_meta)?;
     engine.live_replay_meta_initialized = true;
+    engine.live_replay_meta = Some(replay_meta);
     engine.live_replay_meta_signature = signature;
     Ok(())
 }
@@ -1076,25 +1084,68 @@ fn push_drainable_events_from_timeline(
     });
 }
 
+fn current_timeline_frame(graph: &AnalysisGraph) -> Option<ReplayStatsFrame> {
+    graph
+        .state::<StatsTimelineFrameState>()
+        .and_then(|state| state.frame.clone())
+}
+
+fn record_timeline_frame(frames: &mut Vec<ReplayStatsFrame>, frame: ReplayStatsFrame) {
+    if let Some(last_frame) = frames.last_mut() {
+        if last_frame.frame_number == frame.frame_number {
+            *last_frame = frame;
+            return;
+        }
+    }
+    frames.push(frame);
+}
+
+fn serialize_live_timeline(
+    replay_meta: Option<&ReplayMeta>,
+    events: ReplayStatsTimelineEvents,
+    frames: Vec<ReplayStatsFrame>,
+) -> Vec<u8> {
+    let Some(replay_meta) = replay_meta else {
+        return Vec::new();
+    };
+    serde_json::to_vec(&ReplayStatsTimeline {
+        config: default_stats_timeline_config(),
+        replay_meta: replay_meta.clone(),
+        events,
+        frames,
+    })
+    .unwrap_or_default()
+}
+
 fn refresh_timeline_graph_views(engine: &mut SaEngine) {
-    let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
+    let Some(events) = engine
+        .graph
+        .state::<StatsTimelineEventsState>()
+        .map(|state| state.events.clone())
+    else {
         engine.events_json.clear();
         engine.frame_json.clear();
+        engine.timeline_json.clear();
         return;
     };
     push_drainable_events_from_timeline(
         &mut engine.pending_events,
         &mut engine.emitted_mechanic_ids,
-        &timeline_events.events,
+        &events,
     );
-    engine.events_json = serde_json::to_vec(&timeline_events.events).unwrap_or_default();
+    engine.events_json = serde_json::to_vec(&events).unwrap_or_default();
 
-    engine.frame_json = engine
-        .graph
-        .state::<StatsTimelineFrameState>()
-        .and_then(|state| state.frame.as_ref())
-        .and_then(|frame| serde_json::to_vec(frame).ok())
-        .unwrap_or_default();
+    if let Some(frame) = current_timeline_frame(&engine.graph) {
+        record_timeline_frame(&mut engine.timeline_frames, frame.clone());
+        engine.frame_json = serde_json::to_vec(&frame).unwrap_or_default();
+    } else {
+        engine.frame_json.clear();
+    }
+    engine.timeline_json = serialize_live_timeline(
+        engine.live_replay_meta.as_ref(),
+        events,
+        engine.timeline_frames.clone(),
+    );
 }
 
 /// Creates an opaque live-analysis engine.
@@ -1305,6 +1356,52 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
 
     let count = max_bytes.min(engine.frame_json.len());
     ptr::copy_nonoverlapping(engine.frame_json.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of the current serialized live stats timeline.
+///
+/// The JSON payload is a `ReplayStatsTimeline` value produced by the live
+/// analysis graph. It contains the graph config, live replay metadata, all
+/// timeline event families, and every frame snapshot observed by this engine.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_timeline_json_len(engine: *const SaEngine) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.timeline_json.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the current serialized live stats timeline into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_timeline_json_len` first to size the destination
+/// buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let count = max_bytes.min(engine.timeline_json.len());
+    ptr::copy_nonoverlapping(engine.timeline_json.as_ptr(), out_bytes, count);
     count
 }
 
@@ -1691,6 +1788,7 @@ mod tests {
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
         assert!(unsafe { subtr_actor_bakkesmod_events_json_len(engine) } > 0);
         assert!(unsafe { subtr_actor_bakkesmod_frame_json_len(engine) } > 0);
+        assert!(unsafe { subtr_actor_bakkesmod_timeline_json_len(engine) } > 0);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
@@ -1807,6 +1905,65 @@ mod tests {
         assert!(value.get("bump").is_some());
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_events_json(engine, ptr::null_mut(), 10) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn exposes_full_stats_timeline_json_after_processing_frames() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let blue_name = std::ffi::CString::new("Blue Live").unwrap();
+        let mut players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: -100.0,
+                y: -200.0,
+                z: 92.75,
+            },
+        )];
+        players[0].player_name = blue_name.as_ptr();
+
+        for (frame_number, time) in [(9, 1.75), (10, 1.766)] {
+            let frame = SaLiveFrame {
+                frame_number,
+                time,
+                dt: 0.016,
+                seconds_remaining: 298,
+                has_seconds_remaining: 1,
+                ball_has_been_hit: 1,
+                has_ball_has_been_hit: 1,
+                live_play: 1,
+                players: players.as_ptr(),
+                player_count: players.len(),
+                ..SaLiveFrame::default()
+            };
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+                0
+            );
+        }
+
+        let json_len = unsafe { subtr_actor_bakkesmod_timeline_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_timeline_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("timeline json should be valid");
+        assert!(value.get("config").is_some());
+        assert!(value.get("events").is_some());
+        assert_eq!(value["replay_meta"]["team_zero"][0]["name"], "Blue Live");
+        let frames = value["frames"].as_array().expect("frames array");
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0]["frame_number"], 9);
+        assert_eq!(frames[1]["frame_number"], 10);
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_write_timeline_json(engine, ptr::null_mut(), 10) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };

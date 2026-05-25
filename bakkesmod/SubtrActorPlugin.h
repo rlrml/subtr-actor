@@ -42,6 +42,8 @@ private:
   using WriteEventsJson = WriteJson;
   using FrameJsonLen = JsonLen;
   using WriteFrameJson = WriteJson;
+  using TimelineJsonLen = JsonLen;
+  using WriteTimelineJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
 
   struct OverlayMessage {
@@ -73,6 +75,8 @@ private:
   WriteEventsJson writeEventsJson = nullptr;
   FrameJsonLen frameJsonLen = nullptr;
   WriteFrameJson writeFrameJson = nullptr;
+  TimelineJsonLen timelineJsonLen = nullptr;
+  WriteTimelineJson writeTimelineJson = nullptr;
   DrainEvents drainEvents = nullptr;
 
   uint64_t frameNumber = 0;

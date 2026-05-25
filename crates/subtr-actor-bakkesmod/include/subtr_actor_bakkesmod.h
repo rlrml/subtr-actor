@@ -202,6 +202,11 @@ size_t subtr_actor_bakkesmod_write_frame_json(
     const SaEngine *engine,
     uint8_t *out_bytes,
     size_t max_bytes);
+size_t subtr_actor_bakkesmod_timeline_json_len(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_write_timeline_json(
+    const SaEngine *engine,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_drain_events(
     SaEngine *engine,
     SaMechanicEvent *out_events,

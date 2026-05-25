@@ -225,7 +225,7 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_dump_graph",
       [this](std::vector<std::string> params) { dumpGraphJson(params); },
-      "Writes the current subtr-actor graph events and frame JSON snapshots",
+      "Writes the current subtr-actor graph timeline, events, and frame JSON snapshots",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -323,12 +323,16 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_frame_json_len"));
   writeFrameJson = reinterpret_cast<WriteFrameJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_frame_json"));
+  timelineJsonLen = reinterpret_cast<TimelineJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_timeline_json_len"));
+  writeTimelineJson = reinterpret_cast<WriteTimelineJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_timeline_json"));
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
 
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
-      !drainEvents) {
+      !timelineJsonLen || !writeTimelineJson || !drainEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -359,6 +363,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeEventsJson = nullptr;
   frameJsonLen = nullptr;
   writeFrameJson = nullptr;
+  timelineJsonLen = nullptr;
+  writeTimelineJson = nullptr;
   drainEvents = nullptr;
 }
 
@@ -961,23 +967,28 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
 
   const std::string eventsJson = readJsonBuffer(eventsJsonLen, writeEventsJson);
   const std::string frameJson = readJsonBuffer(frameJsonLen, writeFrameJson);
+  const std::string timelineJson = readJsonBuffer(timelineJsonLen, writeTimelineJson);
   const std::filesystem::path eventsPath = outputDirectory / "graph-events.json";
   const std::filesystem::path framePath = outputDirectory / "graph-frame.json";
+  const std::filesystem::path timelinePath = outputDirectory / "graph-timeline.json";
 
   std::ofstream eventsFile(eventsPath, std::ios::binary);
   eventsFile.write(eventsJson.data(), static_cast<std::streamsize>(eventsJson.size()));
   std::ofstream frameFile(framePath, std::ios::binary);
   frameFile.write(frameJson.data(), static_cast<std::streamsize>(frameJson.size()));
+  std::ofstream timelineFile(timelinePath, std::ios::binary);
+  timelineFile.write(timelineJson.data(), static_cast<std::streamsize>(timelineJson.size()));
 
-  if (!eventsFile || !frameFile) {
+  if (!eventsFile || !frameFile || !timelineFile) {
     cvarManager->log("subtr-actor: failed to write graph JSON snapshots");
     return;
   }
 
   cvarManager->log(std::format(
-      "subtr-actor: wrote graph JSON snapshots to {} and {}",
+      "subtr-actor: wrote graph JSON snapshots to {}, {}, and {}",
       eventsPath.string(),
-      framePath.string()));
+      framePath.string(),
+      timelinePath.string()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {
