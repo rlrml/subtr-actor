@@ -26,6 +26,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-window-toggle="playback">Playback</button>
               <button type="button" data-window-toggle="recording">Recording</button>
               <button type="button" data-window-toggle="mechanics">Events</button>
+              <button type="button" data-window-toggle="event-playlist">Event playlist</button>
               <button type="button" data-window-toggle="mechanics-review">Mechanics review</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
@@ -352,6 +353,23 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               </button>
             </header>
             <div id="mechanics-timeline-window-body"></div>
+          </section>
+
+          <section
+            class="floating-window floating-window-event-playlist"
+            data-window-id="event-playlist"
+            hidden
+            style="--window-x: calc(100vw - 28rem); --window-y: 16rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Event playlist</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="event-playlist">
+                Hide
+              </button>
+            </header>
+            <div id="event-playlist-window-body" class="event-playlist-window-body"></div>
           </section>
 
           <section

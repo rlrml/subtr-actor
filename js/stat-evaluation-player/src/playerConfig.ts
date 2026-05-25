@@ -22,6 +22,7 @@ export type SingletonWindowId =
   | "playback"
   | "recording"
   | "mechanics"
+  | "event-playlist"
   | "mechanics-review"
   | "boost-pickups"
   | "touch-controls";
@@ -416,6 +417,7 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "playback" ||
     value === "recording" ||
     value === "mechanics" ||
+    value === "event-playlist" ||
     value === "mechanics-review" ||
     value === "boost-pickups" ||
     value === "touch-controls"

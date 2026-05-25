@@ -59,6 +59,16 @@ const CONFIG: StatsPlayerConfig = {
         visible: true,
       },
     },
+    {
+      id: "event-playlist",
+      placement: {
+        x: 1280,
+        y: 180,
+        viewport: { width: 1920, height: 1080 },
+        zIndex: 32,
+        visible: false,
+      },
+    },
   ],
   statsWindows: [
     {

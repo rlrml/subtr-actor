@@ -6,6 +6,8 @@ README, or refactor-only commit.
 
 ## v0.7.13 - 2026-05-25
 
+- Add a stats evaluation player event playlist window with filter controls,
+  automatic timeline following, and per-player event colors.
 - Expand touch stats with wall-touch counts and surface-labeled touch
   breakdowns across Rust exports and the stats evaluation player.
 - Add touch surface confidence documentation and keep player entrypoint
