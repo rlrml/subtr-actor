@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.6 - 2026-05-25
+
+- Refresh release metadata after the playlist clip seek clamping and Rust
+  clippy fixes landed on `master`.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.6`.
+
 ## v0.8.5 - 2026-05-25
 
 - Clamp direct replay seeks and state updates against raw replay duration instead
