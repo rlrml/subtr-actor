@@ -396,7 +396,7 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   BoostWrapper boost = car.GetBoostComponent();
   if (!boost.IsNull()) {
     const auto previousBoost = lastBoostAmounts.find(playerIndex);
-    player.boost_amount = boost.GetCurrentBoostAmount();
+    player.boost_amount = static_cast<float>(boost.GetReplicatedBoostAmount());
     player.last_boost_amount =
         previousBoost == lastBoostAmounts.end() ? player.boost_amount : previousBoost->second;
     player.boost_active = player.boost_amount < player.last_boost_amount ? 1 : 0;
