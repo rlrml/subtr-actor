@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ptr;
 use std::slice;
 
@@ -226,7 +227,7 @@ pub struct SaMechanicEvent {
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
-    last_mechanic_count: usize,
+    emitted_mechanic_ids: HashSet<String>,
     pending_events: Vec<SaMechanicEvent>,
 }
 
@@ -237,7 +238,7 @@ impl Default for SaEngine {
         Self {
             graph,
             live_events: SaLiveEventGenerator::default(),
-            last_mechanic_count: 0,
+            emitted_mechanic_ids: HashSet::new(),
             pending_events: Vec::new(),
         }
     }
@@ -702,17 +703,20 @@ fn mechanic_start(event: &MechanicEvent) -> (usize, f32) {
     }
 }
 
-fn push_new_events(engine: &mut SaEngine) {
-    let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
-        return;
-    };
-    let mechanics = &timeline_events.events.mechanics;
-    for event in &mechanics[engine.last_mechanic_count..] {
+fn push_mechanic_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    mechanics: &[MechanicEvent],
+) {
+    for event in mechanics {
         let Some(kind) = mechanic_kind(&event.kind) else {
             continue;
         };
+        if !emitted_mechanic_ids.insert(event.id.clone()) {
+            continue;
+        }
         let (frame_number, time) = mechanic_start(event);
-        engine.pending_events.push(SaMechanicEvent {
+        pending_events.push(SaMechanicEvent {
             kind,
             player_index: player_index(&event.player_id),
             is_team_0: event.is_team_0 as u8,
@@ -721,7 +725,17 @@ fn push_new_events(engine: &mut SaEngine) {
             confidence: 1.0,
         });
     }
-    engine.last_mechanic_count = mechanics.len();
+}
+
+fn push_new_events(engine: &mut SaEngine) {
+    let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
+        return;
+    };
+    push_mechanic_events_from_timeline(
+        &mut engine.pending_events,
+        &mut engine.emitted_mechanic_ids,
+        &timeline_events.events.mechanics,
+    );
 }
 
 /// Creates an opaque live-analysis engine.
@@ -904,6 +918,17 @@ mod tests {
 
     fn player_at(location: SaVec3) -> SaPlayerFrame {
         player_at_index(0, true, location)
+    }
+
+    fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> MechanicEvent {
+        MechanicEvent {
+            id: id.to_owned(),
+            kind: kind.to_owned(),
+            player_id: RemoteId::SplitScreen(0),
+            is_team_0: true,
+            timing: MechanicTiming::Moment { frame, time },
+            properties: Vec::new(),
+        }
     }
 
     #[test]
@@ -1319,6 +1344,38 @@ mod tests {
 
         assert_eq!(status, -1);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn emits_late_inserted_sorted_timeline_mechanics() {
+        let mut pending_events = Vec::new();
+        let mut emitted_mechanic_ids = HashSet::new();
+
+        push_mechanic_events_from_timeline(
+            &mut pending_events,
+            &mut emitted_mechanic_ids,
+            &[
+                normalized_mechanic("speed_flip:10:0", "speed_flip", 10, 1.0),
+                normalized_mechanic("wavedash:20:25:0", "wavedash", 20, 2.0),
+            ],
+        );
+        assert_eq!(pending_events.len(), 2);
+
+        pending_events.clear();
+        push_mechanic_events_from_timeline(
+            &mut pending_events,
+            &mut emitted_mechanic_ids,
+            &[
+                normalized_mechanic("speed_flip:10:0", "speed_flip", 10, 1.0),
+                normalized_mechanic("center:15:30:0", "center", 15, 1.5),
+                normalized_mechanic("wavedash:20:25:0", "wavedash", 20, 2.0),
+            ],
+        );
+
+        assert_eq!(pending_events.len(), 1);
+        assert_eq!(pending_events[0].kind, SaMechanicKind::Center);
+        assert_eq!(pending_events[0].frame_number, 15);
+        assert_eq!(pending_events[0].time, 1.5);
     }
 
     #[test]
