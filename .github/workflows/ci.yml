@@ -5,13 +5,22 @@ on:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
+  schedule:
+    - cron: '23 10 * * *'
+  workflow_dispatch:
+    inputs:
+      full_replay_tests:
+        description: Run exhaustive replay fixture tests
+        type: boolean
+        default: true
 
 env:
   CARGO_TERM_COLOR: always
+  RUN_FULL_REPLAY_TESTS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
 jobs:
-  test:
-    name: Test
+  rust-quality:
+    name: Rust quality
     runs-on: ubuntu-24.04
 
     steps:
@@ -21,35 +30,12 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
-        targets: wasm32-unknown-unknown
 
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: |
-          js/package-lock.json
-          js/player/package-lock.json
-          js/stat-evaluation-player/package-lock.json
-          js/example/package-lock.json
-
-    - name: Install wasm-pack
-      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
 
     - name: Check release metadata consistency
       run: python3 scripts/check_release_versions.py
-
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
 
     - name: Check formatting
       run: cargo fmt --all -- --check
@@ -60,8 +46,88 @@ jobs:
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
 
-    - name: Run tests
-      run: cargo test --verbose
+  rust-tests:
+    name: Rust tests
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run Rust tests
+      run: |
+        cargo test --verbose -- \
+          --skip post_eac_replays_emit_stats_outputs \
+          --skip stats_collector_default_resolution_matches_every_frame \
+          --skip stats_collector_and_timeline_collector_match_at_sampled_resolution \
+          --skip test_stats_timeline_value_serializes_for_rlcs_replay
+
+  rust-replay-fixtures:
+    name: Rust replay fixtures
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run exhaustive Rust replay tests
+      run: |
+        cargo test --verbose --test post_eac_replay_fixture_test post_eac_replays_emit_stats_outputs
+        cargo test --verbose --test stats_frame_resolution_test stats_collector_default_resolution_matches_every_frame
+        cargo test --verbose --test stats_frame_resolution_test stats_collector_and_timeline_collector_match_at_sampled_resolution
+        cargo test --verbose --test stats_timeline_collector_test test_stats_timeline_value_serializes_for_rlcs_replay
+
+  rust-release-build:
+    name: Rust release build
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build release
+      run: cargo build --release --verbose
+
+  player-package:
+    name: Player package
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: js/player/package-lock.json
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
     - name: Install JS tooling dependencies
       working-directory: js
@@ -83,6 +149,37 @@ jobs:
       working-directory: js/player
       run: npm run build
 
+  stats-player-package:
+    name: Stats player package
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: |
+          js/player/package-lock.json
+          js/stat-evaluation-player/package-lock.json
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Install player dependencies
+      working-directory: js/player
+      run: npm ci
+
     - name: Install stats player dependencies
       working-directory: js/stat-evaluation-player
       run: npm ci
@@ -93,11 +190,76 @@ jobs:
 
     - name: Test stats player package
       working-directory: js/stat-evaluation-player
-      run: npm test
+      run: npm run test:ci
 
     - name: Build stats player package
       working-directory: js/stat-evaluation-player
       run: npm run build
+
+  stats-player-replay-fixtures:
+    name: Stats player replay fixtures
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: |
+          js/player/package-lock.json
+          js/stat-evaluation-player/package-lock.json
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Install player dependencies
+      working-directory: js/player
+      run: npm ci
+
+    - name: Install stats player dependencies
+      working-directory: js/stat-evaluation-player
+      run: npm ci
+
+    - name: Run exhaustive stats player replay fixture tests
+      working-directory: js/stat-evaluation-player
+      run: npm run test:fixtures
+
+  example-package:
+    name: Example package
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Rust build outputs
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: js/example/package-lock.json
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
     - name: Install example dependencies
       working-directory: js/example
@@ -106,6 +268,3 @@ jobs:
     - name: Build example package
       working-directory: js/example
       run: npm run build
-
-    - name: Build release
-      run: cargo build --release --verbose

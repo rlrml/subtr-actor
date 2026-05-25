@@ -483,11 +483,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlayModeReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
-  const orderedBreakdownClasses: TouchBreakdownClass[] = [
-    "kind",
-    "height_band",
-    "dodge_state",
-  ];
+  const orderedBreakdownClasses: TouchBreakdownClass[] = ["kind", "height_band", "dodge_state"];
 
   return {
     id: "touch",

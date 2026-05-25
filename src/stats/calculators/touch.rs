@@ -126,20 +126,22 @@ impl TouchStats {
         let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
             .into_iter()
             .flat_map(|height_band| {
-                ALL_TOUCH_DODGE_STATES.into_iter().flat_map(move |dodge_state| {
-                    ALL_TOUCH_KINDS.into_iter().map(move |kind| {
-                        let mut labels = vec![
-                            kind.as_label(),
-                            height_band.as_label(),
-                            dodge_state.as_label(),
-                        ];
-                        labels.sort();
-                        LabeledCountEntry {
-                            count: self.labeled_touch_counts.count_exact(&labels),
-                            labels,
-                        }
+                ALL_TOUCH_DODGE_STATES
+                    .into_iter()
+                    .flat_map(move |dodge_state| {
+                        ALL_TOUCH_KINDS.into_iter().map(move |kind| {
+                            let mut labels = vec![
+                                kind.as_label(),
+                                height_band.as_label(),
+                                dodge_state.as_label(),
+                            ];
+                            labels.sort();
+                            LabeledCountEntry {
+                                count: self.labeled_touch_counts.count_exact(&labels),
+                                labels,
+                            }
+                        })
                     })
-                })
             })
             .collect();
 

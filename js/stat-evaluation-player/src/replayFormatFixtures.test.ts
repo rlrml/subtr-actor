@@ -7,6 +7,11 @@ import path from "node:path";
 import { ensureWasmPackageFresh } from "../../scripts/ensure-wasm-package.mjs";
 
 const FIXTURE_LOAD_TIMEOUT_MS = 180_000;
+const SMOKE_FIXTURES = new Set([
+  "old-ballchasing-midfield-car.replay",
+  "replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay",
+  "replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
+]);
 
 interface FixtureLoadResult {
   fixture: string;
@@ -28,7 +33,74 @@ async function replayFormatFixtureNames(): Promise<string[]> {
   const repoRoot = path.resolve(import.meta.dirname, "../../..");
   const docs = await readFile(path.join(repoRoot, "docs/replay-format-evolution.md"), "utf8");
   const fixtures = [...docs.matchAll(/\| `([^`]+\.replay)` \|/g)].map((match) => match[1]!);
-  return [...new Set(fixtures)];
+  const uniqueFixtures = [...new Set(fixtures)];
+  const mode = process.env.SUBTR_ACTOR_REPLAY_FIXTURE_MODE ?? "full";
+  if (mode === "full") {
+    return uniqueFixtures;
+  }
+  if (mode !== "smoke") {
+    throw new Error(`unknown SUBTR_ACTOR_REPLAY_FIXTURE_MODE: ${mode}`);
+  }
+
+  const smokeFixtures = uniqueFixtures.filter((fixture) => SMOKE_FIXTURES.has(fixture));
+  assert.equal(
+    smokeFixtures.length,
+    SMOKE_FIXTURES.size,
+    "expected smoke fixtures to be present in replay-format docs table",
+  );
+  return smokeFixtures;
+}
+
+function fixtureConcurrency(): number {
+  const requested = Number.parseInt(process.env.SUBTR_ACTOR_REPLAY_FIXTURE_CONCURRENCY ?? "1", 10);
+  return Number.isFinite(requested) && requested > 0 ? requested : 1;
+}
+
+async function loadFixtures(
+  fixtures: string[],
+): Promise<{ failures: string[]; loaded: FixtureLoadResult[] }> {
+  const failures: string[] = [];
+  const loaded: FixtureLoadResult[] = [];
+  let nextFixtureIndex = 0;
+
+  const workerCount = Math.min(fixtureConcurrency(), fixtures.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const fixture = fixtures[nextFixtureIndex];
+        nextFixtureIndex += 1;
+        if (!fixture) {
+          return;
+        }
+
+        const result = await runFixtureLoadChild(fixture);
+        if (result.timedOut) {
+          failures.push(`${fixture}: timed out after ${FIXTURE_LOAD_TIMEOUT_MS}ms`);
+          continue;
+        }
+        if (result.code !== 0) {
+          failures.push(
+            `${fixture}: exited ${result.code}${result.signal ? ` (${result.signal})` : ""}\n${result.stderr.trim()}`,
+          );
+          continue;
+        }
+
+        const jsonLine = result.stdout.trim().split(/\r?\n/).at(-1) ?? "";
+        const parsed = JSON.parse(jsonLine) as FixtureLoadResult;
+        assert.equal(parsed.fixture, fixture);
+        assert.ok(parsed.frameCount > 0, `${fixture} should expose replay frames`);
+        assert.ok(parsed.players > 0, `${fixture} should expose players`);
+        assert.ok(parsed.statsFrames > 0, `${fixture} should expose stats frames`);
+        assert.ok(
+          parsed.progressStages.includes("processing"),
+          `${fixture} should report processing progress`,
+        );
+        loaded.push(parsed);
+      }
+    }),
+  );
+
+  return { failures, loaded };
 }
 
 function runFixtureLoadChild(fixture: string): Promise<ChildResult> {
@@ -105,34 +177,7 @@ test(
     const fixtures = await replayFormatFixtureNames();
     assert.ok(fixtures.length > 0, "expected replay fixtures in docs table");
 
-    const failures: string[] = [];
-    const loaded: FixtureLoadResult[] = [];
-
-    for (const fixture of fixtures) {
-      const result = await runFixtureLoadChild(fixture);
-      if (result.timedOut) {
-        failures.push(`${fixture}: timed out after ${FIXTURE_LOAD_TIMEOUT_MS}ms`);
-        continue;
-      }
-      if (result.code !== 0) {
-        failures.push(
-          `${fixture}: exited ${result.code}${result.signal ? ` (${result.signal})` : ""}\n${result.stderr.trim()}`,
-        );
-        continue;
-      }
-
-      const jsonLine = result.stdout.trim().split(/\r?\n/).at(-1) ?? "";
-      const parsed = JSON.parse(jsonLine) as FixtureLoadResult;
-      assert.equal(parsed.fixture, fixture);
-      assert.ok(parsed.frameCount > 0, `${fixture} should expose replay frames`);
-      assert.ok(parsed.players > 0, `${fixture} should expose players`);
-      assert.ok(parsed.statsFrames > 0, `${fixture} should expose stats frames`);
-      assert.ok(
-        parsed.progressStages.includes("processing"),
-        `${fixture} should report processing progress`,
-      );
-      loaded.push(parsed);
-    }
+    const { failures, loaded } = await loadFixtures(fixtures);
 
     assert.deepEqual(
       failures,
