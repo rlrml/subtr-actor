@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "bakkesmod-sdk": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1769100650,
+        "narHash": "sha256-luQVo8ZIw7+SmDf5lp+KHrH2EYiDHbVBWOVQuzYPieU=",
+        "owner": "bakkesmodorg",
+        "repo": "BakkesModSDK",
+        "rev": "479e8f571cf554b25f4eeb64d611dec4133edcaf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bakkesmodorg",
+        "repo": "BakkesModSDK",
+        "rev": "479e8f571cf554b25f4eeb64d611dec4133edcaf",
+        "type": "github"
+      }
+    },
     "fenix": {
       "inputs": {
         "nixpkgs": [
@@ -103,6 +120,7 @@
     },
     "root": {
       "inputs": {
+        "bakkesmod-sdk": "bakkesmod-sdk",
         "fenix": "fenix",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",

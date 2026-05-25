@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/subtr-actor-tools", "js", "python"]
+members = [".", "crates/subtr-actor-bakkesmod", "crates/subtr-actor-tools", "js", "python"]
 resolver = "2"
 
 [workspace.package]
