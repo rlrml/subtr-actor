@@ -289,6 +289,7 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
+    last_dodge_refreshed_event_count: usize,
     last_player_stat_event_count: usize,
     last_goal_event_count: usize,
     _marker: PhantomData<T>,
@@ -432,6 +433,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
+            last_dodge_refreshed_event_count: 0,
             last_player_stat_event_count: 0,
             last_goal_event_count: 0,
             _marker: PhantomData,
@@ -457,6 +459,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
+            last_dodge_refreshed_event_count,
             last_player_stat_event_count,
             last_goal_event_count,
             ..
@@ -474,6 +477,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
+            last_dodge_refreshed_event_count,
             last_player_stat_event_count,
             last_goal_event_count,
             _marker: PhantomData,
@@ -615,6 +619,7 @@ where
                 self.last_demolish_count,
                 self.last_boost_pad_event_count,
                 self.last_touch_event_count,
+                self.last_dodge_refreshed_event_count,
                 self.last_player_stat_event_count,
                 self.last_goal_event_count,
             ),
@@ -640,6 +645,7 @@ where
             self.last_demolish_count = processor.demolishes().len();
             self.last_boost_pad_event_count = processor.boost_pad_events().len();
             self.last_touch_event_count = processor.touch_events().len();
+            self.last_dodge_refreshed_event_count = processor.dodge_refreshed_events().len();
             self.last_player_stat_event_count = processor.player_stat_events().len();
             self.last_goal_event_count = processor.goal_events().len();
         }

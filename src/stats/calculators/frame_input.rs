@@ -98,6 +98,7 @@ impl FrameInput {
         last_demolish_count: usize,
         last_boost_pad_event_count: usize,
         last_touch_event_count: usize,
+        last_dodge_refreshed_event_count: usize,
         last_player_stat_event_count: usize,
         last_goal_event_count: usize,
     ) -> Self {
@@ -111,6 +112,7 @@ impl FrameInput {
                 last_demolish_count,
                 last_boost_pad_event_count,
                 last_touch_event_count,
+                last_dodge_refreshed_event_count,
                 last_player_stat_event_count,
                 last_goal_event_count,
             ),
@@ -239,6 +241,7 @@ impl FrameInput {
         last_demolish_count: usize,
         last_boost_pad_event_count: usize,
         last_touch_event_count: usize,
+        last_dodge_refreshed_event_count: usize,
         last_player_stat_event_count: usize,
         last_goal_event_count: usize,
     ) -> FrameEventsState {
@@ -247,7 +250,9 @@ impl FrameInput {
             demo_events: processor.demolishes()[last_demolish_count..].to_vec(),
             boost_pad_events: processor.boost_pad_events()[last_boost_pad_event_count..].to_vec(),
             touch_events: processor.touch_events()[last_touch_event_count..].to_vec(),
-            dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
+            dodge_refreshed_events: processor.dodge_refreshed_events()
+                [last_dodge_refreshed_event_count..]
+                .to_vec(),
             player_stat_events: processor.player_stat_events()[last_player_stat_event_count..]
                 .to_vec(),
             goal_events: processor.goal_events()[last_goal_event_count..].to_vec(),

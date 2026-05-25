@@ -7559,15 +7559,16 @@ mod tests {
             ),
         ];
         let frame = live_frame(
-            2,
+            3,
             rigid_body(SaVec3::default(), SaVec3::default()),
             &players,
         );
         let previous_events = sample_events(1, 0.0);
-        let current_events = sample_events(2, frame.time);
+        let between_sample_events = sample_events(2, 0.5);
+        let current_events = FrameEventsState::default();
         let mut event_history = SaLiveEventHistory::default();
         event_history.append_frame_events(&previous_events);
-        event_history.append_frame_events(&current_events);
+        event_history.append_frame_events(&between_sample_events);
         let view = SaLiveProcessorView::new(None, &frame, &players, current_events, &event_history);
 
         assert_eq!(view.demolishes().len(), 2);
@@ -7576,14 +7577,15 @@ mod tests {
         assert_eq!(view.dodge_refreshed_events().len(), 2);
         assert_eq!(view.player_stat_events().len(), 2);
         assert_eq!(view.goal_events().len(), 2);
-        assert_eq!(view.current_frame_demolish_events().len(), 1);
-        assert_eq!(view.current_frame_boost_pad_events().len(), 1);
-        assert_eq!(view.current_frame_touch_events().len(), 1);
-        assert_eq!(view.current_frame_dodge_refreshed_events().len(), 1);
-        assert_eq!(view.current_frame_player_stat_events().len(), 1);
-        assert_eq!(view.current_frame_goal_events().len(), 1);
+        assert_eq!(view.current_frame_demolish_events().len(), 0);
+        assert_eq!(view.current_frame_boost_pad_events().len(), 0);
+        assert_eq!(view.current_frame_touch_events().len(), 0);
+        assert_eq!(view.current_frame_dodge_refreshed_events().len(), 0);
+        assert_eq!(view.current_frame_player_stat_events().len(), 0);
+        assert_eq!(view.current_frame_goal_events().len(), 0);
 
-        let aggregate_input = FrameInput::aggregate(&view, 2, frame.time, frame.dt, 1, 1, 1, 1, 1);
+        let aggregate_input =
+            FrameInput::aggregate(&view, 3, frame.time, frame.dt, 1, 1, 1, 1, 1, 1);
         let aggregate_events = aggregate_input.frame_events_state();
         assert_eq!(aggregate_events.demo_events[0].frame, 2);
         assert_eq!(aggregate_events.boost_pad_events[0].frame, 2);
