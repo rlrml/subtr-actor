@@ -236,6 +236,13 @@ export interface StatEvaluationPlayerHandle {
   destroy(): void;
 }
 
+export interface StatEvaluationPlayerMountOptions {
+  initialBundle?: ReplayLoadBundle | Promise<ReplayLoadBundle>;
+  initialConfig?: StatsPlayerConfig | null;
+  initialReplayName?: string;
+  loadFromLocation?: boolean;
+}
+
 let appRoot: HTMLElement | null = null;
 let fileInput!: HTMLInputElement;
 let viewport!: HTMLDivElement;
@@ -3956,7 +3963,10 @@ function loadReplayFromLocation(signal: AbortSignal): void {
   });
 }
 
-export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlayerHandle {
+export function mountStatEvaluationPlayer(
+  root: HTMLElement,
+  options: StatEvaluationPlayerMountOptions = {},
+): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
   root.innerHTML = getAppTemplate(DEFAULT_CAMERA_DISTANCE_SCALE);
@@ -4072,17 +4082,21 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
   const configParamSnapshot = getStatsPlayerConfigParamSnapshot(window.location);
   const configDebugEnabled = isStatsPlayerConfigDebugEnabled(window.location);
   let configLoadError: unknown = null;
-  try {
-    initialUrlConfig = getStatsPlayerConfigFromLocation(window.location);
-  } catch (error) {
-    configLoadError = error;
-    console.error("Invalid stats player config:", error);
-    statusReadout.textContent =
-      error instanceof Error ? error.message : "Invalid stats player config";
-    initialUrlConfig = null;
-  }
-  if (configDebugEnabled) {
-    logStatsPlayerConfigLoadDebug(configParamSnapshot, initialUrlConfig, configLoadError);
+  if (options.initialConfig !== undefined) {
+    initialUrlConfig = options.initialConfig;
+  } else {
+    try {
+      initialUrlConfig = getStatsPlayerConfigFromLocation(window.location);
+    } catch (error) {
+      configLoadError = error;
+      console.error("Invalid stats player config:", error);
+      statusReadout.textContent =
+        error instanceof Error ? error.message : "Invalid stats player config";
+      initialUrlConfig = null;
+    }
+    if (configDebugEnabled) {
+      logStatsPlayerConfigLoadDebug(configParamSnapshot, initialUrlConfig, configLoadError);
+    }
   }
 
   const listeners = new AbortController();
@@ -4553,7 +4567,28 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
   syncRecordingWindow();
   renderTimelineEventCount();
   renderMechanicsReviewWindow();
-  loadReplayFromLocation(listeners.signal);
+  renderEventPlaylistWindow();
+  if (options.initialBundle) {
+    void loadReplayBundleForDisplay(
+      {
+        name: options.initialReplayName ?? "replay",
+        preparingStatus: "Preparing replay...",
+        async readBytes() {
+          throw new Error("Replay bytes are not available for this preloaded replay");
+        },
+      },
+      Promise.resolve(options.initialBundle),
+    ).catch((error) => {
+      if (listeners.signal.aborted) {
+        return;
+      }
+      console.error("Failed to load preprocessed replay bundle:", error);
+      statusReadout.textContent =
+        error instanceof Error ? error.message : "Failed to load preprocessed replay bundle";
+    });
+  } else if (options.loadFromLocation !== false) {
+    loadReplayFromLocation(listeners.signal);
+  }
 
   const reviewUrl = getMechanicsReviewUrlFromLocation();
   if (reviewUrl) {

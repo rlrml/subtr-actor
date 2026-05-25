@@ -417,6 +417,7 @@ input {
   border-radius: var(--ui-radius-md);
   background: rgba(101, 214, 173, 0.14);
   color: #d7ffef;
+  cursor: pointer;
   font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;

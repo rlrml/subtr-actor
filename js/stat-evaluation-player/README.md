@@ -31,6 +31,27 @@ player.destroy();
 The mounted UI exposes the same replay file chooser, replay camera controls,
 timeline overlays, and per-module stat panels as the in-repo demo app.
 
+The package also exposes two lighter composition surfaces:
+
+```ts
+import {
+  createReplayReviewDataProviderFromLocation,
+  mountReplayReview,
+  mountStatsReport,
+} from "subtr-actor-stats-player";
+```
+
+- `mountStatsReport(root, { initialData })` renders the static report-style
+  stats pages from an existing `StatsTimeline`.
+- `mountReplayReview(root, { provider })` renders the shared review shell with
+  full-page Stats and Viewer modes backed by one data provider.
+- `createReplayReviewDataProviderFromLocation()` creates the GitHub Pages-style
+  provider for `replayUrl`, compressed replay URL, and Ballchasing query params.
+
+Host apps such as Rocket Sense can provide their own `ReplayReviewDataProvider`
+that returns backend-precomputed stats immediately and only supplies a full
+`ReplayLoadBundle` when replay playback is available.
+
 To preload a replay from a URL, pass the replay file URL in the query string.
 GitHub raw replay URLs work well because they are stable and include permissive
 CORS headers:

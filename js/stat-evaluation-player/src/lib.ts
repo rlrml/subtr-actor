@@ -1,5 +1,5 @@
 export { mountStatEvaluationPlayer } from "./main.ts";
-export type { StatEvaluationPlayerHandle } from "./main.ts";
+export type { StatEvaluationPlayerHandle, StatEvaluationPlayerMountOptions } from "./main.ts";
 export * from "./boostFormatting.ts";
 export * from "./ceilingShotOverlay.ts";
 export * from "./fiftyFiftyFormatting.ts";
@@ -8,7 +8,10 @@ export * from "./movementFormatting.ts";
 export * from "./overlays.ts";
 export * from "./possessionFormatting.ts";
 export * from "./pressureFormatting.ts";
+export * from "./replayLoader.ts";
 export * from "./replayUrl.ts";
+export * from "./report.ts";
+export * from "./review.ts";
 export * from "./rushFormatting.ts";
 export * from "./speedFlipOverlay.ts";
 export * from "./statsTimeline.ts";
