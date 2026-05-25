@@ -56,6 +56,8 @@ pub struct FlickStats {
     pub cumulative_confidence: f32,
     pub cumulative_setup_duration: f32,
     pub cumulative_ball_speed_change: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl FlickStats {
@@ -81,6 +83,36 @@ impl FlickStats {
         } else {
             self.cumulative_ball_speed_change / self.count as f32
         }
+    }
+
+    fn record_event(&mut self, event: &FlickEvent) {
+        self.labeled_event_counts.increment([confidence_band_label(
+            event.confidence >= FLICK_HIGH_CONFIDENCE,
+        )]);
+        self.sync_legacy_counts();
+        self.last_flick_time = Some(event.time);
+        self.last_flick_frame = Some(event.frame);
+        self.last_confidence = Some(event.confidence);
+        self.best_confidence = self.best_confidence.max(event.confidence);
+        self.cumulative_confidence += event.confidence;
+        self.cumulative_setup_duration += event.setup_duration;
+        self.cumulative_ball_speed_change += event.ball_speed_change;
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[&CONFIDENCE_BAND_LABELS],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.high_confidence_count = self.event_count_with_labels(&[confidence_band_label(true)]);
     }
 }
 
@@ -474,20 +506,10 @@ impl FlickCalculator {
 
     fn apply_event(&mut self, frame: &FrameInfo, event: FlickEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.count += 1;
-        if event.confidence >= FLICK_HIGH_CONFIDENCE {
-            stats.high_confidence_count += 1;
-        }
+        stats.record_event(&event);
         stats.is_last_flick = true;
-        stats.last_flick_time = Some(event.time);
-        stats.last_flick_frame = Some(event.frame);
         stats.time_since_last_flick = Some((frame.time - event.time).max(0.0));
         stats.frames_since_last_flick = Some(frame.frame_number.saturating_sub(event.frame));
-        stats.last_confidence = Some(event.confidence);
-        stats.best_confidence = stats.best_confidence.max(event.confidence);
-        stats.cumulative_confidence += event.confidence;
-        stats.cumulative_setup_duration += event.setup_duration;
-        stats.cumulative_ball_speed_change += event.ball_speed_change;
 
         self.current_last_flick_player = Some(event.player.clone());
         self.events.push(event);

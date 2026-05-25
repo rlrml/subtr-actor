@@ -48,6 +48,8 @@ pub struct CeilingShotStats {
     pub last_confidence: Option<f32>,
     pub best_confidence: f32,
     pub cumulative_confidence: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl CeilingShotStats {
@@ -57,6 +59,34 @@ impl CeilingShotStats {
         } else {
             self.cumulative_confidence / self.count as f32
         }
+    }
+
+    fn record_event(&mut self, event: &CeilingShotEvent) {
+        self.labeled_event_counts.increment([confidence_band_label(
+            event.confidence >= CEILING_SHOT_HIGH_CONFIDENCE,
+        )]);
+        self.sync_legacy_counts();
+        self.last_ceiling_shot_time = Some(event.time);
+        self.last_ceiling_shot_frame = Some(event.frame);
+        self.last_confidence = Some(event.confidence);
+        self.best_confidence = self.best_confidence.max(event.confidence);
+        self.cumulative_confidence += event.confidence;
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[&CONFIDENCE_BAND_LABELS],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.high_confidence_count = self.event_count_with_labels(&[confidence_band_label(true)]);
     }
 }
 
@@ -335,19 +365,11 @@ impl CeilingShotCalculator {
             };
 
             let stats = self.player_stats.entry(player_id.clone()).or_default();
-            stats.count += 1;
-            if event.confidence >= CEILING_SHOT_HIGH_CONFIDENCE {
-                stats.high_confidence_count += 1;
-            }
+            stats.record_event(&event);
             stats.is_last_ceiling_shot = true;
-            stats.last_ceiling_shot_time = Some(event.time);
-            stats.last_ceiling_shot_frame = Some(event.frame);
             stats.time_since_last_ceiling_shot = Some((frame.time - event.time).max(0.0));
             stats.frames_since_last_ceiling_shot =
                 Some(frame.frame_number.saturating_sub(event.frame));
-            stats.last_confidence = Some(event.confidence);
-            stats.best_confidence = stats.best_confidence.max(event.confidence);
-            stats.cumulative_confidence += event.confidence;
 
             self.current_last_ceiling_shot_player = Some(player_id.clone());
             self.events.push(event);

@@ -74,5 +74,14 @@ impl StatFieldProvider for HalfFlipStats {
             StatUnit::Percent,
             self.best_quality * 100.0,
         ));
+        for entry in self.complete_labeled_event_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "half_flip",
+                "count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }

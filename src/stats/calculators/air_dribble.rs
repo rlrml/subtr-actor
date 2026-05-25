@@ -33,6 +33,8 @@ pub struct AirDribbleStats {
     pub speed_sum: f32,
     pub average_horizontal_gap_sum: f32,
     pub average_vertical_gap_sum: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl AirDribbleStats {
@@ -71,6 +73,33 @@ impl AirDribbleStats {
     pub fn average_vertical_gap(&self) -> f32 {
         self.count_average(self.average_vertical_gap_sum)
     }
+
+    fn record_event(&mut self, event: &BallCarryEvent) {
+        if let Some(origin) = event.air_dribble_origin {
+            self.labeled_event_counts
+                .increment([air_dribble_origin_label(origin)]);
+        }
+        self.sync_legacy_counts();
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[&AIR_DRIBBLE_ORIGIN_LABELS],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.ground_to_air_count = self
+            .event_count_with_labels(&[air_dribble_origin_label(AirDribbleOrigin::GroundToAir)]);
+        self.wall_to_air_count =
+            self.event_count_with_labels(&[air_dribble_origin_label(AirDribbleOrigin::WallToAir)]);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
@@ -79,6 +108,15 @@ impl AirDribbleStats {
 pub enum AirDribbleOrigin {
     GroundToAir,
     WallToAir,
+}
+
+const AIR_DRIBBLE_ORIGIN_LABELS: [StatLabel; 2] = [
+    StatLabel::new("origin", "ground_to_air"),
+    StatLabel::new("origin", "wall_to_air"),
+];
+
+fn air_dribble_origin_label(origin: AirDribbleOrigin) -> StatLabel {
+    StatLabel::new("origin", origin.as_label_value())
 }
 
 impl AirDribbleOrigin {
@@ -135,7 +173,7 @@ impl AirDribblePolicy {
     }
 
     pub(crate) fn apply_event(stats: &mut AirDribbleStats, event: &BallCarryEvent) {
-        stats.count += 1;
+        stats.record_event(event);
         stats.total_time += event.duration;
         stats.total_straight_line_distance += event.straight_line_distance;
         stats.total_path_distance += event.path_distance;
@@ -147,11 +185,6 @@ impl AirDribblePolicy {
         stats.average_vertical_gap_sum += event.average_vertical_gap;
         stats.total_touch_count += event.touch_count;
         stats.max_touch_count = stats.max_touch_count.max(event.touch_count);
-        match event.air_dribble_origin {
-            Some(AirDribbleOrigin::GroundToAir) => stats.ground_to_air_count += 1,
-            Some(AirDribbleOrigin::WallToAir) => stats.wall_to_air_count += 1,
-            None => {}
-        }
     }
 }
 

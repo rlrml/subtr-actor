@@ -41,23 +41,17 @@ pub struct WhiffEvent {
     pub aerial: bool,
 }
 
+const WHIFF_DODGE_STATE_LABELS: [StatLabel; 2] = [
+    StatLabel::new("dodge_state", "no_dodge"),
+    StatLabel::new("dodge_state", "dodge"),
+];
+
 impl WhiffEvent {
     fn labels(&self) -> [StatLabel; 2] {
         [
-            whiff_vertical_state_label(self.aerial),
+            vertical_state_label(self.aerial),
             whiff_dodge_state_label(self.dodge_active),
         ]
-    }
-}
-
-const ALL_WHIFF_AERIAL_STATES: [bool; 2] = [false, true];
-const ALL_WHIFF_DODGE_STATES: [bool; 2] = [false, true];
-
-fn whiff_vertical_state_label(aerial: bool) -> StatLabel {
-    if aerial {
-        StatLabel::new("vertical_state", "aerial")
-    } else {
-        StatLabel::new("vertical_state", "grounded")
     }
 }
 
@@ -117,26 +111,10 @@ impl WhiffStats {
     }
 
     pub fn complete_labeled_whiff_counts(&self) -> LabeledCounts {
-        let mut entries: Vec<_> = ALL_WHIFF_AERIAL_STATES
-            .into_iter()
-            .flat_map(|aerial| {
-                ALL_WHIFF_DODGE_STATES.into_iter().map(move |dodge_active| {
-                    let mut labels = vec![
-                        whiff_vertical_state_label(aerial),
-                        whiff_dodge_state_label(dodge_active),
-                    ];
-                    labels.sort();
-                    LabeledCountEntry {
-                        count: self.labeled_whiff_counts.count_exact(&labels),
-                        labels,
-                    }
-                })
-            })
-            .collect();
-
-        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
-
-        LabeledCounts { entries }
+        LabeledCounts::complete_from_label_sets(
+            &[&VERTICAL_STATE_LABELS, &WHIFF_DODGE_STATE_LABELS],
+            &self.labeled_whiff_counts,
+        )
     }
 
     pub fn with_complete_labeled_whiff_counts(mut self) -> Self {
@@ -145,15 +123,9 @@ impl WhiffStats {
     }
 
     fn sync_legacy_counts(&mut self) {
-        self.whiff_count = self
-            .labeled_whiff_counts
-            .entries
-            .iter()
-            .map(|entry| entry.count)
-            .sum();
-        self.grounded_whiff_count =
-            self.whiff_count_with_labels(&[whiff_vertical_state_label(false)]);
-        self.aerial_whiff_count = self.whiff_count_with_labels(&[whiff_vertical_state_label(true)]);
+        self.whiff_count = self.labeled_whiff_counts.total();
+        self.grounded_whiff_count = self.whiff_count_with_labels(&[vertical_state_label(false)]);
+        self.aerial_whiff_count = self.whiff_count_with_labels(&[vertical_state_label(true)]);
         self.dodge_whiff_count = self.whiff_count_with_labels(&[whiff_dodge_state_label(true)]);
     }
 }

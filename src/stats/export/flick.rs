@@ -86,5 +86,14 @@ impl StatFieldProvider for FlickStats {
             StatUnit::UnrealUnitsPerSecond,
             self.average_ball_speed_change(),
         ));
+        for entry in self.complete_labeled_event_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "flick",
+                "count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }

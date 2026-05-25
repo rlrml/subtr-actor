@@ -177,6 +177,41 @@ impl LabeledCounts {
             .unwrap_or(0)
     }
 
+    pub fn total(&self) -> u32 {
+        self.entries.iter().map(|entry| entry.count).sum()
+    }
+
+    pub fn complete_from_label_sets(label_sets: &[&[StatLabel]], counts: &Self) -> Self {
+        fn append_entries(
+            label_sets: &[&[StatLabel]],
+            index: usize,
+            labels: &mut Vec<StatLabel>,
+            counts: &LabeledCounts,
+            entries: &mut Vec<LabeledCountEntry>,
+        ) {
+            if index == label_sets.len() {
+                let mut normalized_labels = labels.clone();
+                normalized_labels.sort();
+                entries.push(LabeledCountEntry {
+                    count: counts.count_exact(&normalized_labels),
+                    labels: normalized_labels,
+                });
+                return;
+            }
+
+            for label in label_sets[index] {
+                labels.push(label.clone());
+                append_entries(label_sets, index + 1, labels, counts, entries);
+                labels.pop();
+            }
+        }
+
+        let mut entries = Vec::new();
+        append_entries(label_sets, 0, &mut Vec::new(), counts, &mut entries);
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+        Self { entries }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

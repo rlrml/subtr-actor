@@ -31,6 +31,10 @@ pub struct BoostStats {
     pub amount_used_while_grounded: f32,
     pub amount_used_while_airborne: f32,
     pub amount_used_while_supersonic: f32,
+    #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
+    pub labeled_amounts: LabeledFloatSums,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_counts: LabeledCounts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +206,58 @@ impl BoostStats {
 
     pub fn amount_used_by_vertical_band(&self) -> f32 {
         self.amount_used_while_grounded + self.amount_used_while_airborne
+    }
+
+    fn add_labeled_amount<I>(&mut self, labels: I, amount: f32)
+    where
+        I: IntoIterator<Item = StatLabel>,
+    {
+        if amount > 0.0 {
+            self.labeled_amounts.add(labels, amount);
+        }
+    }
+
+    fn increment_labeled_count<I>(&mut self, labels: I)
+    where
+        I: IntoIterator<Item = StatLabel>,
+    {
+        self.labeled_counts.increment(labels);
+    }
+}
+
+fn boost_transaction_label(kind: &'static str) -> StatLabel {
+    StatLabel::new("transaction", kind)
+}
+
+fn boost_pad_size_label(pad_size: Option<BoostPadSize>) -> StatLabel {
+    match pad_size {
+        Some(BoostPadSize::Big) => StatLabel::new("pad_size", "big"),
+        Some(BoostPadSize::Small) => StatLabel::new("pad_size", "small"),
+        None => StatLabel::new("pad_size", "unknown"),
+    }
+}
+
+fn boost_activity_label(activity: BoostPickupActivity) -> StatLabel {
+    match activity {
+        BoostPickupActivity::Active => StatLabel::new("activity", "active"),
+        BoostPickupActivity::Inactive => StatLabel::new("activity", "inactive"),
+        BoostPickupActivity::Unknown => StatLabel::new("activity", "unknown"),
+    }
+}
+
+fn boost_field_half_label(field_half: BoostPickupFieldHalf) -> StatLabel {
+    match field_half {
+        BoostPickupFieldHalf::Own => StatLabel::new("field_half", "own"),
+        BoostPickupFieldHalf::Opponent => StatLabel::new("field_half", "opponent"),
+        BoostPickupFieldHalf::Unknown => StatLabel::new("field_half", "unknown"),
+    }
+}
+
+fn boost_supersonic_label(supersonic: bool) -> StatLabel {
+    if supersonic {
+        StatLabel::new("supersonic", "true")
+    } else {
+        StatLabel::new("supersonic", "false")
     }
 }
 
@@ -538,9 +594,24 @@ impl BoostCalculator {
             .max(pending_pickup.pre_applied_collected_amount);
         let collected_amount_delta = collected_amount - pending_pickup.pre_applied_collected_amount;
         let overfill = (nominal_gain - collected_amount).max(0.0);
+        let field_half = if stolen {
+            BoostPickupFieldHalf::Opponent
+        } else {
+            BoostPickupFieldHalf::Own
+        };
 
         stats.amount_collected += collected_amount_delta;
         team_stats.amount_collected += collected_amount_delta;
+        let collected_labels = [
+            boost_transaction_label("collected"),
+            boost_pad_size_label(Some(pad_size)),
+            boost_activity_label(BoostPickupActivity::Active),
+            boost_field_half_label(field_half),
+        ];
+        stats.add_labeled_amount(collected_labels.clone(), collected_amount_delta);
+        team_stats.add_labeled_amount(collected_labels.clone(), collected_amount_delta);
+        stats.increment_labeled_count(collected_labels.clone());
+        team_stats.increment_labeled_count(collected_labels.clone());
 
         match pending_pickup.pre_applied_pad_size {
             Some(pre_applied_pad_size) if pre_applied_pad_size == pad_size => {
@@ -570,6 +641,14 @@ impl BoostCalculator {
         if stolen {
             stats.amount_stolen += collected_amount;
             team_stats.amount_stolen += collected_amount;
+            let stolen_labels = [
+                boost_transaction_label("stolen"),
+                boost_pad_size_label(Some(pad_size)),
+                boost_activity_label(BoostPickupActivity::Active),
+                boost_field_half_label(field_half),
+            ];
+            stats.add_labeled_amount(stolen_labels.clone(), collected_amount);
+            team_stats.add_labeled_amount(stolen_labels, collected_amount);
         }
 
         match pad_size {
@@ -597,16 +676,20 @@ impl BoostCalculator {
 
         stats.overfill_total += overfill;
         team_stats.overfill_total += overfill;
+        let overfill_labels = [
+            boost_transaction_label("overfill"),
+            boost_pad_size_label(Some(pad_size)),
+            boost_activity_label(BoostPickupActivity::Active),
+            boost_field_half_label(field_half),
+        ];
+        stats.add_labeled_amount(overfill_labels.clone(), overfill);
+        team_stats.add_labeled_amount(overfill_labels.clone(), overfill);
         if stolen {
             stats.overfill_from_stolen += overfill;
             team_stats.overfill_from_stolen += overfill;
         }
 
-        if stolen {
-            BoostPickupFieldHalf::Opponent
-        } else {
-            BoostPickupFieldHalf::Own
-        }
+        field_half
     }
 
     fn apply_collected_bucket_amount(stats: &mut BoostStats, pad_size: BoostPadSize, amount: f32) {
@@ -639,6 +722,16 @@ impl BoostCalculator {
         };
         stats.amount_collected += amount;
         team_stats.amount_collected += amount;
+        let collected_labels = [
+            boost_transaction_label("collected"),
+            boost_pad_size_label(pad_size),
+            boost_activity_label(BoostPickupActivity::Active),
+            boost_field_half_label(BoostPickupFieldHalf::Unknown),
+        ];
+        stats.add_labeled_amount(collected_labels.clone(), amount);
+        team_stats.add_labeled_amount(collected_labels.clone(), amount);
+        stats.increment_labeled_count(collected_labels.clone());
+        team_stats.increment_labeled_count(collected_labels);
         if let Some(pad_size) = pad_size {
             Self::apply_collected_bucket_amount(stats, pad_size, amount);
             Self::apply_collected_bucket_amount(team_stats, pad_size, amount);
@@ -660,6 +753,16 @@ impl BoostCalculator {
         };
         stats.amount_collected_inactive += amount;
         team_stats.amount_collected_inactive += amount;
+        let collected_labels = [
+            boost_transaction_label("collected"),
+            boost_pad_size_label(Some(pad_size)),
+            boost_activity_label(BoostPickupActivity::Inactive),
+            boost_field_half_label(BoostPickupFieldHalf::Unknown),
+        ];
+        stats.add_labeled_amount(collected_labels.clone(), amount);
+        team_stats.add_labeled_amount(collected_labels.clone(), amount);
+        stats.increment_labeled_count(collected_labels.clone());
+        team_stats.increment_labeled_count(collected_labels);
         match pad_size {
             BoostPadSize::Big => {
                 stats.big_pads_collected_inactive += 1;
@@ -685,6 +788,9 @@ impl BoostCalculator {
         };
         stats.amount_respawned += amount;
         team_stats.amount_respawned += amount;
+        let respawn_labels = [boost_transaction_label("respawn")];
+        stats.add_labeled_amount(respawn_labels.clone(), amount);
+        team_stats.add_labeled_amount(respawn_labels, amount);
     }
 
     fn warn_for_boost_invariant_violations(
@@ -1475,6 +1581,18 @@ impl BoostCalculator {
                     } else {
                         &mut self.team_one_stats
                     };
+                    let vertical_label = if vertical_state.is_grounded(&player.player_id) {
+                        vertical_state_label(false)
+                    } else {
+                        vertical_state_label(true)
+                    };
+                    let used_labels = [
+                        boost_transaction_label("used"),
+                        vertical_label,
+                        boost_supersonic_label(used_while_supersonic),
+                    ];
+                    stats.add_labeled_amount(used_labels.clone(), amount_used_delta);
+                    team_stats.add_labeled_amount(used_labels.clone(), amount_used_delta);
                     if vertical_state.is_grounded(&player.player_id) {
                         stats.amount_used_while_grounded += amount_used_delta;
                         team_stats.amount_used_while_grounded += amount_used_delta;

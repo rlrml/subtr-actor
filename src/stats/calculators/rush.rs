@@ -23,6 +23,20 @@ pub struct RushEvent {
     pub defenders: usize,
 }
 
+const RUSH_TEAM_LABELS: [StatLabel; 2] = [
+    StatLabel::new("team", "team_zero"),
+    StatLabel::new("team", "team_one"),
+];
+const RUSH_ATTACKER_LABELS: [StatLabel; 2] = [
+    StatLabel::new("attackers", "2"),
+    StatLabel::new("attackers", "3"),
+];
+const RUSH_DEFENDER_LABELS: [StatLabel; 3] = [
+    StatLabel::new("defenders", "1"),
+    StatLabel::new("defenders", "2"),
+    StatLabel::new("defenders", "3"),
+];
+
 impl RushEvent {
     fn labels(&self) -> [StatLabel; 3] {
         [
@@ -50,9 +64,6 @@ impl ActiveRush {
         (self.last_time - self.start_time).max(0.0)
     }
 }
-
-const RUSH_ATTACKER_COUNTS: [usize; 2] = [2, 3];
-const RUSH_DEFENDER_COUNTS: [usize; 3] = [1, 2, 3];
 
 fn rush_team_label(is_team_0: bool) -> StatLabel {
     if is_team_0 {
@@ -135,29 +146,14 @@ impl RushStats {
     }
 
     pub fn complete_labeled_rush_counts(&self) -> LabeledCounts {
-        let mut entries: Vec<_> = [true, false]
-            .into_iter()
-            .flat_map(|is_team_0| {
-                RUSH_ATTACKER_COUNTS.into_iter().flat_map(move |attackers| {
-                    RUSH_DEFENDER_COUNTS.into_iter().map(move |defenders| {
-                        let mut labels = vec![
-                            rush_team_label(is_team_0),
-                            rush_attackers_label(attackers),
-                            rush_defenders_label(defenders),
-                        ];
-                        labels.sort();
-                        LabeledCountEntry {
-                            count: self.labeled_rush_counts.count_exact(&labels),
-                            labels,
-                        }
-                    })
-                })
-            })
-            .collect();
-
-        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
-
-        LabeledCounts { entries }
+        LabeledCounts::complete_from_label_sets(
+            &[
+                &RUSH_TEAM_LABELS,
+                &RUSH_ATTACKER_LABELS,
+                &RUSH_DEFENDER_LABELS,
+            ],
+            &self.labeled_rush_counts,
+        )
     }
 
     pub fn with_complete_labeled_rush_counts(mut self) -> Self {
