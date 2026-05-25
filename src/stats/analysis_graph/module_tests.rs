@@ -1,12 +1,12 @@
 use super::*;
 use crate::{
-    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
-    BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
-    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
-    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
-    PossessionState, RotationCalculator, TouchState, WallAerialCalculator,
+    builtin_stats_module_names, AerialGoalCalculator, AirDribbleGoalCalculator,
+    BackboardCalculator, BallCarryCalculator, BumpCalculator, CenterCalculator,
+    CounterAttackGoalCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FlickCalculator,
+    FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
+    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
+    PlayerVerticalState, PossessionState, RotationCalculator, TouchState, WallAerialCalculator,
     WallAerialShotCalculator,
 };
 use std::collections::HashSet;
@@ -76,6 +76,17 @@ fn every_builtin_analysis_node_name_builds() {
         graph
             .resolve()
             .unwrap_or_else(|_| panic!("builtin analysis node should resolve: {name}"));
+    }
+}
+
+#[test]
+fn every_builtin_stats_module_is_graph_callable() {
+    for module_name in builtin_stats_module_names() {
+        let mut graph = graph_with_builtin_analysis_nodes([*module_name])
+            .unwrap_or_else(|_| panic!("stats module should be graph-callable: {module_name}"));
+        graph
+            .resolve()
+            .unwrap_or_else(|_| panic!("stats module graph should resolve: {module_name}"));
     }
 }
 
