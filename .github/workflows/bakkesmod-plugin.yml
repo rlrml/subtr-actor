@@ -73,6 +73,7 @@ jobs:
           Assert-Contains $pluginText "subtr_actor_verify_graph" "BakkesMod graph verification command"
           Assert-Contains $pluginText "every callable analysis node" "BakkesMod graph verification scope"
           Assert-Contains $pluginText "verified {} graph outputs by name" "BakkesMod graph output registry verification"
+          Assert-Contains $pluginText "verified {} builtin stats modules by name" "BakkesMod stats module registry verification"
           Assert-Contains $pluginText "subtr_actor_dump_graph_output <events|frame|timeline|stats|analysis_nodes|graph_info> [finish]" "graph output command usage"
           Assert-Contains $pluginText "graph-analysis-nodes.json" "bulk analysis-node dump filename"
           Assert-Contains $pluginText "analysis_nodes" "analysis_nodes graph output name"

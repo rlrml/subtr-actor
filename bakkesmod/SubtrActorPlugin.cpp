@@ -2082,6 +2082,43 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         outputNames.size()));
   }
 
+  const std::vector<std::string> moduleNames =
+      parseJsonStringArrayProperty(graphInfoJson, "builtin_stats_module_names");
+  if (moduleNames.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not read builtin stats module names from graph_info");
+  }
+  for (const std::string &moduleName : moduleNames) {
+    const std::string moduleJson =
+        readNamedJsonBuffer(statsModuleJsonLen, writeStatsModuleJson, moduleName);
+    const std::string frameJson =
+        readNamedJsonBuffer(statsModuleFrameJsonLen, writeStatsModuleFrameJson, moduleName);
+    const std::string configJson =
+        readNamedJsonBuffer(statsModuleConfigJsonLen, writeStatsModuleConfigJson, moduleName);
+    if (moduleJson.empty() || frameJson.empty() || configJson.empty()) {
+      ok = false;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification missing stats module '{}' output: module={} frame={} config={}",
+          moduleName,
+          moduleJson.size(),
+          frameJson.size(),
+          configJson.size()));
+      continue;
+    }
+    cvarManager->log(std::format(
+        "subtr-actor: stats module '{}' callable (module={} frame={} config={} bytes)",
+        moduleName,
+        moduleJson.size(),
+        frameJson.size(),
+        configJson.size()));
+  }
+  if (!moduleNames.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: verified {} builtin stats modules by name",
+        moduleNames.size()));
+  }
+
   const std::string nodeNamesJson =
       readJsonBuffer(analysisNodeNamesJsonLen, writeAnalysisNodeNamesJson);
   const std::vector<std::string> nodeNames = parseJsonStringArray(nodeNamesJson);
