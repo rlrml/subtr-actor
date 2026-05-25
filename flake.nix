@@ -115,7 +115,7 @@
           npmDeps = pkgs.fetchNpmDeps {
             inherit pname version;
             src = ./js/stat-evaluation-player;
-            hash = "sha256-ybibmEJ5jvHxO6dg0GFVfM2ypPejr4cMoUnRGeIq4uI=";
+            hash = "sha256-Yg/58OXDmzdcXhs5Wz44Al2uRYDtwEEoK+MjikVcxDI=";
           };
           preBuild = ''
             rm -rf js/pkg

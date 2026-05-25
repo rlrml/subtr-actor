@@ -177,6 +177,7 @@ async function main() {
         "    goal_context: [],",
         "    backboard: [],",
         "    ceiling_shot: [],",
+        "    center: [],",
         "    double_tap: [],",
         "    fifty_fifty: [],",
         "    one_timer: [],",
