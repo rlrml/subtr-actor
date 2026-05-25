@@ -4141,6 +4141,43 @@ mod tests {
         serde_json::from_slice(&bytes).expect("direct graph frame json should be valid")
     }
 
+    fn direct_full_graph_analysis_node_json_value(
+        frames: &[SaLiveFrame],
+        node_name: &str,
+    ) -> serde_json::Value {
+        let mut engine = SaEngine::default();
+        let mut graph = graph_with_all_analysis_nodes();
+
+        for frame in frames {
+            let players = live_frame_players(frame);
+            let explicit_events = unsafe { frame_event_slices(frame) }
+                .expect("test frame explicit event pointers should be valid");
+            let signature = live_replay_meta_signature(players);
+            if !engine.live_replay_meta_initialized
+                || engine.live_replay_meta_signature != signature
+            {
+                let replay_meta = live_replay_meta(players);
+                graph
+                    .on_replay_meta(&replay_meta)
+                    .expect("direct graph should accept replay metadata");
+                engine.live_replay_meta_initialized = true;
+                engine.live_replay_meta = Some(replay_meta);
+                engine.live_replay_meta_signature = signature;
+            }
+            let frame_input = frame_input(&mut engine, frame, players, &explicit_events);
+            graph
+                .evaluate_with_state(&frame_input)
+                .expect("direct graph should evaluate live frame input");
+        }
+
+        graph.finish().expect("direct graph should finish");
+        let value = builtin_analysis_node_json(node_name, &graph)
+            .unwrap_or_else(|_| panic!("direct graph should serialize node {node_name}"));
+        let bytes =
+            serde_json::to_vec(&value).expect("direct graph analysis node should serialize");
+        serde_json::from_slice(&bytes).expect("direct graph analysis node json should be valid")
+    }
+
     #[derive(Debug, PartialEq, Eq)]
     struct MechanicEventSnapshot {
         kind: u32,
@@ -6723,6 +6760,11 @@ mod tests {
             assert!(
                 !value.is_null(),
                 "analysis node {node_name} should expose a JSON payload"
+            );
+            assert_eq!(
+                value,
+                direct_full_graph_analysis_node_json_value(&frames, node_name),
+                "live analysis node {node_name} should match direct full graph output"
             );
         }
         assert_eq!(
