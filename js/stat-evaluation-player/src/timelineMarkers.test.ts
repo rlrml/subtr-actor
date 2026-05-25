@@ -1113,6 +1113,7 @@ test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () =
   const statsTimeline = createLegacyStatsTimeline({
     whiff_events: [
       {
+        kind: "whiff",
         time: 1.2,
         frame: 1,
         player: { Steam: "blue-id" },
@@ -1134,6 +1135,50 @@ test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () =
       kind: "whiff",
       label: "Blue aerial dodge whiff | 128uu closest, 1311uu/s",
       shortLabel: "DW",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildWhiffTimelineEvents labels beaten-to-ball events separately", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    whiff_events: [
+      {
+        kind: "beaten_to_ball",
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        closest_approach_distance: 128.4,
+        forward_alignment: 0.72,
+        approach_speed: 1310.6,
+        dodge_active: true,
+        aerial: true,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildWhiffTimelineEvents(statsTimeline, replay), [
+    {
+      id: "whiff:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "whiff",
+      label: "Blue aerial dodge beaten to ball | 128uu closest, 1311uu/s",
+      shortLabel: "BT",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,
@@ -1392,6 +1437,7 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
     ],
     whiff_events: [
       {
+        kind: "whiff",
         time: 1.1,
         frame: 1,
         player: { Steam: "blue-id" },

@@ -414,6 +414,7 @@ export function createPlayerStatsSnapshot(
       },
       whiff: {
         whiff_count: 0,
+        beaten_to_ball_count: 0,
         grounded_whiff_count: 0,
         aerial_whiff_count: 0,
         dodge_whiff_count: 0,

@@ -124,6 +124,7 @@ test("whiff renderer shows counts and derives average closest approach", () => {
   const whiff = createPlayerStatsSnapshot({
     whiff: {
       whiff_count: 2,
+      beaten_to_ball_count: 1,
       grounded_whiff_count: 1,
       aerial_whiff_count: 1,
       dodge_whiff_count: 1,
@@ -137,6 +138,7 @@ test("whiff renderer shows counts and derives average closest approach", () => {
   const html = renderWhiffStats(whiff);
 
   assert.match(html, /Whiffs.*2/s);
+  assert.match(html, /Beaten to ball.*1/s);
   assert.match(html, /Grounded.*1/s);
   assert.match(html, /Aerial.*1/s);
   assert.match(html, /Dodge.*1/s);

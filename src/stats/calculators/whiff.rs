@@ -15,9 +15,20 @@ const WHIFF_MAX_DODGE_LATERAL_OFFSET: f32 = 150.0;
 const WHIFF_MIN_LOCAL_FORWARD_OFFSET: f32 = 0.0;
 const WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET: f32 = -20.0;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum WhiffEventKind {
+    #[default]
+    Whiff,
+    BeatenToBall,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffEvent {
+    #[serde(default)]
+    pub kind: WhiffEventKind,
     pub time: f32,
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
@@ -34,6 +45,7 @@ pub struct WhiffEvent {
 #[ts(export)]
 pub struct WhiffStats {
     pub whiff_count: u32,
+    pub beaten_to_ball_count: u32,
     pub grounded_whiff_count: u32,
     pub aerial_whiff_count: u32,
     pub dodge_whiff_count: u32,
@@ -215,18 +227,49 @@ impl WhiffCalculator {
         }
     }
 
-    fn cancel_touched_candidates(&mut self, touch_state: &TouchState) {
-        for touch in &touch_state.touch_events {
-            if let Some(player_id) = touch.player.as_ref() {
-                self.active_candidates.remove(player_id);
+    fn finish_touched_candidates(&mut self, frame: &FrameInfo, touch_state: &TouchState) {
+        let touched_players = touch_state
+            .touch_events
+            .iter()
+            .filter_map(|touch| touch.player.as_ref())
+            .collect::<HashSet<_>>();
+        let touched_teams = touch_state
+            .touch_events
+            .iter()
+            .map(|touch| touch.team_is_team_0)
+            .collect::<HashSet<_>>();
+        if touched_players.is_empty() && touched_teams.is_empty() {
+            return;
+        }
+
+        let candidate_players = self.active_candidates.keys().cloned().collect::<Vec<_>>();
+        for player_id in candidate_players {
+            let Some(candidate) = self.active_candidates.remove(&player_id) else {
+                continue;
+            };
+            if touched_players.contains(&candidate.player) {
+                continue;
+            }
+            if touched_teams.contains(&!candidate.is_team_0) {
+                self.emit_candidate(candidate, frame, WhiffEventKind::BeatenToBall);
             }
         }
     }
 
-    fn emit_whiff(&mut self, candidate: ActiveWhiffCandidate, frame: &FrameInfo) {
+    fn emit_candidate(
+        &mut self,
+        candidate: ActiveWhiffCandidate,
+        frame: &FrameInfo,
+        kind: WhiffEventKind,
+    ) {
+        let (time, frame_number) = match kind {
+            WhiffEventKind::Whiff => (candidate.closest_time, candidate.closest_frame),
+            WhiffEventKind::BeatenToBall => (frame.time, frame.frame_number),
+        };
         let event = WhiffEvent {
-            time: candidate.closest_time,
-            frame: candidate.closest_frame,
+            kind,
+            time,
+            frame: frame_number,
             player: candidate.player.clone(),
             is_team_0: candidate.is_team_0,
             closest_approach_distance: candidate.closest_approach_distance,
@@ -240,30 +283,37 @@ impl WhiffCalculator {
             .player_stats
             .entry(candidate.player.clone())
             .or_default();
-        stats.whiff_count += 1;
-        if event.aerial {
-            stats.aerial_whiff_count += 1;
-        } else {
-            stats.grounded_whiff_count += 1;
+        match event.kind {
+            WhiffEventKind::Whiff => {
+                stats.whiff_count += 1;
+                if event.aerial {
+                    stats.aerial_whiff_count += 1;
+                } else {
+                    stats.grounded_whiff_count += 1;
+                }
+                if event.dodge_active {
+                    stats.dodge_whiff_count += 1;
+                }
+                stats.is_last_whiff = true;
+                stats.last_whiff_time = Some(event.time);
+                stats.last_whiff_frame = Some(event.frame);
+                stats.time_since_last_whiff = Some((frame.time - event.time).max(0.0));
+                stats.frames_since_last_whiff =
+                    Some(frame.frame_number.saturating_sub(event.frame));
+                stats.last_closest_approach_distance = Some(event.closest_approach_distance);
+                stats.best_closest_approach_distance = Some(
+                    stats
+                        .best_closest_approach_distance
+                        .map(|distance| distance.min(event.closest_approach_distance))
+                        .unwrap_or(event.closest_approach_distance),
+                );
+                stats.cumulative_closest_approach_distance += event.closest_approach_distance;
+                self.current_last_whiff_player = Some(candidate.player);
+            }
+            WhiffEventKind::BeatenToBall => {
+                stats.beaten_to_ball_count += 1;
+            }
         }
-        if event.dodge_active {
-            stats.dodge_whiff_count += 1;
-        }
-        stats.is_last_whiff = true;
-        stats.last_whiff_time = Some(event.time);
-        stats.last_whiff_frame = Some(event.frame);
-        stats.time_since_last_whiff = Some((frame.time - event.time).max(0.0));
-        stats.frames_since_last_whiff = Some(frame.frame_number.saturating_sub(event.frame));
-        stats.last_closest_approach_distance = Some(event.closest_approach_distance);
-        stats.best_closest_approach_distance = Some(
-            stats
-                .best_closest_approach_distance
-                .map(|distance| distance.min(event.closest_approach_distance))
-                .unwrap_or(event.closest_approach_distance),
-        );
-        stats.cumulative_closest_approach_distance += event.closest_approach_distance;
-
-        self.current_last_whiff_player = Some(candidate.player);
         self.events.push(event);
     }
 
@@ -302,7 +352,7 @@ impl WhiffCalculator {
                     || frame.time - candidate.start_time > WHIFF_MAX_CANDIDATE_SECONDS
                 {
                     if let Some(candidate) = self.active_candidates.remove(&player_id) {
-                        self.emit_whiff(candidate, frame);
+                        self.emit_candidate(candidate, frame, WhiffEventKind::Whiff);
                     }
                 }
                 continue;
@@ -341,14 +391,16 @@ impl WhiffCalculator {
         }
 
         self.begin_sample(frame);
-        self.cancel_touched_candidates(touch_state);
-        if let Some(ball_position) = ball.position() {
-            self.update_active_candidates(
-                frame,
-                ball_position,
-                ball.velocity().unwrap_or(glam::Vec3::ZERO),
-                players,
-            );
+        self.finish_touched_candidates(frame, touch_state);
+        if touch_state.touch_events.is_empty() {
+            if let Some(ball_position) = ball.position() {
+                self.update_active_candidates(
+                    frame,
+                    ball_position,
+                    ball.velocity().unwrap_or(glam::Vec3::ZERO),
+                    players,
+                );
+            }
         }
 
         if let Some(player_id) = self.current_last_whiff_player.as_ref() {

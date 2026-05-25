@@ -2389,6 +2389,17 @@ fn parse_wavedash_event(value: &Value) -> SubtrActorResult<WavedashEvent> {
 fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
     let object = json_object(value, "whiff event")?;
     Ok(WhiffEvent {
+        kind: match object.get("kind").and_then(Value::as_str) {
+            None | Some("whiff") => WhiffEventKind::Whiff,
+            Some("beaten_to_ball") => WhiffEventKind::BeatenToBall,
+            Some(kind) => {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::StatsSerializationError(format!(
+                        "Unknown whiff event kind '{kind}'"
+                    )),
+                );
+            }
+        },
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,

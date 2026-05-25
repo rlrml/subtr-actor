@@ -799,6 +799,9 @@ export function buildBumpTimelineEvents(
 }
 
 function getWhiffShortLabel(event: StatsTimeline["events"]["whiff"][number]): string {
+  if (event.kind === "beaten_to_ball") {
+    return "BT";
+  }
   if (event.dodge_active) {
     return "DW";
   }
@@ -814,6 +817,10 @@ function getWhiffKindLabel(event: StatsTimeline["events"]["whiff"][number]): str
     labels.push("dodge");
   }
   return labels.join(" ");
+}
+
+function getWhiffOutcomeLabel(event: StatsTimeline["events"]["whiff"][number]): string {
+  return event.kind === "beaten_to_ball" ? "beaten to ball" : "whiff";
 }
 
 export function buildWhiffTimelineEvents(
@@ -832,7 +839,7 @@ export function buildWhiffTimelineEvents(
       time: eventTime,
       frame: event.frame,
       kind: "whiff",
-      label: `${playerName} ${getWhiffKindLabel(event)} whiff | ${closestApproach}uu closest, ${approachSpeed}uu/s`,
+      label: `${playerName} ${getWhiffKindLabel(event)} ${getWhiffOutcomeLabel(event)} | ${closestApproach}uu closest, ${approachSpeed}uu/s`,
       shortLabel: getWhiffShortLabel(event),
       playerId,
       playerName,

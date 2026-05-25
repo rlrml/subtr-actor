@@ -12,6 +12,12 @@ impl StatFieldProvider for WhiffStats {
         ));
         visitor(ExportedStat::unsigned(
             "whiff",
+            "beaten_to_ball_count",
+            StatUnit::Count,
+            self.beaten_to_ball_count,
+        ));
+        visitor(ExportedStat::unsigned(
+            "whiff",
             "grounded_whiff_count",
             StatUnit::Count,
             self.grounded_whiff_count,
