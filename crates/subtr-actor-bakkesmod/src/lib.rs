@@ -2423,18 +2423,22 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
         DemoCalculator,
     };
 
-    fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
+    fn checked_in_header_text() -> String {
         let header_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("include")
             .join("subtr_actor_bakkesmod.h");
-        let header = std::fs::read_to_string(&header_path)
-            .unwrap_or_else(|_| panic!("failed to read {}", header_path.display()));
+        std::fs::read_to_string(&header_path)
+            .unwrap_or_else(|_| panic!("failed to read {}", header_path.display()))
+    }
+
+    fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
+        let header = checked_in_header_text();
         let start = format!("typedef enum {enum_name} {{");
         let end = format!("}} {enum_name};");
         let mut in_enum = false;
@@ -2463,7 +2467,37 @@ mod tests {
                     .unwrap_or_else(|_| panic!("invalid enum value in {enum_name}: {line}")),
             );
         }
-        panic!("did not find enum {enum_name} in {}", header_path.display());
+        panic!("did not find enum {enum_name} in checked-in header");
+    }
+
+    fn header_exported_function_names() -> BTreeSet<String> {
+        checked_in_header_text()
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                let start = line.find("subtr_actor_bakkesmod_")?;
+                let rest = &line[start..];
+                let end = rest.find('(')?;
+                Some(rest[..end].to_owned())
+            })
+            .collect()
+    }
+
+    fn rust_exported_function_names() -> BTreeSet<String> {
+        include_str!("lib.rs")
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                if !line.starts_with("pub ") || !line.contains(" extern \"C\" fn ") {
+                    return None;
+                }
+                let (_, rest) = line.split_once("fn ")?;
+                let end = rest.find('(')?;
+                let name = &rest[..end];
+                name.starts_with("subtr_actor_bakkesmod_")
+                    .then(|| name.to_owned())
+            })
+            .collect()
     }
 
     #[test]
@@ -2634,6 +2668,14 @@ mod tests {
                     SaGoalBuildupKind::Other as i32,
                 ),
             ])
+        );
+    }
+
+    #[test]
+    fn checked_in_header_declares_every_exported_function() {
+        assert_eq!(
+            header_exported_function_names(),
+            rust_exported_function_names()
         );
     }
 
