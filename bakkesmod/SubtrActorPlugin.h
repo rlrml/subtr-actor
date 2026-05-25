@@ -56,6 +56,8 @@ private:
   using WriteStatsModuleConfigJson = WriteNamedJson;
   using GraphOutputJsonLen = NamedJsonLen;
   using WriteGraphOutputJson = WriteNamedJson;
+  using AnalysisNodeJsonLen = NamedJsonLen;
+  using WriteAnalysisNodeJson = WriteNamedJson;
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
@@ -103,6 +105,8 @@ private:
   WriteStatsModuleConfigJson writeStatsModuleConfigJson = nullptr;
   GraphOutputJsonLen graphOutputJsonLen = nullptr;
   WriteGraphOutputJson writeGraphOutputJson = nullptr;
+  AnalysisNodeJsonLen analysisNodeJsonLen = nullptr;
+  WriteAnalysisNodeJson writeAnalysisNodeJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
   DrainEvents drainEvents = nullptr;
@@ -152,6 +156,7 @@ private:
   void dumpStatsModuleFrameJson(std::vector<std::string> params);
   void dumpStatsModuleConfigJson(std::vector<std::string> params);
   void dumpGraphOutputJson(std::vector<std::string> params);
+  void dumpAnalysisNodeJson(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);

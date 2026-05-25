@@ -7,6 +7,7 @@ use std::ptr;
 use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
+use serde_json::{json, Value};
 use subtr_actor::{
     builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
     builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
@@ -15,15 +16,17 @@ use subtr_actor::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
     },
-    BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishAttribute, DemolishInfo,
-    DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
-    GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind,
-    LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo,
-    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta,
-    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
-    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchStateCalculator, WhiffEvent,
+    BackboardBounceEvent, BackboardBounceState, BallFrameState, BallSample, BoostPadEvent,
+    BoostPadEventKind, BoostPickupComparisonEvent, BumpEvent, ContinuousBallControlState,
+    DemoEventSample, DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, FiftyFiftyEvent,
+    FiftyFiftyState, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
+    GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState,
+    MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample,
+    PlayerStatEvent, PlayerStatEventKind, PlayerVerticalBand, PlayerVerticalState, PossessionState,
+    ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
+    RushEvent, SettingsCalculator, ShotEventMetadata, SubtrActorError, SubtrActorErrorVariant,
+    SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent, TouchState,
+    TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -1937,6 +1940,280 @@ fn serialize_stats_graph_snapshot(engine: &SaEngine) -> Vec<u8> {
     }
 }
 
+fn vec3_json(value: &Vector3f) -> Value {
+    json!({
+        "x": value.x,
+        "y": value.y,
+        "z": value.z,
+    })
+}
+
+fn quat_json(value: &Quaternion) -> Value {
+    json!({
+        "x": value.x,
+        "y": value.y,
+        "z": value.z,
+        "w": value.w,
+    })
+}
+
+fn rigid_body_json(value: &RigidBody) -> Value {
+    json!({
+        "location": vec3_json(&value.location),
+        "rotation": quat_json(&value.rotation),
+        "sleeping": value.sleeping,
+        "linear_velocity": value.linear_velocity.as_ref().map(vec3_json),
+        "angular_velocity": value.angular_velocity.as_ref().map(vec3_json),
+    })
+}
+
+fn ball_frame_state_json(state: &BallFrameState) -> Value {
+    match state {
+        BallFrameState::Missing => json!({
+            "kind": "Missing",
+            "ball": Value::Null,
+        }),
+        BallFrameState::Present(ball) => json!({
+            "kind": "Present",
+            "ball": ball_sample_json(ball),
+        }),
+    }
+}
+
+fn ball_sample_json(sample: &BallSample) -> Value {
+    json!({
+        "rigid_body": rigid_body_json(&sample.rigid_body),
+    })
+}
+
+fn player_sample_json(sample: &PlayerSample) -> Value {
+    json!({
+        "player_id": sample.player_id,
+        "is_team_0": sample.is_team_0,
+        "rigid_body": sample.rigid_body.as_ref().map(rigid_body_json),
+        "boost_amount": sample.boost_amount,
+        "last_boost_amount": sample.last_boost_amount,
+        "boost_active": sample.boost_active,
+        "dodge_active": sample.dodge_active,
+        "powerslide_active": sample.powerslide_active,
+        "match_goals": sample.match_goals,
+        "match_assists": sample.match_assists,
+        "match_saves": sample.match_saves,
+        "match_shots": sample.match_shots,
+        "match_score": sample.match_score,
+    })
+}
+
+fn demo_event_sample_json(sample: &DemoEventSample) -> Value {
+    json!({
+        "attacker": sample.attacker,
+        "victim": sample.victim,
+    })
+}
+
+fn vertical_band_label(band: PlayerVerticalBand) -> &'static str {
+    match band {
+        PlayerVerticalBand::Ground => "ground",
+        PlayerVerticalBand::LowAir => "low_air",
+        PlayerVerticalBand::HighAir => "high_air",
+    }
+}
+
+fn player_vertical_state_json(state: &PlayerVerticalState) -> Value {
+    let mut players = state
+        .players
+        .iter()
+        .map(|(player_id, sample)| {
+            json!({
+                "player_id": player_id,
+                "height": sample.height,
+                "band": vertical_band_label(sample.band),
+            })
+        })
+        .collect::<Vec<_>>();
+    players.sort_by_key(|value| value["player_id"].to_string());
+    json!({ "players": players })
+}
+
+fn settings_json(calculator: &SettingsCalculator) -> Value {
+    let mut player_settings = calculator
+        .player_settings()
+        .iter()
+        .map(|(player_id, settings)| {
+            json!({
+                "player_id": player_id,
+                "settings": {
+                    "steering_sensitivity": settings.steering_sensitivity,
+                    "camera_fov": settings.camera_fov,
+                    "camera_height": settings.camera_height,
+                    "camera_pitch": settings.camera_pitch,
+                    "camera_distance": settings.camera_distance,
+                    "camera_stiffness": settings.camera_stiffness,
+                    "camera_swivel_speed": settings.camera_swivel_speed,
+                    "camera_transition_speed": settings.camera_transition_speed,
+                },
+            })
+        })
+        .collect::<Vec<_>>();
+    player_settings.sort_by_key(|value| value["player_id"].to_string());
+    json!({ "player_settings": player_settings })
+}
+
+fn analysis_node_json_value(name: &str, engine: &SaEngine) -> Option<Value> {
+    let graph = &engine.graph;
+    match name {
+        "core" | "match_stats" => builtin_stats_module_json("core", graph).ok(),
+        "stats_timeline_events" => graph
+            .state::<StatsTimelineEventsState>()
+            .and_then(|state| serde_json::to_value(&state.events).ok()),
+        "stats_timeline_frame" => current_timeline_frame(graph).and_then(|frame| {
+            serde_json::to_value(&frame).ok()
+        }),
+        "frame_info" => graph.state::<FrameInfo>().map(|state| {
+            json!({
+                "frame_number": state.frame_number,
+                "time": state.time,
+                "dt": state.dt,
+                "seconds_remaining": state.seconds_remaining,
+            })
+        }),
+        "gameplay_state" => graph.state::<GameplayState>().map(|state| {
+            json!({
+                "game_state": state.game_state,
+                "ball_has_been_hit": state.ball_has_been_hit,
+                "kickoff_countdown_time": state.kickoff_countdown_time,
+                "team_zero_score": state.team_zero_score,
+                "team_one_score": state.team_one_score,
+                "possession_team_is_team_0": state.possession_team_is_team_0,
+                "scored_on_team_is_team_0": state.scored_on_team_is_team_0,
+                "current_in_game_team_player_counts": state.current_in_game_team_player_counts,
+                "is_live_play": state.is_live_play(),
+                "kickoff_phase_active": state.kickoff_phase_active(),
+            })
+        }),
+        "ball_frame_state" => graph.state::<BallFrameState>().map(ball_frame_state_json),
+        "player_frame_state" => graph.state::<PlayerFrameState>().map(|state| {
+            json!({
+                "players": state.players.iter().map(player_sample_json).collect::<Vec<_>>(),
+            })
+        }),
+        "frame_events_state" => graph.state::<FrameEventsState>().map(|state| {
+            json!({
+                "active_demos": state.active_demos.iter().map(demo_event_sample_json).collect::<Vec<_>>(),
+                "demo_events": state.demo_events,
+                "boost_pad_events": state.boost_pad_events,
+                "touch_events": state.touch_events,
+                "dodge_refreshed_events": state.dodge_refreshed_events,
+                "player_stat_events": state.player_stat_events,
+                "goal_events": state.goal_events,
+            })
+        }),
+        "live_play" => graph
+            .state::<LivePlayState>()
+            .and_then(|state| serde_json::to_value(state).ok()),
+        "touch_state" => graph.state::<TouchState>().map(|state| {
+            json!({
+                "touch_events": state.touch_events,
+                "last_touch": state.last_touch,
+                "last_touch_player": state.last_touch_player,
+                "last_touch_team_is_team_0": state.last_touch_team_is_team_0,
+            })
+        }),
+        "possession_state" => graph.state::<PossessionState>().map(|state| {
+            json!({
+                "active_team_before_sample": state.active_team_before_sample,
+                "current_team_is_team_0": state.current_team_is_team_0,
+                "active_player_before_sample": state.active_player_before_sample,
+                "current_player": state.current_player,
+            })
+        }),
+        "backboard_bounce_state" => graph.state::<BackboardBounceState>().map(|state| {
+            json!({
+                "bounce_events": state.bounce_events,
+                "last_bounce_event": state.last_bounce_event,
+            })
+        }),
+        "continuous_ball_control" => graph.state::<ContinuousBallControlState>().map(|state| {
+            json!({
+                "completed_sequences": state.completed_sequences.iter().map(|sequence| {
+                    json!({
+                        "player_id": sequence.player_id,
+                        "is_team_0": sequence.is_team_0,
+                        "kind": sequence.kind,
+                        "start_frame": sequence.start_frame,
+                        "end_frame": sequence.end_frame,
+                        "start_time": sequence.start_time,
+                        "end_time": sequence.end_time,
+                        "duration": sequence.duration,
+                        "straight_line_distance": sequence.straight_line_distance,
+                        "path_distance": sequence.path_distance,
+                        "average_horizontal_gap": sequence.average_horizontal_gap,
+                        "average_vertical_gap": sequence.average_vertical_gap,
+                        "average_speed": sequence.average_speed,
+                        "start_position": {
+                            "x": sequence.start_position.x,
+                            "y": sequence.start_position.y,
+                            "z": sequence.start_position.z,
+                        },
+                        "end_position": {
+                            "x": sequence.end_position.x,
+                            "y": sequence.end_position.y,
+                            "z": sequence.end_position.z,
+                        },
+                        "touch_count": sequence.touch_count,
+                        "air_touch_count": sequence.air_touch_count,
+                    })
+                }).collect::<Vec<_>>(),
+            })
+        }),
+        "fifty_fifty_state" => graph.state::<FiftyFiftyState>().map(|state| {
+            json!({
+                "active_event": state.active_event.as_ref().map(|event| {
+                    json!({
+                        "start_time": event.start_time,
+                        "start_frame": event.start_frame,
+                        "last_touch_time": event.last_touch_time,
+                        "last_touch_frame": event.last_touch_frame,
+                        "is_kickoff": event.is_kickoff,
+                        "team_zero_player": event.team_zero_player,
+                        "team_one_player": event.team_one_player,
+                        "team_zero_position": event.team_zero_position,
+                        "team_one_position": event.team_one_position,
+                        "midpoint": event.midpoint,
+                        "plane_normal": event.plane_normal,
+                    })
+                }),
+                "resolved_events": state.resolved_events,
+                "last_resolved_event": state.last_resolved_event,
+            })
+        }),
+        "player_vertical_state" => graph
+            .state::<PlayerVerticalState>()
+            .map(player_vertical_state_json),
+        "settings" => graph.state::<SettingsCalculator>().map(settings_json),
+        module_name if builtin_stats_module_names().contains(&module_name) => {
+            builtin_stats_module_json(module_name, graph).ok()
+        }
+        _ => None,
+    }
+}
+
+unsafe fn serialize_named_analysis_node(
+    engine: *const SaEngine,
+    node_name: *const c_char,
+) -> Vec<u8> {
+    let Some(engine) = engine.as_ref() else {
+        return Vec::new();
+    };
+    let Some(node_name) = c_string_arg(node_name) else {
+        return Vec::new();
+    };
+    let Some(value) = analysis_node_json_value(&node_name, engine) else {
+        return Vec::new();
+    };
+    serde_json::to_vec(&value).unwrap_or_default()
+}
+
 unsafe fn c_string_arg(value: *const c_char) -> Option<String> {
     if value.is_null() {
         return None;
@@ -2569,6 +2846,53 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
     let Some(bytes) = live_graph_output_bytes(engine, &output_name) else {
         return 0;
     };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of one named live analysis-node JSON payload.
+///
+/// `node_name` must be one of the names reported by `builtin_analysis_node_names`
+/// in graph info JSON. Calculator nodes use the same graph-backed payloads as
+/// stats modules; signal/state nodes use structured snapshots of their current
+/// graph state.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`. `node_name` must be a valid
+/// null-terminated UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_json_len(
+    engine: *const SaEngine,
+    node_name: *const c_char,
+) -> usize {
+    serialize_named_analysis_node(engine, node_name).len()
+}
+
+#[no_mangle]
+/// Writes one named live analysis-node JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_analysis_node_json_len` first to size the destination
+/// buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `node_name` must be a valid
+/// null-terminated UTF-8 string. `out_bytes` must point to writable storage for
+/// at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
+    engine: *const SaEngine,
+    node_name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let bytes = serialize_named_analysis_node(engine, node_name);
     if out_bytes.is_null() || max_bytes == 0 {
         return 0;
     }
@@ -3864,6 +4188,28 @@ mod tests {
         };
         assert_eq!(written, json_len);
         serde_json::from_slice(&bytes).expect("graph output json should be valid")
+    }
+
+    fn live_analysis_node_json_value(
+        engine: *const SaEngine,
+        node_name: &str,
+    ) -> serde_json::Value {
+        let node_name =
+            std::ffi::CString::new(node_name).expect("node name should not contain nul bytes");
+        let json_len =
+            unsafe { subtr_actor_bakkesmod_analysis_node_json_len(engine, node_name.as_ptr()) };
+        assert!(json_len > 0, "analysis node {node_name:?} should have JSON");
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_analysis_node_json(
+                engine,
+                node_name.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("analysis node json should be valid")
     }
 
     fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
@@ -6578,6 +6924,101 @@ mod tests {
         );
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_graph_output_json_len(engine, ptr::null()) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_exposes_every_builtin_analysis_node_by_name() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 0.0,
+            has_closest_approach_distance: 1,
+        }];
+        let players_by_frame = (1..=12)
+            .map(|frame_number| {
+                [player_at(SaVec3 {
+                    x: frame_number as f32 * 20.0,
+                    y: 0.0,
+                    z: 20.0,
+                })]
+            })
+            .collect::<Vec<_>>();
+        let mut frames = Vec::new();
+        for (offset, players) in players_by_frame.iter().enumerate() {
+            let frame_number = offset as u64 + 1;
+            let mut frame = live_frame(
+                frame_number,
+                rigid_body(
+                    SaVec3 {
+                        x: frame_number as f32 * 20.0,
+                        y: 0.0,
+                        z: 120.0,
+                    },
+                    SaVec3::default(),
+                ),
+                players,
+            );
+            frame.has_live_play = 1;
+            if frame_number == 1 {
+                frame.touches = touches.as_ptr();
+                frame.touch_count = touches.len();
+            }
+            frames.push(frame);
+        }
+
+        for frame in &frames {
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, frame) },
+                0
+            );
+        }
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        for node_name in builtin_analysis_node_names() {
+            let value = live_analysis_node_json_value(engine, node_name);
+            assert!(
+                !value.is_null(),
+                "analysis node {node_name} should expose a JSON payload"
+            );
+        }
+        assert_eq!(
+            live_analysis_node_json_value(engine, "core"),
+            live_stats_module_json_value(engine, "core")
+        );
+        assert_eq!(
+            live_analysis_node_json_value(engine, "match_stats"),
+            live_stats_module_json_value(engine, "core")
+        );
+        let timeline_events = live_analysis_node_json_value(engine, "stats_timeline_events");
+        assert!(timeline_events["timeline"].is_array());
+        assert!(timeline_events["mechanics"].is_array());
+        let timeline_frame = live_analysis_node_json_value(engine, "stats_timeline_frame");
+        assert_eq!(timeline_frame["frame_number"], serde_json::json!(12));
+        assert!(timeline_frame["players"].is_array());
+
+        let unknown = std::ffi::CString::new("not_a_node").unwrap();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_analysis_node_json_len(engine, unknown.as_ptr()) },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_write_analysis_node_json(
+                    engine,
+                    unknown.as_ptr(),
+                    ptr::null_mut(),
+                    10,
+                )
+            },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_analysis_node_json_len(engine, ptr::null()) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };

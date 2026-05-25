@@ -527,6 +527,12 @@ void SubtrActorPlugin::onLoad() {
       "Writes one named graph output JSON. Usage: "
       "subtr_actor_dump_graph_output <events|frame|timeline|stats|graph_info> [finish]",
       PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_dump_analysis_node",
+      [this](std::vector<std::string> params) { dumpAnalysisNodeJson(params); },
+      "Writes one named graph-backed analysis node JSON. Usage: "
+      "subtr_actor_dump_analysis_node <node_name> [finish]",
+      PERMISSION_ALL);
   hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
@@ -651,6 +657,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_output_json_len"));
   writeGraphOutputJson = reinterpret_cast<WriteGraphOutputJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_graph_output_json"));
+  analysisNodeJsonLen = reinterpret_cast<AnalysisNodeJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_analysis_node_json_len"));
+  writeAnalysisNodeJson = reinterpret_cast<WriteAnalysisNodeJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_analysis_node_json"));
   graphInfoJsonLen = reinterpret_cast<GraphInfoJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
@@ -668,8 +678,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !statsModuleJsonLen || !writeStatsModuleJson || !statsModuleFrameJsonLen ||
       !writeStatsModuleFrameJson || !statsModuleConfigJsonLen ||
       !writeStatsModuleConfigJson || !graphOutputJsonLen || !writeGraphOutputJson ||
-      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents ||
-      !drainGoalContextEvents) {
+      !analysisNodeJsonLen || !writeAnalysisNodeJson || !graphInfoJsonLen ||
+      !writeGraphInfoJson || !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -712,6 +722,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeStatsModuleConfigJson = nullptr;
   graphOutputJsonLen = nullptr;
   writeGraphOutputJson = nullptr;
+  analysisNodeJsonLen = nullptr;
+  writeAnalysisNodeJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
@@ -1791,6 +1803,75 @@ void SubtrActorPlugin::dumpGraphOutputJson(std::vector<std::string> params) {
       shouldFinish ? " after finish" : "",
       outputPath.string(),
       outputJson.size()));
+}
+
+void SubtrActorPlugin::dumpAnalysisNodeJson(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: analysis node dump requested before engine was loaded");
+    return;
+  }
+  if (params.size() < 2) {
+    cvarManager->log(
+        "subtr-actor: usage: subtr_actor_dump_analysis_node <node_name> [finish]");
+    return;
+  }
+
+  const std::string nodeName = params[1];
+  const bool shouldFinish =
+      std::find_if(params.begin() + 2, params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log(
+          "subtr-actor: analysis node dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(std::format(
+          "subtr-actor: graph finish failed before analysis node dump: {}",
+          finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  const std::string nodeJson =
+      readNamedJsonBuffer(analysisNodeJsonLen, writeAnalysisNodeJson, nodeName);
+  if (nodeJson.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: analysis node '{}' was unavailable or produced empty JSON",
+        nodeName));
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(std::format(
+        "subtr-actor: failed to create analysis node dump directory: {}",
+        error.message()));
+    return;
+  }
+
+  const std::filesystem::path nodePath =
+      outputDirectory / std::format("graph-node-{}.json", safeModuleFileStem(nodeName));
+  std::ofstream nodeFile(nodePath, std::ios::binary);
+  nodeFile.write(nodeJson.data(), static_cast<std::streamsize>(nodeJson.size()));
+  if (!nodeFile) {
+    cvarManager->log("subtr-actor: failed to write analysis node JSON snapshot");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote analysis node '{}' JSON{}: {} ({} bytes)",
+      nodeName,
+      shouldFinish ? " after finish" : "",
+      nodePath.string(),
+      nodeJson.size()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

@@ -22,6 +22,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   The `subtr_actor_dump_graph_output <output_name> [finish]` console command
   writes one named graph output (`events`, `frame`, `timeline`, `stats`, or
   `graph_info`) using the output names reported in `graph-info.json`.
+  The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
+  writes one graph-backed builtin analysis node by name, using the node names
+  reported in `graph-info.json`.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
