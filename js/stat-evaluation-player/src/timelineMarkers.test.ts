@@ -6,11 +6,17 @@ import {
   buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
   buildCeilingShotTimelineEvents,
+  buildCenterTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildDoubleTapTimelineEvents,
   buildFiftyFiftyTimelineEvents,
+  buildGoalContextTimelineEvents,
+  buildGoalTagTimelineEvents,
   buildHalfFlipTimelineEvents,
+  buildHalfVolleyTimelineEvents,
   buildMustyFlickTimelineEvents,
+  buildOneTimerTimelineEvents,
+  buildPassTimelineEvents,
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
@@ -24,7 +30,13 @@ import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 
 test("timeline defaults to goals and adds core and demo replay events when enabled", () => {
   assert.deepEqual(getReplayTimelineEventKinds([]), ["goal"]);
-  assert.deepEqual(getReplayTimelineEventKinds(["core", "demo"]), ["goal", "save", "shot", "demo"]);
+  assert.deepEqual(getReplayTimelineEventKinds(["core", "demo"]), [
+    "goal",
+    "save",
+    "shot",
+    "assist",
+    "demo",
+  ]);
 });
 
 test("filterReplayTimelineEvents keeps only goal markers by default", () => {
@@ -33,6 +45,7 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
       { kind: "goal", time: 10 },
       { kind: "save", time: 12 },
       { kind: "shot", time: 13 },
+      { kind: "assist", time: 13.5 },
       { kind: "demo", time: 14 },
     ],
   } as ReplayModel;
@@ -43,7 +56,7 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
   );
   assert.deepEqual(
     filterReplayTimelineEvents(replay, ["core", "demo"]).map((event) => event.kind),
-    ["goal", "save", "shot", "demo"],
+    ["goal", "save", "shot", "assist", "demo"],
   );
 });
 
@@ -280,6 +293,244 @@ test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline
       kind: "double-tap",
       label: "Blue double tap",
       shortLabel: "DT",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildCenterTimelineEvents maps serialized center events to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    center_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        start_time: 0.9,
+        start_frame: 0,
+        duration: 0.3,
+        start_ball_position: [0, 0, 100],
+        end_ball_position: [200, -300, 110],
+        ball_travel_distance: 360,
+        ball_advance_distance: 220,
+        lateral_centering_distance: 415.6,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildCenterTimelineEvents(statsTimeline, replay), [
+    {
+      id: "center:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "center",
+      label: "Blue center | 416uu lateral",
+      shortLabel: "C",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildPassTimelineEvents maps serialized passes to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [
+      { id: "Steam:passer-id", name: "Passer" },
+      { id: "Steam:receiver-id", name: "Receiver" },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    pass_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        passer: { Steam: "passer-id" },
+        receiver: { Steam: "receiver-id" },
+        is_team_0: true,
+        start_time: 0.8,
+        start_frame: 0,
+        duration: 0.4,
+        ball_travel_distance: 1234.4,
+        ball_advance_distance: 900,
+        pass_kind: "fifty_fifty_backboard",
+      },
+    ],
+  });
+
+  assert.deepEqual(buildPassTimelineEvents(statsTimeline, replay), [
+    {
+      id: "pass:1:Steam:passer-id:Steam:receiver-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "pass",
+      label: "Passer to Receiver fifty fifty backboard pass | 1234uu",
+      shortLabel: "P",
+      playerId: "Steam:passer-id",
+      playerName: "Passer",
+      secondaryPlayerId: "Steam:receiver-id",
+      secondaryPlayerName: "Receiver",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildOneTimerTimelineEvents maps serialized one-timers to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [
+      { id: "Steam:shooter-id", name: "Shooter" },
+      { id: "Steam:passer-id", name: "Passer" },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    one_timer_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "shooter-id" },
+        passer: { Steam: "passer-id" },
+        is_team_0: true,
+        pass_start_time: 0.8,
+        pass_start_frame: 0,
+        pass_duration: 0.4,
+        pass_travel_distance: 1200,
+        pass_advance_distance: 700,
+        ball_speed: 1800.7,
+        goal_alignment: 0.9,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildOneTimerTimelineEvents(statsTimeline, replay), [
+    {
+      id: "one-timer:1:Steam:passer-id:Steam:shooter-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "one-timer",
+      label: "Shooter one-timer from Passer | 1801uu/s",
+      shortLabel: "OT",
+      playerId: "Steam:shooter-id",
+      playerName: "Shooter",
+      secondaryPlayerId: "Steam:passer-id",
+      secondaryPlayerName: "Passer",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildHalfVolleyTimelineEvents maps serialized half volleys to timeline markers", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    half_volley_events: [
+      {
+        time: 1.2,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        bounce_time: 1.0,
+        bounce_frame: 0,
+        bounce_to_touch_seconds: 0.2,
+        ball_speed: 1650.4,
+        goal_alignment: 0.8,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildHalfVolleyTimelineEvents(statsTimeline, replay), [
+    {
+      id: "half-volley:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "half-volley",
+      label: "Blue half volley | 1650uu/s",
+      shortLabel: "HV",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildGoalTagTimelineEvents and buildGoalContextTimelineEvents map goal analysis events", () => {
+  const replay = {
+    frames: [{ time: 0 }, { time: 1.5 }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    goal_tag_events: [
+      {
+        goal_index: 0,
+        time: 1.2,
+        frame: 1,
+        kind: "half_volley_goal",
+        scoring_team_is_team_0: true,
+        scorer: { Steam: "blue-id" },
+        confidence: 0.88,
+        modifiers: [],
+        evidence: [],
+      },
+    ],
+    events: {
+      goal_context: [
+        {
+          time: 1.2,
+          frame: 1,
+          scoring_team_is_team_0: true,
+          scorer: { Steam: "blue-id" },
+          scoring_team_most_back_player: null,
+          defending_team_most_back_player: null,
+          ball_position: null,
+          ball_air_time_before_goal: null,
+          scorer_last_touch: null,
+          players: [],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(buildGoalTagTimelineEvents(statsTimeline, replay), [
+    {
+      id: "goal-tag:0:half_volley_goal:0",
+      time: 1.5,
+      frame: 1,
+      kind: "goal-tag",
+      label: "Blue half volley goal 88%",
+      shortLabel: "GT",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+  assert.deepEqual(buildGoalContextTimelineEvents(statsTimeline, replay), [
+    {
+      id: "goal-context:1:Steam:blue-id:0",
+      time: 1.5,
+      frame: 1,
+      kind: "goal-context",
+      label: "Blue goal context",
+      shortLabel: "GC",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,
@@ -775,6 +1026,66 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         backboard_frame: 1,
       },
     ],
+    center_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        start_time: 0.8,
+        start_frame: 0,
+        duration: 0.3,
+        start_ball_position: [0, 0, 100],
+        end_ball_position: [100, 200, 100],
+        ball_travel_distance: 300,
+        ball_advance_distance: 200,
+        lateral_centering_distance: 240,
+      },
+    ],
+    one_timer_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        passer: { Steam: "orange-id" },
+        is_team_0: true,
+        pass_start_time: 0.7,
+        pass_start_frame: 0,
+        pass_duration: 0.4,
+        pass_travel_distance: 1200,
+        pass_advance_distance: 800,
+        ball_speed: 1800,
+        goal_alignment: 0.9,
+      },
+    ],
+    pass_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        passer: { Steam: "blue-id" },
+        receiver: { Steam: "orange-id" },
+        is_team_0: true,
+        start_time: 0.7,
+        start_frame: 0,
+        duration: 0.4,
+        ball_travel_distance: 1200,
+        ball_advance_distance: 800,
+        pass_kind: "direct",
+      },
+    ],
+    goal_tag_events: [
+      {
+        goal_index: 0,
+        time: 1.1,
+        frame: 1,
+        kind: "one_timer_goal",
+        scoring_team_is_team_0: true,
+        scorer: { Steam: "blue-id" },
+        confidence: 0.8,
+        modifiers: [],
+        evidence: [],
+      },
+    ],
     speed_flip_events: [
       {
         time: 1.1,
@@ -810,6 +1121,19 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         confidence: 0.81,
       },
     ],
+    half_volley_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        bounce_time: 0.9,
+        bounce_frame: 0,
+        bounce_to_touch_seconds: 0.2,
+        ball_speed: 1600,
+        goal_alignment: 0.8,
+      },
+    ],
     wavedash_events: [
       {
         time: 1.1,
@@ -841,6 +1165,40 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         aerial: false,
       },
     ],
+    bump_events: [
+      {
+        time: 1.1,
+        frame: 1,
+        initiator: { Steam: "blue-id" },
+        victim: { Steam: "orange-id" },
+        initiator_is_team_0: true,
+        victim_is_team_0: false,
+        is_team_bump: false,
+        strength: 500,
+        confidence: 0.8,
+        contact_distance: 30,
+        closing_speed: 900,
+        victim_impulse: 1000,
+        initiator_position: [0, 0, 0],
+        victim_position: [10, 0, 0],
+      },
+    ],
+    events: {
+      goal_context: [
+        {
+          time: 1.1,
+          frame: 1,
+          scoring_team_is_team_0: true,
+          scorer: { Steam: "blue-id" },
+          scoring_team_most_back_player: null,
+          defending_team_most_back_player: null,
+          ball_position: null,
+          ball_air_time_before_goal: null,
+          scorer_last_touch: null,
+          players: [],
+        },
+      ],
+    },
     frames: [
       {
         frame_number: 1,
@@ -959,19 +1317,26 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "musty-flick",
         "backboard",
         "ceiling-shot",
+        "center",
         "double-tap",
+        "goal-context",
+        "goal-tags",
+        "one-timer",
+        "pass",
         "touch",
         "dodge-reset",
         "ball-carry",
         "powerslide",
         "speed-flip",
         "half-flip",
+        "half-volley",
         "wavedash",
         "whiff",
+        "bump",
       ],
       replay,
       statsTimeline,
     ),
-    15,
+    22,
   );
 });

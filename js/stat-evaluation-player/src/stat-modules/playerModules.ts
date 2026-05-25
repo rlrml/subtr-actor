@@ -17,6 +17,8 @@ import {
   buildDoubleTapTimelineEvents,
   buildFlickTimelineEvents,
   buildHalfFlipTimelineEvents,
+  buildOneTimerTimelineEvents,
+  buildPassTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
   buildSpeedFlipTimelineEvents,
@@ -248,6 +250,9 @@ export function createPassModule(): StatModule {
     label: "Pass",
     select: (player) => player.pass,
     render: (pass) => renderPassStats(pass),
+    getTimelineEvents(ctx) {
+      return buildPassTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }
 
@@ -257,6 +262,9 @@ export function createOneTimerModule(): StatModule {
     label: "One-timer",
     select: (player) => player.one_timer,
     render: (oneTimer) => renderOneTimerStats(oneTimer),
+    getTimelineEvents(ctx) {
+      return buildOneTimerTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
   });
 }
 

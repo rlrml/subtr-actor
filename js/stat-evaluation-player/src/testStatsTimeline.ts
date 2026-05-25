@@ -148,6 +148,7 @@ export function createLegacyStatsTimeline(
     wavedash_events?: StatsEvents["wavedash"];
     whiff_events?: StatsEvents["whiff"];
     boost_pickups?: StatsEvents["boost_pickups"];
+    bump_events?: StatsEvents["bump"];
   } = {},
 ): StatsTimeline {
   return createStatsTimeline({
@@ -171,6 +172,7 @@ export function createLegacyStatsTimeline(
       wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
+      bump: overrides.bump_events ?? overrides.events?.bump ?? [],
     },
   });
 }

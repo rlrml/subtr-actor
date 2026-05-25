@@ -14,6 +14,7 @@ import type {
   CameraSettings,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
+  ReplayTimelineEvent,
   ReplayPlayerState,
   ReplayPlayerTrack,
   PlaylistManifestPage,
@@ -44,6 +45,8 @@ import {
   buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
   formatMechanicKind,
+  buildGoalContextTimelineEvents,
+  buildGoalTagTimelineEvents,
   getMechanicKinds,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
@@ -148,6 +151,59 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
 ]);
 const TOUCH_MODULE_ID = "touch";
 const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
+const MECHANIC_BACKED_EVENT_MODULE_IDS = new Set([
+  "ball-carry",
+  "ceiling-shot",
+  "double-tap",
+  "flick",
+  "half-flip",
+  "musty-flick",
+  "one-timer",
+  "pass",
+  "speed-flip",
+]);
+
+interface EventWindowSourceDefinition {
+  id: string;
+  label: string;
+  buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
+}
+
+const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
+  {
+    id: "core",
+    label: "Shots, saves, assists",
+    buildEvents(ctx) {
+      return ctx.replay.timelineEvents.filter((event) =>
+        event.kind === "shot" || event.kind === "save" || event.kind === "assist",
+      );
+    },
+  },
+  {
+    id: "demo",
+    label: "Demos",
+    buildEvents(ctx) {
+      return ctx.replay.timelineEvents.filter((event) => event.kind === "demo");
+    },
+  },
+];
+
+const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
+  {
+    id: "goal-context",
+    label: "Goal Context",
+    buildEvents(ctx) {
+      return buildGoalContextTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+  },
+  {
+    id: "goal-tags",
+    label: "Goal Tags",
+    buildEvents(ctx) {
+      return buildGoalTagTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+  },
+];
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -516,6 +572,24 @@ function syncTimelineEvents(): void {
       timelineOverlay.addEventSource(events, {
         id: `module:${mod.id}`,
         label: mod.label,
+      }),
+    );
+  }
+
+  for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
+    if (!activeTimelineEventModuleIds.has(source.id)) {
+      continue;
+    }
+    const events = source.buildEvents(ctx);
+    if (events.length === 0) {
+      continue;
+    }
+
+    timelineSourceRemovers.set(
+      `events:${source.id}`,
+      timelineOverlay.addEventSource(events, {
+        id: `events:${source.id}`,
+        label: source.label,
       }),
     );
   }
@@ -1080,19 +1154,45 @@ function renderModuleSummary(): void {
   );
 }
 
-function renderMechanicsTimelineControls(): void {
+function renderEventTimelineControls(): void {
   mechanicsTimelineWindowBody.replaceChildren();
 
+  const ctx = getModuleContext();
   const kinds = getMechanicKinds(statsTimeline);
-  const counts = new Map<string, number>();
+  const mechanicCounts = new Map<string, number>();
   for (const event of statsTimeline?.events.mechanics ?? []) {
-    counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1);
+    mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
   }
 
-  if (kinds.length === 0) {
+  const moduleEventSources = MODULES.filter(
+    (mod) => mod.getTimelineEvents && !MECHANIC_BACKED_EVENT_MODULE_IDS.has(mod.id),
+  ).map((mod) => ({
+    id: mod.id,
+    label: mod.label,
+    count: ctx ? (mod.getTimelineEvents?.(ctx).length ?? 0) : 0,
+  }));
+  const replayEventSources = REPLAY_EVENT_SOURCE_DEFINITIONS.map((source) => ({
+    id: source.id,
+    label: source.label,
+    count: ctx ? source.buildEvents(ctx).length : 0,
+  }));
+  const extraEventSources = EXTRA_EVENT_SOURCE_DEFINITIONS.map((source) => ({
+    id: source.id,
+    label: source.label,
+    count: ctx ? source.buildEvents(ctx).length : 0,
+  }));
+  const eventSourceIds = [
+    ...replayEventSources,
+    ...moduleEventSources,
+    ...extraEventSources,
+  ]
+    .filter((source) => source.count > 0)
+    .map((source) => source.id);
+
+  if (eventSourceIds.length === 0 && kinds.length === 0) {
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
-    empty.textContent = "No mechanic events loaded.";
+    empty.textContent = "No events loaded.";
     mechanicsTimelineWindowBody.append(empty);
     return;
   }
@@ -1104,71 +1204,147 @@ function renderMechanicsTimelineControls(): void {
   allButton.type = "button";
   allButton.className = "module-summary-item";
   allButton.addEventListener("click", () => {
+    for (const id of eventSourceIds) {
+      activeTimelineEventModuleIds.add(id);
+    }
     activeMechanicTimelineKinds = new Set(kinds);
+    setupActiveModules();
     syncTimelineEvents();
     syncTimelineRanges();
-    renderMechanicsTimelineControls();
+    renderEventTimelineControls();
+    renderModuleSummary();
+    renderModuleSettings();
     renderTimelineEventCount();
     scheduleConfigUrlUpdate();
   });
   const allName = document.createElement("span");
-  allName.textContent = "All mechanics";
+  allName.textContent = "All events";
   const allCount = document.createElement("strong");
-  allCount.textContent = `${kinds.length}`;
+  allCount.textContent = `${eventSourceIds.length + kinds.length}`;
   allButton.append(allName, allCount);
 
   const noneButton = document.createElement("button");
   noneButton.type = "button";
   noneButton.className = "module-summary-item";
   noneButton.addEventListener("click", () => {
+    activeTimelineEventModuleIds.clear();
     activeMechanicTimelineKinds.clear();
+    setupActiveModules();
     syncTimelineEvents();
     syncTimelineRanges();
-    renderMechanicsTimelineControls();
+    renderEventTimelineControls();
+    renderModuleSummary();
+    renderModuleSettings();
     renderTimelineEventCount();
     scheduleConfigUrlUpdate();
   });
   const noneName = document.createElement("span");
-  noneName.textContent = "No mechanics";
+  noneName.textContent = "No events";
   const noneState = document.createElement("strong");
   noneState.textContent = "Off";
   noneButton.append(noneName, noneState);
 
   actions.append(allButton, noneButton);
+  mechanicsTimelineWindowBody.append(actions);
+
+  const replayList = renderEventSourceList("Replay", replayEventSources);
+  if (replayList) {
+    mechanicsTimelineWindowBody.append(replayList);
+  }
+
+  const moduleList = renderEventSourceList("Stats", [...moduleEventSources, ...extraEventSources]);
+  if (moduleList) {
+    mechanicsTimelineWindowBody.append(moduleList);
+  }
+
+  if (kinds.length > 0) {
+    const mechanicsHeading = document.createElement("h3");
+    mechanicsHeading.className = "module-settings-eyebrow";
+    mechanicsHeading.textContent = "Mechanics";
+    mechanicsTimelineWindowBody.append(mechanicsHeading);
+
+    const list = document.createElement("div");
+    list.className = "module-list mechanics-list";
+    for (const kind of kinds) {
+      const active = activeMechanicTimelineKinds.has(kind);
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "module-summary-item";
+      item.dataset.active = active ? "true" : "false";
+      item.setAttribute("aria-pressed", active ? "true" : "false");
+      item.addEventListener("click", () => {
+        if (activeMechanicTimelineKinds.has(kind)) {
+          activeMechanicTimelineKinds.delete(kind);
+        } else {
+          activeMechanicTimelineKinds.add(kind);
+        }
+        syncTimelineEvents();
+        syncTimelineRanges();
+        renderEventTimelineControls();
+        renderTimelineEventCount();
+        scheduleConfigUrlUpdate();
+      });
+
+      const name = document.createElement("span");
+      name.textContent = formatMechanicKind(kind);
+
+      const state = document.createElement("strong");
+      state.textContent = `${active ? "On" : "Off"} ${mechanicCounts.get(kind) ?? 0}`;
+
+      item.append(name, state);
+      list.append(item);
+    }
+
+    mechanicsTimelineWindowBody.append(list);
+  }
+}
+
+function renderMechanicsTimelineControls(): void {
+  renderEventTimelineControls();
+}
+
+function renderEventSourceList(
+  label: string,
+  sources: Array<{ id: string; label: string; count: number }>,
+): HTMLElement | null {
+  const availableSources = sources.filter((source) => source.count > 0);
+  if (availableSources.length === 0) {
+    return null;
+  }
+
+  const fragment = document.createElement("section");
+  const heading = document.createElement("h3");
+  heading.className = "module-settings-eyebrow";
+  heading.textContent = label;
 
   const list = document.createElement("div");
   list.className = "module-list mechanics-list";
-  for (const kind of kinds) {
-    const active = activeMechanicTimelineKinds.has(kind);
+
+  for (const source of availableSources) {
+    const active = activeTimelineEventModuleIds.has(source.id);
     const item = document.createElement("button");
     item.type = "button";
     item.className = "module-summary-item";
     item.dataset.active = active ? "true" : "false";
     item.setAttribute("aria-pressed", active ? "true" : "false");
     item.addEventListener("click", () => {
-      if (activeMechanicTimelineKinds.has(kind)) {
-        activeMechanicTimelineKinds.delete(kind);
-      } else {
-        activeMechanicTimelineKinds.add(kind);
-      }
-      syncTimelineEvents();
-      syncTimelineRanges();
-      renderMechanicsTimelineControls();
+      toggleCapability(source.id, "events", !activeTimelineEventModuleIds.has(source.id));
+      renderEventTimelineControls();
       renderTimelineEventCount();
-      scheduleConfigUrlUpdate();
     });
 
     const name = document.createElement("span");
-    name.textContent = formatMechanicKind(kind);
+    name.textContent = source.label;
 
     const state = document.createElement("strong");
-    state.textContent = `${active ? "On" : "Off"} ${counts.get(kind) ?? 0}`;
+    state.textContent = `${active ? "On" : "Off"} ${source.count}`;
 
     item.append(name, state);
     list.append(item);
   }
 
-  mechanicsTimelineWindowBody.append(actions, list);
+  fragment.append(heading, list);
+  return fragment;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
