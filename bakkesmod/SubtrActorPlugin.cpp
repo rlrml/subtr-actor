@@ -392,7 +392,8 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
   frame.frame_number = frameNumber++;
   frame.time = now;
   frame.dt = dt;
-  frame.live_play = 1;
+  frame.live_play = 0;
+  frame.has_live_play = 0;
   frame.ball_has_been_hit =
       server.IsNull() ? 1 : static_cast<uint8_t>(server.GetbBallHasBeenHit() != 0);
   frame.has_ball_has_been_hit = 1;

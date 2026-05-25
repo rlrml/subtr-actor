@@ -133,6 +133,7 @@ typedef struct SaLiveFrame {
   uint8_t scored_on_team_is_team_0;
   uint8_t has_scored_on_team;
   uint8_t live_play;
+  uint8_t has_live_play;
   uint8_t has_ball;
   SaRigidBody ball;
   const SaPlayerFrame *players;

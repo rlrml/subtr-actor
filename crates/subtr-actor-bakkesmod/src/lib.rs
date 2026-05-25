@@ -179,6 +179,7 @@ pub struct SaLiveFrame {
     pub scored_on_team_is_team_0: u8,
     pub has_scored_on_team: u8,
     pub live_play: u8,
+    pub has_live_play: u8,
     pub has_ball: u8,
     pub ball: SaRigidBody,
     pub players: *const SaPlayerFrame,
@@ -265,6 +266,7 @@ impl Default for SaEngine {
 #[derive(Default)]
 struct SaLiveEventGenerator {
     touch_state: TouchStateCalculator,
+    live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
 }
 
@@ -407,16 +409,20 @@ fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
     }
 }
 
-fn live_play_state(frame: &SaLiveFrame) -> LivePlayState {
+fn explicit_live_play_state(frame: &SaLiveFrame) -> Option<LivePlayState> {
+    if frame.has_live_play == 0 {
+        return None;
+    }
+
     let is_live_play = frame.live_play != 0;
-    LivePlayState {
+    Some(LivePlayState {
         gameplay_phase: if is_live_play {
             GameplayPhase::ActivePlay
         } else {
             GameplayPhase::Unknown
         },
         is_live_play,
-    }
+    })
 }
 
 fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
@@ -621,13 +627,31 @@ impl SaLiveEventGenerator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        live_play: &LivePlayState,
+        gameplay: &GameplayState,
+        explicit_live_play: Option<LivePlayState>,
         explicit_events: &SaFrameEventSlices<'_>,
-    ) -> FrameEventsState {
+    ) -> (FrameEventsState, LivePlayState) {
+        let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
+        let active_demos = explicit_active_demo_events(explicit_events.demolishes);
+        let boost_pad_events = explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
+        let player_stat_events =
+            explicit_player_stat_events(frame, explicit_events.player_stat_events);
+        let goal_events = explicit_goal_events(frame, explicit_events.goals);
+        let base_events = FrameEventsState {
+            active_demos,
+            demo_events,
+            boost_pad_events,
+            player_stat_events,
+            goal_events,
+            ..FrameEventsState::default()
+        };
+        let live_play = explicit_live_play
+            .unwrap_or_else(|| self.live_play_tracker.state_parts(gameplay, &base_events));
+
         let empty_events = FrameEventsState::default();
         let touch_state = self
             .touch_state
-            .update(frame, ball, players, &empty_events, live_play);
+            .update(frame, ball, players, &empty_events, &live_play);
         let mut touch_events = explicit_touch_events(frame, explicit_events.touches);
         if touch_events.is_empty() {
             touch_events.extend(touch_state.touch_events);
@@ -651,22 +675,14 @@ impl SaLiveEventGenerator {
         ));
         dodge_refreshed_events.sort_by_key(|event| event.counter_value);
 
-        let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
-        let active_demos = explicit_active_demo_events(explicit_events.demolishes);
-
-        FrameEventsState {
-            active_demos,
-            demo_events,
-            boost_pad_events: explicit_boost_pad_events(frame, explicit_events.boost_pad_events),
-            touch_events,
-            dodge_refreshed_events,
-            player_stat_events: explicit_player_stat_events(
-                frame,
-                explicit_events.player_stat_events,
-            ),
-            goal_events: explicit_goal_events(frame, explicit_events.goals),
-            ..FrameEventsState::default()
-        }
+        (
+            FrameEventsState {
+                touch_events,
+                dodge_refreshed_events,
+                ..base_events
+            },
+            live_play,
+        )
     }
 }
 
@@ -679,14 +695,18 @@ fn frame_input(
     let frame_info = frame_info(frame);
     let ball = ball_state(frame);
     let players = player_state(sampled_players);
-    let live_play = live_play_state(frame);
-    let frame_events =
-        engine
-            .live_events
-            .frame_events(&frame_info, &ball, &players, &live_play, explicit_events);
+    let gameplay = gameplay_state(frame, sampled_players);
+    let (frame_events, live_play) = engine.live_events.frame_events(
+        &frame_info,
+        &ball,
+        &players,
+        &gameplay,
+        explicit_live_play_state(frame),
+        explicit_events,
+    );
     FrameInput::from_parts_with_live_play_state(
         frame_info,
-        gameplay_state(frame, sampled_players),
+        gameplay,
         ball,
         players,
         frame_events,
@@ -1475,6 +1495,7 @@ mod tests {
             ball_has_been_hit: 1,
             has_ball_has_been_hit: 1,
             live_play: 0,
+            has_live_play: 1,
             ..SaLiveFrame::default()
         };
 
@@ -1487,6 +1508,36 @@ mod tests {
             .state::<LivePlayState>()
             .expect("full analysis graph should expose live play state");
         assert_eq!(live_play.gameplay_phase, GameplayPhase::Unknown);
+        assert!(!live_play.is_live_play);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_derives_live_play_when_not_explicit() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            ball_has_been_hit: 0,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_live_play: 0,
+            ..SaLiveFrame::default()
+        };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, 0);
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let live_play = engine_ref
+            .graph
+            .state::<LivePlayState>()
+            .expect("full analysis graph should expose live play state");
+        assert_eq!(
+            live_play.gameplay_phase,
+            GameplayPhase::KickoffWaitingForTouch
+        );
         assert!(!live_play.is_live_play);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
