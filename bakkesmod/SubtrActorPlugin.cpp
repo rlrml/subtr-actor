@@ -2122,10 +2122,26 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   const std::string nodeNamesJson =
       readJsonBuffer(analysisNodeNamesJsonLen, writeAnalysisNodeNamesJson);
   const std::vector<std::string> nodeNames = parseJsonStringArray(nodeNamesJson);
+  const std::vector<std::string> graphInfoNodeNames =
+      parseJsonStringArrayProperty(graphInfoJson, "callable_analysis_node_names");
   if (nodeNames.empty()) {
     ok = false;
     cvarManager->log(
         "subtr-actor: graph verification could not read callable analysis node names");
+  }
+  if (graphInfoNodeNames.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not read callable analysis node names from graph_info");
+  } else if (!nodeNames.empty() && graphInfoNodeNames != nodeNames) {
+    ok = false;
+    cvarManager->log(std::format(
+        "subtr-actor: graph verification callable analysis node registry mismatch: graph_info={} names_abi={}",
+        graphInfoNodeNames.size(),
+        nodeNames.size()));
+  } else if (!nodeNames.empty()) {
+    cvarManager->log(
+        "subtr-actor: callable analysis node registry matches graph_info");
   }
 
   for (const std::string &nodeName : nodeNames) {
