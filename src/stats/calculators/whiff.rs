@@ -41,6 +41,34 @@ pub struct WhiffEvent {
     pub aerial: bool,
 }
 
+impl WhiffEvent {
+    fn labels(&self) -> [StatLabel; 2] {
+        [
+            whiff_vertical_state_label(self.aerial),
+            whiff_dodge_state_label(self.dodge_active),
+        ]
+    }
+}
+
+const ALL_WHIFF_AERIAL_STATES: [bool; 2] = [false, true];
+const ALL_WHIFF_DODGE_STATES: [bool; 2] = [false, true];
+
+fn whiff_vertical_state_label(aerial: bool) -> StatLabel {
+    if aerial {
+        StatLabel::new("vertical_state", "aerial")
+    } else {
+        StatLabel::new("vertical_state", "grounded")
+    }
+}
+
+fn whiff_dodge_state_label(dodge_active: bool) -> StatLabel {
+    if dodge_active {
+        StatLabel::new("dodge_state", "dodge")
+    } else {
+        StatLabel::new("dodge_state", "no_dodge")
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffStats {
@@ -57,6 +85,8 @@ pub struct WhiffStats {
     pub last_closest_approach_distance: Option<f32>,
     pub best_closest_approach_distance: Option<f32>,
     pub cumulative_closest_approach_distance: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_whiff_counts: LabeledCounts,
 }
 
 impl WhiffStats {
@@ -66,6 +96,65 @@ impl WhiffStats {
         } else {
             self.cumulative_closest_approach_distance / self.whiff_count as f32
         }
+    }
+
+    fn record_whiff(&mut self, event: &WhiffEvent) {
+        self.labeled_whiff_counts.increment(event.labels());
+        self.sync_legacy_counts();
+        self.last_whiff_time = Some(event.time);
+        self.last_whiff_frame = Some(event.frame);
+        self.last_closest_approach_distance = Some(event.closest_approach_distance);
+        self.best_closest_approach_distance = Some(
+            self.best_closest_approach_distance
+                .map(|distance| distance.min(event.closest_approach_distance))
+                .unwrap_or(event.closest_approach_distance),
+        );
+        self.cumulative_closest_approach_distance += event.closest_approach_distance;
+    }
+
+    pub fn whiff_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_whiff_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_whiff_counts(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = ALL_WHIFF_AERIAL_STATES
+            .into_iter()
+            .flat_map(|aerial| {
+                ALL_WHIFF_DODGE_STATES.into_iter().map(move |dodge_active| {
+                    let mut labels = vec![
+                        whiff_vertical_state_label(aerial),
+                        whiff_dodge_state_label(dodge_active),
+                    ];
+                    labels.sort();
+                    LabeledCountEntry {
+                        count: self.labeled_whiff_counts.count_exact(&labels),
+                        labels,
+                    }
+                })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledCounts { entries }
+    }
+
+    pub fn with_complete_labeled_whiff_counts(mut self) -> Self {
+        self.labeled_whiff_counts = self.complete_labeled_whiff_counts();
+        self
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.whiff_count = self
+            .labeled_whiff_counts
+            .entries
+            .iter()
+            .map(|entry| entry.count)
+            .sum();
+        self.grounded_whiff_count =
+            self.whiff_count_with_labels(&[whiff_vertical_state_label(false)]);
+        self.aerial_whiff_count = self.whiff_count_with_labels(&[whiff_vertical_state_label(true)]);
+        self.dodge_whiff_count = self.whiff_count_with_labels(&[whiff_dodge_state_label(true)]);
     }
 }
 
@@ -285,29 +374,11 @@ impl WhiffCalculator {
             .or_default();
         match event.kind {
             WhiffEventKind::Whiff => {
-                stats.whiff_count += 1;
-                if event.aerial {
-                    stats.aerial_whiff_count += 1;
-                } else {
-                    stats.grounded_whiff_count += 1;
-                }
-                if event.dodge_active {
-                    stats.dodge_whiff_count += 1;
-                }
+                stats.record_whiff(&event);
                 stats.is_last_whiff = true;
-                stats.last_whiff_time = Some(event.time);
-                stats.last_whiff_frame = Some(event.frame);
                 stats.time_since_last_whiff = Some((frame.time - event.time).max(0.0));
                 stats.frames_since_last_whiff =
                     Some(frame.frame_number.saturating_sub(event.frame));
-                stats.last_closest_approach_distance = Some(event.closest_approach_distance);
-                stats.best_closest_approach_distance = Some(
-                    stats
-                        .best_closest_approach_distance
-                        .map(|distance| distance.min(event.closest_approach_distance))
-                        .unwrap_or(event.closest_approach_distance),
-                );
-                stats.cumulative_closest_approach_distance += event.closest_approach_distance;
                 self.current_last_whiff_player = Some(candidate.player);
             }
             WhiffEventKind::BeatenToBall => {

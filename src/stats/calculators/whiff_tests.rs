@@ -366,3 +366,61 @@ fn side_dodge_is_not_a_whiff_attempt() {
     assert!(calculator.player_stats().get(&player_id).is_none());
     assert!(calculator.events().is_empty());
 }
+
+fn whiff_event(aerial: bool, dodge_active: bool, closest_approach_distance: f32) -> WhiffEvent {
+    WhiffEvent {
+        kind: WhiffEventKind::Whiff,
+        time: 1.0,
+        frame: 10,
+        player: boxcars::RemoteId::Steam(1),
+        is_team_0: true,
+        closest_approach_distance,
+        forward_alignment: 0.9,
+        approach_speed: 900.0,
+        dodge_active,
+        aerial,
+    }
+}
+
+#[test]
+fn whiff_stats_records_events_as_labeled_counts() {
+    let mut stats = WhiffStats::default();
+
+    stats.record_whiff(&whiff_event(false, false, 120.0));
+    stats.record_whiff(&whiff_event(true, true, 90.0));
+    stats.record_whiff(&whiff_event(true, true, 110.0));
+
+    assert_eq!(
+        stats.whiff_count_with_labels(&[StatLabel::new("vertical_state", "aerial")]),
+        2
+    );
+    assert_eq!(
+        stats.whiff_count_with_labels(&[
+            StatLabel::new("vertical_state", "aerial"),
+            StatLabel::new("dodge_state", "dodge"),
+        ]),
+        2
+    );
+    assert_eq!(
+        stats.whiff_count_with_labels(&[
+            StatLabel::new("vertical_state", "grounded"),
+            StatLabel::new("dodge_state", "no_dodge"),
+        ]),
+        1
+    );
+}
+
+#[test]
+fn whiff_stats_keeps_legacy_fields_synced_from_labeled_counts() {
+    let mut stats = WhiffStats::default();
+
+    stats.record_whiff(&whiff_event(false, false, 120.0));
+    stats.record_whiff(&whiff_event(true, true, 90.0));
+
+    assert_eq!(stats.whiff_count, 2);
+    assert_eq!(stats.grounded_whiff_count, 1);
+    assert_eq!(stats.aerial_whiff_count, 1);
+    assert_eq!(stats.dodge_whiff_count, 1);
+    assert_eq!(stats.best_closest_approach_distance, Some(90.0));
+    assert_eq!(stats.average_closest_approach_distance(), 105.0);
+}

@@ -94,5 +94,18 @@ impl StatFieldProvider for WhiffStats {
             StatUnit::UnrealUnits,
             self.average_closest_approach_distance(),
         ));
+        for entry in self.complete_labeled_whiff_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "whiff",
+                "whiff_count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "whiff_test.rs"]
+mod tests;
