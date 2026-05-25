@@ -2054,7 +2054,28 @@ fn parse_pass_event(value: &Value) -> SubtrActorResult<PassEvent> {
         duration: json_required_f32(object, "duration")?,
         ball_travel_distance: json_required_f32(object, "ball_travel_distance")?,
         ball_advance_distance: json_required_f32(object, "ball_advance_distance")?,
+        pass_kind: parse_pass_kind(object.get("pass_kind"))?,
     })
+}
+
+fn parse_pass_kind(value: Option<&Value>) -> SubtrActorResult<PassKind> {
+    let Some(value) = value else {
+        return Ok(PassKind::Direct);
+    };
+    let kind = value.as_str().ok_or_else(|| {
+        SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+            "Expected JSON field 'pass_kind' to be a string".to_owned(),
+        ))
+    })?;
+    match kind {
+        "direct" => Ok(PassKind::Direct),
+        "backboard" => Ok(PassKind::Backboard),
+        "fifty_fifty" => Ok(PassKind::FiftyFifty),
+        "fifty_fifty_backboard" => Ok(PassKind::FiftyFiftyBackboard),
+        other => Err(SubtrActorError::new(
+            SubtrActorErrorVariant::StatsSerializationError(format!("Unknown pass kind '{other}'")),
+        )),
+    }
 }
 
 fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {

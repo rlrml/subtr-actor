@@ -3,6 +3,16 @@ use super::*;
 const PASS_MAX_DURATION_SECONDS: f32 = 3.0;
 const PASS_MIN_BALL_TRAVEL_DISTANCE: f32 = 500.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PassKind {
+    Direct,
+    Backboard,
+    FiftyFifty,
+    FiftyFiftyBackboard,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PassEvent {
@@ -18,6 +28,7 @@ pub struct PassEvent {
     pub duration: f32,
     pub ball_travel_distance: f32,
     pub ball_advance_distance: f32,
+    pub pass_kind: PassKind,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -87,6 +98,7 @@ struct PendingPassTouch {
     time: f32,
     frame: usize,
     ball_position: glam::Vec3,
+    from_fifty_fifty: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -137,6 +149,7 @@ impl PassCalculator {
         touch: &TouchEvent,
         receiver: &PlayerId,
         ball_position: glam::Vec3,
+        backboard_bounce_state: &BackboardBounceState,
     ) -> Option<PassEvent> {
         let previous = self.last_touch.as_ref()?;
         if previous.player == *receiver || previous.is_team_0 != touch.team_is_team_0 {
@@ -155,6 +168,11 @@ impl PassCalculator {
         }
 
         let team_forward_sign = if touch.team_is_team_0 { 1.0 } else { -1.0 };
+        let went_off_backboard = Self::has_backboard_bounce_between(
+            previous,
+            touch,
+            backboard_bounce_state.last_bounce_event.as_ref(),
+        );
         Some(PassEvent {
             time: touch.time,
             frame: touch.frame,
@@ -166,7 +184,75 @@ impl PassCalculator {
             duration,
             ball_travel_distance,
             ball_advance_distance: ball_delta.y * team_forward_sign,
+            pass_kind: Self::pass_kind(previous.from_fifty_fifty, went_off_backboard),
         })
+    }
+
+    fn pass_kind(from_fifty_fifty: bool, went_off_backboard: bool) -> PassKind {
+        match (from_fifty_fifty, went_off_backboard) {
+            (true, true) => PassKind::FiftyFiftyBackboard,
+            (true, false) => PassKind::FiftyFifty,
+            (false, true) => PassKind::Backboard,
+            (false, false) => PassKind::Direct,
+        }
+    }
+
+    fn has_backboard_bounce_between(
+        previous: &PendingPassTouch,
+        touch: &TouchEvent,
+        bounce_event: Option<&BackboardBounceEvent>,
+    ) -> bool {
+        bounce_event.is_some_and(|event| {
+            event.player == previous.player
+                && event.is_team_0 == previous.is_team_0
+                && event.time >= previous.time
+                && event.time <= touch.time
+        })
+    }
+
+    fn touch_from_fifty_fifty(touch: &TouchEvent, fifty_fifty_state: &FiftyFiftyState) -> bool {
+        fifty_fifty_state
+            .active_event
+            .as_ref()
+            .is_some_and(|event| {
+                Self::fifty_fifty_involves_touch(
+                    event.start_time,
+                    event.last_touch_time,
+                    event.team_zero_player.as_ref(),
+                    event.team_one_player.as_ref(),
+                    touch,
+                )
+            })
+            || fifty_fifty_state
+                .last_resolved_event
+                .as_ref()
+                .is_some_and(|event| {
+                    Self::fifty_fifty_involves_touch(
+                        event.start_time,
+                        event.resolve_time,
+                        event.team_zero_player.as_ref(),
+                        event.team_one_player.as_ref(),
+                        touch,
+                    )
+                })
+    }
+
+    fn fifty_fifty_involves_touch(
+        start_time: f32,
+        end_time: f32,
+        team_zero_player: Option<&PlayerId>,
+        team_one_player: Option<&PlayerId>,
+        touch: &TouchEvent,
+    ) -> bool {
+        if touch.time < start_time || touch.time > end_time {
+            return false;
+        }
+
+        match (touch.team_is_team_0, touch.player.as_ref()) {
+            (true, Some(player)) => team_zero_player == Some(player),
+            (false, Some(player)) => team_one_player == Some(player),
+            _ => false,
+        }
     }
 
     fn record_pass(&mut self, frame: &FrameInfo, event: PassEvent) {
@@ -209,6 +295,8 @@ impl PassCalculator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         touch_state: &TouchState,
+        backboard_bounce_state: &BackboardBounceState,
+        fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.begin_sample(frame);
@@ -228,7 +316,9 @@ impl PassCalculator {
                 continue;
             };
 
-            if let Some(pass_event) = self.pass_event_for_touch(touch, &player, ball_position) {
+            if let Some(pass_event) =
+                self.pass_event_for_touch(touch, &player, ball_position, backboard_bounce_state)
+            {
                 self.record_pass(frame, pass_event);
             }
 
@@ -238,6 +328,7 @@ impl PassCalculator {
                 time: touch.time,
                 frame: touch.frame,
                 ball_position,
+                from_fifty_fifty: Self::touch_from_fifty_fifty(touch, fifty_fifty_state),
             });
         }
 

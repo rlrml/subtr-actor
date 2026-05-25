@@ -32,6 +32,8 @@ impl AnalysisNode for PassNode {
             frame_info_dependency(),
             ball_frame_state_dependency(),
             touch_state_dependency(),
+            backboard_bounce_state_dependency(),
+            fifty_fifty_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -41,6 +43,8 @@ impl AnalysisNode for PassNode {
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
             ctx.get::<TouchState>()?,
+            ctx.get::<BackboardBounceState>()?,
+            ctx.get::<FiftyFiftyState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

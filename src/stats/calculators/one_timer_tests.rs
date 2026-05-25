@@ -54,6 +54,8 @@ fn update_pass(
                 touch_events,
                 ..TouchState::default()
             },
+            &BackboardBounceState::default(),
+            &FiftyFiftyState::default(),
             true,
         )
         .unwrap();

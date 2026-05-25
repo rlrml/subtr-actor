@@ -51,6 +51,24 @@ fn update(
     ball: BallFrameState,
     touch_events: Vec<TouchEvent>,
 ) {
+    update_with_context(
+        calculator,
+        frame,
+        ball,
+        touch_events,
+        BackboardBounceState::default(),
+        FiftyFiftyState::default(),
+    );
+}
+
+fn update_with_context(
+    calculator: &mut PassCalculator,
+    frame: FrameInfo,
+    ball: BallFrameState,
+    touch_events: Vec<TouchEvent>,
+    backboard_bounce_state: BackboardBounceState,
+    fifty_fifty_state: FiftyFiftyState,
+) {
     calculator
         .update(
             &frame,
@@ -59,9 +77,54 @@ fn update(
                 touch_events,
                 ..TouchState::default()
             },
+            &backboard_bounce_state,
+            &fifty_fifty_state,
             true,
         )
         .unwrap();
+}
+
+fn backboard_bounce(
+    frame_number: usize,
+    time: f32,
+    player: PlayerId,
+    is_team_0: bool,
+) -> BackboardBounceState {
+    let event = BackboardBounceEvent {
+        time,
+        frame: frame_number,
+        player,
+        is_team_0,
+    };
+    BackboardBounceState {
+        bounce_events: vec![event.clone()],
+        last_bounce_event: Some(event),
+    }
+}
+
+fn active_fifty_fifty(
+    frame_number: usize,
+    time: f32,
+    team_zero_player: PlayerId,
+    team_one_player: PlayerId,
+) -> FiftyFiftyState {
+    FiftyFiftyState {
+        active_event: Some(ActiveFiftyFifty {
+            start_time: time,
+            start_frame: frame_number,
+            last_touch_time: time,
+            last_touch_frame: frame_number,
+            is_kickoff: false,
+            team_zero_player: Some(team_zero_player),
+            team_one_player: Some(team_one_player),
+            team_zero_position: [0.0, 0.0, 0.0],
+            team_one_position: [100.0, 0.0, 0.0],
+            midpoint: [50.0, 0.0, 0.0],
+            plane_normal: [1.0, 0.0, 0.0],
+        }),
+        resolved_events: Vec::new(),
+        last_resolved_event: None,
+    }
 }
 
 #[test]
@@ -90,6 +153,7 @@ fn counts_completed_teammate_pass_after_meaningful_ball_travel() {
     assert_eq!(calculator.team_zero_stats().completed_pass_count, 1);
     assert_eq!(calculator.events().len(), 1);
     assert_eq!(calculator.events()[0].ball_advance_distance, 800.0);
+    assert_eq!(calculator.events()[0].pass_kind, PassKind::Direct);
 }
 
 #[test]
@@ -165,4 +229,86 @@ fn ignores_passes_outside_duration_window() {
     );
 
     assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn classifies_backboard_passes() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let mut calculator = PassCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(0.0),
+        vec![touch(10, 1.0, Some(passer.clone()), true)],
+    );
+    update_with_context(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(900.0),
+        vec![touch(20, 2.0, Some(receiver), true)],
+        backboard_bounce(15, 1.5, passer, true),
+        FiftyFiftyState::default(),
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].pass_kind, PassKind::Backboard);
+}
+
+#[test]
+fn classifies_passes_from_fifty_fifty_touches() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let opponent = PlayerId::Steam(3);
+    let mut calculator = PassCalculator::new();
+
+    update_with_context(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(0.0),
+        vec![touch(10, 1.0, Some(passer.clone()), true)],
+        BackboardBounceState::default(),
+        active_fifty_fifty(10, 1.0, passer, opponent),
+    );
+    update(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(900.0),
+        vec![touch(20, 2.0, Some(receiver), true)],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].pass_kind, PassKind::FiftyFifty);
+}
+
+#[test]
+fn classifies_fifty_fifty_backboard_passes() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let opponent = PlayerId::Steam(3);
+    let mut calculator = PassCalculator::new();
+
+    update_with_context(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(0.0),
+        vec![touch(10, 1.0, Some(passer.clone()), true)],
+        BackboardBounceState::default(),
+        active_fifty_fifty(10, 1.0, passer.clone(), opponent),
+    );
+    update_with_context(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(900.0),
+        vec![touch(20, 2.0, Some(receiver), true)],
+        backboard_bounce(15, 1.5, passer, true),
+        FiftyFiftyState::default(),
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(
+        calculator.events()[0].pass_kind,
+        PassKind::FiftyFiftyBackboard
+    );
 }
