@@ -1,7 +1,10 @@
 param(
     [string]$BuildDir = "",
     [string]$Configuration = "Release",
-    [string]$BakkesModSdkDir = ""
+    [string]$BakkesModSdkDir = "",
+    [switch]$Install,
+    [switch]$EnableAutoload,
+    [string]$BakkesModRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,9 +16,16 @@ if ($BuildDir -eq "") {
     $BuildDir = Join-Path $ScriptDir "build"
 }
 
+if ($BakkesModRoot -eq "") {
+    $BakkesModRoot = Join-Path $env:APPDATA "bakkesmod\bakkesmod"
+}
+
 Push-Location $RepoRoot
 try {
     cargo build -p subtr-actor-bakkesmod --release
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo build failed with exit code $LASTEXITCODE"
+    }
 
     $cmakeArgs = @(
         "-S", $ScriptDir,
@@ -29,7 +39,14 @@ try {
     }
 
     cmake @cmakeArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake configure failed with exit code $LASTEXITCODE"
+    }
+
     cmake --build $BuildDir --config $Configuration
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake build failed with exit code $LASTEXITCODE"
+    }
 
     $PluginOutDir = Join-Path $BuildDir $Configuration
     New-Item -ItemType Directory -Force -Path $PluginOutDir | Out-Null
@@ -39,6 +56,43 @@ try {
         -Destination (Join-Path $PluginOutDir "subtr_actor_bakkesmod.dll")
 
     Write-Host "Built plugin artifacts in $PluginOutDir"
+
+    if ($Install) {
+        $BakkesModPluginsDir = Join-Path $BakkesModRoot "plugins"
+        $BakkesModDataDir = Join-Path $BakkesModRoot "data\subtr-actor"
+        $BakkesModPluginsCfg = Join-Path $BakkesModRoot "cfg\plugins.cfg"
+        if (-not (Test-Path $BakkesModPluginsDir)) {
+            throw "BakkesMod plugins directory not found: $BakkesModPluginsDir"
+        }
+
+        New-Item -ItemType Directory -Force -Path $BakkesModDataDir | Out-Null
+        Copy-Item `
+            -Force `
+            -Path (Join-Path $PluginOutDir "SubtrActorPlugin.dll") `
+            -Destination (Join-Path $BakkesModPluginsDir "SubtrActorPlugin.dll")
+        Copy-Item `
+            -Force `
+            -Path (Join-Path $PluginOutDir "subtr_actor_bakkesmod.dll") `
+            -Destination (Join-Path $BakkesModDataDir "subtr_actor_bakkesmod.dll")
+
+        Write-Host "Installed SubtrActorPlugin.dll to $BakkesModPluginsDir"
+        Write-Host "Installed subtr_actor_bakkesmod.dll to $BakkesModDataDir"
+
+        if ($EnableAutoload) {
+            if (-not (Test-Path $BakkesModPluginsCfg)) {
+                New-Item -ItemType File -Force -Path $BakkesModPluginsCfg | Out-Null
+            }
+
+            $AutoloadCommand = "plugin load SubtrActorPlugin"
+            $ExistingAutoload = Get-Content $BakkesModPluginsCfg | Where-Object {
+                $_.Trim().ToLowerInvariant() -eq $AutoloadCommand.ToLowerInvariant()
+            }
+            if (-not $ExistingAutoload) {
+                Add-Content -Path $BakkesModPluginsCfg -Value $AutoloadCommand
+                Write-Host "Added SubtrActorPlugin to $BakkesModPluginsCfg"
+            }
+        }
+    }
 }
 finally {
     Pop-Location

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use clap::{Parser, ValueEnum};
 use subtr_actor::{evaluate_replay_plausibility, Collector, PlayerFrame, ReplayDataCollector};
-use subtr_actor::{ReplayProcessor, TimeAdvance};
+use subtr_actor::{ProcessorView, TimeAdvance};
 
 const DEFAULT_REPLAY_PATH: &str =
     "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
@@ -526,15 +526,14 @@ impl LegacyRotationProbe {
 impl Collector for LegacyRotationProbe {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         _frame_number: usize,
         current_time: f32,
     ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
         for player_id in &player_ids {
-            if let Ok(rigid_body) = processor.get_player_rigid_body(player_id) {
-                let rigid_body = normalize_probe_rigid_body_vectors(processor, *rigid_body);
+            if let Ok(rigid_body) = processor.get_normalized_player_rigid_body(player_id) {
                 if !rigid_body.sleeping {
                     self.sample_player(player_id, current_time, rigid_body);
                 }
@@ -1070,34 +1069,6 @@ fn reinterpret_euler_rotation(raw: boxcars::Quaternion, mode: EulerMode) -> glam
         values[1],
         values[2],
     )
-}
-
-fn normalize_probe_rigid_body_vectors(
-    processor: &ReplayProcessor,
-    rigid_body: boxcars::RigidBody,
-) -> boxcars::RigidBody {
-    boxcars::RigidBody {
-        sleeping: rigid_body.sleeping,
-        location: scale_vector(
-            rigid_body.location,
-            processor.spatial_normalization_factor(),
-        ),
-        rotation: rigid_body.rotation,
-        linear_velocity: rigid_body.linear_velocity.map(|vector| {
-            scale_vector(vector, processor.rigid_body_velocity_normalization_factor())
-        }),
-        angular_velocity: rigid_body.angular_velocity.map(|vector| {
-            scale_vector(vector, processor.rigid_body_velocity_normalization_factor())
-        }),
-    }
-}
-
-fn scale_vector(vector: boxcars::Vector3f, factor: f32) -> boxcars::Vector3f {
-    boxcars::Vector3f {
-        x: vector.x * factor,
-        y: vector.y * factor,
-        z: vector.z * factor,
-    }
 }
 
 fn rotation_alignment(

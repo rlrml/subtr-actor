@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::ptr;
 use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    BallFrameState, BallSample, FrameInfo, GameplayState, HalfFlipCalculator, MechanicTiming,
-    PlayerFrameState, PlayerSample, SpeedFlipCalculator, WavedashCalculator,
+    BallFrameState, BallSample, FrameInfo, GameplayState, HalfFlipCalculator, PlayerFrameState,
+    PlayerSample, SpeedFlipCalculator, WavedashCalculator,
 };
 
 #[repr(C)]
@@ -213,7 +212,7 @@ fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
     }
 }
 
-fn push_new_events(engine: &mut SaEngine, team_lookup: &HashMap<u32, u8>) {
+fn push_new_events(engine: &mut SaEngine) {
     for event in &engine.speed_flip.events()[engine.last_speed_flip_count..] {
         engine.pending_events.push(SaMechanicEvent {
             kind: SaMechanicKind::SpeedFlip,
@@ -242,32 +241,13 @@ fn push_new_events(engine: &mut SaEngine, team_lookup: &HashMap<u32, u8>) {
         engine.pending_events.push(SaMechanicEvent {
             kind: SaMechanicKind::Wavedash,
             player_index: player_index(&event.player),
-            is_team_0: team_lookup
-                .get(&player_index(&event.player))
-                .copied()
-                .unwrap_or(0),
-            frame_number: match event.timing() {
-                MechanicTiming::Moment { frame, .. } => frame as u64,
-                MechanicTiming::Span { end_frame, .. } => end_frame as u64,
-            },
+            is_team_0: event.is_team_0 as u8,
+            frame_number: event.frame as u64,
             time: event.time,
             confidence: event.confidence,
         });
     }
     engine.last_wavedash_count = engine.wavedash.events().len();
-}
-
-trait WavedashTiming {
-    fn timing(&self) -> MechanicTiming;
-}
-
-impl WavedashTiming for subtr_actor::WavedashEvent {
-    fn timing(&self) -> MechanicTiming {
-        MechanicTiming::Moment {
-            frame: self.frame,
-            time: self.time,
-        }
-    }
 }
 
 /// Creates an opaque live-analysis engine.
@@ -330,17 +310,16 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
         return -1;
     }
 
-    let players = slice::from_raw_parts(frame.players, frame.player_count);
+    let players = if frame.player_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(frame.players, frame.player_count)
+    };
     let frame_info = frame_info(frame);
     let gameplay = gameplay_state(frame, players);
     let ball = ball_state(frame);
     let players_state = player_state(players);
     let live_play = frame.live_play != 0;
-    let team_lookup = players
-        .iter()
-        .map(|player| (player.player_index, player.is_team_0))
-        .collect::<HashMap<_, _>>();
-
     if engine
         .speed_flip
         .update_parts(&frame_info, &gameplay, &ball, &players_state, live_play)
@@ -363,7 +342,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
         return -2;
     }
 
-    push_new_events(engine, &team_lookup);
+    push_new_events(engine);
     0
 }
 
@@ -408,4 +387,65 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
     ptr::copy_nonoverlapping(engine.pending_events.as_ptr(), out_events, count);
     engine.pending_events.drain(..count);
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_null_players_when_count_is_zero() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: 0,
+            has_seconds_remaining: 0,
+            game_state: 0,
+            has_game_state: 0,
+            kickoff_countdown_time: 0,
+            has_kickoff_countdown_time: 0,
+            ball_has_been_hit: 0,
+            has_ball_has_been_hit: 0,
+            live_play: 1,
+            has_ball: 0,
+            ball: SaRigidBody::default(),
+            players: ptr::null(),
+            player_count: 0,
+        };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, 0);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn rejects_null_players_when_count_is_nonzero() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 1,
+            time: 0.0,
+            dt: 0.0,
+            seconds_remaining: 0,
+            has_seconds_remaining: 0,
+            game_state: 0,
+            has_game_state: 0,
+            kickoff_countdown_time: 0,
+            has_kickoff_countdown_time: 0,
+            ball_has_been_hit: 0,
+            has_ball_has_been_hit: 0,
+            live_play: 1,
+            has_ball: 0,
+            ball: SaRigidBody::default(),
+            players: ptr::null(),
+            player_count: 1,
+        };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, -1);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
 }

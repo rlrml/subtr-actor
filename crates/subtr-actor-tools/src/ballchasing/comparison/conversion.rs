@@ -305,7 +305,7 @@ struct ReplayMetaCollector {
 impl Collector for ReplayMetaCollector {
     fn process_frame(
         &mut self,
-        _processor: &ReplayProcessor,
+        _processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         _frame_number: usize,
         _current_time: f32,
@@ -313,7 +313,7 @@ impl Collector for ReplayMetaCollector {
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.replay_meta = Some(processor.get_replay_meta()?);
         Ok(())
     }
