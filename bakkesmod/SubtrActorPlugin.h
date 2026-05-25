@@ -134,6 +134,8 @@ private:
   void samplePlayers(ServerWrapper server, CarWrapper localCar);
   SaRigidBody sampleRigidBody(ActorWrapper actor);
   SaPlayerFrame samplePlayer(CarWrapper car, uint32_t playerIndex);
+  SaPlayerFrame samplePlayer(PriWrapper pri, uint32_t playerIndex);
+  void populatePlayerFromPri(SaPlayerFrame &player, PriWrapper pri, uint32_t fallbackIndex);
   void hookGameEvents();
   void unhookGameEvents();
   void resetLiveState();

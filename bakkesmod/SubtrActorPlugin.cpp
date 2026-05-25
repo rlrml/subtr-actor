@@ -755,15 +755,30 @@ void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) 
 
   if (!server.IsNull()) {
     ArrayWrapper<CarWrapper> cars = server.GetCars();
+    ArrayWrapper<PriWrapper> pris = server.GetPRIs();
+    const int carCount = cars.IsNull() ? 0 : cars.Count();
+    const int priCount = pris.IsNull() ? 0 : pris.Count();
+    const auto reserveCount = static_cast<size_t>(std::max(0, carCount + priCount));
+    sampledPlayers.reserve(reserveCount);
+    sampledPlayerNames.reserve(reserveCount);
+
     if (!cars.IsNull()) {
-      const int carCount = cars.Count();
-      sampledPlayers.reserve(static_cast<size_t>(std::max(0, carCount)));
-      sampledPlayerNames.reserve(static_cast<size_t>(std::max(0, carCount)));
       for (int i = 0; i < carCount; i += 1) {
         CarWrapper car = cars.Get(i);
         if (!car.IsNull()) {
           sampledPlayers.push_back(samplePlayer(car, static_cast<uint32_t>(i)));
         }
+      }
+    }
+
+    if (!pris.IsNull()) {
+      for (int i = 0; i < priCount; i += 1) {
+        PriWrapper pri = pris.Get(i);
+        if (pri.IsNull() || priPlayerIndices.find(pri.memory_address) != priPlayerIndices.end()) {
+          continue;
+        }
+        sampledPlayers.push_back(
+            samplePlayer(pri, static_cast<uint32_t>(sampledPlayers.size())));
       }
     }
   }
@@ -792,6 +807,37 @@ SaRigidBody SubtrActorPlugin::sampleRigidBody(ActorWrapper actor) {
   return body;
 }
 
+SaPlayerFrame SubtrActorPlugin::samplePlayer(PriWrapper pri, uint32_t playerIndex) {
+  SaPlayerFrame player{};
+  player.player_index = playerIndex;
+  player.is_team_0 = 1;
+  populatePlayerFromPri(player, pri, playerIndex);
+  return player;
+}
+
+void SubtrActorPlugin::populatePlayerFromPri(
+    SaPlayerFrame &player,
+    PriWrapper pri,
+    uint32_t fallbackIndex) {
+  if (pri.IsNull()) {
+    return;
+  }
+
+  const uint32_t playerIndex = stablePlayerIndexForPri(pri, fallbackIndex);
+  player.player_index = playerIndex;
+  sampledPlayerNames.push_back(pri.GetPlayerName().ToString());
+  player.player_name = sampledPlayerNames.back().c_str();
+  player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
+  player.has_match_stats = 1;
+  player.match_goals = pri.GetMatchGoals();
+  player.match_assists = pri.GetMatchAssists();
+  player.match_saves = pri.GetMatchSaves();
+  player.match_shots = pri.GetMatchShots();
+  player.match_score = pri.GetMatchScore();
+  priPlayerIndices[pri.memory_address] = playerIndex;
+  recordPlayerStatDeltas(pri, playerIndex, player.is_team_0);
+}
+
 SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerIndex) {
   SaPlayerFrame player{};
   player.player_index = playerIndex;
@@ -803,19 +849,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
 
   PriWrapper pri = car.GetPRI();
   if (!pri.IsNull()) {
-    playerIndex = stablePlayerIndexForPri(pri, playerIndex);
-    player.player_index = playerIndex;
-    sampledPlayerNames.push_back(pri.GetPlayerName().ToString());
-    player.player_name = sampledPlayerNames.back().c_str();
-    player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
-    player.has_match_stats = 1;
-    player.match_goals = pri.GetMatchGoals();
-    player.match_assists = pri.GetMatchAssists();
-    player.match_saves = pri.GetMatchSaves();
-    player.match_shots = pri.GetMatchShots();
-    player.match_score = pri.GetMatchScore();
-    priPlayerIndices[pri.memory_address] = playerIndex;
-    recordPlayerStatDeltas(pri, playerIndex, player.is_team_0);
+    populatePlayerFromPri(player, pri, playerIndex);
+    playerIndex = player.player_index;
   }
   carPlayerIndices[car.memory_address] = playerIndex;
   recordDodgeRefreshFromJumpState(car, playerIndex, player.is_team_0);
