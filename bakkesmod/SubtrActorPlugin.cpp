@@ -29,6 +29,22 @@ constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 constexpr char GRAPH_OUTPUT_USAGE[] =
     "subtr_actor_dump_graph_output "
     "<events|frame|timeline|stats|analysis_nodes|graph_info> [finish]";
+constexpr std::array<const char *, 6> VERIFY_GRAPH_OUTPUTS{
+    "events",
+    "frame",
+    "timeline",
+    "stats",
+    "analysis_nodes",
+    "graph_info",
+};
+constexpr std::array<const char *, 6> VERIFY_ANALYSIS_NODES{
+    "frame_info",
+    "frame_events_state",
+    "live_play",
+    "match_stats",
+    "stats_timeline_frame",
+    "stats_timeline_events",
+};
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
@@ -534,6 +550,12 @@ void SubtrActorPlugin::onLoad() {
       [this](std::vector<std::string> params) { dumpAnalysisNodeJson(params); },
       "Writes one named graph-backed analysis node JSON. Usage: "
       "subtr_actor_dump_analysis_node <node_name> [finish]",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_verify_graph",
+      [this](std::vector<std::string> params) { verifyGraphRuntime(params); },
+      "Calls the live graph outputs and representative analysis nodes, logging byte sizes. "
+      "Pass 'finish' to flush delayed graph events first.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -1882,6 +1904,67 @@ void SubtrActorPlugin::dumpAnalysisNodeJson(std::vector<std::string> params) {
       shouldFinish ? " after finish" : "",
       nodePath.string(),
       nodeJson.size()));
+}
+
+void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: graph verification requested before engine was loaded");
+    return;
+  }
+
+  const bool shouldFinish =
+      std::find_if(params.begin(), params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log(
+          "subtr-actor: graph verification requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(
+          std::format("subtr-actor: graph finish failed before verification: {}", finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  bool ok = true;
+  for (const char *outputName : VERIFY_GRAPH_OUTPUTS) {
+    const std::string outputJson =
+        readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, outputName);
+    if (outputJson.empty()) {
+      ok = false;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification missing graph output '{}'", outputName));
+      continue;
+    }
+    cvarManager->log(std::format(
+        "subtr-actor: graph output '{}' callable ({} bytes)",
+        outputName,
+        outputJson.size()));
+  }
+
+  for (const char *nodeName : VERIFY_ANALYSIS_NODES) {
+    const std::string nodeJson =
+        readNamedJsonBuffer(analysisNodeJsonLen, writeAnalysisNodeJson, nodeName);
+    if (nodeJson.empty()) {
+      ok = false;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification missing analysis node '{}'", nodeName));
+      continue;
+    }
+    cvarManager->log(std::format(
+        "subtr-actor: analysis node '{}' callable ({} bytes)",
+        nodeName,
+        nodeJson.size()));
+  }
+
+  cvarManager->log(ok
+                       ? "subtr-actor: graph verification passed"
+                       : "subtr-actor: graph verification failed; enter gameplay/replay and try again");
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

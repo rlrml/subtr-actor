@@ -157,6 +157,7 @@ private:
   void dumpStatsModuleConfigJson(std::vector<std::string> params);
   void dumpGraphOutputJson(std::vector<std::string> params);
   void dumpAnalysisNodeJson(std::vector<std::string> params);
+  void verifyGraphRuntime(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);

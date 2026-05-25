@@ -26,6 +26,10 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
   writes one graph-backed builtin analysis node by name, using the node names
   reported in `graph-info.json`.
+  The `subtr_actor_verify_graph [finish]` console command calls the fixed graph
+  outputs plus representative analysis nodes from the loaded plugin runtime and
+  logs byte sizes, giving a quick in-game check that the graph surface is
+  callable after at least one live frame has been processed.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
