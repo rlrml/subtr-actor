@@ -4,6 +4,18 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.0 - 2026-05-25
+
+- Add a reusable replay review shell to the stats player package with full-page
+  Stats and Viewer modes, shared replay bundle loading, and provider-based data
+  injection for hosted review flows.
+- Move the GitHub Pages stats report into `subtr-actor-stats-player` as a
+  reusable `mountStatsReport` surface and make the Pages app a thin review-shell
+  host.
+- Make goal `Watch` actions switch into the in-page viewer when the report is
+  mounted inside the review shell, while preserving standalone report links.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.0`.
+
 ## v0.7.13 - 2026-05-25
 
 - Add a stats evaluation player event playlist window with filter controls,
