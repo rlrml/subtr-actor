@@ -56,6 +56,7 @@ pub struct ReplayStatsTimelineEvents {
     pub goal_context: Vec<GoalContextEvent>,
     pub backboard: Vec<BackboardBounceEvent>,
     pub ceiling_shot: Vec<CeilingShotEvent>,
+    pub center: Vec<CenterEvent>,
     pub double_tap: Vec<DoubleTapEvent>,
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
     pub one_timer: Vec<OneTimerEvent>,

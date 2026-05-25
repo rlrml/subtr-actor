@@ -2,16 +2,16 @@ pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
     BallCarryCalculator, BallFrameState, BoostCalculator, BumpCalculator, CeilingShotCalculator,
-    ContinuousBallControlState, DemoCalculator, DodgeResetCalculator, DoubleTapCalculator,
-    EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator,
-    FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState,
-    HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
-    LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator,
-    MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RotationCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
-    WavedashCalculator, WhiffCalculator,
+    CenterCalculator, ContinuousBallControlState, DemoCalculator, DodgeResetCalculator,
+    DoubleTapCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState,
+    FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
+    GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
+    MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PlayerFrameState, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator,
+    TouchState, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -21,6 +21,7 @@ pub(crate) mod ball_frame_state;
 pub(crate) mod boost;
 pub(crate) mod bump;
 pub(crate) mod ceiling_shot;
+pub(crate) mod center;
 pub(crate) mod continuous_ball_control;
 pub(crate) mod demo;
 pub(crate) mod dodge_reset;
@@ -72,6 +73,8 @@ pub use boost::BoostNode;
 pub use bump::BumpNode;
 #[allow(unused_imports)]
 pub use ceiling_shot::CeilingShotNode;
+#[allow(unused_imports)]
+pub use center::CenterNode;
 #[allow(unused_imports)]
 pub use continuous_ball_control::ContinuousBallControlNode;
 #[allow(unused_imports)]
@@ -263,6 +266,10 @@ pub(crate) fn backboard_dependency() -> AnalysisDependency {
 
 pub(crate) fn ceiling_shot_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<CeilingShotCalculator>(ceiling_shot::boxed_default)
+}
+
+pub(crate) fn center_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<CenterCalculator>(center::boxed_default)
 }
 
 pub(crate) fn double_tap_dependency() -> AnalysisDependency {

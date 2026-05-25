@@ -1,5 +1,5 @@
 import { loadReplayFromBytes } from "./wasm";
-import type { LoadedReplay, ReplaySource } from "./types";
+import type { LoadedReplay, PlaylistSourceLoadContext, ReplaySource } from "./types";
 
 export const BALLCHASING_API_BASE_URL = "https://ballchasing.com/api";
 export const BALLCHASING_BASE_URL = "https://ballchasing.com";
@@ -126,9 +126,19 @@ export function createBallchasingReplaySource(
   const id = normalizeBallchasingReplayId(idOrUrl);
   return {
     id: `ballchasing:${id}`,
-    async load(): Promise<LoadedReplay> {
+    async load(context?: PlaylistSourceLoadContext): Promise<LoadedReplay> {
       const bytes = await fetchBallchasingReplayBytes(id, options);
-      return loadReplayFromBytes(bytes, { useWorker: true });
+      return loadReplayFromBytes(bytes, {
+        useWorker: true,
+        onProgress(progress) {
+          context?.updateProgress({
+            stage: progress.stage,
+            progress: progress.progress,
+            processedFrames: progress.processedFrames,
+            totalFrames: progress.totalFrames,
+          });
+        },
+      });
     },
   };
 }

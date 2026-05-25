@@ -6,6 +6,7 @@ mod ball_carry;
 mod boost;
 mod bump;
 mod ceiling_shot;
+mod center;
 mod core;
 mod demo;
 mod dodge_reset;

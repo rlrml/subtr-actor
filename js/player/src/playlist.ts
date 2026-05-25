@@ -11,6 +11,9 @@ import type {
   PlaylistLoadSource,
   PlaylistPreloadContext,
   PlaylistPreloadPolicy,
+  PlaylistSourceLoadContext,
+  PlaylistSourceLoadProgress,
+  PlaylistSourceLoadState,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayPreloadPolicy,
@@ -31,7 +34,11 @@ const END_TIME_EPSILON = 0.0001;
 
 type ReplayPlaylistPlayerListener = (state: ReplayPlaylistPlayerState) => void;
 
-type ReplayPathLoader = (path: string) => Promise<LoadedReplay>;
+type ReplayPathLoader = (
+  path: string,
+  context?: PlaylistSourceLoadContext,
+) => Promise<LoadedReplay>;
+type ReplaySourceLoader = (context?: PlaylistSourceLoadContext) => Promise<LoadedReplay>;
 
 export interface FullReplayPlaylistItemOptions {
   label?: string;
@@ -309,7 +316,7 @@ export function timeBound(value: number): PlaybackBound {
   return { kind: "time", value };
 }
 
-export function createReplaySource(id: string, load: () => Promise<LoadedReplay>): ReplaySource {
+export function createReplaySource(id: string, load: ReplaySourceLoader): ReplaySource {
   return { id, load };
 }
 
@@ -336,7 +343,7 @@ export function createReplayPathSource(
   loadReplay: ReplayPathLoader,
   id = path,
 ): ReplaySource {
-  return createReplaySource(id, async () => loadReplay(path));
+  return createReplaySource(id, async (context) => loadReplay(path, context));
 }
 
 export function createFullReplayPlaylistItem(
@@ -357,6 +364,8 @@ export class PlaylistLoadCache<
   TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
 > {
   private readonly cache = new Map<string, Promise<TLoaded>>();
+  private readonly states = new Map<string, PlaylistSourceLoadState>();
+  private readonly listeners = new Set<() => void>();
 
   load(source: TSource): Promise<TLoaded> {
     const cached = this.cache.get(source.id);
@@ -364,17 +373,47 @@ export class PlaylistLoadCache<
       return cached;
     }
 
-    const loadPromise = source.load().catch((error) => {
-      this.cache.delete(source.id);
-      throw error;
+    this.setSourceState(source.id, {
+      status: "loading",
+      progress: null,
+      error: null,
+      startedAt: Date.now(),
+      completedAt: null,
     });
+    const context: PlaylistSourceLoadContext = {
+      sourceId: source.id,
+      updateProgress: (progress) => this.updateProgress(source.id, progress),
+    };
+    const loadPromise = Promise.resolve()
+      .then(() => source.load(context))
+      .then((loaded) => {
+        this.setSourceState(source.id, {
+          status: "loaded",
+          progress: null,
+          error: null,
+          completedAt: Date.now(),
+        });
+        return loaded;
+      })
+      .catch((error) => {
+        this.cache.delete(source.id);
+        this.setSourceState(source.id, {
+          status: "error",
+          error: describeError(error),
+          completedAt: Date.now(),
+        });
+        throw error;
+      });
     this.cache.set(source.id, loadPromise);
     return loadPromise;
   }
 
   preload(sources: Iterable<TSource>): void {
     for (const source of sources) {
-      void this.load(source);
+      void this.load(source).catch(() => {
+        // Preload errors are exposed through cache state and should not surface
+        // as unhandled promise rejections.
+      });
     }
   }
 
@@ -383,11 +422,76 @@ export class PlaylistLoadCache<
   }
 
   delete(source: TSource | string): boolean {
-    return this.cache.delete(typeof source === "string" ? source : source.id);
+    const sourceId = typeof source === "string" ? source : source.id;
+    const deleted = this.cache.delete(sourceId);
+    if (deleted) {
+      this.states.delete(sourceId);
+      this.emitChange();
+    }
+    return deleted;
   }
 
   clear(): void {
     this.cache.clear();
+    if (this.states.size > 0) {
+      this.states.clear();
+      this.emitChange();
+    }
+  }
+
+  getState(source: TSource | string): PlaylistSourceLoadState {
+    const sourceId = typeof source === "string" ? source : source.id;
+    return (
+      this.states.get(sourceId) ?? {
+        sourceId,
+        status: "idle",
+        progress: null,
+        error: null,
+        startedAt: null,
+        updatedAt: null,
+        completedAt: null,
+      }
+    );
+  }
+
+  getStates(): PlaylistSourceLoadState[] {
+    return Array.from(this.states.values());
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private updateProgress(sourceId: string, progress: PlaylistSourceLoadProgress): void {
+    const current = this.getState(sourceId);
+    this.setSourceState(sourceId, {
+      status: current.status === "idle" ? "loading" : current.status,
+      progress,
+      updatedAt: Date.now(),
+    });
+  }
+
+  private setSourceState(
+    sourceId: string,
+    patch: Partial<Omit<PlaylistSourceLoadState, "sourceId">>,
+  ): void {
+    const current = this.getState(sourceId);
+    this.states.set(sourceId, {
+      ...current,
+      ...patch,
+      sourceId,
+      updatedAt: patch.updatedAt ?? Date.now(),
+    });
+    this.emitChange();
+  }
+
+  private emitChange(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
   }
 }
 
@@ -646,6 +750,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
   private boundaryGuard = false;
   private pendingLoad: Promise<void> = Promise.resolve();
   private readonly replayCache = new PlaylistLoadCache<LoadedReplay, ReplaySource>();
+  private replayCacheUnsubscribe: (() => void) | null = null;
   private readonly preferences: PlayerPreferences;
   private readonly preloadPolicy: ReplayPreloadPolicy;
   private advanceMode: PlaylistAdvanceMode;
@@ -694,6 +799,9 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.advanceMode = normalizeAdvanceMode(options);
     this.endMode = normalizeEndMode(options);
     this.playbackIntent = options.autoplay ?? false;
+    this.replayCacheUnsubscribe = this.replayCache.subscribe(() => {
+      this.emitChange();
+    });
 
     if (items.length > 0) {
       const initialIndex = clamp(options.initialItemIndex ?? 0, 0, items.length - 1);
@@ -892,6 +1000,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
       ready: this.currentResolvedItem !== null && !this.loading && this.error === null,
       loading: this.loading,
       error: this.error,
+      replayLoadStates: this.getReplayLoadStates(),
       itemIndex,
       itemCount: this.items.length,
       item,
@@ -951,6 +1060,8 @@ export class ReplayPlaylistPlayer extends EventTarget {
 
   destroy(): void {
     this.disposed = true;
+    this.replayCacheUnsubscribe?.();
+    this.replayCacheUnsubscribe = null;
     this.detachPlayer();
     this.replayCache.clear();
   }
@@ -974,7 +1085,9 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.emitChange();
 
     try {
-      const replay = await this.loadReplaySource(item.replay);
+      const replayPromise = this.loadReplaySource(item.replay);
+      this.prefetchNearbyReplays(clampedIndex);
+      const replay = await replayPromise;
       if (this.disposed || generation !== this.loadGeneration) {
         return;
       }
@@ -1010,6 +1123,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
 
   private prefetchNearbyReplays(index: number): void {
     this.replayCache.preload(resolvePolicySources(this.items, index, this.preloadPolicy));
+  }
+
+  private getReplayLoadStates(): PlaylistSourceLoadState[] {
+    return uniqueSourcesFromItems(this.items).map((source) => this.replayCache.getState(source));
   }
 
   private attachPlayer(resolvedItem: ResolvedPlaylistItem): void {

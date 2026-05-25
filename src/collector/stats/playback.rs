@@ -209,6 +209,19 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.is_team_0,
             ));
         }
+        for (index, value) in self.module_array("center", "events").iter().enumerate() {
+            let event = parse_center_event(value)?;
+            events.push(span_mechanic_event(
+                "center",
+                index,
+                event.start_frame,
+                event.frame,
+                event.start_time,
+                event.time,
+                event.player,
+                event.is_team_0,
+            ));
+        }
         for (index, value) in self
             .module_array("dodge_reset", "events")
             .iter()
@@ -365,6 +378,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_ceiling_shot_event,
             )?,
+            center: self.module_player_events("center", "events", parse_center_event)?,
             double_tap: self.module_player_events(
                 "double_tap",
                 "events",
@@ -412,6 +426,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "ceiling_shot".to_owned(),
             Value::Array(self.module_array("ceiling_shot", "events")),
+        );
+        events.insert(
+            "center".to_owned(),
+            Value::Array(self.module_array("center", "events")),
         );
         events.insert(
             "double_tap".to_owned(),
@@ -1990,6 +2008,24 @@ fn parse_ceiling_shot_event(value: &Value) -> SubtrActorResult<CeilingShotEvent>
         forward_approach_speed: json_required_f32(object, "forward_approach_speed")?,
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
         confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_center_event(value: &Value) -> SubtrActorResult<CenterEvent> {
+    let object = json_object(value, "center event")?;
+    Ok(CenterEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_time: json_required_f32(object, "start_time")?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        duration: json_required_f32(object, "duration")?,
+        start_ball_position: json_required_vec3(object, "start_ball_position")?,
+        end_ball_position: json_required_vec3(object, "end_ball_position")?,
+        ball_travel_distance: json_required_f32(object, "ball_travel_distance")?,
+        ball_advance_distance: json_required_f32(object, "ball_advance_distance")?,
+        lateral_centering_distance: json_required_f32(object, "lateral_centering_distance")?,
     })
 }
 

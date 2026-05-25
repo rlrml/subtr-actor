@@ -133,6 +133,47 @@ test("playlist load cache supports custom loaded result types", async () => {
   assert.equal(loadCount, 1);
 });
 
+test("playlist load cache exposes loading progress and loaded state", async () => {
+  const cache = new PlaylistLoadCache<{ replay: string }>();
+  const observed: string[] = [];
+  cache.subscribe(() => {
+    observed.push(cache.getState("tracked").status);
+  });
+
+  const loaded = await cache.load({
+    id: "tracked",
+    async load(context) {
+      context?.updateProgress({
+        stage: "fetching",
+        processedBytes: 4,
+        totalBytes: 8,
+        progress: 0.5,
+      });
+      return { replay: "normalized replay" };
+    },
+  });
+
+  assert.deepEqual(loaded, { replay: "normalized replay" });
+  assert.equal(cache.getState("tracked").status, "loaded");
+  assert.deepEqual(observed, ["loading", "loading", "loaded"]);
+});
+
+test("playlist load cache records preload failures without unhandled rejections", async () => {
+  const cache = new PlaylistLoadCache<{ replay: string }>();
+  cache.preload([
+    {
+      id: "missing",
+      async load() {
+        throw new Error("not found");
+      },
+    },
+  ]);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(cache.getState("missing").status, "error");
+  assert.equal(cache.getState("missing").error, "not found");
+});
+
 test("headless playlist session advances and loops custom loaded bundles", async () => {
   const items = ["first", "second"].map((id) => ({
     replay: {

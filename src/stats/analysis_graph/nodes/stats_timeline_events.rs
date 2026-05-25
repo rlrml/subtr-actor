@@ -29,6 +29,7 @@ impl_analysis_node! {
         backboard_dependency(),
         ball_carry_dependency(),
         ceiling_shot_dependency(),
+        center_dependency(),
         dodge_reset_dependency(),
         double_tap_dependency(),
         one_timer_dependency(),
@@ -61,6 +62,7 @@ impl_analysis_node! {
         backboard: BackboardCalculator,
         ball_carry: BallCarryCalculator,
         ceiling_shot: CeilingShotCalculator,
+        center: CenterCalculator,
         dodge_reset: DodgeResetCalculator,
         double_tap: DoubleTapCalculator,
         one_timer: OneTimerCalculator,
@@ -109,6 +111,7 @@ impl_analysis_node! {
             mechanics: build_mechanic_events(
                 ball_carry,
                 ceiling_shot,
+                center,
                 dodge_reset,
                 double_tap,
                 flick,
@@ -123,6 +126,7 @@ impl_analysis_node! {
             goal_context: match_stats.goal_context_events().to_vec(),
             backboard: backboard.events().to_vec(),
             ceiling_shot: ceiling_shot.events().to_vec(),
+            center: center.events().to_vec(),
             double_tap: double_tap.events().to_vec(),
             one_timer: one_timer.events().to_vec(),
             pass: pass.events().to_vec(),
@@ -221,6 +225,7 @@ fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<MechanicE
 fn build_mechanic_events(
     ball_carry: &BallCarryCalculator,
     ceiling_shot: &CeilingShotCalculator,
+    center: &CenterCalculator,
     dodge_reset: &DodgeResetCalculator,
     double_tap: &DoubleTapCalculator,
     flick: &FlickCalculator,
@@ -260,6 +265,19 @@ fn build_mechanic_events(
             event.ceiling_contact_frame,
             event.frame,
             event.ceiling_contact_time,
+            event.time,
+            event.player.clone(),
+            event.is_team_0,
+        ));
+    }
+
+    for (index, event) in center.events().iter().enumerate() {
+        events.push(span_mechanic_event(
+            "center",
+            index,
+            event.start_frame,
+            event.frame,
+            event.start_time,
             event.time,
             event.player.clone(),
             event.is_team_0,

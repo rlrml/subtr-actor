@@ -413,6 +413,16 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 <button id="mechanics-review-reject" type="button" disabled>Reject</button>
                 <button id="mechanics-review-uncertain" type="button" disabled>Uncertain</button>
               </div>
+              <section class="mechanics-review-replays">
+                <div class="mechanics-review-list-header">
+                  <span>Replays</span>
+                  <span id="mechanics-review-replay-load-summary">0 replays</span>
+                </div>
+                <div
+                  id="mechanics-review-replay-loads"
+                  class="mechanics-review-replay-loads"
+                ></div>
+              </section>
               <div class="mechanics-review-list-header">
                 <span>Playlist</span>
                 <span id="mechanics-review-count">0 items</span>

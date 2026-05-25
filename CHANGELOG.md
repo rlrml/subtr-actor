@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.12 - 2026-05-25
+
+- Add replay preload state tracking to playlist replay caches and expose queued,
+  loading, loaded, and failed replay sources to JavaScript player consumers.
+- Show mechanics-review replay preload details in both the standalone review
+  player and the stats evaluation player's mechanics review window.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.12`.
+
 ## v0.7.11 - 2026-05-24
 
 - Add optional playlist manifest pagination metadata and preserve it through

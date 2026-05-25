@@ -366,6 +366,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "core",
         "backboard",
         "ceiling_shot",
+        "center",
         "double_tap",
         "one_timer",
         "half_volley",
@@ -441,6 +442,15 @@ pub(crate) fn builtin_module_json(
         "ceiling_shot" => {
             let calculator = graph_state::<CeilingShotCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "center" => {
+            let calculator = graph_state::<CenterCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.events(),
             })
@@ -731,6 +741,14 @@ pub(crate) fn builtin_snapshot_frame_json(
         "ceiling_shot" => {
             let calculator = graph_state::<CeilingShotCalculator>(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(calculator.player_stats()),
+            })?
+        }
+        "center" => {
+            let calculator = graph_state::<CenterCalculator>(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: calculator.team_zero_stats(),
+                team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
@@ -1042,7 +1060,7 @@ pub(crate) fn builtin_snapshot_config_json(
                 "half_volley_min_ball_speed": calculator.config().min_ball_speed,
             }))?)
         }
-        "core" | "backboard" | "ceiling_shot" | "double_tap" | "one_timer" | "pass"
+        "core" | "backboard" | "ceiling_shot" | "center" | "double_tap" | "one_timer" | "pass"
         | "fifty_fifty" | "possession" | "touch" | "whiff" | "wavedash" | "speed_flip"
         | "half_flip" | "flick" | "musty_flick" | "dodge_reset" | "ball_carry" | "boost"
         | "bump" | "movement" | "powerslide" | "demo" => None,

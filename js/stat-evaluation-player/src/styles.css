@@ -446,6 +446,102 @@ input {
   text-transform: uppercase;
 }
 
+.mechanics-review-replays {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.mechanics-review-replay-loads {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.mechanics-review-replay-load {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem var(--ui-gap-sm);
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.mechanics-review-replay-load.loaded {
+  border-color: rgba(76, 175, 120, 0.42);
+}
+
+.mechanics-review-replay-load.error {
+  border-color: rgba(220, 95, 95, 0.58);
+}
+
+.mechanics-review-replay-load-main {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.mechanics-review-replay-load-title,
+.mechanics-review-replay-load-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanics-review-replay-load-title {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mechanics-review-replay-load-meta {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.mechanics-review-replay-load-status {
+  max-width: 11rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanics-review-replay-load.loaded .mechanics-review-replay-load-status {
+  color: #83d4a4;
+}
+
+.mechanics-review-replay-load.error .mechanics-review-replay-load-status {
+  color: #ff9b9b;
+}
+
+.mechanics-review-replay-load-progress {
+  grid-column: 1 / -1;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mechanics-review-replay-load-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #77a9ff;
+  transition: width 140ms ease;
+}
+
+.mechanics-review-replay-load.loaded .mechanics-review-replay-load-progress span {
+  background: #4caf78;
+}
+
+.mechanics-review-replay-load.error .mechanics-review-replay-load-progress span {
+  background: #dc5f5f;
+}
+
 .mechanics-review-list {
   display: grid;
   gap: var(--ui-gap-xs);

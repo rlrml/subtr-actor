@@ -30,6 +30,8 @@ pub mod bump;
 pub use bump::*;
 pub mod ceiling_shot;
 pub use ceiling_shot::*;
+pub mod center;
+pub use center::*;
 pub mod demo;
 pub use demo::*;
 mod flip_reset;

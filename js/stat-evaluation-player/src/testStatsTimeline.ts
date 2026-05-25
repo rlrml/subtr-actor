@@ -21,6 +21,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       goal_context: [],
       backboard: [],
       ceiling_shot: [],
+      center: [],
       double_tap: [],
       fifty_fifty: [],
       one_timer: [],
@@ -133,6 +134,7 @@ export function createLegacyStatsTimeline(
     timeline_events?: StatsEvents["timeline"];
     backboard_events?: StatsEvents["backboard"];
     ceiling_shot_events?: StatsEvents["ceiling_shot"];
+    center_events?: StatsEvents["center"];
     double_tap_events?: StatsEvents["double_tap"];
     fifty_fifty_events?: StatsEvents["fifty_fifty"];
     one_timer_events?: StatsEvents["one_timer"];
@@ -156,6 +158,7 @@ export function createLegacyStatsTimeline(
       mechanics: overrides.mechanic_events ?? overrides.events?.mechanics ?? [],
       backboard: overrides.backboard_events ?? overrides.events?.backboard ?? [],
       ceiling_shot: overrides.ceiling_shot_events ?? overrides.events?.ceiling_shot ?? [],
+      center: overrides.center_events ?? overrides.events?.center ?? [],
       double_tap: overrides.double_tap_events ?? overrides.events?.double_tap ?? [],
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
       one_timer: overrides.one_timer_events ?? overrides.events?.one_timer ?? [],

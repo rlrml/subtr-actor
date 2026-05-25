@@ -12,6 +12,8 @@ import {
   type PlaylistItem,
   type PlaylistManifest,
   type PlaylistManifestReplay,
+  type PlaylistSourceLoadProgress,
+  type PlaylistSourceLoadState,
   type ReplayPlaylistPlayerState,
   type ReplaySource,
 } from "subtr-actor-player";
@@ -68,6 +70,8 @@ const advanceMode = requireElement<HTMLSelectElement>("advance-mode");
 const endMode = requireElement<HTMLSelectElement>("end-mode");
 const speedSelect = requireElement<HTMLSelectElement>("speed");
 const followPlayer = requireElement<HTMLInputElement>("follow-player");
+const replayLoadSummary = requireElement<HTMLElement>("replay-load-summary");
+const replayLoads = requireElement<HTMLDivElement>("replay-loads");
 const playlistCount = requireElement<HTMLElement>("playlist-count");
 const playlistItems = requireElement<HTMLDivElement>("playlist-items");
 const eventJson = requireElement<HTMLPreElement>("event-json");
@@ -125,12 +129,53 @@ function resolveReplayFetchUrl(path: string): string {
   return path;
 }
 
-async function fetchReplayBytes(path: string): Promise<Uint8Array> {
+async function fetchReplayBytes(
+  path: string,
+  updateProgress?: (progress: PlaylistSourceLoadProgress) => void,
+): Promise<Uint8Array> {
   const response = await fetch(resolveReplayFetchUrl(path));
   if (!response.ok) {
     throw new Error(`Failed to load replay ${path}: ${response.status}`);
   }
-  return new Uint8Array(await response.arrayBuffer());
+  const totalBytesHeader = response.headers.get("content-length");
+  const parsedTotalBytes = totalBytesHeader === null ? NaN : Number(totalBytesHeader);
+  const totalBytes = Number.isFinite(parsedTotalBytes) ? parsedTotalBytes : undefined;
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    updateProgress?.({
+      stage: "fetching",
+      processedBytes: bytes.byteLength,
+      totalBytes: totalBytes ?? bytes.byteLength,
+      progress: totalBytes && totalBytes > 0 ? bytes.byteLength / totalBytes : undefined,
+    });
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let processedBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    processedBytes += value.byteLength;
+    updateProgress?.({
+      stage: "fetching",
+      processedBytes,
+      totalBytes,
+      progress: totalBytes && totalBytes > 0 ? processedBytes / totalBytes : undefined,
+    });
+  }
+
+  const bytes = new Uint8Array(processedBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 function ballchasingIdFromReplayId(replayId: string): string | null {
@@ -143,8 +188,19 @@ function resolveReplaySource(context: {
 }): ReplaySource {
   const path = context.replay?.path;
   if (path) {
-    return createReplaySource(context.replayId, async () =>
-      loadReplayFromBytes(await fetchReplayBytes(path), { useWorker: true }),
+    return createReplaySource(context.replayId, async (loadContext) =>
+      loadReplayFromBytes(await fetchReplayBytes(path, loadContext?.updateProgress), {
+        useWorker: true,
+        reportEveryNFrames: 100,
+        onProgress(progress) {
+          loadContext?.updateProgress({
+            stage: progress.stage,
+            progress: progress.progress,
+            processedFrames: progress.processedFrames,
+            totalFrames: progress.totalFrames,
+          });
+        },
+      }),
     );
   }
 
@@ -171,7 +227,7 @@ async function loadPlaylist(manifest: PlaylistManifest, sourceUrl: string | null
     initialCameraViewMode: "follow",
     initialBallCamEnabled: true,
     initialSkipPostGoalTransitionsEnabled: false,
-    preloadRadius: 1,
+    preloadPolicy: { kind: "all" },
   });
   reviewPlayer.subscribe(renderState);
   advanceMode.value = manifest.playback?.advanceMode ?? "manual";
@@ -226,6 +282,140 @@ function updatePlaylistSelection(index: number) {
   }
   const active = playlistItems.querySelector<HTMLButtonElement>(".playlist-item.active");
   active?.scrollIntoView({ block: "nearest" });
+}
+
+function replayClipCounts(): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of reviewPlayer?.items ?? []) {
+    counts.set(item.replay.id, (counts.get(item.replay.id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function manifestReplaysById(): Map<string, PlaylistManifestReplay> {
+  return new Map((activeManifest?.replays ?? []).map((replay) => [replay.id, replay]));
+}
+
+function formatBytes(value: number): string {
+  const units = ["B", "KB", "MB", "GB"];
+  let scaled = value;
+  let unitIndex = 0;
+  while (scaled >= 1024 && unitIndex < units.length - 1) {
+    scaled /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 ? 0 : scaled >= 10 ? 1 : 2;
+  return `${scaled.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function progressFraction(progress: PlaylistSourceLoadProgress | null): number | null {
+  if (!progress) {
+    return null;
+  }
+  if (typeof progress.progress === "number" && Number.isFinite(progress.progress)) {
+    return Math.max(0, Math.min(1, progress.progress));
+  }
+  if (
+    typeof progress.processedBytes === "number" &&
+    typeof progress.totalBytes === "number" &&
+    progress.totalBytes > 0
+  ) {
+    return Math.max(0, Math.min(1, progress.processedBytes / progress.totalBytes));
+  }
+  if (
+    typeof progress.processedFrames === "number" &&
+    typeof progress.totalFrames === "number" &&
+    progress.totalFrames > 0
+  ) {
+    return Math.max(0, Math.min(1, progress.processedFrames / progress.totalFrames));
+  }
+  return null;
+}
+
+function formatProgress(progress: PlaylistSourceLoadProgress | null): string {
+  if (!progress) {
+    return "";
+  }
+  const fraction = progressFraction(progress);
+  if (progress.stage === "fetching" && typeof progress.processedBytes === "number") {
+    const total =
+      typeof progress.totalBytes === "number" ? ` / ${formatBytes(progress.totalBytes)}` : "";
+    return `Fetching ${formatBytes(progress.processedBytes)}${total}`;
+  }
+  if (progress.stage && typeof progress.processedFrames === "number") {
+    const total =
+      typeof progress.totalFrames === "number" ? ` / ${progress.totalFrames}` : "";
+    return `${progress.stage} ${progress.processedFrames}${total} frames`;
+  }
+  if (progress.stage && fraction !== null) {
+    return `${progress.stage} ${Math.round(fraction * 100)}%`;
+  }
+  return progress.message ?? progress.stage ?? "";
+}
+
+function replayLoadLabel(state: PlaylistSourceLoadState): string {
+  if (state.status === "idle") {
+    return "Pending";
+  }
+  if (state.status === "loading") {
+    return formatProgress(state.progress) || "Loading";
+  }
+  if (state.status === "loaded") {
+    return "Loaded";
+  }
+  return state.error ? `Failed: ${state.error}` : "Failed";
+}
+
+function renderReplayLoads(states: PlaylistSourceLoadState[]) {
+  const counts = replayClipCounts();
+  const manifestReplays = manifestReplaysById();
+  const loaded = states.filter((state) => state.status === "loaded").length;
+  const loading = states.filter((state) => state.status === "loading").length;
+  const failed = states.filter((state) => state.status === "error").length;
+  replayLoadSummary.textContent =
+    states.length === 0
+      ? "0 replays"
+      : `${loaded}/${states.length} loaded${loading > 0 ? `, ${loading} loading` : ""}${
+          failed > 0 ? `, ${failed} failed` : ""
+        }`;
+  replayLoads.replaceChildren();
+
+  for (const state of states) {
+    const replay = manifestReplays.get(state.sourceId);
+    const row = document.createElement("div");
+    row.className = `replay-load-item ${state.status}`;
+
+    const main = document.createElement("div");
+    main.className = "replay-load-main";
+    const title = document.createElement("div");
+    title.className = "replay-load-title";
+    title.textContent = replay?.label || state.sourceId;
+    const meta = document.createElement("div");
+    meta.className = "replay-load-meta";
+    const clipCount = counts.get(state.sourceId) ?? 0;
+    meta.textContent = [
+      state.sourceId,
+      `${clipCount} ${clipCount === 1 ? "clip" : "clips"}`,
+      replay?.path,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    main.append(title, meta);
+
+    const status = document.createElement("div");
+    status.className = "replay-load-status";
+    status.textContent = replayLoadLabel(state);
+
+    const progress = document.createElement("div");
+    progress.className = "replay-load-progress";
+    const bar = document.createElement("span");
+    const fraction = state.status === "loaded" ? 1 : progressFraction(state.progress);
+    bar.style.width = `${Math.round((fraction ?? 0) * 100)}%`;
+    progress.append(bar);
+
+    row.append(main, status, progress);
+    replayLoads.append(row);
+  }
 }
 
 function reviewAuthHeaders(): Record<string, string> {
@@ -334,6 +524,7 @@ function renderState(state: ReplayPlaylistPlayerState) {
   reviewStatus.textContent = `Review: ${formatReviewStatus(meta.reviewStatus)}`;
   reviewStatus.classList.remove("error");
   updatePlaylistSelection(state.itemIndex);
+  renderReplayLoads(state.replayLoadStates);
 
   if (!scrubbing) {
     scrubber.value =

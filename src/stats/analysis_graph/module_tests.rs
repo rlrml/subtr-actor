@@ -1,11 +1,11 @@
 use super::*;
 use crate::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BumpCalculator,
-    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
-    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PlayerVerticalState, PossessionState,
-    RotationCalculator, TouchState,
+    CenterCalculator, EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator,
+    FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
+    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PlayerVerticalState,
+    PossessionState, RotationCalculator, TouchState,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -27,7 +27,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 50);
+    assert_eq!(names.len(), 51);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -42,6 +42,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("half_flip"));
     assert!(names.contains("half_volley"));
     assert!(names.contains("one_timer"));
+    assert!(names.contains("center"));
     assert!(names.contains("pass"));
     assert!(names.contains("rotation"));
     assert!(names.contains("flick"));
@@ -70,6 +71,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<BumpCalculator>().is_some());
     assert!(graph.state::<MatchStatsCalculator>().is_some());
     assert!(graph.state::<OneTimerCalculator>().is_some());
+    assert!(graph.state::<CenterCalculator>().is_some());
     assert!(graph.state::<HalfVolleyCalculator>().is_some());
     assert!(graph.state::<PassCalculator>().is_some());
     assert!(graph.state::<RotationCalculator>().is_some());

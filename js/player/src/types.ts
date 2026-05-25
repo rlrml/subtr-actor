@@ -227,9 +227,36 @@ export interface LoadedReplay {
   raw?: RawReplayFramesData;
 }
 
+export type PlaylistSourceLoadStatus = "idle" | "loading" | "loaded" | "error";
+
+export interface PlaylistSourceLoadProgress {
+  stage?: string;
+  message?: string;
+  progress?: number;
+  processedBytes?: number;
+  totalBytes?: number;
+  processedFrames?: number;
+  totalFrames?: number;
+}
+
+export interface PlaylistSourceLoadContext {
+  sourceId: string;
+  updateProgress: (progress: PlaylistSourceLoadProgress) => void;
+}
+
+export interface PlaylistSourceLoadState {
+  sourceId: string;
+  status: PlaylistSourceLoadStatus;
+  progress: PlaylistSourceLoadProgress | null;
+  error: string | null;
+  startedAt: number | null;
+  updatedAt: number | null;
+  completedAt: number | null;
+}
+
 export interface PlaylistLoadSource<TLoaded> {
   id: string;
-  load: () => Promise<TLoaded>;
+  load: (context?: PlaylistSourceLoadContext) => Promise<TLoaded>;
 }
 
 export interface ReplaySource extends PlaylistLoadSource<LoadedReplay> {}
@@ -399,6 +426,7 @@ export interface ReplayPlaylistPlayerState {
   ready: boolean;
   loading: boolean;
   error: string | null;
+  replayLoadStates: PlaylistSourceLoadState[];
   itemIndex: number;
   itemCount: number;
   item: PlaylistItem | null;
