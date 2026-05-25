@@ -2511,11 +2511,13 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
     }
 
     skipPostGoalTransitions.checked = false;
+    skipKickoffs.checked = false;
     review.currentClip = { startTime, endTime };
     replayPlayer?.setState({
       currentTime: startTime,
       playing: true,
       skipPostGoalTransitionsEnabled: false,
+      skipKickoffsEnabled: false,
     });
     setMechanicsReviewStatus(
       `Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`,
@@ -2539,6 +2541,7 @@ function replayMechanicsReviewClip(): void {
     currentTime: clip.startTime,
     playing: true,
     skipPostGoalTransitionsEnabled: false,
+    skipKickoffsEnabled: false,
   });
 }
 
@@ -2601,6 +2604,7 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
       currentTime: beforeStart ? clip.startTime : clip.endTime,
       playing: false,
       skipPostGoalTransitionsEnabled: false,
+      skipKickoffsEnabled: false,
     });
     if (atOrPastEnd) {
       setMechanicsReviewStatus(`Finished clip at ${clip.endTime.toFixed(2)}s`);

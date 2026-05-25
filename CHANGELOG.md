@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.3 - 2026-05-25
+
+- Keep mechanics review clips from inheriting kickoff skipping, so kickoff-adjacent
+  clip preroll does not jump past the event or stop at the clip boundary.
+- Add player-package coverage for playlist clip time bounds, frame bounds, and
+  invalid backwards clips.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.3`.
+
 ## v0.8.2 - 2026-05-25
 
 - Make mechanics review clip selection start playback immediately after loading

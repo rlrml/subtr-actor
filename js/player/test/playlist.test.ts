@@ -7,6 +7,7 @@ import {
   createFullReplayPlaylistItem,
   createReplaySource,
   parsePlaylistManifest,
+  resolvePlaylistItem,
 } from "../src/lib";
 import type { LoadedReplay, ReplayModel } from "../src/lib";
 
@@ -230,6 +231,25 @@ function emptyReplay(duration: number): ReplayModel {
   };
 }
 
+function replayWithFrames(times: number[]): ReplayModel {
+  return {
+    frameCount: times.length,
+    duration: times.at(-1) ?? 0,
+    frames: times.map((time) => ({
+      time,
+      secondsRemaining: 300 - time,
+      gameState: 0,
+      kickoffCountdown: 0,
+    })),
+    ballFrames: [],
+    boostPads: [],
+    players: [],
+    timelineEvents: [],
+    teamZeroNames: [],
+    teamOneNames: [],
+  };
+}
+
 test("full replay playlist item represents the natural one-replay playlist", () => {
   const loaded: LoadedReplay = { replay: emptyReplay(123) };
   const source = createReplaySource("single", async () => loaded);
@@ -242,4 +262,58 @@ test("full replay playlist item represents the natural one-replay playlist", () 
   assert.equal(item.end.kind, "time");
   assert.equal(item.end.value, Number.POSITIVE_INFINITY);
   assert.equal(item.label, "Full replay");
+});
+
+test("playlist clip time bounds resolve to replay time and duration", () => {
+  const loaded: LoadedReplay = { replay: replayWithFrames([0, 1, 2, 3, 4, 5]) };
+  const source = createReplaySource("clip-replay", async () => loaded);
+  const item = {
+    replay: source,
+    start: { kind: "time" as const, value: 1.25 },
+    end: { kind: "time" as const, value: 3.75 },
+    label: "Time clip",
+  };
+
+  const resolved = resolvePlaylistItem(item, loaded);
+
+  assert.equal(resolved.start.time, 1.25);
+  assert.equal(resolved.start.frameIndex, 1);
+  assert.equal(resolved.end.time, 3.75);
+  assert.equal(resolved.end.frameIndex, 3);
+  assert.equal(resolved.duration, 2.5);
+});
+
+test("playlist clip frame bounds resolve through replay frame times", () => {
+  const loaded: LoadedReplay = { replay: replayWithFrames([0, 0.25, 1.5, 2.25, 4]) };
+  const source = createReplaySource("frame-clip-replay", async () => loaded);
+  const item = {
+    replay: source,
+    start: { kind: "frame" as const, value: 2 },
+    end: { kind: "frame" as const, value: 4 },
+  };
+
+  const resolved = resolvePlaylistItem(item, loaded);
+
+  assert.deepEqual(resolved.start, { frameIndex: 2, time: 1.5 });
+  assert.deepEqual(resolved.end, { frameIndex: 4, time: 4 });
+  assert.equal(resolved.duration, 2.5);
+});
+
+test("playlist clip bounds reject clips that end before they start", () => {
+  const loaded: LoadedReplay = { replay: replayWithFrames([0, 1, 2, 3]) };
+  const source = createReplaySource("bad-clip-replay", async () => loaded);
+
+  assert.throws(
+    () =>
+      resolvePlaylistItem(
+        {
+          replay: source,
+          start: { kind: "time", value: 3 },
+          end: { kind: "time", value: 1 },
+          label: "Backwards clip",
+        },
+        loaded,
+      ),
+    /Backwards clip.*ends before it starts/,
+  );
 });
