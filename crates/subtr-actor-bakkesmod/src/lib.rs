@@ -1,6 +1,6 @@
 #![allow(clippy::result_large_err)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::ptr;
@@ -2012,11 +2012,27 @@ unsafe fn serialize_named_analysis_node(
     }
 }
 
+fn callable_analysis_node_names(engine: &SaEngine) -> Vec<String> {
+    let mut names = BTreeSet::new();
+    names.extend(engine.graph.node_names().map(str::to_owned));
+    names.extend(
+        builtin_analysis_node_names()
+            .iter()
+            .map(|name| (*name).to_owned()),
+    );
+    names.extend(
+        builtin_analysis_node_aliases()
+            .iter()
+            .map(|alias| alias.alias.to_owned()),
+    );
+    names.into_iter().collect()
+}
+
 fn serialize_analysis_node_names(engine: *const SaEngine) -> Vec<u8> {
-    if engine.is_null() {
+    let Some(engine) = (unsafe { engine.as_ref() }) else {
         return Vec::new();
-    }
-    serde_json::to_vec(builtin_analysis_node_names()).unwrap_or_default()
+    };
+    serde_json::to_vec(&callable_analysis_node_names(engine)).unwrap_or_default()
 }
 
 unsafe fn c_string_arg(value: *const c_char) -> Option<String> {
@@ -2666,10 +2682,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
 #[no_mangle]
 /// Returns the UTF-8 byte length of one named live analysis-node JSON payload.
 ///
-/// `node_name` must be one of the names reported by `builtin_analysis_node_names`
-/// in graph info JSON. Calculator nodes use the same graph-backed payloads as
-/// stats modules; signal/state nodes use structured snapshots of their current
-/// graph state.
+/// `node_name` must be one of the names reported by
+/// `subtr_actor_bakkesmod_analysis_node_names_json_len`. Calculator nodes use
+/// the same graph-backed payloads as stats modules; signal/state nodes use
+/// structured snapshots of their current graph state.
 ///
 /// # Safety
 ///
@@ -2711,7 +2727,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
 }
 
 #[no_mangle]
-/// Returns the UTF-8 byte length of the builtin analysis-node name registry.
+/// Returns the UTF-8 byte length of the callable analysis-node name registry.
 ///
 /// The payload is a JSON string array containing every supported name for
 /// `subtr_actor_bakkesmod_analysis_node_json_len`.
@@ -2727,7 +2743,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_names_json_len(
 }
 
 #[no_mangle]
-/// Writes the builtin analysis-node name registry into caller-owned storage.
+/// Writes the callable analysis-node name registry into caller-owned storage.
 ///
 /// Returns the number of bytes written. Call
 /// `subtr_actor_bakkesmod_analysis_node_names_json_len` first to size the
@@ -7046,12 +7062,27 @@ mod tests {
         }
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
 
+        let expected_node_names = callable_analysis_node_names(unsafe {
+            engine
+                .as_ref()
+                .expect("engine should remain valid while checking node names")
+        });
+        let exposed_node_names = live_analysis_node_names_json_value(engine)
+            .as_array()
+            .expect("live ABI node-name registry should be an array")
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .expect("live ABI node names should be strings")
+                    .to_owned()
+            })
+            .collect::<Vec<_>>();
         assert_eq!(
-            live_analysis_node_names_json_value(engine),
-            serde_json::json!(builtin_analysis_node_names()),
-            "live ABI should expose the same node-name registry used by named node calls"
+            exposed_node_names, expected_node_names,
+            "live ABI should expose the complete callable node-name registry"
         );
-        for node_name in builtin_analysis_node_names() {
+        for node_name in &exposed_node_names {
             let value = live_analysis_node_json_value(engine, node_name);
             assert!(
                 !value.is_null(),

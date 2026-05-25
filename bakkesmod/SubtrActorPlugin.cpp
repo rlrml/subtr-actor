@@ -2060,7 +2060,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   }
   if (!nodeNames.empty()) {
     cvarManager->log(std::format(
-        "subtr-actor: verified {} builtin analysis nodes by name",
+        "subtr-actor: verified {} callable analysis nodes by name",
         nodeNames.size()));
   }
 
