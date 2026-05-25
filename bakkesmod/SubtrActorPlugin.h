@@ -141,11 +141,12 @@ private:
   void recordTouch(CarWrapper car);
   void recordDodgeRefreshFromJumpState(CarWrapper car, uint32_t playerIndex, uint8_t isTeam0);
   void recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind);
-  void recordGoal(ServerWrapper server, GoalWrapper goal);
+  void recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex);
   void recordDemolish(CarWrapper victim, ActorWrapper demolisher);
   void recordPlayerStatDeltas(PriWrapper pri, uint32_t playerIndex, uint8_t isTeam0);
   std::optional<uint32_t> playerIndexForCar(CarWrapper car);
   std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
+  std::optional<uint32_t> playerIndexForScoreIndex(ServerWrapper server, int scoreIndex);
   std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
   uint32_t stablePlayerIndexForPri(PriWrapper pri, uint32_t fallbackIndex);
   uint32_t boostPadId(ActorWrapper pickup);

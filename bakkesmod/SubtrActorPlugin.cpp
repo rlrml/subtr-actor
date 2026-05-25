@@ -529,11 +529,13 @@ void SubtrActorPlugin::hookGameEvents() {
       GOAL_SCORED_EVENT,
       [this](ServerWrapper server, void *params, std::string) {
         auto goal = GoalWrapper(0);
+        int scoreIndex = -1;
         if (params) {
           const auto *goalParams = static_cast<const GoalScoredParams *>(params);
           goal = GoalWrapper(goalParams->goal);
+          scoreIndex = goalParams->scoreIndex;
         }
-        recordGoal(server, goal);
+        recordGoal(server, goal, scoreIndex);
       });
 
   gameWrapper->HookEventWithCallerPost<CarWrapper>(
@@ -966,7 +968,7 @@ void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventK
   pendingBoostPadEvents.push_back(event);
 }
 
-void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal) {
+void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex) {
   SaGoalEvent event{};
   if (!goal.IsNull()) {
     event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
@@ -976,7 +978,10 @@ void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal) {
       event.scoring_team_is_team_0 = scoredOnTeam == 0 ? 0 : 1;
     }
   }
-  if (lastTouch && lastTouch->is_team_0 == event.scoring_team_is_team_0) {
+  if (auto scorerIndex = playerIndexForScoreIndex(server, scoreIndex)) {
+    event.player_index = *scorerIndex;
+    event.has_player = 1;
+  } else if (lastTouch && lastTouch->is_team_0 == event.scoring_team_is_team_0) {
     event.player_index = lastTouch->player_index;
     event.has_player = 1;
   }
@@ -1086,6 +1091,21 @@ std::optional<uint32_t> SubtrActorPlugin::playerIndexForPri(PriWrapper pri) {
   const uint32_t playerIndex = stablePlayerIndexForPri(pri, nextPlayerIndex);
   priPlayerIndices[pri.memory_address] = playerIndex;
   return playerIndex;
+}
+
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForScoreIndex(
+    ServerWrapper server,
+    int scoreIndex) {
+  if (server.IsNull() || scoreIndex < 0) {
+    return std::nullopt;
+  }
+
+  ArrayWrapper<PriWrapper> pris = server.GetPRIs();
+  if (pris.IsNull() || scoreIndex >= pris.Count()) {
+    return std::nullopt;
+  }
+
+  return playerIndexForPri(pris.Get(scoreIndex));
 }
 
 std::optional<uint32_t> SubtrActorPlugin::playerIndexForNearestCar(
