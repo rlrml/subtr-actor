@@ -4,7 +4,7 @@ use std::slice;
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
     stats::analysis_graph::{graph_with_all_analysis_nodes, AnalysisGraph},
-    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemolishInfo,
+    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo,
     DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalEvent, HalfFlipCalculator, LivePlayState, PlayerFrameState, PlayerSample, PlayerStatEvent,
     PlayerStatEventKind, SpeedFlipCalculator, TouchEvent, TouchStateCalculator, WavedashCalculator,
@@ -465,6 +465,16 @@ fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Ve
         .collect()
 }
 
+fn explicit_active_demo_events(events: &[SaDemolishEvent]) -> Vec<DemoEventSample> {
+    events
+        .iter()
+        .map(|event| DemoEventSample {
+            attacker: player_id(event.attacker_index),
+            victim: player_id(event.victim_index),
+        })
+        .collect()
+}
+
 fn infer_dodge_refreshed_events(
     frame: &FrameInfo,
     ball: &BallFrameState,
@@ -569,8 +579,12 @@ impl SaLiveEventGenerator {
                 .collect::<Vec<_>>();
         dodge_refreshed_events.sort_by_key(|event| event.counter_value);
 
+        let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
+        let active_demos = explicit_active_demo_events(explicit_events.demolishes);
+
         FrameEventsState {
-            demo_events: explicit_demolish_events(frame, explicit_events.demolishes),
+            active_demos,
+            demo_events,
             boost_pad_events: explicit_boost_pad_events(frame, explicit_events.boost_pad_events),
             touch_events,
             dodge_refreshed_events,
@@ -1152,9 +1166,14 @@ mod tests {
         assert_eq!(frame_events.goal_events.len(), 1);
         assert_eq!(frame_events.player_stat_events.len(), 1);
         assert_eq!(frame_events.demo_events.len(), 1);
+        assert_eq!(frame_events.active_demos.len(), 1);
         assert_eq!(frame_events.boost_pad_events[0].pad_id, "34");
         assert_eq!(frame_events.goal_events[0].team_zero_score, Some(1));
         assert_eq!(frame_events.demo_events[0].victim, RemoteId::SplitScreen(1));
+        assert_eq!(
+            frame_events.active_demos[0].victim,
+            RemoteId::SplitScreen(1)
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
