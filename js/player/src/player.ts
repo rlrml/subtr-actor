@@ -298,7 +298,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   seek(time: number): void {
-    this.currentTime = THREE.MathUtils.clamp(time, 0, this.getPlaybackEndTime());
+    this.currentTime = this.clampReplayTime(time);
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
     if (this.playing) {
@@ -383,7 +383,7 @@ export class ReplayPlayer extends EventTarget {
       this.skipKickoffsEnabled = nextState.skipKickoffsEnabled;
     }
     if (nextState.currentTime !== undefined) {
-      this.currentTime = THREE.MathUtils.clamp(nextState.currentTime, 0, this.getPlaybackEndTime());
+      this.currentTime = this.clampReplayTime(nextState.currentTime);
     }
     if (nextState.playing !== undefined && nextState.playing !== this.playing) {
       if (nextState.playing) {
@@ -474,6 +474,10 @@ export class ReplayPlayer extends EventTarget {
       this.getTimelineSegments(),
       timelineTime,
     );
+  }
+
+  private clampReplayTime(time: number): number {
+    return THREE.MathUtils.clamp(time, 0, this.replay.duration);
   }
 
   private getPlaybackEndTime(): number {

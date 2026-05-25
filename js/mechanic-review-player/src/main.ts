@@ -227,6 +227,7 @@ async function loadPlaylist(manifest: PlaylistManifest, sourceUrl: string | null
     initialCameraViewMode: "follow",
     initialBallCamEnabled: true,
     initialSkipPostGoalTransitionsEnabled: false,
+    initialSkipKickoffsEnabled: false,
     preloadPolicy: { kind: "all" },
   });
   reviewPlayer.subscribe(renderState);

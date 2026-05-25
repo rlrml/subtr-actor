@@ -1,6 +1,6 @@
 {
   "name": "subtr-actor-mechanic-review-player",
-  "version": "0.1.0",
+  "version": "0.8.5",
   "description": "Mechanic candidate review player for subtr-actor playlist manifests",
   "type": "module",
   "scripts": {
