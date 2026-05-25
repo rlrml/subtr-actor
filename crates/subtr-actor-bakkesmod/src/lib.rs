@@ -1058,6 +1058,33 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_reset(engine: *mut SaEngin
 }
 
 #[no_mangle]
+/// Finishes live graph evaluation and refreshes exported graph views.
+///
+/// This mirrors replay collectors' end-of-replay `AnalysisGraph::finish` call,
+/// allowing delayed calculators to flush active state before a live engine is
+/// reset or destroyed.
+///
+/// Returns `0` on success, `-1` for an invalid engine pointer, and `-2` if graph
+/// finalization fails.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_finish(engine: *mut SaEngine) -> i32 {
+    let Some(engine) = engine.as_mut() else {
+        return -1;
+    };
+    if !engine.live_replay_meta_initialized {
+        return 0;
+    }
+    if engine.graph.finish().is_err() {
+        return -2;
+    }
+    refresh_timeline_graph_views(engine);
+    0
+}
+
+#[no_mangle]
 /// Feeds one sampled Rocket League frame into the live mechanics engine.
 ///
 /// Returns `0` on success, `-1` for invalid pointers, and `-2` if detector
@@ -1540,6 +1567,39 @@ mod tests {
         );
         assert!(!live_play.is_live_play);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn finish_refreshes_exported_graph_views() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let frame = SaLiveFrame {
+            frame_number: 7,
+            time: 1.5,
+            dt: 0.016,
+            seconds_remaining: 299,
+            has_seconds_remaining: 1,
+            ball_has_been_hit: 1,
+            has_ball_has_been_hit: 1,
+            live_play: 1,
+            has_live_play: 1,
+            players: ptr::null(),
+            player_count: 0,
+            ..SaLiveFrame::default()
+        };
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        assert!(unsafe { subtr_actor_bakkesmod_events_json_len(engine) } > 0);
+        assert!(unsafe { subtr_actor_bakkesmod_frame_json_len(engine) } > 0);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn finish_rejects_null_engine() {
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(ptr::null_mut()) }, -1);
     }
 
     #[test]

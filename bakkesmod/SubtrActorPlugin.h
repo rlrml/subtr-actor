@@ -34,6 +34,7 @@ private:
   using EngineCreate = SaEngine *(*)();
   using EngineDestroy = void (*)(SaEngine *);
   using EngineReset = void (*)(SaEngine *);
+  using EngineFinish = int32_t (*)(SaEngine *);
   using ProcessFrame = int32_t (*)(SaEngine *, const SaLiveFrame *);
   using EventsJsonLen = size_t (*)(const SaEngine *);
   using WriteEventsJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
@@ -64,6 +65,7 @@ private:
   EngineCreate engineCreate = nullptr;
   EngineDestroy engineDestroy = nullptr;
   EngineReset engineReset = nullptr;
+  EngineFinish engineFinish = nullptr;
   ProcessFrame processFrame = nullptr;
   EventsJsonLen eventsJsonLen = nullptr;
   WriteEventsJson writeEventsJson = nullptr;
@@ -104,6 +106,7 @@ private:
   void tick(std::string eventName);
   void render(CanvasWrapper canvas);
   void pushEventMessage(const SaMechanicEvent &event);
+  void drainPendingEvents();
   SaLiveFrame sampleFrame();
   void samplePlayers(ServerWrapper server, CarWrapper localCar);
   SaRigidBody sampleRigidBody(ActorWrapper actor);

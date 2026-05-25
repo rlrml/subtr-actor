@@ -187,6 +187,7 @@ typedef struct SaMechanicEvent {
 SaEngine *subtr_actor_bakkesmod_engine_create(void);
 void subtr_actor_bakkesmod_engine_destroy(SaEngine *engine);
 void subtr_actor_bakkesmod_engine_reset(SaEngine *engine);
+int32_t subtr_actor_bakkesmod_finish(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame *frame);
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);

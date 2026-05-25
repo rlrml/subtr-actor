@@ -301,6 +301,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_engine_destroy"));
   engineReset = reinterpret_cast<EngineReset>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_engine_reset"));
+  engineFinish = reinterpret_cast<EngineFinish>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_finish"));
   processFrame = reinterpret_cast<ProcessFrame>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_process_frame"));
   eventsJsonLen = reinterpret_cast<EventsJsonLen>(
@@ -314,8 +316,9 @@ bool SubtrActorPlugin::loadRustLibrary() {
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
 
-  if (!engineCreate || !engineDestroy || !engineReset || !processFrame || !eventsJsonLen ||
-      !writeEventsJson || !frameJsonLen || !writeFrameJson || !drainEvents) {
+  if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
+      !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
+      !drainEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -325,6 +328,9 @@ bool SubtrActorPlugin::loadRustLibrary() {
 }
 
 void SubtrActorPlugin::unloadRustLibrary() {
+  if (engine && engineFinish) {
+    engineFinish(engine);
+  }
   if (engine && engineDestroy) {
     engineDestroy(engine);
   }
@@ -337,6 +343,7 @@ void SubtrActorPlugin::unloadRustLibrary() {
   engineCreate = nullptr;
   engineDestroy = nullptr;
   engineReset = nullptr;
+  engineFinish = nullptr;
   processFrame = nullptr;
   eventsJsonLen = nullptr;
   writeEventsJson = nullptr;
@@ -352,6 +359,9 @@ void SubtrActorPlugin::tick(std::string) {
 
   if (!gameWrapper->IsInGame()) {
     if (wasInGame && engineReset) {
+      if (engineFinish && engineFinish(engine) == 0) {
+        drainPendingEvents();
+      }
       engineReset(engine);
       resetLiveState();
     }
@@ -371,11 +381,7 @@ void SubtrActorPlugin::tick(std::string) {
     return;
   }
 
-  SaMechanicEvent events[16];
-  const size_t count = drainEvents(engine, events, 16);
-  for (size_t i = 0; i < count; i += 1) {
-    pushEventMessage(events[i]);
-  }
+  drainPendingEvents();
 }
 
 SaLiveFrame SubtrActorPlugin::sampleFrame() {
@@ -905,6 +911,21 @@ void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal)
       goal.has_team_one_score = 1;
     }
   }
+}
+
+void SubtrActorPlugin::drainPendingEvents() {
+  if (!engine || !drainEvents) {
+    return;
+  }
+
+  SaMechanicEvent events[16];
+  size_t count = 0;
+  do {
+    count = drainEvents(engine, events, 16);
+    for (size_t i = 0; i < count; i += 1) {
+      pushEventMessage(events[i]);
+    }
+  } while (count == 16);
 }
 
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
