@@ -3606,7 +3606,15 @@ mod tests {
                 .len(),
             1
         );
-        assert!(value["frame"]["modules"].get("boost").is_some());
+        let frame_modules = value["frame"]["modules"]
+            .as_object()
+            .expect("frame modules should be an object");
+        for module_name in builtin_stats_module_names() {
+            assert!(
+                frame_modules.contains_key(*module_name),
+                "stats frame should include module payload for {module_name}"
+            );
+        }
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_stats_json(engine, ptr::null_mut(), 10) },
             0
@@ -3679,6 +3687,71 @@ mod tests {
         assert_eq!(value["players"][1]["is_team_0"], false);
         assert!(value.get("team_zero").is_some());
         assert!(value.get("team_one").is_some());
+        let team_module_names = [
+            "fifty_fifty",
+            "possession",
+            "pressure",
+            "rotation",
+            "rush",
+            "core",
+            "backboard",
+            "double_tap",
+            "one_timer",
+            "pass",
+            "ball_carry",
+            "air_dribble",
+            "boost",
+            "bump",
+            "half_volley",
+            "movement",
+            "powerslide",
+            "demo",
+        ];
+        let player_module_names = [
+            "core",
+            "backboard",
+            "ceiling_shot",
+            "wall_aerial",
+            "wall_aerial_shot",
+            "double_tap",
+            "one_timer",
+            "pass",
+            "fifty_fifty",
+            "speed_flip",
+            "half_flip",
+            "half_volley",
+            "wavedash",
+            "touch",
+            "whiff",
+            "flick",
+            "musty_flick",
+            "dodge_reset",
+            "ball_carry",
+            "air_dribble",
+            "boost",
+            "bump",
+            "movement",
+            "positioning",
+            "rotation",
+            "powerslide",
+            "demo",
+        ];
+        for module_name in team_module_names {
+            assert!(
+                value["team_zero"].get(module_name).is_some(),
+                "typed stats frame should include team_zero.{module_name}"
+            );
+            assert!(
+                value["team_one"].get(module_name).is_some(),
+                "typed stats frame should include team_one.{module_name}"
+            );
+        }
+        for module_name in player_module_names {
+            assert!(
+                value["players"][0].get(module_name).is_some(),
+                "typed stats frame should include player module {module_name}"
+            );
+        }
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_frame_json(engine, ptr::null_mut(), 10) },
             0
