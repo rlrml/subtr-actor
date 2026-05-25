@@ -4,11 +4,12 @@ This is an early BakkesMod integration spike. It is intentionally split into:
 
 - `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames and
   emits mechanics detected by `subtr-actor` calculators.
-- `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples the
-  local car and ball, calls the Rust ABI, and renders short on-screen labels.
+- `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
+  cars and the ball, calls the Rust ABI, and renders short on-screen labels.
 
-The current spike only feeds the local car. That is enough to test mechanics
-whose first pass can work from local kinematics and control state:
+The current spike feeds active cars from BakkesMod's server car list, falling
+back to the local car when that list is unavailable. That is enough to test
+mechanics whose first pass can work from live kinematics and control state:
 
 - speed flip
 - half flip
@@ -32,6 +33,22 @@ To test a local SDK checkout instead:
 
 The script builds the Rust ABI DLL, builds the C++ plugin, and copies
 `subtr_actor_bakkesmod.dll` next to the plugin DLL under the CMake build output.
+
+To install the built DLLs into the default local BakkesMod tree:
+
+```powershell
+.\bakkesmod\build-windows.ps1 -Install
+```
+
+To also add the plugin to BakkesMod's `cfg\plugins.cfg` autoload list:
+
+```powershell
+.\bakkesmod\build-windows.ps1 -Install -EnableAutoload
+```
+
+The install step copies `SubtrActorPlugin.dll` into BakkesMod's `plugins`
+directory and `subtr_actor_bakkesmod.dll` into `data\subtr-actor`, which is
+also where the plugin looks for the Rust ABI at runtime.
 
 ## Linux/Nix support
 

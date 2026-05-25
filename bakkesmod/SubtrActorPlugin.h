@@ -4,15 +4,18 @@
 #include <deque>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <windows.h>
 
 #pragma comment(lib, "pluginsdk.lib")
 
 #include "bakkesmod/plugin/bakkesmodplugin.h"
+#include "bakkesmod/wrappers/arraywrapper.h"
 #include "bakkesmod/wrappers/GameObject/BallWrapper.h"
 #include "bakkesmod/wrappers/GameObject/CarWrapper.h"
 #include "bakkesmod/wrappers/GameObject/CarComponent/BoostWrapper.h"
+#include "bakkesmod/wrappers/GameObject/PriWrapper.h"
 #include "bakkesmod/wrappers/GameEvent/ServerWrapper.h"
 #include "bakkesmod/wrappers/canvaswrapper.h"
 #include "subtr_actor_bakkesmod.h"
@@ -45,8 +48,10 @@ private:
 
   uint64_t frameNumber = 0;
   float lastTime = 0.0f;
-  float lastBoostAmount = 0.0f;
   bool loaded = false;
+  bool wasInGame = false;
+  std::vector<SaPlayerFrame> sampledPlayers;
+  std::unordered_map<uint32_t, float> lastBoostAmounts;
   std::deque<OverlayMessage> messages;
 
   bool loadRustLibrary();
@@ -55,6 +60,7 @@ private:
   void render(CanvasWrapper canvas);
   void pushEventMessage(const SaMechanicEvent &event);
   SaLiveFrame sampleFrame();
+  void samplePlayers(ServerWrapper server, CarWrapper localCar);
   SaRigidBody sampleRigidBody(ActorWrapper actor);
-  SaPlayerFrame sampleLocalPlayer(CarWrapper car);
+  SaPlayerFrame samplePlayer(CarWrapper car, uint32_t playerIndex);
 };

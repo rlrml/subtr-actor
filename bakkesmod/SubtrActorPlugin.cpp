@@ -1,5 +1,7 @@
 #include "SubtrActorPlugin.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 
@@ -13,6 +15,9 @@ namespace {
 
 constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
+constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
+
+int moduleAnchor = 0;
 
 SaVec3 toSaVec3(Vector value) {
   return SaVec3{value.X, value.Y, value.Z};
@@ -51,6 +56,40 @@ std::string mechanicLabel(SaMechanicKind kind) {
   }
 }
 
+std::filesystem::path currentModuleDirectory() {
+  HMODULE module = nullptr;
+  const BOOL foundModule = GetModuleHandleExW(
+      GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+      reinterpret_cast<LPCWSTR>(&moduleAnchor),
+      &module);
+  if (!foundModule || !module) {
+    return {};
+  }
+
+  std::array<wchar_t, 32768> pathBuffer{};
+  const DWORD length =
+      GetModuleFileNameW(module, pathBuffer.data(), static_cast<DWORD>(pathBuffer.size()));
+  if (length == 0 || length >= pathBuffer.size()) {
+    return {};
+  }
+
+  return std::filesystem::path(pathBuffer.data()).parent_path();
+}
+
+std::vector<std::filesystem::path> rustLibrarySearchPaths(GameWrapper *gameWrapper) {
+  std::vector<std::filesystem::path> paths;
+  const auto moduleDirectory = currentModuleDirectory();
+  if (!moduleDirectory.empty()) {
+    paths.push_back(moduleDirectory / RUST_DLL_NAME);
+  }
+  if (gameWrapper) {
+    paths.push_back(gameWrapper->GetDataFolder() / "subtr-actor" / RUST_DLL_NAME);
+  }
+  paths.emplace_back(RUST_DLL_NAME);
+  return paths;
+}
+
 } // namespace
 
 void SubtrActorPlugin::onLoad() {
@@ -75,13 +114,16 @@ void SubtrActorPlugin::onUnload() {
 }
 
 bool SubtrActorPlugin::loadRustLibrary() {
-  const auto dllPath =
-      gameWrapper->GetDataFolder() / "subtr-actor" / "subtr_actor_bakkesmod.dll";
-  rustLibrary = LoadLibraryW(dllPath.c_str());
-  if (!rustLibrary) {
-    rustLibrary = LoadLibraryW(L"subtr_actor_bakkesmod.dll");
+  for (const auto &dllPath : rustLibrarySearchPaths(gameWrapper.get())) {
+    rustLibrary = LoadLibraryW(dllPath.c_str());
+    if (rustLibrary) {
+      cvarManager->log(std::format("subtr-actor: loaded Rust ABI from {}", dllPath.string()));
+      break;
+    }
   }
   if (!rustLibrary) {
+    cvarManager->log(
+        std::format("subtr-actor: LoadLibrary failed with error {}", GetLastError()));
     return false;
   }
 
@@ -123,9 +165,31 @@ void SubtrActorPlugin::unloadRustLibrary() {
 }
 
 void SubtrActorPlugin::tick(std::string) {
-  if (!loaded || !engine || !gameWrapper->IsInGame()) {
+  if (!loaded || !engine) {
     return;
   }
+
+  if (!gameWrapper->IsInGame()) {
+    if (wasInGame && engineReset) {
+      engineReset(engine);
+      frameNumber = 0;
+      lastTime = 0.0f;
+      lastBoostAmounts.clear();
+      sampledPlayers.clear();
+      messages.clear();
+    }
+    wasInGame = false;
+    return;
+  }
+  if (!wasInGame && engineReset) {
+    engineReset(engine);
+    frameNumber = 0;
+    lastTime = 0.0f;
+    lastBoostAmounts.clear();
+    sampledPlayers.clear();
+    messages.clear();
+  }
+  wasInGame = true;
 
   SaLiveFrame frame = sampleFrame();
   if (processFrame(engine, &frame) != 0) {
@@ -141,15 +205,13 @@ void SubtrActorPlugin::tick(std::string) {
 
 SaLiveFrame SubtrActorPlugin::sampleFrame() {
   ServerWrapper server = gameWrapper->GetGameEventAsServer();
-  BallWrapper ball = server.GetBall();
   CarWrapper car = gameWrapper->GetLocalCar();
 
   const float now = server.IsNull() ? lastTime : server.GetSecondsElapsed();
   const float dt = frameNumber == 0 ? 0.0f : std::max(0.0f, now - lastTime);
   lastTime = now;
 
-  static SaPlayerFrame localPlayer;
-  localPlayer = sampleLocalPlayer(car);
+  samplePlayers(server, car);
 
   SaLiveFrame frame{};
   frame.frame_number = frameNumber++;
@@ -158,15 +220,40 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
   frame.live_play = 1;
   frame.ball_has_been_hit = 1;
   frame.has_ball_has_been_hit = 1;
-  frame.players = &localPlayer;
-  frame.player_count = car.IsNull() ? 0 : 1;
+  frame.players = sampledPlayers.empty() ? nullptr : sampledPlayers.data();
+  frame.player_count = sampledPlayers.size();
 
-  if (!ball.IsNull()) {
-    frame.has_ball = 1;
-    frame.ball = sampleRigidBody(ball);
+  if (!server.IsNull()) {
+    BallWrapper ball = server.GetBall();
+    if (!ball.IsNull()) {
+      frame.has_ball = 1;
+      frame.ball = sampleRigidBody(ball);
+    }
   }
 
   return frame;
+}
+
+void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) {
+  sampledPlayers.clear();
+
+  if (!server.IsNull()) {
+    ArrayWrapper<CarWrapper> cars = server.GetCars();
+    if (!cars.IsNull()) {
+      const int carCount = cars.Count();
+      sampledPlayers.reserve(static_cast<size_t>(std::max(0, carCount)));
+      for (int i = 0; i < carCount; i += 1) {
+        CarWrapper car = cars.Get(i);
+        if (!car.IsNull()) {
+          sampledPlayers.push_back(samplePlayer(car, static_cast<uint32_t>(i)));
+        }
+      }
+    }
+  }
+
+  if (sampledPlayers.empty() && !localCar.IsNull()) {
+    sampledPlayers.push_back(samplePlayer(localCar, 0));
+  }
 }
 
 SaRigidBody SubtrActorPlugin::sampleRigidBody(ActorWrapper actor) {
@@ -186,13 +273,18 @@ SaRigidBody SubtrActorPlugin::sampleRigidBody(ActorWrapper actor) {
   return body;
 }
 
-SaPlayerFrame SubtrActorPlugin::sampleLocalPlayer(CarWrapper car) {
+SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerIndex) {
   SaPlayerFrame player{};
-  player.player_index = 0;
+  player.player_index = playerIndex;
   player.is_team_0 = 1;
   if (car.IsNull()) {
     player.has_rigid_body = 0;
     return player;
+  }
+
+  PriWrapper pri = car.GetPRI();
+  if (!pri.IsNull()) {
+    player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
   }
 
   player.has_rigid_body = 1;
@@ -203,10 +295,12 @@ SaPlayerFrame SubtrActorPlugin::sampleLocalPlayer(CarWrapper car) {
 
   BoostWrapper boost = car.GetBoostComponent();
   if (!boost.IsNull()) {
+    const auto previousBoost = lastBoostAmounts.find(playerIndex);
     player.boost_amount = boost.GetCurrentBoostAmount();
-    player.last_boost_amount = lastBoostAmount;
-    player.boost_active = player.boost_amount < lastBoostAmount ? 1 : 0;
-    lastBoostAmount = player.boost_amount;
+    player.last_boost_amount =
+        previousBoost == lastBoostAmounts.end() ? player.boost_amount : previousBoost->second;
+    player.boost_active = player.boost_amount < player.last_boost_amount ? 1 : 0;
+    lastBoostAmounts[playerIndex] = player.boost_amount;
   }
 
   return player;

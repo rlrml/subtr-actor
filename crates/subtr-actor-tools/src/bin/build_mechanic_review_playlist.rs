@@ -16,8 +16,8 @@ use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
     DoubleTapCalculator, FlickCalculator, FlipResetTracker, GoalEvent, HalfFlipCalculator,
-    MustyFlickCalculator, OneTimerCalculator, PlayerId, PlayerInfo, ReplayMeta, ReplayProcessor,
-    SpeedFlipCalculator, SubtrActorResult, TimeAdvance, WavedashCalculator,
+    MustyFlickCalculator, OneTimerCalculator, PlayerId, PlayerInfo, ProcessorView, ReplayMeta,
+    ReplayProcessor, SpeedFlipCalculator, SubtrActorResult, TimeAdvance, WavedashCalculator,
 };
 
 const BALLCHASING_API_BASE_URL: &str = "https://ballchasing.com/api";
@@ -303,7 +303,7 @@ struct GoalScanCollector;
 impl Collector for GoalScanCollector {
     fn process_frame(
         &mut self,
-        _processor: &ReplayProcessor,
+        _processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         _frame_number: usize,
         _current_time: f32,
