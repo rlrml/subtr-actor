@@ -530,12 +530,14 @@ void SubtrActorPlugin::hookGameEvents() {
       [this](ServerWrapper server, void *params, std::string) {
         auto goal = GoalWrapper(0);
         int scoreIndex = -1;
+        int assistIndex = -1;
         if (params) {
           const auto *goalParams = static_cast<const GoalScoredParams *>(params);
           goal = GoalWrapper(goalParams->goal);
           scoreIndex = goalParams->scoreIndex;
+          assistIndex = goalParams->assistIndex;
         }
-        recordGoal(server, goal, scoreIndex);
+        recordGoal(server, goal, scoreIndex, assistIndex);
       });
 
   gameWrapper->HookEventWithCallerPost<CarWrapper>(
@@ -850,6 +852,7 @@ void SubtrActorPlugin::resetLiveState() {
   uniqueIdPlayerIndices.clear();
   stablePriPlayerIndices.clear();
   lastPlayerStats.clear();
+  suppressedPlayerStatDeltas.clear();
   lastDoubleJumped.clear();
   lastBallTouchFrames.clear();
   dodgeRefreshCounters.clear();
@@ -968,7 +971,11 @@ void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventK
   pendingBoostPadEvents.push_back(event);
 }
 
-void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex) {
+void SubtrActorPlugin::recordGoal(
+    ServerWrapper server,
+    GoalWrapper goal,
+    int scoreIndex,
+    int assistIndex) {
   SaGoalEvent event{};
   if (!goal.IsNull()) {
     event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
@@ -987,6 +994,8 @@ void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal, int sc
   }
   sampleTeamScores(server, event);
   pendingGoals.push_back(event);
+
+  recordExplicitPlayerStat(priForScoreIndex(server, assistIndex), SaPlayerStatEventKindAssist);
 }
 
 void SubtrActorPlugin::recordDemolish(CarWrapper victim, ActorWrapper demolisher) {
@@ -1030,8 +1039,20 @@ void SubtrActorPlugin::recordPlayerStatDeltas(
     return;
   }
 
-  auto pushStats = [&](int previous, int next, SaPlayerStatEventKind kind) {
-    for (int i = previous; i < next; i += 1) {
+  auto suppressions = suppressedPlayerStatDeltas.find(pri.memory_address);
+  auto consumeSuppressed = [&](int count, int PlayerStatSnapshot::*field) {
+    if (count <= 0 || suppressions == suppressedPlayerStatDeltas.end()) {
+      return count;
+    }
+
+    int &suppressed = suppressions->second.*field;
+    const int consumed = std::min(count, suppressed);
+    suppressed -= consumed;
+    return count - consumed;
+  };
+  auto pushStats = [&](int previous, int next, SaPlayerStatEventKind kind, int PlayerStatSnapshot::*field) {
+    const int count = consumeSuppressed(next - previous, field);
+    for (int i = 0; i < count; i += 1) {
       SaPlayerStatEvent event{};
       event.player_index = playerIndex;
       event.is_team_0 = isTeam0;
@@ -1055,10 +1076,51 @@ void SubtrActorPlugin::recordPlayerStatDeltas(
       pendingPlayerStatEvents.push_back(event);
     }
   };
-  pushStats(it->second.shots, current.shots, SaPlayerStatEventKindShot);
-  pushStats(it->second.saves, current.saves, SaPlayerStatEventKindSave);
-  pushStats(it->second.assists, current.assists, SaPlayerStatEventKindAssist);
+  pushStats(it->second.shots, current.shots, SaPlayerStatEventKindShot, &PlayerStatSnapshot::shots);
+  pushStats(it->second.saves, current.saves, SaPlayerStatEventKindSave, &PlayerStatSnapshot::saves);
+  pushStats(
+      it->second.assists,
+      current.assists,
+      SaPlayerStatEventKindAssist,
+      &PlayerStatSnapshot::assists);
   it->second = current;
+  if (suppressions != suppressedPlayerStatDeltas.end() &&
+      suppressions->second.shots == 0 &&
+      suppressions->second.saves == 0 &&
+      suppressions->second.assists == 0 &&
+      suppressions->second.demolishes == 0) {
+    suppressedPlayerStatDeltas.erase(suppressions);
+  }
+}
+
+void SubtrActorPlugin::recordExplicitPlayerStat(PriWrapper pri, SaPlayerStatEventKind kind) {
+  if (pri.IsNull()) {
+    return;
+  }
+
+  const auto playerIndex = playerIndexForPri(pri);
+  if (!playerIndex) {
+    return;
+  }
+
+  SaPlayerStatEvent event{};
+  event.player_index = *playerIndex;
+  event.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
+  event.kind = kind;
+  pendingPlayerStatEvents.push_back(event);
+
+  if (lastPlayerStats.find(pri.memory_address) == lastPlayerStats.end()) {
+    return;
+  }
+
+  PlayerStatSnapshot &suppressed = suppressedPlayerStatDeltas[pri.memory_address];
+  if (kind == SaPlayerStatEventKindShot) {
+    suppressed.shots += 1;
+  } else if (kind == SaPlayerStatEventKindSave) {
+    suppressed.saves += 1;
+  } else if (kind == SaPlayerStatEventKindAssist) {
+    suppressed.assists += 1;
+  }
 }
 
 std::optional<uint32_t> SubtrActorPlugin::playerIndexForCar(CarWrapper car) {
@@ -1093,19 +1155,23 @@ std::optional<uint32_t> SubtrActorPlugin::playerIndexForPri(PriWrapper pri) {
   return playerIndex;
 }
 
-std::optional<uint32_t> SubtrActorPlugin::playerIndexForScoreIndex(
-    ServerWrapper server,
-    int scoreIndex) {
+PriWrapper SubtrActorPlugin::priForScoreIndex(ServerWrapper server, int scoreIndex) {
   if (server.IsNull() || scoreIndex < 0) {
-    return std::nullopt;
+    return PriWrapper(0);
   }
 
   ArrayWrapper<PriWrapper> pris = server.GetPRIs();
   if (pris.IsNull() || scoreIndex >= pris.Count()) {
-    return std::nullopt;
+    return PriWrapper(0);
   }
 
-  return playerIndexForPri(pris.Get(scoreIndex));
+  return pris.Get(scoreIndex);
+}
+
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForScoreIndex(
+    ServerWrapper server,
+    int scoreIndex) {
+  return playerIndexForPri(priForScoreIndex(server, scoreIndex));
 }
 
 std::optional<uint32_t> SubtrActorPlugin::playerIndexForNearestCar(

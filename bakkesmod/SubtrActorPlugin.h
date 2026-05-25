@@ -109,6 +109,7 @@ private:
   std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
+  std::unordered_map<uintptr_t, PlayerStatSnapshot> suppressedPlayerStatDeltas;
   std::unordered_map<uint32_t, bool> lastDoubleJumped;
   std::unordered_map<uint32_t, uint64_t> lastBallTouchFrames;
   std::unordered_map<uint32_t, int32_t> dodgeRefreshCounters;
@@ -141,11 +142,13 @@ private:
   void recordTouch(CarWrapper car);
   void recordDodgeRefreshFromJumpState(CarWrapper car, uint32_t playerIndex, uint8_t isTeam0);
   void recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind);
-  void recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex);
+  void recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex, int assistIndex);
   void recordDemolish(CarWrapper victim, ActorWrapper demolisher);
   void recordPlayerStatDeltas(PriWrapper pri, uint32_t playerIndex, uint8_t isTeam0);
+  void recordExplicitPlayerStat(PriWrapper pri, SaPlayerStatEventKind kind);
   std::optional<uint32_t> playerIndexForCar(CarWrapper car);
   std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
+  PriWrapper priForScoreIndex(ServerWrapper server, int scoreIndex);
   std::optional<uint32_t> playerIndexForScoreIndex(ServerWrapper server, int scoreIndex);
   std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
   uint32_t stablePlayerIndexForPri(PriWrapper pri, uint32_t fallbackIndex);
