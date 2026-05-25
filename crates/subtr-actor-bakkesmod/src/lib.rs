@@ -1598,6 +1598,76 @@ mod tests {
     }
 
     #[test]
+    fn finish_drains_finalized_live_ball_carry_events() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let mut events = [SaMechanicEvent {
+            kind: SaMechanicKind::SpeedFlip,
+            player_index: 0,
+            is_team_0: 0,
+            frame_number: 0,
+            time: 0.0,
+            confidence: 0.0,
+        }; 4];
+
+        for frame_number in 1..=12 {
+            let players = [player_at(SaVec3 {
+                x: frame_number as f32 * 20.0,
+                y: 0.0,
+                z: 20.0,
+            })];
+            let mut frame = live_frame(
+                frame_number,
+                rigid_body(
+                    SaVec3 {
+                        x: frame_number as f32 * 20.0,
+                        y: 0.0,
+                        z: 120.0,
+                    },
+                    SaVec3::default(),
+                ),
+                &players,
+            );
+            frame.has_live_play = 1;
+            if frame_number == 1 {
+                let touches = [SaTouchEvent {
+                    player_index: 0,
+                    has_player: 1,
+                    is_team_0: 1,
+                    closest_approach_distance: 0.0,
+                    has_closest_approach_distance: 1,
+                }];
+                frame.touches = touches.as_ptr();
+                frame.touch_count = touches.len();
+                assert_eq!(
+                    unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+                    0
+                );
+            } else {
+                assert_eq!(
+                    unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+                    0
+                );
+            }
+        }
+
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
+            },
+            0
+        );
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        let count = unsafe {
+            subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
+        };
+        assert_eq!(count, 1);
+        assert_eq!(events[0].kind, SaMechanicKind::BallCarry);
+        assert_eq!(events[0].player_index, 0);
+        assert_eq!(events[0].is_team_0, 1);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
     fn finish_rejects_null_engine() {
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(ptr::null_mut()) }, -1);
     }
