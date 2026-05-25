@@ -1314,7 +1314,7 @@ function renderInvolvementPage(finalFrame: StatsFrame, definitions: StatDefiniti
   page.append(
     el("p", {
       className: "stats-report-note",
-      text: "Experimental mechanic detectors such as musty flicks, speed flips, dodge resets, and ceiling shots are kept in All stats until their precision is stronger.",
+      text: "Experimental mechanic detectors such as musty flicks, speed flips, dodge refreshes, and ceiling shots are kept in All stats until their precision is stronger.",
     }),
   );
   return page;

@@ -493,8 +493,8 @@ export function renderDodgeResetStats(
   dodgeReset: PlayerStatsSnapshot["dodge_reset"] | undefined,
 ): string {
   return `
-    <div class="stat-row"><span class="label">Count</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
-    <div class="stat-row"><span class="label">On ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
+    <div class="stat-row"><span class="label">Refreshes</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
+    <div class="stat-row"><span class="label">Flip resets</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
   `;
 }
 

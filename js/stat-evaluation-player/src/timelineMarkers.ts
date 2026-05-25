@@ -646,13 +646,16 @@ export function buildDodgeResetTimelineEvents(
       for (let index = 0; index < delta; index += 1) {
         const sequence = currentCount - delta + index + 1;
         const onBall = index < onBallDelta;
+        if (onBall) {
+          continue;
+        }
         events.push({
-          id: `dodge-reset:${frame.frame_number}:${playerId}:${sequence}:${onBall ? "ball" : "air"}`,
+          id: `dodge-reset:${frame.frame_number}:${playerId}:${sequence}:air`,
           time: eventTime,
           frame: frame.frame_number,
           kind: "dodge-reset",
-          label: onBall ? `${player.name} ball reset` : `${player.name} dodge reset`,
-          shortLabel: onBall ? "BR" : "DR",
+          label: `${player.name} dodge refresh`,
+          shortLabel: "DR",
           playerId,
           playerName: player.name,
           isTeamZero: player.is_team_0,

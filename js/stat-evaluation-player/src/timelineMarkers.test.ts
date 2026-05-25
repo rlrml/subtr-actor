@@ -778,7 +778,7 @@ test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", 
   ]);
 });
 
-test("buildDodgeResetTimelineEvents distinguishes on-ball resets", () => {
+test("buildDodgeResetTimelineEvents emits non-flip-reset dodge refreshes", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
   } as ReplayModel;
@@ -824,23 +824,11 @@ test("buildDodgeResetTimelineEvents distinguishes on-ball resets", () => {
 
   assert.deepEqual(buildDodgeResetTimelineEvents(statsTimeline, replay), [
     {
-      id: "dodge-reset:1:Steam:blue-id:1:ball",
-      time: 1.5,
-      frame: 1,
-      kind: "dodge-reset",
-      label: "Blue ball reset",
-      shortLabel: "BR",
-      playerId: "Steam:blue-id",
-      playerName: "Blue",
-      isTeamZero: true,
-      color: "#3b82f6",
-    },
-    {
       id: "dodge-reset:2:Steam:blue-id:2:air",
       time: 2.25,
       frame: 2,
       kind: "dodge-reset",
-      label: "Blue dodge reset",
+      label: "Blue dodge refresh",
       shortLabel: "DR",
       playerId: "Steam:blue-id",
       playerName: "Blue",
@@ -1623,6 +1611,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    24,
+    23,
   );
 });

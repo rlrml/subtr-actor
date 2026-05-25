@@ -2641,7 +2641,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "bump:events": "Bump",
     "ceiling-shot:events": "Ceiling shot",
     "demo:events": "Demo",
-    "dodge-reset:events": "Dodge reset",
+    "dodge-reset:events": "Dodge refresh",
     "double-tap:events": "Double tap",
     "fifty-fifty:events": "50/50",
     "half-flip:events": "Half flip",
