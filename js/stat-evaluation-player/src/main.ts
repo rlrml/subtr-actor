@@ -1542,13 +1542,11 @@ function formatReplayLoadStateProgress(progress: ReplayLoadProgress | null): str
   }
   const label = formatReplayLoadProgress(progress);
   if (progress.processedFrames !== undefined) {
-    const total =
-      progress.totalFrames !== undefined ? ` / ${progress.totalFrames}` : "";
+    const total = progress.totalFrames !== undefined ? ` / ${progress.totalFrames}` : "";
     return `${label} (${progress.processedFrames}${total} frames)`;
   }
   if (progress.processedChunks !== undefined) {
-    const total =
-      progress.totalChunks !== undefined ? ` / ${progress.totalChunks}` : "";
+    const total = progress.totalChunks !== undefined ? ` / ${progress.totalChunks}` : "";
     return `${label} (${progress.processedChunks}${total} chunks)`;
   }
   return label;
@@ -1567,16 +1565,12 @@ function mechanicsReviewReplayLoadStatusText(state: MechanicsReviewReplayLoadSta
   return state.error ? `Failed: ${state.error}` : "Failed";
 }
 
-function mechanicsReviewReplayLoadProgressValue(
-  state: MechanicsReviewReplayLoadState,
-): number {
+function mechanicsReviewReplayLoadProgressValue(state: MechanicsReviewReplayLoadState): number {
   if (state.status === "loaded") {
     return 1;
   }
   const value = state.progress?.progress;
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.max(0, Math.min(1, value))
-    : 0;
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 }
 
 function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null): void {
@@ -3454,10 +3448,7 @@ export function mountStatEvaluationPlayer(root: HTMLElement): StatEvaluationPlay
     root,
     "#mechanics-review-replay-load-summary",
   );
-  mechanicsReviewReplayLoads = mustElement<HTMLDivElement>(
-    root,
-    "#mechanics-review-replay-loads",
-  );
+  mechanicsReviewReplayLoads = mustElement<HTMLDivElement>(root, "#mechanics-review-replay-loads");
   mechanicsReviewCount = mustElement<HTMLElement>(root, "#mechanics-review-count");
   mechanicsReviewList = mustElement<HTMLDivElement>(root, "#mechanics-review-list");
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(

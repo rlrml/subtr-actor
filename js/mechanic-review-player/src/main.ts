@@ -343,8 +343,7 @@ function formatProgress(progress: PlaylistSourceLoadProgress | null): string {
     return `Fetching ${formatBytes(progress.processedBytes)}${total}`;
   }
   if (progress.stage && typeof progress.processedFrames === "number") {
-    const total =
-      typeof progress.totalFrames === "number" ? ` / ${progress.totalFrames}` : "";
+    const total = typeof progress.totalFrames === "number" ? ` / ${progress.totalFrames}` : "";
     return `${progress.stage} ${progress.processedFrames}${total} frames`;
   }
   if (progress.stage && fraction !== null) {

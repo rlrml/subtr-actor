@@ -42,9 +42,7 @@ async function replayFormatFixtureNames(): Promise<string[]> {
     throw new Error(`unknown SUBTR_ACTOR_REPLAY_FIXTURE_MODE: ${mode}`);
   }
 
-  const smokeFixtures = uniqueFixtures.filter((fixture) =>
-    SMOKE_FIXTURES.has(fixture)
-  );
+  const smokeFixtures = uniqueFixtures.filter((fixture) => SMOKE_FIXTURES.has(fixture));
   assert.equal(
     smokeFixtures.length,
     SMOKE_FIXTURES.size,
@@ -54,10 +52,7 @@ async function replayFormatFixtureNames(): Promise<string[]> {
 }
 
 function fixtureConcurrency(): number {
-  const requested = Number.parseInt(
-    process.env.SUBTR_ACTOR_REPLAY_FIXTURE_CONCURRENCY ?? "1",
-    10,
-  );
+  const requested = Number.parseInt(process.env.SUBTR_ACTOR_REPLAY_FIXTURE_CONCURRENCY ?? "1", 10);
   return Number.isFinite(requested) && requested > 0 ? requested : 1;
 }
 
