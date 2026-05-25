@@ -8,7 +8,7 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
+    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
     builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
@@ -324,6 +324,7 @@ pub struct SaEngine {
     frame_json: Vec<u8>,
     timeline_json: Vec<u8>,
     stats_json: Vec<u8>,
+    analysis_nodes_json: Vec<u8>,
     graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
@@ -331,7 +332,14 @@ pub struct SaEngine {
     pending_goal_context_events: Vec<SaGoalContextEvent>,
 }
 
-const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &["events", "frame", "timeline", "stats", "graph_info"];
+const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
+    "events",
+    "frame",
+    "timeline",
+    "stats",
+    "analysis_nodes",
+    "graph_info",
+];
 
 impl Default for SaEngine {
     fn default() -> Self {
@@ -350,6 +358,7 @@ impl Default for SaEngine {
             frame_json: Vec::new(),
             timeline_json: Vec::new(),
             stats_json: Vec::new(),
+            analysis_nodes_json: Vec::new(),
             graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
@@ -1937,6 +1946,13 @@ fn serialize_stats_graph_snapshot(engine: &SaEngine) -> Vec<u8> {
     }
 }
 
+fn serialize_analysis_nodes_snapshot(engine: &SaEngine) -> Vec<u8> {
+    match builtin_analysis_nodes_json(&engine.graph) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
 unsafe fn serialize_named_analysis_node(
     engine: *const SaEngine,
     node_name: *const c_char,
@@ -2017,6 +2033,7 @@ fn live_graph_output_bytes<'a>(engine: &'a SaEngine, output_name: &str) -> Optio
         "frame" => Some(&engine.frame_json),
         "timeline" => Some(&engine.timeline_json),
         "stats" => Some(&engine.stats_json),
+        "analysis_nodes" => Some(&engine.analysis_nodes_json),
         "graph_info" => Some(&engine.graph_info_json),
         _ => None,
     }
@@ -2032,6 +2049,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         engine.frame_json.clear();
         engine.timeline_json.clear();
         engine.stats_json.clear();
+        engine.analysis_nodes_json.clear();
         return;
     };
     push_drainable_events_from_timeline(
@@ -2057,6 +2075,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         engine.timeline_frames.clone(),
     );
     engine.stats_json = serialize_stats_graph_snapshot(engine);
+    engine.analysis_nodes_json = serialize_analysis_nodes_snapshot(engine);
 }
 
 /// Creates an opaque live-analysis engine.
@@ -2535,8 +2554,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_config_json(
 #[no_mangle]
 /// Returns the UTF-8 byte length of one named live graph output JSON payload.
 ///
-/// `output_name` must be one of `events`, `frame`, `timeline`, `stats`, or
-/// `graph_info`, which are also reported by graph info JSON.
+/// `output_name` must be one of `events`, `frame`, `timeline`, `stats`,
+/// `analysis_nodes`, or `graph_info`, which are also reported by graph info
+/// JSON.
 ///
 /// # Safety
 ///
@@ -4176,6 +4196,40 @@ mod tests {
         let bytes =
             serde_json::to_vec(&value).expect("direct graph analysis node should serialize");
         serde_json::from_slice(&bytes).expect("direct graph analysis node json should be valid")
+    }
+
+    fn direct_full_graph_analysis_nodes_json_value(frames: &[SaLiveFrame]) -> serde_json::Value {
+        let mut engine = SaEngine::default();
+        let mut graph = graph_with_all_analysis_nodes();
+
+        for frame in frames {
+            let players = live_frame_players(frame);
+            let explicit_events = unsafe { frame_event_slices(frame) }
+                .expect("test frame explicit event pointers should be valid");
+            let signature = live_replay_meta_signature(players);
+            if !engine.live_replay_meta_initialized
+                || engine.live_replay_meta_signature != signature
+            {
+                let replay_meta = live_replay_meta(players);
+                graph
+                    .on_replay_meta(&replay_meta)
+                    .expect("direct graph should accept replay metadata");
+                engine.live_replay_meta_initialized = true;
+                engine.live_replay_meta = Some(replay_meta);
+                engine.live_replay_meta_signature = signature;
+            }
+            let frame_input = frame_input(&mut engine, frame, players, &explicit_events);
+            graph
+                .evaluate_with_state(&frame_input)
+                .expect("direct graph should evaluate live frame input");
+        }
+
+        graph.finish().expect("direct graph should finish");
+        let value = builtin_analysis_nodes_json(&graph)
+            .expect("direct graph should serialize all analysis nodes");
+        let bytes =
+            serde_json::to_vec(&value).expect("direct graph analysis nodes should serialize");
+        serde_json::from_slice(&bytes).expect("direct graph analysis nodes json should be valid")
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -6677,6 +6731,21 @@ mod tests {
             live_graph_output_json_value(engine, "stats"),
             live_stats_json_value(engine)
         );
+        let analysis_nodes = live_graph_output_json_value(engine, "analysis_nodes");
+        assert_eq!(
+            analysis_nodes,
+            direct_full_graph_analysis_nodes_json_value(&frames),
+            "named all-node graph output should match the shared full graph"
+        );
+        for node_name in builtin_analysis_node_names() {
+            assert_eq!(
+                analysis_nodes
+                    .get(*node_name)
+                    .unwrap_or_else(|| panic!("analysis_nodes should include {node_name}")),
+                &live_analysis_node_json_value(engine, node_name),
+                "analysis_nodes output should include the same payload as named node {node_name}"
+            );
+        }
         assert_eq!(
             live_graph_output_json_value(engine, "graph_info"),
             live_graph_info_json_value(engine)

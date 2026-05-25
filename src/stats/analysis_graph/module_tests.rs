@@ -1,13 +1,14 @@
 use super::*;
 use crate::{
-    builtin_analysis_node_json, builtin_stats_module_names, AerialGoalCalculator,
-    AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator, BumpCalculator,
-    CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator,
-    FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator,
-    HalfVolleyGoalCalculator, HighAerialGoalCalculator, LongDistanceGoalCalculator,
-    MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState, RotationCalculator,
-    StatsTimelineCollector, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_module_names,
+    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
+    BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
+    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
+    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
+    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState,
+    RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -174,6 +175,22 @@ fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
         assert!(
             !value.is_null(),
             "builtin analysis node should expose non-null JSON: {name}"
+        );
+    }
+    let all_nodes = builtin_analysis_nodes_json(&graph)
+        .expect("all builtin analysis nodes should serialize together");
+    let all_nodes = all_nodes
+        .as_object()
+        .expect("all builtin analysis node JSON should be an object");
+    assert_eq!(all_nodes.len(), builtin_analysis_node_names().len());
+    for name in builtin_analysis_node_names() {
+        assert_eq!(
+            all_nodes.get(*name),
+            Some(
+                &builtin_analysis_node_json(name, &graph)
+                    .unwrap_or_else(|_| panic!("builtin analysis node should serialize: {name}"))
+            ),
+            "all-node analysis JSON should include node {name}"
         );
     }
 

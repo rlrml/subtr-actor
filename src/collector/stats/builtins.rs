@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::stats::analysis_graph::{
-    AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
+    builtin_analysis_node_names, AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
 };
 use crate::*;
 use boxcars::{Quaternion, RigidBody, Vector3f};
@@ -1082,6 +1082,17 @@ pub fn builtin_analysis_node_json(
         }
     };
     Ok(value)
+}
+
+pub fn builtin_analysis_nodes_json(graph: &AnalysisGraph) -> SubtrActorResult<Value> {
+    let mut values = Map::new();
+    for node_name in builtin_analysis_node_names() {
+        values.insert(
+            (*node_name).to_owned(),
+            builtin_analysis_node_json(node_name, graph)?,
+        );
+    }
+    Ok(Value::Object(values))
 }
 
 pub(crate) fn builtin_snapshot_frame_json(
