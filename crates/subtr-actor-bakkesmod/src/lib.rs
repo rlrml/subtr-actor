@@ -5798,6 +5798,65 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
+        let frame_events_node = live_analysis_node_json_value(engine, "frame_events_state");
+        assert_eq!(
+            frame_events_node["touch_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["dodge_refreshed_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["boost_pad_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["goal_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["player_stat_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["demo_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["active_demos"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            frame_events_node["boost_pad_events"][0]["pad_id"],
+            serde_json::json!("34")
+        );
+        assert_eq!(
+            frame_events_node["goal_events"][0]["team_zero_score"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            frame_events_node["player_stat_events"][0]["kind"],
+            serde_json::json!("Shot")
+        );
+        assert_eq!(
+            frame_events_node["demo_events"][0]["victim"],
+            serde_json::json!({"SplitScreen": 1})
+        );
+        assert_eq!(
+            live_graph_output_json_value(engine, "analysis_nodes")["frame_events_state"],
+            frame_events_node,
+            "bulk analysis_nodes output should include the callable frame_events_state payload"
+        );
         let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
         assert!(json_len > 0);
         let mut event_json_bytes = vec![0; json_len];
