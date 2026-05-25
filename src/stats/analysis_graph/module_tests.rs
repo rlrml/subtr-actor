@@ -79,6 +79,25 @@ fn every_builtin_analysis_node_name_builds() {
 }
 
 #[test]
+fn core_alias_and_match_stats_share_one_provider() {
+    assert_eq!(builtin_analysis_node_aliases()[0].alias, "core");
+    assert_eq!(builtin_analysis_node_aliases()[0].node_name, "match_stats");
+
+    let mut graph = graph_with_builtin_analysis_nodes(["core", "match_stats"])
+        .expect("core alias and match_stats should be accepted together");
+    graph
+        .resolve()
+        .expect("core alias and match_stats should not duplicate providers");
+
+    let names = graph.node_names().collect::<Vec<_>>();
+    assert_eq!(
+        names.iter().filter(|name| **name == "match_stats").count(),
+        1
+    );
+    assert!(!names.contains(&"core"));
+}
+
+#[test]
 fn every_resolved_shared_graph_node_name_is_directly_callable() {
     let mut graph = graph_with_all_analysis_nodes();
     graph.resolve().expect("shared graph should resolve");

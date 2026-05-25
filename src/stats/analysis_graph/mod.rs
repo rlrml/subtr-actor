@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use serde::Serialize;
+
 use crate::Collector;
 use crate::{SubtrActorError, SubtrActorErrorVariant, SubtrActorResult};
 
@@ -86,8 +88,36 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "stats_timeline_events",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct BuiltinAnalysisNodeAlias {
+    pub alias: &'static str,
+    pub node_name: &'static str,
+}
+
+pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] =
+    &[BuiltinAnalysisNodeAlias {
+        alias: "core",
+        node_name: "match_stats",
+    }];
+
 pub fn builtin_analysis_node_names() -> &'static [&'static str] {
     BUILTIN_ANALYSIS_NODE_NAMES
+}
+
+pub fn builtin_analysis_node_aliases() -> &'static [BuiltinAnalysisNodeAlias] {
+    BUILTIN_ANALYSIS_NODE_ALIASES
+}
+
+fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
+    builtin_analysis_node_aliases()
+        .iter()
+        .find_map(|alias| (alias.alias == name).then_some(alias.node_name))
+        .or_else(|| {
+            builtin_analysis_node_names()
+                .iter()
+                .copied()
+                .find(|candidate| *candidate == name)
+        })
 }
 
 pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn AnalysisNodeDyn>> {
@@ -164,10 +194,15 @@ where
     let mut seen = HashSet::new();
     for name in names {
         let name = name.as_ref();
-        if !seen.insert(name.to_owned()) {
+        let canonical_name = canonical_builtin_analysis_node_name(name).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
+                name.to_owned(),
+            ))
+        })?;
+        if !seen.insert(canonical_name) {
             continue;
         }
-        graph.push_boxed_node(boxed_analysis_node_by_name(name).ok_or_else(|| {
+        graph.push_boxed_node(boxed_analysis_node_by_name(canonical_name).ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
                 name.to_owned(),
             ))

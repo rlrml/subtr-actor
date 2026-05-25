@@ -8,8 +8,8 @@ use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
     builtin_stats_graph_snapshot_json, builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
-        builtin_analysis_node_names, graph_with_all_analysis_nodes, AnalysisGraph,
-        StatsTimelineEventsState, StatsTimelineFrameState,
+        builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
+        AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
@@ -362,6 +362,7 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
     let node_names = graph.node_names().collect::<Vec<_>>();
     serde_json::to_vec(&serde_json::json!({
         "builtin_analysis_node_names": builtin_analysis_node_names(),
+        "builtin_analysis_node_aliases": builtin_analysis_node_aliases(),
         "builtin_stats_module_names": builtin_stats_module_names(),
         "node_names": node_names,
         "dag": dag,
@@ -3152,6 +3153,12 @@ mod tests {
         assert!(builtin_names
             .iter()
             .any(|name| name == "stats_timeline_events"));
+        let builtin_aliases = value["builtin_analysis_node_aliases"]
+            .as_array()
+            .expect("builtin aliases should be an array");
+        assert!(builtin_aliases
+            .iter()
+            .any(|alias| alias["alias"] == "core" && alias["node_name"] == "match_stats"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
