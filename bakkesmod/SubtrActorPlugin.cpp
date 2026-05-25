@@ -509,6 +509,12 @@ void SubtrActorPlugin::onLoad() {
       "Writes one named graph-backed stats module JSON. Usage: "
       "subtr_actor_dump_stats_module <module_name> [finish]",
       PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_dump_graph_output",
+      [this](std::vector<std::string> params) { dumpGraphOutputJson(params); },
+      "Writes one named graph output JSON. Usage: "
+      "subtr_actor_dump_graph_output <events|frame|timeline|stats|graph_info> [finish]",
+      PERMISSION_ALL);
   hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
@@ -621,6 +627,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_module_json_len"));
   writeStatsModuleJson = reinterpret_cast<WriteStatsModuleJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_module_json"));
+  graphOutputJsonLen = reinterpret_cast<GraphOutputJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_output_json_len"));
+  writeGraphOutputJson = reinterpret_cast<WriteGraphOutputJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_graph_output_json"));
   graphInfoJsonLen = reinterpret_cast<GraphInfoJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
@@ -635,8 +645,9 @@ bool SubtrActorPlugin::loadRustLibrary() {
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
       !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
-      !statsModuleJsonLen || !writeStatsModuleJson || !graphInfoJsonLen ||
-      !writeGraphInfoJson || !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
+      !statsModuleJsonLen || !writeStatsModuleJson || !graphOutputJsonLen ||
+      !writeGraphOutputJson || !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents ||
+      !drainTeamEvents || !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -673,6 +684,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeStatsJson = nullptr;
   statsModuleJsonLen = nullptr;
   writeStatsModuleJson = nullptr;
+  graphOutputJsonLen = nullptr;
+  writeGraphOutputJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
@@ -1549,6 +1562,71 @@ void SubtrActorPlugin::dumpStatsModuleJson(std::vector<std::string> params) {
       shouldFinish ? " after finish" : "",
       modulePath.string(),
       moduleJson.size()));
+}
+
+void SubtrActorPlugin::dumpGraphOutputJson(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: graph output dump requested before engine was loaded");
+    return;
+  }
+  if (params.size() < 2) {
+    cvarManager->log(
+        "subtr-actor: usage: subtr_actor_dump_graph_output <output_name> [finish]");
+    return;
+  }
+
+  const std::string outputName = params[1];
+  const bool shouldFinish =
+      std::find_if(params.begin() + 2, params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log("subtr-actor: graph output dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(
+          std::format("subtr-actor: graph finish failed before output dump: {}", finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  const std::string outputJson =
+      readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, outputName);
+  if (outputJson.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph output '{}' was unavailable or produced empty JSON", outputName));
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(std::format(
+        "subtr-actor: failed to create graph output dump directory: {}", error.message()));
+    return;
+  }
+
+  const std::filesystem::path outputPath =
+      outputDirectory / std::format("graph-output-{}.json", safeModuleFileStem(outputName));
+  std::ofstream outputFile(outputPath, std::ios::binary);
+  outputFile.write(outputJson.data(), static_cast<std::streamsize>(outputJson.size()));
+  if (!outputFile) {
+    cvarManager->log("subtr-actor: failed to write graph output JSON snapshot");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote graph output '{}' JSON{}: {} ({} bytes)",
+      outputName,
+      shouldFinish ? " after finish" : "",
+      outputPath.string(),
+      outputJson.size()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

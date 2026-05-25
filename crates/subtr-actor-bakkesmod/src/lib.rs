@@ -330,6 +330,8 @@ pub struct SaEngine {
     pending_goal_context_events: Vec<SaGoalContextEvent>,
 }
 
+const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &["events", "frame", "timeline", "stats", "graph_info"];
+
 impl Default for SaEngine {
     fn default() -> Self {
         let mut graph = live_analysis_graph();
@@ -367,6 +369,7 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
         "builtin_analysis_node_names": builtin_analysis_node_names(),
         "builtin_analysis_node_aliases": builtin_analysis_node_aliases(),
         "builtin_stats_module_names": builtin_stats_module_names(),
+        "graph_output_names": LIVE_GRAPH_OUTPUT_NAMES,
         "node_names": node_names,
         "dag": dag,
     }))
@@ -1933,11 +1936,11 @@ fn serialize_stats_graph_snapshot(engine: &SaEngine) -> Vec<u8> {
     }
 }
 
-unsafe fn stats_module_name(module_name: *const c_char) -> Option<String> {
-    if module_name.is_null() {
+unsafe fn c_string_arg(value: *const c_char) -> Option<String> {
+    if value.is_null() {
         return None;
     }
-    CStr::from_ptr(module_name).to_str().ok().map(str::to_owned)
+    CStr::from_ptr(value).to_str().ok().map(str::to_owned)
 }
 
 unsafe fn serialize_named_stats_module(
@@ -1947,12 +1950,23 @@ unsafe fn serialize_named_stats_module(
     let Some(engine) = engine.as_ref() else {
         return Vec::new();
     };
-    let Some(module_name) = stats_module_name(module_name) else {
+    let Some(module_name) = c_string_arg(module_name) else {
         return Vec::new();
     };
     match builtin_stats_module_json(&module_name, &engine.graph) {
         Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
         Err(_) => Vec::new(),
+    }
+}
+
+fn live_graph_output_bytes<'a>(engine: &'a SaEngine, output_name: &str) -> Option<&'a [u8]> {
+    match output_name {
+        "events" => Some(&engine.events_json),
+        "frame" => Some(&engine.frame_json),
+        "timeline" => Some(&engine.timeline_json),
+        "stats" => Some(&engine.stats_json),
+        "graph_info" => Some(&engine.graph_info_json),
+        _ => None,
     }
 }
 
@@ -2371,6 +2385,67 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_json(
         return 0;
     }
     let bytes = serialize_named_stats_module(engine, module_name);
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of one named live graph output JSON payload.
+///
+/// `output_name` must be one of `events`, `frame`, `timeline`, `stats`, or
+/// `graph_info`, which are also reported by graph info JSON.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`. `output_name` must be a valid
+/// null-terminated UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_output_json_len(
+    engine: *const SaEngine,
+    output_name: *const c_char,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    let Some(output_name) = c_string_arg(output_name) else {
+        return 0;
+    };
+    live_graph_output_bytes(engine, &output_name)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes one named live graph output JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_graph_output_json_len` first to size the destination
+/// buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `output_name` must be a valid
+/// null-terminated UTF-8 string. `out_bytes` must point to writable storage for
+/// at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
+    engine: *const SaEngine,
+    output_name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    let Some(output_name) = c_string_arg(output_name) else {
+        return 0;
+    };
+    let Some(bytes) = live_graph_output_bytes(engine, &output_name) else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
     let count = max_bytes.min(bytes.len());
     ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
@@ -3564,6 +3639,17 @@ mod tests {
         serde_json::from_slice(&bytes).expect("stats json should be valid")
     }
 
+    fn live_graph_info_json_value(engine: *const SaEngine) -> serde_json::Value {
+        let json_len = unsafe { subtr_actor_bakkesmod_graph_info_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_graph_info_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("graph info json should be valid")
+    }
+
     fn live_stats_module_json_value(
         engine: *const SaEngine,
         module_name: &str,
@@ -3584,6 +3670,28 @@ mod tests {
         };
         assert_eq!(written, json_len);
         serde_json::from_slice(&bytes).expect("stats module json should be valid")
+    }
+
+    fn live_graph_output_json_value(
+        engine: *const SaEngine,
+        output_name: &str,
+    ) -> serde_json::Value {
+        let output_name =
+            std::ffi::CString::new(output_name).expect("output name should not contain nul bytes");
+        let json_len =
+            unsafe { subtr_actor_bakkesmod_graph_output_json_len(engine, output_name.as_ptr()) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_graph_output_json(
+                engine,
+                output_name.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("graph output json should be valid")
     }
 
     fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
@@ -4583,16 +4691,7 @@ mod tests {
     #[test]
     fn exposes_live_graph_info_json() {
         let engine = subtr_actor_bakkesmod_engine_create();
-        let json_len = unsafe { subtr_actor_bakkesmod_graph_info_json_len(engine) };
-        assert!(json_len > 0);
-        let mut bytes = vec![0; json_len];
-        let written = unsafe {
-            subtr_actor_bakkesmod_write_graph_info_json(engine, bytes.as_mut_ptr(), bytes.len())
-        };
-        assert_eq!(written, json_len);
-
-        let value: serde_json::Value =
-            serde_json::from_slice(&bytes).expect("graph info json should be valid");
+        let value = live_graph_info_json_value(engine);
         assert!(value["dag"]
             .as_str()
             .expect("dag should be a string")
@@ -4630,6 +4729,16 @@ mod tests {
             assert!(
                 stats_module_names.iter().any(|name| name == module_name),
                 "graph info should expose stats module {module_name}"
+            );
+        }
+        let graph_output_names = value["graph_output_names"]
+            .as_array()
+            .expect("graph output names should be an array");
+        assert_eq!(graph_output_names.len(), LIVE_GRAPH_OUTPUT_NAMES.len());
+        for output_name in LIVE_GRAPH_OUTPUT_NAMES {
+            assert!(
+                graph_output_names.iter().any(|name| name == output_name),
+                "graph info should expose graph output {output_name}"
             );
         }
         let node_names = value["node_names"]
@@ -5961,6 +6070,100 @@ mod tests {
         );
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_stats_module_json_len(engine, ptr::null()) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_exposes_named_graph_outputs() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 0.0,
+            has_closest_approach_distance: 1,
+        }];
+        let players_by_frame = (1..=12)
+            .map(|frame_number| {
+                [player_at(SaVec3 {
+                    x: frame_number as f32 * 20.0,
+                    y: 0.0,
+                    z: 20.0,
+                })]
+            })
+            .collect::<Vec<_>>();
+        let mut frames = Vec::new();
+        for (offset, players) in players_by_frame.iter().enumerate() {
+            let frame_number = offset as u64 + 1;
+            let mut frame = live_frame(
+                frame_number,
+                rigid_body(
+                    SaVec3 {
+                        x: frame_number as f32 * 20.0,
+                        y: 0.0,
+                        z: 120.0,
+                    },
+                    SaVec3::default(),
+                ),
+                players,
+            );
+            frame.has_live_play = 1;
+            if frame_number == 1 {
+                frame.touches = touches.as_ptr();
+                frame.touch_count = touches.len();
+            }
+            frames.push(frame);
+        }
+
+        for frame in &frames {
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, frame) },
+                0
+            );
+        }
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        assert_eq!(
+            live_graph_output_json_value(engine, "events"),
+            live_events_json_value(engine)
+        );
+        assert_eq!(
+            live_graph_output_json_value(engine, "frame"),
+            live_frame_json_value(engine)
+        );
+        assert_eq!(
+            live_graph_output_json_value(engine, "timeline"),
+            live_timeline_json_value(engine)
+        );
+        assert_eq!(
+            live_graph_output_json_value(engine, "stats"),
+            live_stats_json_value(engine)
+        );
+        assert_eq!(
+            live_graph_output_json_value(engine, "graph_info"),
+            live_graph_info_json_value(engine)
+        );
+
+        let unknown = std::ffi::CString::new("not_an_output").unwrap();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_graph_output_json_len(engine, unknown.as_ptr()) },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_write_graph_output_json(
+                    engine,
+                    unknown.as_ptr(),
+                    ptr::null_mut(),
+                    10,
+                )
+            },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_graph_output_json_len(engine, ptr::null()) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
