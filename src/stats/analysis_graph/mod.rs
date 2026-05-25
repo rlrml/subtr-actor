@@ -65,6 +65,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "flick_goal",
     "double_tap_goal",
     "one_timer_goal",
+    "passing_goal",
     "air_dribble_goal",
     "flip_reset_goal",
     "half_volley_goal",
@@ -81,6 +82,8 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "player_vertical_state",
     "demo",
     "settings",
+    "stats_timeline_frame",
+    "stats_timeline_events",
 ];
 
 pub fn builtin_analysis_node_names() -> &'static [&'static str] {
@@ -146,6 +149,8 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "player_vertical_state" => Some(nodes::player_vertical_state::boxed_default()),
         "demo" => Some(nodes::demo::boxed_default()),
         "settings" => Some(nodes::settings::boxed_default()),
+        "stats_timeline_frame" => Some(nodes::stats_timeline_frame::boxed_default()),
+        "stats_timeline_events" => Some(nodes::stats_timeline_events::boxed_default()),
         _ => None,
     }
 }
@@ -237,6 +242,8 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::wall_aerial::boxed_default(),
         nodes::wall_aerial_shot::boxed_default(),
         nodes::whiff::boxed_default(),
+        nodes::stats_timeline_frame::boxed_default(),
+        nodes::stats_timeline_events::boxed_default(),
     ]
 }
 

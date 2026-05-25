@@ -544,3 +544,7 @@ fn mechanic_event_start_time(event: &MechanicEvent) -> f32 {
         MechanicTiming::Span { start_time, .. } => start_time,
     }
 }
+
+pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(StatsTimelineEventsNode::new())
+}

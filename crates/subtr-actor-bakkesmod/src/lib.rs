@@ -9,8 +9,7 @@ use subtr_actor::{
     builtin_stats_graph_snapshot_json, builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
         builtin_analysis_node_names, graph_with_all_analysis_nodes, AnalysisGraph,
-        StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
-        StatsTimelineFrameState,
+        StatsTimelineEventsState, StatsTimelineFrameState,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
@@ -355,10 +354,7 @@ impl Default for SaEngine {
 }
 
 fn live_analysis_graph() -> AnalysisGraph {
-    let mut graph = graph_with_all_analysis_nodes();
-    graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
-    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
-    graph
+    graph_with_all_analysis_nodes()
 }
 
 fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
@@ -2684,11 +2680,21 @@ mod tests {
         let mut graph = live_analysis_graph();
         graph.resolve().expect("live graph should resolve");
         let live_names = graph.node_names().collect::<HashSet<_>>();
+        let builtin_names = builtin_analysis_node_names()
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>();
 
         for name in expected_names {
             assert!(
                 live_names.contains(name),
                 "live graph should include shared analysis node {name}"
+            );
+        }
+        for name in &live_names {
+            assert!(
+                builtin_names.contains(name),
+                "live graph node should be callable by builtin name: {name}"
             );
         }
         assert!(live_names.contains("stats_timeline_frame"));
@@ -3019,6 +3025,45 @@ mod tests {
     }
 
     #[test]
+    fn live_timeline_event_fields_are_classified_for_drain_coverage() {
+        let value = serde_json::to_value(ReplayStatsTimelineEvents::default())
+            .expect("default events should serialize");
+        let fields = value
+            .as_object()
+            .expect("events should serialize as an object")
+            .keys()
+            .map(String::as_str)
+            .collect::<HashSet<_>>();
+        let accounted_fields = HashSet::from([
+            "timeline",
+            "mechanics",
+            "goal_context",
+            "backboard",
+            "ceiling_shot",
+            "wall_aerial",
+            "wall_aerial_shot",
+            "center",
+            "double_tap",
+            "fifty_fifty",
+            "one_timer",
+            "pass",
+            "goal_tags",
+            "rush",
+            "speed_flip",
+            "half_flip",
+            "half_volley",
+            "wavedash",
+            "whiff",
+            "boost_pickups",
+            "bump",
+        ]);
+        assert_eq!(
+            fields, accounted_fields,
+            "new timeline event fields need an explicit live drain/export decision"
+        );
+    }
+
+    #[test]
     fn exposes_live_graph_info_json() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let json_len = unsafe { subtr_actor_bakkesmod_graph_info_json_len(engine) };
@@ -3044,6 +3089,12 @@ mod tests {
             .any(|name| name == "continuous_ball_control"));
         assert!(builtin_names.iter().any(|name| name == "frame_info"));
         assert!(builtin_names.iter().any(|name| name == "live_play"));
+        assert!(builtin_names
+            .iter()
+            .any(|name| name == "stats_timeline_frame"));
+        assert!(builtin_names
+            .iter()
+            .any(|name| name == "stats_timeline_events"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
