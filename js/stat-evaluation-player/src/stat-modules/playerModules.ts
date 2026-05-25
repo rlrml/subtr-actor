@@ -491,7 +491,12 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlayModeReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
-  const orderedBreakdownClasses: TouchBreakdownClass[] = ["kind", "height_band", "dodge_state"];
+  const orderedBreakdownClasses: TouchBreakdownClass[] = [
+    "kind",
+    "height_band",
+    "surface",
+    "dodge_state",
+  ];
 
   return {
     id: "touch",
@@ -698,6 +703,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         for (const option of [
           { className: "kind", label: "Kind" },
           { className: "height_band", label: "Height" },
+          { className: "surface", label: "Surface" },
           { className: "dodge_state", label: "Dodge" },
         ] satisfies Array<{ className: TouchBreakdownClass; label: string }>) {
           const optionLabel = document.createElement("label");
@@ -767,6 +773,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
                   ({
                     kind: "Kind",
                     height_band: "Height",
+                    surface: "Surface",
                     dodge_state: "Dodge",
                   })[className],
               )

@@ -40,6 +40,12 @@ impl StatFieldProvider for TouchStats {
             StatUnit::Count,
             self.high_aerial_touch_count,
         ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "wall_touch_count",
+            StatUnit::Count,
+            self.wall_touch_count,
+        ));
         for entry in self.complete_labeled_touch_counts().entries {
             visitor(ExportedStat::unsigned_labeled(
                 "touch",

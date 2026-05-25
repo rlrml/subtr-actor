@@ -12,6 +12,13 @@ enum TouchKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TouchSurface {
+    Ground,
+    Air,
+    Wall,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TouchDodgeState {
     NoDodge,
     Dodge,
@@ -19,6 +26,8 @@ enum TouchDodgeState {
 
 const ALL_TOUCH_KINDS: [TouchKind; 3] =
     [TouchKind::Control, TouchKind::MediumHit, TouchKind::HardHit];
+const ALL_TOUCH_SURFACES: [TouchSurface; 3] =
+    [TouchSurface::Ground, TouchSurface::Air, TouchSurface::Wall];
 const ALL_TOUCH_DODGE_STATES: [TouchDodgeState; 2] =
     [TouchDodgeState::NoDodge, TouchDodgeState::Dodge];
 
@@ -30,6 +39,17 @@ impl TouchKind {
             Self::HardHit => "hard_hit",
         };
         StatLabel::new("kind", value)
+    }
+}
+
+impl TouchSurface {
+    fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::Ground => "ground",
+            Self::Air => "air",
+            Self::Wall => "wall",
+        };
+        StatLabel::new("surface", value)
     }
 }
 
@@ -55,14 +75,16 @@ impl TouchDodgeState {
 struct TouchClassification {
     kind: TouchKind,
     height_band: PlayerVerticalBand,
+    surface: TouchSurface,
     dodge_state: TouchDodgeState,
 }
 
 impl TouchClassification {
-    fn labels(self) -> [StatLabel; 3] {
+    fn labels(self) -> [StatLabel; 4] {
         [
             self.kind.as_label(),
             self.height_band.as_label(),
+            self.surface.as_label(),
             self.dodge_state.as_label(),
         ]
     }
@@ -77,6 +99,8 @@ pub struct TouchStats {
     pub hard_hit_count: u32,
     pub aerial_touch_count: u32,
     pub high_aerial_touch_count: u32,
+    #[serde(default)]
+    pub wall_touch_count: u32,
     pub is_last_touch: bool,
     pub last_touch_time: Option<f32>,
     pub last_touch_frame: Option<usize>,
@@ -126,22 +150,25 @@ impl TouchStats {
         let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
             .into_iter()
             .flat_map(|height_band| {
-                ALL_TOUCH_DODGE_STATES
-                    .into_iter()
-                    .flat_map(move |dodge_state| {
-                        ALL_TOUCH_KINDS.into_iter().map(move |kind| {
-                            let mut labels = vec![
-                                kind.as_label(),
-                                height_band.as_label(),
-                                dodge_state.as_label(),
-                            ];
-                            labels.sort();
-                            LabeledCountEntry {
-                                count: self.labeled_touch_counts.count_exact(&labels),
-                                labels,
-                            }
+                ALL_TOUCH_SURFACES.into_iter().flat_map(move |surface| {
+                    ALL_TOUCH_DODGE_STATES
+                        .into_iter()
+                        .flat_map(move |dodge_state| {
+                            ALL_TOUCH_KINDS.into_iter().map(move |kind| {
+                                let mut labels = vec![
+                                    kind.as_label(),
+                                    height_band.as_label(),
+                                    surface.as_label(),
+                                    dodge_state.as_label(),
+                                ];
+                                labels.sort();
+                                LabeledCountEntry {
+                                    count: self.labeled_touch_counts.count_exact(&labels),
+                                    labels,
+                                }
+                            })
                         })
-                    })
+                })
             })
             .collect();
 
@@ -203,6 +230,7 @@ impl TouchCalculator {
 
     fn classify_touch(
         height_band: PlayerVerticalBand,
+        surface: TouchSurface,
         dodge_state: TouchDodgeState,
         ball_speed_change: f32,
         controlled_touch_kind: Option<BallCarryKind>,
@@ -220,6 +248,7 @@ impl TouchCalculator {
         TouchClassification {
             kind,
             height_band,
+            surface,
             dodge_state,
         }
     }
@@ -233,6 +262,19 @@ impl TouchCalculator {
             PlayerVerticalBand::Ground
         } else {
             sample.band
+        }
+    }
+
+    fn surface_for_touch(
+        player_position: Option<glam::Vec3>,
+        height_band: PlayerVerticalBand,
+    ) -> TouchSurface {
+        if player_position.is_some_and(player_is_on_wall) {
+            TouchSurface::Wall
+        } else if height_band.is_grounded() {
+            TouchSurface::Ground
+        } else {
+            TouchSurface::Air
         }
     }
 
@@ -250,6 +292,10 @@ impl TouchCalculator {
             TouchKind::Control => stats.control_touch_count += 1,
             TouchKind::MediumHit => stats.medium_hit_count += 1,
             TouchKind::HardHit => stats.hard_hit_count += 1,
+        }
+
+        if classification.surface == TouchSurface::Wall {
+            stats.wall_touch_count += 1;
         }
 
         stats
@@ -284,6 +330,14 @@ impl TouchCalculator {
             })
     }
 
+    fn player_position(players: &PlayerFrameState, player_id: &PlayerId) -> Option<glam::Vec3> {
+        players
+            .players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+            .and_then(PlayerSample::position)
+    }
+
     fn player_dodge_active(players: &PlayerFrameState, player_id: &PlayerId) -> bool {
         players
             .players
@@ -307,11 +361,14 @@ impl TouchCalculator {
                 continue;
             };
             let height_band = Self::height_band_for_touch(vertical_state.sample(player_id));
+            let surface =
+                Self::surface_for_touch(Self::player_position(players, player_id), height_band);
             let dodge_state =
                 TouchDodgeState::from_dodge_active(Self::player_dodge_active(players, player_id));
             let controlled_touch_kind = Self::controlled_touch_kind(ball, players, player_id);
             let classification = Self::classify_touch(
                 height_band,
+                surface,
                 dodge_state,
                 ball_speed_change,
                 controlled_touch_kind,

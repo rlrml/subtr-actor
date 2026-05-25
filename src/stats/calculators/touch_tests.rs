@@ -274,6 +274,33 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
 }
 
 #[test]
+fn touch_on_wall_gets_wall_surface_classification() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_position_and_velocity(glam::Vec3::new(3720.0, 0.0, 520.0), glam::Vec3::ZERO),
+            &player_frame_state(&player_id, glam::Vec3::new(3650.0, 0.0, 360.0)),
+            &vertical_state(&player_id, 360.0),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            true,
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.touch_count, 1);
+    assert_eq!(stats.wall_touch_count, 1);
+    assert_eq!(
+        stats.touch_count_with_labels(&[StatLabel::new("surface", "wall")]),
+        1
+    );
+}
+
+#[test]
 fn credits_ball_travel_and_goal_advancement_to_possession_player() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();

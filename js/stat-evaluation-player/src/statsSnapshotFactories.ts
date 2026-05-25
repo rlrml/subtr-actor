@@ -369,6 +369,7 @@ export function createPlayerStatsSnapshot(
         hard_hit_count: 0,
         aerial_touch_count: 0,
         high_aerial_touch_count: 0,
+        wall_touch_count: 0,
         is_last_touch: false,
         last_touch_time: null,
         last_touch_frame: null,

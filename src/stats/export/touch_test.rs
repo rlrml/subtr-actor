@@ -9,11 +9,13 @@ fn touch_export_includes_labeled_touch_count_stats() {
     stats.labeled_touch_counts.increment([
         StatLabel::new("kind", "hard_hit"),
         StatLabel::new("height_band", "high_air"),
+        StatLabel::new("surface", "air"),
         StatLabel::new("dodge_state", "dodge"),
     ]);
     stats.labeled_touch_counts.increment([
         StatLabel::new("kind", "hard_hit"),
         StatLabel::new("height_band", "high_air"),
+        StatLabel::new("surface", "air"),
         StatLabel::new("dodge_state", "dodge"),
     ]);
 
@@ -25,7 +27,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
         })
         .collect();
 
-    assert_eq!(labeled_touch_stats.len(), 18);
+    assert_eq!(labeled_touch_stats.len(), 54);
     assert_eq!(
         labeled_touch_stats
             .iter()
@@ -35,6 +37,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
                         StatLabel::new("dodge_state", "dodge"),
                         StatLabel::new("height_band", "high_air"),
                         StatLabel::new("kind", "hard_hit"),
+                        StatLabel::new("surface", "air"),
                     ]
             })
             .unwrap()
@@ -44,6 +47,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
             StatLabel::new("dodge_state", "dodge"),
             StatLabel::new("height_band", "high_air"),
             StatLabel::new("kind", "hard_hit"),
+            StatLabel::new("surface", "air"),
         ]
     );
     assert_eq!(
@@ -55,6 +59,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
                         StatLabel::new("dodge_state", "dodge"),
                         StatLabel::new("height_band", "high_air"),
                         StatLabel::new("kind", "hard_hit"),
+                        StatLabel::new("surface", "air"),
                     ]
             })
             .unwrap()
@@ -70,6 +75,7 @@ fn touch_export_includes_labeled_touch_count_stats() {
                         StatLabel::new("dodge_state", "no_dodge"),
                         StatLabel::new("height_band", "ground"),
                         StatLabel::new("kind", "control"),
+                        StatLabel::new("surface", "ground"),
                     ]
             })
             .unwrap()
