@@ -11,6 +11,9 @@ import { mountStatsReport, type StatsReportData, type StatsReportHandle } from "
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 
+const REVIEW_DOCUMENT_CLASS = "replay-review-document";
+const REVIEW_ROOT_CLASS = "replay-review-root";
+
 export type ReplayReviewMode = "report" | "viewer";
 
 export interface ReplayReviewDataProvider {
@@ -143,6 +146,10 @@ export function mountReplayReview(
   root: HTMLElement,
   options: ReplayReviewMountOptions = {},
 ): ReplayReviewHandle {
+  document.documentElement.classList.add(REVIEW_DOCUMENT_CLASS);
+  document.body.classList.add(REVIEW_DOCUMENT_CLASS);
+  root.classList.add(REVIEW_ROOT_CLASS);
+
   let provider: ReplayReviewDataProvider | null = options.provider ?? null;
   let mode = getInitialMode(options.initialMode);
   let reportHandle: StatsReportHandle | null = null;
@@ -346,6 +353,9 @@ export function mountReplayReview(
     destroy() {
       disposed = true;
       resetMountedViews();
+      root.classList.remove(REVIEW_ROOT_CLASS);
+      document.documentElement.classList.remove(REVIEW_DOCUMENT_CLASS);
+      document.body.classList.remove(REVIEW_DOCUMENT_CLASS);
       root.replaceChildren();
     },
   };

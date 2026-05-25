@@ -1,3 +1,15 @@
+.replay-review-document,
+#app.replay-review-root,
+.replay-review-root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+body.replay-review-document {
+  overflow-y: auto;
+}
+
 .replay-review-shell {
   min-height: 100dvh;
 }
