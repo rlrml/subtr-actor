@@ -851,6 +851,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   if (!pri.IsNull()) {
     populatePlayerFromPri(player, pri, playerIndex);
     playerIndex = player.player_index;
+  } else {
+    nextPlayerIndex = std::max(nextPlayerIndex, playerIndex + 1);
   }
   carPlayerIndices[car.memory_address] = playerIndex;
   recordDodgeRefreshFromJumpState(car, playerIndex, player.is_team_0);
