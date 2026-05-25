@@ -772,7 +772,10 @@ std::optional<uint32_t> SubtrActorPlugin::playerIndexForPri(PriWrapper pri) {
   if (priMatch != priPlayerIndices.end()) {
     return priMatch->second;
   }
-  return std::nullopt;
+
+  const uint32_t playerIndex = stablePlayerIndexForPri(pri, nextPlayerIndex);
+  priPlayerIndices[pri.memory_address] = playerIndex;
+  return playerIndex;
 }
 
 std::optional<uint32_t> SubtrActorPlugin::playerIndexForNearestCar(
