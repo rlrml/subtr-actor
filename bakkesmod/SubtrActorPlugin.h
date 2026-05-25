@@ -33,6 +33,8 @@ public:
 private:
   using JsonLen = size_t (*)(const SaEngine *);
   using WriteJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
+  using NamedJsonLen = size_t (*)(const SaEngine *, const char *);
+  using WriteNamedJson = size_t (*)(const SaEngine *, const char *, uint8_t *, size_t);
   using EngineCreate = SaEngine *(*)();
   using EngineDestroy = void (*)(SaEngine *);
   using EngineReset = void (*)(SaEngine *);
@@ -46,6 +48,8 @@ private:
   using WriteTimelineJson = WriteJson;
   using StatsJsonLen = JsonLen;
   using WriteStatsJson = WriteJson;
+  using StatsModuleJsonLen = NamedJsonLen;
+  using WriteStatsModuleJson = WriteNamedJson;
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
@@ -85,6 +89,8 @@ private:
   WriteTimelineJson writeTimelineJson = nullptr;
   StatsJsonLen statsJsonLen = nullptr;
   WriteStatsJson writeStatsJson = nullptr;
+  StatsModuleJsonLen statsModuleJsonLen = nullptr;
+  WriteStatsModuleJson writeStatsModuleJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
   DrainEvents drainEvents = nullptr;
@@ -125,7 +131,12 @@ private:
   void tick(std::string eventName);
   void render(CanvasWrapper canvas);
   std::string readJsonBuffer(JsonLen len, WriteJson write);
+  std::string readNamedJsonBuffer(
+      NamedJsonLen len,
+      WriteNamedJson write,
+      const std::string &name);
   void dumpGraphJson(std::vector<std::string> params);
+  void dumpStatsModuleJson(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);

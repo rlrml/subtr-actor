@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
@@ -475,6 +476,16 @@ std::vector<std::filesystem::path> rustLibrarySearchPaths(GameWrapper *gameWrapp
   return paths;
 }
 
+std::string safeModuleFileStem(std::string moduleName) {
+  for (char &ch : moduleName) {
+    const unsigned char value = static_cast<unsigned char>(ch);
+    if (!std::isalnum(value) && ch != '_' && ch != '-') {
+      ch = '_';
+    }
+  }
+  return moduleName.empty() ? "module" : moduleName;
+}
+
 } // namespace
 
 void SubtrActorPlugin::onLoad() {
@@ -491,6 +502,12 @@ void SubtrActorPlugin::onLoad() {
       [this](std::vector<std::string> params) { dumpGraphJson(params); },
       "Writes graph metadata, timeline, events, frame, and stats JSON. "
       "Pass 'finish' to flush delayed graph events first.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_dump_stats_module",
+      [this](std::vector<std::string> params) { dumpStatsModuleJson(params); },
+      "Writes one named graph-backed stats module JSON. Usage: "
+      "subtr_actor_dump_stats_module <module_name> [finish]",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -600,6 +617,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_json_len"));
   writeStatsJson = reinterpret_cast<WriteStatsJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_json"));
+  statsModuleJsonLen = reinterpret_cast<StatsModuleJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_stats_module_json_len"));
+  writeStatsModuleJson = reinterpret_cast<WriteStatsModuleJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_stats_module_json"));
   graphInfoJsonLen = reinterpret_cast<GraphInfoJsonLen>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
@@ -614,8 +635,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
       !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
-      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents ||
-      !drainGoalContextEvents) {
+      !statsModuleJsonLen || !writeStatsModuleJson || !graphInfoJsonLen ||
+      !writeGraphInfoJson || !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -650,6 +671,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeTimelineJson = nullptr;
   statsJsonLen = nullptr;
   writeStatsJson = nullptr;
+  statsModuleJsonLen = nullptr;
+  writeStatsModuleJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
@@ -1367,6 +1390,26 @@ std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {
   return buffer;
 }
 
+std::string SubtrActorPlugin::readNamedJsonBuffer(
+    NamedJsonLen len,
+    WriteNamedJson write,
+    const std::string &name) {
+  if (!engine || !len || !write) {
+    return {};
+  }
+
+  const size_t byteCount = len(engine, name.c_str());
+  if (byteCount == 0) {
+    return {};
+  }
+
+  std::string buffer(byteCount, '\0');
+  const size_t written =
+      write(engine, name.c_str(), reinterpret_cast<uint8_t *>(buffer.data()), buffer.size());
+  buffer.resize(written);
+  return buffer;
+}
+
 void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   if (!loaded || !engine) {
     cvarManager->log("subtr-actor: graph dump requested before engine was loaded");
@@ -1442,6 +1485,70 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
       statsJson.size(),
       graphInfoPath.string(),
       graphInfoJson.size()));
+}
+
+void SubtrActorPlugin::dumpStatsModuleJson(std::vector<std::string> params) {
+  if (!loaded || !engine) {
+    cvarManager->log("subtr-actor: stats module dump requested before engine was loaded");
+    return;
+  }
+  if (params.size() < 2) {
+    cvarManager->log("subtr-actor: usage: subtr_actor_dump_stats_module <module_name> [finish]");
+    return;
+  }
+
+  const std::string moduleName = params[1];
+  const bool shouldFinish =
+      std::find_if(params.begin() + 2, params.end(), [](const std::string &param) {
+        return param == "finish" || param == "finalize";
+      }) != params.end();
+  if (shouldFinish) {
+    if (!engineFinish) {
+      cvarManager->log("subtr-actor: stats module dump requested finish but finish ABI is unavailable");
+      return;
+    }
+    const int32_t finishResult = engineFinish(engine);
+    if (finishResult != 0) {
+      cvarManager->log(
+          std::format("subtr-actor: graph finish failed before stats module dump: {}", finishResult));
+      return;
+    }
+    drainPendingEvents();
+  }
+
+  const std::string moduleJson =
+      readNamedJsonBuffer(statsModuleJsonLen, writeStatsModuleJson, moduleName);
+  if (moduleJson.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: stats module '{}' was unavailable or produced empty JSON", moduleName));
+    return;
+  }
+
+  const std::filesystem::path outputDirectory =
+      gameWrapper->GetDataFolder() / "subtr-actor";
+  std::error_code error;
+  std::filesystem::create_directories(outputDirectory, error);
+  if (error) {
+    cvarManager->log(std::format(
+        "subtr-actor: failed to create stats module dump directory: {}", error.message()));
+    return;
+  }
+
+  const std::filesystem::path modulePath =
+      outputDirectory / std::format("graph-module-{}.json", safeModuleFileStem(moduleName));
+  std::ofstream moduleFile(modulePath, std::ios::binary);
+  moduleFile.write(moduleJson.data(), static_cast<std::streamsize>(moduleJson.size()));
+  if (!moduleFile) {
+    cvarManager->log("subtr-actor: failed to write stats module JSON snapshot");
+    return;
+  }
+
+  cvarManager->log(std::format(
+      "subtr-actor: wrote stats module '{}' JSON{}: {} ({} bytes)",
+      moduleName,
+      shouldFinish ? " after finish" : "",
+      modulePath.string(),
+      moduleJson.size()));
 }
 
 void SubtrActorPlugin::drainPendingEvents() {

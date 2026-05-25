@@ -782,6 +782,13 @@ pub(crate) fn builtin_module_json(
     }
 }
 
+pub fn builtin_stats_module_json(
+    module_name: &str,
+    graph: &AnalysisGraph,
+) -> SubtrActorResult<Value> {
+    builtin_module_json(module_name, graph)
+}
+
 pub(crate) fn builtin_snapshot_frame_json(
     module_name: &str,
     graph: &AnalysisGraph,

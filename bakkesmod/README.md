@@ -13,6 +13,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   metadata, full timeline payload, event bundle, graph-backed stats modules, and
   current frame stats snapshot to BakkesMod's `data/subtr-actor` directory as
   JSON.
+  The `subtr_actor_dump_stats_module <module_name> [finish]` console command
+  writes one graph-backed builtin stats module by name, using the module names
+  reported in `graph-info.json`.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
