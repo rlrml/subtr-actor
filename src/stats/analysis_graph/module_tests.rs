@@ -1,13 +1,13 @@
 use super::*;
 use crate::{
-    builtin_stats_module_names, AerialGoalCalculator, AirDribbleGoalCalculator,
-    BackboardCalculator, BallCarryCalculator, BumpCalculator, CenterCalculator,
-    CounterAttackGoalCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FlickCalculator,
-    FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
-    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
-    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
-    PossessionState, RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator, PlayerVerticalState,
+    builtin_analysis_node_json, builtin_stats_module_names, AerialGoalCalculator,
+    AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator, BumpCalculator,
+    CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator,
+    FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator,
+    HalfVolleyGoalCalculator, HighAerialGoalCalculator, LongDistanceGoalCalculator,
+    MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState, RotationCalculator,
+    StatsTimelineCollector, TouchState, WallAerialCalculator, WallAerialShotCalculator,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -160,6 +160,31 @@ fn continuous_ball_control_is_directly_callable() {
 
     let names: HashSet<_> = graph.node_names().collect();
     assert!(names.contains("continuous_ball_control"));
+}
+
+#[test]
+fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
+    let replay = parse_replay("assets/rlcs.replay");
+    let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
+        .expect("graph should evaluate a real replay");
+
+    for name in builtin_analysis_node_names() {
+        let value = builtin_analysis_node_json(name, &graph)
+            .unwrap_or_else(|_| panic!("builtin analysis node should serialize: {name}"));
+        assert!(
+            !value.is_null(),
+            "builtin analysis node should expose non-null JSON: {name}"
+        );
+    }
+
+    assert_eq!(
+        builtin_analysis_node_json("core", &graph).expect("core should serialize"),
+        builtin_analysis_node_json("match_stats", &graph).expect("match_stats should serialize")
+    );
+    assert!(
+        builtin_analysis_node_json("not_a_node", &graph).is_err(),
+        "unknown analysis nodes should be rejected"
+    );
 }
 
 #[test]

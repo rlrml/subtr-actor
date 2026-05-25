@@ -4,8 +4,8 @@ mod playback;
 mod types;
 
 pub use builtins::{
-    builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
-    builtin_stats_module_names,
+    builtin_analysis_node_json, builtin_stats_module_config_json, builtin_stats_module_frame_json,
+    builtin_stats_module_json, builtin_stats_module_names,
 };
 pub use collector::{
     builtin_stats_graph_snapshot_json, FrameTransform, IdentityFrameTransform,
