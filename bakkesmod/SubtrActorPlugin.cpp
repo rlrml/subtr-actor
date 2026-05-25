@@ -135,6 +135,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Air dribble";
   case SaMechanicKindAirDribbleGoal:
     return "Air dribble goal";
+  case SaMechanicKindAssist:
+    return "Assist";
   case SaMechanicKindBallCarry:
     return "Ball carry";
   case SaMechanicKindBackboard:
@@ -149,6 +151,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Counter attack goal";
   case SaMechanicKindDemo:
     return "Demo";
+  case SaMechanicKindDeath:
+    return "Demolished";
   case SaMechanicKindDoubleTapGoal:
     return "Double tap goal";
   case SaMechanicKindEmptyNetGoal:
@@ -165,6 +169,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Flip reset";
   case SaMechanicKindFlipResetGoal:
     return "Flip reset goal";
+  case SaMechanicKindGoal:
+    return "Goal";
   case SaMechanicKindSpeedFlip:
     return "Speed flip";
   case SaMechanicKindHalfFlip:
@@ -187,6 +193,10 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Own half goal";
   case SaMechanicKindPass:
     return "Pass";
+  case SaMechanicKindSave:
+    return "Save";
+  case SaMechanicKindShot:
+    return "Shot";
   case SaMechanicKindWallAerial:
     return "Wall aerial";
   case SaMechanicKindWallAerialShot:

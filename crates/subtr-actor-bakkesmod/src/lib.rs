@@ -240,6 +240,11 @@ pub enum SaMechanicKind {
     AirDribbleGoal = 32,
     FlipResetGoal = 33,
     HalfVolleyGoal = 34,
+    Goal = 35,
+    Shot = 36,
+    Save = 37,
+    Assist = 38,
+    Death = 39,
 }
 
 #[repr(C)]
@@ -1055,15 +1060,23 @@ fn push_boost_pickup_events_from_timeline(
     }
 }
 
-fn push_demo_events_from_timeline(
+fn timeline_event_kind(kind: TimelineEventKind) -> SaMechanicKind {
+    match kind {
+        TimelineEventKind::Goal => SaMechanicKind::Goal,
+        TimelineEventKind::Shot => SaMechanicKind::Shot,
+        TimelineEventKind::Save => SaMechanicKind::Save,
+        TimelineEventKind::Assist => SaMechanicKind::Assist,
+        TimelineEventKind::Kill => SaMechanicKind::Demo,
+        TimelineEventKind::Death => SaMechanicKind::Death,
+    }
+}
+
+fn push_timeline_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
     timeline: &[TimelineEvent],
 ) {
     for (index, event) in timeline.iter().enumerate() {
-        if event.kind != TimelineEventKind::Kill {
-            continue;
-        }
         let (Some(player_id), Some(is_team_0)) = (&event.player_id, event.is_team_0) else {
             continue;
         };
@@ -1071,8 +1084,13 @@ fn push_demo_events_from_timeline(
             pending_events,
             emitted_mechanic_ids,
             PendingGraphEvent {
-                id: format!("demo:{:.3}:{}:{index}", event.time, player_index(player_id)),
-                kind: SaMechanicKind::Demo,
+                id: format!(
+                    "timeline:{:?}:{:.3}:{}:{index}",
+                    event.kind,
+                    event.time,
+                    player_index(player_id)
+                ),
+                kind: timeline_event_kind(event.kind),
                 player_id: player_id.clone(),
                 is_team_0,
                 frame_number: event.frame.unwrap_or(0),
@@ -1183,7 +1201,7 @@ fn push_drainable_events_from_timeline(
         &events.boost_pickups,
     );
     push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
-    push_demo_events_from_timeline(pending_events, emitted_mechanic_ids, &events.timeline);
+    push_timeline_events_from_timeline(pending_events, emitted_mechanic_ids, &events.timeline);
     push_fifty_fifty_events_from_timeline(
         pending_events,
         emitted_mechanic_ids,
@@ -2035,7 +2053,7 @@ mod tests {
             frame_number: 0,
             time: 0.0,
             confidence: 0.0,
-        }; 4];
+        }; 8];
 
         for frame_number in 1..=12 {
             let players = [player_at(SaVec3 {
@@ -2078,12 +2096,13 @@ mod tests {
             }
         }
 
-        assert_eq!(
-            unsafe {
-                subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
-            },
-            0
-        );
+        let pre_finish_count = unsafe {
+            subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
+        };
+        assert!(pre_finish_count > 0);
+        assert!(events[..pre_finish_count]
+            .iter()
+            .all(|event| event.kind != SaMechanicKind::BallCarry));
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
         let count = unsafe {
             subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
@@ -2930,6 +2949,34 @@ mod tests {
         let timeline_events = ReplayStatsTimelineEvents {
             timeline: vec![
                 TimelineEvent {
+                    time: 1.05,
+                    frame: Some(10),
+                    kind: TimelineEventKind::Goal,
+                    player_id: Some(RemoteId::SplitScreen(0)),
+                    is_team_0: Some(true),
+                },
+                TimelineEvent {
+                    time: 1.06,
+                    frame: Some(10),
+                    kind: TimelineEventKind::Shot,
+                    player_id: Some(RemoteId::SplitScreen(0)),
+                    is_team_0: Some(true),
+                },
+                TimelineEvent {
+                    time: 1.07,
+                    frame: Some(10),
+                    kind: TimelineEventKind::Save,
+                    player_id: Some(RemoteId::SplitScreen(1)),
+                    is_team_0: Some(false),
+                },
+                TimelineEvent {
+                    time: 1.08,
+                    frame: Some(10),
+                    kind: TimelineEventKind::Assist,
+                    player_id: Some(RemoteId::SplitScreen(0)),
+                    is_team_0: Some(true),
+                },
+                TimelineEvent {
                     time: 1.35,
                     frame: Some(13),
                     kind: TimelineEventKind::Kill,
@@ -2968,35 +3015,52 @@ mod tests {
             &timeline_events,
         );
 
-        assert_eq!(pending_events.len(), 8);
-        assert_eq!(pending_events[0].kind, SaMechanicKind::Backboard);
-        assert_eq!(pending_events[0].frame_number, 11);
+        assert_eq!(pending_events.len(), 13);
+        assert_eq!(pending_events[0].kind, SaMechanicKind::Goal);
+        assert_eq!(pending_events[0].frame_number, 10);
         assert_eq!(pending_events[0].player_index, 0);
-        assert_eq!(pending_events[1].kind, SaMechanicKind::Whiff);
-        assert_eq!(pending_events[1].frame_number, 12);
+        assert_eq!(pending_events[1].kind, SaMechanicKind::Shot);
+        assert_eq!(pending_events[1].frame_number, 10);
         assert_eq!(pending_events[1].player_index, 0);
-        assert_eq!(pending_events[2].kind, SaMechanicKind::BoostPickup);
-        assert_eq!(pending_events[2].frame_number, 125);
-        assert_eq!(pending_events[2].player_index, 0);
-        assert_eq!(pending_events[3].kind, SaMechanicKind::Bump);
-        assert_eq!(pending_events[3].frame_number, 13);
+        assert_eq!(pending_events[2].kind, SaMechanicKind::Save);
+        assert_eq!(pending_events[2].frame_number, 10);
+        assert_eq!(pending_events[2].player_index, 1);
+        assert_eq!(pending_events[3].kind, SaMechanicKind::Assist);
+        assert_eq!(pending_events[3].frame_number, 10);
         assert_eq!(pending_events[3].player_index, 0);
-        assert_eq!(pending_events[3].confidence, 0.42);
-        assert_eq!(pending_events[4].kind, SaMechanicKind::Demo);
-        assert_eq!(pending_events[4].time, 1.35);
-        assert_eq!(pending_events[4].frame_number, 13);
+        assert_eq!(pending_events[4].kind, SaMechanicKind::Backboard);
+        assert_eq!(pending_events[4].frame_number, 11);
         assert_eq!(pending_events[4].player_index, 0);
-        assert_eq!(pending_events[5].kind, SaMechanicKind::FlickGoal);
-        assert_eq!(pending_events[5].time, 1.36);
-        assert_eq!(pending_events[5].frame_number, 13);
-        assert_eq!(pending_events[5].player_index, 1);
-        assert_eq!(pending_events[5].is_team_0, 0);
-        assert_eq!(pending_events[5].confidence, 0.72);
-        assert_eq!(pending_events[6].kind, SaMechanicKind::FiftyFifty);
-        assert_eq!(pending_events[6].frame_number, 14);
-        assert_eq!(pending_events[6].player_index, 1);
-        assert_eq!(pending_events[6].is_team_0, 0);
-        assert_eq!(pending_events[7].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_events[5].kind, SaMechanicKind::Whiff);
+        assert_eq!(pending_events[5].frame_number, 12);
+        assert_eq!(pending_events[5].player_index, 0);
+        assert_eq!(pending_events[6].kind, SaMechanicKind::BoostPickup);
+        assert_eq!(pending_events[6].frame_number, 125);
+        assert_eq!(pending_events[6].player_index, 0);
+        assert_eq!(pending_events[7].kind, SaMechanicKind::Bump);
+        assert_eq!(pending_events[7].frame_number, 13);
+        assert_eq!(pending_events[7].player_index, 0);
+        assert_eq!(pending_events[7].confidence, 0.42);
+        assert_eq!(pending_events[8].kind, SaMechanicKind::Demo);
+        assert_eq!(pending_events[8].time, 1.35);
+        assert_eq!(pending_events[8].frame_number, 13);
+        assert_eq!(pending_events[8].player_index, 0);
+        assert_eq!(pending_events[9].kind, SaMechanicKind::Death);
+        assert_eq!(pending_events[9].time, 1.35);
+        assert_eq!(pending_events[9].frame_number, 13);
+        assert_eq!(pending_events[9].player_index, 1);
+        assert_eq!(pending_events[9].is_team_0, 0);
+        assert_eq!(pending_events[10].kind, SaMechanicKind::FlickGoal);
+        assert_eq!(pending_events[10].time, 1.36);
+        assert_eq!(pending_events[10].frame_number, 13);
+        assert_eq!(pending_events[10].player_index, 1);
+        assert_eq!(pending_events[10].is_team_0, 0);
+        assert_eq!(pending_events[10].confidence, 0.72);
+        assert_eq!(pending_events[11].kind, SaMechanicKind::FiftyFifty);
+        assert_eq!(pending_events[11].frame_number, 14);
+        assert_eq!(pending_events[11].player_index, 1);
+        assert_eq!(pending_events[11].is_team_0, 0);
+        assert_eq!(pending_events[12].kind, SaMechanicKind::SpeedFlip);
 
         pending_events.clear();
         push_drainable_events_from_timeline(
@@ -3044,6 +3108,34 @@ mod tests {
         );
         assert_eq!(mechanic_kind("wavedash"), Some(SaMechanicKind::Wavedash));
         assert_eq!(mechanic_kind("unmapped"), None);
+    }
+
+    #[test]
+    fn maps_timeline_event_kinds_to_abi_kinds() {
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Goal),
+            SaMechanicKind::Goal
+        );
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Shot),
+            SaMechanicKind::Shot
+        );
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Save),
+            SaMechanicKind::Save
+        );
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Assist),
+            SaMechanicKind::Assist
+        );
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Kill),
+            SaMechanicKind::Demo
+        );
+        assert_eq!(
+            timeline_event_kind(TimelineEventKind::Death),
+            SaMechanicKind::Death
+        );
     }
 
     #[test]
