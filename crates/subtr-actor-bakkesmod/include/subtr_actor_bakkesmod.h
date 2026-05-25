@@ -110,6 +110,7 @@ typedef struct SaDemolishEvent {
   SaVec3 attacker_velocity;
   SaVec3 victim_velocity;
   SaVec3 victim_location;
+  float active_duration_seconds;
 } SaDemolishEvent;
 
 typedef struct SaLiveFrame {

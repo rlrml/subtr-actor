@@ -156,6 +156,7 @@ pub struct SaDemolishEvent {
     pub attacker_velocity: SaVec3,
     pub victim_velocity: SaVec3,
     pub victim_location: SaVec3,
+    pub active_duration_seconds: f32,
 }
 
 #[repr(C)]
@@ -278,6 +279,13 @@ struct SaLiveEventGenerator {
     touch_state: TouchStateCalculator,
     live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
+    active_demos: Vec<SaActiveDemo>,
+}
+
+#[derive(Debug, Clone)]
+struct SaActiveDemo {
+    sample: DemoEventSample,
+    expires_at: f32,
 }
 
 fn vec3(value: SaVec3) -> Vector3f {
@@ -548,16 +556,6 @@ fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Ve
         .collect()
 }
 
-fn explicit_active_demo_events(events: &[SaDemolishEvent]) -> Vec<DemoEventSample> {
-    events
-        .iter()
-        .map(|event| DemoEventSample {
-            attacker: player_id(event.attacker_index),
-            victim: player_id(event.victim_index),
-        })
-        .collect()
-}
-
 fn infer_dodge_refreshed_events(
     frame: &FrameInfo,
     ball: &BallFrameState,
@@ -632,6 +630,39 @@ fn infer_dodge_refreshed_events(
 }
 
 impl SaLiveEventGenerator {
+    fn sync_active_demos(&mut self, time: f32, events: &[SaDemolishEvent]) -> Vec<DemoEventSample> {
+        self.active_demos
+            .retain(|demo| demo.expires_at + f32::EPSILON >= time);
+
+        for event in events {
+            let sample = DemoEventSample {
+                attacker: player_id(event.attacker_index),
+                victim: player_id(event.victim_index),
+            };
+            let active_duration_seconds = if event.active_duration_seconds.is_finite()
+                && event.active_duration_seconds > 0.0
+            {
+                event.active_duration_seconds
+            } else {
+                0.0
+            };
+            let expires_at = time + active_duration_seconds;
+            if let Some(active_demo) = self.active_demos.iter_mut().find(|active_demo| {
+                active_demo.sample.attacker == sample.attacker
+                    && active_demo.sample.victim == sample.victim
+            }) {
+                active_demo.expires_at = expires_at;
+            } else {
+                self.active_demos.push(SaActiveDemo { sample, expires_at });
+            }
+        }
+
+        self.active_demos
+            .iter()
+            .map(|active_demo| active_demo.sample.clone())
+            .collect()
+    }
+
     fn frame_events(
         &mut self,
         frame: &FrameInfo,
@@ -642,7 +673,7 @@ impl SaLiveEventGenerator {
         explicit_events: &SaFrameEventSlices<'_>,
     ) -> (FrameEventsState, LivePlayState) {
         let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
-        let active_demos = explicit_active_demo_events(explicit_events.demolishes);
+        let active_demos = self.sync_active_demos(frame.time, explicit_events.demolishes);
         let boost_pad_events = explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
         let player_stat_events =
             explicit_player_stat_events(frame, explicit_events.player_stat_events);
@@ -1437,6 +1468,7 @@ mod tests {
     use super::*;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
+        DemoCalculator,
     };
 
     fn rigid_body(location: SaVec3, linear_velocity: SaVec3) -> SaRigidBody {
@@ -2316,6 +2348,7 @@ mod tests {
                 y: 0.0,
                 z: 92.75,
             },
+            active_duration_seconds: 0.0,
         }];
         let mut frame = live_frame(
             1,
@@ -2384,6 +2417,101 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_demolish_events_keep_active_demo_state_until_expiration() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let demolishes = [SaDemolishEvent {
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+            active_duration_seconds: 0.25,
+        }];
+
+        let mut first = live_frame(
+            1,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        first.demolishes = demolishes.as_ptr();
+        first.demolish_count = demolishes.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+
+        let second = live_frame(
+            2,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.demo_events.len(), 0);
+        assert_eq!(frame_events.active_demos.len(), 1);
+        assert_eq!(
+            frame_events.active_demos[0].victim,
+            RemoteId::SplitScreen(1)
+        );
+        let demo = engine_ref
+            .graph
+            .state::<DemoCalculator>()
+            .expect("full analysis graph should expose demo calculator state");
+        assert_eq!(demo.timeline().len(), 2);
+
+        let fourth = live_frame(
+            4,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &fourth) },
+            0
+        );
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert!(frame_events.active_demos.is_empty());
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

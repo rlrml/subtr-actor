@@ -25,6 +25,7 @@ constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventG
 constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
+constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
 constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
 constexpr uint64_t DODGE_REFRESH_TOUCH_FRAME_WINDOW = 2;
 
@@ -709,6 +710,7 @@ void SubtrActorPlugin::recordDemolish(CarWrapper victim, ActorWrapper demolisher
   event.attacker_velocity = toSaVec3(attacker.GetVelocity());
   event.victim_velocity = toSaVec3(victim.GetVelocity());
   event.victim_location = toSaVec3(victim.GetLocation());
+  event.active_duration_seconds = DEMO_ACTIVE_DURATION_SECONDS;
   pendingDemolishes.push_back(event);
 }
 
