@@ -1227,12 +1227,13 @@ fn frame_input(
         explicit_live_play,
         explicit_events,
     );
-    FrameInput::from_parts_with_live_play_state(
-        frame_info,
-        gameplay,
-        ball,
-        players,
-        frame_events,
+    let replay_meta = engine.live_replay_meta.as_ref();
+    let processor = SaLiveProcessorView::new(replay_meta, frame, sampled_players, frame_events);
+    FrameInput::timeline_with_live_play_state(
+        &processor,
+        frame.frame_number as usize,
+        frame.time,
+        frame.dt,
         live_play,
     )
 }
@@ -1965,10 +1966,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     let Ok(explicit_events) = frame_event_slices(frame) else {
         return -1;
     };
-    let frame_input = frame_input(engine, frame, players, &explicit_events);
     if sync_live_replay_meta(engine, players).is_err() {
         return -2;
     }
+    let frame_input = frame_input(engine, frame, players, &explicit_events);
     if engine.graph.evaluate_with_state(&frame_input).is_err() {
         return -2;
     }
@@ -2645,6 +2646,8 @@ mod tests {
 
         assert_eq!(status, 0);
         let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        assert!(engine_ref.live_replay_meta_initialized);
+        assert!(engine_ref.live_replay_meta.is_some());
         let frame_info = engine_ref
             .graph
             .state::<FrameInfo>()
@@ -3761,6 +3764,96 @@ mod tests {
         assert_eq!(view.get_jump_active(&player_id).unwrap(), 1);
         assert_eq!(view.get_double_jump_active(&player_id).unwrap(), 1);
         assert_eq!(view.get_dodge_active(&player_id).unwrap(), 1);
+    }
+
+    #[test]
+    fn live_processor_view_frame_input_preserves_live_event_streams() {
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = live_frame(
+            7,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        let frame_info = frame_info(&frame);
+        let demo_events = explicit_demolish_events(
+            &frame_info,
+            &[SaDemolishEvent {
+                attacker_index: 0,
+                victim_index: 1,
+                attacker_velocity: SaVec3 {
+                    x: 2300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: SaVec3::default(),
+                victim_location: SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                active_duration_seconds: 0.25,
+            }],
+        );
+        let view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState {
+                active_demos: vec![DemoEventSample {
+                    attacker: RemoteId::SplitScreen(0),
+                    victim: RemoteId::SplitScreen(1),
+                }],
+                demo_events,
+                ..FrameEventsState::default()
+            },
+        );
+
+        let live_play = LivePlayState {
+            gameplay_phase: GameplayPhase::ActivePlay,
+            is_live_play: true,
+        };
+        let input = FrameInput::timeline_with_live_play_state(
+            &view,
+            7,
+            frame.time,
+            frame.dt,
+            live_play.clone(),
+        );
+
+        let frame_events = input.frame_events_state();
+        assert_eq!(frame_events.demo_events.len(), 1);
+        assert_eq!(
+            frame_events.demo_events[0].attacker,
+            RemoteId::SplitScreen(0)
+        );
+        assert_eq!(frame_events.active_demos.len(), 1);
+        assert_eq!(
+            frame_events.active_demos[0].victim,
+            RemoteId::SplitScreen(1)
+        );
+        let player_frame = input.player_frame_state();
+        assert_eq!(player_frame.players.len(), 2);
+        assert_eq!(player_frame.players[1].match_score, Some(101));
+        assert_eq!(input.live_play_state(), Some(live_play));
     }
 
     #[test]
