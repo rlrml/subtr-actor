@@ -741,44 +741,6 @@ function renderGoalTagChips(tags: GoalTagEvent[]): HTMLElement {
   return list;
 }
 
-function renderGoalEvidence(finalFrame: StatsFrame, tags: GoalTagEvent[]): HTMLElement | null {
-  const rows = tags.flatMap((tag) =>
-    tag.evidence.map((evidence) => ({
-      tag,
-      evidence,
-    })),
-  );
-  if (rows.length === 0) return null;
-
-  const section = el("div", { className: "stats-report-goal-subsection" });
-  section.append(el("h3", { text: "Tag evidence" }));
-  const wrap = el("div", { className: "stats-report-table-wrap" });
-  const table = el("table", { className: "stats-report-table" });
-  const thead = el("thead");
-  const headerRow = el("tr");
-  ["Tag", "Evidence", "Player", "Time", "Frame"].forEach((label) => {
-    headerRow.append(el("th", { text: label }));
-  });
-  thead.append(headerRow);
-
-  const tbody = el("tbody");
-  for (const row of rows) {
-    const tr = el("tr");
-    tr.append(
-      el("td", { text: formatMechanicKind(row.tag.kind) }),
-      el("td", { text: formatMechanicKind(row.evidence.kind) }),
-      el("td", { text: playerNameForId(finalFrame, row.evidence.player) }),
-      el("td", { text: formatTime(row.evidence.time) }),
-      el("td", { text: row.evidence.frame.toLocaleString() }),
-    );
-    tbody.append(tr);
-  }
-  table.append(thead, tbody);
-  wrap.append(table);
-  section.append(wrap);
-  return section;
-}
-
 function renderGoalPlayerContextTable(
   finalFrame: StatsFrame,
   players: GoalPlayerContext[],
@@ -900,8 +862,6 @@ function renderGoalCard(
   ];
   card.append(createDetailList(detailItems));
 
-  const evidence = renderGoalEvidence(finalFrame, tags);
-  if (evidence) card.append(evidence);
   const playerContext = renderGoalPlayerContextTable(finalFrame, context?.players ?? []);
   if (playerContext) card.append(playerContext);
   return card;
@@ -912,7 +872,7 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
   page.append(
     createPageIntro(
       "Goal metadata",
-      "Goal-by-goal scorer, timing, context, tag confidence, evidence, and lead-up player state from the stats timeline event stream.",
+      "Goal-by-goal scorer, timing, context, tag confidence, and lead-up player state from the stats timeline event stream.",
     ),
   );
 
