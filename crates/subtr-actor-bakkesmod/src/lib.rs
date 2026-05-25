@@ -1227,17 +1227,12 @@ fn frame_input(
         explicit_live_play,
         explicit_events,
     );
-    let processor_view = SaLiveProcessorView::new(
-        engine.live_replay_meta.as_ref(),
-        frame,
-        sampled_players,
+    FrameInput::from_parts_with_live_play_state(
+        frame_info,
+        gameplay,
+        ball,
+        players,
         frame_events,
-    );
-    FrameInput::timeline_with_live_play_state(
-        &processor_view,
-        frame.frame_number as usize,
-        frame.time,
-        frame.dt,
         live_play,
     )
 }
