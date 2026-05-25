@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.1 - 2026-05-25
+
+- Fix the GitHub Pages Nix build by refreshing the stats-player Pages package
+  metadata and npm dependency hash after the `0.8.0` release.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.1`.
+
 ## v0.8.0 - 2026-05-25
 
 - Add a reusable replay review shell to the stats player package with full-page
