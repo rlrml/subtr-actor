@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use std::collections::HashSet;
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -10,7 +12,6 @@ use subtr_actor::{
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
-        STATS_TIMELINE_MECHANIC_KINDS,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishAttribute, DemolishInfo,
@@ -20,7 +21,7 @@ use subtr_actor::{
     PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta,
     ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
     SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -2434,9 +2435,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
+    use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
-        DemoCalculator,
+        DemoCalculator, TouchState, WhiffEventKind,
     };
 
     fn checked_in_header_text() -> String {
@@ -3599,6 +3601,16 @@ mod tests {
                 "live graph node should be callable by builtin name: {name}"
             );
         }
+        for name in &builtin_names {
+            let live_name = builtin_analysis_node_aliases()
+                .iter()
+                .find_map(|alias| (alias.alias == *name).then_some(alias.node_name))
+                .unwrap_or(name);
+            assert!(
+                live_names.contains(live_name),
+                "live graph should include every builtin analysis node or resolved alias: {name}"
+            );
+        }
         assert!(live_names.contains("stats_timeline_frame"));
         assert!(live_names.contains("stats_timeline_events"));
     }
@@ -4077,6 +4089,16 @@ mod tests {
         let node_names = value["node_names"]
             .as_array()
             .expect("node names should be an array");
+        for builtin_name in builtin_analysis_node_names() {
+            let live_name = builtin_analysis_node_aliases()
+                .iter()
+                .find_map(|alias| (alias.alias == *builtin_name).then_some(alias.node_name))
+                .unwrap_or(builtin_name);
+            assert!(
+                node_names.iter().any(|name| name == live_name),
+                "graph info should expose live graph node or resolved alias {builtin_name}"
+            );
+        }
         assert!(node_names
             .iter()
             .any(|name| name == "continuous_ball_control"));
