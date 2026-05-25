@@ -2733,45 +2733,6 @@ function formatScoreboardInteger(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}` : "--";
 }
 
-function getScoreboardPlayerStats(frame: StatsFrame, playerId: string): PlayerStatsSnapshot | null {
-  return frame.players.find((player) => playerIdToString(player.player_id) === playerId) ?? null;
-}
-
-function createScoreboardPlayerRow(frame: StatsFrame, player: ReplayPlayerTrack): HTMLElement {
-  const stats = getScoreboardPlayerStats(frame, player.id);
-  const row = document.createElement("div");
-  row.className = `scoreboard-player-row ${getTeamClass(player.isTeamZero)}`;
-
-  const name = document.createElement("span");
-  name.className = "scoreboard-player-name";
-  name.textContent = stats?.name || player.name;
-
-  const values = document.createElement("span");
-  values.className = "scoreboard-player-values";
-  values.append(
-    createScoreboardValue(formatScoreboardInteger(stats?.core.score), "Score"),
-    createScoreboardValue(formatScoreboardInteger(stats?.core.goals), "Goals"),
-    createScoreboardValue(formatScoreboardInteger(stats?.core.assists), "Assists"),
-    createScoreboardValue(formatScoreboardInteger(stats?.core.saves), "Saves"),
-    createScoreboardValue(formatScoreboardInteger(stats?.core.shots), "Shots"),
-  );
-
-  row.append(name, values);
-  return row;
-}
-
-function createScoreboardValue(value: string, label: string): HTMLElement {
-  const wrapper = document.createElement("span");
-  wrapper.className = "scoreboard-value";
-  wrapper.title = label;
-
-  const amount = document.createElement("strong");
-  amount.textContent = value;
-
-  wrapper.append(amount);
-  return wrapper;
-}
-
 function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0): void {
   if (!scoreboardWindowBody) {
     return;
@@ -2790,33 +2751,24 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
 
   const header = document.createElement("div");
   header.className = "scoreboard-scoreline";
-  header.append(
-    createScoreboardTeamScore("Blue", frame.team_zero?.core.goals, true),
+  const bluePlayers = replay.players.filter((player) => player.isTeamZero);
+  const orangePlayers = replay.players.filter((player) => !player.isTeamZero);
+
+  const score = document.createElement("div");
+  score.className = "scoreboard-game-score";
+  score.append(
+    createScoreboardGoalValue(frame.team_zero?.core.goals, true),
     createScoreboardDivider(),
-    createScoreboardTeamScore("Orange", frame.team_one?.core.goals, false),
+    createScoreboardGoalValue(frame.team_one?.core.goals, false),
   );
 
-  const teams = document.createElement("div");
-  teams.className = "scoreboard-teams";
-  teams.append(
-    createScoreboardTeam(
-      frame,
-      replay.players.filter((player) => player.isTeamZero),
-    ),
-    createScoreboardTeam(
-      frame,
-      replay.players.filter((player) => !player.isTeamZero),
-    ),
+  header.replaceChildren(
+    createScoreboardTeamNames("Blue", bluePlayers, true),
+    score,
+    createScoreboardTeamNames("Orange", orangePlayers, false),
   );
 
-  scoreboardWindowBody.append(header, teams);
-}
-
-function createScoreboardHeaderValue(label: string): HTMLElement {
-  const value = document.createElement("span");
-  value.className = "scoreboard-header-value";
-  value.textContent = label;
-  return value;
+  scoreboardWindowBody.append(header);
 }
 
 function createScoreboardDivider(): HTMLElement {
@@ -2826,60 +2778,38 @@ function createScoreboardDivider(): HTMLElement {
   return divider;
 }
 
-function createScoreboardTeamScore(
-  label: string,
+function createScoreboardGoalValue(
   goals: number | null | undefined,
   isTeamZero: boolean,
 ): HTMLElement {
+  const score = document.createElement("strong");
+  score.className = `scoreboard-goal-value ${getTeamClass(isTeamZero)}`;
+  score.textContent = formatScoreboardInteger(goals);
+  return score;
+}
+
+function createScoreboardTeamNames(
+  label: string,
+  players: ReplayPlayerTrack[],
+  isTeamZero: boolean,
+): HTMLElement {
   const team = document.createElement("div");
-  team.className = `scoreboard-team-score ${getTeamClass(isTeamZero)}`;
+  team.className = `scoreboard-team-summary ${getTeamClass(isTeamZero)}`;
 
   const name = document.createElement("span");
+  name.className = "scoreboard-team-label";
   name.textContent = label;
 
-  const score = document.createElement("strong");
-  score.textContent = formatScoreboardInteger(goals);
-
-  team.append(name, score);
-  return team;
-}
-
-function createScoreboardStatHeaderRow(): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "scoreboard-player-row scoreboard-player-row-header";
-
-  const spacer = document.createElement("span");
-  spacer.className = "scoreboard-player-name";
-
-  const values = document.createElement("span");
-  values.className = "scoreboard-player-values";
-  values.append(
-    createScoreboardHeaderValue("Score"),
-    createScoreboardHeaderValue("G"),
-    createScoreboardHeaderValue("A"),
-    createScoreboardHeaderValue("S"),
-    createScoreboardHeaderValue("Sh"),
-  );
-
-  row.append(spacer, values);
-  return row;
-}
-
-function createScoreboardTeam(frame: StatsFrame, players: ReplayPlayerTrack[]): HTMLElement {
-  const team = document.createElement("div");
-  team.className = "scoreboard-team";
-  team.append(createScoreboardStatHeaderRow());
+  const playerList = document.createElement("span");
+  playerList.className = "scoreboard-player-list";
   if (players.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "scoreboard-empty";
-    empty.textContent = "No players";
-    team.append(empty);
-    return team;
+    playerList.textContent = "No players";
+  } else {
+    playerList.textContent = players.map((player) => player.name).join(" / ");
+    playerList.title = players.map((player) => player.name).join(", ");
   }
 
-  for (const player of players) {
-    team.append(createScoreboardPlayerRow(frame, player));
-  }
+  team.append(name, playerList);
   return team;
 }
 
