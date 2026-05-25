@@ -96,6 +96,49 @@ The install step copies `SubtrActorPlugin.dll` into BakkesMod's `plugins`
 directory and `subtr_actor_bakkesmod.dll` into `data\subtr-actor`, which is
 also where the plugin looks for the Rust ABI at runtime.
 
+## In-game verification
+
+Use this checklist after installing the DLLs into BakkesMod. It is the runtime
+acceptance check for live graph callability and event-generation parity.
+
+1. Launch Rocket League with BakkesMod and enter a freeplay, replay, or custom
+   training session.
+2. Wait until at least one live frame has been processed, then run:
+
+   ```text
+   subtr_actor_verify_graph
+   ```
+
+   The BakkesMod console should log `subtr-actor: graph verification passed`
+   along with nonzero byte sizes for `events`, `frame`, `timeline`, `stats`,
+   `analysis_nodes`, `graph_info`, `frame_info`, `frame_events_state`,
+   `live_play`, `match_stats`, `stats_timeline_frame`, and
+   `stats_timeline_events`.
+3. Exercise live events that should be visible to the graph: touch the ball,
+   pick up a boost pad, score a goal, and trigger a demolition when possible.
+   Overlay labels should appear for drainable graph events.
+4. Dump the complete live graph surface:
+
+   ```text
+   subtr_actor_dump_graph finish
+   ```
+
+   BakkesMod should write these files under `data\subtr-actor`:
+   `graph-events.json`, `graph-frame.json`, `graph-timeline.json`,
+   `graph-stats.json`, `graph-analysis-nodes.json`, and `graph-info.json`.
+   `graph-info.json` should list `analysis_nodes` in `graph_output_names`, and
+   `graph-analysis-nodes.json` should contain keys for the builtin analysis
+   nodes reported by `builtin_analysis_node_names`.
+5. Spot-check individual call paths:
+
+   ```text
+   subtr_actor_dump_graph_output analysis_nodes finish
+   subtr_actor_dump_analysis_node stats_timeline_events finish
+   subtr_actor_dump_analysis_node frame_events_state finish
+   ```
+
+   Each command should write a nonempty JSON file in `data\subtr-actor`.
+
 ## Linux/Nix support
 
 The optional shell is for Linux-side Rust development and MinGW smoke checks:
