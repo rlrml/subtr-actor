@@ -16,8 +16,31 @@ namespace {
 constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
+constexpr char TICK_EVENT[] = "Function TAGame.Car_TA.SetVehicleInput";
+constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
+constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
+constexpr char BOOST_SPAWNED_EVENT[] = "Function TAGame.VehiclePickup_TA.EventSpawned";
+constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventGoalScored";
+constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 
 int moduleAnchor = 0;
+
+struct BallTouchParams {
+  uintptr_t hitCar;
+  uint8_t hitType;
+};
+
+struct GoalScoredParams {
+  uintptr_t gameEvent;
+  uintptr_t ball;
+  uintptr_t goal;
+  int scoreIndex;
+  int assistIndex;
+};
+
+struct CarDemolishedParams {
+  uintptr_t demolisher;
+};
 
 SaVec3 toSaVec3(Vector value) {
   return SaVec3{value.X, value.Y, value.Z};
@@ -100,17 +123,69 @@ void SubtrActorPlugin::onLoad() {
   }
 
   gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) { render(canvas); });
-  gameWrapper->HookEvent(
-      "Function TAGame.Car_TA.SetVehicleInput",
-      [this](std::string eventName) { tick(eventName); });
+  gameWrapper->HookEvent(TICK_EVENT, [this](std::string eventName) { tick(eventName); });
+  hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
 }
 
 void SubtrActorPlugin::onUnload() {
   gameWrapper->UnregisterDrawables();
-  gameWrapper->UnhookEvent("Function TAGame.Car_TA.SetVehicleInput");
+  gameWrapper->UnhookEvent(TICK_EVENT);
+  unhookGameEvents();
   unloadRustLibrary();
+}
+
+void SubtrActorPlugin::hookGameEvents() {
+  gameWrapper->HookEventWithCallerPost<BallWrapper>(
+      BALL_TOUCH_EVENT,
+      [this](BallWrapper, void *params, std::string) {
+        if (!params) {
+          return;
+        }
+        const auto *touchParams = static_cast<const BallTouchParams *>(params);
+        recordTouch(CarWrapper(touchParams->hitCar));
+      });
+
+  gameWrapper->HookEventWithCallerPost<ActorWrapper>(
+      BOOST_PICKED_UP_EVENT,
+      [this](ActorWrapper pickup, void *, std::string) {
+        recordBoostPadEvent(pickup, SaBoostPadEventKindPickedUp);
+      });
+  gameWrapper->HookEventWithCallerPost<ActorWrapper>(
+      BOOST_SPAWNED_EVENT,
+      [this](ActorWrapper pickup, void *, std::string) {
+        recordBoostPadEvent(pickup, SaBoostPadEventKindAvailable);
+      });
+
+  gameWrapper->HookEventWithCallerPost<ServerWrapper>(
+      GOAL_SCORED_EVENT,
+      [this](ServerWrapper server, void *params, std::string) {
+        auto goal = GoalWrapper(0);
+        if (params) {
+          const auto *goalParams = static_cast<const GoalScoredParams *>(params);
+          goal = GoalWrapper(goalParams->goal);
+        }
+        recordGoal(server, goal);
+      });
+
+  gameWrapper->HookEventWithCallerPost<CarWrapper>(
+      CAR_DEMOLISHED_EVENT,
+      [this](CarWrapper victim, void *params, std::string) {
+        if (!params) {
+          return;
+        }
+        const auto *demolishParams = static_cast<const CarDemolishedParams *>(params);
+        recordDemolish(victim, ActorWrapper(demolishParams->demolisher));
+      });
+}
+
+void SubtrActorPlugin::unhookGameEvents() {
+  gameWrapper->UnhookEventPost(BALL_TOUCH_EVENT);
+  gameWrapper->UnhookEventPost(BOOST_PICKED_UP_EVENT);
+  gameWrapper->UnhookEventPost(BOOST_SPAWNED_EVENT);
+  gameWrapper->UnhookEventPost(GOAL_SCORED_EVENT);
+  gameWrapper->UnhookEventPost(CAR_DEMOLISHED_EVENT);
 }
 
 bool SubtrActorPlugin::loadRustLibrary() {
@@ -172,27 +247,21 @@ void SubtrActorPlugin::tick(std::string) {
   if (!gameWrapper->IsInGame()) {
     if (wasInGame && engineReset) {
       engineReset(engine);
-      frameNumber = 0;
-      lastTime = 0.0f;
-      lastBoostAmounts.clear();
-      sampledPlayers.clear();
-      messages.clear();
+      resetLiveState();
     }
     wasInGame = false;
     return;
   }
   if (!wasInGame && engineReset) {
     engineReset(engine);
-    frameNumber = 0;
-    lastTime = 0.0f;
-    lastBoostAmounts.clear();
-    sampledPlayers.clear();
-    messages.clear();
+    resetLiveState();
   }
   wasInGame = true;
 
   SaLiveFrame frame = sampleFrame();
-  if (processFrame(engine, &frame) != 0) {
+  const int32_t processResult = processFrame(engine, &frame);
+  clearPendingFrameEvents();
+  if (processResult != 0) {
     return;
   }
 
@@ -218,10 +287,15 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
   frame.time = now;
   frame.dt = dt;
   frame.live_play = 1;
-  frame.ball_has_been_hit = 1;
+  frame.ball_has_been_hit =
+      server.IsNull() ? 1 : static_cast<uint8_t>(server.GetbBallHasBeenHit() != 0);
   frame.has_ball_has_been_hit = 1;
   frame.players = sampledPlayers.empty() ? nullptr : sampledPlayers.data();
   frame.player_count = sampledPlayers.size();
+  if (!server.IsNull()) {
+    frame.seconds_remaining = server.GetSecondsRemaining();
+    frame.has_seconds_remaining = 1;
+  }
 
   if (!server.IsNull()) {
     BallWrapper ball = server.GetBall();
@@ -231,11 +305,14 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
     }
   }
 
+  attachPendingFrameEvents(frame);
   return frame;
 }
 
 void SubtrActorPlugin::samplePlayers(ServerWrapper server, CarWrapper localCar) {
   sampledPlayers.clear();
+  carPlayerIndices.clear();
+  priPlayerIndices.clear();
 
   if (!server.IsNull()) {
     ArrayWrapper<CarWrapper> cars = server.GetCars();
@@ -285,7 +362,10 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   PriWrapper pri = car.GetPRI();
   if (!pri.IsNull()) {
     player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
+    priPlayerIndices[pri.memory_address] = playerIndex;
+    recordPlayerStatDeltas(pri, playerIndex, player.is_team_0);
   }
+  carPlayerIndices[car.memory_address] = playerIndex;
 
   player.has_rigid_body = 1;
   player.rigid_body = sampleRigidBody(car);
@@ -304,6 +384,208 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   }
 
   return player;
+}
+
+void SubtrActorPlugin::resetLiveState() {
+  frameNumber = 0;
+  lastTime = 0.0f;
+  sampledPlayers.clear();
+  clearPendingFrameEvents();
+  lastBoostAmounts.clear();
+  carPlayerIndices.clear();
+  priPlayerIndices.clear();
+  lastPlayerStats.clear();
+  boostPadIds.clear();
+  boostPadSequences.clear();
+  nextBoostPadId = 1;
+  messages.clear();
+}
+
+void SubtrActorPlugin::clearPendingFrameEvents() {
+  pendingTouches.clear();
+  pendingDodgeRefreshes.clear();
+  pendingBoostPadEvents.clear();
+  pendingGoals.clear();
+  pendingPlayerStatEvents.clear();
+  pendingDemolishes.clear();
+}
+
+void SubtrActorPlugin::attachPendingFrameEvents(SaLiveFrame &frame) {
+  frame.touches = pendingTouches.empty() ? nullptr : pendingTouches.data();
+  frame.touch_count = pendingTouches.size();
+  frame.dodge_refreshes = pendingDodgeRefreshes.empty() ? nullptr : pendingDodgeRefreshes.data();
+  frame.dodge_refresh_count = pendingDodgeRefreshes.size();
+  frame.boost_pad_events =
+      pendingBoostPadEvents.empty() ? nullptr : pendingBoostPadEvents.data();
+  frame.boost_pad_event_count = pendingBoostPadEvents.size();
+  frame.goals = pendingGoals.empty() ? nullptr : pendingGoals.data();
+  frame.goal_count = pendingGoals.size();
+  frame.player_stat_events =
+      pendingPlayerStatEvents.empty() ? nullptr : pendingPlayerStatEvents.data();
+  frame.player_stat_event_count = pendingPlayerStatEvents.size();
+  frame.demolishes = pendingDemolishes.empty() ? nullptr : pendingDemolishes.data();
+  frame.demolish_count = pendingDemolishes.size();
+}
+
+void SubtrActorPlugin::recordTouch(CarWrapper car) {
+  if (car.IsNull()) {
+    return;
+  }
+
+  SaTouchEvent event{};
+  if (auto playerIndex = playerIndexForCar(car)) {
+    event.player_index = *playerIndex;
+    event.has_player = 1;
+  }
+
+  PriWrapper pri = car.GetPRI();
+  event.is_team_0 = pri.IsNull() || pri.GetTeamNum() == 0 ? 1 : 0;
+  pendingTouches.push_back(event);
+}
+
+void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind) {
+  if (pickup.IsNull()) {
+    return;
+  }
+
+  SaBoostPadEvent event{};
+  event.pad_id = boostPadId(pickup.memory_address);
+  event.kind = kind;
+  if (kind == SaBoostPadEventKindPickedUp) {
+    event.sequence = ++boostPadSequences[pickup.memory_address];
+  }
+  pendingBoostPadEvents.push_back(event);
+}
+
+void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal) {
+  SaGoalEvent event{};
+  if (!goal.IsNull()) {
+    event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
+  }
+  sampleTeamScores(server, event);
+  pendingGoals.push_back(event);
+}
+
+void SubtrActorPlugin::recordDemolish(CarWrapper victim, ActorWrapper demolisher) {
+  if (victim.IsNull() || demolisher.IsNull()) {
+    return;
+  }
+
+  CarWrapper attacker(demolisher.memory_address);
+  const auto victimIndex = playerIndexForCar(victim);
+  const auto attackerIndex = playerIndexForCar(attacker);
+  if (!victimIndex || !attackerIndex) {
+    return;
+  }
+
+  SaDemolishEvent event{};
+  event.attacker_index = *attackerIndex;
+  event.victim_index = *victimIndex;
+  event.attacker_velocity = toSaVec3(attacker.GetVelocity());
+  event.victim_velocity = toSaVec3(victim.GetVelocity());
+  event.victim_location = toSaVec3(victim.GetLocation());
+  pendingDemolishes.push_back(event);
+}
+
+void SubtrActorPlugin::recordPlayerStatDeltas(
+    PriWrapper pri,
+    uint32_t playerIndex,
+    uint8_t isTeam0) {
+  if (pri.IsNull()) {
+    return;
+  }
+
+  const PlayerStatSnapshot current{
+      pri.GetMatchShots(),
+      pri.GetMatchSaves(),
+      pri.GetMatchAssists(),
+      pri.GetMatchDemolishes(),
+  };
+  auto [it, inserted] = lastPlayerStats.emplace(pri.memory_address, current);
+  if (inserted) {
+    return;
+  }
+
+  auto pushStats = [&](int previous, int next, SaPlayerStatEventKind kind) {
+    for (int i = previous; i < next; i += 1) {
+      pendingPlayerStatEvents.push_back(SaPlayerStatEvent{
+          playerIndex,
+          isTeam0,
+          kind,
+      });
+    }
+  };
+  pushStats(it->second.shots, current.shots, SaPlayerStatEventKindShot);
+  pushStats(it->second.saves, current.saves, SaPlayerStatEventKindSave);
+  pushStats(it->second.assists, current.assists, SaPlayerStatEventKindAssist);
+  it->second = current;
+}
+
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForCar(CarWrapper car) {
+  if (car.IsNull()) {
+    return std::nullopt;
+  }
+
+  const auto carMatch = carPlayerIndices.find(car.memory_address);
+  if (carMatch != carPlayerIndices.end()) {
+    return carMatch->second;
+  }
+
+  PriWrapper pri = car.GetPRI();
+  if (!pri.IsNull()) {
+    return playerIndexForPri(pri);
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForPri(PriWrapper pri) {
+  if (pri.IsNull()) {
+    return std::nullopt;
+  }
+
+  const auto priMatch = priPlayerIndices.find(pri.memory_address);
+  if (priMatch != priPlayerIndices.end()) {
+    return priMatch->second;
+  }
+  return std::nullopt;
+}
+
+uint32_t SubtrActorPlugin::boostPadId(uintptr_t pickupAddress) {
+  const auto existing = boostPadIds.find(pickupAddress);
+  if (existing != boostPadIds.end()) {
+    return existing->second;
+  }
+
+  const uint32_t id = nextBoostPadId++;
+  boostPadIds[pickupAddress] = id;
+  return id;
+}
+
+void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal) {
+  if (server.IsNull()) {
+    return;
+  }
+
+  ArrayWrapper<TeamWrapper> teams = server.GetTeams();
+  if (teams.IsNull()) {
+    return;
+  }
+
+  const int teamCount = teams.Count();
+  for (int i = 0; i < teamCount; i += 1) {
+    TeamWrapper team = teams.Get(i);
+    if (team.IsNull()) {
+      continue;
+    }
+    const int teamIndex = team.GetTeamIndex();
+    if (teamIndex == 0) {
+      goal.team_zero_score = team.GetScore();
+      goal.has_team_zero_score = 1;
+    } else if (teamIndex == 1) {
+      goal.team_one_score = team.GetScore();
+      goal.has_team_one_score = 1;
+    }
+  }
 }
 
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {

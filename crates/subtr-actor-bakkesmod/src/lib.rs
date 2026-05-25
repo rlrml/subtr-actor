@@ -552,7 +552,9 @@ impl SaLiveEventGenerator {
             .touch_state
             .update(frame, ball, players, &empty_events, live_play);
         let mut touch_events = explicit_touch_events(frame, explicit_events.touches);
-        touch_events.extend(touch_state.touch_events);
+        if touch_events.is_empty() {
+            touch_events.extend(touch_state.touch_events);
+        }
         let dodge_refreshed_events = infer_dodge_refreshed_events(
             frame,
             ball,
