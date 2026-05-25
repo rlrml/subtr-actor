@@ -23,6 +23,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
             <section class="launcher-section">
               <h2>Windows</h2>
               <button type="button" data-window-toggle="camera">Camera</button>
+              <button type="button" data-window-toggle="scoreboard">Scoreboard</button>
               <button type="button" data-window-toggle="playback">Playback</button>
               <button type="button" data-window-toggle="recording">Recording</button>
               <button type="button" data-window-toggle="mechanics">Events</button>
@@ -43,6 +44,10 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
         </div>
 
         <div id="floating-window-layer" class="floating-window-layer">
+          <section class="scoreboard-window" data-window-id="scoreboard">
+            <div id="scoreboard-window-body" class="scoreboard-window-body"></div>
+          </section>
+
           <section
             class="floating-window floating-window-camera"
             data-window-id="camera"

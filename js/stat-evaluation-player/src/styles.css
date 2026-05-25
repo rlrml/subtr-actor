@@ -235,7 +235,8 @@ input {
 }
 
 .floating-window,
-.stats-window {
+.stats-window,
+.scoreboard-window {
   position: absolute;
   left: clamp(0.8rem, var(--window-x, 1rem), calc(100vw - 18rem));
   top: clamp(0.8rem, var(--window-y, 1rem), calc(100dvh - 12rem));
@@ -254,8 +255,175 @@ input {
 }
 
 .floating-window[hidden],
-.stats-window[hidden] {
+.stats-window[hidden],
+.scoreboard-window[hidden] {
   display: none;
+}
+
+.scoreboard-window {
+  --window-x: calc(50vw - 15rem);
+  --window-y: 3.1rem;
+  left: clamp(0.8rem, var(--window-x), calc(100vw - min(30rem, calc(100vw - 1.6rem)) - 0.8rem));
+  top: clamp(0.8rem, var(--window-y), calc(100dvh - 8rem));
+  width: min(30rem, calc(100vw - 1.6rem));
+  gap: var(--ui-gap-sm);
+  padding: 0.48rem 0.56rem;
+  border-radius: var(--ui-radius-lg);
+}
+
+.scoreboard-window-body {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.scoreboard-scoreline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.scoreboard-team-score {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--team-accent);
+}
+
+.scoreboard-team-score:last-child {
+  justify-content: end;
+}
+
+.scoreboard-team-score span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.scoreboard-team-score strong {
+  min-width: 1.45rem;
+  color: var(--team-accent);
+  font-size: 1.35rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard-divider {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scoreboard-player-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.26rem 0.34rem;
+  border: 1px solid color-mix(in srgb, var(--team-accent) 28%, rgba(255, 255, 255, 0.08));
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, var(--team-soft) 55%, rgba(255, 255, 255, 0.03));
+}
+
+.scoreboard-teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.scoreboard-team {
+  display: grid;
+  gap: 0.26rem;
+  min-width: 0;
+}
+
+.scoreboard-player-row-header {
+  padding-block: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.scoreboard-player-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreboard-player-values {
+  display: grid;
+  grid-template-columns: 2.8rem repeat(4, 1.4rem);
+  gap: 0.18rem;
+  justify-content: end;
+}
+
+.scoreboard-value {
+  display: grid;
+  justify-items: end;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.54rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.scoreboard-value strong {
+  color: var(--text);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.scoreboard-header-value {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.scoreboard-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .scoreboard-window {
+    --window-y: 5.65rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .scoreboard-window {
+    width: min(24rem, calc(100vw - 1.6rem));
+    left: clamp(0.8rem, var(--window-x), calc(100vw - min(24rem, calc(100vw - 1.6rem)) - 0.8rem));
+  }
+
+  .scoreboard-teams {
+    grid-template-columns: 1fr;
+  }
+
+  .scoreboard-player-values {
+    grid-template-columns: 2.5rem repeat(4, 1.2rem);
+  }
 }
 
 .floating-window-camera {

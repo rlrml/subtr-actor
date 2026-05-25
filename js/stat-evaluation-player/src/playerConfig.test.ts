@@ -69,6 +69,16 @@ const CONFIG: StatsPlayerConfig = {
         visible: false,
       },
     },
+    {
+      id: "scoreboard",
+      placement: {
+        x: 820,
+        y: 48,
+        viewport: { width: 1920, height: 1080 },
+        zIndex: 33,
+        visible: true,
+      },
+    },
   ],
   statsWindows: [
     {

@@ -19,6 +19,7 @@ export type TeamScope = "blue" | "orange";
 export type ModuleCapabilityKind = "events" | "ranges" | "effects";
 export type SingletonWindowId =
   | "camera"
+  | "scoreboard"
   | "playback"
   | "recording"
   | "mechanics"
@@ -414,6 +415,7 @@ function normalizePlacement(value: unknown): WindowPlacementConfig {
 function isSingletonWindowId(value: unknown): value is SingletonWindowId {
   return (
     value === "camera" ||
+    value === "scoreboard" ||
     value === "playback" ||
     value === "recording" ||
     value === "mechanics" ||
