@@ -77,6 +77,23 @@ fn every_builtin_analysis_node_name_builds() {
 }
 
 #[test]
+fn every_resolved_shared_graph_node_name_is_directly_callable() {
+    let mut graph = graph_with_all_analysis_nodes();
+    graph.resolve().expect("shared graph should resolve");
+
+    let builtin_names = builtin_analysis_node_names()
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
+    for name in graph.node_names() {
+        assert!(
+            builtin_names.contains(name),
+            "resolved shared graph node should be callable by name: {name}"
+        );
+    }
+}
+
+#[test]
 fn continuous_ball_control_is_directly_callable() {
     assert!(builtin_analysis_node_names().contains(&"continuous_ball_control"));
     let mut graph = graph_with_builtin_analysis_nodes(["continuous_ball_control"])

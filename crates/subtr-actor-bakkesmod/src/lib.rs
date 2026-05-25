@@ -3042,6 +3042,8 @@ mod tests {
         assert!(builtin_names
             .iter()
             .any(|name| name == "continuous_ball_control"));
+        assert!(builtin_names.iter().any(|name| name == "frame_info"));
+        assert!(builtin_names.iter().any(|name| name == "live_play"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
