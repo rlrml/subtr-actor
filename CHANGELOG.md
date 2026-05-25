@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.8 - 2026-05-25
+
+- Move the compact stats evaluation scoreboard into the same top HUD row as the
+  player boost chips, centered between blue and orange.
+- Reserve center spacing in the player HUD so the score does not overlap the
+  player chips.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.8`.
+
 ## v0.8.7 - 2026-05-25
 
 - Simplify the stats evaluation player scoreboard into a compact game score
