@@ -32,7 +32,11 @@ export type {
   CanvasRecorderStatusListener,
 } from "./canvas-recorder";
 export { createTimelineOverlayPlugin } from "./timeline-overlay";
-export type { TimelineOverlayPlugin, TimelineOverlayPluginOptions } from "./timeline-overlay";
+export type {
+  TimelineOverlayEventSourceOptions,
+  TimelineOverlayPlugin,
+  TimelineOverlayPluginOptions,
+} from "./timeline-overlay";
 export {
   loadPlaylistManifestFromFile,
   parsePlaylistManifest,

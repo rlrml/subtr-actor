@@ -147,7 +147,6 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "touch",
 ]);
 const TOUCH_MODULE_ID = "touch";
-const MECHANIC_EVENT_SOURCE_ID = "mechanics:events";
 const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
 
 export interface StatEvaluationPlayerHandle {
@@ -512,18 +511,26 @@ function syncTimelineEvents(): void {
       continue;
     }
 
-    timelineSourceRemovers.set(mod.id, timelineOverlay.addEventSource(events));
+    timelineSourceRemovers.set(
+      mod.id,
+      timelineOverlay.addEventSource(events, {
+        id: `module:${mod.id}`,
+        label: mod.label,
+      }),
+    );
   }
 
-  const mechanicEvents = buildMechanicTimelineEvents(
-    ctx.statsTimeline,
-    ctx.replay,
-    activeMechanicTimelineKinds,
-  );
-  if (mechanicEvents.length > 0) {
+  for (const kind of activeMechanicTimelineKinds) {
+    const mechanicEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
+    if (mechanicEvents.length === 0) {
+      continue;
+    }
     timelineSourceRemovers.set(
-      MECHANIC_EVENT_SOURCE_ID,
-      timelineOverlay.addEventSource(mechanicEvents),
+      `mechanics:events:${kind}`,
+      timelineOverlay.addEventSource(mechanicEvents, {
+        id: `mechanics:${kind}`,
+        label: formatMechanicKind(kind),
+      }),
     );
   }
 
@@ -3316,6 +3323,7 @@ async function loadReplayBundleForDisplay(
     statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
 
     timelineOverlay = createTimelineOverlayPlugin({
+      replayEventsLabel: "Replay",
       replayEvents: (context) =>
         filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
     });

@@ -14,13 +14,23 @@ export interface TimelineOverlayPluginOptions {
   pauseWhileScrubbing?: boolean;
   includeReplayEvents?: boolean;
   replayEventKinds?: Iterable<ReplayTimelineEventKind>;
+  replayEventsLabel?: string;
   replayEvents?: ReplayTimelineEventSource;
+  eventsLabel?: string;
   events?: ReplayTimelineEventSource;
   ranges?: ReplayTimelineRangeSource;
 }
 
+export interface TimelineOverlayEventSourceOptions {
+  id?: string;
+  label?: string;
+}
+
 export interface TimelineOverlayPlugin extends ReplayPlayerPlugin {
-  addEventSource(source: ReplayTimelineEventSource): () => void;
+  addEventSource(
+    source: ReplayTimelineEventSource,
+    options?: TimelineOverlayEventSourceOptions,
+  ): () => void;
   removeEventSource(source: ReplayTimelineEventSource): boolean;
   refreshEvents(): void;
   addRangeSource(source: ReplayTimelineRangeSource): () => void;
@@ -32,6 +42,18 @@ interface TimelineEventBucket {
   key: string;
   time: number;
   events: ReplayTimelineEvent[];
+}
+
+interface TimelineEventLane {
+  key: string;
+  label: string;
+  buckets: TimelineEventBucket[];
+}
+
+interface TimelineEventSourceRecord {
+  key: string;
+  label: string;
+  source: ReplayTimelineEventSource;
 }
 
 interface TimelineRangeLane {
@@ -209,6 +231,51 @@ function ensureStyles(): void {
       pointer-events: none;
     }
 
+    .sap-tl-event-lanes {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.34rem;
+      margin-bottom: 0.58rem;
+    }
+
+    .sap-tl-event-lane {
+      display: grid;
+      grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
+      column-gap: var(--sap-tl-gutter-gap);
+      align-items: center;
+    }
+
+    .sap-tl-event-lane-track {
+      position: relative;
+      grid-column: 2;
+      height: 1.05rem;
+      margin: 0 calc(var(--sap-tl-thumb-size) / 2);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.045);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+      pointer-events: none;
+    }
+
+    .sap-tl-event-lane-label {
+      display: block;
+      max-width: 100%;
+      padding: 0.08rem 0.38rem;
+      border: 1px solid rgba(184, 214, 236, 0.18);
+      border-radius: 999px;
+      background: rgba(10, 16, 23, 0.82);
+      color: #c8d7e4;
+      font-size: 0.54rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+      text-transform: uppercase;
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .sap-tl-range-lane {
       display: grid;
       grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
@@ -370,6 +437,27 @@ function ensureStyles(): void {
       height: 1rem;
       pointer-events: none;
       z-index: 1;
+    }
+
+    .sap-tl-event-lane .sap-tl-markers {
+      position: relative;
+      left: auto;
+      right: auto;
+      top: auto;
+      height: 100%;
+    }
+
+    .sap-tl-event-lane .sap-tl-marker {
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .sap-tl-event-lane .sap-tl-marker::before {
+      display: none;
+    }
+
+    .sap-tl-event-lane .sap-tl-marker[data-active="true"] {
+      transform: translate(-50%, -50%) scale(1.16);
     }
 
     .sap-tl-marker {
@@ -558,14 +646,22 @@ function resolveCustomEvents(
 }
 
 function resolveEventSources(
-  sources: Iterable<ReplayTimelineEventSource>,
+  sources: Iterable<TimelineEventSourceRecord>,
   context: ReplayPlayerPluginContext,
-): ReplayTimelineEvent[] {
-  const events: ReplayTimelineEvent[] = [];
+): TimelineEventLane[] {
+  const lanes: TimelineEventLane[] = [];
   for (const source of sources) {
-    events.push(...resolveCustomEvents(source, context));
+    const events = resolveCustomEvents(source.source, context);
+    if (events.length === 0) {
+      continue;
+    }
+    lanes.push({
+      key: source.key,
+      label: source.label,
+      buckets: groupEvents(events),
+    });
   }
-  return events;
+  return lanes;
 }
 
 function resolveCustomRanges(
@@ -701,7 +797,16 @@ export function createTimelineOverlayPlugin(
   options: TimelineOverlayPluginOptions = {},
 ): TimelineOverlayPlugin {
   const pauseWhileScrubbing = options.pauseWhileScrubbing ?? true;
-  const extraEventSources = options.events ? [options.events] : [];
+  let nextEventSourceId = 0;
+  const extraEventSources: TimelineEventSourceRecord[] = options.events
+    ? [
+        {
+          key: "events:initial",
+          label: options.eventsLabel ?? "Events",
+          source: options.events,
+        },
+      ]
+    : [];
   const extraRangeSources = options.ranges ? [options.ranges] : [];
 
   let root: HTMLDivElement | null = null;
@@ -713,6 +818,7 @@ export function createTimelineOverlayPlugin(
   let toggleButtonLabel: HTMLSpanElement | null = null;
   let currentTimeText: HTMLSpanElement | null = null;
   let remainingTimeText: HTMLSpanElement | null = null;
+  let eventLanesRoot: HTMLDivElement | null = null;
   let markers: HTMLDivElement | null = null;
   let removeWindowListeners: (() => void) | null = null;
   let changedContainerPosition = false;
@@ -720,7 +826,7 @@ export function createTimelineOverlayPlugin(
   let scrubbing = false;
   let resumePlaybackAfterScrub = false;
   let playerContext: ReplayPlayerPluginContext | null = null;
-  let eventBuckets: TimelineEventBucket[] = [];
+  let eventLanes: TimelineEventLane[] = [];
   let rangeLanes: TimelineRangeLane[] = [];
   let projectionCacheKey: string | null = null;
   const markerElements = new Map<string, TimelineMarkerRecord>();
@@ -789,11 +895,7 @@ export function createTimelineOverlayPlugin(
     remainingTimeText.textContent = `-${formatPlaybackTime(duration - currentTime)}`;
     shell.dataset.scrubbing = scrubbing ? "true" : "false";
 
-    for (const bucket of eventBuckets) {
-      const markerRecord = markerElements.get(bucket.key);
-      if (!markerRecord) {
-        continue;
-      }
+    for (const markerRecord of markerElements.values()) {
       const timeSinceEvent = currentTime - markerRecord.timelineTime;
       const active = timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
       markerRecord.element.dataset.active = active ? "true" : "false";
@@ -822,43 +924,106 @@ export function createTimelineOverlayPlugin(
     }
   }
 
+  function createMarker(
+    bucket: TimelineEventBucket,
+    context: ReplayPlayerPluginContext,
+    duration: number,
+  ): HTMLButtonElement | null {
+    const primaryEvent = bucket.events[0];
+    if (!primaryEvent) {
+      return null;
+    }
+    const projection = context.player.projectReplayTimeToTimeline(bucket.time);
+
+    const marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = "sap-tl-marker";
+    marker.style.left = markerLeftPercent(projection.timelineTime, duration);
+    marker.style.color = eventAccent(primaryEvent);
+    marker.title = bucketTitle(bucket);
+    marker.textContent = eventBadgeText(bucket);
+    marker.addEventListener("click", () => {
+      context.player.seek(markerSeekTime(bucket.time, context));
+    });
+    marker.dataset.active = "false";
+    marker.dataset.passed = "false";
+
+    markerElements.set(bucket.key, {
+      element: marker,
+      timelineTime: projection.timelineTime,
+    });
+
+    return marker;
+  }
+
   function buildMarkers(context: ReplayPlayerPluginContext): void {
-    if (!markers) {
+    if (!markers || !eventLanesRoot) {
       return;
     }
 
     markers.replaceChildren();
+    eventLanesRoot.replaceChildren();
     markerElements.clear();
 
     const replayEvents = resolveReplayEvents(options, context);
-    const customEvents = resolveEventSources(extraEventSources, context);
-    eventBuckets = groupEvents([...replayEvents, ...customEvents]);
+    eventLanes = [];
+    if (replayEvents.length > 0) {
+      eventLanes.push({
+        key: "replay",
+        label: options.replayEventsLabel ?? "Replay",
+        buckets: groupEvents(replayEvents),
+      });
+    }
+    eventLanes.push(...resolveEventSources(extraEventSources, context));
     const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
 
-    for (const bucket of eventBuckets) {
-      const primaryEvent = bucket.events[0];
-      if (!primaryEvent) {
-        continue;
+    const replayLane = eventLanes[0];
+    if (replayLane?.key === "replay") {
+      for (const bucket of replayLane.buckets) {
+        const marker = createMarker(
+          { ...bucket, key: `${replayLane.key}:${bucket.key}` },
+          context,
+          duration,
+        );
+        if (marker) {
+          markers.append(marker);
+        }
       }
-      const projection = context.player.projectReplayTimeToTimeline(bucket.time);
+    }
 
-      const marker = document.createElement("button");
-      marker.type = "button";
-      marker.className = "sap-tl-marker";
-      marker.style.left = markerLeftPercent(projection.timelineTime, duration);
-      marker.style.color = eventAccent(primaryEvent);
-      marker.title = bucketTitle(bucket);
-      marker.textContent = eventBadgeText(bucket);
-      marker.addEventListener("click", () => {
-        context.player.seek(markerSeekTime(bucket.time, context));
-      });
-      marker.dataset.active = "false";
-      marker.dataset.passed = "false";
-      markers.append(marker);
-      markerElements.set(bucket.key, {
-        element: marker,
-        timelineTime: projection.timelineTime,
-      });
+    const customLanes = eventLanes.filter((lane) => lane.key !== "replay");
+    eventLanesRoot.hidden = customLanes.length === 0;
+
+    for (const lane of customLanes) {
+      const laneEl = document.createElement("div");
+      laneEl.className = "sap-tl-event-lane";
+
+      const label = document.createElement("span");
+      label.className = "sap-tl-event-lane-label";
+      label.textContent = lane.label;
+      label.title = lane.label;
+      laneEl.append(label);
+
+      const track = document.createElement("div");
+      track.className = "sap-tl-event-lane-track";
+
+      const laneMarkers = document.createElement("div");
+      laneMarkers.className = "sap-tl-markers";
+
+      for (const bucket of lane.buckets) {
+        const marker = createMarker(
+          { ...bucket, key: `${lane.key}:${bucket.key}` },
+          context,
+          duration,
+        );
+        if (marker) {
+          laneMarkers.append(marker);
+        }
+      }
+
+      track.append(laneMarkers);
+      laneEl.append(track);
+      eventLanesRoot.append(laneEl);
     }
   }
 
@@ -979,15 +1144,19 @@ export function createTimelineOverlayPlugin(
 
   return {
     id: "timeline-overlay",
-    addEventSource(source): () => void {
-      extraEventSources.push(source);
+    addEventSource(source, sourceOptions = {}): () => void {
+      extraEventSources.push({
+        key: sourceOptions.id ?? `events:${nextEventSourceId++}`,
+        label: sourceOptions.label ?? "Events",
+        source,
+      });
       refreshMarkers();
       return () => {
         this.removeEventSource(source);
       };
     },
     removeEventSource(source): boolean {
-      const index = extraEventSources.indexOf(source);
+      const index = extraEventSources.findIndex((record) => record.source === source);
       if (index < 0) {
         return false;
       }
@@ -1074,6 +1243,10 @@ export function createTimelineOverlayPlugin(
       rangesRoot.className = "sap-tl-ranges";
       rangesRoot.hidden = true;
 
+      eventLanesRoot = document.createElement("div");
+      eventLanesRoot.className = "sap-tl-event-lanes";
+      eventLanesRoot.hidden = true;
+
       const trackRail = document.createElement("div");
       trackRail.className = "sap-tl-track-rail";
 
@@ -1119,7 +1292,7 @@ export function createTimelineOverlayPlugin(
       };
 
       trackRail.append(mainRail, markers, range);
-      trackWrap.append(rangesRoot, toggleButton, trackRail);
+      trackWrap.append(rangesRoot, eventLanesRoot, toggleButton, trackRail);
       shell.append(topLine, trackWrap);
       root.append(shell);
       context.container.append(root);
@@ -1142,6 +1315,7 @@ export function createTimelineOverlayPlugin(
       root = null;
       shell = null;
       rangesRoot = null;
+      eventLanesRoot = null;
       range = null;
       toggleButton = null;
       toggleButtonIcon = null;
@@ -1150,7 +1324,7 @@ export function createTimelineOverlayPlugin(
       remainingTimeText = null;
       markers = null;
       playerContext = null;
-      eventBuckets = [];
+      eventLanes = [];
       rangeLanes = [];
       projectionCacheKey = null;
       markerElements.clear();
