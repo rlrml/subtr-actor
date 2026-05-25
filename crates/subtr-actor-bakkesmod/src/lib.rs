@@ -10,11 +10,12 @@ use subtr_actor::{
         graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
         StatsTimelineEventsState, StatsTimelineFrameNode, StatsTimelineFrameState,
     },
-    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo,
-    DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
-    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ShotEventMetadata, TouchEvent,
-    TouchState, TouchStateCalculator,
+    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, BumpEvent, DemoEventSample,
+    DemolishInfo, DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
+    GameplayState, GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState,
+    PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta,
+    ReplayStatsTimelineEvents, ShotEventMetadata, TouchEvent, TouchState, TouchStateCalculator,
+    WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -215,6 +216,8 @@ pub enum SaMechanicKind {
     OneTimer = 14,
     Pass = 15,
     HalfVolley = 16,
+    Whiff = 17,
+    Bump = 18,
 }
 
 #[repr(C)]
@@ -792,6 +795,34 @@ fn mechanic_start(event: &MechanicEvent) -> (usize, f32) {
     }
 }
 
+struct PendingGraphEvent {
+    id: String,
+    kind: SaMechanicKind,
+    player_id: RemoteId,
+    is_team_0: bool,
+    frame_number: usize,
+    time: f32,
+    confidence: f32,
+}
+
+fn push_pending_graph_event(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    event: PendingGraphEvent,
+) {
+    if !emitted_mechanic_ids.insert(event.id) {
+        return;
+    }
+    pending_events.push(SaMechanicEvent {
+        kind: event.kind,
+        player_index: player_index(&event.player_id),
+        is_team_0: event.is_team_0 as u8,
+        frame_number: event.frame_number as u64,
+        time: event.time,
+        confidence: event.confidence,
+    });
+}
+
 fn push_mechanic_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -801,19 +832,91 @@ fn push_mechanic_events_from_timeline(
         let Some(kind) = mechanic_kind(&event.kind) else {
             continue;
         };
-        if !emitted_mechanic_ids.insert(event.id.clone()) {
-            continue;
-        }
         let (frame_number, time) = mechanic_start(event);
-        pending_events.push(SaMechanicEvent {
-            kind,
-            player_index: player_index(&event.player_id),
-            is_team_0: event.is_team_0 as u8,
-            frame_number: frame_number as u64,
-            time,
-            confidence: 1.0,
-        });
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: event.id.clone(),
+                kind,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                frame_number,
+                time,
+                confidence: 1.0,
+            },
+        );
     }
+}
+
+fn push_whiff_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    whiffs: &[WhiffEvent],
+) {
+    for (index, event) in whiffs.iter().enumerate() {
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "whiff:{}:{}:{index}",
+                    event.frame,
+                    player_index(&event.player)
+                ),
+                kind: SaMechanicKind::Whiff,
+                player_id: event.player.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
+fn push_bump_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    bumps: &[BumpEvent],
+) {
+    for (index, event) in bumps.iter().enumerate() {
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "bump:{}:{}:{}:{index}",
+                    event.frame,
+                    player_index(&event.initiator),
+                    player_index(&event.victim)
+                ),
+                kind: SaMechanicKind::Bump,
+                player_id: event.initiator.clone(),
+                is_team_0: event.initiator_is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: event.confidence,
+            },
+        );
+    }
+}
+
+fn push_drainable_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    events: &ReplayStatsTimelineEvents,
+) {
+    push_mechanic_events_from_timeline(pending_events, emitted_mechanic_ids, &events.mechanics);
+    push_whiff_events_from_timeline(pending_events, emitted_mechanic_ids, &events.whiff);
+    push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
+    pending_events.sort_by(|left, right| {
+        left.time
+            .total_cmp(&right.time)
+            .then_with(|| left.frame_number.cmp(&right.frame_number))
+            .then_with(|| (left.kind as u32).cmp(&(right.kind as u32)))
+            .then_with(|| left.player_index.cmp(&right.player_index))
+    });
 }
 
 fn refresh_timeline_graph_views(engine: &mut SaEngine) {
@@ -822,10 +925,10 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         engine.frame_json.clear();
         return;
     };
-    push_mechanic_events_from_timeline(
+    push_drainable_events_from_timeline(
         &mut engine.pending_events,
         &mut engine.emitted_mechanic_ids,
-        &timeline_events.events.mechanics,
+        &timeline_events.events,
     );
     engine.events_json = serde_json::to_vec(&timeline_events.events).unwrap_or_default();
 
@@ -1119,6 +1222,40 @@ mod tests {
             is_team_0: true,
             timing: MechanicTiming::Moment { frame, time },
             properties: Vec::new(),
+        }
+    }
+
+    fn whiff_event(frame: usize, time: f32, player_index: u32) -> WhiffEvent {
+        WhiffEvent {
+            kind: WhiffEventKind::Whiff,
+            time,
+            frame,
+            player: RemoteId::SplitScreen(player_index),
+            is_team_0: player_index == 0,
+            closest_approach_distance: 42.0,
+            forward_alignment: 0.7,
+            approach_speed: 900.0,
+            dodge_active: false,
+            aerial: false,
+        }
+    }
+
+    fn bump_event(frame: usize, time: f32, confidence: f32) -> BumpEvent {
+        BumpEvent {
+            time,
+            frame,
+            initiator: RemoteId::SplitScreen(0),
+            victim: RemoteId::SplitScreen(1),
+            initiator_is_team_0: true,
+            victim_is_team_0: false,
+            is_team_bump: false,
+            strength: 800.0,
+            confidence,
+            contact_distance: 120.0,
+            closing_speed: 500.0,
+            victim_impulse: 220.0,
+            initiator_position: [0.0, 0.0, 0.0],
+            victim_position: [100.0, 0.0, 0.0],
         }
     }
 
@@ -1824,6 +1961,47 @@ mod tests {
         assert_eq!(pending_events[0].kind, SaMechanicKind::Center);
         assert_eq!(pending_events[0].frame_number, 15);
         assert_eq!(pending_events[0].time, 1.5);
+    }
+
+    #[test]
+    fn drains_whiff_and_bump_events_from_timeline_events() {
+        let mut pending_events = Vec::new();
+        let mut emitted_mechanic_ids = HashSet::new();
+        let timeline_events = ReplayStatsTimelineEvents {
+            mechanics: vec![normalized_mechanic(
+                "speed_flip:15:0",
+                "speed_flip",
+                15,
+                1.5,
+            )],
+            whiff: vec![whiff_event(12, 1.2, 0)],
+            bump: vec![bump_event(13, 1.3, 0.42)],
+            ..ReplayStatsTimelineEvents::default()
+        };
+
+        push_drainable_events_from_timeline(
+            &mut pending_events,
+            &mut emitted_mechanic_ids,
+            &timeline_events,
+        );
+
+        assert_eq!(pending_events.len(), 3);
+        assert_eq!(pending_events[0].kind, SaMechanicKind::Whiff);
+        assert_eq!(pending_events[0].frame_number, 12);
+        assert_eq!(pending_events[0].player_index, 0);
+        assert_eq!(pending_events[1].kind, SaMechanicKind::Bump);
+        assert_eq!(pending_events[1].frame_number, 13);
+        assert_eq!(pending_events[1].player_index, 0);
+        assert_eq!(pending_events[1].confidence, 0.42);
+        assert_eq!(pending_events[2].kind, SaMechanicKind::SpeedFlip);
+
+        pending_events.clear();
+        push_drainable_events_from_timeline(
+            &mut pending_events,
+            &mut emitted_mechanic_ids,
+            &timeline_events,
+        );
+        assert!(pending_events.is_empty());
     }
 
     #[test]
