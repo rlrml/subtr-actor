@@ -154,6 +154,19 @@ typedef enum SaMechanicKind {
   SaMechanicKindSpeedFlip = 1,
   SaMechanicKindHalfFlip = 2,
   SaMechanicKindWavedash = 3,
+  SaMechanicKindBallCarry = 4,
+  SaMechanicKindAirDribble = 5,
+  SaMechanicKindCeilingShot = 6,
+  SaMechanicKindWallAerial = 7,
+  SaMechanicKindWallAerialShot = 8,
+  SaMechanicKindCenter = 9,
+  SaMechanicKindFlipReset = 10,
+  SaMechanicKindDoubleTap = 11,
+  SaMechanicKindFlick = 12,
+  SaMechanicKindMustyFlick = 13,
+  SaMechanicKindOneTimer = 14,
+  SaMechanicKindPass = 15,
+  SaMechanicKindHalfVolley = 16,
 } SaMechanicKind;
 
 typedef struct SaMechanicEvent {

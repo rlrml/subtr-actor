@@ -126,10 +126,36 @@ SaQuat rotatorToQuat(Rotator rotation) {
 
 std::string mechanicLabel(SaMechanicKind kind) {
   switch (kind) {
+  case SaMechanicKindAirDribble:
+    return "Air dribble";
+  case SaMechanicKindBallCarry:
+    return "Ball carry";
+  case SaMechanicKindCeilingShot:
+    return "Ceiling shot";
+  case SaMechanicKindCenter:
+    return "Center";
+  case SaMechanicKindDoubleTap:
+    return "Double tap";
+  case SaMechanicKindFlick:
+    return "Flick";
+  case SaMechanicKindFlipReset:
+    return "Flip reset";
   case SaMechanicKindSpeedFlip:
     return "Speed flip";
   case SaMechanicKindHalfFlip:
     return "Half flip";
+  case SaMechanicKindHalfVolley:
+    return "Half volley";
+  case SaMechanicKindMustyFlick:
+    return "Musty flick";
+  case SaMechanicKindOneTimer:
+    return "One timer";
+  case SaMechanicKindPass:
+    return "Pass";
+  case SaMechanicKindWallAerial:
+    return "Wall aerial";
+  case SaMechanicKindWallAerialShot:
+    return "Wall aerial shot";
   case SaMechanicKindWavedash:
     return "Wavedash";
   default:
@@ -808,8 +834,14 @@ void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal)
 
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
   const bool isBlue = event.is_team_0 != 0;
+  const std::string label = event.confidence < 0.999f
+                                ? std::format(
+                                      "{} ({:.0f}%)",
+                                      mechanicLabel(event.kind),
+                                      event.confidence * 100.0f)
+                                : mechanicLabel(event.kind);
   OverlayMessage message{
-      std::format("{} ({:.0f}%)", mechanicLabel(event.kind), event.confidence * 100.0f),
+      label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       std::chrono::steady_clock::now() + std::chrono::seconds(2),
   };

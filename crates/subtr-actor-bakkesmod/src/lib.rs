@@ -3,12 +3,14 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    stats::analysis_graph::{graph_with_all_analysis_nodes, AnalysisGraph},
+    stats::analysis_graph::{
+        graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
+        StatsTimelineEventsState,
+    },
     BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo,
     DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalEvent, HalfFlipCalculator, LivePlayState, PlayerFrameState, PlayerSample, PlayerStatEvent,
-    PlayerStatEventKind, ShotEventMetadata, SpeedFlipCalculator, TouchEvent, TouchStateCalculator,
-    WavedashCalculator,
+    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerSample,
+    PlayerStatEvent, PlayerStatEventKind, ShotEventMetadata, TouchEvent, TouchStateCalculator,
 };
 
 #[repr(C)]
@@ -195,6 +197,19 @@ pub enum SaMechanicKind {
     SpeedFlip = 1,
     HalfFlip = 2,
     Wavedash = 3,
+    BallCarry = 4,
+    AirDribble = 5,
+    CeilingShot = 6,
+    WallAerial = 7,
+    WallAerialShot = 8,
+    Center = 9,
+    FlipReset = 10,
+    DoubleTap = 11,
+    Flick = 12,
+    MustyFlick = 13,
+    OneTimer = 14,
+    Pass = 15,
+    HalfVolley = 16,
 }
 
 #[repr(C)]
@@ -211,20 +226,18 @@ pub struct SaMechanicEvent {
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
-    last_speed_flip_count: usize,
-    last_half_flip_count: usize,
-    last_wavedash_count: usize,
+    last_mechanic_count: usize,
     pending_events: Vec<SaMechanicEvent>,
 }
 
 impl Default for SaEngine {
     fn default() -> Self {
+        let mut graph = graph_with_all_analysis_nodes();
+        graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
         Self {
-            graph: graph_with_all_analysis_nodes(),
+            graph,
             live_events: SaLiveEventGenerator::default(),
-            last_speed_flip_count: 0,
-            last_half_flip_count: 0,
-            last_wavedash_count: 0,
+            last_mechanic_count: 0,
             pending_events: Vec::new(),
         }
     }
@@ -656,48 +669,59 @@ fn frame_input(
     )
 }
 
+fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
+    match kind {
+        "air_dribble" => Some(SaMechanicKind::AirDribble),
+        "ball_carry" => Some(SaMechanicKind::BallCarry),
+        "ceiling_shot" => Some(SaMechanicKind::CeilingShot),
+        "center" => Some(SaMechanicKind::Center),
+        "double_tap" => Some(SaMechanicKind::DoubleTap),
+        "flick" => Some(SaMechanicKind::Flick),
+        "flip_reset" => Some(SaMechanicKind::FlipReset),
+        "half_flip" => Some(SaMechanicKind::HalfFlip),
+        "half_volley" => Some(SaMechanicKind::HalfVolley),
+        "musty_flick" => Some(SaMechanicKind::MustyFlick),
+        "one_timer" => Some(SaMechanicKind::OneTimer),
+        "pass" => Some(SaMechanicKind::Pass),
+        "speed_flip" => Some(SaMechanicKind::SpeedFlip),
+        "wall_aerial" => Some(SaMechanicKind::WallAerial),
+        "wall_aerial_shot" => Some(SaMechanicKind::WallAerialShot),
+        "wavedash" => Some(SaMechanicKind::Wavedash),
+        _ => None,
+    }
+}
+
+fn mechanic_start(event: &MechanicEvent) -> (usize, f32) {
+    match event.timing {
+        MechanicTiming::Moment { frame, time } => (frame, time),
+        MechanicTiming::Span {
+            start_frame,
+            start_time,
+            ..
+        } => (start_frame, start_time),
+    }
+}
+
 fn push_new_events(engine: &mut SaEngine) {
-    if let Some(speed_flip) = engine.graph.state::<SpeedFlipCalculator>() {
-        for event in &speed_flip.events()[engine.last_speed_flip_count..] {
-            engine.pending_events.push(SaMechanicEvent {
-                kind: SaMechanicKind::SpeedFlip,
-                player_index: player_index(&event.player),
-                is_team_0: event.is_team_0 as u8,
-                frame_number: event.frame as u64,
-                time: event.time,
-                confidence: event.confidence,
-            });
-        }
-        engine.last_speed_flip_count = speed_flip.events().len();
+    let Some(timeline_events) = engine.graph.state::<StatsTimelineEventsState>() else {
+        return;
+    };
+    let mechanics = &timeline_events.events.mechanics;
+    for event in &mechanics[engine.last_mechanic_count..] {
+        let Some(kind) = mechanic_kind(&event.kind) else {
+            continue;
+        };
+        let (frame_number, time) = mechanic_start(event);
+        engine.pending_events.push(SaMechanicEvent {
+            kind,
+            player_index: player_index(&event.player_id),
+            is_team_0: event.is_team_0 as u8,
+            frame_number: frame_number as u64,
+            time,
+            confidence: 1.0,
+        });
     }
-
-    if let Some(half_flip) = engine.graph.state::<HalfFlipCalculator>() {
-        for event in &half_flip.events()[engine.last_half_flip_count..] {
-            engine.pending_events.push(SaMechanicEvent {
-                kind: SaMechanicKind::HalfFlip,
-                player_index: player_index(&event.player),
-                is_team_0: event.is_team_0 as u8,
-                frame_number: event.frame as u64,
-                time: event.time,
-                confidence: event.confidence,
-            });
-        }
-        engine.last_half_flip_count = half_flip.events().len();
-    }
-
-    if let Some(wavedash) = engine.graph.state::<WavedashCalculator>() {
-        for event in &wavedash.events()[engine.last_wavedash_count..] {
-            engine.pending_events.push(SaMechanicEvent {
-                kind: SaMechanicKind::Wavedash,
-                player_index: player_index(&event.player),
-                is_team_0: event.is_team_0 as u8,
-                frame_number: event.frame as u64,
-                time: event.time,
-                confidence: event.confidence,
-            });
-        }
-        engine.last_wavedash_count = wavedash.events().len();
-    }
+    engine.last_mechanic_count = mechanics.len();
 }
 
 /// Creates an opaque live-analysis engine.
@@ -979,6 +1003,10 @@ mod tests {
             .graph
             .state::<FrameInfo>()
             .expect("full analysis graph should expose frame info state");
+        engine_ref
+            .graph
+            .state::<StatsTimelineEventsState>()
+            .expect("live graph should expose normalized timeline events state");
         assert_eq!(frame_info.frame_number, 7);
         assert_eq!(frame_info.seconds_remaining, Some(299));
         let gameplay = engine_ref
@@ -1291,5 +1319,44 @@ mod tests {
 
         assert_eq!(status, -1);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn maps_normalized_timeline_mechanic_kinds_to_abi_kinds() {
+        assert_eq!(
+            mechanic_kind("air_dribble"),
+            Some(SaMechanicKind::AirDribble)
+        );
+        assert_eq!(mechanic_kind("ball_carry"), Some(SaMechanicKind::BallCarry));
+        assert_eq!(
+            mechanic_kind("ceiling_shot"),
+            Some(SaMechanicKind::CeilingShot)
+        );
+        assert_eq!(mechanic_kind("center"), Some(SaMechanicKind::Center));
+        assert_eq!(mechanic_kind("double_tap"), Some(SaMechanicKind::DoubleTap));
+        assert_eq!(mechanic_kind("flick"), Some(SaMechanicKind::Flick));
+        assert_eq!(mechanic_kind("flip_reset"), Some(SaMechanicKind::FlipReset));
+        assert_eq!(mechanic_kind("half_flip"), Some(SaMechanicKind::HalfFlip));
+        assert_eq!(
+            mechanic_kind("half_volley"),
+            Some(SaMechanicKind::HalfVolley)
+        );
+        assert_eq!(
+            mechanic_kind("musty_flick"),
+            Some(SaMechanicKind::MustyFlick)
+        );
+        assert_eq!(mechanic_kind("one_timer"), Some(SaMechanicKind::OneTimer));
+        assert_eq!(mechanic_kind("pass"), Some(SaMechanicKind::Pass));
+        assert_eq!(mechanic_kind("speed_flip"), Some(SaMechanicKind::SpeedFlip));
+        assert_eq!(
+            mechanic_kind("wall_aerial"),
+            Some(SaMechanicKind::WallAerial)
+        );
+        assert_eq!(
+            mechanic_kind("wall_aerial_shot"),
+            Some(SaMechanicKind::WallAerialShot)
+        );
+        assert_eq!(mechanic_kind("wavedash"), Some(SaMechanicKind::Wavedash));
+        assert_eq!(mechanic_kind("unmapped"), None);
     }
 }
