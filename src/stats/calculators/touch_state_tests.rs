@@ -94,3 +94,71 @@ fn emits_consecutive_same_player_touch_candidates_without_cooldown() {
     assert_eq!(second_touch.touch_events[0].frame, 2);
     assert_eq!(second_touch.last_touch_player, Some(player_id));
 }
+
+#[test]
+fn explicit_touch_events_feed_touch_state_without_velocity_candidate() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+    let events = FrameEventsState {
+        touch_events: vec![TouchEvent {
+            time: 0.1,
+            frame: 1,
+            team_is_team_0: true,
+            player: Some(player_id.clone()),
+            closest_approach_distance: None,
+        }],
+        ..FrameEventsState::default()
+    };
+
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &events,
+        &live_play,
+    );
+
+    assert_eq!(touch_state.touch_events.len(), 1);
+    assert_eq!(touch_state.touch_events[0].player, Some(player_id.clone()));
+    assert_eq!(touch_state.touch_events[0].frame, 1);
+    assert_eq!(touch_state.last_touch_player, Some(player_id));
+}
+
+#[test]
+fn explicit_touch_events_are_enriched_with_proximity_distance() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+    let events = FrameEventsState {
+        touch_events: vec![TouchEvent {
+            time: 0.1,
+            frame: 1,
+            team_is_team_0: true,
+            player: Some(player_id),
+            closest_approach_distance: None,
+        }],
+        ..FrameEventsState::default()
+    };
+
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &events,
+        &live_play,
+    );
+
+    assert_eq!(
+        touch_state.touch_events[0].closest_approach_distance,
+        Some(0.0)
+    );
+}

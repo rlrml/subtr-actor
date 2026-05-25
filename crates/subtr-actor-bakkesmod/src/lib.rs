@@ -14,7 +14,7 @@ use subtr_actor::{
     DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
     PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ShotEventMetadata, TouchEvent,
-    TouchStateCalculator,
+    TouchState, TouchStateCalculator,
 };
 
 #[repr(C)]
@@ -1692,6 +1692,62 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_feeds_explicit_live_touch_events_to_touch_state() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 12.0,
+            has_closest_approach_distance: 1,
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let touch_state = engine_ref
+            .graph
+            .state::<TouchState>()
+            .expect("full analysis graph should expose touch state");
+        assert_eq!(touch_state.touch_events.len(), 1);
+        assert_eq!(
+            touch_state.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
+        );
+        assert_eq!(
+            touch_state.touch_events[0].closest_approach_distance,
+            Some(12.0)
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

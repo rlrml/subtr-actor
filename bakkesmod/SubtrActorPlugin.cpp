@@ -574,6 +574,14 @@ void SubtrActorPlugin::recordTouch(CarWrapper car) {
 
   PriWrapper pri = car.GetPRI();
   event.is_team_0 = pri.IsNull() || pri.GetTeamNum() == 0 ? 1 : 0;
+  ServerWrapper server = gameWrapper->GetGameEventAsServer();
+  if (!server.IsNull()) {
+    BallWrapper ball = server.GetBall();
+    if (!ball.IsNull()) {
+      event.closest_approach_distance = (ball.GetLocation() - car.GetLocation()).magnitude();
+      event.has_closest_approach_distance = 1;
+    }
+  }
   if (event.has_player != 0) {
     lastTouch = TouchAttribution{
         event.player_index,
