@@ -46,7 +46,7 @@ impl AnalysisNodeCollector {
 impl Collector for AnalysisNodeCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -74,16 +74,16 @@ impl Collector for AnalysisNodeCollector {
         );
         self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
-        self.last_demolish_count = processor.demolishes.len();
-        self.last_boost_pad_event_count = processor.boost_pad_events.len();
-        self.last_touch_event_count = processor.touch_events.len();
-        self.last_player_stat_event_count = processor.player_stat_events.len();
-        self.last_goal_event_count = processor.goal_events.len();
+        self.last_demolish_count = processor.demolishes().len();
+        self.last_boost_pad_event_count = processor.boost_pad_events().len();
+        self.last_touch_event_count = processor.touch_events().len();
+        self.last_player_stat_event_count = processor.player_stat_events().len();
+        self.last_goal_event_count = processor.goal_events().len();
 
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()
     }
 }

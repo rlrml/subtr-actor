@@ -543,7 +543,7 @@ impl<T, F> StatsCollector<T, F> {
         Ok(())
     }
 
-    fn refresh_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn refresh_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         let player_count = processor.player_count();
         if self.last_replay_meta_player_count == Some(player_count) {
             return Ok(());
@@ -563,7 +563,7 @@ where
 {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -605,17 +605,17 @@ where
 
         self.last_sample_time = Some(current_time);
         if matches!(self.sample_mode, SampleMode::Aggregate) {
-            self.last_demolish_count = processor.demolishes.len();
-            self.last_boost_pad_event_count = processor.boost_pad_events.len();
-            self.last_touch_event_count = processor.touch_events.len();
-            self.last_player_stat_event_count = processor.player_stat_events.len();
-            self.last_goal_event_count = processor.goal_events.len();
+            self.last_demolish_count = processor.demolishes().len();
+            self.last_boost_pad_event_count = processor.boost_pad_events().len();
+            self.last_touch_event_count = processor.touch_events().len();
+            self.last_player_stat_event_count = processor.player_stat_events().len();
+            self.last_goal_event_count = processor.goal_events().len();
         }
 
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
         let Some(replay_meta) = self.replay_meta.as_ref().cloned() else {
             return Ok(());

@@ -261,7 +261,7 @@ impl FlipResetTracker {
 
     pub fn on_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -312,7 +312,7 @@ impl FlipResetTracker {
 
     fn build_flip_reset_event(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         touch_event: &TouchEvent,
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
@@ -339,7 +339,7 @@ impl FlipResetTracker {
 
     fn build_flip_reset_event_for_player(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         player: &PlayerId,
         time: f32,
         frame_index: usize,
@@ -367,7 +367,7 @@ impl FlipResetTracker {
 
     fn build_flip_reset_followup_touch_candidate(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         touch_event: &TouchEvent,
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
@@ -394,7 +394,7 @@ impl FlipResetTracker {
 
     fn build_flip_reset_proximity_event(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         player: &PlayerId,
         time: f32,
         frame_index: usize,
@@ -421,7 +421,7 @@ impl FlipResetTracker {
 
     fn update_flip_reset_events(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         current_time: f32,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -499,7 +499,7 @@ impl FlipResetTracker {
         Ok(())
     }
 
-    fn update_dodge_rising_edges(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn update_dodge_rising_edges(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.current_frame_dodge_rising_edges.clear();
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
 
@@ -546,7 +546,7 @@ impl FlipResetTracker {
 
     fn update_post_wall_dodge_events(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -615,7 +615,7 @@ impl FlipResetTracker {
 
     fn update_flip_reset_followup_dodge_events(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
@@ -689,7 +689,7 @@ impl FlipResetTracker {
 impl Collector for FlipResetTracker {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         _current_time: f32,

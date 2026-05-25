@@ -82,7 +82,7 @@ impl BallFrame {
     /// - The ball's rigid body cannot be retrieved
     ///
     /// Otherwise returns [`Data`](BallFrame::Data) containing the ball's rigid body.
-    fn new_from_processor(processor: &ReplayProcessor, current_time: f32) -> Self {
+    fn new_from_processor(processor: &dyn ProcessorView, current_time: f32) -> Self {
         if processor.get_ignore_ball_syncing().unwrap_or(false) {
             Self::Empty
         } else if let Ok(rigid_body) = processor.get_interpolated_ball_rigid_body(current_time, 0.0)
@@ -171,7 +171,7 @@ impl PlayerFrame {
     /// Returns a [`SubtrActorError`] if:
     /// - The player's rigid body cannot be retrieved
     fn new_from_processor(
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         player_id: &PlayerId,
         current_time: f32,
     ) -> SubtrActorResult<Self> {
@@ -423,7 +423,7 @@ impl MetadataFrame {
     ///
     /// Returns a [`SubtrActorError`] if the seconds remaining cannot be retrieved
     /// from the processor.
-    fn new_from_processor(processor: &ReplayProcessor, time: f32) -> SubtrActorResult<Self> {
+    fn new_from_processor(processor: &dyn ProcessorView, time: f32) -> SubtrActorResult<Self> {
         Ok(Self::new(
             time,
             processor.get_seconds_remaining()?,
@@ -738,13 +738,13 @@ impl ReplayDataCollector {
         let meta = processor.get_replay_meta()?;
         Ok(ReplayData {
             meta,
-            demolish_infos: processor.demolishes,
-            boost_pad_events: processor.boost_pad_events,
+            demolish_infos: processor.demolishes().to_vec(),
+            boost_pad_events: processor.boost_pad_events().to_vec(),
             boost_pads,
-            touch_events: processor.touch_events,
-            dodge_refreshed_events: processor.dodge_refreshed_events,
-            player_stat_events: processor.player_stat_events,
-            goal_events: processor.goal_events,
+            touch_events: processor.touch_events().to_vec(),
+            dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
+            player_stat_events: processor.player_stat_events().to_vec(),
+            goal_events: processor.goal_events().to_vec(),
             frame_data: self.get_frame_data(),
         })
     }
@@ -816,7 +816,7 @@ impl ReplayDataCollector {
     /// Returns a [`SubtrActorError`] if player frame data cannot be extracted.
     fn get_player_frames(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         current_time: f32,
     ) -> SubtrActorResult<Vec<(PlayerId, PlayerFrame)>> {
         Ok(processor
@@ -859,7 +859,7 @@ impl Collector for ReplayDataCollector {
     /// - Frame data cannot be added to the collection
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         _frame_number: usize,
         current_time: f32,

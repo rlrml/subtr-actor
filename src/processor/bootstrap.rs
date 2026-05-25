@@ -32,7 +32,7 @@ impl<'a> ReplayProcessor<'a> {
     /// If any error other than `FinishProcessingEarly` occurs during the
     /// processing operation, it is propagated up by this function.
     pub fn process_long_enough_to_get_actor_ids(&mut self) -> SubtrActorResult<()> {
-        let mut handler = |_p: &ReplayProcessor, _f: &boxcars::Frame, n: usize, _current_time| {
+        let mut handler = |_p: &dyn ProcessorView, _f: &boxcars::Frame, n: usize, _current_time| {
             // XXX: 10 seconds should be enough to find everyone, right?
             if n > 10 * 30 {
                 SubtrActorError::new_result(SubtrActorErrorVariant::FinishProcessingEarly)

@@ -1290,7 +1290,7 @@ impl FrameCounter {
 impl Collector for FrameCounter {
     fn process_frame(
         &mut self,
-        _processor: &ReplayProcessor,
+        _processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         _frame_number: usize,
         current_time: f32,

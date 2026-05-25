@@ -40,7 +40,7 @@ impl ResolvedBoostPadCollector {
 impl Collector for ResolvedBoostPadCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -49,7 +49,7 @@ impl Collector for ResolvedBoostPadCollector {
             .process_frame(processor, frame, frame_number, current_time)
     }
 
-    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.collector.finish_replay(processor)
     }
 }
