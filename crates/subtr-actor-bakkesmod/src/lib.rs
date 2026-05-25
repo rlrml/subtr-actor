@@ -2342,10 +2342,219 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
         DemoCalculator,
     };
+
+    fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
+        let header_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("include")
+            .join("subtr_actor_bakkesmod.h");
+        let header = std::fs::read_to_string(&header_path)
+            .unwrap_or_else(|_| panic!("failed to read {}", header_path.display()));
+        let start = format!("typedef enum {enum_name} {{");
+        let end = format!("}} {enum_name};");
+        let mut in_enum = false;
+        let mut values = BTreeMap::new();
+        for line in header.lines() {
+            let line = line.trim();
+            if line == start {
+                in_enum = true;
+                continue;
+            }
+            if in_enum && line == end {
+                return values;
+            }
+            if !in_enum || line.is_empty() {
+                continue;
+            }
+
+            let line = line.trim_end_matches(',');
+            let Some((name, value)) = line.split_once(" = ") else {
+                continue;
+            };
+            values.insert(
+                name.to_owned(),
+                value
+                    .parse::<i32>()
+                    .unwrap_or_else(|_| panic!("invalid enum value in {enum_name}: {line}")),
+            );
+        }
+        panic!("did not find enum {enum_name} in {}", header_path.display());
+    }
+
+    #[test]
+    fn checked_in_header_matches_event_abi_enums() {
+        assert_eq!(
+            header_enum_values("SaMechanicKind"),
+            BTreeMap::from([
+                (
+                    "SaMechanicKindSpeedFlip".to_owned(),
+                    SaMechanicKind::SpeedFlip as i32,
+                ),
+                (
+                    "SaMechanicKindHalfFlip".to_owned(),
+                    SaMechanicKind::HalfFlip as i32,
+                ),
+                (
+                    "SaMechanicKindWavedash".to_owned(),
+                    SaMechanicKind::Wavedash as i32,
+                ),
+                (
+                    "SaMechanicKindBallCarry".to_owned(),
+                    SaMechanicKind::BallCarry as i32,
+                ),
+                (
+                    "SaMechanicKindAirDribble".to_owned(),
+                    SaMechanicKind::AirDribble as i32,
+                ),
+                (
+                    "SaMechanicKindCeilingShot".to_owned(),
+                    SaMechanicKind::CeilingShot as i32,
+                ),
+                (
+                    "SaMechanicKindWallAerial".to_owned(),
+                    SaMechanicKind::WallAerial as i32,
+                ),
+                (
+                    "SaMechanicKindWallAerialShot".to_owned(),
+                    SaMechanicKind::WallAerialShot as i32,
+                ),
+                (
+                    "SaMechanicKindCenter".to_owned(),
+                    SaMechanicKind::Center as i32,
+                ),
+                (
+                    "SaMechanicKindFlipReset".to_owned(),
+                    SaMechanicKind::FlipReset as i32,
+                ),
+                (
+                    "SaMechanicKindDoubleTap".to_owned(),
+                    SaMechanicKind::DoubleTap as i32,
+                ),
+                (
+                    "SaMechanicKindFlick".to_owned(),
+                    SaMechanicKind::Flick as i32,
+                ),
+                (
+                    "SaMechanicKindMustyFlick".to_owned(),
+                    SaMechanicKind::MustyFlick as i32,
+                ),
+                (
+                    "SaMechanicKindOneTimer".to_owned(),
+                    SaMechanicKind::OneTimer as i32,
+                ),
+                ("SaMechanicKindPass".to_owned(), SaMechanicKind::Pass as i32),
+                (
+                    "SaMechanicKindHalfVolley".to_owned(),
+                    SaMechanicKind::HalfVolley as i32,
+                ),
+                (
+                    "SaMechanicKindWhiff".to_owned(),
+                    SaMechanicKind::Whiff as i32,
+                ),
+                ("SaMechanicKindBump".to_owned(), SaMechanicKind::Bump as i32),
+                (
+                    "SaMechanicKindBackboard".to_owned(),
+                    SaMechanicKind::Backboard as i32,
+                ),
+                (
+                    "SaMechanicKindBoostPickup".to_owned(),
+                    SaMechanicKind::BoostPickup as i32,
+                ),
+                ("SaMechanicKindDemo".to_owned(), SaMechanicKind::Demo as i32),
+                (
+                    "SaMechanicKindFiftyFifty".to_owned(),
+                    SaMechanicKind::FiftyFifty as i32,
+                ),
+                (
+                    "SaMechanicKindAerialGoal".to_owned(),
+                    SaMechanicKind::AerialGoal as i32,
+                ),
+                (
+                    "SaMechanicKindHighAerialGoal".to_owned(),
+                    SaMechanicKind::HighAerialGoal as i32,
+                ),
+                (
+                    "SaMechanicKindLongDistanceGoal".to_owned(),
+                    SaMechanicKind::LongDistanceGoal as i32,
+                ),
+                (
+                    "SaMechanicKindOwnHalfGoal".to_owned(),
+                    SaMechanicKind::OwnHalfGoal as i32,
+                ),
+                (
+                    "SaMechanicKindEmptyNetGoal".to_owned(),
+                    SaMechanicKind::EmptyNetGoal as i32,
+                ),
+                (
+                    "SaMechanicKindCounterAttackGoal".to_owned(),
+                    SaMechanicKind::CounterAttackGoal as i32,
+                ),
+                (
+                    "SaMechanicKindFlickGoal".to_owned(),
+                    SaMechanicKind::FlickGoal as i32,
+                ),
+                (
+                    "SaMechanicKindDoubleTapGoal".to_owned(),
+                    SaMechanicKind::DoubleTapGoal as i32,
+                ),
+                (
+                    "SaMechanicKindOneTimerGoal".to_owned(),
+                    SaMechanicKind::OneTimerGoal as i32,
+                ),
+                (
+                    "SaMechanicKindAirDribbleGoal".to_owned(),
+                    SaMechanicKind::AirDribbleGoal as i32,
+                ),
+                (
+                    "SaMechanicKindFlipResetGoal".to_owned(),
+                    SaMechanicKind::FlipResetGoal as i32,
+                ),
+                (
+                    "SaMechanicKindHalfVolleyGoal".to_owned(),
+                    SaMechanicKind::HalfVolleyGoal as i32,
+                ),
+                ("SaMechanicKindGoal".to_owned(), SaMechanicKind::Goal as i32),
+                ("SaMechanicKindShot".to_owned(), SaMechanicKind::Shot as i32),
+                ("SaMechanicKindSave".to_owned(), SaMechanicKind::Save as i32),
+                (
+                    "SaMechanicKindAssist".to_owned(),
+                    SaMechanicKind::Assist as i32,
+                ),
+                (
+                    "SaMechanicKindDeath".to_owned(),
+                    SaMechanicKind::Death as i32,
+                ),
+            ])
+        );
+        assert_eq!(
+            header_enum_values("SaTeamEventKind"),
+            BTreeMap::from([(
+                "SaTeamEventKindRush".to_owned(),
+                SaTeamEventKind::Rush as i32,
+            )])
+        );
+        assert_eq!(
+            header_enum_values("SaGoalBuildupKind"),
+            BTreeMap::from([
+                (
+                    "SaGoalBuildupKindCounterAttack".to_owned(),
+                    SaGoalBuildupKind::CounterAttack as i32,
+                ),
+                (
+                    "SaGoalBuildupKindSustainedPressure".to_owned(),
+                    SaGoalBuildupKind::SustainedPressure as i32,
+                ),
+                (
+                    "SaGoalBuildupKindOther".to_owned(),
+                    SaGoalBuildupKind::Other as i32,
+                ),
+            ])
+        );
+    }
 
     fn rigid_body(location: SaVec3, linear_velocity: SaVec3) -> SaRigidBody {
         SaRigidBody {
