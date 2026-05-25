@@ -37,7 +37,7 @@ events, dodge-refresh transitions, and control state:
 - the shared `StatsCollector` module-keyed stats surface through
   `subtr_actor_bakkesmod_stats_json_len` and
   `subtr_actor_bakkesmod_write_stats_json`
-- the resolved graph DAG and builtin node registry through
+- the resolved graph DAG, builtin node registry, and stats module registry through
   `subtr_actor_bakkesmod_graph_info_json_len` and
   `subtr_actor_bakkesmod_write_graph_info_json`
 

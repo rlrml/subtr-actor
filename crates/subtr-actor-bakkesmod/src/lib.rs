@@ -6,7 +6,7 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    builtin_stats_graph_snapshot_json, default_stats_timeline_config,
+    builtin_stats_graph_snapshot_json, builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
         builtin_analysis_node_names, graph_with_all_analysis_nodes, AnalysisGraph,
         StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
@@ -363,6 +363,7 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
     let node_names = graph.node_names().collect::<Vec<_>>();
     serde_json::to_vec(&serde_json::json!({
         "builtin_analysis_node_names": builtin_analysis_node_names(),
+        "builtin_stats_module_names": builtin_stats_module_names(),
         "node_names": node_names,
         "dag": dag,
     }))
@@ -2277,6 +2278,28 @@ mod tests {
     }
 
     #[test]
+    fn live_graph_contains_every_shared_analysis_node() {
+        let mut expected_graph = graph_with_all_analysis_nodes();
+        expected_graph
+            .resolve()
+            .expect("shared graph should resolve");
+        let expected_names = expected_graph.node_names().collect::<HashSet<_>>();
+
+        let mut graph = live_analysis_graph();
+        graph.resolve().expect("live graph should resolve");
+        let live_names = graph.node_names().collect::<HashSet<_>>();
+
+        for name in expected_names {
+            assert!(
+                live_names.contains(name),
+                "live graph should include shared analysis node {name}"
+            );
+        }
+        assert!(live_names.contains("stats_timeline_frame"));
+        assert!(live_names.contains("stats_timeline_events"));
+    }
+
+    #[test]
     fn process_frame_uses_explicit_live_play_state_for_analysis_graph() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let frame = SaLiveFrame {
@@ -2620,6 +2643,16 @@ mod tests {
             .as_array()
             .expect("builtin names should be an array");
         assert!(builtin_names.iter().any(|name| name == "settings"));
+        let stats_module_names = value["builtin_stats_module_names"]
+            .as_array()
+            .expect("stats module names should be an array");
+        assert_eq!(stats_module_names.len(), builtin_stats_module_names().len());
+        for module_name in builtin_stats_module_names() {
+            assert!(
+                stats_module_names.iter().any(|name| name == module_name),
+                "graph info should expose stats module {module_name}"
+            );
+        }
         let node_names = value["node_names"]
             .as_array()
             .expect("node names should be an array");
@@ -2738,9 +2771,17 @@ mod tests {
         let module_names = value["module_names"]
             .as_array()
             .expect("module names should be an array");
-        assert!(module_names.iter().any(|name| name == "core"));
-        assert!(module_names.iter().any(|name| name == "ball_carry"));
-        assert!(module_names.iter().any(|name| name == "demo"));
+        assert_eq!(module_names.len(), builtin_stats_module_names().len());
+        for module_name in builtin_stats_module_names() {
+            assert!(
+                module_names.iter().any(|name| name == module_name),
+                "stats json should expose stats module {module_name}"
+            );
+            assert!(
+                value["modules"].get(module_name).is_some(),
+                "stats json should include module payload for {module_name}"
+            );
+        }
         assert!(value["config"].get("positioning").is_some());
         assert!(value["modules"].get("core").is_some());
         assert!(value["modules"].get("boost").is_some());
