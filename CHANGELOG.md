@@ -20,11 +20,19 @@ README, or refactor-only commit.
 
 ## v0.8.4 - 2026-05-25
 
+- Add the stats evaluation scoreboard to the review UI.
+- Add replay binding output for the stats player so replay review flows can use
+  the generated package artifacts.
+- Distinguish beaten-to-ball whiff attempts in stat event output.
+- Tighten mechanic classification by requiring forward dodge acceleration for
+  speed flips and presenting dodge refreshes separately from flip resets.
+- Hide verbose goal-tag evidence in the stats report by default.
 - Fix the GitHub Pages Nix build by refreshing the stats-player npm dependency
   hash after the generated stats-player bindings update.
 - Keep the stats-player package smoke install fixture in sync with new timeline
   config fields and wall aerial event collections.
 - Refresh Rust, Python, and JavaScript release metadata to `0.8.4`.
+
 ## v0.8.3 - 2026-05-25
 
 - Keep mechanics review clips from inheriting kickoff skipping, so kickoff-adjacent
@@ -39,6 +47,11 @@ README, or refactor-only commit.
   and avoid re-enforcing the end boundary once the clip is already paused.
 - Show clip timing, event timing, preroll, and postroll details in the mechanics
   review panel.
+- Add lead-in behavior when cueing timeline events and default noisy event
+  playlist sources off.
+- Add counter-attack, wall-aerial, and double-tap goal event coverage.
+- Fix bot-player handling in replay data exports.
+- Fix stats report scrolling inside the review page shell.
 - Refresh Rust, Python, and JavaScript release metadata to `0.8.2`.
 
 ## v0.8.1 - 2026-05-25
@@ -63,8 +76,14 @@ README, or refactor-only commit.
 
 - Add a stats evaluation player event playlist window with filter controls,
   automatic timeline following, and per-player event colors.
+- Expand the stats player events window with lane-separated event sources,
+  timeline lane label tooltips, and pass-origin classification.
 - Expand touch stats with wall-touch counts and surface-labeled touch
   breakdowns across Rust exports and the stats evaluation player.
+- Track dodge state for touch counts.
+- Tighten air-dribble detection by separating air-dribble policy from ball carry
+  handling and lowering the minimum detected duration.
+- Move tools CLI parsing to `clap` and speed up CI replay fixture checks.
 - Add touch surface confidence documentation and keep player entrypoint
   formatting lint-clean.
 - Refresh Rust, Python, and JavaScript release metadata to `0.7.13`.
@@ -90,6 +109,13 @@ README, or refactor-only commit.
 - Fix own-half goal tagging so team orientation is applied from the scoring
   team perspective.
 - Refresh Rust, Python, and JavaScript release metadata to `0.7.10`.
+
+## v0.7.9 - 2026-05-24
+
+- Improve speed-flip detection.
+- Update touch-state behavior for downstream mechanics and touch stats.
+- Fix the GitHub Pages Nix metadata carried forward from the `0.7.8` release.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.9`.
 
 ## v0.7.8 - 2026-05-24
 
