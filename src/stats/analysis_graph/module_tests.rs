@@ -1,12 +1,13 @@
 use super::*;
 use crate::{
-    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BumpCalculator,
-    CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator,
-    FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator,
-    HalfVolleyGoalCalculator, HighAerialGoalCalculator, LongDistanceGoalCalculator,
-    MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState,
-    RotationCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
+    BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
+    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
+    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
+    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
+    PossessionState, RotationCalculator, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -80,8 +81,9 @@ fn every_builtin_analysis_node_name_builds() {
 
 #[test]
 fn core_alias_and_match_stats_share_one_provider() {
-    assert_eq!(builtin_analysis_node_aliases()[0].alias, "core");
-    assert_eq!(builtin_analysis_node_aliases()[0].node_name, "match_stats");
+    assert!(builtin_analysis_node_aliases()
+        .iter()
+        .any(|alias| alias.alias == "core" && alias.node_name == "match_stats"));
 
     let mut graph = graph_with_builtin_analysis_nodes(["core", "match_stats"])
         .expect("core alias and match_stats should be accepted together");
@@ -95,6 +97,28 @@ fn core_alias_and_match_stats_share_one_provider() {
         1
     );
     assert!(!names.contains(&"core"));
+}
+
+#[test]
+fn air_dribble_alias_and_ball_carry_share_one_provider() {
+    assert!(builtin_analysis_node_names().contains(&"air_dribble"));
+    assert!(builtin_analysis_node_aliases()
+        .iter()
+        .any(|alias| alias.alias == "air_dribble" && alias.node_name == "ball_carry"));
+
+    let mut graph = graph_with_builtin_analysis_nodes(["air_dribble", "ball_carry"])
+        .expect("air_dribble alias and ball_carry should be accepted together");
+    graph
+        .resolve()
+        .expect("air_dribble alias and ball_carry should not duplicate providers");
+
+    let names = graph.node_names().collect::<Vec<_>>();
+    assert_eq!(
+        names.iter().filter(|name| **name == "ball_carry").count(),
+        1
+    );
+    assert!(!names.contains(&"air_dribble"));
+    assert!(graph.state::<BallCarryCalculator>().is_some());
 }
 
 #[test]

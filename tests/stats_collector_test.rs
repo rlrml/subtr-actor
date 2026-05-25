@@ -23,6 +23,24 @@ fn stats_collector_serializes_selected_modules_by_name() {
 }
 
 #[test]
+fn stats_collector_accepts_air_dribble_as_ball_carry_backed_module() {
+    let replay = common::parse_replay("assets/soccar-lan.replay");
+    let collected = StatsCollector::with_builtin_module_names(["air_dribble", "ball_carry"])
+        .expect("air_dribble should be a valid builtin module")
+        .get_stats(&replay)
+        .expect("stats collection should succeed");
+
+    let value = serde_json::to_value(&collected).expect("stats should serialize to json");
+    let modules = value
+        .get("modules")
+        .and_then(|value| value.as_object())
+        .expect("modules should serialize as an object");
+
+    assert!(modules.contains_key("air_dribble"));
+    assert!(modules.contains_key("ball_carry"));
+}
+
+#[test]
 fn stats_collector_processes_all_builtin_modules() {
     let replay =
         common::parse_replay("assets/replay-format-2016-07-21-v868-12-net-none-lan.replay");

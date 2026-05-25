@@ -75,6 +75,14 @@ struct TeamPlayerStatsWithEventsExport<'a, Team, Player, Event> {
 }
 
 #[derive(Serialize)]
+struct TeamPlayerStatsWithCollectedEventsExport<'a, Team, Player, Event> {
+    team_zero: &'a Team,
+    team_one: &'a Team,
+    player_stats: Vec<PlayerStatsEntry<'a, Player>>,
+    events: Vec<&'a Event>,
+}
+
+#[derive(Serialize)]
 struct StatsExport<'a, T> {
     stats: &'a T,
 }
@@ -402,6 +410,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "musty_flick",
         "dodge_reset",
         "ball_carry",
+        "air_dribble",
         "boost",
         "bump",
         "movement",
@@ -697,6 +706,20 @@ pub(crate) fn builtin_module_json(
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
                 events: calculator.carry_events(),
+            })
+        }
+        "air_dribble" => {
+            let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            let events = calculator
+                .carry_events()
+                .iter()
+                .filter(|event| event.kind == BallCarryKind::AirDribble)
+                .collect::<Vec<_>>();
+            serialize_to_json_value(&TeamPlayerStatsWithCollectedEventsExport {
+                team_zero: calculator.team_zero_air_dribble_stats(),
+                team_one: calculator.team_one_air_dribble_stats(),
+                player_stats: player_stats_entries(calculator.player_air_dribble_stats()),
+                events,
             })
         }
         "boost" => {
@@ -1166,6 +1189,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "musty_flick"
         | "dodge_reset"
         | "ball_carry"
+        | "air_dribble"
         | "counter_attack_goal"
         | "boost"
         | "bump"

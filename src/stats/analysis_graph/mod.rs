@@ -76,6 +76,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "pass",
     "dodge_reset",
     "ball_carry",
+    "air_dribble",
     "boost",
     "bump",
     "movement",
@@ -94,11 +95,16 @@ pub struct BuiltinAnalysisNodeAlias {
     pub node_name: &'static str,
 }
 
-pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] =
-    &[BuiltinAnalysisNodeAlias {
+pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] = &[
+    BuiltinAnalysisNodeAlias {
         alias: "core",
         node_name: "match_stats",
-    }];
+    },
+    BuiltinAnalysisNodeAlias {
+        alias: "air_dribble",
+        node_name: "ball_carry",
+    },
+];
 
 pub fn builtin_analysis_node_names() -> &'static [&'static str] {
     BUILTIN_ANALYSIS_NODE_NAMES

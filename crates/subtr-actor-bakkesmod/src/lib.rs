@@ -3140,6 +3140,7 @@ mod tests {
         assert!(builtin_names
             .iter()
             .any(|name| name == "continuous_ball_control"));
+        assert!(builtin_names.iter().any(|name| name == "air_dribble"));
         assert!(builtin_names.iter().any(|name| name == "frame_info"));
         assert!(builtin_names.iter().any(|name| name == "live_play"));
         assert!(builtin_names
@@ -3154,6 +3155,9 @@ mod tests {
         assert!(builtin_aliases
             .iter()
             .any(|alias| alias["alias"] == "core" && alias["node_name"] == "match_stats"));
+        assert!(builtin_aliases
+            .iter()
+            .any(|alias| alias["alias"] == "air_dribble" && alias["node_name"] == "ball_carry"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
