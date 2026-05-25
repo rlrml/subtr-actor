@@ -613,6 +613,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
 
   player.has_rigid_body = 1;
   player.rigid_body = sampleRigidBody(car);
+  player.jump_active = car.GetbJumped() != 0;
+  player.double_jump_active = car.GetbDoubleJumped() != 0;
   player.dodge_active =
       car.GetDodgeComponent().IsNull() ? 0 : car.GetDodgeComponent().GetbActive();
   player.powerslide_active = car.GetbReplicatedHandbrake() != 0;

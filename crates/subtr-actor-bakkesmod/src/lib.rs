@@ -74,6 +74,8 @@ pub struct SaPlayerFrame {
     pub boost_amount: f32,
     pub last_boost_amount: f32,
     pub boost_active: u8,
+    pub jump_active: u8,
+    pub double_jump_active: u8,
     pub dodge_active: u8,
     pub powerslide_active: u8,
     pub has_match_stats: u8,
@@ -711,12 +713,12 @@ impl ProcessorView for SaLiveProcessorView<'_> {
         Ok(self.player(player_id)?.boost_active)
     }
 
-    fn get_jump_active(&self, _player_id: &PlayerId) -> SubtrActorResult<u8> {
-        Ok(0)
+    fn get_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(self.player(player_id)?.jump_active)
     }
 
-    fn get_double_jump_active(&self, _player_id: &PlayerId) -> SubtrActorResult<u8> {
-        Ok(0)
+    fn get_double_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(self.player(player_id)?.double_jump_active)
     }
 
     fn get_dodge_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
@@ -2395,6 +2397,8 @@ mod tests {
             boost_amount: 33.0,
             last_boost_amount: 33.0,
             boost_active: 0,
+            jump_active: 0,
+            double_jump_active: 0,
             dodge_active: 0,
             powerslide_active: 0,
             has_match_stats: 1,
@@ -3611,6 +3615,30 @@ mod tests {
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_processor_view_exposes_sampled_jump_state() {
+        let mut player = player_at_index(
+            3,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 120.0,
+            },
+        );
+        player.jump_active = 1;
+        player.double_jump_active = 1;
+        player.dodge_active = 1;
+        let players = [player];
+        let frame = live_frame(1, SaRigidBody::default(), &players);
+        let view = SaLiveProcessorView::new(None, &frame, &players, FrameEventsState::default());
+        let player_id = RemoteId::SplitScreen(3);
+
+        assert_eq!(view.get_jump_active(&player_id).unwrap(), 1);
+        assert_eq!(view.get_double_jump_active(&player_id).unwrap(), 1);
+        assert_eq!(view.get_dodge_active(&player_id).unwrap(), 1);
     }
 
     #[test]

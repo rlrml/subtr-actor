@@ -41,6 +41,8 @@ typedef struct SaPlayerFrame {
   float boost_amount;
   float last_boost_amount;
   uint8_t boost_active;
+  uint8_t jump_active;
+  uint8_t double_jump_active;
   uint8_t dodge_active;
   uint8_t powerslide_active;
   uint8_t has_match_stats;
