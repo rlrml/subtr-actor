@@ -314,6 +314,7 @@ pub struct SaGoalContextEvent {
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
+    live_event_history: SaLiveEventHistory,
     live_replay_meta_initialized: bool,
     live_replay_meta: Option<ReplayMeta>,
     live_replay_meta_signature: Vec<(RemoteId, bool, Option<String>)>,
@@ -348,6 +349,7 @@ impl Default for SaEngine {
         Self {
             graph,
             live_events: SaLiveEventGenerator::default(),
+            live_event_history: SaLiveEventHistory::default(),
             live_replay_meta_initialized: false,
             live_replay_meta: None,
             live_replay_meta_signature: Vec::new(),
@@ -392,6 +394,31 @@ struct SaLiveEventGenerator {
     live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
     active_demos: Vec<SaActiveDemo>,
+}
+
+#[derive(Default)]
+struct SaLiveEventHistory {
+    demo_events: Vec<DemolishInfo>,
+    boost_pad_events: Vec<BoostPadEvent>,
+    touch_events: Vec<TouchEvent>,
+    dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
+    player_stat_events: Vec<PlayerStatEvent>,
+    goal_events: Vec<GoalEvent>,
+}
+
+impl SaLiveEventHistory {
+    fn append_frame_events(&mut self, events: &FrameEventsState) {
+        self.demo_events.extend(events.demo_events.iter().cloned());
+        self.boost_pad_events
+            .extend(events.boost_pad_events.iter().cloned());
+        self.touch_events
+            .extend(events.touch_events.iter().cloned());
+        self.dodge_refreshed_events
+            .extend(events.dodge_refreshed_events.iter().cloned());
+        self.player_stat_events
+            .extend(events.player_stat_events.iter().cloned());
+        self.goal_events.extend(events.goal_events.iter().cloned());
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -496,6 +523,7 @@ struct SaLiveProcessorView<'a> {
     players: &'a [SaPlayerFrame],
     player_ids: Vec<PlayerId>,
     events: FrameEventsState,
+    event_history: &'a SaLiveEventHistory,
 }
 
 impl<'a> SaLiveProcessorView<'a> {
@@ -504,6 +532,7 @@ impl<'a> SaLiveProcessorView<'a> {
         frame: &'a SaLiveFrame,
         players: &'a [SaPlayerFrame],
         events: FrameEventsState,
+        event_history: &'a SaLiveEventHistory,
     ) -> Self {
         Self {
             replay_meta,
@@ -514,6 +543,7 @@ impl<'a> SaLiveProcessorView<'a> {
                 .map(|player| player_id(player.player_index))
                 .collect(),
             events,
+            event_history,
         }
     }
 
@@ -883,27 +913,27 @@ impl ProcessorView for SaLiveProcessorView<'_> {
     }
 
     fn demolishes(&self) -> &[DemolishInfo] {
-        &self.events.demo_events
+        &self.event_history.demo_events
     }
 
     fn boost_pad_events(&self) -> &[BoostPadEvent] {
-        &self.events.boost_pad_events
+        &self.event_history.boost_pad_events
     }
 
     fn touch_events(&self) -> &[TouchEvent] {
-        &self.events.touch_events
+        &self.event_history.touch_events
     }
 
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
-        &self.events.dodge_refreshed_events
+        &self.event_history.dodge_refreshed_events
     }
 
     fn player_stat_events(&self) -> &[PlayerStatEvent] {
-        &self.events.player_stat_events
+        &self.event_history.player_stat_events
     }
 
     fn goal_events(&self) -> &[GoalEvent] {
-        &self.events.goal_events
+        &self.event_history.goal_events
     }
 
     fn current_frame_active_demo_events(&self) -> &[DemoEventSample] {
@@ -1330,8 +1360,15 @@ fn frame_input(
         explicit_live_play,
         explicit_events,
     );
+    engine.live_event_history.append_frame_events(&frame_events);
     let replay_meta = engine.live_replay_meta.as_ref();
-    let processor = SaLiveProcessorView::new(replay_meta, frame, sampled_players, frame_events);
+    let processor = SaLiveProcessorView::new(
+        replay_meta,
+        frame,
+        sampled_players,
+        frame_events,
+        &engine.live_event_history,
+    );
     FrameInput::timeline_with_live_play_state(
         &processor,
         frame.frame_number as usize,
@@ -7162,7 +7199,14 @@ mod tests {
         player.dodge_active = 1;
         let players = [player];
         let frame = live_frame(1, SaRigidBody::default(), &players);
-        let view = SaLiveProcessorView::new(None, &frame, &players, FrameEventsState::default());
+        let event_history = SaLiveEventHistory::default();
+        let view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState::default(),
+            &event_history,
+        );
         let player_id = RemoteId::SplitScreen(3);
 
         assert_eq!(view.get_jump_active(&player_id).unwrap(), 1);
@@ -7306,7 +7350,15 @@ mod tests {
             goal_events,
         };
         let replay_meta = live_replay_meta(&players);
-        let view = SaLiveProcessorView::new(Some(&replay_meta), &frame, &players, frame_events);
+        let mut event_history = SaLiveEventHistory::default();
+        event_history.append_frame_events(&frame_events);
+        let view = SaLiveProcessorView::new(
+            Some(&replay_meta),
+            &frame,
+            &players,
+            frame_events,
+            &event_history,
+        );
         let blue_id = RemoteId::SplitScreen(2);
         let orange_id = RemoteId::SplitScreen(5);
 
@@ -7418,6 +7470,130 @@ mod tests {
     }
 
     #[test]
+    fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
+        fn sample_events(frame: usize, time: f32) -> FrameEventsState {
+            FrameEventsState {
+                demo_events: vec![DemolishInfo {
+                    frame,
+                    time,
+                    seconds_remaining: 300,
+                    attacker: RemoteId::SplitScreen(0),
+                    victim: RemoteId::SplitScreen(1),
+                    attacker_velocity: Vector3f {
+                        x: 2300.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    victim_velocity: Vector3f {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    victim_location: Vector3f {
+                        x: 120.0,
+                        y: 0.0,
+                        z: 92.75,
+                    },
+                }],
+                boost_pad_events: vec![BoostPadEvent {
+                    time,
+                    frame,
+                    pad_id: "34".to_owned(),
+                    player: Some(RemoteId::SplitScreen(0)),
+                    kind: BoostPadEventKind::PickedUp {
+                        sequence: frame as u8,
+                    },
+                }],
+                touch_events: vec![TouchEvent {
+                    time,
+                    frame,
+                    team_is_team_0: true,
+                    player: Some(RemoteId::SplitScreen(0)),
+                    closest_approach_distance: Some(12.0),
+                }],
+                dodge_refreshed_events: vec![DodgeRefreshedEvent {
+                    time,
+                    frame,
+                    player: RemoteId::SplitScreen(0),
+                    is_team_0: true,
+                    counter_value: frame as i32,
+                }],
+                player_stat_events: vec![PlayerStatEvent {
+                    time,
+                    frame,
+                    player: RemoteId::SplitScreen(0),
+                    is_team_0: true,
+                    kind: PlayerStatEventKind::Shot,
+                    shot: None,
+                }],
+                goal_events: vec![GoalEvent {
+                    time,
+                    frame,
+                    scoring_team_is_team_0: true,
+                    player: Some(RemoteId::SplitScreen(0)),
+                    team_zero_score: Some(frame as i32),
+                    team_one_score: Some(0),
+                }],
+                ..FrameEventsState::default()
+            }
+        }
+
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = live_frame(
+            2,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        let previous_events = sample_events(1, 0.0);
+        let current_events = sample_events(2, frame.time);
+        let mut event_history = SaLiveEventHistory::default();
+        event_history.append_frame_events(&previous_events);
+        event_history.append_frame_events(&current_events);
+        let view = SaLiveProcessorView::new(None, &frame, &players, current_events, &event_history);
+
+        assert_eq!(view.demolishes().len(), 2);
+        assert_eq!(view.boost_pad_events().len(), 2);
+        assert_eq!(view.touch_events().len(), 2);
+        assert_eq!(view.dodge_refreshed_events().len(), 2);
+        assert_eq!(view.player_stat_events().len(), 2);
+        assert_eq!(view.goal_events().len(), 2);
+        assert_eq!(view.current_frame_demolish_events().len(), 1);
+        assert_eq!(view.current_frame_boost_pad_events().len(), 1);
+        assert_eq!(view.current_frame_touch_events().len(), 1);
+        assert_eq!(view.current_frame_dodge_refreshed_events().len(), 1);
+        assert_eq!(view.current_frame_player_stat_events().len(), 1);
+        assert_eq!(view.current_frame_goal_events().len(), 1);
+
+        let aggregate_input = FrameInput::aggregate(&view, 2, frame.time, frame.dt, 1, 1, 1, 1, 1);
+        let aggregate_events = aggregate_input.frame_events_state();
+        assert_eq!(aggregate_events.demo_events[0].frame, 2);
+        assert_eq!(aggregate_events.boost_pad_events[0].frame, 2);
+        assert_eq!(aggregate_events.touch_events[0].frame, 2);
+        assert_eq!(aggregate_events.dodge_refreshed_events[0].frame, 2);
+        assert_eq!(aggregate_events.player_stat_events[0].frame, 2);
+        assert_eq!(aggregate_events.goal_events[0].frame, 2);
+    }
+
+    #[test]
     fn live_processor_view_resolves_demo_car_actor_ids() {
         let players = [
             player_at_index(
@@ -7464,6 +7640,7 @@ mod tests {
                 active_duration_seconds: 0.25,
             }],
         );
+        let event_history = SaLiveEventHistory::default();
         let view = SaLiveProcessorView::new(
             None,
             &frame,
@@ -7476,6 +7653,7 @@ mod tests {
                 demo_events,
                 ..FrameEventsState::default()
             },
+            &event_history,
         );
 
         let active_demos = view.get_active_demos().unwrap();
@@ -7540,6 +7718,7 @@ mod tests {
                 active_duration_seconds: 0.25,
             }],
         );
+        let event_history = SaLiveEventHistory::default();
         let view = SaLiveProcessorView::new(
             None,
             &frame,
@@ -7548,6 +7727,7 @@ mod tests {
                 demo_events,
                 ..FrameEventsState::default()
             },
+            &event_history,
         );
 
         let input = FrameInput::timeline_with_live_play_state(
@@ -7620,6 +7800,7 @@ mod tests {
                 active_duration_seconds: 0.25,
             }],
         );
+        let event_history = SaLiveEventHistory::default();
         let view = SaLiveProcessorView::new(
             None,
             &frame,
@@ -7632,6 +7813,7 @@ mod tests {
                 demo_events,
                 ..FrameEventsState::default()
             },
+            &event_history,
         );
 
         let live_play = LivePlayState {
