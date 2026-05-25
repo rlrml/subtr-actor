@@ -228,7 +228,6 @@ function ensureStyles(): void {
       flex-direction: column;
       gap: 0.34rem;
       margin-bottom: 0.58rem;
-      pointer-events: none;
     }
 
     .sap-tl-event-lanes {
@@ -240,6 +239,7 @@ function ensureStyles(): void {
     }
 
     .sap-tl-event-lane {
+      position: relative;
       display: grid;
       grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
       column-gap: var(--sap-tl-gutter-gap);
@@ -254,7 +254,6 @@ function ensureStyles(): void {
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.045);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-      pointer-events: none;
     }
 
     .sap-tl-event-lane-label {
@@ -277,6 +276,7 @@ function ensureStyles(): void {
     }
 
     .sap-tl-range-lane {
+      position: relative;
       display: grid;
       grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
       column-gap: var(--sap-tl-gutter-gap);
@@ -311,6 +311,42 @@ function ensureStyles(): void {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .sap-tl-event-lane[data-label]::after,
+    .sap-tl-range-lane[data-label]::after {
+      content: attr(data-label);
+      position: absolute;
+      left: calc(var(--sap-tl-gutter-width) + var(--sap-tl-gutter-gap) + calc(var(--sap-tl-thumb-size) / 2));
+      bottom: calc(100% + 0.28rem);
+      z-index: 8;
+      max-width: min(22rem, calc(100% - var(--sap-tl-gutter-width) - var(--sap-tl-gutter-gap)));
+      padding: 0.28rem 0.48rem;
+      border: 1px solid rgba(184, 214, 236, 0.24);
+      border-radius: 0.4rem;
+      background: rgba(7, 12, 18, 0.96);
+      color: #f5fbff;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1.2;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      text-overflow: ellipsis;
+      transform: translateY(0.14rem);
+      transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+      white-space: nowrap;
+    }
+
+    .sap-tl-event-lane[data-label]:hover::after,
+    .sap-tl-event-lane[data-label]:focus-within::after,
+    .sap-tl-range-lane[data-label]:hover::after,
+    .sap-tl-range-lane[data-label]:focus-within::after {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .sap-tl-range-segment {
@@ -997,11 +1033,12 @@ export function createTimelineOverlayPlugin(
     for (const lane of customLanes) {
       const laneEl = document.createElement("div");
       laneEl.className = "sap-tl-event-lane";
+      laneEl.dataset.label = lane.label;
 
       const label = document.createElement("span");
       label.className = "sap-tl-event-lane-label";
       label.textContent = lane.label;
-      label.title = lane.label;
+      label.setAttribute("aria-label", lane.label);
       laneEl.append(label);
 
       const track = document.createElement("div");
@@ -1060,10 +1097,11 @@ export function createTimelineOverlayPlugin(
       track.className = "sap-tl-range-lane-track";
 
       if (lane.label) {
+        laneEl.dataset.label = lane.label;
         const label = document.createElement("span");
         label.className = "sap-tl-range-lane-label";
         label.textContent = lane.label;
-        label.title = lane.label;
+        label.setAttribute("aria-label", lane.label);
         laneEl.append(label);
       }
 
