@@ -65,6 +65,17 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
 }
 
 #[test]
+fn every_builtin_analysis_node_name_builds() {
+    for name in builtin_analysis_node_names() {
+        let mut graph = graph_with_builtin_analysis_nodes([*name])
+            .unwrap_or_else(|_| panic!("builtin analysis node should build: {name}"));
+        graph
+            .resolve()
+            .unwrap_or_else(|_| panic!("builtin analysis node should resolve: {name}"));
+    }
+}
+
+#[test]
 fn evaluates_all_reducer_nodes_against_a_real_replay() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())

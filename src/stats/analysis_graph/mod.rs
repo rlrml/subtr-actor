@@ -24,6 +24,56 @@ pub use collector::AnalysisNodeCollector;
 #[allow(unused_imports)]
 pub use nodes::*;
 
+pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
+    "core",
+    "backboard",
+    "ceiling_shot",
+    "center",
+    "double_tap",
+    "fifty_fifty",
+    "possession",
+    "pressure",
+    "rotation",
+    "rush",
+    "touch",
+    "wall_aerial",
+    "wall_aerial_shot",
+    "whiff",
+    "wavedash",
+    "speed_flip",
+    "half_flip",
+    "half_volley",
+    "flick",
+    "aerial_goal",
+    "high_aerial_goal",
+    "long_distance_goal",
+    "own_half_goal",
+    "empty_net_goal",
+    "counter_attack_goal",
+    "flick_goal",
+    "double_tap_goal",
+    "one_timer_goal",
+    "air_dribble_goal",
+    "flip_reset_goal",
+    "half_volley_goal",
+    "musty_flick",
+    "one_timer",
+    "pass",
+    "dodge_reset",
+    "ball_carry",
+    "boost",
+    "bump",
+    "movement",
+    "positioning",
+    "powerslide",
+    "demo",
+    "settings",
+];
+
+pub fn builtin_analysis_node_names() -> &'static [&'static str] {
+    BUILTIN_ANALYSIS_NODE_NAMES
+}
+
 pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn AnalysisNodeDyn>> {
     match name {
         "core" => Some(nodes::match_stats::boxed_default()),
@@ -69,6 +119,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "positioning" => Some(nodes::positioning::boxed_default()),
         "powerslide" => Some(nodes::powerslide::boxed_default()),
         "demo" => Some(nodes::demo::boxed_default()),
+        "settings" => Some(nodes::settings::boxed_default()),
         _ => None,
     }
 }

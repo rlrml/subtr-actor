@@ -8,8 +8,9 @@ use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
     default_stats_timeline_config,
     stats::analysis_graph::{
-        graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
-        StatsTimelineEventsState, StatsTimelineFrameNode, StatsTimelineFrameState,
+        builtin_analysis_node_names, graph_with_all_analysis_nodes, AnalysisGraph,
+        StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
+        StatsTimelineFrameState,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
@@ -249,15 +250,15 @@ pub struct SaEngine {
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
     timeline_json: Vec<u8>,
+    graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
 }
 
 impl Default for SaEngine {
     fn default() -> Self {
-        let mut graph = graph_with_all_analysis_nodes();
-        graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
-        graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+        let mut graph = live_analysis_graph();
+        let graph_info_json = serialize_graph_info(&mut graph);
         Self {
             graph,
             live_events: SaLiveEventGenerator::default(),
@@ -268,10 +269,29 @@ impl Default for SaEngine {
             events_json: Vec::new(),
             frame_json: Vec::new(),
             timeline_json: Vec::new(),
+            graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
         }
     }
+}
+
+fn live_analysis_graph() -> AnalysisGraph {
+    let mut graph = graph_with_all_analysis_nodes();
+    graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
+    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+    graph
+}
+
+fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
+    let dag = graph.render_ascii_dag().unwrap_or_default();
+    let node_names = graph.node_names().collect::<Vec<_>>();
+    serde_json::to_vec(&serde_json::json!({
+        "builtin_analysis_node_names": builtin_analysis_node_names(),
+        "node_names": node_names,
+        "dag": dag,
+    }))
+    .unwrap_or_default()
 }
 
 #[derive(Default)]
@@ -1437,6 +1457,53 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
 }
 
 #[no_mangle]
+/// Returns the UTF-8 byte length of the serialized live graph metadata.
+///
+/// The JSON payload includes the builtin analysis-node registry, the actual
+/// node names configured in this engine, and an ASCII DAG rendering.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_info_json_len(
+    engine: *const SaEngine,
+) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.graph_info_json.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the serialized live graph metadata into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_graph_info_json_len` first to size the destination
+/// buffer.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_bytes` must point to writable
+/// storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_info_json(
+    engine: *const SaEngine,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = engine.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let count = max_bytes.min(engine.graph_info_json.len());
+    ptr::copy_nonoverlapping(engine.graph_info_json.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
 /// Copies and removes pending events from the engine.
 ///
 /// Returns the number of events copied into `out_events`.
@@ -1937,6 +2004,41 @@ mod tests {
         assert!(value.get("bump").is_some());
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_write_events_json(engine, ptr::null_mut(), 10) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn exposes_live_graph_info_json() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let json_len = unsafe { subtr_actor_bakkesmod_graph_info_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_graph_info_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("graph info json should be valid");
+        assert!(value["dag"]
+            .as_str()
+            .expect("dag should be a string")
+            .contains("stats_timeline_events"));
+        let builtin_names = value["builtin_analysis_node_names"]
+            .as_array()
+            .expect("builtin names should be an array");
+        assert!(builtin_names.iter().any(|name| name == "settings"));
+        let node_names = value["node_names"]
+            .as_array()
+            .expect("node names should be an array");
+        assert!(node_names.iter().any(|name| name == "stats_timeline_frame"));
+        assert!(node_names
+            .iter()
+            .any(|name| name == "stats_timeline_events"));
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_write_graph_info_json(engine, ptr::null_mut(), 10) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
