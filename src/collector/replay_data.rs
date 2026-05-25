@@ -23,7 +23,7 @@
 //! use subtr_actor::collector::replay_data::ReplayDataCollector;
 //! use boxcars::ParserBuilder;
 //!
-//! let data = std::fs::read("assets/new_boost_format.replay").unwrap();
+//! let data = std::fs::read("assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay").unwrap();
 //! let replay = ParserBuilder::new(&data).parse().unwrap();
 //!
 //! let collector = ReplayDataCollector::new();
@@ -508,7 +508,7 @@ pub struct FrameData {
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
 ///
-/// let data = std::fs::read("assets/new_boost_format.replay").unwrap();
+/// let data = std::fs::read("assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay").unwrap();
 /// let replay = ParserBuilder::new(&data).parse().unwrap();
 /// let collector = ReplayDataCollector::new();
 /// let replay_data = collector.get_replay_data(&replay).unwrap();
@@ -559,7 +559,7 @@ impl ReplayData {
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
     ///
-    /// let data = std::fs::read("assets/new_boost_format.replay").unwrap();
+    /// let data = std::fs::read("assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay").unwrap();
     /// let replay = ParserBuilder::new(&data).parse().unwrap();
     /// let collector = ReplayDataCollector::new();
     /// let replay_data = collector.get_replay_data(&replay).unwrap();
@@ -668,7 +668,7 @@ impl FrameData {
 /// use subtr_actor::collector::replay_data::ReplayDataCollector;
 /// use boxcars::ParserBuilder;
 ///
-/// let data = std::fs::read("assets/new_boost_format.replay").unwrap();
+/// let data = std::fs::read("assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay").unwrap();
 /// let replay = ParserBuilder::new(&data).parse().unwrap();
 ///
 /// let collector = ReplayDataCollector::new();
@@ -777,7 +777,7 @@ impl ReplayDataCollector {
     /// use subtr_actor::collector::replay_data::ReplayDataCollector;
     /// use boxcars::ParserBuilder;
     ///
-    /// let data = std::fs::read("assets/new_boost_format.replay").unwrap();
+    /// let data = std::fs::read("assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay").unwrap();
     /// let replay = ParserBuilder::new(&data).parse().unwrap();
     ///
     /// let collector = ReplayDataCollector::new();

@@ -4,8 +4,10 @@ use clap::{Parser, ValueEnum};
 use subtr_actor::{evaluate_replay_plausibility, Collector, PlayerFrame, ReplayDataCollector};
 use subtr_actor::{ReplayProcessor, TimeAdvance};
 
-const DEFAULT_REPLAY_PATH: &str = "assets/rlcs.replay";
-const DEFAULT_DEMOLITION_REPLAY_PATH: &str = "assets/new_demolition_format.replay";
+const DEFAULT_REPLAY_PATH: &str =
+    "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
+const DEFAULT_DEMOLITION_REPLAY_PATH: &str =
+    "assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay";
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
 const MAX_GROUNDED_HEIGHT: f32 = 60.0;

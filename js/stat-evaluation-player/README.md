@@ -57,7 +57,7 @@ GitHub raw replay URLs work well because they are stable and include permissive
 CORS headers:
 
 ```text
-https://example.com/stats-player/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay
+https://example.com/stats-player/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay
 ```
 
 For shorter share links, encode the replay URL into the compressed `r=` query
@@ -68,7 +68,7 @@ and does not depend on an external URL shortener:
 import { encodeCompressedReplayUrl } from "subtr-actor-stats-player";
 
 const replayParam = encodeCompressedReplayUrl(
-  "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay",
+  "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
 );
 const link = `https://example.com/stats-player/?r=${replayParam}`;
 ```

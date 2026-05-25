@@ -10,7 +10,7 @@ import {
 
 const BASE_URL = "https://viewer.example/app/";
 const GITHUB_REPLAY_URL =
-  "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/dodges_refreshed_counter.replay";
+  "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay";
 const BALLCHASING_ID = "56889c3e-c420-45db-92fd-47ce2a3604b0";
 
 test("getReplayUrlFromSearch accepts replayUrl parameter", () => {
@@ -81,7 +81,7 @@ test("getReplayFetchRequestFromSearch falls back to replay URL parameters", () =
 
   assert.equal(request?.kind, "url");
   assert.equal(request?.url.href, GITHUB_REPLAY_URL);
-  assert.equal(request?.name, "dodges_refreshed_counter.replay");
+  assert.equal(request?.name, "replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
 });
 
 test("getReplayFileNameFromUrl derives a readable name", () => {

@@ -1,7 +1,7 @@
 use subtr_actor::{PlayerId, StatsTimelineCollector};
 
 const COLONELPANIC_NO_SPEED_FLIP_REPLAY: &str =
-    "assets/colonelpanic-no-speed-flip-28s-2026-05-24.replay";
+    "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
