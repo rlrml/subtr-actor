@@ -143,7 +143,9 @@ pub use settings::SettingsNode;
 #[allow(unused_imports)]
 pub use speed_flip::SpeedFlipNode;
 #[allow(unused_imports)]
-pub use stats_timeline_events::{StatsTimelineEventsNode, StatsTimelineEventsState};
+pub use stats_timeline_events::{
+    StatsTimelineEventsNode, StatsTimelineEventsState, STATS_TIMELINE_MECHANIC_KINDS,
+};
 #[allow(unused_imports)]
 pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 #[allow(unused_imports)]

@@ -10,6 +10,7 @@ use subtr_actor::{
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
+        STATS_TIMELINE_MECHANIC_KINDS,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
@@ -4237,6 +4238,39 @@ mod tests {
 
     #[test]
     fn maps_normalized_timeline_mechanic_kinds_to_abi_kinds() {
+        let expected_shared_graph_kinds = HashSet::from([
+            "air_dribble",
+            "ball_carry",
+            "ceiling_shot",
+            "center",
+            "double_tap",
+            "flick",
+            "flip_reset",
+            "half_flip",
+            "half_volley",
+            "musty_flick",
+            "one_timer",
+            "pass",
+            "speed_flip",
+            "wall_aerial",
+            "wall_aerial_shot",
+            "wavedash",
+        ]);
+        let shared_graph_kinds = STATS_TIMELINE_MECHANIC_KINDS
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            shared_graph_kinds, expected_shared_graph_kinds,
+            "shared stats timeline mechanic kind set changed; update ABI mapping expectations"
+        );
+        for &kind in STATS_TIMELINE_MECHANIC_KINDS {
+            assert!(
+                mechanic_kind(kind).is_some(),
+                "BakkesMod ABI mapping must cover shared stats timeline mechanic kind: {kind}"
+            );
+        }
+
         assert_eq!(
             mechanic_kind("air_dribble"),
             Some(SaMechanicKind::AirDribble)

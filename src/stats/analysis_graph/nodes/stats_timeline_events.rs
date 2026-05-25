@@ -7,6 +7,42 @@ pub struct StatsTimelineEventsState {
     pub events: ReplayStatsTimelineEvents,
 }
 
+const MECHANIC_AIR_DRIBBLE: &str = "air_dribble";
+const MECHANIC_BALL_CARRY: &str = "ball_carry";
+const MECHANIC_CEILING_SHOT: &str = "ceiling_shot";
+const MECHANIC_CENTER: &str = "center";
+const MECHANIC_DOUBLE_TAP: &str = "double_tap";
+const MECHANIC_FLICK: &str = "flick";
+const MECHANIC_FLIP_RESET: &str = "flip_reset";
+const MECHANIC_HALF_FLIP: &str = "half_flip";
+const MECHANIC_HALF_VOLLEY: &str = "half_volley";
+const MECHANIC_MUSTY_FLICK: &str = "musty_flick";
+const MECHANIC_ONE_TIMER: &str = "one_timer";
+const MECHANIC_PASS: &str = "pass";
+const MECHANIC_SPEED_FLIP: &str = "speed_flip";
+const MECHANIC_WALL_AERIAL: &str = "wall_aerial";
+const MECHANIC_WALL_AERIAL_SHOT: &str = "wall_aerial_shot";
+const MECHANIC_WAVEDASH: &str = "wavedash";
+
+pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
+    MECHANIC_AIR_DRIBBLE,
+    MECHANIC_BALL_CARRY,
+    MECHANIC_CEILING_SHOT,
+    MECHANIC_CENTER,
+    MECHANIC_DOUBLE_TAP,
+    MECHANIC_FLICK,
+    MECHANIC_FLIP_RESET,
+    MECHANIC_HALF_FLIP,
+    MECHANIC_HALF_VOLLEY,
+    MECHANIC_MUSTY_FLICK,
+    MECHANIC_ONE_TIMER,
+    MECHANIC_PASS,
+    MECHANIC_SPEED_FLIP,
+    MECHANIC_WALL_AERIAL,
+    MECHANIC_WALL_AERIAL_SHOT,
+    MECHANIC_WAVEDASH,
+];
+
 pub struct StatsTimelineEventsNode {
     state: StatsTimelineEventsState,
 }
@@ -326,8 +362,8 @@ fn build_mechanic_events(
 
     for (index, event) in ball_carry.carry_events().iter().enumerate() {
         let kind = match event.kind {
-            BallCarryKind::Carry => "ball_carry",
-            BallCarryKind::AirDribble => "air_dribble",
+            BallCarryKind::Carry => MECHANIC_BALL_CARRY,
+            BallCarryKind::AirDribble => MECHANIC_AIR_DRIBBLE,
         };
         let mut mechanic_event = span_mechanic_event(
             kind,
@@ -345,7 +381,7 @@ fn build_mechanic_events(
 
     for (index, event) in ceiling_shot.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "ceiling_shot",
+            MECHANIC_CEILING_SHOT,
             index,
             event.ceiling_contact_frame,
             event.frame,
@@ -358,7 +394,7 @@ fn build_mechanic_events(
 
     for (index, event) in wall_aerial.events().iter().enumerate() {
         let mut mechanic_event = span_mechanic_event(
-            "wall_aerial",
+            MECHANIC_WALL_AERIAL,
             index,
             event.wall_contact_frame,
             event.frame,
@@ -376,7 +412,7 @@ fn build_mechanic_events(
 
     for (index, event) in wall_aerial_shot.events().iter().enumerate() {
         let mut mechanic_event = span_mechanic_event(
-            "wall_aerial_shot",
+            MECHANIC_WALL_AERIAL_SHOT,
             index,
             event.takeoff_frame,
             event.frame,
@@ -394,7 +430,7 @@ fn build_mechanic_events(
 
     for (index, event) in center.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "center",
+            MECHANIC_CENTER,
             index,
             event.start_frame,
             event.frame,
@@ -407,7 +443,7 @@ fn build_mechanic_events(
 
     for (index, event) in dodge_reset.on_ball_events().iter().enumerate() {
         events.push(moment_mechanic_event(
-            "flip_reset",
+            MECHANIC_FLIP_RESET,
             index,
             event.frame,
             event.time,
@@ -418,7 +454,7 @@ fn build_mechanic_events(
 
     for (index, event) in double_tap.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "double_tap",
+            MECHANIC_DOUBLE_TAP,
             index,
             event.backboard_frame,
             event.frame,
@@ -431,7 +467,7 @@ fn build_mechanic_events(
 
     for (index, event) in flick.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "flick",
+            MECHANIC_FLICK,
             index,
             event.setup_start_frame,
             event.frame,
@@ -444,7 +480,7 @@ fn build_mechanic_events(
 
     for (index, event) in musty_flick.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "musty_flick",
+            MECHANIC_MUSTY_FLICK,
             index,
             event.dodge_frame,
             event.frame,
@@ -457,7 +493,7 @@ fn build_mechanic_events(
 
     for (index, event) in one_timer.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "one_timer",
+            MECHANIC_ONE_TIMER,
             index,
             event.pass_start_frame,
             event.frame,
@@ -470,7 +506,7 @@ fn build_mechanic_events(
 
     for (index, event) in pass.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "pass",
+            MECHANIC_PASS,
             index,
             event.start_frame,
             event.frame,
@@ -483,7 +519,7 @@ fn build_mechanic_events(
 
     for (index, event) in speed_flip.events().iter().enumerate() {
         events.push(moment_mechanic_event(
-            "speed_flip",
+            MECHANIC_SPEED_FLIP,
             index,
             event.frame,
             event.time,
@@ -494,7 +530,7 @@ fn build_mechanic_events(
 
     for (index, event) in half_flip.events().iter().enumerate() {
         events.push(moment_mechanic_event(
-            "half_flip",
+            MECHANIC_HALF_FLIP,
             index,
             event.frame,
             event.time,
@@ -505,7 +541,7 @@ fn build_mechanic_events(
 
     for (index, event) in half_volley.events().iter().enumerate() {
         events.push(moment_mechanic_event(
-            "half_volley",
+            MECHANIC_HALF_VOLLEY,
             index,
             event.frame,
             event.time,
@@ -516,7 +552,7 @@ fn build_mechanic_events(
 
     for (index, event) in wavedash.events().iter().enumerate() {
         events.push(span_mechanic_event(
-            "wavedash",
+            MECHANIC_WAVEDASH,
             index,
             event.dodge_frame,
             event.frame,
