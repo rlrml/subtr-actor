@@ -1227,8 +1227,6 @@ impl MatchStatsCalculator {
         goal_event: &GoalEvent,
         scoring_team_most_back_player: Option<&PlayerId>,
         defending_team_most_back_player: Option<&PlayerId>,
-        scorer_last_touch: Option<&GoalTouchContext>,
-        ball_air_time_before_goal: Option<f32>,
     ) {
         if let Some(player_id) = scoring_team_most_back_player {
             self.player_stats
@@ -1262,23 +1260,6 @@ impl MatchStatsCalculator {
                     boost_leadup,
                 );
         }
-
-        if let Some(scorer) = goal_event.player.as_ref() {
-            if let Some(touch_position) = scorer_last_touch.and_then(|touch| touch.ball_position) {
-                self.player_stats
-                    .entry(scorer.clone())
-                    .or_default()
-                    .scoring_context
-                    .record_scoring_goal_last_touch_position(touch_position);
-            }
-            if let Some(ball_air_time_before_goal) = ball_air_time_before_goal {
-                self.player_stats
-                    .entry(scorer.clone())
-                    .or_default()
-                    .scoring_context
-                    .record_goal_ball_air_time(ball_air_time_before_goal);
-            }
-        }
     }
 
     fn record_goal_context_events(
@@ -1308,8 +1289,6 @@ impl MatchStatsCalculator {
                 goal_event,
                 scoring_team_most_back_player.as_ref(),
                 defending_team_most_back_player.as_ref(),
-                scorer_last_touch.as_ref(),
-                ball_air_time_before_goal,
             );
 
             self.goal_context_events.push(GoalContextEvent {
@@ -1333,15 +1312,11 @@ impl MatchStatsCalculator {
         }
     }
 
-    fn fill_missing_goal_context_scorer(
+    fn reconcile_goal_context_scorer(
         &mut self,
         goal_event: &GoalEvent,
         scorer: &PlayerId,
     ) -> Option<GoalTouchContext> {
-        if goal_event.player.is_some() {
-            return None;
-        }
-
         let scorer_last_touch = self
             .last_touch_context_by_player
             .get(scorer)
@@ -1351,7 +1326,7 @@ impl MatchStatsCalculator {
             context.frame == goal_event.frame
                 && context.time == goal_event.time
                 && context.scoring_team_is_team_0 == goal_event.scoring_team_is_team_0
-                && context.scorer.is_none()
+                && context.scorer.as_ref() != Some(scorer)
         }) {
             context.scorer = Some(scorer.clone());
             context.scorer_last_touch = scorer_last_touch.clone();
@@ -1607,25 +1582,23 @@ impl MatchStatsCalculator {
                     let pending_goal_event =
                         self.take_pending_goal_event(&player.player_id, player.is_team_0);
                     if let Some(pending_goal_event) = pending_goal_event.as_ref() {
-                        if pending_goal_event.event.player.is_none() {
-                            let scorer_last_touch = self.fill_missing_goal_context_scorer(
-                                &pending_goal_event.event,
-                                &player.player_id,
-                            );
-                            if let Some(touch_position) =
-                                scorer_last_touch.and_then(|touch| touch.ball_position)
-                            {
-                                current_stats
-                                    .scoring_context
-                                    .record_scoring_goal_last_touch_position(touch_position);
-                            }
-                            if let Some(ball_air_time_before_goal) =
-                                pending_goal_event.ball_air_time_before_goal
-                            {
-                                current_stats
-                                    .scoring_context
-                                    .record_goal_ball_air_time(ball_air_time_before_goal);
-                            }
+                        let scorer_last_touch = self.reconcile_goal_context_scorer(
+                            &pending_goal_event.event,
+                            &player.player_id,
+                        );
+                        if let Some(touch_position) =
+                            scorer_last_touch.and_then(|touch| touch.ball_position)
+                        {
+                            current_stats
+                                .scoring_context
+                                .record_scoring_goal_last_touch_position(touch_position);
+                        }
+                        if let Some(ball_air_time_before_goal) =
+                            pending_goal_event.ball_air_time_before_goal
+                        {
+                            current_stats
+                                .scoring_context
+                                .record_goal_ball_air_time(ball_air_time_before_goal);
                         }
                     }
                     let goal_time = pending_goal_event

@@ -159,6 +159,75 @@ fn fills_missing_goal_context_scorer_from_goal_delta() {
 }
 
 #[test]
+fn rewrites_misattributed_goal_context_scorer_from_goal_delta() {
+    let scorer = PlayerId::Steam(1);
+    let stale_touch_player = PlayerId::Steam(2);
+    let mut calculator = MatchStatsCalculator::new();
+
+    let update_players = |calculator: &mut MatchStatsCalculator,
+                          frame: FrameInfo,
+                          player_goals: i32,
+                          goal_events| {
+        calculator
+            .update_parts(
+                &frame,
+                &GameplayState {
+                    ball_has_been_hit: Some(true),
+                    team_zero_score: Some(player_goals),
+                    team_one_score: Some(0),
+                    ..GameplayState::default()
+                },
+                &ball(BALL_GROUND_CONTACT_MAX_Z + 200.0),
+                &PlayerFrameState {
+                    players: vec![
+                        player(scorer.clone(), true, player_goals),
+                        player(stale_touch_player.clone(), true, 0),
+                    ],
+                },
+                &FrameEventsState {
+                    goal_events,
+                    ..FrameEventsState::default()
+                },
+                &LivePlayState {
+                    gameplay_phase: GameplayPhase::ActivePlay,
+                    is_live_play: true,
+                },
+                &TouchState::default(),
+            )
+            .unwrap();
+    };
+
+    update_players(&mut calculator, frame(0, 0.0), 0, Vec::new());
+    update_players(
+        &mut calculator,
+        frame(1, 1.5),
+        1,
+        vec![goal_event(1.5, 1, stale_touch_player.clone())],
+    );
+
+    assert_eq!(
+        calculator.goal_context_events()[0].scorer,
+        Some(scorer.clone())
+    );
+    assert_eq!(
+        calculator
+            .timeline()
+            .iter()
+            .find(|event| event.kind == TimelineEventKind::Goal)
+            .and_then(|event| event.player_id.as_ref()),
+        Some(&scorer)
+    );
+    let stale_stats = calculator.player_stats().get(&stale_touch_player).unwrap();
+    assert_eq!(
+        stale_stats
+            .scoring_context
+            .goal_ball_air_time
+            .goal_ball_air_time_sample_count,
+        0
+    );
+}
+
+#[test]
 fn records_goal_ball_air_time_from_last_ground_contact() {
     let scorer = PlayerId::Steam(1);
     let mut calculator = MatchStatsCalculator::new();
