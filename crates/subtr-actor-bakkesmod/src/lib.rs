@@ -4025,6 +4025,46 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
+        let mut drained_events = [SaMechanicEvent {
+            kind: SaMechanicKind::Shot,
+            player_index: 0,
+            is_team_0: 0,
+            frame_number: 0,
+            time: 0.0,
+            confidence: 0.0,
+        }; 64];
+        let drained_count = unsafe {
+            subtr_actor_bakkesmod_drain_events(
+                engine,
+                drained_events.as_mut_ptr(),
+                drained_events.len(),
+            )
+        };
+        let drained_events = &drained_events[..drained_count];
+        assert!(
+            drained_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Shot
+                    && event.player_index == 0
+                    && event.frame_number == 1
+            }),
+            "explicit live player stat events should drain through the full graph"
+        );
+        assert!(
+            drained_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Demo
+                    && event.player_index == 0
+                    && event.frame_number == 1
+            }),
+            "explicit live demolish events should drain attacker demo events through the full graph"
+        );
+        assert!(
+            drained_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Death
+                    && event.player_index == 1
+                    && event.frame_number == 1
+            }),
+            "explicit live demolish events should drain victim death events through the full graph"
+        );
         assert_eq!(player_frame.players[1].match_goals, Some(1));
         assert_eq!(player_frame.players[1].match_assists, Some(2));
         assert_eq!(player_frame.players[1].match_saves, Some(3));
