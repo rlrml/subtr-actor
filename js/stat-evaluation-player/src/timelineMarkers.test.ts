@@ -14,10 +14,12 @@ import {
   buildGoalTagTimelineEvents,
   buildHalfFlipTimelineEvents,
   buildHalfVolleyTimelineEvents,
+  buildMechanicTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildOneTimerTimelineEvents,
   buildPassTimelineEvents,
   buildPowerslideTimelineEvents,
+  buildRushTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   buildWavedashTimelineEvents,
@@ -60,6 +62,52 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
     filterReplayTimelineEvents(replay, ["core", "demo"]).map((event) => event.kind),
     ["goal", "save", "shot", "assist", "demo"],
   );
+});
+
+test("buildMechanicTimelineEvents maps span mechanics to markers at the end frame", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "double_tap:1:3:0",
+        kind: "double_tap",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+    ],
+  });
+
+  assert.deepEqual(buildMechanicTimelineEvents(statsTimeline, replay, ["double_tap"]), [
+    {
+      id: "double_tap:1:3:0",
+      time: 3,
+      frame: 3,
+      kind: "double_tap",
+      label: "Blue double tap",
+      shortLabel: "DT",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
 });
 
 test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
@@ -573,6 +621,42 @@ test("buildHalfVolleyTimelineEvents maps serialized half volleys to timeline mar
       shortLabel: "HV",
       playerId: "Steam:blue-id",
       playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("buildRushTimelineEvents maps serialized rush spans to end-time markers", () => {
+  const replay = {
+    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
+    players: [],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    rush_events: [
+      {
+        start_time: 1,
+        start_frame: 1,
+        end_time: 4,
+        end_frame: 4,
+        is_team_0: true,
+        attackers: 2,
+        defenders: 1,
+      },
+    ],
+  });
+
+  assert.deepEqual(buildRushTimelineEvents(statsTimeline, replay), [
+    {
+      id: "rush:1:4:0",
+      time: 4,
+      frame: 4,
+      kind: "rush",
+      label: "Blue rush 2v1",
+      shortLabel: "R",
+      playerId: null,
+      playerName: null,
       isTeamZero: true,
       color: "#3b82f6",
     },

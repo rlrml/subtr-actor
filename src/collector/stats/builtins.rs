@@ -380,6 +380,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "empty_net_goal",
         "counter_attack_goal",
         "flick_goal",
+        "double_tap_goal",
         "one_timer_goal",
         "air_dribble_goal",
         "flip_reset_goal",
@@ -546,6 +547,12 @@ pub(crate) fn builtin_module_json(
         }
         "flick_goal" => {
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "double_tap_goal" => {
+            let calculator = graph_state::<DoubleTapGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -819,11 +826,18 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
-        "aerial_goal" | "high_aerial_goal" | "long_distance_goal" | "own_half_goal"
-        | "empty_net_goal" | "counter_attack_goal" | "flick_goal" | "one_timer_goal" | "air_dribble_goal"
-        | "flip_reset_goal" | "half_volley_goal" => {
-            serialize_to_json_value(&serde_json::json!({}))?
-        }
+        "aerial_goal"
+        | "high_aerial_goal"
+        | "long_distance_goal"
+        | "own_half_goal"
+        | "empty_net_goal"
+        | "counter_attack_goal"
+        | "flick_goal"
+        | "double_tap_goal"
+        | "one_timer_goal"
+        | "air_dribble_goal"
+        | "flip_reset_goal"
+        | "half_volley_goal" => serialize_to_json_value(&serde_json::json!({}))?,
         "fifty_fifty" => {
             let calculator = graph_state::<FiftyFiftyCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsWithPlayerStatsExport {
@@ -1061,6 +1075,12 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "flick_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "double_tap_goal" => {
+            let calculator = graph_state::<DoubleTapGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "double_tap_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "one_timer_goal" => {

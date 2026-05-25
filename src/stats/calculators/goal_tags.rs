@@ -10,6 +10,7 @@ const DEFAULT_EMPTY_NET_MIN_DEFENDER_Y_MARGIN: f32 = 700.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_DISTANCE: f32 = 1000.0;
 const DEFAULT_EMPTY_NET_MAX_TOUCH_ATTACKING_Y: f32 = 3600.0;
 const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_DOUBLE_TAP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
@@ -27,6 +28,7 @@ pub enum GoalTagKind {
     EmptyNetGoal,
     CounterAttackGoal,
     FlickGoal,
+    DoubleTapGoal,
     OneTimerGoal,
     AirDribbleGoal,
     FlipResetGoal,
@@ -42,6 +44,7 @@ pub enum GoalTagEvidenceKind {
     DefenderPosition,
     GoalBuildup,
     Flick,
+    DoubleTap,
     OneTimer,
     AirDribble,
     FlipReset,
@@ -170,6 +173,20 @@ impl Default for FlickGoalCalculatorConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
+pub struct DoubleTapGoalCalculatorConfig {
+    pub max_event_to_goal_seconds: f32,
+}
+
+impl Default for DoubleTapGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_event_to_goal_seconds: DEFAULT_DOUBLE_TAP_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct OneTimerGoalCalculatorConfig {
     pub max_event_to_goal_seconds: f32,
 }
@@ -274,6 +291,12 @@ pub struct FlickGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct DoubleTapGoalCalculator {
+    config: DoubleTapGoalCalculatorConfig,
+    events: Vec<GoalTagEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct OneTimerGoalCalculator {
     config: OneTimerGoalCalculatorConfig,
     events: Vec<GoalTagEvent>,
@@ -334,6 +357,7 @@ impl_goal_tag_calculator!(LongDistanceGoalCalculator, LongDistanceGoalCalculator
 impl_goal_tag_calculator!(OwnHalfGoalCalculator, OwnHalfGoalCalculatorConfig);
 impl_goal_tag_calculator!(EmptyNetGoalCalculator, EmptyNetGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlickGoalCalculator, FlickGoalCalculatorConfig);
+impl_goal_tag_calculator!(DoubleTapGoalCalculator, DoubleTapGoalCalculatorConfig);
 impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
@@ -563,6 +587,30 @@ impl OneTimerGoalCalculator {
     }
 }
 
+impl DoubleTapGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        double_tap: &DoubleTapCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events = self.tag_goals(match_stats.goal_context_events(), double_tap.events());
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        events: &[DoubleTapEvent],
+    ) -> Vec<GoalTagEvent> {
+        tag_goals_by_point_mechanic_event(
+            goals,
+            events,
+            GoalTagKind::DoubleTapGoal,
+            self.config.max_event_to_goal_seconds,
+        )
+    }
+}
+
 impl AirDribbleGoalCalculator {
     pub fn update(
         &mut self,
@@ -735,6 +783,32 @@ impl GoalMechanicPointEvent for OneTimerEvent {
 
     fn evidence_kind(&self) -> GoalTagEvidenceKind {
         GoalTagEvidenceKind::OneTimer
+    }
+}
+
+impl GoalMechanicPointEvent for DoubleTapEvent {
+    fn event_time(&self) -> f32 {
+        self.time
+    }
+
+    fn event_frame(&self) -> usize {
+        self.frame
+    }
+
+    fn event_player(&self) -> &PlayerId {
+        &self.player
+    }
+
+    fn event_team_is_team_0(&self) -> bool {
+        self.is_team_0
+    }
+
+    fn event_confidence(&self) -> f32 {
+        1.0
+    }
+
+    fn evidence_kind(&self) -> GoalTagEvidenceKind {
+        GoalTagEvidenceKind::DoubleTap
     }
 }
 

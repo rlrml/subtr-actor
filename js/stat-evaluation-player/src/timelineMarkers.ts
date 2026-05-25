@@ -83,19 +83,26 @@ export function buildMechanicTimelineEvents(
 
   return (statsTimeline.events.mechanics ?? [])
     .filter(
-      (event): event is MechanicEvent & { timing: { type: "moment" } } =>
-        isVisibleMechanicKind(event.kind) &&
-        event.timing.type === "moment" &&
-        (!enabled || enabled.has(event.kind)),
+      (event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)),
     )
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
       const playerName = playerNames.get(playerId) ?? playerId;
       const mechanicLabel = formatMechanicKind(event.kind);
+      const timing =
+        event.timing.type === "moment"
+          ? {
+              frame: event.timing.frame,
+              time: event.timing.time,
+            }
+          : {
+              frame: event.timing.end_frame,
+              time: event.timing.end_time,
+            };
       return {
         id: event.id,
-        time: getReplayFrameTime(replay, event.timing.frame, event.timing.time),
-        frame: event.timing.frame,
+        time: getReplayFrameTime(replay, timing.frame, timing.time),
+        frame: timing.frame,
         kind: event.kind,
         label: `${playerName} ${mechanicLabel.toLowerCase()}`,
         shortLabel: mechanicShortLabel(event.kind),
@@ -534,6 +541,30 @@ export function buildHalfVolleyTimelineEvents(
   });
 }
 
+export function buildRushTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return statsTimeline.events.rush.map((event, index) => {
+    const eventTime = getReplayFrameTime(replay, event.end_frame, event.end_time);
+    const matchupLabel = `${event.attackers}v${event.defenders}`;
+    const teamName = event.is_team_0 ? "Blue" : "Orange";
+
+    return {
+      id: `rush:${event.start_frame}:${event.end_frame}:${index}`,
+      time: eventTime,
+      frame: event.end_frame,
+      kind: "rush",
+      label: `${teamName} rush ${matchupLabel}`,
+      shortLabel: "R",
+      playerId: null,
+      playerName: null,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 function formatGoalTagKind(kind: string): string {
   return formatMechanicKind(kind.replace(/_goal$/, ""));
 }
@@ -897,6 +928,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("half-volley")) {
     count += buildHalfVolleyTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("rush")) {
+    count += buildRushTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("wavedash")) {

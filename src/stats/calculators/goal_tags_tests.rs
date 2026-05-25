@@ -133,6 +133,17 @@ fn one_timer_event(time: f32, frame: usize, player: PlayerId) -> OneTimerEvent {
     }
 }
 
+fn double_tap_event(time: f32, frame: usize, player: PlayerId) -> DoubleTapEvent {
+    DoubleTapEvent {
+        time,
+        frame,
+        player,
+        is_team_0: true,
+        backboard_time: time - 0.4,
+        backboard_frame: frame.saturating_sub(4),
+    }
+}
+
 fn air_dribble_event(
     start_time: f32,
     end_time: f32,
@@ -381,6 +392,20 @@ fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::OneTimer));
+}
+
+#[test]
+fn double_tap_goal_tags_matching_double_tap_before_goal() {
+    let goal = goal_with_touch(true, position(0.0, 2800.0, 500.0), Vec::new());
+    let events = DoubleTapGoalCalculator::new()
+        .tag_goals(&[goal], &[double_tap_event(9.4, 94, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::DoubleTapGoal]);
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert!(events[0]
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::DoubleTap));
 }
 
 #[test]

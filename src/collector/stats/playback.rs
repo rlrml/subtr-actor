@@ -166,6 +166,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "empty_net_goal",
             "counter_attack_goal",
             "flick_goal",
+            "double_tap_goal",
             "one_timer_goal",
             "air_dribble_goal",
             "flip_reset_goal",
@@ -394,6 +395,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "empty_net_goal",
             "counter_attack_goal",
             "flick_goal",
+            "double_tap_goal",
             "one_timer_goal",
             "air_dribble_goal",
             "flip_reset_goal",
@@ -569,6 +571,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
         let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
         let flick_goal_config = self.config.get("flick_goal").and_then(Value::as_object);
+        let double_tap_goal_config = self
+            .config
+            .get("double_tap_goal")
+            .and_then(Value::as_object);
         let one_timer_goal_config = self.config.get("one_timer_goal").and_then(Value::as_object);
         let air_dribble_goal_config = self
             .config
@@ -659,6 +665,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flick_goal_max_event_to_touch_seconds",
             )
             .unwrap_or(FlickGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            double_tap_goal_max_event_to_goal_seconds: json_config_f32(
+                double_tap_goal_config,
+                "double_tap_goal_max_event_to_goal_seconds",
+                "double_tap_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(DoubleTapGoalCalculatorConfig::default().max_event_to_goal_seconds),
             one_timer_goal_max_event_to_goal_seconds: json_config_f32(
                 one_timer_goal_config,
                 "one_timer_goal_max_event_to_goal_seconds",
@@ -713,6 +725,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
         let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
         let flick_goal_config = self.config.get("flick_goal").and_then(Value::as_object);
+        let double_tap_goal_config = self
+            .config
+            .get("double_tap_goal")
+            .and_then(Value::as_object);
         let one_timer_goal_config = self.config.get("one_timer_goal").and_then(Value::as_object);
         let air_dribble_goal_config = self
             .config
@@ -865,6 +881,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 flick_goal_config,
                 "flick_goal_max_event_to_goal_seconds",
                 FlickGoalCalculatorConfig::default().max_event_to_goal_seconds,
+            ),
+            (
+                double_tap_goal_config,
+                "double_tap_goal_max_event_to_goal_seconds",
+                DoubleTapGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
             (
                 one_timer_goal_config,

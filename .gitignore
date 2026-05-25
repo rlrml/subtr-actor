@@ -5,6 +5,7 @@
 !assets/replay-format-*.replay
 !assets/post-eac-*.replay
 !assets/problematic-*.replay
+!assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay
 perf.data
 perf.data.old
 flamegraph.svg

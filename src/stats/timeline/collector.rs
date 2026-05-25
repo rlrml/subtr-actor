@@ -72,6 +72,8 @@ impl StatsTimelineCollector {
                 .max_touch_attacking_y,
             flick_goal_max_event_to_goal_seconds: FlickGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
+            double_tap_goal_max_event_to_goal_seconds: DoubleTapGoalCalculatorConfig::default()
+                .max_event_to_goal_seconds,
             one_timer_goal_max_event_to_goal_seconds: OneTimerGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
             air_dribble_goal_max_end_to_goal_seconds: AirDribbleGoalCalculatorConfig::default()

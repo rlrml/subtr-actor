@@ -107,6 +107,7 @@ export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): Sta
         empty_net_min_defender_distance: 0,
         empty_net_max_touch_attacking_y: 0,
         flick_goal_max_event_to_goal_seconds: 0,
+        double_tap_goal_max_event_to_goal_seconds: 0,
         one_timer_goal_max_event_to_goal_seconds: 0,
         air_dribble_goal_max_end_to_goal_seconds: 0,
         flip_reset_goal_max_event_to_goal_seconds: 0,

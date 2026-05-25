@@ -115,6 +115,13 @@ mechanic_goal_tag_node!(
     FlickCalculator
 );
 mechanic_goal_tag_node!(
+    DoubleTapGoalNode,
+    DoubleTapGoalCalculator,
+    "double_tap_goal",
+    double_tap_dependency,
+    DoubleTapCalculator
+);
+mechanic_goal_tag_node!(
     OneTimerGoalNode,
     OneTimerGoalCalculator,
     "one_timer_goal",
@@ -203,6 +210,10 @@ pub(crate) fn boxed_counter_attack_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_flick_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(FlickGoalNode::new())
+}
+
+pub(crate) fn boxed_double_tap_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(DoubleTapGoalNode::new())
 }
 
 pub(crate) fn boxed_one_timer_goal() -> Box<dyn AnalysisNodeDyn> {

@@ -1229,9 +1229,13 @@ function renderEventTimelineControls(): void {
   for (const event of statsTimeline?.events.mechanics ?? []) {
     mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
   }
+  const mechanicModuleIds = new Set(kinds.map((kind) => kind.replaceAll("_", "-")));
 
   const moduleEventSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !MECHANIC_BACKED_EVENT_MODULE_IDS.has(mod.id),
+    (mod) =>
+      mod.getTimelineEvents &&
+      !MECHANIC_BACKED_EVENT_MODULE_IDS.has(mod.id) &&
+      !mechanicModuleIds.has(mod.id),
   ).map((mod) => ({
     id: mod.id,
     label: mod.label,
