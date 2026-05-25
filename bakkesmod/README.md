@@ -24,10 +24,10 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   `analysis_nodes`, or `graph_info`) using the output names reported in
   `graph-info.json`.
   The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
-  writes one graph-backed builtin analysis node by name, using the node names
-  reported in `graph-info.json`.
+  writes one callable analysis node by name, using the callable node-name
+  registry exposed by the Rust ABI.
   The `subtr_actor_verify_graph [finish]` console command calls the fixed graph
-  outputs plus every builtin analysis node by name from the loaded plugin
+  outputs plus every callable analysis node name from the loaded plugin
   runtime and logs byte sizes, giving a quick in-game check that the graph
   surface is callable after at least one live frame has been processed.
 
@@ -111,8 +111,8 @@ acceptance check for live graph callability and event-generation parity.
 
    The BakkesMod console should log `subtr-actor: graph verification passed`
    along with nonzero byte sizes for `events`, `frame`, `timeline`, `stats`,
-   `analysis_nodes`, `graph_info`, and every name reported by
-   `builtin_analysis_node_names`.
+   `analysis_nodes`, `graph_info`, and every name reported by the callable
+   analysis-node name registry.
 3. Exercise live events that should be visible to the graph: touch the ball,
    pick up a boost pad, score a goal, and trigger a demolition when possible.
    Overlay labels should appear for drainable graph events.

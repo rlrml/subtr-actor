@@ -635,7 +635,7 @@ void SubtrActorPlugin::onLoad() {
   cvarManager->registerNotifier(
       "subtr_actor_verify_graph",
       [this](std::vector<std::string> params) { verifyGraphRuntime(params); },
-      "Calls the live graph outputs and every builtin analysis node, logging byte sizes. "
+      "Calls the live graph outputs and every callable analysis node, logging byte sizes. "
       "Pass 'finish' to flush delayed graph events first.",
       PERMISSION_ALL);
   hookGameEvents();
@@ -2041,7 +2041,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   if (nodeNames.empty()) {
     ok = false;
     cvarManager->log(
-        "subtr-actor: graph verification could not read builtin analysis node names");
+        "subtr-actor: graph verification could not read callable analysis node names");
   }
 
   for (const std::string &nodeName : nodeNames) {
