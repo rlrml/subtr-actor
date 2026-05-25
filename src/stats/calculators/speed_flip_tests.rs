@@ -45,11 +45,16 @@ fn strong_candidate(boost_alignment_sample_count: u32) -> ActiveSpeedFlipCandida
         start_frame: 10,
         start_position: [0.0, 0.0, 17.0],
         end_position: [450.0, 0.0, 50.0],
+        start_velocity_xy: glam::Vec2::new(900.0, 0.0),
+        start_forward_xy: glam::Vec2::X,
         start_speed: 900.0,
         max_speed: 1800.0,
         best_alignment: 0.98,
         best_boost_alignment: 0.98,
         boost_alignment_sample_count,
+        best_dodge_forward_delta: 320.0,
+        best_dodge_delta_alignment: 0.72,
+        dodge_acceleration_sample_count: 2,
         best_diagonal_score: 1.0,
         min_forward_z: -0.16,
         latest_forward_z: 0.02,
@@ -82,6 +87,46 @@ fn candidate_event_requires_boost_aligned_sample() {
 
     assert!(SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(0)).is_none());
     assert!(SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(2)).is_some());
+}
+
+#[test]
+fn candidate_event_rejects_sideways_dodge_acceleration() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut sideways_candidate = strong_candidate(2);
+    sideways_candidate.best_dodge_forward_delta = 50.0;
+    sideways_candidate.best_dodge_delta_alignment = 0.10;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, sideways_candidate).is_none());
+}
+
+#[test]
+fn update_candidate_tracks_early_forward_dodge_acceleration() {
+    let mut candidate = strong_candidate(1);
+    candidate.start_velocity_xy = glam::Vec2::new(900.0, 0.0);
+    candidate.start_forward_xy = glam::Vec2::X;
+    candidate.best_dodge_forward_delta = 0.0;
+    candidate.best_dodge_delta_alignment = -1.0;
+    candidate.dodge_acceleration_sample_count = 0;
+    let frame = FrameInfo {
+        frame_number: 12,
+        time: candidate.start_time + 0.10,
+        dt: 0.05,
+        seconds_remaining: None,
+    };
+
+    SpeedFlipCalculator::update_candidate(
+        &mut candidate,
+        &frame,
+        &BallFrameState::default(),
+        &PlayerSample {
+            boost_active: true,
+            ..player(glam::Vec3::new(1200.0, 120.0, 0.0), true)
+        },
+    );
+
+    assert_eq!(candidate.dodge_acceleration_sample_count, 1);
+    assert!(candidate.best_dodge_forward_delta >= 299.0);
+    assert!(candidate.best_dodge_delta_alignment > 0.9);
 }
 
 #[test]

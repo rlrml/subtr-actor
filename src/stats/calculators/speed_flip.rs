@@ -6,6 +6,9 @@ const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
 const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
+const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
+const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
+const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 
@@ -63,11 +66,16 @@ struct ActiveSpeedFlipCandidate {
     start_frame: usize,
     start_position: [f32; 3],
     end_position: [f32; 3],
+    start_velocity_xy: glam::Vec2,
+    start_forward_xy: glam::Vec2,
     start_speed: f32,
     max_speed: f32,
     best_alignment: f32,
     best_boost_alignment: f32,
     boost_alignment_sample_count: u32,
+    best_dodge_forward_delta: f32,
+    best_dodge_delta_alignment: f32,
+    dodge_acceleration_sample_count: u32,
     best_diagonal_score: f32,
     min_forward_z: f32,
     latest_forward_z: f32,
@@ -155,6 +163,14 @@ impl SpeedFlipCalculator {
         }
 
         Some(forward_xy.dot(velocity_xy))
+    }
+
+    fn forward_xy(player: &PlayerSample) -> Option<glam::Vec2> {
+        let rigid_body = player.rigid_body.as_ref()?;
+        let forward_xy = (quat_to_glam(&rigid_body.rotation) * glam::Vec3::X)
+            .truncate()
+            .normalize_or_zero();
+        (forward_xy.length_squared() > f32::EPSILON).then_some(forward_xy)
     }
 
     fn boost_alignment(player: &PlayerSample) -> Option<f32> {
@@ -290,6 +306,12 @@ impl SpeedFlipCalculator {
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
             return;
         }
+        let Some(start_velocity_xy) = player.velocity().map(|velocity| velocity.truncate()) else {
+            return;
+        };
+        let Some(start_forward_xy) = Self::forward_xy(player) else {
+            return;
+        };
 
         let rotation = quat_to_glam(&rigid_body.rotation);
         let local_angular_velocity = rigid_body
@@ -311,11 +333,16 @@ impl SpeedFlipCalculator {
                 start_frame: frame.frame_number,
                 start_position: player_position.to_array(),
                 end_position: player_position.to_array(),
+                start_velocity_xy,
+                start_forward_xy,
                 start_speed,
                 max_speed: start_speed,
                 best_alignment,
                 best_boost_alignment: Self::boost_alignment(player).unwrap_or(best_alignment),
                 boost_alignment_sample_count: u32::from(player.boost_active),
+                best_dodge_forward_delta: 0.0,
+                best_dodge_delta_alignment: -1.0,
+                dodge_acceleration_sample_count: 0,
                 best_diagonal_score,
                 min_forward_z: forward_z,
                 latest_forward_z: forward_z,
@@ -345,6 +372,23 @@ impl SpeedFlipCalculator {
         if let Some(boost_alignment) = Self::boost_alignment(player) {
             candidate.best_boost_alignment = candidate.best_boost_alignment.max(boost_alignment);
             candidate.boost_alignment_sample_count += 1;
+        }
+        if frame.time > candidate.start_time
+            && frame.time - candidate.start_time <= SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS
+        {
+            if let Some(velocity) = player.velocity() {
+                let velocity_delta = velocity.truncate() - candidate.start_velocity_xy;
+                let delta_length = velocity_delta.length();
+                if delta_length > f32::EPSILON {
+                    let forward_delta = velocity_delta.dot(candidate.start_forward_xy);
+                    candidate.best_dodge_forward_delta =
+                        candidate.best_dodge_forward_delta.max(forward_delta);
+                    candidate.best_dodge_delta_alignment = candidate
+                        .best_dodge_delta_alignment
+                        .max(forward_delta / delta_length);
+                    candidate.dodge_acceleration_sample_count += 1;
+                }
+            }
         }
 
         let rotation = quat_to_glam(&rigid_body.rotation);
@@ -389,6 +433,12 @@ impl SpeedFlipCalculator {
                 * Self::normalize_score(candidate.max_speed - candidate.start_speed, 180.0, 650.0);
         let alignment_score = Self::normalize_score(candidate.best_alignment, 0.78, 0.98);
         if candidate.boost_alignment_sample_count == 0 {
+            return None;
+        }
+        if candidate.dodge_acceleration_sample_count == 0
+            || candidate.best_dodge_forward_delta < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA
+            || candidate.best_dodge_delta_alignment < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT
+        {
             return None;
         }
         let boost_alignment_score =
