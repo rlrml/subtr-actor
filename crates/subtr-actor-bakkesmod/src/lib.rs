@@ -10,12 +10,12 @@ use subtr_actor::{
         graph_with_all_analysis_nodes, AnalysisGraph, StatsTimelineEventsNode,
         StatsTimelineEventsState, StatsTimelineFrameNode, StatsTimelineFrameState,
     },
-    BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind, BumpEvent, DemoEventSample,
-    DemolishInfo, DodgeRefreshedEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
-    GameplayState, GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState,
-    PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta,
-    ReplayStatsTimelineEvents, ShotEventMetadata, TouchEvent, TouchState, TouchStateCalculator,
-    WhiffEvent, WhiffEventKind,
+    BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
+    BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
+    FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalEvent,
+    LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo, PlayerSample,
+    PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsTimelineEvents, ShotEventMetadata,
+    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -218,6 +218,8 @@ pub enum SaMechanicKind {
     HalfVolley = 16,
     Whiff = 17,
     Bump = 18,
+    Backboard = 19,
+    BoostPickup = 20,
 }
 
 #[repr(C)]
@@ -902,13 +904,73 @@ fn push_bump_events_from_timeline(
     }
 }
 
+fn push_backboard_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    backboard: &[BackboardBounceEvent],
+) {
+    for (index, event) in backboard.iter().enumerate() {
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "backboard:{}:{}:{index}",
+                    event.frame,
+                    player_index(&event.player)
+                ),
+                kind: SaMechanicKind::Backboard,
+                player_id: event.player.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
+fn push_boost_pickup_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    boost_pickups: &[BoostPickupComparisonEvent],
+) {
+    for (index, event) in boost_pickups.iter().enumerate() {
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "boost_pickup:{}:{}:{:?}:{:?}:{index}",
+                    event.frame,
+                    player_index(&event.player_id),
+                    event.reported_frame,
+                    event.inferred_frame
+                ),
+                kind: SaMechanicKind::BoostPickup,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
     events: &ReplayStatsTimelineEvents,
 ) {
     push_mechanic_events_from_timeline(pending_events, emitted_mechanic_ids, &events.mechanics);
+    push_backboard_events_from_timeline(pending_events, emitted_mechanic_ids, &events.backboard);
     push_whiff_events_from_timeline(pending_events, emitted_mechanic_ids, &events.whiff);
+    push_boost_pickup_events_from_timeline(
+        pending_events,
+        emitted_mechanic_ids,
+        &events.boost_pickups,
+    );
     push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
     pending_events.sort_by(|left, right| {
         left.time
@@ -1154,6 +1216,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use subtr_actor::{
+        BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
+    };
 
     fn rigid_body(location: SaVec3, linear_velocity: SaVec3) -> SaRigidBody {
         SaRigidBody {
@@ -1256,6 +1321,34 @@ mod tests {
             victim_impulse: 220.0,
             initiator_position: [0.0, 0.0, 0.0],
             victim_position: [100.0, 0.0, 0.0],
+        }
+    }
+
+    fn backboard_event(frame: usize, time: f32) -> BackboardBounceEvent {
+        BackboardBounceEvent {
+            time,
+            frame,
+            player: RemoteId::SplitScreen(0),
+            is_team_0: true,
+        }
+    }
+
+    fn boost_pickup_event(frame: usize, time: f32) -> BoostPickupComparisonEvent {
+        BoostPickupComparisonEvent {
+            comparison: BoostPickupComparison::Both,
+            frame,
+            time,
+            player_id: RemoteId::SplitScreen(0),
+            is_team_0: true,
+            pad_type: BoostPickupPadType::Big,
+            field_half: BoostPickupFieldHalf::Opponent,
+            activity: BoostPickupActivity::Active,
+            reported_frame: Some(frame),
+            reported_time: Some(time),
+            inferred_frame: None,
+            inferred_time: None,
+            boost_before: Some(20.0),
+            boost_after: Some(100.0),
         }
     }
 
@@ -1964,7 +2057,7 @@ mod tests {
     }
 
     #[test]
-    fn drains_whiff_and_bump_events_from_timeline_events() {
+    fn drains_player_owned_events_from_timeline_events() {
         let mut pending_events = Vec::new();
         let mut emitted_mechanic_ids = HashSet::new();
         let timeline_events = ReplayStatsTimelineEvents {
@@ -1974,7 +2067,9 @@ mod tests {
                 15,
                 1.5,
             )],
+            backboard: vec![backboard_event(11, 1.1)],
             whiff: vec![whiff_event(12, 1.2, 0)],
+            boost_pickups: vec![boost_pickup_event(125, 1.25)],
             bump: vec![bump_event(13, 1.3, 0.42)],
             ..ReplayStatsTimelineEvents::default()
         };
@@ -1985,15 +2080,21 @@ mod tests {
             &timeline_events,
         );
 
-        assert_eq!(pending_events.len(), 3);
-        assert_eq!(pending_events[0].kind, SaMechanicKind::Whiff);
-        assert_eq!(pending_events[0].frame_number, 12);
+        assert_eq!(pending_events.len(), 5);
+        assert_eq!(pending_events[0].kind, SaMechanicKind::Backboard);
+        assert_eq!(pending_events[0].frame_number, 11);
         assert_eq!(pending_events[0].player_index, 0);
-        assert_eq!(pending_events[1].kind, SaMechanicKind::Bump);
-        assert_eq!(pending_events[1].frame_number, 13);
+        assert_eq!(pending_events[1].kind, SaMechanicKind::Whiff);
+        assert_eq!(pending_events[1].frame_number, 12);
         assert_eq!(pending_events[1].player_index, 0);
-        assert_eq!(pending_events[1].confidence, 0.42);
-        assert_eq!(pending_events[2].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_events[2].kind, SaMechanicKind::BoostPickup);
+        assert_eq!(pending_events[2].frame_number, 125);
+        assert_eq!(pending_events[2].player_index, 0);
+        assert_eq!(pending_events[3].kind, SaMechanicKind::Bump);
+        assert_eq!(pending_events[3].frame_number, 13);
+        assert_eq!(pending_events[3].player_index, 0);
+        assert_eq!(pending_events[3].confidence, 0.42);
+        assert_eq!(pending_events[4].kind, SaMechanicKind::SpeedFlip);
 
         pending_events.clear();
         push_drainable_events_from_timeline(

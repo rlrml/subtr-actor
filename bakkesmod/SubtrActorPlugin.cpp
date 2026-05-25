@@ -131,6 +131,10 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Air dribble";
   case SaMechanicKindBallCarry:
     return "Ball carry";
+  case SaMechanicKindBackboard:
+    return "Backboard";
+  case SaMechanicKindBoostPickup:
+    return "Boost pickup";
   case SaMechanicKindCeilingShot:
     return "Ceiling shot";
   case SaMechanicKindCenter:

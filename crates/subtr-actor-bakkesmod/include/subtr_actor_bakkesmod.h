@@ -170,6 +170,8 @@ typedef enum SaMechanicKind {
   SaMechanicKindHalfVolley = 16,
   SaMechanicKindWhiff = 17,
   SaMechanicKindBump = 18,
+  SaMechanicKindBackboard = 19,
+  SaMechanicKindBoostPickup = 20,
 } SaMechanicKind;
 
 typedef struct SaMechanicEvent {
