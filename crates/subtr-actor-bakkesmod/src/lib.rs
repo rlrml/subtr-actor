@@ -1391,6 +1391,13 @@ fn sync_live_replay_meta(
     Ok(())
 }
 
+fn has_duplicate_player_indices(players: &[SaPlayerFrame]) -> bool {
+    let mut seen = HashSet::new();
+    players
+        .iter()
+        .any(|player| !seen.insert(player.player_index))
+}
+
 fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
     match kind {
         "air_dribble" => Some(SaMechanicKind::AirDribble),
@@ -2045,6 +2052,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     } else {
         slice::from_raw_parts(frame.players, frame.player_count)
     };
+    if has_duplicate_player_indices(players) {
+        return -1;
+    }
     let Ok(explicit_events) = frame_event_slices(frame) else {
         return -1;
     };
@@ -3482,6 +3492,21 @@ mod tests {
             player_count: 1,
             ..SaLiveFrame::default()
         };
+
+        let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
+
+        assert_eq!(status, -1);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn rejects_duplicate_live_player_indices() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(0, true, SaVec3::default()),
+            player_at_index(0, false, SaVec3::default()),
+        ];
+        let frame = live_frame(1, SaRigidBody::default(), &players);
 
         let status = unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) };
 
