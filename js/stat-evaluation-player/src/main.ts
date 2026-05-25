@@ -5,6 +5,7 @@ import {
   createBoostPickupAnimationPlugin,
   createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
+  timelineEventSeekTime,
   ReplayPlayer,
 } from "subtr-actor-player";
 import type {
@@ -607,7 +608,7 @@ function syncTimelineEvents(): void {
 
     timelineSourceRemovers.set(
       mod.id,
-      timelineOverlay.addEventSource(events, {
+      timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
         id: `module:${mod.id}`,
         label: mod.label,
       }),
@@ -625,7 +626,7 @@ function syncTimelineEvents(): void {
 
     timelineSourceRemovers.set(
       `events:${source.id}`,
-      timelineOverlay.addEventSource(events, {
+      timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
         id: `events:${source.id}`,
         label: source.label,
       }),
@@ -639,7 +640,7 @@ function syncTimelineEvents(): void {
     }
     timelineSourceRemovers.set(
       `mechanics:events:${kind}`,
-      timelineOverlay.addEventSource(mechanicEvents, {
+      timelineOverlay.addEventSource(withTimelineEventSeekTimes(mechanicEvents), {
         id: `mechanics:${kind}`,
         label: formatMechanicKind(kind),
       }),
@@ -1008,6 +1009,32 @@ function watchGoalReplay(time: number, scorerId: string | null): void {
     skipKickoffsEnabled: false,
   });
   scheduleConfigUrlUpdate();
+}
+
+function cueTimelineEvent(event: ReplayTimelineEvent): void {
+  if (!replayPlayer) {
+    return;
+  }
+
+  if (activeMechanicsReview) {
+    activeMechanicsReview.currentClip = null;
+  }
+
+  skipPostGoalTransitions.checked = false;
+  skipKickoffs.checked = false;
+  replayPlayer.setState({
+    currentTime: timelineEventSeekTime(event),
+    skipPostGoalTransitionsEnabled: false,
+    skipKickoffsEnabled: false,
+  });
+  scheduleConfigUrlUpdate();
+}
+
+function withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[] {
+  return events.map((event) => ({
+    ...event,
+    seekTime: timelineEventSeekTime(event),
+  }));
 }
 
 function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
@@ -1638,7 +1665,7 @@ function renderEventPlaylistWindow(): void {
       button.dataset.eventTime = `${item.event.time}`;
       button.style.setProperty("--event-color", item.color);
       button.addEventListener("click", () => {
-        replayPlayer?.seek(item.event.time);
+        cueTimelineEvent(item.event);
       });
 
       const time = document.createElement("span");
@@ -3870,7 +3897,9 @@ async function loadReplayBundleForDisplay(
     timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
       replayEvents: (context) =>
-        filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
+        withTimelineEventSeekTimes(
+          filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
+        ),
     });
     const recorder = createCanvasRecorderPlugin({
       onStatusChange: syncRecordingWindow,

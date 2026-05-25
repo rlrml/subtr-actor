@@ -81,6 +81,8 @@ interface TimelineMarkerRecord {
 const STYLE_ID = "subtr-actor-timeline-overlay-styles";
 const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>(["goal", "save"]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
+const DEFAULT_EVENT_SEEK_LEAD_SECONDS = 2;
+const GOAL_EVENT_SEEK_LEAD_SECONDS = 4;
 const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
 const COLLAPSED_SKIPPED_RANGE_WIDTH_SECONDS = 0.01;
 
@@ -588,6 +590,27 @@ function eventPriority(event: ReplayTimelineEvent): number {
   }
 }
 
+function eventSeekLeadSeconds(event: ReplayTimelineEvent): number {
+  switch (event.kind) {
+    case "goal":
+    case "goal-context":
+    case "goal-tag":
+      return GOAL_EVENT_SEEK_LEAD_SECONDS;
+    default:
+      return DEFAULT_EVENT_SEEK_LEAD_SECONDS;
+  }
+}
+
+export function timelineEventSeekTime(event: ReplayTimelineEvent): number {
+  if (event.seekTime !== undefined && Number.isFinite(event.seekTime)) {
+    return Math.max(0, event.seekTime);
+  }
+  if (!Number.isFinite(event.time)) {
+    return 0;
+  }
+  return Math.max(0, event.time - eventSeekLeadSeconds(event));
+}
+
 function eventAccent(event: ReplayTimelineEvent): string {
   if (event.color) {
     return event.color;
@@ -786,8 +809,8 @@ function resolveReplayEvents(
   return context.replay.timelineEvents.filter((event) => allowedKinds.has(event.kind));
 }
 
-function markerSeekTime(eventTime: number, context: ReplayPlayerPluginContext): number {
-  const projection = context.player.projectReplayTimeToTimeline(eventTime);
+function markerSeekTime(event: ReplayTimelineEvent, context: ReplayPlayerPluginContext): number {
+  const projection = context.player.projectReplayTimeToTimeline(timelineEventSeekTime(event));
   if (!projection.hiddenBySkip) {
     return projection.seekTime;
   }
@@ -979,7 +1002,7 @@ export function createTimelineOverlayPlugin(
     marker.title = bucketTitle(bucket);
     marker.textContent = eventBadgeText(bucket);
     marker.addEventListener("click", () => {
-      context.player.seek(markerSeekTime(bucket.time, context));
+      context.player.seek(markerSeekTime(primaryEvent, context));
     });
     marker.dataset.active = "false";
     marker.dataset.passed = "false";

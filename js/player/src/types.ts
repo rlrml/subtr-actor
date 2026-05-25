@@ -119,6 +119,7 @@ export type ReplayTimelineEventKind = "goal" | "shot" | "save" | "assist" | "dem
 export interface ReplayTimelineEvent {
   id?: string;
   time: number;
+  seekTime?: number;
   frame?: number;
   kind: ReplayTimelineEventKind;
   label?: string;

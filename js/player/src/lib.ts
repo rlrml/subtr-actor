@@ -31,7 +31,7 @@ export type {
   CanvasRecorderStatus,
   CanvasRecorderStatusListener,
 } from "./canvas-recorder";
-export { createTimelineOverlayPlugin } from "./timeline-overlay";
+export { createTimelineOverlayPlugin, timelineEventSeekTime } from "./timeline-overlay";
 export type {
   TimelineOverlayEventSourceOptions,
   TimelineOverlayPlugin,
