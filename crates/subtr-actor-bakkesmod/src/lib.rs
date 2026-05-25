@@ -16,10 +16,11 @@ use subtr_actor::{
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
     FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState,
-    MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo, PlayerSample, PlayerStatEvent,
-    PlayerStatEventKind, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
-    ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample,
+    PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame,
+    ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, SubtrActorError,
+    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
+    TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -431,6 +432,59 @@ struct SaFrameEventSlices<'a> {
     demolishes: &'a [SaDemolishEvent],
 }
 
+struct SaLiveProcessorView<'a> {
+    replay_meta: Option<&'a ReplayMeta>,
+    frame: &'a SaLiveFrame,
+    players: &'a [SaPlayerFrame],
+    player_ids: Vec<PlayerId>,
+    events: FrameEventsState,
+}
+
+impl<'a> SaLiveProcessorView<'a> {
+    fn new(
+        replay_meta: Option<&'a ReplayMeta>,
+        frame: &'a SaLiveFrame,
+        players: &'a [SaPlayerFrame],
+        events: FrameEventsState,
+    ) -> Self {
+        Self {
+            replay_meta,
+            frame,
+            players,
+            player_ids: players
+                .iter()
+                .map(|player| player_id(player.player_index))
+                .collect(),
+            events,
+        }
+    }
+
+    fn missing<T>(property: &'static str) -> SubtrActorResult<T> {
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState { property })
+    }
+
+    fn player_index(player_id: &PlayerId) -> Option<u32> {
+        match player_id {
+            RemoteId::SplitScreen(index) => Some(*index),
+            _ => None,
+        }
+    }
+
+    fn player(&self, player_id: &PlayerId) -> SubtrActorResult<&SaPlayerFrame> {
+        let Some(index) = Self::player_index(player_id) else {
+            return Self::missing("live player");
+        };
+        self.players
+            .iter()
+            .find(|player| player.player_index == index)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "live player",
+                })
+            })
+    }
+}
+
 unsafe fn checked_slice<'a, T>(items: *const T, count: usize) -> Result<&'a [T], ()> {
     if items.is_null() && count != 0 {
         return Err(());
@@ -451,6 +505,338 @@ unsafe fn frame_event_slices(frame: &SaLiveFrame) -> Result<SaFrameEventSlices<'
         player_stat_events: checked_slice(frame.player_stat_events, frame.player_stat_event_count)?,
         demolishes: checked_slice(frame.demolishes, frame.demolish_count)?,
     })
+}
+
+impl ProcessorView for SaLiveProcessorView<'_> {
+    fn get_replay_meta(&self) -> SubtrActorResult<ReplayMeta> {
+        self.replay_meta
+            .cloned()
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))
+    }
+
+    fn player_count(&self) -> usize {
+        self.players.len()
+    }
+
+    fn iter_player_ids_in_order(&self) -> Box<dyn Iterator<Item = &PlayerId> + '_> {
+        Box::new(self.player_ids.iter())
+    }
+
+    fn current_in_game_team_player_counts(&self) -> [usize; 2] {
+        let mut counts = [0, 0];
+        for player in self.players {
+            counts[usize::from(player.is_team_0 == 0)] += 1;
+        }
+        counts
+    }
+
+    fn get_seconds_remaining(&self) -> SubtrActorResult<i32> {
+        (self.frame.has_seconds_remaining != 0)
+            .then_some(self.frame.seconds_remaining)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "seconds_remaining",
+                })
+            })
+    }
+
+    fn get_replicated_state_name(&self) -> SubtrActorResult<i32> {
+        (self.frame.has_game_state != 0)
+            .then_some(self.frame.game_state)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "game_state",
+                })
+            })
+    }
+
+    fn get_replicated_game_state_time_remaining(&self) -> SubtrActorResult<i32> {
+        (self.frame.has_kickoff_countdown_time != 0)
+            .then_some(self.frame.kickoff_countdown_time)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "kickoff_countdown_time",
+                })
+            })
+    }
+
+    fn get_ball_has_been_hit(&self) -> SubtrActorResult<bool> {
+        (self.frame.has_ball_has_been_hit != 0)
+            .then_some(self.frame.ball_has_been_hit != 0)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "ball_has_been_hit",
+                })
+            })
+    }
+
+    fn get_ignore_ball_syncing(&self) -> SubtrActorResult<bool> {
+        Ok(false)
+    }
+
+    fn get_team_scores(&self) -> SubtrActorResult<(i32, i32)> {
+        if self.frame.has_team_zero_score != 0 && self.frame.has_team_one_score != 0 {
+            Ok((self.frame.team_zero_score, self.frame.team_one_score))
+        } else {
+            Self::missing("team_scores")
+        }
+    }
+
+    fn get_ball_hit_team_num(&self) -> SubtrActorResult<u8> {
+        (self.frame.has_possession_team != 0)
+            .then_some(if self.frame.possession_team_is_team_0 != 0 {
+                0
+            } else {
+                1
+            })
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "possession_team",
+                })
+            })
+    }
+
+    fn get_scored_on_team_num(&self) -> SubtrActorResult<u8> {
+        (self.frame.has_scored_on_team != 0)
+            .then_some(if self.frame.scored_on_team_is_team_0 != 0 {
+                0
+            } else {
+                1
+            })
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "scored_on_team",
+                })
+            })
+    }
+
+    fn get_normalized_ball_rigid_body(&self) -> SubtrActorResult<RigidBody> {
+        (self.frame.has_ball != 0)
+            .then(|| rigid_body(self.frame.ball))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "ball",
+                })
+            })
+    }
+
+    fn get_velocity_applied_ball_rigid_body(
+        &self,
+        _target_time: f32,
+    ) -> SubtrActorResult<RigidBody> {
+        self.get_normalized_ball_rigid_body()
+    }
+
+    fn get_interpolated_ball_rigid_body(
+        &self,
+        _target_time: f32,
+        _close_enough_to_frame_time: f32,
+    ) -> SubtrActorResult<RigidBody> {
+        self.get_normalized_ball_rigid_body()
+    }
+
+    fn get_normalized_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<RigidBody> {
+        let player = self.player(player_id)?;
+        (player.has_rigid_body != 0)
+            .then(|| rigid_body(player.rigid_body))
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "player rigid body",
+                })
+            })
+    }
+
+    fn get_velocity_applied_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        _target_time: f32,
+    ) -> SubtrActorResult<RigidBody> {
+        self.get_normalized_player_rigid_body(player_id)
+    }
+
+    fn get_interpolated_player_rigid_body(
+        &self,
+        player_id: &PlayerId,
+        _target_time: f32,
+        _close_enough_to_frame_time: f32,
+    ) -> SubtrActorResult<RigidBody> {
+        self.get_normalized_player_rigid_body(player_id)
+    }
+
+    fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
+        let player = self.player(player_id)?;
+        player_name(player).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                property: "player name",
+            })
+        })
+    }
+
+    fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
+        Ok(if self.get_player_is_team_0(player_id)? {
+            "0".to_owned()
+        } else {
+            "1".to_owned()
+        })
+    }
+
+    fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        Ok(self.player(player_id)?.is_team_0 != 0)
+    }
+
+    fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId> {
+        Err(SubtrActorError::new(
+            SubtrActorErrorVariant::NoMatchingPlayerId {
+                actor_id: *actor_id,
+            },
+        ))
+    }
+
+    fn get_player_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        Ok(self.player(player_id)?.boost_amount)
+    }
+
+    fn get_player_last_boost_level(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        Ok(self.player(player_id)?.last_boost_amount)
+    }
+
+    fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
+        self.get_player_boost_level(player_id)
+    }
+
+    fn get_boost_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(self.player(player_id)?.boost_active)
+    }
+
+    fn get_jump_active(&self, _player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(0)
+    }
+
+    fn get_double_jump_active(&self, _player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(0)
+    }
+
+    fn get_dodge_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        Ok(self.player(player_id)?.dodge_active)
+    }
+
+    fn get_powerslide_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        Ok(self.player(player_id)?.powerslide_active != 0)
+    }
+
+    fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        let player = self.player(player_id)?;
+        (player.has_match_stats != 0)
+            .then_some(player.match_assists)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "match assists",
+                })
+            })
+    }
+
+    fn get_player_match_goals(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        let player = self.player(player_id)?;
+        (player.has_match_stats != 0)
+            .then_some(player.match_goals)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "match goals",
+                })
+            })
+    }
+
+    fn get_player_match_saves(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        let player = self.player(player_id)?;
+        (player.has_match_stats != 0)
+            .then_some(player.match_saves)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "match saves",
+                })
+            })
+    }
+
+    fn get_player_match_score(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        let player = self.player(player_id)?;
+        (player.has_match_stats != 0)
+            .then_some(player.match_score)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "match score",
+                })
+            })
+    }
+
+    fn get_player_match_shots(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
+        let player = self.player(player_id)?;
+        (player.has_match_stats != 0)
+            .then_some(player.match_shots)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::PropertyNotFoundInState {
+                    property: "match shots",
+                })
+            })
+    }
+
+    fn get_active_demos(&self) -> SubtrActorResult<Vec<subtr_actor::DemolishAttribute>> {
+        Ok(Vec::new())
+    }
+
+    fn demolishes(&self) -> &[DemolishInfo] {
+        &self.events.demo_events
+    }
+
+    fn boost_pad_events(&self) -> &[BoostPadEvent] {
+        &self.events.boost_pad_events
+    }
+
+    fn touch_events(&self) -> &[TouchEvent] {
+        &self.events.touch_events
+    }
+
+    fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
+        &self.events.dodge_refreshed_events
+    }
+
+    fn player_stat_events(&self) -> &[PlayerStatEvent] {
+        &self.events.player_stat_events
+    }
+
+    fn goal_events(&self) -> &[GoalEvent] {
+        &self.events.goal_events
+    }
+
+    fn current_frame_active_demo_events(&self) -> &[DemoEventSample] {
+        &self.events.active_demos
+    }
+
+    fn current_frame_demolish_events(&self) -> &[DemolishInfo] {
+        &self.events.demo_events
+    }
+
+    fn current_frame_boost_pad_events(&self) -> &[BoostPadEvent] {
+        &self.events.boost_pad_events
+    }
+
+    fn current_frame_touch_events(&self) -> &[TouchEvent] {
+        &self.events.touch_events
+    }
+
+    fn current_frame_dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
+        &self.events.dodge_refreshed_events
+    }
+
+    fn current_frame_player_stat_events(&self) -> &[PlayerStatEvent] {
+        &self.events.player_stat_events
+    }
+
+    fn current_frame_goal_events(&self) -> &[GoalEvent] {
+        &self.events.goal_events
+    }
 }
 
 fn find_counter(counters: &[(RemoteId, i32)], player_id: &RemoteId) -> Option<i32> {
@@ -833,20 +1219,26 @@ fn frame_input(
     let ball = ball_state(frame);
     let players = player_state(sampled_players);
     let gameplay = gameplay_state(frame, sampled_players);
+    let explicit_live_play = explicit_live_play_state(frame);
     let (frame_events, live_play) = engine.live_events.frame_events(
         &frame_info,
         &ball,
         &players,
         &gameplay,
-        explicit_live_play_state(frame),
+        explicit_live_play,
         explicit_events,
     );
-    FrameInput::from_parts_with_live_play_state(
-        frame_info,
-        gameplay,
-        ball,
-        players,
+    let processor_view = SaLiveProcessorView::new(
+        engine.live_replay_meta.as_ref(),
+        frame,
+        sampled_players,
         frame_events,
+    );
+    FrameInput::timeline_with_live_play_state(
+        &processor_view,
+        frame.frame_number as usize,
+        frame.time,
+        frame.dt,
         live_play,
     )
 }

@@ -77,6 +77,18 @@ impl FrameInput {
         }
     }
 
+    pub fn timeline_with_live_play_state(
+        processor: &dyn ProcessorView,
+        frame_number: usize,
+        current_time: f32,
+        dt: f32,
+        live_play_state: LivePlayState,
+    ) -> Self {
+        let mut input = Self::timeline(processor, frame_number, current_time, dt);
+        input.live_play_state = Some(live_play_state);
+        input
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn aggregate(
         processor: &dyn ProcessorView,
@@ -192,7 +204,10 @@ impl FrameInput {
     }
 
     fn build_current_frame_events_state(processor: &dyn ProcessorView) -> FrameEventsState {
-        let active_demos = if let Ok(demos) = processor.get_active_demos() {
+        let active_demo_events = processor.current_frame_active_demo_events();
+        let active_demos = if !active_demo_events.is_empty() {
+            active_demo_events.to_vec()
+        } else if let Ok(demos) = processor.get_active_demos() {
             demos
                 .into_iter()
                 .filter_map(|demo| {
@@ -210,7 +225,7 @@ impl FrameInput {
         };
         FrameEventsState {
             active_demos,
-            demo_events: Vec::new(),
+            demo_events: processor.current_frame_demolish_events().to_vec(),
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
             touch_events: processor.current_frame_touch_events().to_vec(),
             dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
