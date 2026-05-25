@@ -5,46 +5,34 @@ use super::{
     PlayerFrameState, PlayerSample,
 };
 
-#[derive(Debug, Clone, Copy)]
-enum EventWindow {
-    CurrentFrame,
-    SinceLastSample {
-        last_demolish_count: usize,
-        last_boost_pad_event_count: usize,
-        last_touch_event_count: usize,
-        last_player_stat_event_count: usize,
-        last_goal_event_count: usize,
-    },
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FrameInput {
-    processor: *const (),
-    frame_number: usize,
-    current_time: f32,
-    dt: f32,
-    event_window: EventWindow,
+    frame_info: FrameInfo,
+    gameplay_state: GameplayState,
+    ball_frame_state: BallFrameState,
+    player_frame_state: PlayerFrameState,
+    frame_events_state: FrameEventsState,
 }
 
 impl FrameInput {
     pub fn timeline(
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame_number: usize,
         current_time: f32,
         dt: f32,
     ) -> Self {
         Self {
-            processor: processor as *const ReplayProcessor<'_> as *const (),
-            frame_number,
-            current_time,
-            dt,
-            event_window: EventWindow::CurrentFrame,
+            frame_info: Self::build_frame_info(processor, frame_number, current_time, dt),
+            gameplay_state: Self::build_gameplay_state(processor),
+            ball_frame_state: Self::build_ball_frame_state(processor, current_time),
+            player_frame_state: Self::build_player_frame_state(processor, current_time),
+            frame_events_state: Self::build_current_frame_events_state(processor),
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn aggregate(
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame_number: usize,
         current_time: f32,
         dt: f32,
@@ -55,37 +43,36 @@ impl FrameInput {
         last_goal_event_count: usize,
     ) -> Self {
         Self {
-            processor: processor as *const ReplayProcessor<'_> as *const (),
-            frame_number,
-            current_time,
-            dt,
-            event_window: EventWindow::SinceLastSample {
+            frame_info: Self::build_frame_info(processor, frame_number, current_time, dt),
+            gameplay_state: Self::build_gameplay_state(processor),
+            ball_frame_state: Self::build_ball_frame_state(processor, current_time),
+            player_frame_state: Self::build_player_frame_state(processor, current_time),
+            frame_events_state: Self::build_events_since_last_sample(
+                processor,
                 last_demolish_count,
                 last_boost_pad_event_count,
                 last_touch_event_count,
                 last_player_stat_event_count,
                 last_goal_event_count,
-            },
+            ),
         }
     }
 
-    fn processor(&self) -> &ReplayProcessor<'_> {
-        // `FrameInput` is only used while evaluating the graph, so the replay
-        // processor borrowed by the collector outlives this ephemeral wrapper.
-        unsafe { &*(self.processor as *const ReplayProcessor<'_>) }
-    }
-
-    pub fn frame_info(&self) -> FrameInfo {
+    fn build_frame_info(
+        processor: &dyn ProcessorView,
+        frame_number: usize,
+        current_time: f32,
+        dt: f32,
+    ) -> FrameInfo {
         FrameInfo {
-            frame_number: self.frame_number,
-            time: self.current_time,
-            dt: self.dt,
-            seconds_remaining: self.processor().get_seconds_remaining().ok(),
+            frame_number,
+            time: current_time,
+            dt,
+            seconds_remaining: processor.get_seconds_remaining().ok(),
         }
     }
 
-    pub fn gameplay_state(&self) -> GameplayState {
-        let processor = self.processor();
+    fn build_gameplay_state(processor: &dyn ProcessorView) -> GameplayState {
         let team_scores = processor.get_team_scores().ok();
         let possession_team_is_team_0 =
             processor
@@ -117,16 +104,18 @@ impl FrameInput {
         }
     }
 
-    pub fn ball_frame_state(&self) -> BallFrameState {
-        self.processor()
-            .get_interpolated_ball_rigid_body(self.current_time, 0.0)
+    fn build_ball_frame_state(processor: &dyn ProcessorView, current_time: f32) -> BallFrameState {
+        processor
+            .get_interpolated_ball_rigid_body(current_time, 0.0)
             .ok()
             .map(|rigid_body| BallSample { rigid_body })
             .into()
     }
 
-    pub fn player_frame_state(&self) -> PlayerFrameState {
-        let processor = self.processor();
+    fn build_player_frame_state(
+        processor: &dyn ProcessorView,
+        current_time: f32,
+    ) -> PlayerFrameState {
         let mut players = Vec::new();
         for player_id in processor.iter_player_ids_in_order() {
             let Ok(is_team_0) = processor.get_player_is_team_0(player_id) else {
@@ -136,7 +125,7 @@ impl FrameInput {
                 player_id: player_id.clone(),
                 is_team_0,
                 rigid_body: processor
-                    .get_interpolated_player_rigid_body(player_id, self.current_time, 0.0)
+                    .get_interpolated_player_rigid_body(player_id, current_time, 0.0)
                     .ok()
                     .filter(|rigid_body| !rigid_body.sleeping),
                 boost_amount: processor.get_player_boost_level(player_id).ok(),
@@ -154,10 +143,10 @@ impl FrameInput {
         PlayerFrameState { players }
     }
 
-    pub fn frame_events_state(&self) -> FrameEventsState {
-        let processor = self.processor();
+    fn build_current_frame_events_state(processor: &dyn ProcessorView) -> FrameEventsState {
         let active_demos = if let Ok(demos) = processor.get_active_demos() {
             demos
+                .into_iter()
                 .filter_map(|demo| {
                     let attacker = processor
                         .get_player_id_from_car_id(&demo.attacker_actor_id())
@@ -171,7 +160,7 @@ impl FrameInput {
         } else {
             Vec::new()
         };
-        let mut events = FrameEventsState {
+        FrameEventsState {
             active_demos,
             demo_events: Vec::new(),
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
@@ -179,24 +168,46 @@ impl FrameInput {
             dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
             player_stat_events: processor.current_frame_player_stat_events().to_vec(),
             goal_events: processor.current_frame_goal_events().to_vec(),
-        };
-        if let EventWindow::SinceLastSample {
-            last_demolish_count,
-            last_boost_pad_event_count,
-            last_touch_event_count,
-            last_player_stat_event_count,
-            last_goal_event_count,
-        } = self.event_window
-        {
-            events.active_demos.clear();
-            events.demo_events = processor.demolishes[last_demolish_count..].to_vec();
-            events.boost_pad_events =
-                processor.boost_pad_events[last_boost_pad_event_count..].to_vec();
-            events.touch_events = processor.touch_events[last_touch_event_count..].to_vec();
-            events.player_stat_events =
-                processor.player_stat_events[last_player_stat_event_count..].to_vec();
-            events.goal_events = processor.goal_events[last_goal_event_count..].to_vec();
         }
-        events
+    }
+
+    fn build_events_since_last_sample(
+        processor: &dyn ProcessorView,
+        last_demolish_count: usize,
+        last_boost_pad_event_count: usize,
+        last_touch_event_count: usize,
+        last_player_stat_event_count: usize,
+        last_goal_event_count: usize,
+    ) -> FrameEventsState {
+        FrameEventsState {
+            active_demos: Vec::new(),
+            demo_events: processor.demolishes()[last_demolish_count..].to_vec(),
+            boost_pad_events: processor.boost_pad_events()[last_boost_pad_event_count..].to_vec(),
+            touch_events: processor.touch_events()[last_touch_event_count..].to_vec(),
+            dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
+            player_stat_events: processor.player_stat_events()[last_player_stat_event_count..]
+                .to_vec(),
+            goal_events: processor.goal_events()[last_goal_event_count..].to_vec(),
+        }
+    }
+
+    pub fn frame_info(&self) -> FrameInfo {
+        self.frame_info.clone()
+    }
+
+    pub fn gameplay_state(&self) -> GameplayState {
+        self.gameplay_state.clone()
+    }
+
+    pub fn ball_frame_state(&self) -> BallFrameState {
+        self.ball_frame_state.clone()
+    }
+
+    pub fn player_frame_state(&self) -> PlayerFrameState {
+        self.player_frame_state.clone()
+    }
+
+    pub fn frame_events_state(&self) -> FrameEventsState {
+        self.frame_events_state.clone()
     }
 }

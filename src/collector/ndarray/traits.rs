@@ -16,7 +16,7 @@ pub trait FeatureAdder<F> {
 
     fn add_features(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -33,7 +33,7 @@ pub trait LengthCheckedFeatureAdder<F, const N: usize> {
 
     fn get_features(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -50,7 +50,7 @@ macro_rules! impl_feature_adder {
         {
             fn add_features(
                 &self,
-                processor: &ReplayProcessor,
+                processor: &dyn ProcessorView,
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
@@ -84,7 +84,7 @@ pub trait PlayerFeatureAdder<F> {
     fn add_features(
         &self,
         player_id: &PlayerId,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -102,7 +102,7 @@ pub trait LengthCheckedPlayerFeatureAdder<F, const N: usize> {
     fn get_features(
         &self,
         player_id: &PlayerId,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -120,7 +120,7 @@ macro_rules! impl_player_feature_adder {
             fn add_features(
                 &self,
                 player_id: &PlayerId,
-                processor: &ReplayProcessor,
+                processor: &dyn ProcessorView,
                 frame: &boxcars::Frame,
                 frame_count: usize,
                 current_time: f32,
@@ -144,11 +144,11 @@ macro_rules! impl_player_feature_adder {
 
 impl<G, F, const N: usize> FeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
+    G: Fn(&dyn ProcessorView, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
 {
     fn add_features(
         &self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -165,12 +165,12 @@ where
 
 impl<G, F, const N: usize> PlayerFeatureAdder<F> for (G, &[&str; N])
 where
-    G: Fn(&PlayerId, &ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
+    G: Fn(&PlayerId, &dyn ProcessorView, &boxcars::Frame, usize, f32) -> SubtrActorResult<[F; N]>,
 {
     fn add_features(
         &self,
         player_id: &PlayerId,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_count: usize,
         current_time: f32,
@@ -233,7 +233,7 @@ macro_rules! global_feature_adder {
 
                     fn get_features(
                         &self,
-                        processor: &ReplayProcessor,
+                        processor: &dyn ProcessorView,
                         frame: &boxcars::Frame,
                         frame_count: usize,
                         current_time: f32,
@@ -294,7 +294,7 @@ macro_rules! player_feature_adder {
                     fn get_features(
                         &self,
                         player_id: &PlayerId,
-                        processor: &ReplayProcessor,
+                        processor: &dyn ProcessorView,
                         frame: &boxcars::Frame,
                         frame_count: usize,
                         current_time: f32,

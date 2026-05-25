@@ -17,7 +17,7 @@ impl BoostUnitVerifier {
 impl Collector for BoostUnitVerifier {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         _current_time: f32,

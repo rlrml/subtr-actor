@@ -3,7 +3,9 @@ use boxcars;
 use std::collections::HashMap;
 
 pub mod actor_state;
+pub mod view;
 pub use actor_state::*;
+pub use view::*;
 
 pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static str {
     match attribute {

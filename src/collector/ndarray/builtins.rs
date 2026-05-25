@@ -174,7 +174,7 @@ where
 
 build_global_feature_adder!(
     SecondsRemaining,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         convert_all_floats!(processor.get_seconds_remaining().unwrap_or(0) as f32)
     },
     "seconds remaining"
@@ -188,7 +188,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     ReplicatedStateName,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         convert_all_floats!(processor.get_replicated_state_name().unwrap_or(0) as f32)
     },
     "game state"
@@ -196,7 +196,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     ReplicatedGameStateTimeRemaining,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         convert_all_floats!(processor
             .get_replicated_game_state_time_remaining()
             .unwrap_or(0) as f32)
@@ -206,7 +206,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     BallHasBeenHit,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         convert_all_floats!(if processor.get_ball_has_been_hit().unwrap_or(false) {
             1.0
         } else {
@@ -226,7 +226,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     BallRigidBody,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         processor
             .get_normalized_ball_rigid_body()
             .and_then(|rb| get_rigid_body_properties(&rb))
@@ -248,7 +248,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     BallRigidBodyNoVelocities,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         processor
             .get_normalized_ball_rigid_body()
             .and_then(|rb| get_rigid_body_properties_no_velocities(&rb))
@@ -265,7 +265,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     VelocityAddedBallRigidBodyNoVelocities,
-    |_, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+    |_, processor: &dyn ProcessorView, _frame, _index, current_time: f32| {
         processor
             .get_velocity_applied_ball_rigid_body(current_time)
             .and_then(|rb| get_rigid_body_properties_no_velocities(&rb))
@@ -297,7 +297,7 @@ impl<F> InterpolatedBallRigidBodyNoVelocities<F> {
 global_feature_adder!(
     InterpolatedBallRigidBodyNoVelocities,
     |s: &InterpolatedBallRigidBodyNoVelocities<F>,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame: &boxcars::Frame,
      _index,
      current_time: f32| {
@@ -317,7 +317,7 @@ global_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRigidBody,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
             get_rigid_body_properties(&rb)
         } else {
@@ -340,7 +340,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRigidBodyNoVelocities,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
             get_rigid_body_properties_no_velocities(&rb)
         } else {
@@ -358,7 +358,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     VelocityAddedPlayerRigidBodyNoVelocities,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, current_time: f32| {
         if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, current_time) {
             get_rigid_body_properties_no_velocities(&rb)
         } else {
@@ -392,7 +392,7 @@ player_feature_adder!(
     InterpolatedPlayerRigidBodyNoVelocities,
     |s: &InterpolatedPlayerRigidBodyNoVelocities<F>,
      player_id: &PlayerId,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame: &boxcars::Frame,
      _index,
      current_time: f32| {
@@ -416,7 +416,7 @@ player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRelativeBallPosition,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         let relative_position = processor
             .get_normalized_player_rigid_body(player_id)
             .ok()
@@ -438,7 +438,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRelativeBallVelocity,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         let relative_velocity = processor
             .get_normalized_player_rigid_body(player_id)
             .ok()
@@ -468,7 +468,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerLocalRelativeBallPosition,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         let local_relative_position = processor
             .get_normalized_player_rigid_body(player_id)
             .ok()
@@ -499,7 +499,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerLocalRelativeBallVelocity,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         let local_relative_velocity = processor
             .get_normalized_player_rigid_body(player_id)
             .ok()
@@ -537,7 +537,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerBallDistance,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         let distance = processor
             .get_normalized_player_rigid_body(player_id)
             .ok()
@@ -554,7 +554,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerBoost,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         convert_all_floats!(processor.get_player_boost_level(player_id).unwrap_or(0.0))
     },
     "boost level (raw replay units)"
@@ -568,7 +568,7 @@ build_player_feature_adder!(
     PlayerJump,
     |_,
      player_id: &PlayerId,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame,
      _frame_number,
      _current_time: f32| {
@@ -596,7 +596,7 @@ build_player_feature_adder!(
     PlayerAnyJump,
     |_,
      player_id: &PlayerId,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame,
      _frame_number,
      _current_time: f32| {
@@ -617,7 +617,7 @@ build_player_feature_adder!(
     PlayerDodgeRefreshed,
     |_,
      player_id: &PlayerId,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame,
      _frame_number,
      _current_time: f32| {
@@ -637,12 +637,12 @@ build_player_feature_adder!(
     PlayerDemolishedBy,
     |_,
      player_id: &PlayerId,
-     processor: &ReplayProcessor,
+     processor: &dyn ProcessorView,
      _frame,
      frame_number,
      _current_time: f32| {
         let demolisher_index = processor
-            .demolishes
+            .demolishes()
             .iter()
             .find(|demolish_info| {
                 &demolish_info.victim == player_id
@@ -663,7 +663,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRigidBodyQuaternions,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
             let rotation = rb.rotation;
             let location = rb.location;
@@ -685,7 +685,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRigidBodyQuaternionVelocities,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
             get_rigid_body_properties_quaternion(&rb)
         } else {
@@ -709,7 +709,7 @@ build_player_feature_adder!(
 
 build_player_feature_adder!(
     PlayerRigidBodyBasis,
-    |_, player_id: &PlayerId, processor: &ReplayProcessor, _frame, _index, _current_time: f32| {
+    |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
         if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
             get_rigid_body_properties_basis(&rb)
         } else {
@@ -735,7 +735,7 @@ build_player_feature_adder!(
 
 build_global_feature_adder!(
     BallRigidBodyQuaternions,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         match processor.get_normalized_ball_rigid_body() {
             Ok(rb) => {
                 let rotation = rb.rotation;
@@ -759,7 +759,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     BallRigidBodyQuaternionVelocities,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         processor
             .get_normalized_ball_rigid_body()
             .and_then(|rb| get_rigid_body_properties_quaternion(&rb))
@@ -782,7 +782,7 @@ build_global_feature_adder!(
 
 build_global_feature_adder!(
     BallRigidBodyBasis,
-    |_, processor: &ReplayProcessor, _frame, _index, _current_time| {
+    |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
         processor
             .get_normalized_ball_rigid_body()
             .and_then(|rb| get_rigid_body_properties_basis(&rb))
