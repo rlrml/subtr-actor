@@ -3039,6 +3039,9 @@ mod tests {
             .as_array()
             .expect("builtin names should be an array");
         assert!(builtin_names.iter().any(|name| name == "settings"));
+        assert!(builtin_names
+            .iter()
+            .any(|name| name == "continuous_ball_control"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
@@ -3052,6 +3055,9 @@ mod tests {
         let node_names = value["node_names"]
             .as_array()
             .expect("node names should be an array");
+        assert!(node_names
+            .iter()
+            .any(|name| name == "continuous_ball_control"));
         assert!(node_names.iter().any(|name| name == "stats_timeline_frame"));
         assert!(node_names
             .iter()

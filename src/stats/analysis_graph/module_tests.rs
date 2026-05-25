@@ -32,6 +32,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
+    assert!(names.contains("continuous_ball_control"));
     assert!(names.contains("backboard_bounce_state"));
     assert!(names.contains("fifty_fifty_state"));
     assert!(names.contains("match_stats"));
@@ -73,6 +74,19 @@ fn every_builtin_analysis_node_name_builds() {
             .resolve()
             .unwrap_or_else(|_| panic!("builtin analysis node should resolve: {name}"));
     }
+}
+
+#[test]
+fn continuous_ball_control_is_directly_callable() {
+    assert!(builtin_analysis_node_names().contains(&"continuous_ball_control"));
+    let mut graph = graph_with_builtin_analysis_nodes(["continuous_ball_control"])
+        .expect("continuous ball control should be a builtin analysis node");
+    graph
+        .resolve()
+        .expect("continuous ball control node should resolve");
+
+    let names: HashSet<_> = graph.node_names().collect();
+    assert!(names.contains("continuous_ball_control"));
 }
 
 #[test]
