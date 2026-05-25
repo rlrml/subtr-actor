@@ -15,10 +15,11 @@ use subtr_actor::{
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
     FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalEvent, LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo,
-    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsFrame,
-    ReplayStatsTimeline, ReplayStatsTimelineEvents, ShotEventMetadata, TimelineEvent,
-    TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
+    PlayerFrameState, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta,
+    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, ShotEventMetadata,
+    TimelineEvent, TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent,
+    WhiffEventKind,
 };
 
 #[repr(C)]
@@ -227,6 +228,18 @@ pub enum SaMechanicKind {
     BoostPickup = 20,
     Demo = 21,
     FiftyFifty = 22,
+    AerialGoal = 23,
+    HighAerialGoal = 24,
+    LongDistanceGoal = 25,
+    OwnHalfGoal = 26,
+    EmptyNetGoal = 27,
+    CounterAttackGoal = 28,
+    FlickGoal = 29,
+    DoubleTapGoal = 30,
+    OneTimerGoal = 31,
+    AirDribbleGoal = 32,
+    FlipResetGoal = 33,
+    HalfVolleyGoal = 34,
 }
 
 #[repr(C)]
@@ -1108,6 +1121,54 @@ fn push_fifty_fifty_events_from_timeline(
     }
 }
 
+fn goal_tag_kind(kind: GoalTagKind) -> SaMechanicKind {
+    match kind {
+        GoalTagKind::AerialGoal => SaMechanicKind::AerialGoal,
+        GoalTagKind::HighAerialGoal => SaMechanicKind::HighAerialGoal,
+        GoalTagKind::LongDistanceGoal => SaMechanicKind::LongDistanceGoal,
+        GoalTagKind::OwnHalfGoal => SaMechanicKind::OwnHalfGoal,
+        GoalTagKind::EmptyNetGoal => SaMechanicKind::EmptyNetGoal,
+        GoalTagKind::CounterAttackGoal => SaMechanicKind::CounterAttackGoal,
+        GoalTagKind::FlickGoal => SaMechanicKind::FlickGoal,
+        GoalTagKind::DoubleTapGoal => SaMechanicKind::DoubleTapGoal,
+        GoalTagKind::OneTimerGoal => SaMechanicKind::OneTimerGoal,
+        GoalTagKind::AirDribbleGoal => SaMechanicKind::AirDribbleGoal,
+        GoalTagKind::FlipResetGoal => SaMechanicKind::FlipResetGoal,
+        GoalTagKind::HalfVolleyGoal => SaMechanicKind::HalfVolleyGoal,
+    }
+}
+
+fn push_goal_tag_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    goal_tags: &[GoalTagEvent],
+) {
+    for event in goal_tags {
+        let Some(scorer) = event.scorer.as_ref() else {
+            continue;
+        };
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "goal_tag:{}:{}:{:?}:{}",
+                    event.goal_index,
+                    event.frame,
+                    event.kind,
+                    player_index(scorer)
+                ),
+                kind: goal_tag_kind(event.kind),
+                player_id: scorer.clone(),
+                is_team_0: event.scoring_team_is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: event.confidence,
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -1128,6 +1189,7 @@ fn push_drainable_events_from_timeline(
         emitted_mechanic_ids,
         &events.fifty_fifty,
     );
+    push_goal_tag_events_from_timeline(pending_events, emitted_mechanic_ids, &events.goal_tags);
     pending_events.sort_by(|left, right| {
         left.time
             .total_cmp(&right.time)
@@ -1746,6 +1808,20 @@ mod tests {
             plane_normal: [1.0, 0.0, 0.0],
             winning_team_is_team_0: Some(false),
             possession_team_is_team_0: Some(false),
+        }
+    }
+
+    fn goal_tag_event(kind: GoalTagKind, scorer: Option<RemoteId>) -> GoalTagEvent {
+        GoalTagEvent {
+            goal_index: 0,
+            time: 1.36,
+            frame: 13,
+            kind,
+            scoring_team_is_team_0: false,
+            scorer,
+            confidence: 0.72,
+            modifiers: Vec::new(),
+            evidence: Vec::new(),
         }
     }
 
@@ -2879,6 +2955,10 @@ mod tests {
             boost_pickups: vec![boost_pickup_event(125, 1.25)],
             bump: vec![bump_event(13, 1.3, 0.42)],
             fifty_fifty: vec![fifty_fifty_event(9, 14, 1.4)],
+            goal_tags: vec![
+                goal_tag_event(GoalTagKind::FlickGoal, Some(RemoteId::SplitScreen(1))),
+                goal_tag_event(GoalTagKind::AerialGoal, None),
+            ],
             ..ReplayStatsTimelineEvents::default()
         };
 
@@ -2888,7 +2968,7 @@ mod tests {
             &timeline_events,
         );
 
-        assert_eq!(pending_events.len(), 7);
+        assert_eq!(pending_events.len(), 8);
         assert_eq!(pending_events[0].kind, SaMechanicKind::Backboard);
         assert_eq!(pending_events[0].frame_number, 11);
         assert_eq!(pending_events[0].player_index, 0);
@@ -2906,11 +2986,17 @@ mod tests {
         assert_eq!(pending_events[4].time, 1.35);
         assert_eq!(pending_events[4].frame_number, 13);
         assert_eq!(pending_events[4].player_index, 0);
-        assert_eq!(pending_events[5].kind, SaMechanicKind::FiftyFifty);
-        assert_eq!(pending_events[5].frame_number, 14);
+        assert_eq!(pending_events[5].kind, SaMechanicKind::FlickGoal);
+        assert_eq!(pending_events[5].time, 1.36);
+        assert_eq!(pending_events[5].frame_number, 13);
         assert_eq!(pending_events[5].player_index, 1);
         assert_eq!(pending_events[5].is_team_0, 0);
-        assert_eq!(pending_events[6].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_events[5].confidence, 0.72);
+        assert_eq!(pending_events[6].kind, SaMechanicKind::FiftyFifty);
+        assert_eq!(pending_events[6].frame_number, 14);
+        assert_eq!(pending_events[6].player_index, 1);
+        assert_eq!(pending_events[6].is_team_0, 0);
+        assert_eq!(pending_events[7].kind, SaMechanicKind::SpeedFlip);
 
         pending_events.clear();
         push_drainable_events_from_timeline(
@@ -2958,5 +3044,57 @@ mod tests {
         );
         assert_eq!(mechanic_kind("wavedash"), Some(SaMechanicKind::Wavedash));
         assert_eq!(mechanic_kind("unmapped"), None);
+    }
+
+    #[test]
+    fn maps_goal_tag_kinds_to_abi_kinds() {
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::AerialGoal),
+            SaMechanicKind::AerialGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::HighAerialGoal),
+            SaMechanicKind::HighAerialGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::LongDistanceGoal),
+            SaMechanicKind::LongDistanceGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::OwnHalfGoal),
+            SaMechanicKind::OwnHalfGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::EmptyNetGoal),
+            SaMechanicKind::EmptyNetGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::CounterAttackGoal),
+            SaMechanicKind::CounterAttackGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::FlickGoal),
+            SaMechanicKind::FlickGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::DoubleTapGoal),
+            SaMechanicKind::DoubleTapGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::OneTimerGoal),
+            SaMechanicKind::OneTimerGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::AirDribbleGoal),
+            SaMechanicKind::AirDribbleGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::FlipResetGoal),
+            SaMechanicKind::FlipResetGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::HalfVolleyGoal),
+            SaMechanicKind::HalfVolleyGoal
+        );
     }
 }

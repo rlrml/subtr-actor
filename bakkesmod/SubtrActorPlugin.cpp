@@ -129,8 +129,12 @@ SaQuat rotatorToQuat(Rotator rotation) {
 
 std::string mechanicLabel(SaMechanicKind kind) {
   switch (kind) {
+  case SaMechanicKindAerialGoal:
+    return "Aerial goal";
   case SaMechanicKindAirDribble:
     return "Air dribble";
+  case SaMechanicKindAirDribbleGoal:
+    return "Air dribble goal";
   case SaMechanicKindBallCarry:
     return "Ball carry";
   case SaMechanicKindBackboard:
@@ -141,26 +145,46 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Ceiling shot";
   case SaMechanicKindCenter:
     return "Center";
+  case SaMechanicKindCounterAttackGoal:
+    return "Counter attack goal";
   case SaMechanicKindDemo:
     return "Demo";
+  case SaMechanicKindDoubleTapGoal:
+    return "Double tap goal";
+  case SaMechanicKindEmptyNetGoal:
+    return "Empty net goal";
   case SaMechanicKindFiftyFifty:
     return "Fifty fifty";
   case SaMechanicKindDoubleTap:
     return "Double tap";
   case SaMechanicKindFlick:
     return "Flick";
+  case SaMechanicKindFlickGoal:
+    return "Flick goal";
   case SaMechanicKindFlipReset:
     return "Flip reset";
+  case SaMechanicKindFlipResetGoal:
+    return "Flip reset goal";
   case SaMechanicKindSpeedFlip:
     return "Speed flip";
   case SaMechanicKindHalfFlip:
     return "Half flip";
   case SaMechanicKindHalfVolley:
     return "Half volley";
+  case SaMechanicKindHalfVolleyGoal:
+    return "Half volley goal";
+  case SaMechanicKindHighAerialGoal:
+    return "High aerial goal";
+  case SaMechanicKindLongDistanceGoal:
+    return "Long distance goal";
   case SaMechanicKindMustyFlick:
     return "Musty flick";
   case SaMechanicKindOneTimer:
     return "One timer";
+  case SaMechanicKindOneTimerGoal:
+    return "One timer goal";
+  case SaMechanicKindOwnHalfGoal:
+    return "Own half goal";
   case SaMechanicKindPass:
     return "Pass";
   case SaMechanicKindWallAerial:
