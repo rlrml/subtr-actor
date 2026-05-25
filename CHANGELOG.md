@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.7 - 2026-05-25
+
+- Simplify the stats evaluation player scoreboard into a compact game score
+  strip with team player names on either side.
+- Remove the per-player stat columns from the scoreboard overlay to avoid
+  overflow and keep detailed player stats in the existing stats windows.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.7`.
+
 ## v0.8.6 - 2026-05-25
 
 - Refresh release metadata after the playlist clip seek clamping and Rust
