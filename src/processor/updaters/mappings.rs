@@ -162,19 +162,19 @@ impl<'a> ReplayProcessor<'a> {
                         skip_value boxcars::ActorId(-1)
                     );
                 }
-                object_id if Some(object_id) == ctx.bot_object_id => {
-                    if ctx.player_type_actor_ids.contains(&update.actor_id) {
-                        let is_bot =
-                            *attribute_match!(&update.attribute, boxcars::Attribute::Boolean)?;
-                        if is_bot
-                            && !self
-                                .player_to_actor_id
-                                .values()
-                                .any(|actor_id| *actor_id == update.actor_id)
-                        {
-                            self.player_to_actor_id
-                                .insert(synthetic_bot_player_id(update.actor_id), update.actor_id);
-                        }
+                object_id
+                    if Some(object_id) == ctx.bot_object_id
+                        && ctx.player_type_actor_ids.contains(&update.actor_id) =>
+                {
+                    let is_bot = *attribute_match!(&update.attribute, boxcars::Attribute::Boolean)?;
+                    if is_bot
+                        && !self
+                            .player_to_actor_id
+                            .values()
+                            .any(|actor_id| *actor_id == update.actor_id)
+                    {
+                        self.player_to_actor_id
+                            .insert(synthetic_bot_player_id(update.actor_id), update.actor_id);
                     }
                 }
                 object_id if object_id == ctx.player_replication_object_id => {
