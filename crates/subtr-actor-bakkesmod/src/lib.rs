@@ -377,9 +377,11 @@ fn live_analysis_graph() -> AnalysisGraph {
 fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
     let dag = graph.render_ascii_dag().unwrap_or_default();
     let node_names = graph.node_names().collect::<Vec<_>>();
+    let callable_analysis_node_names = callable_analysis_node_names_for_graph(graph);
     serde_json::to_vec(&serde_json::json!({
         "builtin_analysis_node_names": builtin_analysis_node_names(),
         "builtin_analysis_node_aliases": builtin_analysis_node_aliases(),
+        "callable_analysis_node_names": callable_analysis_node_names,
         "builtin_stats_module_names": builtin_stats_module_names(),
         "graph_output_names": LIVE_GRAPH_OUTPUT_NAMES,
         "node_names": node_names,
@@ -2012,9 +2014,9 @@ unsafe fn serialize_named_analysis_node(
     }
 }
 
-fn callable_analysis_node_names(engine: &SaEngine) -> Vec<String> {
+fn callable_analysis_node_names_for_graph(graph: &AnalysisGraph) -> Vec<String> {
     let mut names = BTreeSet::new();
-    names.extend(engine.graph.node_names().map(str::to_owned));
+    names.extend(graph.node_names().map(str::to_owned));
     names.extend(
         builtin_analysis_node_names()
             .iter()
@@ -2026,6 +2028,10 @@ fn callable_analysis_node_names(engine: &SaEngine) -> Vec<String> {
             .map(|alias| alias.alias.to_owned()),
     );
     names.into_iter().collect()
+}
+
+fn callable_analysis_node_names(engine: &SaEngine) -> Vec<String> {
+    callable_analysis_node_names_for_graph(&engine.graph)
 }
 
 fn serialize_analysis_node_names(engine: *const SaEngine) -> Vec<u8> {
@@ -5191,6 +5197,16 @@ mod tests {
         assert!(builtin_aliases
             .iter()
             .any(|alias| alias["alias"] == "air_dribble" && alias["node_name"] == "ball_carry"));
+        let callable_names = value["callable_analysis_node_names"]
+            .as_array()
+            .expect("callable names should be an array");
+        assert!(callable_names.iter().any(|name| name == "core"));
+        assert!(callable_names.iter().any(|name| name == "match_stats"));
+        assert!(callable_names.iter().any(|name| name == "air_dribble"));
+        assert!(callable_names.iter().any(|name| name == "ball_carry"));
+        assert!(callable_names
+            .iter()
+            .any(|name| name == "continuous_ball_control"));
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");
