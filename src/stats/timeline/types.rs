@@ -1,5 +1,6 @@
 use crate::*;
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -47,6 +48,36 @@ impl ReplayStatsTimeline {
             .iter()
             .find(|frame| frame.frame_number == frame_number)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReplayStatsTimelineScaffold {
+    pub config: StatsTimelineConfig,
+    pub replay_meta: ReplayMeta,
+    pub events: ReplayStatsTimelineEvents,
+    pub frames: Vec<ReplayStatsFrameScaffold>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReplayStatsFrameScaffold {
+    pub frame_number: usize,
+    pub time: f32,
+    pub dt: f32,
+    pub seconds_remaining: Option<i32>,
+    pub game_state: Option<i32>,
+    pub gameplay_phase: GameplayPhase,
+    pub is_live_play: bool,
+    pub team_zero: BTreeMap<String, serde_json::Value>,
+    pub team_one: BTreeMap<String, serde_json::Value>,
+    pub players: Vec<ReplayStatsPlayerIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReplayStatsPlayerIdentity {
+    #[serde(rename = "player_id")]
+    pub player_id: PlayerId,
+    pub name: String,
+    pub is_team_0: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]

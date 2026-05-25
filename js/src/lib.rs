@@ -1,4 +1,5 @@
 #![allow(clippy::result_large_err)]
+#![allow(dead_code)]
 
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use serde_json::Value;
@@ -6,7 +7,7 @@ use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector},
     collector::CallbackCollector,
     Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, ResolvedBoostPadCollector,
-    StatsCollector, StatsTimelineCollector, SubtrActorError, SubtrActorErrorVariant,
+    StatsCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
     SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
@@ -658,12 +659,12 @@ fn collect_replay_data_with_optional_progress(
 fn collect_replay_bundle_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
-) -> Result<(ReplayData, subtr_actor::ReplayStatsTimeline), JsValue> {
+) -> Result<(ReplayData, subtr_actor::ReplayStatsTimelineScaffold), JsValue> {
     let total_frames = get_total_frames(replay)?;
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut stats_collector = StatsTimelineCollector::new();
+    let mut stats_collector = StatsTimelineEventCollector::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -704,7 +705,7 @@ fn collect_replay_bundle_with_optional_progress(
     }
 
     let stats_timeline = stats_collector
-        .into_replay_stats_timeline()
+        .into_replay_stats_timeline_scaffold()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
     if let Some((callback, _)) = progress {
         emit_stage_progress(callback, "building-stats", 1.0)
@@ -1092,7 +1093,7 @@ fn compact_stats_frame_for_transfer(
 }
 
 fn stats_timeline_json_parts(
-    timeline: subtr_actor::ReplayStatsTimeline,
+    timeline: subtr_actor::ReplayStatsTimelineScaffold,
     max_frame_chunk_bytes: Option<usize>,
     progress: Option<(&Function, usize, f64, f64)>,
 ) -> Result<JsValue, JsValue> {
@@ -1121,78 +1122,10 @@ fn stats_timeline_json_parts(
     current_chunk.push(b'[');
     let mut current_chunk_frames = 0usize;
     let total_frames = timeline.frames.len();
-    let compact_core = true;
-    let compact_possession = true;
-    let compact_pressure = true;
-    let compact_movement = true;
-    let compact_positioning = true;
-    let compact_rotation = true;
-    let compact_backboard = true;
-    let compact_double_tap = true;
-    let compact_ceiling_shot = true;
-    let compact_one_timer = true;
-    let compact_half_volley = true;
-    let compact_pass = true;
-    let compact_ball_carry = true;
-    let compact_wall_aerial = true;
-    let compact_wall_aerial_shot = true;
-    let compact_flick = true;
-    let compact_musty_flick = true;
-    let compact_dodge_reset = true;
-    let compact_powerslide = true;
-    let compact_touch = true;
-    let compact_rush = true;
-    let compact_bump = true;
-    let compact_fifty_fifty = true;
-    let compact_demo = true;
-    let compact_boost = true;
-    let compact_speed_flip = true;
-    let compact_half_flip = true;
-    let compact_wavedash = true;
-    let compact_whiff = true;
-    let compact_event_derived_fields = true;
 
     for (frame_index, frame) in timeline.frames.iter().enumerate() {
-        let frame_bytes = if compact_event_derived_fields {
-            serde_json::to_vec(
-                &compact_stats_frame_for_transfer(
-                    frame,
-                    compact_core,
-                    compact_possession,
-                    compact_pressure,
-                    compact_movement,
-                    compact_positioning,
-                    compact_rotation,
-                    compact_backboard,
-                    compact_double_tap,
-                    compact_ceiling_shot,
-                    compact_one_timer,
-                    compact_half_volley,
-                    compact_pass,
-                    compact_ball_carry,
-                    compact_wall_aerial,
-                    compact_wall_aerial_shot,
-                    compact_flick,
-                    compact_musty_flick,
-                    compact_dodge_reset,
-                    compact_powerslide,
-                    compact_touch,
-                    compact_rush,
-                    compact_bump,
-                    compact_fifty_fifty,
-                    compact_demo,
-                    compact_boost,
-                    compact_speed_flip,
-                    compact_half_flip,
-                    compact_wavedash,
-                    compact_whiff,
-                )
-                .map_err(|e| JsValue::from_str(&format!("Failed to compact stats frame: {e}")))?,
-            )
-        } else {
-            serde_json::to_vec(frame)
-        }
-        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats frame: {e}")))?;
+        let frame_bytes = serde_json::to_vec(frame)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats frame: {e}")))?;
         let separator_bytes = usize::from(current_chunk_frames > 0);
         if current_chunk_frames > 0
             && current_chunk.len() + separator_bytes + frame_bytes.len() + 1 > max_frame_chunk_bytes
@@ -1487,8 +1420,8 @@ pub fn get_stats_timeline_json_parts(
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_data(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes, None)
