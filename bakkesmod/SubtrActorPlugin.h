@@ -49,6 +49,11 @@ private:
     int demolishes = 0;
   };
 
+  struct TouchAttribution {
+    uint32_t player_index = 0;
+    uint8_t is_team_0 = 1;
+  };
+
   HMODULE rustLibrary = nullptr;
   SaEngine *engine = nullptr;
   EngineCreate engineCreate = nullptr;
@@ -74,6 +79,7 @@ private:
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
   std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
+  std::optional<TouchAttribution> lastTouch;
   uint32_t nextBoostPadId = 1;
   std::deque<OverlayMessage> messages;
 
@@ -98,6 +104,7 @@ private:
   void recordPlayerStatDeltas(PriWrapper pri, uint32_t playerIndex, uint8_t isTeam0);
   std::optional<uint32_t> playerIndexForCar(CarWrapper car);
   std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
+  std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
   uint32_t boostPadId(uintptr_t pickupAddress);
   void sampleTeamScores(ServerWrapper server, SaGoalEvent &goal);
 };

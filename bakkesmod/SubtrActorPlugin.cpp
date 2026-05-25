@@ -22,6 +22,7 @@ constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.Event
 constexpr char BOOST_SPAWNED_EVENT[] = "Function TAGame.VehiclePickup_TA.EventSpawned";
 constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventGoalScored";
 constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
+constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 
 int moduleAnchor = 0;
 
@@ -397,6 +398,7 @@ void SubtrActorPlugin::resetLiveState() {
   lastPlayerStats.clear();
   boostPadIds.clear();
   boostPadSequences.clear();
+  lastTouch.reset();
   nextBoostPadId = 1;
   messages.clear();
 }
@@ -440,6 +442,12 @@ void SubtrActorPlugin::recordTouch(CarWrapper car) {
 
   PriWrapper pri = car.GetPRI();
   event.is_team_0 = pri.IsNull() || pri.GetTeamNum() == 0 ? 1 : 0;
+  if (event.has_player != 0) {
+    lastTouch = TouchAttribution{
+        event.player_index,
+        event.is_team_0,
+    };
+  }
   pendingTouches.push_back(event);
 }
 
@@ -453,6 +461,10 @@ void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventK
   event.kind = kind;
   if (kind == SaBoostPadEventKindPickedUp) {
     event.sequence = ++boostPadSequences[pickup.memory_address];
+    if (auto playerIndex = playerIndexForNearestCar(pickup, BOOST_PICKUP_ATTRIBUTION_RADIUS)) {
+      event.player_index = *playerIndex;
+      event.has_player = 1;
+    }
   }
   pendingBoostPadEvents.push_back(event);
 }
@@ -461,6 +473,15 @@ void SubtrActorPlugin::recordGoal(ServerWrapper server, GoalWrapper goal) {
   SaGoalEvent event{};
   if (!goal.IsNull()) {
     event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
+  } else if (!server.IsNull()) {
+    const unsigned char scoredOnTeam = server.GetReplicatedScoredOnTeam();
+    if (scoredOnTeam == 0 || scoredOnTeam == 1) {
+      event.scoring_team_is_team_0 = scoredOnTeam == 0 ? 0 : 1;
+    }
+  }
+  if (lastTouch && lastTouch->is_team_0 == event.scoring_team_is_team_0) {
+    event.player_index = lastTouch->player_index;
+    event.has_player = 1;
   }
   sampleTeamScores(server, event);
   pendingGoals.push_back(event);
@@ -548,6 +569,43 @@ std::optional<uint32_t> SubtrActorPlugin::playerIndexForPri(PriWrapper pri) {
     return priMatch->second;
   }
   return std::nullopt;
+}
+
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForNearestCar(
+    ActorWrapper actor,
+    float maxDistance) {
+  if (actor.IsNull()) {
+    return std::nullopt;
+  }
+
+  ServerWrapper server = gameWrapper->GetGameEventAsServer();
+  if (server.IsNull()) {
+    return std::nullopt;
+  }
+
+  ArrayWrapper<CarWrapper> cars = server.GetCars();
+  if (cars.IsNull()) {
+    return std::nullopt;
+  }
+
+  const Vector actorLocation = actor.GetLocation();
+  const int carCount = cars.Count();
+  std::optional<uint32_t> bestIndex;
+  float bestDistance = maxDistance;
+  for (int i = 0; i < carCount; i += 1) {
+    CarWrapper car = cars.Get(i);
+    if (car.IsNull()) {
+      continue;
+    }
+
+    const float distance = (car.GetLocation() - actorLocation).magnitude();
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      bestIndex = static_cast<uint32_t>(i);
+    }
+  }
+
+  return bestIndex;
 }
 
 uint32_t SubtrActorPlugin::boostPadId(uintptr_t pickupAddress) {
