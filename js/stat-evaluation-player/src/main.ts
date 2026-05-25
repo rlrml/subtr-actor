@@ -46,7 +46,6 @@ import {
   buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
   formatMechanicKind,
-  buildGoalContextTimelineEvents,
   buildGoalTagTimelineEvents,
   getMechanicKinds,
 } from "./timelineMarkers.ts";
@@ -217,13 +216,6 @@ const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
 ];
 
 const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
-  {
-    id: "goal-context",
-    label: "Goal Context",
-    buildEvents(ctx) {
-      return buildGoalContextTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-  },
   {
     id: "goal-tags",
     label: "Goal Tags",
