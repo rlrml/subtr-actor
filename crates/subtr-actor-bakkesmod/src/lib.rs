@@ -63,6 +63,12 @@ pub struct SaPlayerFrame {
     pub boost_active: u8,
     pub dodge_active: u8,
     pub powerslide_active: u8,
+    pub has_match_stats: u8,
+    pub match_goals: i32,
+    pub match_assists: i32,
+    pub match_saves: i32,
+    pub match_shots: i32,
+    pub match_score: i32,
 }
 
 #[repr(C)]
@@ -156,6 +162,14 @@ pub struct SaLiveFrame {
     pub has_kickoff_countdown_time: u8,
     pub ball_has_been_hit: u8,
     pub has_ball_has_been_hit: u8,
+    pub team_zero_score: i32,
+    pub has_team_zero_score: u8,
+    pub team_one_score: i32,
+    pub has_team_one_score: u8,
+    pub possession_team_is_team_0: u8,
+    pub has_possession_team: u8,
+    pub scored_on_team_is_team_0: u8,
+    pub has_scored_on_team: u8,
     pub live_play: u8,
     pub has_ball: u8,
     pub ball: SaRigidBody,
@@ -318,10 +332,12 @@ fn gameplay_state(frame: &SaLiveFrame, players: &[SaPlayerFrame]) -> GameplaySta
             .then_some(frame.ball_has_been_hit != 0),
         kickoff_countdown_time: (frame.has_kickoff_countdown_time != 0)
             .then_some(frame.kickoff_countdown_time),
-        team_zero_score: None,
-        team_one_score: None,
-        possession_team_is_team_0: None,
-        scored_on_team_is_team_0: None,
+        team_zero_score: (frame.has_team_zero_score != 0).then_some(frame.team_zero_score),
+        team_one_score: (frame.has_team_one_score != 0).then_some(frame.team_one_score),
+        possession_team_is_team_0: (frame.has_possession_team != 0)
+            .then_some(frame.possession_team_is_team_0 != 0),
+        scored_on_team_is_team_0: (frame.has_scored_on_team != 0)
+            .then_some(frame.scored_on_team_is_team_0 != 0),
         current_in_game_team_player_counts: counts,
     }
 }
@@ -349,11 +365,11 @@ fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
                 boost_active: player.boost_active != 0,
                 dodge_active: player.dodge_active != 0,
                 powerslide_active: player.powerslide_active != 0,
-                match_goals: None,
-                match_assists: None,
-                match_saves: None,
-                match_shots: None,
-                match_score: None,
+                match_goals: (player.has_match_stats != 0).then_some(player.match_goals),
+                match_assists: (player.has_match_stats != 0).then_some(player.match_assists),
+                match_saves: (player.has_match_stats != 0).then_some(player.match_saves),
+                match_shots: (player.has_match_stats != 0).then_some(player.match_shots),
+                match_score: (player.has_match_stats != 0).then_some(player.match_score),
             })
             .collect(),
     }
@@ -853,6 +869,12 @@ mod tests {
             boost_active: 0,
             dodge_active: 0,
             powerslide_active: 0,
+            has_match_stats: 1,
+            match_goals: player_index as i32,
+            match_assists: player_index as i32 + 1,
+            match_saves: player_index as i32 + 2,
+            match_shots: player_index as i32 + 3,
+            match_score: player_index as i32 + 100,
         }
     }
 
@@ -933,6 +955,14 @@ mod tests {
             has_kickoff_countdown_time: 0,
             ball_has_been_hit: 1,
             has_ball_has_been_hit: 1,
+            team_zero_score: 2,
+            has_team_zero_score: 1,
+            team_one_score: 1,
+            has_team_one_score: 1,
+            possession_team_is_team_0: 1,
+            has_possession_team: 1,
+            scored_on_team_is_team_0: 0,
+            has_scored_on_team: 1,
             live_play: 1,
             has_ball: 0,
             ball: SaRigidBody::default(),
@@ -951,6 +981,13 @@ mod tests {
             .expect("full analysis graph should expose frame info state");
         assert_eq!(frame_info.frame_number, 7);
         assert_eq!(frame_info.seconds_remaining, Some(299));
+        let gameplay = engine_ref
+            .graph
+            .state::<GameplayState>()
+            .expect("full analysis graph should expose gameplay state");
+        assert_eq!(gameplay.current_score(), Some((2, 1)));
+        assert_eq!(gameplay.possession_team_is_team_0, Some(true));
+        assert_eq!(gameplay.scored_on_team_is_team_0, Some(false));
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
@@ -1205,6 +1242,10 @@ mod tests {
             .graph
             .state::<FrameEventsState>()
             .expect("full analysis graph should expose frame events state");
+        let player_frame = engine_ref
+            .graph
+            .state::<PlayerFrameState>()
+            .expect("full analysis graph should expose player frame state");
         assert_eq!(frame_events.touch_events.len(), 1);
         assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
         assert_eq!(frame_events.boost_pad_events.len(), 1);
@@ -1228,6 +1269,11 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
+        assert_eq!(player_frame.players[1].match_goals, Some(1));
+        assert_eq!(player_frame.players[1].match_assists, Some(2));
+        assert_eq!(player_frame.players[1].match_saves, Some(3));
+        assert_eq!(player_frame.players[1].match_shots, Some(4));
+        assert_eq!(player_frame.players[1].match_score, Some(101));
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

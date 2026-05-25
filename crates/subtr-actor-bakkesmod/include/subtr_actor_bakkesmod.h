@@ -42,6 +42,12 @@ typedef struct SaPlayerFrame {
   uint8_t boost_active;
   uint8_t dodge_active;
   uint8_t powerslide_active;
+  uint8_t has_match_stats;
+  int32_t match_goals;
+  int32_t match_assists;
+  int32_t match_saves;
+  int32_t match_shots;
+  int32_t match_score;
 } SaPlayerFrame;
 
 typedef struct SaTouchEvent {
@@ -117,6 +123,14 @@ typedef struct SaLiveFrame {
   uint8_t has_kickoff_countdown_time;
   uint8_t ball_has_been_hit;
   uint8_t has_ball_has_been_hit;
+  int32_t team_zero_score;
+  uint8_t has_team_zero_score;
+  int32_t team_one_score;
+  uint8_t has_team_one_score;
+  uint8_t possession_team_is_team_0;
+  uint8_t has_possession_team;
+  uint8_t scored_on_team_is_team_0;
+  uint8_t has_scored_on_team;
   uint8_t live_play;
   uint8_t has_ball;
   SaRigidBody ball;

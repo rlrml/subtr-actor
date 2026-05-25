@@ -296,6 +296,14 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
   if (!server.IsNull()) {
     frame.seconds_remaining = server.GetSecondsRemaining();
     frame.has_seconds_remaining = 1;
+    frame.kickoff_countdown_time = server.GetReplicatedGameStateTimeRemaining();
+    frame.has_kickoff_countdown_time = 1;
+    sampleTeamScores(server, frame);
+    const unsigned char scoredOnTeam = server.GetReplicatedScoredOnTeam();
+    if (scoredOnTeam == 0 || scoredOnTeam == 1) {
+      frame.scored_on_team_is_team_0 = scoredOnTeam == 0 ? 1 : 0;
+      frame.has_scored_on_team = 1;
+    }
   }
 
   if (!server.IsNull()) {
@@ -303,6 +311,11 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
     if (!ball.IsNull()) {
       frame.has_ball = 1;
       frame.ball = sampleRigidBody(ball);
+      const unsigned char hitTeam = ball.GetHitTeamNum();
+      if (hitTeam == 0 || hitTeam == 1) {
+        frame.possession_team_is_team_0 = hitTeam == 0 ? 1 : 0;
+        frame.has_possession_team = 1;
+      }
     }
   }
 
@@ -363,6 +376,12 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   PriWrapper pri = car.GetPRI();
   if (!pri.IsNull()) {
     player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
+    player.has_match_stats = 1;
+    player.match_goals = pri.GetMatchGoals();
+    player.match_assists = pri.GetMatchAssists();
+    player.match_saves = pri.GetMatchSaves();
+    player.match_shots = pri.GetMatchShots();
+    player.match_score = pri.GetMatchScore();
     priPlayerIndices[pri.memory_address] = playerIndex;
     recordPlayerStatDeltas(pri, playerIndex, player.is_team_0);
   }
@@ -633,6 +652,33 @@ uint32_t SubtrActorPlugin::boostPadId(uintptr_t pickupAddress) {
   const uint32_t id = nextBoostPadId++;
   boostPadIds[pickupAddress] = id;
   return id;
+}
+
+void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaLiveFrame &frame) {
+  if (server.IsNull()) {
+    return;
+  }
+
+  ArrayWrapper<TeamWrapper> teams = server.GetTeams();
+  if (teams.IsNull()) {
+    return;
+  }
+
+  const int teamCount = teams.Count();
+  for (int i = 0; i < teamCount; i += 1) {
+    TeamWrapper team = teams.Get(i);
+    if (team.IsNull()) {
+      continue;
+    }
+    const int teamIndex = team.GetTeamIndex();
+    if (teamIndex == 0) {
+      frame.team_zero_score = team.GetScore();
+      frame.has_team_zero_score = 1;
+    } else if (teamIndex == 1) {
+      frame.team_one_score = team.GetScore();
+      frame.has_team_one_score = 1;
+    }
+  }
 }
 
 void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal) {

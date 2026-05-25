@@ -106,5 +106,6 @@ private:
   std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
   std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
   uint32_t boostPadId(uintptr_t pickupAddress);
+  void sampleTeamScores(ServerWrapper server, SaLiveFrame &frame);
   void sampleTeamScores(ServerWrapper server, SaGoalEvent &goal);
 };
