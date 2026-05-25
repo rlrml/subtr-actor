@@ -21,6 +21,7 @@ pub static BALL_HIT_TEAM_NUM_KEY: &str = "TAGame.Ball_TA:HitTeamNum";
 pub static BALL_EXPLOSION_DATA_KEY: &str = "TAGame.Ball_TA:ReplicatedExplosionData";
 pub static BALL_EXPLOSION_DATA_EXTENDED_KEY: &str =
     "TAGame.Ball_TA:ReplicatedExplosionDataExtended";
+pub static BOT_KEY: &str = "Engine.PlayerReplicationInfo:bBot";
 pub static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
 pub static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
 pub static DEMOLISH_GOAL_EXPLOSION_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishGoalExplosion";

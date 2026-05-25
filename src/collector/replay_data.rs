@@ -170,8 +170,6 @@ impl PlayerFrame {
     ///
     /// Returns a [`SubtrActorError`] if:
     /// - The player's rigid body cannot be retrieved
-    /// - The player's boost level cannot be accessed
-    /// - Other player state information is inaccessible
     fn new_from_processor(
         processor: &ReplayProcessor,
         player_id: &PlayerId,
@@ -180,7 +178,7 @@ impl PlayerFrame {
         let rigid_body =
             processor.get_interpolated_player_rigid_body(player_id, current_time, 0.0)?;
 
-        let boost_amount = processor.get_player_boost_level(player_id)?;
+        let boost_amount = processor.get_player_boost_level(player_id).unwrap_or(0.0);
         let boost_active = processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1;
         let powerslide_active = processor.get_powerslide_active(player_id).unwrap_or(false);
         let jump_active = processor.get_jump_active(player_id).unwrap_or(0) % 2 == 1;

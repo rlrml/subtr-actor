@@ -9,8 +9,14 @@ struct MappingUpdateContext {
     double_jump_type_actor_ids: Vec<boxcars::ActorId>,
     unique_id_object_id: boxcars::ObjectId,
     team_object_id: boxcars::ObjectId,
+    bot_object_id: Option<boxcars::ObjectId>,
     player_replication_object_id: boxcars::ObjectId,
     vehicle_object_id: boxcars::ObjectId,
+}
+
+fn synthetic_bot_player_id(actor_id: boxcars::ActorId) -> PlayerId {
+    let actor_id = u32::try_from(actor_id.0).unwrap_or(0);
+    boxcars::RemoteId::SplitScreen(u32::MAX - actor_id)
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -52,6 +58,7 @@ impl<'a> ReplayProcessor<'a> {
                 .to_vec(),
             unique_id_object_id,
             team_object_id,
+            bot_object_id: cached.bot,
             player_replication_object_id,
             vehicle_object_id,
         })
@@ -154,6 +161,21 @@ impl<'a> ReplayProcessor<'a> {
                         boxcars::Attribute::ActiveActor,
                         skip_value boxcars::ActorId(-1)
                     );
+                }
+                object_id if Some(object_id) == ctx.bot_object_id => {
+                    if ctx.player_type_actor_ids.contains(&update.actor_id) {
+                        let is_bot =
+                            *attribute_match!(&update.attribute, boxcars::Attribute::Boolean)?;
+                        if is_bot
+                            && !self
+                                .player_to_actor_id
+                                .values()
+                                .any(|actor_id| *actor_id == update.actor_id)
+                        {
+                            self.player_to_actor_id
+                                .insert(synthetic_bot_player_id(update.actor_id), update.actor_id);
+                        }
+                    }
                 }
                 object_id if object_id == ctx.player_replication_object_id => {
                     maintain_actor_link!(self.player_to_car, ctx.car_type_actor_ids);
