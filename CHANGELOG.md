@@ -4,6 +4,17 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.10 - 2026-05-25
+
+- Suppress bump stats around contested fifty-fifties to reduce false positive
+  bump attribution.
+- Require dodge setup evidence for half-volley classification.
+- Refine stats-player timeline event markers.
+- Deduplicate replay fixtures and update tests/docs to use the canonical
+  replay-format assets.
+- Format the replay URL test so the player package CI style check passes.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.10`.
+
 ## v0.8.9 - 2026-05-25
 
 - Remove the manually refreshed GitHub Pages npm dependency hash by deriving
