@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsTimelineCollector};
+use subtr_actor::{GoalTagKind, StatsCollector, StatsTimelineCollector};
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -40,5 +40,26 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
             .any(|event| event.goal_index == 2 && event.kind == GoalTagKind::DoubleTapGoal),
         "expected third goal to be tagged as a double tap; got {:?}",
         timeline.events.goal_tags
+    );
+}
+
+#[test]
+fn dynamic_stats_timeline_value_includes_normalized_mechanics_stream() {
+    let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
+    let value = StatsCollector::new()
+        .capture_frames()
+        .get_captured_data(&replay)
+        .expect("failed to capture stats frames for double tap replay")
+        .into_stats_timeline_value()
+        .expect("failed to convert captured stats frames to timeline value");
+
+    let mechanics = value["events"]["mechanics"]
+        .as_array()
+        .expect("timeline value should expose mechanics as an array");
+    assert!(
+        mechanics
+            .iter()
+            .any(|event| event["kind"].as_str() == Some("double_tap")),
+        "expected value timeline mechanics stream to include the double tap"
     );
 }
