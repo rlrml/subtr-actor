@@ -212,6 +212,15 @@ std::string mechanicLabel(SaMechanicKind kind) {
   }
 }
 
+std::string teamEventLabel(const SaTeamEvent &event) {
+  switch (event.kind) {
+  case SaTeamEventKindRush:
+    return std::format("{}v{} rush", event.attackers, event.defenders);
+  default:
+    return "Team event";
+  }
+}
+
 std::filesystem::path currentModuleDirectory() {
   HMODULE module = nullptr;
   const BOOL foundModule = GetModuleHandleExW(
@@ -372,11 +381,13 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_graph_info_json"));
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
+  drainTeamEvents = reinterpret_cast<DrainTeamEvents>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_team_events"));
 
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
       !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
-      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents) {
+      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -414,6 +425,7 @@ void SubtrActorPlugin::unloadRustLibrary() {
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
+  drainTeamEvents = nullptr;
 }
 
 void SubtrActorPlugin::tick(std::string) {
@@ -1051,7 +1063,7 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
 }
 
 void SubtrActorPlugin::drainPendingEvents() {
-  if (!engine || !drainEvents) {
+  if (!engine || !drainEvents || !drainTeamEvents) {
     return;
   }
 
@@ -1061,6 +1073,14 @@ void SubtrActorPlugin::drainPendingEvents() {
     count = drainEvents(engine, events, 16);
     for (size_t i = 0; i < count; i += 1) {
       pushEventMessage(events[i]);
+    }
+  } while (count == 16);
+
+  SaTeamEvent teamEvents[16];
+  do {
+    count = drainTeamEvents(engine, teamEvents, 16);
+    for (size_t i = 0; i < count; i += 1) {
+      pushTeamEventMessage(teamEvents[i]);
     }
   } while (count == 16);
 }
@@ -1073,6 +1093,22 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
                                       mechanicLabel(event.kind),
                                       event.confidence * 100.0f)
                                 : mechanicLabel(event.kind);
+  OverlayMessage message{
+      label,
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      std::chrono::steady_clock::now() + std::chrono::seconds(2),
+  };
+  messages.push_back(message);
+}
+
+void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
+  const bool isBlue = event.is_team_0 != 0;
+  const std::string label = event.confidence < 0.999f
+                                ? std::format(
+                                      "{} ({:.0f}%)",
+                                      teamEventLabel(event),
+                                      event.confidence * 100.0f)
+                                : teamEventLabel(event);
   OverlayMessage message{
       label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},

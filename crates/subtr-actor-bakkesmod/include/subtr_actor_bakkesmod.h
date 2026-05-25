@@ -204,12 +204,29 @@ typedef struct SaMechanicEvent {
   float confidence;
 } SaMechanicEvent;
 
+typedef enum SaTeamEventKind {
+  SaTeamEventKindRush = 1,
+} SaTeamEventKind;
+
+typedef struct SaTeamEvent {
+  SaTeamEventKind kind;
+  uint8_t is_team_0;
+  uint64_t start_frame;
+  uint64_t end_frame;
+  float start_time;
+  float end_time;
+  uint32_t attackers;
+  uint32_t defenders;
+  float confidence;
+} SaTeamEvent;
+
 SaEngine *subtr_actor_bakkesmod_engine_create(void);
 void subtr_actor_bakkesmod_engine_destroy(SaEngine *engine);
 void subtr_actor_bakkesmod_engine_reset(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_finish(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame *frame);
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_pending_team_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_events_json(
     const SaEngine *engine,
@@ -238,6 +255,10 @@ size_t subtr_actor_bakkesmod_write_graph_info_json(
 size_t subtr_actor_bakkesmod_drain_events(
     SaEngine *engine,
     SaMechanicEvent *out_events,
+    size_t max_events);
+size_t subtr_actor_bakkesmod_drain_team_events(
+    SaEngine *engine,
+    SaTeamEvent *out_events,
     size_t max_events);
 
 #ifdef __cplusplus

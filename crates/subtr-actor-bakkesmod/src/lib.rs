@@ -17,7 +17,7 @@ use subtr_actor::{
     FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
     GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
     PlayerFrameState, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta,
-    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, ShotEventMetadata,
+    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
     TimelineEvent, TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent,
     WhiffEventKind,
 };
@@ -258,6 +258,26 @@ pub struct SaMechanicEvent {
     pub confidence: f32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaTeamEventKind {
+    Rush = 1,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SaTeamEvent {
+    pub kind: SaTeamEventKind,
+    pub is_team_0: u8,
+    pub start_frame: u64,
+    pub end_frame: u64,
+    pub start_time: f32,
+    pub end_time: f32,
+    pub attackers: u32,
+    pub defenders: u32,
+    pub confidence: f32,
+}
+
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
@@ -265,6 +285,7 @@ pub struct SaEngine {
     live_replay_meta: Option<ReplayMeta>,
     live_replay_meta_signature: Vec<(RemoteId, bool, Option<String>)>,
     emitted_mechanic_ids: HashSet<String>,
+    emitted_team_event_ids: HashSet<String>,
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
     timeline_json: Vec<u8>,
@@ -272,6 +293,7 @@ pub struct SaEngine {
     graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
+    pending_team_events: Vec<SaTeamEvent>,
 }
 
 impl Default for SaEngine {
@@ -285,6 +307,7 @@ impl Default for SaEngine {
             live_replay_meta: None,
             live_replay_meta_signature: Vec::new(),
             emitted_mechanic_ids: HashSet::new(),
+            emitted_team_event_ids: HashSet::new(),
             events_json: Vec::new(),
             frame_json: Vec::new(),
             timeline_json: Vec::new(),
@@ -292,6 +315,7 @@ impl Default for SaEngine {
             graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
+            pending_team_events: Vec::new(),
         }
     }
 }
@@ -927,6 +951,18 @@ fn push_pending_graph_event(
     });
 }
 
+fn push_pending_team_event(
+    pending_team_events: &mut Vec<SaTeamEvent>,
+    emitted_team_event_ids: &mut HashSet<String>,
+    id: String,
+    event: SaTeamEvent,
+) {
+    if !emitted_team_event_ids.insert(id) {
+        return;
+    }
+    pending_team_events.push(event);
+}
+
 fn push_mechanic_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -1187,9 +1223,39 @@ fn push_goal_tag_events_from_timeline(
     }
 }
 
+fn push_rush_events_from_timeline(
+    pending_team_events: &mut Vec<SaTeamEvent>,
+    emitted_team_event_ids: &mut HashSet<String>,
+    rush: &[RushEvent],
+) {
+    for event in rush {
+        push_pending_team_event(
+            pending_team_events,
+            emitted_team_event_ids,
+            format!(
+                "rush:{}:{}:{}",
+                event.start_frame, event.end_frame, event.is_team_0
+            ),
+            SaTeamEvent {
+                kind: SaTeamEventKind::Rush,
+                is_team_0: event.is_team_0 as u8,
+                start_frame: event.start_frame as u64,
+                end_frame: event.end_frame as u64,
+                start_time: event.start_time,
+                end_time: event.end_time,
+                attackers: event.attackers as u32,
+                defenders: event.defenders as u32,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
+    pending_team_events: &mut Vec<SaTeamEvent>,
+    emitted_team_event_ids: &mut HashSet<String>,
     events: &ReplayStatsTimelineEvents,
 ) {
     push_mechanic_events_from_timeline(pending_events, emitted_mechanic_ids, &events.mechanics);
@@ -1208,12 +1274,20 @@ fn push_drainable_events_from_timeline(
         &events.fifty_fifty,
     );
     push_goal_tag_events_from_timeline(pending_events, emitted_mechanic_ids, &events.goal_tags);
+    push_rush_events_from_timeline(pending_team_events, emitted_team_event_ids, &events.rush);
     pending_events.sort_by(|left, right| {
         left.time
             .total_cmp(&right.time)
             .then_with(|| left.frame_number.cmp(&right.frame_number))
             .then_with(|| (left.kind as u32).cmp(&(right.kind as u32)))
             .then_with(|| left.player_index.cmp(&right.player_index))
+    });
+    pending_team_events.sort_by(|left, right| {
+        left.end_time
+            .total_cmp(&right.end_time)
+            .then_with(|| left.end_frame.cmp(&right.end_frame))
+            .then_with(|| (left.kind as u32).cmp(&(right.kind as u32)))
+            .then_with(|| left.is_team_0.cmp(&right.is_team_0))
     });
 }
 
@@ -1272,6 +1346,8 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
     push_drainable_events_from_timeline(
         &mut engine.pending_events,
         &mut engine.emitted_mechanic_ids,
+        &mut engine.pending_team_events,
+        &mut engine.emitted_team_event_ids,
         &events,
     );
     engine.events_json = serde_json::to_vec(&events).unwrap_or_default();
@@ -1410,6 +1486,22 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
     engine
         .as_ref()
         .map(|engine| engine.pending_events.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Returns the number of pending team-owned events currently buffered by the engine.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
+    engine: *const SaEngine,
+) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.pending_team_events.len())
         .unwrap_or(0)
 }
 
@@ -1667,6 +1759,33 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
     count
 }
 
+#[no_mangle]
+/// Copies and removes pending team-owned events from the engine.
+///
+/// Returns the number of events copied into `out_events`.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_events` must point to writable
+/// storage for at least `max_events` `SaTeamEvent` values.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_team_events(
+    engine: *mut SaEngine,
+    out_events: *mut SaTeamEvent,
+    max_events: usize,
+) -> usize {
+    let Some(engine) = engine.as_mut() else {
+        return 0;
+    };
+    if out_events.is_null() || max_events == 0 {
+        return 0;
+    }
+
+    let count = max_events.min(engine.pending_team_events.len());
+    ptr::copy_nonoverlapping(engine.pending_team_events.as_ptr(), out_events, count);
+    engine.pending_team_events.drain(..count);
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1840,6 +1959,23 @@ mod tests {
             confidence: 0.72,
             modifiers: Vec::new(),
             evidence: Vec::new(),
+        }
+    }
+
+    fn rush_event(
+        start_frame: usize,
+        end_frame: usize,
+        end_time: f32,
+        is_team_0: bool,
+    ) -> RushEvent {
+        RushEvent {
+            start_time: 1.0,
+            start_frame,
+            end_time,
+            end_frame,
+            is_team_0,
+            attackers: 3,
+            defenders: 2,
         }
     }
 
@@ -2117,6 +2253,56 @@ mod tests {
     #[test]
     fn finish_rejects_null_engine() {
         assert_eq!(unsafe { subtr_actor_bakkesmod_finish(ptr::null_mut()) }, -1);
+    }
+
+    #[test]
+    fn drains_pending_team_events_through_abi() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let engine_ref = unsafe { engine.as_mut().expect("engine should be valid") };
+        engine_ref.pending_team_events.push(SaTeamEvent {
+            kind: SaTeamEventKind::Rush,
+            is_team_0: 1,
+            start_frame: 4,
+            end_frame: 9,
+            start_time: 0.4,
+            end_time: 0.9,
+            attackers: 3,
+            defenders: 1,
+            confidence: 1.0,
+        });
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_pending_team_event_count(engine) },
+            1
+        );
+
+        let mut events = [SaTeamEvent {
+            kind: SaTeamEventKind::Rush,
+            is_team_0: 0,
+            start_frame: 0,
+            end_frame: 0,
+            start_time: 0.0,
+            end_time: 0.0,
+            attackers: 0,
+            defenders: 0,
+            confidence: 0.0,
+        }];
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_drain_team_events(engine, events.as_mut_ptr(), 1) },
+            1
+        );
+        assert_eq!(events[0].kind, SaTeamEventKind::Rush);
+        assert_eq!(events[0].is_team_0, 1);
+        assert_eq!(events[0].attackers, 3);
+        assert_eq!(events[0].defenders, 1);
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_pending_team_event_count(engine) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_drain_team_events(engine, ptr::null_mut(), 1) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
     #[test]
@@ -2946,6 +3132,8 @@ mod tests {
     fn drains_player_owned_events_from_timeline_events() {
         let mut pending_events = Vec::new();
         let mut emitted_mechanic_ids = HashSet::new();
+        let mut pending_team_events = Vec::new();
+        let mut emitted_team_event_ids = HashSet::new();
         let timeline_events = ReplayStatsTimelineEvents {
             timeline: vec![
                 TimelineEvent {
@@ -3006,12 +3194,15 @@ mod tests {
                 goal_tag_event(GoalTagKind::FlickGoal, Some(RemoteId::SplitScreen(1))),
                 goal_tag_event(GoalTagKind::AerialGoal, None),
             ],
+            rush: vec![rush_event(8, 16, 1.6, true)],
             ..ReplayStatsTimelineEvents::default()
         };
 
         push_drainable_events_from_timeline(
             &mut pending_events,
             &mut emitted_mechanic_ids,
+            &mut pending_team_events,
+            &mut emitted_team_event_ids,
             &timeline_events,
         );
 
@@ -3061,14 +3252,27 @@ mod tests {
         assert_eq!(pending_events[11].player_index, 1);
         assert_eq!(pending_events[11].is_team_0, 0);
         assert_eq!(pending_events[12].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_team_events.len(), 1);
+        assert_eq!(pending_team_events[0].kind, SaTeamEventKind::Rush);
+        assert_eq!(pending_team_events[0].is_team_0, 1);
+        assert_eq!(pending_team_events[0].start_frame, 8);
+        assert_eq!(pending_team_events[0].end_frame, 16);
+        assert_eq!(pending_team_events[0].start_time, 1.0);
+        assert_eq!(pending_team_events[0].end_time, 1.6);
+        assert_eq!(pending_team_events[0].attackers, 3);
+        assert_eq!(pending_team_events[0].defenders, 2);
 
         pending_events.clear();
+        pending_team_events.clear();
         push_drainable_events_from_timeline(
             &mut pending_events,
             &mut emitted_mechanic_ids,
+            &mut pending_team_events,
+            &mut emitted_team_event_ids,
             &timeline_events,
         );
         assert!(pending_events.is_empty());
+        assert!(pending_team_events.is_empty());
     }
 
     #[test]

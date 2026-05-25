@@ -3,9 +3,10 @@
 This is an early BakkesMod integration spike. It is intentionally split into:
 
 - `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames,
-  evaluates the shared `subtr-actor` analysis graph, drains normalized mechanic
-  events for overlay use, and exposes the live graph metadata, timeline, event
-  bundle, graph-backed stats modules, and current frame stats snapshot as JSON.
+  evaluates the shared `subtr-actor` analysis graph, drains normalized player
+  and team events for overlay use, and exposes the live graph metadata,
+  timeline, event bundle, graph-backed stats modules, and current frame stats
+  snapshot as JSON.
 - `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
   The `subtr_actor_dump_graph` console command writes the current graph
@@ -26,6 +27,9 @@ events, dodge-refresh transitions, and control state:
   `subtr_actor_bakkesmod_write_events_json`,
   `subtr_actor_bakkesmod_frame_json_len`, and
   `subtr_actor_bakkesmod_write_frame_json`
+- player-owned and team-owned drainable overlay events through
+  `subtr_actor_bakkesmod_drain_events` and
+  `subtr_actor_bakkesmod_drain_team_events`
 - the full live `ReplayStatsTimeline` payload through
   `subtr_actor_bakkesmod_timeline_json_len` and
   `subtr_actor_bakkesmod_write_timeline_json`

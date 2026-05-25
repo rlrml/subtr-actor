@@ -49,6 +49,7 @@ private:
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
+  using DrainTeamEvents = size_t (*)(SaEngine *, SaTeamEvent *, size_t);
 
   struct OverlayMessage {
     std::string text;
@@ -86,6 +87,7 @@ private:
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
   DrainEvents drainEvents = nullptr;
+  DrainTeamEvents drainTeamEvents = nullptr;
 
   uint64_t frameNumber = 0;
   float lastTime = 0.0f;
@@ -122,6 +124,7 @@ private:
   std::string readJsonBuffer(JsonLen len, WriteJson write);
   void dumpGraphJson(std::vector<std::string> params);
   void pushEventMessage(const SaMechanicEvent &event);
+  void pushTeamEventMessage(const SaTeamEvent &event);
   void drainPendingEvents();
   SaLiveFrame sampleFrame();
   void samplePlayers(ServerWrapper server, CarWrapper localCar);
