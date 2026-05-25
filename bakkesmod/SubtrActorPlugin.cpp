@@ -28,6 +28,8 @@ constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
 constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
 constexpr uint64_t DODGE_REFRESH_TOUCH_FRAME_WINDOW = 2;
+constexpr int GAME_STATE_KICKOFF_COUNTDOWN = 55;
+constexpr int GAME_STATE_GOAL_SCORED_REPLAY = 86;
 
 int moduleAnchor = 0;
 
@@ -513,6 +515,13 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
     frame.has_seconds_remaining = 1;
     frame.kickoff_countdown_time = server.GetReplicatedGameStateTimeRemaining();
     frame.has_kickoff_countdown_time = 1;
+    if (server.GetbPlayReplays() != 0) {
+      frame.game_state = GAME_STATE_GOAL_SCORED_REPLAY;
+      frame.has_game_state = 1;
+    } else if (frame.kickoff_countdown_time > 0) {
+      frame.game_state = GAME_STATE_KICKOFF_COUNTDOWN;
+      frame.has_game_state = 1;
+    }
     sampleTeamScores(server, frame);
     const unsigned char scoredOnTeam = server.GetReplicatedScoredOnTeam();
     if (scoredOnTeam == 0 || scoredOnTeam == 1) {
