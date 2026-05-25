@@ -31,6 +31,7 @@ impl AnalysisNode for HalfVolleyNode {
         vec![
             frame_info_dependency(),
             ball_frame_state_dependency(),
+            player_frame_state_dependency(),
             touch_state_dependency(),
             live_play_dependency(),
         ]
@@ -40,6 +41,7 @@ impl AnalysisNode for HalfVolleyNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
+            ctx.get::<PlayerFrameState>()?,
             ctx.get::<TouchState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
