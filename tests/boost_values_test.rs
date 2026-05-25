@@ -23,7 +23,7 @@ impl BoostTracker {
 impl Collector for BoostTracker {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         _current_time: f32,

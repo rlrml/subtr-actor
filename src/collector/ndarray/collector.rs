@@ -177,7 +177,7 @@ impl<F> NDArrayCollector<F> {
         Ok(global_feature_count + player_feature_count)
     }
 
-    fn maybe_set_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn maybe_set_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         if self.replay_meta.is_none() {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
@@ -188,7 +188,7 @@ impl<F> NDArrayCollector<F> {
 impl<F> Collector for NDArrayCollector<F> {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,

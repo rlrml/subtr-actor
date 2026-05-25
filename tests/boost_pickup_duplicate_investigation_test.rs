@@ -44,7 +44,7 @@ impl BoostPickupInvestigationCollector {
 impl Collector for BoostPickupInvestigationCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -82,7 +82,7 @@ impl Collector for BoostPickupInvestigationCollector {
         Ok(advance)
     }
 
-    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.analysis.finish_replay(processor)
     }
 }

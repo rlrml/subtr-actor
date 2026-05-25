@@ -145,7 +145,7 @@ impl StatsTimelineCollector {
 impl Collector for StatsTimelineCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -175,7 +175,7 @@ impl Collector for StatsTimelineCollector {
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
         let Some(_) = self.replay_meta.as_ref() else {
             return Ok(());
