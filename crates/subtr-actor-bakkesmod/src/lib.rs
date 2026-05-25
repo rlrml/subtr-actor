@@ -5207,6 +5207,11 @@ mod tests {
         assert!(callable_names
             .iter()
             .any(|name| name == "continuous_ball_control"));
+        assert_eq!(
+            value["callable_analysis_node_names"],
+            live_analysis_node_names_json_value(engine),
+            "graph info should expose the same callable registry as the names ABI"
+        );
         let stats_module_names = value["builtin_stats_module_names"]
             .as_array()
             .expect("stats module names should be an array");

@@ -126,7 +126,8 @@ acceptance check for live graph callability and event-generation parity.
    `graph-events.json`, `graph-frame.json`, `graph-timeline.json`,
    `graph-stats.json`, `graph-analysis-nodes.json`, and `graph-info.json`.
    `graph-info.json` should list `analysis_nodes` in `graph_output_names`, and
-   every individually callable name in `callable_analysis_node_names`.
+   `callable_analysis_node_names` should match the names verified by
+   `subtr_actor_verify_graph`.
    `graph-analysis-nodes.json` should contain keys for the builtin analysis
    nodes reported by `builtin_analysis_node_names`.
 5. Spot-check individual call paths:
