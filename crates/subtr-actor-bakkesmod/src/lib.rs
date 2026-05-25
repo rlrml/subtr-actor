@@ -15,7 +15,8 @@ use subtr_actor::{
     FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalEvent,
     LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo, PlayerSample,
     PlayerStatEvent, PlayerStatEventKind, ReplayMeta, ReplayStatsTimelineEvents, ShotEventMetadata,
-    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
+    TimelineEvent, TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent,
+    WhiffEventKind,
 };
 
 #[repr(C)]
@@ -221,6 +222,7 @@ pub enum SaMechanicKind {
     Bump = 18,
     Backboard = 19,
     BoostPickup = 20,
+    Demo = 21,
 }
 
 #[repr(C)]
@@ -978,6 +980,34 @@ fn push_boost_pickup_events_from_timeline(
     }
 }
 
+fn push_demo_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    timeline: &[TimelineEvent],
+) {
+    for (index, event) in timeline.iter().enumerate() {
+        if event.kind != TimelineEventKind::Kill {
+            continue;
+        }
+        let (Some(player_id), Some(is_team_0)) = (&event.player_id, event.is_team_0) else {
+            continue;
+        };
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!("demo:{:.3}:{}:{index}", event.time, player_index(player_id)),
+                kind: SaMechanicKind::Demo,
+                player_id: player_id.clone(),
+                is_team_0,
+                frame_number: 0,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -992,6 +1022,7 @@ fn push_drainable_events_from_timeline(
         &events.boost_pickups,
     );
     push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
+    push_demo_events_from_timeline(pending_events, emitted_mechanic_ids, &events.timeline);
     pending_events.sort_by(|left, right| {
         left.time
             .total_cmp(&right.time)
@@ -2242,6 +2273,20 @@ mod tests {
         let mut pending_events = Vec::new();
         let mut emitted_mechanic_ids = HashSet::new();
         let timeline_events = ReplayStatsTimelineEvents {
+            timeline: vec![
+                TimelineEvent {
+                    time: 1.35,
+                    kind: TimelineEventKind::Kill,
+                    player_id: Some(RemoteId::SplitScreen(0)),
+                    is_team_0: Some(true),
+                },
+                TimelineEvent {
+                    time: 1.35,
+                    kind: TimelineEventKind::Death,
+                    player_id: Some(RemoteId::SplitScreen(1)),
+                    is_team_0: Some(false),
+                },
+            ],
             mechanics: vec![normalized_mechanic(
                 "speed_flip:15:0",
                 "speed_flip",
@@ -2261,7 +2306,7 @@ mod tests {
             &timeline_events,
         );
 
-        assert_eq!(pending_events.len(), 5);
+        assert_eq!(pending_events.len(), 6);
         assert_eq!(pending_events[0].kind, SaMechanicKind::Backboard);
         assert_eq!(pending_events[0].frame_number, 11);
         assert_eq!(pending_events[0].player_index, 0);
@@ -2275,7 +2320,10 @@ mod tests {
         assert_eq!(pending_events[3].frame_number, 13);
         assert_eq!(pending_events[3].player_index, 0);
         assert_eq!(pending_events[3].confidence, 0.42);
-        assert_eq!(pending_events[4].kind, SaMechanicKind::SpeedFlip);
+        assert_eq!(pending_events[4].kind, SaMechanicKind::Demo);
+        assert_eq!(pending_events[4].time, 1.35);
+        assert_eq!(pending_events[4].player_index, 0);
+        assert_eq!(pending_events[5].kind, SaMechanicKind::SpeedFlip);
 
         pending_events.clear();
         push_drainable_events_from_timeline(

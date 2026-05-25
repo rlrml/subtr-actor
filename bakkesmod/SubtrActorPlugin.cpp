@@ -140,6 +140,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Ceiling shot";
   case SaMechanicKindCenter:
     return "Center";
+  case SaMechanicKindDemo:
+    return "Demo";
   case SaMechanicKindDoubleTap:
     return "Double tap";
   case SaMechanicKindFlick:
