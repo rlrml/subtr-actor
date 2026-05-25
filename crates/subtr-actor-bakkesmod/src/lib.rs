@@ -3454,6 +3454,17 @@ mod tests {
         serde_json::from_slice(&bytes).expect("events json should be valid")
     }
 
+    fn live_timeline_json_value(engine: *const SaEngine) -> serde_json::Value {
+        let json_len = unsafe { subtr_actor_bakkesmod_timeline_json_len(engine) };
+        assert!(json_len > 0);
+        let mut bytes = vec![0; json_len];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_timeline_json(engine, bytes.as_mut_ptr(), bytes.len())
+        };
+        assert_eq!(written, json_len);
+        serde_json::from_slice(&bytes).expect("timeline json should be valid")
+    }
+
     fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
         let mut engine = SaEngine::default();
         let players = unsafe {
@@ -3489,6 +3500,60 @@ mod tests {
             .clone();
         let bytes = serde_json::to_vec(&events).expect("direct graph events should serialize");
         serde_json::from_slice(&bytes).expect("direct graph events json should be valid")
+    }
+
+    fn live_frame_players(frame: &SaLiveFrame) -> &[SaPlayerFrame] {
+        unsafe {
+            if frame.player_count == 0 {
+                &[]
+            } else {
+                slice::from_raw_parts(frame.players, frame.player_count)
+            }
+        }
+    }
+
+    fn direct_full_graph_timeline_json_value(frames: &[SaLiveFrame]) -> serde_json::Value {
+        let mut engine = SaEngine::default();
+        let mut graph = graph_with_all_analysis_nodes();
+        let mut timeline_frames = Vec::new();
+
+        for frame in frames {
+            let players = live_frame_players(frame);
+            let explicit_events = unsafe { frame_event_slices(frame) }
+                .expect("test frame explicit event pointers should be valid");
+            let signature = live_replay_meta_signature(players);
+            if !engine.live_replay_meta_initialized
+                || engine.live_replay_meta_signature != signature
+            {
+                let replay_meta = live_replay_meta(players);
+                graph
+                    .on_replay_meta(&replay_meta)
+                    .expect("direct graph should accept replay metadata");
+                engine.live_replay_meta_initialized = true;
+                engine.live_replay_meta = Some(replay_meta);
+                engine.live_replay_meta_signature = signature;
+            }
+            let frame_input = frame_input(&mut engine, frame, players, &explicit_events);
+            graph
+                .evaluate_with_state(&frame_input)
+                .expect("direct graph should evaluate live frame input");
+            if let Some(frame) = current_timeline_frame(&graph) {
+                record_timeline_frame(&mut timeline_frames, frame);
+            }
+        }
+
+        graph.finish().expect("direct graph should finish");
+        let events = graph
+            .state::<StatsTimelineEventsState>()
+            .expect("direct graph should expose timeline events")
+            .events
+            .clone();
+        if let Some(frame) = current_timeline_frame(&graph) {
+            record_timeline_frame(&mut timeline_frames, frame);
+        }
+        let bytes =
+            serialize_live_timeline(engine.live_replay_meta.as_ref(), events, timeline_frames);
+        serde_json::from_slice(&bytes).expect("direct graph timeline json should be valid")
     }
 
     #[test]
@@ -5056,6 +5121,64 @@ mod tests {
             live_events_json_value(engine),
             direct_full_graph_events_json_value(&frame),
             "BakkesMod ABI exported events should match the shared full analysis graph for the same live frame input"
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_timeline_json_matches_direct_full_graph_across_finish() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 0.0,
+            has_closest_approach_distance: 1,
+        }];
+        let players_by_frame = (1..=12)
+            .map(|frame_number| {
+                [player_at(SaVec3 {
+                    x: frame_number as f32 * 20.0,
+                    y: 0.0,
+                    z: 20.0,
+                })]
+            })
+            .collect::<Vec<_>>();
+        let mut frames = Vec::new();
+        for (offset, players) in players_by_frame.iter().enumerate() {
+            let frame_number = offset as u64 + 1;
+            let mut frame = live_frame(
+                frame_number,
+                rigid_body(
+                    SaVec3 {
+                        x: frame_number as f32 * 20.0,
+                        y: 0.0,
+                        z: 120.0,
+                    },
+                    SaVec3::default(),
+                ),
+                players,
+            );
+            frame.has_live_play = 1;
+            if frame_number == 1 {
+                frame.touches = touches.as_ptr();
+                frame.touch_count = touches.len();
+            }
+            frames.push(frame);
+        }
+
+        for frame in &frames {
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, frame) },
+                0
+            );
+        }
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        assert_eq!(
+            live_timeline_json_value(engine),
+            direct_full_graph_timeline_json_value(&frames),
+            "BakkesMod ABI live timeline JSON should match the shared full graph across multi-frame evaluation and finish"
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
