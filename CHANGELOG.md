@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.7.13 - 2026-05-25
+
+- Expand touch stats with wall-touch counts and surface-labeled touch
+  breakdowns across Rust exports and the stats evaluation player.
+- Add touch surface confidence documentation and keep player entrypoint
+  formatting lint-clean.
+- Refresh Rust, Python, and JavaScript release metadata to `0.7.13`.
+
 ## v0.7.12 - 2026-05-25
 
 - Add replay preload state tracking to playlist replay caches and expose queued,
