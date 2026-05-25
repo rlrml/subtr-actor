@@ -15,11 +15,11 @@ use subtr_actor::{
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
     FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase, GameplayState,
-    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
-    PlayerFrameState, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ReplayMeta,
-    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
-    TimelineEvent, TimelineEventKind, TouchEvent, TouchState, TouchStateCalculator, WhiffEvent,
-    WhiffEventKind,
+    GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState,
+    MechanicEvent, MechanicTiming, PlayerFrameState, PlayerInfo, PlayerSample, PlayerStatEvent,
+    PlayerStatEventKind, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
+    ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, TimelineEvent, TimelineEventKind,
+    TouchEvent, TouchState, TouchStateCalculator, WhiffEvent, WhiffEventKind,
 };
 
 #[repr(C)]
@@ -278,6 +278,33 @@ pub struct SaTeamEvent {
     pub confidence: f32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaGoalBuildupKind {
+    CounterAttack = 1,
+    SustainedPressure = 2,
+    Other = 3,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SaGoalContextEvent {
+    pub frame_number: u64,
+    pub time: f32,
+    pub scoring_team_is_team_0: u8,
+    pub has_scorer: u8,
+    pub scorer_index: u32,
+    pub has_scoring_team_most_back_player: u8,
+    pub scoring_team_most_back_player_index: u32,
+    pub has_defending_team_most_back_player: u8,
+    pub defending_team_most_back_player_index: u32,
+    pub has_ball_position: u8,
+    pub ball_position: SaVec3,
+    pub has_ball_air_time_before_goal: u8,
+    pub ball_air_time_before_goal: f32,
+    pub goal_buildup: SaGoalBuildupKind,
+}
+
 pub struct SaEngine {
     graph: AnalysisGraph,
     live_events: SaLiveEventGenerator,
@@ -286,6 +313,7 @@ pub struct SaEngine {
     live_replay_meta_signature: Vec<(RemoteId, bool, Option<String>)>,
     emitted_mechanic_ids: HashSet<String>,
     emitted_team_event_ids: HashSet<String>,
+    emitted_goal_context_ids: HashSet<String>,
     events_json: Vec<u8>,
     frame_json: Vec<u8>,
     timeline_json: Vec<u8>,
@@ -294,6 +322,7 @@ pub struct SaEngine {
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
     pending_team_events: Vec<SaTeamEvent>,
+    pending_goal_context_events: Vec<SaGoalContextEvent>,
 }
 
 impl Default for SaEngine {
@@ -308,6 +337,7 @@ impl Default for SaEngine {
             live_replay_meta_signature: Vec::new(),
             emitted_mechanic_ids: HashSet::new(),
             emitted_team_event_ids: HashSet::new(),
+            emitted_goal_context_ids: HashSet::new(),
             events_json: Vec::new(),
             frame_json: Vec::new(),
             timeline_json: Vec::new(),
@@ -316,6 +346,7 @@ impl Default for SaEngine {
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
             pending_team_events: Vec::new(),
+            pending_goal_context_events: Vec::new(),
         }
     }
 }
@@ -963,6 +994,18 @@ fn push_pending_team_event(
     pending_team_events.push(event);
 }
 
+fn push_pending_goal_context_event(
+    pending_goal_context_events: &mut Vec<SaGoalContextEvent>,
+    emitted_goal_context_ids: &mut HashSet<String>,
+    id: String,
+    event: SaGoalContextEvent,
+) {
+    if !emitted_goal_context_ids.insert(id) {
+        return;
+    }
+    pending_goal_context_events.push(event);
+}
+
 fn push_mechanic_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -1251,11 +1294,69 @@ fn push_rush_events_from_timeline(
     }
 }
 
+fn goal_buildup_kind(kind: GoalBuildupKind) -> SaGoalBuildupKind {
+    match kind {
+        GoalBuildupKind::CounterAttack => SaGoalBuildupKind::CounterAttack,
+        GoalBuildupKind::SustainedPressure => SaGoalBuildupKind::SustainedPressure,
+        GoalBuildupKind::Other => SaGoalBuildupKind::Other,
+    }
+}
+
+fn goal_context_position(position: Option<subtr_actor::GoalContextPosition>) -> SaVec3 {
+    position
+        .map(|position| SaVec3 {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+        })
+        .unwrap_or_default()
+}
+
+fn push_goal_context_events_from_timeline(
+    pending_goal_context_events: &mut Vec<SaGoalContextEvent>,
+    emitted_goal_context_ids: &mut HashSet<String>,
+    goal_context: &[GoalContextEvent],
+) {
+    for (index, event) in goal_context.iter().enumerate() {
+        let scorer = event.scorer.as_ref();
+        let scoring_team_most_back_player = event.scoring_team_most_back_player.as_ref();
+        let defending_team_most_back_player = event.defending_team_most_back_player.as_ref();
+        push_pending_goal_context_event(
+            pending_goal_context_events,
+            emitted_goal_context_ids,
+            format!("goal_context:{}:{}:{index}", event.frame, event.time),
+            SaGoalContextEvent {
+                frame_number: event.frame as u64,
+                time: event.time,
+                scoring_team_is_team_0: event.scoring_team_is_team_0 as u8,
+                has_scorer: scorer.is_some() as u8,
+                scorer_index: scorer.map(player_index).unwrap_or(0),
+                has_scoring_team_most_back_player: scoring_team_most_back_player.is_some() as u8,
+                scoring_team_most_back_player_index: scoring_team_most_back_player
+                    .map(player_index)
+                    .unwrap_or(0),
+                has_defending_team_most_back_player: defending_team_most_back_player.is_some()
+                    as u8,
+                defending_team_most_back_player_index: defending_team_most_back_player
+                    .map(player_index)
+                    .unwrap_or(0),
+                has_ball_position: event.ball_position.is_some() as u8,
+                ball_position: goal_context_position(event.ball_position),
+                has_ball_air_time_before_goal: event.ball_air_time_before_goal.is_some() as u8,
+                ball_air_time_before_goal: event.ball_air_time_before_goal.unwrap_or(0.0),
+                goal_buildup: goal_buildup_kind(event.goal_buildup),
+            },
+        );
+    }
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
     pending_team_events: &mut Vec<SaTeamEvent>,
     emitted_team_event_ids: &mut HashSet<String>,
+    pending_goal_context_events: &mut Vec<SaGoalContextEvent>,
+    emitted_goal_context_ids: &mut HashSet<String>,
     events: &ReplayStatsTimelineEvents,
 ) {
     push_mechanic_events_from_timeline(pending_events, emitted_mechanic_ids, &events.mechanics);
@@ -1275,6 +1376,11 @@ fn push_drainable_events_from_timeline(
     );
     push_goal_tag_events_from_timeline(pending_events, emitted_mechanic_ids, &events.goal_tags);
     push_rush_events_from_timeline(pending_team_events, emitted_team_event_ids, &events.rush);
+    push_goal_context_events_from_timeline(
+        pending_goal_context_events,
+        emitted_goal_context_ids,
+        &events.goal_context,
+    );
     pending_events.sort_by(|left, right| {
         left.time
             .total_cmp(&right.time)
@@ -1288,6 +1394,15 @@ fn push_drainable_events_from_timeline(
             .then_with(|| left.end_frame.cmp(&right.end_frame))
             .then_with(|| (left.kind as u32).cmp(&(right.kind as u32)))
             .then_with(|| left.is_team_0.cmp(&right.is_team_0))
+    });
+    pending_goal_context_events.sort_by(|left, right| {
+        left.time
+            .total_cmp(&right.time)
+            .then_with(|| left.frame_number.cmp(&right.frame_number))
+            .then_with(|| {
+                left.scoring_team_is_team_0
+                    .cmp(&right.scoring_team_is_team_0)
+            })
     });
 }
 
@@ -1348,6 +1463,8 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         &mut engine.emitted_mechanic_ids,
         &mut engine.pending_team_events,
         &mut engine.emitted_team_event_ids,
+        &mut engine.pending_goal_context_events,
+        &mut engine.emitted_goal_context_ids,
         &events,
     );
     engine.events_json = serde_json::to_vec(&events).unwrap_or_default();
@@ -1502,6 +1619,22 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
     engine
         .as_ref()
         .map(|engine| engine.pending_team_events.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Returns the number of pending goal-context events currently buffered by the engine.
+///
+/// # Safety
+///
+/// `engine` must either be null or a valid pointer returned by
+/// `subtr_actor_bakkesmod_engine_create`.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
+    engine: *const SaEngine,
+) -> usize {
+    engine
+        .as_ref()
+        .map(|engine| engine.pending_goal_context_events.len())
         .unwrap_or(0)
 }
 
@@ -1786,6 +1919,37 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_team_events(
     count
 }
 
+#[no_mangle]
+/// Copies and removes pending goal-context events from the engine.
+///
+/// Returns the number of events copied into `out_events`.
+///
+/// # Safety
+///
+/// `engine` must be a valid engine pointer. `out_events` must point to writable
+/// storage for at least `max_events` `SaGoalContextEvent` values.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
+    engine: *mut SaEngine,
+    out_events: *mut SaGoalContextEvent,
+    max_events: usize,
+) -> usize {
+    let Some(engine) = engine.as_mut() else {
+        return 0;
+    };
+    if out_events.is_null() || max_events == 0 {
+        return 0;
+    }
+
+    let count = max_events.min(engine.pending_goal_context_events.len());
+    ptr::copy_nonoverlapping(
+        engine.pending_goal_context_events.as_ptr(),
+        out_events,
+        count,
+    );
+    engine.pending_goal_context_events.drain(..count);
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1976,6 +2140,26 @@ mod tests {
             is_team_0,
             attackers: 3,
             defenders: 2,
+        }
+    }
+
+    fn goal_context_event(frame: usize, time: f32) -> GoalContextEvent {
+        GoalContextEvent {
+            time,
+            frame,
+            scoring_team_is_team_0: false,
+            scorer: Some(RemoteId::SplitScreen(1)),
+            scoring_team_most_back_player: Some(RemoteId::SplitScreen(1)),
+            defending_team_most_back_player: Some(RemoteId::SplitScreen(0)),
+            ball_position: Some(subtr_actor::GoalContextPosition {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            }),
+            ball_air_time_before_goal: Some(1.25),
+            goal_buildup: GoalBuildupKind::CounterAttack,
+            scorer_last_touch: None,
+            players: Vec::new(),
         }
     }
 
@@ -2300,6 +2484,73 @@ mod tests {
         );
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_drain_team_events(engine, ptr::null_mut(), 1) },
+            0
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn drains_pending_goal_context_events_through_abi() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let engine_ref = unsafe { engine.as_mut().expect("engine should be valid") };
+        engine_ref
+            .pending_goal_context_events
+            .push(SaGoalContextEvent {
+                frame_number: 9,
+                time: 0.9,
+                scoring_team_is_team_0: 0,
+                has_scorer: 1,
+                scorer_index: 1,
+                has_scoring_team_most_back_player: 1,
+                scoring_team_most_back_player_index: 1,
+                has_defending_team_most_back_player: 1,
+                defending_team_most_back_player_index: 0,
+                has_ball_position: 1,
+                ball_position: SaVec3 {
+                    x: 1.0,
+                    y: 2.0,
+                    z: 3.0,
+                },
+                has_ball_air_time_before_goal: 1,
+                ball_air_time_before_goal: 1.25,
+                goal_buildup: SaGoalBuildupKind::CounterAttack,
+            });
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_pending_goal_context_event_count(engine) },
+            1
+        );
+
+        let mut events = [SaGoalContextEvent {
+            frame_number: 0,
+            time: 0.0,
+            scoring_team_is_team_0: 0,
+            has_scorer: 0,
+            scorer_index: 0,
+            has_scoring_team_most_back_player: 0,
+            scoring_team_most_back_player_index: 0,
+            has_defending_team_most_back_player: 0,
+            defending_team_most_back_player_index: 0,
+            has_ball_position: 0,
+            ball_position: SaVec3::default(),
+            has_ball_air_time_before_goal: 0,
+            ball_air_time_before_goal: 0.0,
+            goal_buildup: SaGoalBuildupKind::Other,
+        }];
+        assert_eq!(
+            unsafe {
+                subtr_actor_bakkesmod_drain_goal_context_events(engine, events.as_mut_ptr(), 1)
+            },
+            1
+        );
+        assert_eq!(events[0].frame_number, 9);
+        assert_eq!(events[0].scorer_index, 1);
+        assert_eq!(events[0].goal_buildup, SaGoalBuildupKind::CounterAttack);
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_pending_goal_context_event_count(engine) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_drain_goal_context_events(engine, ptr::null_mut(), 1) },
             0
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
@@ -3134,6 +3385,8 @@ mod tests {
         let mut emitted_mechanic_ids = HashSet::new();
         let mut pending_team_events = Vec::new();
         let mut emitted_team_event_ids = HashSet::new();
+        let mut pending_goal_context_events = Vec::new();
+        let mut emitted_goal_context_ids = HashSet::new();
         let timeline_events = ReplayStatsTimelineEvents {
             timeline: vec![
                 TimelineEvent {
@@ -3179,6 +3432,7 @@ mod tests {
                     is_team_0: Some(false),
                 },
             ],
+            goal_context: vec![goal_context_event(10, 1.09)],
             mechanics: vec![normalized_mechanic(
                 "speed_flip:15:0",
                 "speed_flip",
@@ -3203,6 +3457,8 @@ mod tests {
             &mut emitted_mechanic_ids,
             &mut pending_team_events,
             &mut emitted_team_event_ids,
+            &mut pending_goal_context_events,
+            &mut emitted_goal_context_ids,
             &timeline_events,
         );
 
@@ -3261,18 +3517,46 @@ mod tests {
         assert_eq!(pending_team_events[0].end_time, 1.6);
         assert_eq!(pending_team_events[0].attackers, 3);
         assert_eq!(pending_team_events[0].defenders, 2);
+        assert_eq!(pending_goal_context_events.len(), 1);
+        assert_eq!(pending_goal_context_events[0].frame_number, 10);
+        assert_eq!(pending_goal_context_events[0].time, 1.09);
+        assert_eq!(pending_goal_context_events[0].scoring_team_is_team_0, 0);
+        assert_eq!(pending_goal_context_events[0].has_scorer, 1);
+        assert_eq!(pending_goal_context_events[0].scorer_index, 1);
+        assert_eq!(
+            pending_goal_context_events[0].has_defending_team_most_back_player,
+            1
+        );
+        assert_eq!(
+            pending_goal_context_events[0].defending_team_most_back_player_index,
+            0
+        );
+        assert_eq!(pending_goal_context_events[0].has_ball_position, 1);
+        assert_eq!(pending_goal_context_events[0].ball_position.x, 1.0);
+        assert_eq!(
+            pending_goal_context_events[0].has_ball_air_time_before_goal,
+            1
+        );
+        assert_eq!(
+            pending_goal_context_events[0].goal_buildup,
+            SaGoalBuildupKind::CounterAttack
+        );
 
         pending_events.clear();
         pending_team_events.clear();
+        pending_goal_context_events.clear();
         push_drainable_events_from_timeline(
             &mut pending_events,
             &mut emitted_mechanic_ids,
             &mut pending_team_events,
             &mut emitted_team_event_ids,
+            &mut pending_goal_context_events,
+            &mut emitted_goal_context_ids,
             &timeline_events,
         );
         assert!(pending_events.is_empty());
         assert!(pending_team_events.is_empty());
+        assert!(pending_goal_context_events.is_empty());
     }
 
     #[test]

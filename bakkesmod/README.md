@@ -27,9 +27,10 @@ events, dodge-refresh transitions, and control state:
   `subtr_actor_bakkesmod_write_events_json`,
   `subtr_actor_bakkesmod_frame_json_len`, and
   `subtr_actor_bakkesmod_write_frame_json`
-- player-owned and team-owned drainable overlay events through
-  `subtr_actor_bakkesmod_drain_events` and
-  `subtr_actor_bakkesmod_drain_team_events`
+- player-owned, team-owned, and goal-context drainable overlay events through
+  `subtr_actor_bakkesmod_drain_events`,
+  `subtr_actor_bakkesmod_drain_team_events`, and
+  `subtr_actor_bakkesmod_drain_goal_context_events`
 - the full live `ReplayStatsTimeline` payload through
   `subtr_actor_bakkesmod_timeline_json_len` and
   `subtr_actor_bakkesmod_write_timeline_json`

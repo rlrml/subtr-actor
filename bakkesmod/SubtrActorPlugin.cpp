@@ -221,6 +221,29 @@ std::string teamEventLabel(const SaTeamEvent &event) {
   }
 }
 
+std::string goalBuildupLabel(SaGoalBuildupKind kind) {
+  switch (kind) {
+  case SaGoalBuildupKindCounterAttack:
+    return "counter attack";
+  case SaGoalBuildupKindSustainedPressure:
+    return "sustained pressure";
+  case SaGoalBuildupKindOther:
+    return "goal";
+  default:
+    return "goal";
+  }
+}
+
+std::string goalContextLabel(const SaGoalContextEvent &event) {
+  if (event.has_ball_air_time_before_goal != 0) {
+    return std::format(
+        "{} context ({:.1f}s air)",
+        goalBuildupLabel(event.goal_buildup),
+        event.ball_air_time_before_goal);
+  }
+  return std::format("{} context", goalBuildupLabel(event.goal_buildup));
+}
+
 std::filesystem::path currentModuleDirectory() {
   HMODULE module = nullptr;
   const BOOL foundModule = GetModuleHandleExW(
@@ -383,11 +406,14 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
   drainTeamEvents = reinterpret_cast<DrainTeamEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_team_events"));
+  drainGoalContextEvents = reinterpret_cast<DrainGoalContextEvents>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_goal_context_events"));
 
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
       !timelineJsonLen || !writeTimelineJson || !statsJsonLen || !writeStatsJson ||
-      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents) {
+      !graphInfoJsonLen || !writeGraphInfoJson || !drainEvents || !drainTeamEvents ||
+      !drainGoalContextEvents) {
     unloadRustLibrary();
     return false;
   }
@@ -426,6 +452,7 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeGraphInfoJson = nullptr;
   drainEvents = nullptr;
   drainTeamEvents = nullptr;
+  drainGoalContextEvents = nullptr;
 }
 
 void SubtrActorPlugin::tick(std::string) {
@@ -1063,7 +1090,7 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string>) {
 }
 
 void SubtrActorPlugin::drainPendingEvents() {
-  if (!engine || !drainEvents || !drainTeamEvents) {
+  if (!engine || !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
     return;
   }
 
@@ -1081,6 +1108,14 @@ void SubtrActorPlugin::drainPendingEvents() {
     count = drainTeamEvents(engine, teamEvents, 16);
     for (size_t i = 0; i < count; i += 1) {
       pushTeamEventMessage(teamEvents[i]);
+    }
+  } while (count == 16);
+
+  SaGoalContextEvent goalContextEvents[16];
+  do {
+    count = drainGoalContextEvents(engine, goalContextEvents, 16);
+    for (size_t i = 0; i < count; i += 1) {
+      pushGoalContextEventMessage(goalContextEvents[i]);
     }
   } while (count == 16);
 }
@@ -1111,6 +1146,16 @@ void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
                                 : teamEventLabel(event);
   OverlayMessage message{
       label,
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      std::chrono::steady_clock::now() + std::chrono::seconds(2),
+  };
+  messages.push_back(message);
+}
+
+void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &event) {
+  const bool isBlue = event.scoring_team_is_team_0 != 0;
+  OverlayMessage message{
+      goalContextLabel(event),
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       std::chrono::steady_clock::now() + std::chrono::seconds(2),
   };

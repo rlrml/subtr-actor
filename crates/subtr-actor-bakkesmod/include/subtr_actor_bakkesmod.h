@@ -220,6 +220,29 @@ typedef struct SaTeamEvent {
   float confidence;
 } SaTeamEvent;
 
+typedef enum SaGoalBuildupKind {
+  SaGoalBuildupKindCounterAttack = 1,
+  SaGoalBuildupKindSustainedPressure = 2,
+  SaGoalBuildupKindOther = 3,
+} SaGoalBuildupKind;
+
+typedef struct SaGoalContextEvent {
+  uint64_t frame_number;
+  float time;
+  uint8_t scoring_team_is_team_0;
+  uint8_t has_scorer;
+  uint32_t scorer_index;
+  uint8_t has_scoring_team_most_back_player;
+  uint32_t scoring_team_most_back_player_index;
+  uint8_t has_defending_team_most_back_player;
+  uint32_t defending_team_most_back_player_index;
+  uint8_t has_ball_position;
+  SaVec3 ball_position;
+  uint8_t has_ball_air_time_before_goal;
+  float ball_air_time_before_goal;
+  SaGoalBuildupKind goal_buildup;
+} SaGoalContextEvent;
+
 SaEngine *subtr_actor_bakkesmod_engine_create(void);
 void subtr_actor_bakkesmod_engine_destroy(SaEngine *engine);
 void subtr_actor_bakkesmod_engine_reset(SaEngine *engine);
@@ -227,6 +250,7 @@ int32_t subtr_actor_bakkesmod_finish(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame *frame);
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_pending_team_event_count(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_pending_goal_context_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_events_json(
     const SaEngine *engine,
@@ -259,6 +283,10 @@ size_t subtr_actor_bakkesmod_drain_events(
 size_t subtr_actor_bakkesmod_drain_team_events(
     SaEngine *engine,
     SaTeamEvent *out_events,
+    size_t max_events);
+size_t subtr_actor_bakkesmod_drain_goal_context_events(
+    SaEngine *engine,
+    SaGoalContextEvent *out_events,
     size_t max_events);
 
 #ifdef __cplusplus
