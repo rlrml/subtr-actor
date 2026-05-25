@@ -42,6 +42,25 @@ fn frame(frame_number: usize, time: f32) -> FrameInfo {
     }
 }
 
+fn active_fifty_fifty(team_zero_player: PlayerId, team_one_player: PlayerId) -> FiftyFiftyState {
+    FiftyFiftyState {
+        active_event: Some(ActiveFiftyFifty {
+            start_time: 0.0,
+            start_frame: 0,
+            last_touch_time: 0.1,
+            last_touch_frame: 1,
+            is_kickoff: false,
+            team_zero_player: Some(team_zero_player),
+            team_one_player: Some(team_one_player),
+            team_zero_position: [100.0, 0.0, 17.0],
+            team_one_position: [280.0, 0.0, 17.0],
+            midpoint: [190.0, 0.0, 17.0],
+            plane_normal: [1.0, 0.0, 0.0],
+        }),
+        ..FiftyFiftyState::default()
+    }
+}
+
 fn players(players: Vec<PlayerSample>) -> PlayerFrameState {
     PlayerFrameState { players }
 }
@@ -120,6 +139,114 @@ fn bump_detector_credits_player_with_clear_directional_impulse() {
         1
     );
     assert_eq!(calculator.team_zero_stats().bumps_inflicted, 1);
+}
+
+#[test]
+fn bump_detector_requires_clear_victim_impulse() {
+    let mut calculator = BumpCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(0.0, 0.0, 17.0),
+                    glam::Vec3::new(1000.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(260.0, 0.0, 17.0),
+                    glam::Vec3::ZERO,
+                ),
+            ]),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(1, 0.1),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(100.0, 0.0, 17.0),
+                    glam::Vec3::new(800.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(280.0, 0.0, 17.0),
+                    glam::Vec3::new(150.0, 0.0, 0.0),
+                ),
+            ]),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().is_empty());
+}
+
+#[test]
+fn bump_detector_suppresses_active_fifty_fifty_pair() {
+    let mut calculator = BumpCalculator::new();
+    let initiator_id = boxcars::RemoteId::Steam(1);
+    let victim_id = boxcars::RemoteId::Steam(2);
+
+    calculator
+        .update_with_fifty_fifty_state(
+            &frame(0, 0.0),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(0.0, 0.0, 17.0),
+                    glam::Vec3::new(1200.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(260.0, 0.0, 17.0),
+                    glam::Vec3::ZERO,
+                ),
+            ]),
+            &FrameEventsState::default(),
+            &active_fifty_fifty(initiator_id.clone(), victim_id.clone()),
+            true,
+        )
+        .unwrap();
+
+    calculator
+        .update_with_fifty_fifty_state(
+            &frame(1, 0.1),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(120.0, 0.0, 17.0),
+                    glam::Vec3::new(650.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(300.0, 0.0, 17.0),
+                    glam::Vec3::new(700.0, 0.0, 0.0),
+                ),
+            ]),
+            &FrameEventsState::default(),
+            &active_fifty_fifty(initiator_id, victim_id),
+            true,
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().is_empty());
 }
 
 #[test]

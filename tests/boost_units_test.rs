@@ -84,10 +84,12 @@ fn test_boost_unit_conversion_helpers() {
 
 #[test]
 fn test_boost_percentage_helper_new_replay() {
-    verify_replay_boost_units("assets/new_boost_format.replay");
+    verify_replay_boost_units(
+        "assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay",
+    );
 }
 
 #[test]
 fn test_boost_percentage_helper_old_replay() {
-    verify_replay_boost_units("assets/old_boost_format.replay");
+    verify_replay_boost_units("assets/replay-format-2022-09-29-v868-32-net10-legacy-boost.replay");
 }

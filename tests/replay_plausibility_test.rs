@@ -23,10 +23,10 @@ fn plausibility_report(path: &str) -> ReplayPlausibilityReport {
 #[test]
 fn modern_replay_motion_consistency_passes() {
     for path in [
-        "assets/old_boost_format.replay",
-        "assets/new_boost_format.replay",
-        "assets/tourny.replay",
-        "assets/dodges_refreshed_counter.replay",
+        "assets/replay-format-2022-09-29-v868-32-net10-legacy-boost.replay",
+        "assets/replay-format-2025-06-10-v868-32-net10-replicated-boost.replay",
+        "assets/replay-format-2020-09-25-v868-29-net10-tournament.replay",
+        "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
     ] {
         let report = plausibility_report(path);
         assert!(
@@ -60,7 +60,7 @@ fn modern_replay_motion_consistency_passes() {
 
 #[test]
 fn legacy_replay_rigid_body_normalization_passes() {
-    let path = "assets/rlcs.replay";
+    let path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let report = plausibility_report(path);
     assert!(
         report.all_motion_consistent(),
@@ -92,7 +92,7 @@ fn legacy_replay_rigid_body_normalization_passes() {
 
 #[test]
 fn legacy_replay_rotation_roll_matches_angular_velocity() {
-    let path = "assets/rlcs.replay";
+    let path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = common::parse_replay(path);
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)

@@ -65,7 +65,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
 
 #[test]
 fn evaluates_all_reducer_nodes_against_a_real_replay() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("graph should evaluate a real replay");
 

@@ -32,15 +32,17 @@ impl AnalysisNode for BumpNode {
             frame_info_dependency(),
             player_frame_state_dependency(),
             frame_events_state_dependency(),
+            fifty_fifty_state_dependency(),
             live_play_dependency(),
         ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.calculator.update(
+        self.calculator.update_with_fifty_fifty_state(
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,
+            ctx.get::<FiftyFiftyState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

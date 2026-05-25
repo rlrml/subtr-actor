@@ -64,7 +64,7 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
   );
 });
 
-test("buildMechanicTimelineEvents maps span mechanics to markers at the end frame", () => {
+test("buildMechanicTimelineEvents maps endpoint mechanics to markers at the end frame", () => {
   const replay = {
     frames: Array.from({ length: 4 }, (_, time) => ({ time })),
     players: [
@@ -108,6 +108,74 @@ test("buildMechanicTimelineEvents maps span mechanics to markers at the end fram
       color: "#3b82f6",
     },
   ]);
+});
+
+test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "ball_carry:1:3:0",
+        kind: "ball_carry",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+      {
+        id: "air_dribble:1:3:0",
+        kind: "air_dribble",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+      {
+        id: "double_tap:1:3:0",
+        kind: "double_tap",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    buildMechanicTimelineEvents(statsTimeline, replay, [
+      "air_dribble",
+      "ball_carry",
+      "double_tap",
+    ]).map((event) => event.id),
+    ["double_tap:1:3:0"],
+  );
 });
 
 test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
@@ -1593,7 +1661,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "wall-aerial-shot",
         "center",
         "double-tap",
-        "goal-context",
         "goal-tags",
         "one-timer",
         "pass",
@@ -1611,6 +1678,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    23,
+    22,
   );
 });

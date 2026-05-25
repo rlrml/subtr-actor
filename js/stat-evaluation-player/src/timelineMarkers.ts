@@ -25,6 +25,7 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   wavedash: "WD",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
+const RANGE_ONLY_MECHANIC_KINDS = new Set(["air_dribble", "ball_carry"]);
 
 function getReplayPlayerName(replay: ReplayModel, playerId: string): string {
   return replay.players.find((player) => player.id === playerId)?.name ?? playerId;
@@ -82,7 +83,12 @@ export function buildMechanicTimelineEvents(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter((event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)))
+    .filter(
+      (event) =>
+        isVisibleMechanicKind(event.kind) &&
+        !RANGE_ONLY_MECHANIC_KINDS.has(event.kind) &&
+        (!enabled || enabled.has(event.kind)),
+    )
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
       const playerName = playerNames.get(playerId) ?? playerId;
@@ -860,10 +866,6 @@ export function countEnabledTimelineEvents(
 
   if (active.has("fifty-fifty")) {
     count += buildFiftyFiftyTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("goal-context")) {
-    count += buildGoalContextTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("goal-tags")) {

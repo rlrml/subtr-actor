@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::StatsTimelineCollector;
+use subtr_actor::{GoalTagKind, StatsTimelineCollector};
 
 const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-05-24.replay";
 
@@ -27,5 +27,28 @@ fn detects_colonelpanic8_air_dribble_goal_roughly_at_goal_sequence() {
     assert!(
         common::mechanic_event_unsigned_property(event, "touch_count").unwrap_or(0) >= 3,
         "expected colonelpanic8 air dribble to include at least 3 touches"
+    );
+}
+
+#[test]
+fn does_not_tag_sixth_goal_as_half_volley() {
+    let replay = common::parse_replay(AIR_DRIBBLE_GOAL_MOUTH_REPLAY);
+    let timeline = StatsTimelineCollector::new()
+        .get_replay_data(&replay)
+        .expect("failed to collect stats timeline for air dribble goal replay");
+
+    assert!(
+        timeline.events.goal_context.len() >= 6,
+        "expected at least six goals in replay; got {:?}",
+        timeline.events.goal_context
+    );
+    assert!(
+        !timeline
+            .events
+            .goal_tags
+            .iter()
+            .any(|event| event.goal_index == 5 && event.kind == GoalTagKind::HalfVolleyGoal),
+        "expected sixth goal not to be tagged as a half volley; got {:?}",
+        timeline.events.goal_tags
     );
 }

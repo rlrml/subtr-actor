@@ -409,7 +409,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 
 #[test]
 fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -741,7 +741,7 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
 
 #[test]
 fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -783,7 +783,7 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
 
 #[test]
 fn test_stats_timeline_value_serializes_for_rlcs_replay() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let captured = StatsCollector::new()
         .capture_frames()
         .get_captured_data(&replay)
@@ -796,7 +796,7 @@ fn test_stats_timeline_value_serializes_for_rlcs_replay() {
 
 #[test]
 fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .expect("Expected replay data");
@@ -900,7 +900,8 @@ fn test_stats_timeline_old_replay_with_substitutions_discovers_late_players() {
 
 #[test]
 fn test_stats_timeline_boost_monotonic_dodges_replay() {
-    let replay = parse_replay("assets/dodges_refreshed_counter.replay");
+    let replay =
+        parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -984,7 +985,8 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
 
 #[test]
 fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
-    let replay = parse_replay("assets/dodges_refreshed_counter.replay");
+    let replay =
+        parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");
@@ -1029,7 +1031,8 @@ fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
 
 #[test]
 fn test_stats_timeline_first_kickoff_credits_both_players() {
-    let replay = parse_replay("assets/dodges_refreshed_counter.replay");
+    let replay =
+        parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
         .get_replay_data(&replay)
         .expect("Expected stats timeline data");

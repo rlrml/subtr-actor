@@ -5,6 +5,8 @@ const DEFAULT_HALF_VOLLEY_MIN_BALL_SPEED: f32 = 1000.0;
 const HALF_VOLLEY_FLOOR_BOUNCE_MAX_BALL_Z: f32 = BALL_RADIUS_Z + 45.0;
 const HALF_VOLLEY_FLOOR_BOUNCE_MIN_APPROACH_SPEED_Z: f32 = 250.0;
 const HALF_VOLLEY_FLOOR_BOUNCE_MIN_REBOUND_SPEED_Z: f32 = 150.0;
+const HALF_VOLLEY_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.35;
+const HALF_VOLLEY_MAX_GROUND_TO_DODGE_SECONDS: f32 = 0.45;
 const HALF_VOLLEY_GOAL_CENTER_Y: f32 = 5120.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -85,6 +87,17 @@ struct FloorBounce {
     frame: usize,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct GroundContact {
+    time: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct DodgeStart {
+    time: f32,
+    ground_contact: GroundContact,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct HalfVolleyCalculator {
     config: HalfVolleyCalculatorConfig,
@@ -93,6 +106,9 @@ pub struct HalfVolleyCalculator {
     team_one_stats: HalfVolleyTeamStats,
     events: Vec<HalfVolleyEvent>,
     last_floor_bounce: Option<FloorBounce>,
+    last_ground_contacts: HashMap<PlayerId, GroundContact>,
+    recent_dodge_starts: HashMap<PlayerId, DodgeStart>,
+    previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
     current_last_half_volley_player: Option<PlayerId>,
 }
@@ -181,6 +197,15 @@ impl HalfVolleyCalculator {
         if !(0.0..=self.config.max_bounce_to_touch_seconds).contains(&bounce_to_touch_seconds) {
             return None;
         }
+        let dodge_start = self.recent_dodge_starts.get(&player)?;
+        let dodge_to_touch_seconds = touch.time - dodge_start.time;
+        if !(0.0..=HALF_VOLLEY_MAX_DODGE_TO_TOUCH_SECONDS).contains(&dodge_to_touch_seconds) {
+            return None;
+        }
+        let ground_to_dodge_seconds = dodge_start.time - dodge_start.ground_contact.time;
+        if !(0.0..=HALF_VOLLEY_MAX_GROUND_TO_DODGE_SECONDS).contains(&ground_to_dodge_seconds) {
+            return None;
+        }
 
         let ball = ball.sample()?;
         let ball_position = ball.position();
@@ -237,20 +262,64 @@ impl HalfVolleyCalculator {
         self.events.push(event);
     }
 
+    fn update_player_movement_state(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        for player in &players.players {
+            if player
+                .position()
+                .is_some_and(|position| position.z <= PLAYER_GROUND_Z_THRESHOLD)
+            {
+                self.last_ground_contacts
+                    .insert(player.player_id.clone(), GroundContact { time: frame.time });
+            }
+
+            let was_dodge_active = self
+                .previous_dodge_active
+                .insert(player.player_id.clone(), player.dodge_active)
+                .unwrap_or(false);
+            if !player.dodge_active || was_dodge_active {
+                continue;
+            }
+
+            if let Some(ground_contact) = self.last_ground_contacts.get(&player.player_id) {
+                self.recent_dodge_starts.insert(
+                    player.player_id.clone(),
+                    DodgeStart {
+                        time: frame.time,
+                        ground_contact: ground_contact.clone(),
+                    },
+                );
+            }
+        }
+
+        self.recent_dodge_starts.retain(|_, dodge_start| {
+            frame.time - dodge_start.time <= HALF_VOLLEY_MAX_DODGE_TO_TOUCH_SECONDS
+        });
+        self.last_ground_contacts.retain(|_, ground_contact| {
+            frame.time - ground_contact.time
+                <= HALF_VOLLEY_MAX_GROUND_TO_DODGE_SECONDS + HALF_VOLLEY_MAX_DODGE_TO_TOUCH_SECONDS
+        });
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
+        players: &PlayerFrameState,
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.begin_sample(frame);
         if !live_play {
             self.last_floor_bounce = None;
+            self.last_ground_contacts.clear();
+            self.recent_dodge_starts.clear();
+            self.previous_dodge_active.clear();
             self.previous_ball_velocity = ball.velocity();
             self.current_last_half_volley_player = None;
             return Ok(());
         }
+
+        self.update_player_movement_state(frame, players);
 
         if let Some(bounce) = Self::detect_floor_bounce(
             frame,
