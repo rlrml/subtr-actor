@@ -1183,15 +1183,23 @@ void SubtrActorPlugin::recordTouch(CarWrapper car) {
     event.has_player = 1;
   }
 
-  PriWrapper pri = car.GetPRI();
-  event.is_team_0 = pri.IsNull() || pri.GetTeamNum() == 0 ? 1 : 0;
+  bool hasHitTeam = false;
   ServerWrapper server = gameWrapper->GetGameEventAsServer();
   if (!server.IsNull()) {
     BallWrapper ball = server.GetBall();
     if (!ball.IsNull()) {
+      const unsigned char hitTeam = ball.GetHitTeamNum();
+      if (hitTeam == 0 || hitTeam == 1) {
+        event.is_team_0 = hitTeam == 0 ? 1 : 0;
+        hasHitTeam = true;
+      }
       event.closest_approach_distance = (ball.GetLocation() - car.GetLocation()).magnitude();
       event.has_closest_approach_distance = 1;
     }
+  }
+  if (!hasHitTeam) {
+    PriWrapper pri = car.GetPRI();
+    event.is_team_0 = pri.IsNull() || pri.GetTeamNum() == 0 ? 1 : 0;
   }
   if (event.has_player != 0) {
     lastTouch = TouchAttribution{
