@@ -840,6 +840,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Own half goal";
   case SaMechanicKindPass:
     return "Pass";
+  case SaMechanicKindPassingGoal:
+    return "Passing goal";
   case SaMechanicKindSave:
     return "Save";
   case SaMechanicKindShot:

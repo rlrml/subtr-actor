@@ -261,10 +261,6 @@ impl AnalysisNode for StatsTimelineEventsNode {
     }
 }
 
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineEventsNode::new())
-}
-
 fn moment_mechanic_event(
     kind: &str,
     index: usize,

@@ -50,7 +50,7 @@ fn dynamic_stats_timeline_value_includes_normalized_mechanics_stream() {
         .capture_frames()
         .get_captured_data(&replay)
         .expect("failed to capture stats frames for double tap replay")
-        .into_stats_timeline_value()
+        .into_legacy_stats_timeline_value()
         .expect("failed to convert captured stats frames to timeline value");
 
     let mechanics = value["events"]["mechanics"]

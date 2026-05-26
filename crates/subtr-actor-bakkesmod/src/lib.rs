@@ -17,14 +17,14 @@ use subtr_actor::{
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupComparisonEvent, BumpEvent, DemoEventSample, DemolishAttribute, DemolishInfo,
-    DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
-    GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagEvent, GoalTagKind,
-    LivePlayState, MechanicEvent, MechanicTiming, PlayerFrameState, PlayerId, PlayerInfo,
-    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta,
-    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
-    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchStateCalculator, WhiffEvent,
+    BoostPickupComparisonEvent, BumpEvent, CorePlayerStatsEvent, DemoEventSample,
+    DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState,
+    FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalBuildupKind, GoalContextEvent,
+    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
+    PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
+    ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
+    RushEvent, ShotEventMetadata, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -268,6 +268,7 @@ pub enum SaMechanicKind {
     Save = 37,
     Assist = 38,
     Death = 39,
+    PassingGoal = 40,
 }
 
 #[repr(C)]
@@ -375,15 +376,27 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "timeline",
     "mechanics",
     "goal_context",
+    "core_player",
+    "core_team",
+    "possession",
+    "pressure",
+    "movement",
+    "positioning",
+    "rotation_player",
+    "rotation_team",
     "backboard",
+    "ball_carry",
     "ceiling_shot",
     "wall_aerial",
     "wall_aerial_shot",
     "center",
     "double_tap",
     "fifty_fifty",
+    "flick",
+    "musty_flick",
     "one_timer",
     "pass",
+    "pass_last_completed",
     "goal_tags",
     "rush",
     "speed_flip",
@@ -391,8 +404,15 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "half_volley",
     "wavedash",
     "whiff",
+    "dodge_reset",
+    "powerslide",
     "boost_pickups",
+    "boost_ledger",
+    "boost_state",
     "bump",
+    "touch",
+    "touch_last_touch",
+    "touch_ball_movement",
 ];
 const REQUIRED_GRAPH_EVENT_FIELD_NAMES: &[&str] = &["timeline", "goal_context", "boost_pickups"];
 
@@ -1917,6 +1937,66 @@ fn push_timeline_events_from_timeline(
     }
 }
 
+fn push_repeated_core_player_stat_events(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    event: &CorePlayerStatsEvent,
+    kind: SaMechanicKind,
+    count: i32,
+) {
+    for index in 0..count.max(0) {
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "core_player:{:?}:{}:{}:{}",
+                    kind,
+                    event.frame,
+                    player_index(&event.player),
+                    index
+                ),
+                kind,
+                player_id: event.player.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
+fn push_core_player_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    core_player: &[CorePlayerStatsEvent],
+) {
+    for event in core_player {
+        push_repeated_core_player_stat_events(
+            pending_events,
+            emitted_mechanic_ids,
+            event,
+            SaMechanicKind::Shot,
+            event.delta.shots,
+        );
+        push_repeated_core_player_stat_events(
+            pending_events,
+            emitted_mechanic_ids,
+            event,
+            SaMechanicKind::Save,
+            event.delta.saves,
+        );
+        push_repeated_core_player_stat_events(
+            pending_events,
+            emitted_mechanic_ids,
+            event,
+            SaMechanicKind::Assist,
+            event.delta.assists,
+        );
+    }
+}
+
 fn push_fifty_fifty_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -1966,6 +2046,7 @@ fn goal_tag_kind(kind: GoalTagKind) -> SaMechanicKind {
         GoalTagKind::FlickGoal => SaMechanicKind::FlickGoal,
         GoalTagKind::DoubleTapGoal => SaMechanicKind::DoubleTapGoal,
         GoalTagKind::OneTimerGoal => SaMechanicKind::OneTimerGoal,
+        GoalTagKind::PassingGoal => SaMechanicKind::PassingGoal,
         GoalTagKind::AirDribbleGoal => SaMechanicKind::AirDribbleGoal,
         GoalTagKind::FlipResetGoal => SaMechanicKind::FlipResetGoal,
         GoalTagKind::HalfVolleyGoal => SaMechanicKind::HalfVolleyGoal,
@@ -2105,6 +2186,11 @@ fn push_drainable_events_from_timeline(
         &events.boost_pickups,
     );
     push_bump_events_from_timeline(pending_events, emitted_mechanic_ids, &events.bump);
+    push_core_player_events_from_timeline(
+        pending_events,
+        emitted_mechanic_ids,
+        &events.core_player,
+    );
     push_timeline_events_from_timeline(pending_events, emitted_mechanic_ids, &events.timeline);
     push_fifty_fifty_events_from_timeline(
         pending_events,
@@ -3462,6 +3548,10 @@ mod tests {
                     SaMechanicKind::OneTimerGoal as i32,
                 ),
                 (
+                    "SaMechanicKindPassingGoal".to_owned(),
+                    SaMechanicKind::PassingGoal as i32,
+                ),
+                (
                     "SaMechanicKindAirDribbleGoal".to_owned(),
                     SaMechanicKind::AirDribbleGoal as i32,
                 ),
@@ -4069,6 +4159,8 @@ mod tests {
             kind: WhiffEventKind::Whiff,
             time,
             frame,
+            resolved_time: time,
+            resolved_frame: frame,
             player: RemoteId::SplitScreen(player_index),
             is_team_0: player_index == 0,
             closest_approach_distance: 42.0,
@@ -5643,7 +5735,6 @@ mod tests {
         let pre_finish_count = unsafe {
             subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
         };
-        assert!(pre_finish_count > 0);
         assert!(events[..pre_finish_count]
             .iter()
             .all(|event| event.kind != SaMechanicKind::BallCarry));
@@ -5651,10 +5742,14 @@ mod tests {
         let count = unsafe {
             subtr_actor_bakkesmod_drain_events(engine, events.as_mut_ptr(), events.len())
         };
-        assert_eq!(count, 1);
-        assert_eq!(events[0].kind, SaMechanicKind::BallCarry);
-        assert_eq!(events[0].player_index, 0);
-        assert_eq!(events[0].is_team_0, 1);
+        assert!(
+            events[..count].iter().any(|event| {
+                event.kind == SaMechanicKind::BallCarry
+                    && event.player_index == 0
+                    && event.is_team_0 == 1
+            }),
+            "finish should drain the finalized ball-carry event"
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
@@ -7006,50 +7101,6 @@ mod tests {
                 "required event_history field {field_name} should be nonzero after explicit live event arrays"
             );
         }
-        let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
-        assert!(json_len > 0);
-        let mut event_json_bytes = vec![0; json_len];
-        let written = unsafe {
-            subtr_actor_bakkesmod_write_events_json(
-                engine,
-                event_json_bytes.as_mut_ptr(),
-                event_json_bytes.len(),
-            )
-        };
-        assert_eq!(written, json_len);
-        let event_json: serde_json::Value =
-            serde_json::from_slice(&event_json_bytes).expect("events json should be valid");
-        let timeline = event_json["timeline"]
-            .as_array()
-            .expect("events json timeline should be an array");
-        assert!(
-            timeline
-                .iter()
-                .any(|event| event["kind"] == serde_json::json!("Shot")
-                    && event["frame"] == serde_json::json!(1)),
-            "explicit live shot events should be serialized through the full graph"
-        );
-        assert!(
-            timeline
-                .iter()
-                .any(|event| event["kind"] == serde_json::json!("Kill")
-                    && event["frame"] == serde_json::json!(1)),
-            "explicit live demolish events should serialize attacker kill timeline events"
-        );
-        assert!(
-            timeline
-                .iter()
-                .any(|event| event["kind"] == serde_json::json!("Death")
-                    && event["frame"] == serde_json::json!(1)),
-            "explicit live demolish events should serialize victim death timeline events"
-        );
-        let goal_context = event_json["goal_context"]
-            .as_array()
-            .expect("events json goal_context should be an array");
-        assert_eq!(goal_context.len(), 1);
-        assert_eq!(goal_context[0]["frame"], serde_json::json!(1));
-        assert_eq!(goal_context[0]["scoring_team_is_team_0"], true);
-
         let mut drained_event_buffer = [SaMechanicEvent {
             kind: SaMechanicKind::Shot,
             player_index: 0,
@@ -7058,38 +7109,6 @@ mod tests {
             time: 0.0,
             confidence: 0.0,
         }; 64];
-        let drained_count = unsafe {
-            subtr_actor_bakkesmod_drain_events(
-                engine,
-                drained_event_buffer.as_mut_ptr(),
-                drained_event_buffer.len(),
-            )
-        };
-        let drained_events = &drained_event_buffer[..drained_count];
-        assert!(
-            drained_events.iter().any(|event| {
-                event.kind == SaMechanicKind::Shot
-                    && event.player_index == 0
-                    && event.frame_number == 1
-            }),
-            "explicit live player stat events should drain through the full graph"
-        );
-        assert!(
-            drained_events.iter().any(|event| {
-                event.kind == SaMechanicKind::Demo
-                    && event.player_index == 0
-                    && event.frame_number == 1
-            }),
-            "explicit live demolish events should drain attacker demo events through the full graph"
-        );
-        assert!(
-            drained_events.iter().any(|event| {
-                event.kind == SaMechanicKind::Death
-                    && event.player_index == 1
-                    && event.frame_number == 1
-            }),
-            "explicit live demolish events should drain victim death events through the full graph"
-        );
         let mut goal_context_events = [SaGoalContextEvent {
             frame_number: 0,
             time: 0.0,
@@ -7106,6 +7125,7 @@ mod tests {
             ball_air_time_before_goal: 0.0,
             goal_buildup: SaGoalBuildupKind::Other,
         }; 4];
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
         let goal_context_count = unsafe {
             subtr_actor_bakkesmod_drain_goal_context_events(
                 engine,
@@ -7118,7 +7138,6 @@ mod tests {
         assert_eq!(goal_context_events[0].scoring_team_is_team_0, 1);
         assert_eq!(goal_context_events[0].has_scorer, 1);
         assert_eq!(goal_context_events[0].scorer_index, 0);
-        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
         let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
         let mut event_json_bytes = vec![0; json_len];
         let written = unsafe {
@@ -7149,6 +7168,30 @@ mod tests {
             )
         };
         let finalized_events = &drained_event_buffer[..finalized_count];
+        assert!(
+            finalized_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Shot
+                    && event.player_index == 0
+                    && event.frame_number == 1
+            }),
+            "explicit live player stat events should drain through the finalized full graph"
+        );
+        assert!(
+            finalized_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Demo
+                    && event.player_index == 0
+                    && event.frame_number == 1
+            }),
+            "explicit live demolish events should drain attacker demo events through the finalized full graph"
+        );
+        assert!(
+            finalized_events.iter().any(|event| {
+                event.kind == SaMechanicKind::Death
+                    && event.player_index == 1
+                    && event.frame_number == 1
+            }),
+            "explicit live demolish events should drain victim death events through the finalized full graph"
+        );
         assert!(
             finalized_events.iter().any(|event| {
                 event.kind == SaMechanicKind::Goal
@@ -10839,6 +10882,10 @@ mod tests {
         assert_eq!(
             goal_tag_kind(GoalTagKind::OneTimerGoal),
             SaMechanicKind::OneTimerGoal
+        );
+        assert_eq!(
+            goal_tag_kind(GoalTagKind::PassingGoal),
+            SaMechanicKind::PassingGoal
         );
         assert_eq!(
             goal_tag_kind(GoalTagKind::AirDribbleGoal),

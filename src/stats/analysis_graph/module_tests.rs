@@ -6,8 +6,8 @@ use crate::{
     EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
     HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
     LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState,
-    RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
+    PossessionState, RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
     WallAerialShotCalculator,
 };
 use std::collections::HashSet;
@@ -165,7 +165,7 @@ fn continuous_ball_control_is_directly_callable() {
 
 #[test]
 fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("graph should evaluate a real replay");
 
@@ -254,7 +254,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
 
 #[test]
 fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
-    let replay = parse_replay("assets/rlcs.replay");
+    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("full graph should evaluate a real replay");
     let graph_events = graph
@@ -264,7 +264,7 @@ fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
         .clone();
 
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("stats timeline collector should evaluate the same replay");
 
     assert_eq!(graph_events, timeline.events);
