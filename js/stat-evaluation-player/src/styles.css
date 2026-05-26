@@ -355,6 +355,10 @@ input {
   width: min(30rem, calc(100vw - 1.6rem));
 }
 
+.floating-window-replay-loading {
+  width: min(32rem, calc(100vw - 1.6rem));
+}
+
 .floating-window-boost-pickups {
   width: min(34rem, calc(100vw - 1.6rem));
 }
@@ -669,9 +673,29 @@ input {
   gap: var(--ui-gap-xs);
 }
 
-.mechanics-review-replay-loads {
+.replay-loading-window-body {
+  display: grid;
+  gap: var(--ui-gap-sm);
+}
+
+.replay-loading-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-sm);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.replay-loading-list {
+  max-height: min(38rem, calc(100dvh - 9rem));
+  overflow: auto;
   display: grid;
   gap: var(--ui-gap-xs);
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
 }
 
 .mechanics-review-replay-load {

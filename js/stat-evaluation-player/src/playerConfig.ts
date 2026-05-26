@@ -25,6 +25,7 @@ export type SingletonWindowId =
   | "mechanics"
   | "event-playlist"
   | "mechanics-review"
+  | "replay-loading"
   | "boost-pickups"
   | "touch-controls";
 export type ConfigWindowKind = SingletonWindowId | "stats";
@@ -421,6 +422,7 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "mechanics" ||
     value === "event-playlist" ||
     value === "mechanics-review" ||
+    value === "replay-loading" ||
     value === "boost-pickups" ||
     value === "touch-controls"
   );
