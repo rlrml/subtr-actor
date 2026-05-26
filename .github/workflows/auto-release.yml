@@ -16,7 +16,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-release]')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
