@@ -99,9 +99,11 @@ jobs:
           Assert-Contains $pluginText "live frame processing failed" "BakkesMod live frame processing diagnostics"
           Assert-Contains $pluginText "live graph finalization failed during" "BakkesMod finalization diagnostics"
           Assert-Contains $pluginText "plugin unload" "BakkesMod unload finalization context"
-          Assert-Contains $pluginText "subtr_actor_dump_graph_output <events|frame|timeline|stats|analysis_nodes|graph_info> [finish]" "graph output command usage"
+          Assert-Contains $pluginText "subtr_actor_dump_graph_output <events|frame|timeline|stats|analysis_nodes|event_history|graph_info> [finish]" "graph output command usage"
           Assert-Contains $pluginText "graph-analysis-nodes.json" "bulk analysis-node dump filename"
+          Assert-Contains $pluginText "graph-event-history.json" "live event-history dump filename"
           Assert-Contains $pluginText "analysis_nodes" "analysis_nodes graph output name"
+          Assert-Contains $pluginText "event_history" "event_history graph output name"
           Assert-Contains $pluginText "subtr_actor_bakkesmod_analysis_node_names_json_len" "analysis node names registry loader"
 
           $rustText = Read-ArtifactText $rustDll
@@ -114,6 +116,7 @@ jobs:
           Assert-Contains $rustText "callable_analysis_node_names" "callable analysis-node registry"
           Assert-Contains $rustText "builtin_analysis_node_names" "builtin analysis-node registry"
           Assert-Contains $rustText "analysis_nodes" "analysis_nodes graph output"
+          Assert-Contains $rustText "event_history" "event_history graph output"
           Assert-Contains $rustText "stats_timeline_events" "stats timeline analysis node"
 
       - name: Upload plugin artifacts

@@ -343,6 +343,7 @@ pub struct SaEngine {
     timeline_json: Vec<u8>,
     stats_json: Vec<u8>,
     analysis_nodes_json: Vec<u8>,
+    event_history_json: Vec<u8>,
     graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
@@ -356,6 +357,7 @@ const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
     "timeline",
     "stats",
     "analysis_nodes",
+    "event_history",
     "graph_info",
 ];
 
@@ -378,6 +380,7 @@ impl Default for SaEngine {
             timeline_json: Vec::new(),
             stats_json: Vec::new(),
             analysis_nodes_json: Vec::new(),
+            event_history_json: Vec::new(),
             graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
@@ -2355,9 +2358,34 @@ fn live_graph_output_bytes<'a>(engine: &'a SaEngine, output_name: &str) -> Optio
         "timeline" => Some(&engine.timeline_json),
         "stats" => Some(&engine.stats_json),
         "analysis_nodes" => Some(&engine.analysis_nodes_json),
+        "event_history" => Some(&engine.event_history_json),
         "graph_info" => Some(&engine.graph_info_json),
         _ => None,
     }
+}
+
+fn serialize_live_event_history(engine: &SaEngine) -> Vec<u8> {
+    let active_demos: Vec<_> = engine
+        .live_events
+        .active_demos
+        .iter()
+        .map(|active_demo| {
+            serde_json::json!({
+                "attacker": &active_demo.sample.attacker,
+                "victim": &active_demo.sample.victim,
+            })
+        })
+        .collect();
+    serde_json::to_vec(&serde_json::json!({
+        "active_demos": active_demos,
+        "demo_events": &engine.live_event_history.demo_events,
+        "boost_pad_events": &engine.live_event_history.boost_pad_events,
+        "touch_events": &engine.live_event_history.touch_events,
+        "dodge_refreshed_events": &engine.live_event_history.dodge_refreshed_events,
+        "player_stat_events": &engine.live_event_history.player_stat_events,
+        "goal_events": &engine.live_event_history.goal_events,
+    }))
+    .unwrap_or_default()
 }
 
 fn refresh_timeline_graph_views(engine: &mut SaEngine) {
@@ -2371,6 +2399,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         engine.timeline_json.clear();
         engine.stats_json.clear();
         engine.analysis_nodes_json.clear();
+        engine.event_history_json = serialize_live_event_history(engine);
         return;
     };
     push_drainable_events_from_timeline(
@@ -2397,6 +2426,7 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
     );
     engine.stats_json = serialize_stats_graph_snapshot(engine);
     engine.analysis_nodes_json = serialize_analysis_nodes_snapshot(engine);
+    engine.event_history_json = serialize_live_event_history(engine);
 }
 
 /// Creates an opaque live-analysis engine.
@@ -6725,6 +6755,44 @@ mod tests {
             frame_events_node,
             "bulk analysis_nodes output should include the callable frame_events_state payload"
         );
+        let event_history = live_graph_output_json_value(engine, "event_history");
+        assert_eq!(
+            event_history["touch_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            event_history["dodge_refreshed_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            event_history["boost_pad_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            event_history["goal_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            event_history["player_stat_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            event_history["demo_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            event_history["active_demos"].as_array().unwrap().len(),
+            1
+        );
         let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
         assert!(json_len > 0);
         let mut event_json_bytes = vec![0; json_len];
@@ -6881,6 +6949,81 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_event_history_output_remains_after_frame_events_advance() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 2000.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 10.0,
+            has_closest_approach_distance: 1,
+        }];
+        let mut first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        first.touches = touches.as_ptr();
+        first.touch_count = touches.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+
+        let second = live_frame(
+            2,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let frame_events_node = live_analysis_node_json_value(engine, "frame_events_state");
+        assert_eq!(
+            frame_events_node["touch_events"].as_array().unwrap().len(),
+            0,
+            "frame_events_state should expose only the current frame's raw events"
+        );
+        let event_history = live_graph_output_json_value(engine, "event_history");
+        assert_eq!(
+            event_history["touch_events"].as_array().unwrap().len(),
+            1,
+            "event_history should preserve raw live events after frame_events_state advances"
+        );
+        assert_eq!(
+            event_history["touch_events"][0]["frame"],
+            serde_json::json!(1)
+        );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

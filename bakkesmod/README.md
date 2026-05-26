@@ -21,8 +21,8 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   the same module-keyed frame snapshot and config surfaces by name.
   The `subtr_actor_dump_graph_output <output_name> [finish]` console command
   writes one named graph output (`events`, `frame`, `timeline`, `stats`,
-  `analysis_nodes`, or `graph_info`) using the output names reported in
-  `graph-info.json`.
+  `analysis_nodes`, `event_history`, or `graph_info`) using the output names
+  reported in `graph-info.json`.
   The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
   writes one callable analysis node by name, using the callable node-name
   registry exposed by the Rust ABI.
@@ -55,6 +55,9 @@ events, dodge-refresh transitions, and control state:
   `subtr_actor_bakkesmod_stats_json_len` and
   `subtr_actor_bakkesmod_write_stats_json`
 - the full callable analysis-node output map through the `analysis_nodes` named
+  graph output, using `subtr_actor_bakkesmod_graph_output_json_len` and
+  `subtr_actor_bakkesmod_write_graph_output_json`
+- cumulative raw live event-family history through the `event_history` named
   graph output, using `subtr_actor_bakkesmod_graph_output_json_len` and
   `subtr_actor_bakkesmod_write_graph_output_json`
 - the resolved graph DAG, callable node registry, builtin node registry, and stats module registry through
@@ -111,7 +114,7 @@ acceptance check for live graph callability and event-generation parity.
 
    The BakkesMod console should log `subtr-actor: graph verification passed`
    along with nonzero byte sizes for `events`, `frame`, `timeline`, `stats`,
-   `analysis_nodes`, `graph_info`, every graph output name reported by
+   `analysis_nodes`, `event_history`, `graph_info`, every graph output name reported by
    `graph_info`, every builtin stats module surface (`module`, `frame`, and
    `config`), and every name reported by the callable analysis-node name
    registry. It should also log that every resolved graph node is callable by
@@ -134,16 +137,21 @@ acceptance check for live graph callability and event-generation parity.
 
    BakkesMod should write these files under `data\subtr-actor`:
    `graph-events.json`, `graph-frame.json`, `graph-timeline.json`,
-   `graph-stats.json`, `graph-analysis-nodes.json`, and `graph-info.json`.
-   `graph-info.json` should list `analysis_nodes` in `graph_output_names`, and
-   `callable_analysis_node_names` should match the names verified by
+   `graph-stats.json`, `graph-analysis-nodes.json`,
+   `graph-event-history.json`, and `graph-info.json`.
+   `graph-info.json` should list `analysis_nodes` and `event_history` in
+   `graph_output_names`, and `callable_analysis_node_names` should match the names verified by
    `subtr_actor_verify_graph`.
    `graph-analysis-nodes.json` should contain keys for every node reported by
    `callable_analysis_node_names`.
+   `graph-event-history.json` should contain cumulative raw live event-family
+   arrays, so events exercised earlier remain visible after
+   `frame_events_state` advances to a later frame.
 5. Spot-check individual call paths:
 
    ```text
    subtr_actor_dump_graph_output analysis_nodes finish
+   subtr_actor_dump_graph_output event_history finish
    subtr_actor_dump_analysis_node stats_timeline_events finish
    subtr_actor_dump_analysis_node frame_events_state finish
    ```
@@ -156,6 +164,9 @@ acceptance check for live graph callability and event-generation parity.
    the arrays corresponding to exercised events should contain entries. The
    verifier log should also report nonzero entry counts for the matching
    exercised event-family fields.
+   If `frame_events_state` has advanced past the event frame, use
+   `graph-output-event_history.json` or `graph-event-history.json` for the
+   cumulative raw event-family counts.
 
 ## Linux/Nix support
 

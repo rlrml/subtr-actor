@@ -28,13 +28,14 @@ constexpr char GOAL_SCORED_EVENT[] = "Function TAGame.GameEvent_Soccar_TA.EventG
 constexpr char CAR_DEMOLISHED_EVENT[] = "Function TAGame.Car_TA.Demolish";
 constexpr char GRAPH_OUTPUT_USAGE[] =
     "subtr_actor_dump_graph_output "
-    "<events|frame|timeline|stats|analysis_nodes|graph_info> [finish]";
-constexpr std::array<const char *, 6> VERIFY_GRAPH_OUTPUTS{
+    "<events|frame|timeline|stats|analysis_nodes|event_history|graph_info> [finish]";
+constexpr std::array<const char *, 7> VERIFY_GRAPH_OUTPUTS{
     "events",
     "frame",
     "timeline",
     "stats",
     "analysis_nodes",
+    "event_history",
     "graph_info",
 };
 constexpr char FRAME_EVENTS_STATE_NODE[] = "frame_events_state";
@@ -1972,12 +1973,15 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   const std::string statsJson = readJsonBuffer(statsJsonLen, writeStatsJson);
   const std::string analysisNodesJson =
       readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "analysis_nodes");
+  const std::string eventHistoryJson =
+      readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "event_history");
   const std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
   const std::filesystem::path eventsPath = outputDirectory / "graph-events.json";
   const std::filesystem::path framePath = outputDirectory / "graph-frame.json";
   const std::filesystem::path timelinePath = outputDirectory / "graph-timeline.json";
   const std::filesystem::path statsPath = outputDirectory / "graph-stats.json";
   const std::filesystem::path analysisNodesPath = outputDirectory / "graph-analysis-nodes.json";
+  const std::filesystem::path eventHistoryPath = outputDirectory / "graph-event-history.json";
   const std::filesystem::path graphInfoPath = outputDirectory / "graph-info.json";
 
   std::ofstream eventsFile(eventsPath, std::ios::binary);
@@ -1991,18 +1995,21 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
   std::ofstream analysisNodesFile(analysisNodesPath, std::ios::binary);
   analysisNodesFile.write(
       analysisNodesJson.data(), static_cast<std::streamsize>(analysisNodesJson.size()));
+  std::ofstream eventHistoryFile(eventHistoryPath, std::ios::binary);
+  eventHistoryFile.write(
+      eventHistoryJson.data(), static_cast<std::streamsize>(eventHistoryJson.size()));
   std::ofstream graphInfoFile(graphInfoPath, std::ios::binary);
   graphInfoFile.write(graphInfoJson.data(), static_cast<std::streamsize>(graphInfoJson.size()));
 
   if (!eventsFile || !frameFile || !timelineFile || !statsFile || !analysisNodesFile ||
-      !graphInfoFile) {
+      !eventHistoryFile || !graphInfoFile) {
     cvarManager->log("subtr-actor: failed to write graph JSON snapshots");
     return;
   }
 
   cvarManager->log(std::format(
       "subtr-actor: wrote graph JSON snapshots{}: {} ({} bytes), {} ({} bytes), "
-      "{} ({} bytes), {} ({} bytes), {} ({} bytes), {} ({} bytes)",
+      "{} ({} bytes), {} ({} bytes), {} ({} bytes), {} ({} bytes), {} ({} bytes)",
       shouldFinish ? " after finish" : "",
       eventsPath.string(),
       eventsJson.size(),
@@ -2014,6 +2021,8 @@ void SubtrActorPlugin::dumpGraphJson(std::vector<std::string> params) {
       statsJson.size(),
       analysisNodesPath.string(),
       analysisNodesJson.size(),
+      eventHistoryPath.string(),
+      eventHistoryJson.size(),
       graphInfoPath.string(),
       graphInfoJson.size()));
 }
