@@ -121,7 +121,8 @@ acceptance check for live graph callability and event-generation parity.
    name, that named graph outputs match the fixed ABI outputs, that
    `analysis_nodes` contains exactly the callable analysis nodes, and that
    `frame_events_state` exposes every live event family field with an entry
-   count for each field.
+   count for each field. It should also report cumulative `event_history`
+   entry counts for the same event-family fields.
 3. Exercise live events that should be visible to the graph: touch the ball,
    trigger a dodge refresh or flip reset setup when possible, pick up a boost
    pad, generate shot/save/assist match-stat deltas, score a goal, and trigger
@@ -166,7 +167,8 @@ acceptance check for live graph callability and event-generation parity.
    exercised event-family fields.
    If `frame_events_state` has advanced past the event frame, use
    `graph-output-event_history.json` or `graph-event-history.json` for the
-   cumulative raw event-family counts.
+   cumulative raw event-family counts, or rerun `subtr_actor_verify_graph` and
+   inspect the cumulative `event_history` counts in the console.
 
 ## Linux/Nix support
 

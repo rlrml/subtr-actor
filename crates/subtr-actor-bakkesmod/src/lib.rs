@@ -2917,8 +2917,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_config_json(
 /// Returns the UTF-8 byte length of one named live graph output JSON payload.
 ///
 /// `output_name` must be one of `events`, `frame`, `timeline`, `stats`,
-/// `analysis_nodes`, or `graph_info`, which are also reported by graph info
-/// JSON.
+/// `analysis_nodes`, `event_history`, or `graph_info`, which are also reported
+/// by graph info JSON.
 ///
 /// # Safety
 ///
@@ -8504,6 +8504,15 @@ mod tests {
         assert_eq!(
             live_graph_output_json_value(engine, "stats"),
             live_stats_json_value(engine)
+        );
+        let event_history = live_graph_output_json_value(engine, "event_history");
+        assert_eq!(
+            event_history["touch_events"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            event_history["touch_events"][0]["frame"],
+            serde_json::json!(1)
         );
         let analysis_nodes = live_graph_output_json_value(engine, "analysis_nodes");
         assert_eq!(
