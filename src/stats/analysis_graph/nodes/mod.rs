@@ -9,10 +9,10 @@ use crate::stats::calculators::{
     HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, LivePlayState,
     LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
     OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
-    PlayerFrameState, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
-    PossessionState, PowerslideCalculator, PressureCalculator, RotationCalculator, RushCalculator,
-    SpeedFlipCalculator, TouchCalculator, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    PassingGoalCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
+    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
+    RotationCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -102,7 +102,7 @@ pub use gameplay_state::GameplayStateNode;
 pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, CounterAttackGoalNode, EmptyNetGoalNode, FlickGoalNode,
     FlipResetGoalNode, HalfVolleyGoalNode, HighAerialGoalNode, LongDistanceGoalNode,
-    OneTimerGoalNode, OwnHalfGoalNode,
+    OneTimerGoalNode, OwnHalfGoalNode, PassingGoalNode,
 };
 #[allow(unused_imports)]
 pub use half_flip::HalfFlipNode;
@@ -263,6 +263,10 @@ pub(crate) fn double_tap_goal_dependency() -> AnalysisDependency {
 
 pub(crate) fn one_timer_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<OneTimerGoalCalculator>(goal_tags::boxed_one_timer_goal)
+}
+
+pub(crate) fn passing_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<PassingGoalCalculator>(goal_tags::boxed_passing_goal)
 }
 
 pub(crate) fn air_dribble_goal_dependency() -> AnalysisDependency {

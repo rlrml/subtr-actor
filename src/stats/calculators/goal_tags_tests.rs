@@ -135,6 +135,24 @@ fn one_timer_event(time: f32, frame: usize, player: PlayerId) -> OneTimerEvent {
     }
 }
 
+fn pass_event(time: f32, frame: usize, passer: PlayerId, receiver: PlayerId) -> PassEvent {
+    PassEvent {
+        time,
+        frame,
+        sample_time: time,
+        sample_frame: frame,
+        passer,
+        receiver,
+        is_team_0: true,
+        start_time: time - 1.0,
+        start_frame: frame.saturating_sub(10),
+        duration: 1.0,
+        ball_travel_distance: 1200.0,
+        ball_advance_distance: 800.0,
+        pass_kind: PassKind::Direct,
+    }
+}
+
 fn double_tap_event(time: f32, frame: usize, player: PlayerId) -> DoubleTapEvent {
     DoubleTapEvent {
         time,
@@ -396,6 +414,33 @@ fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::OneTimer));
+}
+
+#[test]
+fn passing_goal_tags_pass_received_by_scorer_on_last_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
+    let events = PassingGoalCalculator::new()
+        .tag_goals(&[goal], &[pass_event(9.5, 95, player_id(2), player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::PassingGoal]);
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert_eq!(
+        events[0]
+            .evidence
+            .iter()
+            .find(|evidence| evidence.kind == GoalTagEvidenceKind::Pass)
+            .and_then(|evidence| evidence.player.as_ref()),
+        Some(&player_id(2))
+    );
+}
+
+#[test]
+fn passing_goal_rejects_pass_not_received_by_scorer() {
+    let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
+    let events = PassingGoalCalculator::new()
+        .tag_goals(&[goal], &[pass_event(9.5, 95, player_id(2), player_id(3))]);
+
+    assert!(events.is_empty());
 }
 
 #[test]

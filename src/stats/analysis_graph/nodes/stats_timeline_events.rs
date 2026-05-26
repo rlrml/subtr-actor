@@ -62,6 +62,7 @@ impl StatsTimelineEventsNode {
             flick_goal_dependency(),
             double_tap_goal_dependency(),
             one_timer_goal_dependency(),
+            passing_goal_dependency(),
             air_dribble_goal_dependency(),
             flip_reset_goal_dependency(),
             half_volley_goal_dependency(),
@@ -98,6 +99,7 @@ impl StatsTimelineEventsNode {
         let flick_goal = ctx.get::<FlickGoalCalculator>()?;
         let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
         let one_timer_goal = ctx.get::<OneTimerGoalCalculator>()?;
+        let passing_goal = ctx.get::<PassingGoalCalculator>()?;
         let air_dribble_goal = ctx.get::<AirDribbleGoalCalculator>()?;
         let flip_reset_goal = ctx.get::<FlipResetGoalCalculator>()?;
         let half_volley_goal = ctx.get::<HalfVolleyGoalCalculator>()?;
@@ -125,6 +127,7 @@ impl StatsTimelineEventsNode {
             flick_goal.events(),
             double_tap_goal.events(),
             one_timer_goal.events(),
+            passing_goal.events(),
             air_dribble_goal.events(),
             flip_reset_goal.events(),
             half_volley_goal.events(),
