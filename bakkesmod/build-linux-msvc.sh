@@ -106,7 +106,7 @@ def resolve_case_insensitive(root: Path, relative: str) -> Path | None:
 
 def source_files(root: Path):
     for path in root.rglob("*"):
-        if any(part in skip_dirs for part in path.parts):
+        if any(part in skip_dirs for part in path.relative_to(root).parts):
             continue
         if path.suffix.lower() in {".h", ".hpp", ".hh", ".cpp", ".cxx", ".cc"}:
             yield path

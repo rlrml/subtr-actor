@@ -175,6 +175,7 @@
             pkgs.lld
             pkgs.ninja
             pkgs.python3
+            pkgs.wine64Packages.unstable
             pkgs.xwin
           ];
 
@@ -194,6 +195,7 @@
             echo "  Rust ABI: cargo build -p subtr-actor-bakkesmod --release"
             echo "  SDK:      $BAKKESMODSDK_DIR"
             echo "  Linux MSVC build: bakkesmod/build-linux-msvc.sh"
+            echo "  Wine:     wine <windows-exe> for local MSVC artifact smoke tests"
             echo "  MinGW note: MinGW can smoke-compile headers, but final plugin linking needs MSVC ABI."
           '';
         };

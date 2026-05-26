@@ -250,3 +250,27 @@ the same install layout as the Windows build: copy its contents into a BakkesMod
 root to place `SubtrActorPlugin.dll` under `plugins` and
 `subtr_actor_bakkesmod.dll` under `data/subtr-actor`. Runtime validation still
 needs Windows, BakkesMod, and Rocket League.
+
+The `.#bakkesmod` shell also includes Wine and MinGW so the Rust ABI DLL can be
+smoke-tested as a Windows DLL from Linux after the MSVC-ABI build:
+
+```sh
+x86_64-w64-mingw32-g++ -std=c++20 -static -static-libgcc -static-libstdc++ \
+  -I crates/subtr-actor-bakkesmod/include \
+  bakkesmod/verify-rust-dll-runtime.cpp \
+  -o /tmp/subtr-actor-verify-rust-dll-runtime.exe
+
+cp ./bakkesmod/build-linux-msvc/Release/subtr_actor_bakkesmod.dll \
+  /tmp/subtr_actor_bakkesmod.dll
+
+WINEPREFIX="$HOME/.wine-subtr-actor" \
+  wine /tmp/subtr-actor-verify-rust-dll-runtime.exe \
+  'Z:\tmp\subtr_actor_bakkesmod.dll'
+```
+
+This synthetic smoke test loads the DLL through the Windows loader, processes
+live frames with every explicit event family, and calls the exposed analysis
+graph, analysis-node, stats-module, and event-drain APIs. It does not replace an
+in-game BakkesMod/Rocket League runtime check. Copying the DLL to `/tmp` keeps
+the Wine path short; some Wine/MinGW combinations crash before the verifier
+starts when given long `Z:\...` paths.
