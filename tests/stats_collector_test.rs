@@ -24,7 +24,7 @@ fn stats_collector_serializes_selected_modules_by_name() {
 
 #[test]
 fn stats_collector_accepts_air_dribble_as_ball_carry_backed_module() {
-    let replay = common::parse_replay("assets/soccar-lan.replay");
+    let replay = common::parse_replay("assets/air-dribble-goal-mouth-2026-05-24.replay");
     let collected = StatsCollector::with_builtin_module_names(["air_dribble", "ball_carry"])
         .expect("air_dribble should be a valid builtin module")
         .get_stats(&replay)
