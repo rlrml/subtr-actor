@@ -78,6 +78,18 @@ export function createTeamStatsSnapshot(
         neutral_time: 0,
         labeled_time: { entries: [] },
       },
+      territorial_pressure: {
+        tracked_time: 0,
+        session_count: 0,
+        opponent_session_count: 0,
+        session_time: 0,
+        opponent_session_time: 0,
+        offensive_half_time: 0,
+        offensive_third_time: 0,
+        longest_session_time: 0,
+        opponent_longest_session_time: 0,
+        average_session_time: 0,
+      },
       rotation: {
         first_man_changes_for_team: 0,
         rotation_count: 0,

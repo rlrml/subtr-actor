@@ -478,6 +478,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_possession_event,
             )?,
             pressure: self.module_player_events("pressure", "events", parse_pressure_event)?,
+            territorial_pressure: self.module_player_events(
+                "territorial_pressure",
+                "events",
+                parse_territorial_pressure_event,
+            )?,
             movement: self.module_player_events("movement", "events", parse_movement_event)?,
             positioning: self.module_player_events(
                 "positioning",
@@ -620,6 +625,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("pressure", "events")),
         );
         events.insert(
+            "territorial_pressure".to_owned(),
+            Value::Array(self.module_array("territorial_pressure", "events")),
+        );
+        events.insert(
             "movement".to_owned(),
             Value::Array(self.module_array("movement", "events")),
         );
@@ -737,6 +746,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_config(&self) -> StatsTimelineConfig {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let territorial_pressure_config = self
+            .config
+            .get("territorial_pressure")
+            .and_then(Value::as_object);
+        let territorial_pressure_defaults = TerritorialPressureCalculatorConfig::default();
         let rotation_config = self.config.get("rotation").and_then(Value::as_object);
         let rotation_defaults = RotationCalculatorConfig::default();
         let rush_config = self.config.get("rush").and_then(Value::as_object);
@@ -785,6 +799,28 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
                 .unwrap_or(PressureCalculatorConfig::default().neutral_zone_half_width_y),
+            territorial_pressure_neutral_zone_half_width_y: territorial_pressure_config
+                .and_then(|config| config.get("territorial_pressure_neutral_zone_half_width_y"))
+                .and_then(json_f32)
+                .unwrap_or(territorial_pressure_defaults.neutral_zone_half_width_y),
+            territorial_pressure_min_establish_seconds: territorial_pressure_config
+                .and_then(|config| config.get("territorial_pressure_min_establish_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(territorial_pressure_defaults.min_establish_seconds),
+            territorial_pressure_min_establish_third_seconds: territorial_pressure_config
+                .and_then(|config| config.get("territorial_pressure_min_establish_third_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(territorial_pressure_defaults.min_establish_third_seconds),
+            territorial_pressure_relief_grace_seconds: territorial_pressure_config
+                .and_then(|config| config.get("territorial_pressure_relief_grace_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(territorial_pressure_defaults.relief_grace_seconds),
+            territorial_pressure_confirmed_relief_grace_seconds: territorial_pressure_config
+                .and_then(|config| {
+                    config.get("territorial_pressure_confirmed_relief_grace_seconds")
+                })
+                .and_then(json_f32)
+                .unwrap_or(territorial_pressure_defaults.confirmed_relief_grace_seconds),
             rotation_role_depth_margin: rotation_config
                 .and_then(|config| config.get("role_depth_margin"))
                 .and_then(json_f32)
@@ -893,6 +929,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
     fn timeline_config_value(&self) -> SubtrActorResult<Value> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let territorial_pressure_config = self
+            .config
+            .get("territorial_pressure")
+            .and_then(Value::as_object);
         let rotation_config = self.config.get("rotation").and_then(Value::as_object);
         let rush_config = self.config.get("rush").and_then(Value::as_object);
         let aerial_goal_config = self.config.get("aerial_goal").and_then(Value::as_object);
@@ -960,6 +1000,39 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     ),
             )?,
         );
+        let territorial_pressure_defaults = TerritorialPressureCalculatorConfig::default();
+        for (key, default_value) in [
+            (
+                "territorial_pressure_neutral_zone_half_width_y",
+                territorial_pressure_defaults.neutral_zone_half_width_y,
+            ),
+            (
+                "territorial_pressure_min_establish_seconds",
+                territorial_pressure_defaults.min_establish_seconds,
+            ),
+            (
+                "territorial_pressure_min_establish_third_seconds",
+                territorial_pressure_defaults.min_establish_third_seconds,
+            ),
+            (
+                "territorial_pressure_relief_grace_seconds",
+                territorial_pressure_defaults.relief_grace_seconds,
+            ),
+            (
+                "territorial_pressure_confirmed_relief_grace_seconds",
+                territorial_pressure_defaults.confirmed_relief_grace_seconds,
+            ),
+        ] {
+            config.insert(
+                key.to_owned(),
+                serialize_to_json_value(
+                    &territorial_pressure_config
+                        .and_then(|config| config.get(key))
+                        .and_then(Value::as_f64)
+                        .unwrap_or(default_value as f64),
+                )?,
+            );
+        }
         let rotation_defaults = RotationCalculatorConfig::default();
         for (key, default_value) in [
             (
@@ -1163,6 +1236,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_stats_or_default::<PressureStats>(frame, "pressure"),
         );
         timeline.insert(
+            "territorial_pressure".to_owned(),
+            self.frame_stats_or_default::<TerritorialPressureStats>(frame, "territorial_pressure"),
+        );
+        timeline.insert(
             "rush".to_owned(),
             self.frame_stats_or_default::<RushStats>(frame, "rush"),
         );
@@ -1225,6 +1302,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .for_team(is_team_zero),
             pressure: self
                 .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+                .for_team(is_team_zero),
+            territorial_pressure: self
+                .frame_stats_or_default_typed::<TerritorialPressureStats>(
+                    frame,
+                    "territorial_pressure",
+                )?
                 .for_team(is_team_zero),
             rotation: self.frame_team_stat_or_default_typed(frame, "rotation", team_key)?,
             rush: self
@@ -1404,6 +1487,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             serialize_to_json_value(
                 &self
                     .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "territorial_pressure".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<TerritorialPressureStats>(
+                        frame,
+                        "territorial_pressure",
+                    )?
                     .for_team(is_team_zero),
             )?,
         );
@@ -2267,6 +2361,10 @@ fn parse_pressure_event(value: &Value) -> SubtrActorResult<PressureEvent> {
         active: json_required_bool(object, "active")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
     })
+}
+
+fn parse_territorial_pressure_event(value: &Value) -> SubtrActorResult<TerritorialPressureEvent> {
+    decode_json_value(value.clone())
 }
 
 fn parse_movement_event(value: &Value) -> SubtrActorResult<MovementEvent> {

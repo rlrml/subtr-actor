@@ -11,8 +11,9 @@ use crate::stats::calculators::{
     OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
     PassingGoalCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
     PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RotationCalculator, RushCalculator, SpeedFlipCalculator, TouchCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    RotationCalculator, RushCalculator, SpeedFlipCalculator, TerritorialPressureCalculator,
+    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -55,6 +56,7 @@ pub(crate) mod settings;
 pub(crate) mod speed_flip;
 pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
+pub(crate) mod territorial_pressure;
 pub(crate) mod touch;
 pub(crate) mod touch_state;
 pub(crate) mod wall_aerial;
@@ -148,6 +150,8 @@ pub use stats_timeline_events::{
 };
 #[allow(unused_imports)]
 pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
+#[allow(unused_imports)]
+pub use territorial_pressure::TerritorialPressureNode;
 #[allow(unused_imports)]
 pub use touch::TouchNode;
 #[allow(unused_imports)]
@@ -309,6 +313,12 @@ pub(crate) fn possession_dependency() -> AnalysisDependency {
 
 pub(crate) fn pressure_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<PressureCalculator>(pressure::boxed_default)
+}
+
+pub(crate) fn territorial_pressure_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<TerritorialPressureCalculator>(
+        territorial_pressure::boxed_default,
+    )
 }
 
 pub(crate) fn rotation_dependency() -> AnalysisDependency {

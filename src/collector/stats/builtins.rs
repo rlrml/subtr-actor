@@ -402,6 +402,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "fifty_fifty",
         "possession",
         "pressure",
+        "territorial_pressure",
         "rotation",
         "rush",
         "touch",
@@ -621,6 +622,13 @@ pub(crate) fn builtin_module_json(
         }
         "pressure" => {
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
+            serialize_to_json_value(&StatsWithEventsExport {
+                stats: calculator.stats(),
+                events: calculator.events(),
+            })
+        }
+        "territorial_pressure" => {
+            let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
                 stats: calculator.stats(),
                 events: calculator.events(),
@@ -1218,6 +1226,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: calculator.stats(),
             })?
         }
+        "territorial_pressure" => {
+            let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: calculator.stats(),
+            })?
+        }
         "rotation" => {
             let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -1381,6 +1395,16 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+            }))?)
+        }
+        "territorial_pressure" => {
+            let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "territorial_pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+                "territorial_pressure_min_establish_seconds": calculator.config().min_establish_seconds,
+                "territorial_pressure_min_establish_third_seconds": calculator.config().min_establish_third_seconds,
+                "territorial_pressure_relief_grace_seconds": calculator.config().relief_grace_seconds,
+                "territorial_pressure_confirmed_relief_grace_seconds": calculator.config().confirmed_relief_grace_seconds,
             }))?)
         }
         "rotation" => {

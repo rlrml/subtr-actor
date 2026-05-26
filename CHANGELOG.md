@@ -4,6 +4,11 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## Unreleased
+
+- Add territorial pressure stats to the Rust timeline, serialized stats output,
+  and stats-player generated bindings.
+
 ## v0.10.0 - 2026-05-26
 
 - Add a BakkesMod plugin pipeline that feeds live Rocket League state through

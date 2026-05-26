@@ -7,8 +7,8 @@ use crate::{
     HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
     LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
     OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
-    PossessionState, RotationCalculator, StatsTimelineCollector, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator,
+    PossessionState, RotationCalculator, StatsTimelineCollector, TerritorialPressureCalculator,
+    TouchState, WallAerialCalculator, WallAerialShotCalculator,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -30,7 +30,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 58);
+    assert_eq!(names.len(), 59);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -51,6 +51,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("center"));
     assert!(names.contains("pass"));
     assert!(names.contains("rotation"));
+    assert!(names.contains("territorial_pressure"));
     assert!(names.contains("flick"));
     assert!(names.contains("aerial_goal"));
     assert!(names.contains("high_aerial_goal"));
@@ -236,6 +237,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
     assert!(graph.state::<WallAerialShotCalculator>().is_some());
     assert!(graph.state::<PassCalculator>().is_some());
     assert!(graph.state::<RotationCalculator>().is_some());
+    assert!(graph.state::<TerritorialPressureCalculator>().is_some());
     assert!(graph.state::<FlickCalculator>().is_some());
     assert!(graph.state::<AerialGoalCalculator>().is_some());
     assert!(graph.state::<HighAerialGoalCalculator>().is_some());

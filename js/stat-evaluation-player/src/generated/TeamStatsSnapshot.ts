@@ -17,5 +17,6 @@ import type { PowerslideStats } from "./PowerslideStats.ts";
 import type { PressureTeamStats } from "./PressureTeamStats.ts";
 import type { RotationTeamStats } from "./RotationTeamStats.ts";
 import type { RushTeamStats } from "./RushTeamStats.ts";
+import type { TerritorialPressureTeamStats } from "./TerritorialPressureTeamStats.ts";
 
-export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, powerslide: PowerslideStats, demo: DemoTeamStats, };
+export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, powerslide: PowerslideStats, demo: DemoTeamStats, };

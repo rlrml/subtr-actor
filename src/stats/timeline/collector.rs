@@ -30,12 +30,23 @@ pub fn build_timeline_event_graph() -> AnalysisGraph {
 
 pub fn default_stats_timeline_config() -> StatsTimelineConfig {
     let rotation_defaults = RotationCalculatorConfig::default();
+    let territorial_pressure_defaults = TerritorialPressureCalculatorConfig::default();
     StatsTimelineConfig {
         most_back_forward_threshold_y: PositioningCalculatorConfig::default()
             .most_back_forward_threshold_y,
         level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
         pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
             .neutral_zone_half_width_y,
+        territorial_pressure_neutral_zone_half_width_y: territorial_pressure_defaults
+            .neutral_zone_half_width_y,
+        territorial_pressure_min_establish_seconds: territorial_pressure_defaults
+            .min_establish_seconds,
+        territorial_pressure_min_establish_third_seconds: territorial_pressure_defaults
+            .min_establish_third_seconds,
+        territorial_pressure_relief_grace_seconds: territorial_pressure_defaults
+            .relief_grace_seconds,
+        territorial_pressure_confirmed_relief_grace_seconds: territorial_pressure_defaults
+            .confirmed_relief_grace_seconds,
         rotation_role_depth_margin: rotation_defaults.role_depth_margin,
         rotation_first_man_ambiguity_margin: rotation_defaults.first_man_ambiguity_margin,
         rotation_first_man_debounce_seconds: rotation_defaults.first_man_debounce_seconds,

@@ -107,6 +107,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         fifty_fifty: FiftyFiftyTeamStats::default(),
         possession: PossessionTeamStats::default(),
         pressure: PressureTeamStats::default(),
+        territorial_pressure: TerritorialPressureTeamStats::default(),
         rotation: RotationTeamStats::default(),
         rush: RushTeamStats::default(),
         core: CoreTeamStats::default(),
@@ -169,6 +170,11 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         most_back_forward_threshold_y: 0.0,
         level_ball_depth_margin: 0.0,
         pressure_neutral_zone_half_width_y: 0.0,
+        territorial_pressure_neutral_zone_half_width_y: 0.0,
+        territorial_pressure_min_establish_seconds: 0.0,
+        territorial_pressure_min_establish_third_seconds: 0.0,
+        territorial_pressure_relief_grace_seconds: 0.0,
+        territorial_pressure_confirmed_relief_grace_seconds: 0.0,
         rotation_role_depth_margin: 0.0,
         rotation_first_man_ambiguity_margin: 0.0,
         rotation_first_man_debounce_seconds: 0.0,
@@ -5223,6 +5229,16 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
+            territorial_pressure_neutral_zone_half_width_y:
+                TerritorialPressureCalculatorConfig::default().neutral_zone_half_width_y,
+            territorial_pressure_min_establish_seconds:
+                TerritorialPressureCalculatorConfig::default().min_establish_seconds,
+            territorial_pressure_min_establish_third_seconds:
+                TerritorialPressureCalculatorConfig::default().min_establish_third_seconds,
+            territorial_pressure_relief_grace_seconds:
+                TerritorialPressureCalculatorConfig::default().relief_grace_seconds,
+            territorial_pressure_confirmed_relief_grace_seconds:
+                TerritorialPressureCalculatorConfig::default().confirmed_relief_grace_seconds,
             rotation_role_depth_margin: RotationCalculatorConfig::default().role_depth_margin,
             rotation_first_man_ambiguity_margin: RotationCalculatorConfig::default()
                 .first_man_ambiguity_margin,
@@ -5274,6 +5290,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             core_team: Vec::new(),
             possession: Vec::new(),
             pressure: Vec::new(),
+            territorial_pressure: Vec::new(),
             movement: Vec::new(),
             positioning: Vec::new(),
             rotation_player: Vec::new(),

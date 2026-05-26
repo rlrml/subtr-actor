@@ -115,6 +115,8 @@ pub mod settings;
 pub use settings::*;
 pub mod speed_flip;
 pub use speed_flip::*;
+pub mod territorial_pressure;
+pub use territorial_pressure::*;
 pub mod touch;
 pub use touch::*;
 pub mod touch_state;

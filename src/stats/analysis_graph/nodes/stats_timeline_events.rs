@@ -70,6 +70,7 @@ impl StatsTimelineEventsNode {
             fifty_fifty_dependency(),
             possession_dependency(),
             pressure_dependency(),
+            territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),
             touch_dependency(),
@@ -109,6 +110,7 @@ impl StatsTimelineEventsNode {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
         let pressure = ctx.get::<PressureCalculator>()?;
+        let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let positioning = ctx.get::<PositioningCalculator>()?;
         let rotation = ctx.get::<RotationCalculator>()?;
@@ -175,6 +177,7 @@ impl StatsTimelineEventsNode {
             core_team: match_stats.core_team_events().to_vec(),
             possession: possession.events().to_vec(),
             pressure: pressure.events().to_vec(),
+            territorial_pressure: territorial_pressure.events().to_vec(),
             movement: movement.events().to_vec(),
             positioning: positioning.events().to_vec(),
             rotation_player: rotation.player_events().to_vec(),
