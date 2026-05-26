@@ -8,9 +8,10 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_graph_snapshot_json,
-    builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
-    builtin_stats_module_names, default_stats_timeline_config,
+    boost_amount_to_percent, builtin_analysis_node_json, builtin_analysis_nodes_json,
+    builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
+    builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
+    default_stats_timeline_config,
     geometry::apply_velocities_to_rigid_body,
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
@@ -829,6 +830,7 @@ impl ProcessorView for SaLiveProcessorView<'_> {
 
     fn get_player_boost_percentage(&self, player_id: &PlayerId) -> SubtrActorResult<f32> {
         self.get_player_boost_level(player_id)
+            .map(boost_amount_to_percent)
     }
 
     fn get_boost_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
@@ -7718,7 +7720,11 @@ mod tests {
 
         assert_eq!(view.get_player_boost_level(&blue_id).unwrap(), 72.0);
         assert_eq!(view.get_player_last_boost_level(&blue_id).unwrap(), 68.0);
-        assert_eq!(view.get_player_boost_percentage(&blue_id).unwrap(), 72.0);
+        assert!(
+            (view.get_player_boost_percentage(&blue_id).unwrap() - boost_amount_to_percent(72.0))
+                .abs()
+                < 1e-6
+        );
         assert_eq!(view.get_boost_active(&blue_id).unwrap(), 1);
         assert_eq!(view.get_jump_active(&blue_id).unwrap(), 1);
         assert_eq!(view.get_double_jump_active(&blue_id).unwrap(), 1);
