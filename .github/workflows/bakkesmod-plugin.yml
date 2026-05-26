@@ -54,11 +54,19 @@ jobs:
         run: |
           $pluginDll = "bakkesmod/build/Release/SubtrActorPlugin.dll"
           $rustDll = "bakkesmod/build/Release/subtr_actor_bakkesmod.dll"
+          $installPluginDll = "bakkesmod/build/Release/bakkesmod-install/plugins/SubtrActorPlugin.dll"
+          $installRustDll = "bakkesmod/build/Release/bakkesmod-install/data/subtr-actor/subtr_actor_bakkesmod.dll"
 
-          foreach ($path in @($pluginDll, $rustDll)) {
+          foreach ($path in @($pluginDll, $rustDll, $installPluginDll, $installRustDll)) {
             if (-not (Test-Path $path)) {
               throw "Expected artifact not found: $path"
             }
+          }
+          if ((Get-FileHash $pluginDll).Hash -ne (Get-FileHash $installPluginDll).Hash) {
+            throw "Install layout plugin DLL differs from primary plugin DLL"
+          }
+          if ((Get-FileHash $rustDll).Hash -ne (Get-FileHash $installRustDll).Hash) {
+            throw "Install layout Rust DLL differs from primary Rust DLL"
           }
 
           function Read-ArtifactText([string]$Path) {
@@ -164,3 +172,4 @@ jobs:
           path: |
             bakkesmod/build/Release/SubtrActorPlugin.dll
             bakkesmod/build/Release/subtr_actor_bakkesmod.dll
+            bakkesmod/build/Release/bakkesmod-install/**

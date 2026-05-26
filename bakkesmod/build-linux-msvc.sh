@@ -171,9 +171,26 @@ fi
 cmake "${cmake_args[@]}"
 cmake --build "$build_dir" --config "$configuration"
 
-mkdir -p "$build_dir/$configuration"
+plugin_out_dir="$build_dir/$configuration"
+mkdir -p "$plugin_out_dir"
+if [[ -f "$build_dir/SubtrActorPlugin.dll" ]]; then
+  cp -f "$build_dir/SubtrActorPlugin.dll" "$plugin_out_dir/SubtrActorPlugin.dll"
+elif [[ ! -f "$plugin_out_dir/SubtrActorPlugin.dll" ]]; then
+  echo "missing built plugin DLL: $build_dir/SubtrActorPlugin.dll" >&2
+  exit 1
+fi
 cp \
   "$repo_root/target/$target/release/subtr_actor_bakkesmod.dll" \
-  "$build_dir/$configuration/subtr_actor_bakkesmod.dll"
+  "$plugin_out_dir/subtr_actor_bakkesmod.dll"
 
-echo "Built Linux MSVC-ABI plugin artifacts in $build_dir/$configuration"
+install_layout_dir="$plugin_out_dir/bakkesmod-install"
+mkdir -p "$install_layout_dir/plugins" "$install_layout_dir/data/subtr-actor"
+cp -f \
+  "$plugin_out_dir/SubtrActorPlugin.dll" \
+  "$install_layout_dir/plugins/SubtrActorPlugin.dll"
+cp -f \
+  "$plugin_out_dir/subtr_actor_bakkesmod.dll" \
+  "$install_layout_dir/data/subtr-actor/subtr_actor_bakkesmod.dll"
+
+echo "Built Linux MSVC-ABI plugin artifacts in $plugin_out_dir"
+echo "Prepared install layout in $install_layout_dir"

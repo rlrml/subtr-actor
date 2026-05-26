@@ -55,7 +55,22 @@ try {
         -Path (Join-Path $RepoRoot "target/release/subtr_actor_bakkesmod.dll") `
         -Destination (Join-Path $PluginOutDir "subtr_actor_bakkesmod.dll")
 
+    $InstallLayoutDir = Join-Path $PluginOutDir "bakkesmod-install"
+    $InstallLayoutPluginsDir = Join-Path $InstallLayoutDir "plugins"
+    $InstallLayoutDataDir = Join-Path $InstallLayoutDir "data\subtr-actor"
+    New-Item -ItemType Directory -Force -Path $InstallLayoutPluginsDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $InstallLayoutDataDir | Out-Null
+    Copy-Item `
+        -Force `
+        -Path (Join-Path $PluginOutDir "SubtrActorPlugin.dll") `
+        -Destination (Join-Path $InstallLayoutPluginsDir "SubtrActorPlugin.dll")
+    Copy-Item `
+        -Force `
+        -Path (Join-Path $PluginOutDir "subtr_actor_bakkesmod.dll") `
+        -Destination (Join-Path $InstallLayoutDataDir "subtr_actor_bakkesmod.dll")
+
     Write-Host "Built plugin artifacts in $PluginOutDir"
+    Write-Host "Prepared install layout in $InstallLayoutDir"
 
     if ($Install) {
         $BakkesModPluginsDir = Join-Path $BakkesModRoot "plugins"

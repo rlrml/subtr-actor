@@ -83,6 +83,9 @@ To test a local SDK checkout instead:
 
 The script builds the Rust ABI DLL, builds the C++ plugin, and copies
 `subtr_actor_bakkesmod.dll` next to the plugin DLL under the CMake build output.
+It also prepares `bakkesmod\build\Release\bakkesmod-install`, whose contents
+can be copied into a BakkesMod root: `plugins\SubtrActorPlugin.dll` and
+`data\subtr-actor\subtr_actor_bakkesmod.dll`.
 
 To install the built DLLs into the default local BakkesMod tree:
 
@@ -223,5 +226,8 @@ a MSVC C++ library, so a plain MinGW build is useful for header smoke checks but
 is not expected to produce a compatible final plugin DLL.
 
 The script produces the C++ plugin DLL and copies the Rust ABI DLL into the same
-configuration directory. Runtime validation still needs Windows, BakkesMod, and
-Rocket League.
+configuration directory. It also prepares a `bakkesmod-install` directory with
+the same install layout as the Windows build: copy its contents into a BakkesMod
+root to place `SubtrActorPlugin.dll` under `plugins` and
+`subtr_actor_bakkesmod.dll` under `data/subtr-actor`. Runtime validation still
+needs Windows, BakkesMod, and Rocket League.
