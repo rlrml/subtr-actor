@@ -936,6 +936,58 @@ std::string safeModuleFileStem(std::string moduleName) {
   return moduleName.empty() ? "module" : moduleName;
 }
 
+SaEventTiming syntheticTiming(uint64_t frameNumber, float time) {
+  SaEventTiming timing{};
+  timing.frame_number = frameNumber;
+  timing.time = time;
+  timing.seconds_remaining = 300;
+  timing.has_timing = 1;
+  timing.has_seconds_remaining = 1;
+  return timing;
+}
+
+SaRigidBody syntheticRigidBody(
+    float x,
+    float y,
+    float z,
+    float vx = 0.0f,
+    float vy = 0.0f,
+    float vz = 0.0f) {
+  SaRigidBody body{};
+  body.location = SaVec3{x, y, z};
+  body.rotation = SaQuat{0.0f, 0.0f, 0.0f, 1.0f};
+  body.linear_velocity = SaVec3{vx, vy, vz};
+  body.angular_velocity = SaVec3{0.0f, 0.0f, 0.0f};
+  body.has_linear_velocity = 1;
+  body.has_angular_velocity = 1;
+  body.sleeping = 0;
+  return body;
+}
+
+SaPlayerFrame syntheticPlayer(
+    uint32_t playerIndex,
+    const char *name,
+    uint8_t isTeam0,
+    float x,
+    float y,
+    float z) {
+  SaPlayerFrame player{};
+  player.player_index = playerIndex;
+  player.player_name = name;
+  player.is_team_0 = isTeam0;
+  player.has_rigid_body = 1;
+  player.rigid_body = syntheticRigidBody(x, y, z);
+  player.boost_amount = isTeam0 != 0 ? 72.0f : 41.0f;
+  player.last_boost_amount = player.boost_amount;
+  player.has_match_stats = 1;
+  player.match_goals = isTeam0 != 0 ? 1 : 0;
+  player.match_assists = 0;
+  player.match_saves = isTeam0 != 0 ? 0 : 1;
+  player.match_shots = isTeam0 != 0 ? 1 : 0;
+  player.match_score = isTeam0 != 0 ? 100 : 50;
+  return player;
+}
+
 } // namespace
 
 void SubtrActorPlugin::onLoad() {
@@ -988,6 +1040,12 @@ void SubtrActorPlugin::onLoad() {
       "Calls the live graph outputs and every callable analysis node, logging byte sizes. "
       "Pass 'finish' to flush delayed graph events first; pass 'require_graph_events' "
       "or 'require_event_history' for strict event checks.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_self_test_graph",
+      [this](std::vector<std::string> params) { selfTestGraphRuntime(params); },
+      "Feeds a synthetic live frame with every required event family, then runs "
+      "strict graph verification against a temporary Rust engine.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -2993,6 +3051,163 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   cvarManager->log(ok
                        ? "subtr-actor: graph verification passed"
                        : "subtr-actor: graph verification failed; enter gameplay/replay and try again");
+}
+
+void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string>) {
+  if (!loaded || !engineCreate || !engineDestroy || !processFrame || !engineFinish) {
+    cvarManager->log("subtr-actor: graph self-test requested before ABI was loaded");
+    return;
+  }
+
+  SaEngine *selfTestEngine = engineCreate();
+  if (!selfTestEngine) {
+    cvarManager->log("subtr-actor: graph self-test failed to create temporary engine");
+    return;
+  }
+
+  std::array<SaPlayerFrame, 2> players{
+      syntheticPlayer(0, "self-test-blue", 1, 0.0f, 0.0f, 92.75f),
+      syntheticPlayer(1, "self-test-orange", 0, 120.0f, 0.0f, 92.75f),
+  };
+  std::array<SaTouchEvent, 1> touches{SaTouchEvent{
+      syntheticTiming(1, 0.1f),
+      0,
+      1,
+      1,
+      12.0f,
+      1,
+  }};
+  std::array<SaDodgeRefreshedEvent, 1> dodgeRefreshes{SaDodgeRefreshedEvent{
+      syntheticTiming(1, 0.1f),
+      0,
+      1,
+      1,
+  }};
+  std::array<SaBoostPadEvent, 1> boostPadEvents{SaBoostPadEvent{
+      syntheticTiming(1, 0.1f),
+      34,
+      SaBoostPadEventKindPickedUp,
+      1,
+      0,
+      1,
+  }};
+  std::array<SaGoalEvent, 1> goals{SaGoalEvent{
+      syntheticTiming(1, 0.1f),
+      1,
+      0,
+      1,
+      1,
+      1,
+      0,
+      1,
+  }};
+  const SaRigidBody shotBall = syntheticRigidBody(300.0f, 100.0f, 120.0f, 1000.0f, 500.0f, 100.0f);
+  const SaRigidBody shotPlayer = syntheticRigidBody(240.0f, 90.0f, 92.75f, 800.0f, 300.0f, 0.0f);
+  std::array<SaPlayerStatEvent, 3> playerStatEvents{
+      SaPlayerStatEvent{
+          syntheticTiming(1, 0.1f),
+          0,
+          1,
+          SaPlayerStatEventKindShot,
+          1,
+          shotBall,
+          1,
+          shotPlayer,
+      },
+      SaPlayerStatEvent{
+          syntheticTiming(1, 0.1f),
+          1,
+          0,
+          SaPlayerStatEventKindSave,
+          0,
+          SaRigidBody{},
+          0,
+          SaRigidBody{},
+      },
+      SaPlayerStatEvent{
+          syntheticTiming(1, 0.1f),
+          0,
+          1,
+          SaPlayerStatEventKindAssist,
+          0,
+          SaRigidBody{},
+          0,
+          SaRigidBody{},
+      },
+  };
+  std::array<SaDemolishEvent, 1> demolishes{SaDemolishEvent{
+      syntheticTiming(1, 0.1f),
+      0,
+      1,
+      SaVec3{2300.0f, 0.0f, 0.0f},
+      SaVec3{0.0f, 0.0f, 0.0f},
+      SaVec3{120.0f, 0.0f, 92.75f},
+      DEMO_ACTIVE_DURATION_SECONDS,
+  }};
+
+  std::array<SaLiveFrame, 3> frames{};
+  for (size_t index = 0; index < frames.size(); index += 1) {
+    const uint64_t frameNumber = static_cast<uint64_t>(index + 1);
+    SaLiveFrame &frame = frames[index];
+    frame.frame_number = frameNumber;
+    frame.time = 0.1f * static_cast<float>(frameNumber);
+    frame.dt = index == 0 ? 0.0f : 0.1f;
+    frame.seconds_remaining = 300;
+    frame.has_seconds_remaining = 1;
+    frame.ball_has_been_hit = 1;
+    frame.has_ball_has_been_hit = 1;
+    frame.team_zero_score = 1;
+    frame.has_team_zero_score = 1;
+    frame.team_one_score = 0;
+    frame.has_team_one_score = 1;
+    frame.possession_team_is_team_0 = 1;
+    frame.has_possession_team = 1;
+    frame.scored_on_team_is_team_0 = 0;
+    frame.has_scored_on_team = 1;
+    frame.live_play = 1;
+    frame.has_live_play = 1;
+    frame.has_ball = 1;
+    frame.ball = syntheticRigidBody(25.0f * static_cast<float>(frameNumber), 0.0f, 120.0f);
+    frame.players = players.data();
+    frame.player_count = players.size();
+  }
+  frames[0].touches = touches.data();
+  frames[0].touch_count = touches.size();
+  frames[0].dodge_refreshes = dodgeRefreshes.data();
+  frames[0].dodge_refresh_count = dodgeRefreshes.size();
+  frames[0].boost_pad_events = boostPadEvents.data();
+  frames[0].boost_pad_event_count = boostPadEvents.size();
+  frames[0].goals = goals.data();
+  frames[0].goal_count = goals.size();
+  frames[0].player_stat_events = playerStatEvents.data();
+  frames[0].player_stat_event_count = playerStatEvents.size();
+  frames[0].demolishes = demolishes.data();
+  frames[0].demolish_count = demolishes.size();
+
+  SaEngine *liveEngine = engine;
+  const auto liveMessages = messages;
+  engine = selfTestEngine;
+  bool processed = true;
+  for (const SaLiveFrame &frame : frames) {
+    const int32_t result = processFrame(engine, &frame);
+    if (result != 0) {
+      processed = false;
+      cvarManager->log(std::format(
+          "subtr-actor: graph self-test frame {} failed: {}",
+          frame.frame_number,
+          result));
+      break;
+    }
+  }
+
+  if (processed) {
+    cvarManager->log(
+        "subtr-actor: graph self-test fed every required event family");
+    verifyGraphRuntime({"finish", "require_event_history", "require_graph_events"});
+  }
+  messages = liveMessages;
+  engine = liveEngine;
+  engineDestroy(selfTestEngine);
 }
 
 bool SubtrActorPlugin::finishAndDrainPendingEvents(std::string_view context) {

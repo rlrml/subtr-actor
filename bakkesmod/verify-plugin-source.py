@@ -201,6 +201,24 @@ def main() -> int:
                 f"{family.graph_field} producer path",
                 errors,
             )
+    require_contains(
+        plugin_source,
+        "subtr_actor_self_test_graph",
+        "synthetic graph self-test command",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "require_event_history",
+        "strict self-test event-history mode",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "require_graph_events",
+        "strict self-test graph-events mode",
+        errors,
+    )
 
     if errors:
         for error in errors:

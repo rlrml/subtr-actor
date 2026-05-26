@@ -30,6 +30,9 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   outputs plus every callable analysis node name from the loaded plugin
   runtime and logs byte sizes, giving a quick in-game check that the graph
   surface is callable after at least one live frame has been processed.
+  The `subtr_actor_self_test_graph` console command creates a temporary Rust
+  engine, feeds a synthetic live sample containing every required event family,
+  and runs strict graph verification without disturbing the current live engine.
 
 The current spike feeds active cars from BakkesMod's server car list, falling
 back to the local car when that list is unavailable. That is enough to test
@@ -127,6 +130,15 @@ acceptance check for live graph callability and event-generation parity.
    `frame_events_state` exposes every live event family field with an entry
    count for each field. It should also report cumulative `event_history`
    entry counts for the same event-family fields.
+   To validate the loaded plugin and Rust ABI without first manually producing
+   gameplay events, run:
+
+   ```text
+   subtr_actor_self_test_graph
+   ```
+
+   The console should log that the self-test fed every required event family and
+   then `subtr-actor: graph verification passed` from the strict verifier.
 3. Exercise live events that should be visible to the graph: touch the ball,
    trigger a dodge refresh or flip reset setup when possible, pick up a boost
    pad, generate shot/save/assist match-stat deltas, score a goal, and trigger
