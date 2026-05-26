@@ -123,11 +123,7 @@ export function buildMechanicPlaylistEvents(
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
   return (statsTimeline.events.mechanics ?? [])
-    .filter(
-      (event) =>
-        isVisibleMechanicKind(event.kind) &&
-        (!enabled || enabled.has(event.kind)),
-    )
+    .filter((event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)))
     .map((event) => {
       const playerId = playerIdToString(event.player_id);
       const playerName = playerNames.get(playerId) ?? playerId;

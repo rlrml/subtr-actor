@@ -143,12 +143,13 @@ impl<'a> ReplayProcessor<'a> {
             }
 
             match update.object_id {
-                object_id if object_id == ctx.unique_id_object_id => {
-                    if ctx.player_type_actor_ids.contains(&update.actor_id) {
-                        let unique_id =
-                            attribute_match!(&update.attribute, boxcars::Attribute::UniqueId)?;
-                        self.insert_player_actor_id(unique_id.remote_id.clone(), update.actor_id);
-                    }
+                object_id
+                    if object_id == ctx.unique_id_object_id
+                        && ctx.player_type_actor_ids.contains(&update.actor_id) =>
+                {
+                    let unique_id =
+                        attribute_match!(&update.attribute, boxcars::Attribute::UniqueId)?;
+                    self.insert_player_actor_id(unique_id.remote_id.clone(), update.actor_id);
                 }
                 object_id if object_id == ctx.team_object_id => {
                     maintain_link!(

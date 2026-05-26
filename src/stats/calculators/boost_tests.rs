@@ -217,6 +217,108 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
 }
 
 #[test]
+fn demo_reset_does_not_count_removed_boost_as_used() {
+    let mut calculator = BoostCalculator::new();
+    let player_id = PlayerId::Steam(1);
+    let attacker_id = PlayerId::Steam(2);
+    let player_position = glam::Vec3::new(0.0, 0.0, 17.0);
+    let active_gameplay = GameplayState {
+        ball_has_been_hit: Some(true),
+        ..GameplayState::default()
+    };
+    let update = |calculator: &mut BoostCalculator,
+                  frame_number,
+                  time,
+                  boost_amount,
+                  last_boost_amount,
+                  events: FrameEventsState| {
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number,
+                    time,
+                    dt: 1.0 / 30.0,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(
+                        player_id.clone(),
+                        boost_amount,
+                        last_boost_amount,
+                        player_position,
+                    )],
+                },
+                &events,
+                &PlayerVerticalState::default(),
+                true,
+            )
+            .expect("boost update should succeed");
+    };
+
+    update(
+        &mut calculator,
+        1,
+        1.0,
+        120.0,
+        120.0,
+        FrameEventsState::default(),
+    );
+    update(
+        &mut calculator,
+        2,
+        1.1,
+        0.0,
+        120.0,
+        FrameEventsState {
+            demo_events: vec![DemolishInfo {
+                time: 1.1,
+                seconds_remaining: 299,
+                frame: 2,
+                attacker: attacker_id,
+                victim: player_id.clone(),
+                attacker_velocity: glam_to_vec(&glam::Vec3::ZERO),
+                victim_velocity: glam_to_vec(&glam::Vec3::ZERO),
+                victim_location: glam_to_vec(&player_position),
+            }],
+            ..FrameEventsState::default()
+        },
+    );
+    update(
+        &mut calculator,
+        3,
+        2.0,
+        0.0,
+        0.0,
+        FrameEventsState::default(),
+    );
+    update(
+        &mut calculator,
+        4,
+        4.4,
+        BOOST_KICKOFF_START_AMOUNT,
+        0.0,
+        FrameEventsState::default(),
+    );
+
+    let player_stats = calculator
+        .player_stats()
+        .get(&player_id)
+        .expect("player stats should be recorded");
+    assert_eq!(player_stats.amount_used, 0.0);
+    assert_eq!(player_stats.amount_used_while_grounded, 0.0);
+    assert_eq!(calculator.team_zero_stats().amount_used, 0.0);
+    assert!(calculator
+        .ledger_events()
+        .iter()
+        .filter(|event| event.player_id == player_id)
+        .all(
+            |event| event.transaction != BoostLedgerTransactionKind::Used
+                && event.transaction != BoostLedgerTransactionKind::UsedAllocation
+        ));
+}
+
+#[test]
 fn counts_reused_pickup_sequence_after_pad_respawn() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);

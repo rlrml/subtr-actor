@@ -1407,8 +1407,9 @@ impl BoostCalculator {
 
             if demo_respawn_pending {
                 if let Some(pending) = self.pending_demo_respawns.get_mut(&player.player_id) {
-                    pending.pre_demo_boost_amount =
-                        pending.pre_demo_boost_amount.or(previous_sample_boost_amount);
+                    pending.pre_demo_boost_amount = pending
+                        .pre_demo_boost_amount
+                        .or(previous_sample_boost_amount);
                 }
                 continue;
             }

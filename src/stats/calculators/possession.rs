@@ -3,17 +3,12 @@ use super::*;
 const PENDING_TURNOVER_CONFIRMATION_WINDOW_SECONDS: f32 = 1.25;
 const LOOSE_BALL_TIMEOUT_SECONDS: f32 = 3.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum PossessionStateLabel {
     TeamZero,
     TeamOne,
+    #[default]
     Neutral,
-}
-
-impl Default for PossessionStateLabel {
-    fn default() -> Self {
-        Self::Neutral
-    }
 }
 
 impl PossessionStateLabel {

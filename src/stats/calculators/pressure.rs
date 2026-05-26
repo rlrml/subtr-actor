@@ -2,17 +2,12 @@ use super::*;
 
 const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum PressureHalfLabel {
     TeamZeroSide,
     TeamOneSide,
+    #[default]
     Neutral,
-}
-
-impl Default for PressureHalfLabel {
-    fn default() -> Self {
-        Self::Neutral
-    }
 }
 
 impl PressureHalfLabel {

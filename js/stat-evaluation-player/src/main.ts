@@ -464,10 +464,6 @@ function getActiveModuleIds(): Set<string> {
   ]);
 }
 
-function getActiveTimelineEventSourceIds(): Set<string> {
-  return new Set(activeTimelineEventSourceIds);
-}
-
 function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
   return kind === "events"
     ? activeTimelineEventSourceIds
