@@ -4,15 +4,20 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.14 - 2026-05-26
+
+- Consolidate mechanic timeline sources so event windows include all configured
+  mechanics while avoiding duplicate timeline spans.
+- Ignore center detections that later resolve as shots or goals.
+- Require initiator slowdown before crediting inferred bump events.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.14`.
+
 ## v0.8.13 - 2026-05-26
 
 - Smoothly interpolate replay ball and car rotations between frames.
 - Resolve mechanics-review absolute replay paths against remote manifest origins
   when hosted review bundles point at non-local assets.
 - Throttle stats-player snapshot UI updates during playback.
-- Consolidate mechanic timeline sources so event windows include all configured
-  mechanics while avoiding duplicate timeline spans.
-- Ignore center detections that later resolve as shots or goals.
 - Refresh Rust, Python, and JavaScript release metadata to `0.8.13`.
 
 ## v0.8.12 - 2026-05-26
