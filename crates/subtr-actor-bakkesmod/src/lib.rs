@@ -1110,20 +1110,25 @@ fn event_seconds_remaining(frame: &FrameInfo, timing: SaEventTiming) -> i32 {
 }
 
 fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
-    events
-        .iter()
-        .map(|event| {
-            let (frame_number, time) = event_frame_and_time(frame, event.timing);
-            TouchEvent {
-                time,
-                frame: frame_number,
-                team_is_team_0: event.is_team_0 != 0,
-                player: (event.has_player != 0).then_some(player_id(event.player_index)),
-                closest_approach_distance: (event.has_closest_approach_distance != 0)
-                    .then_some(event.closest_approach_distance),
-            }
-        })
-        .collect()
+    let mut accepted = Vec::new();
+    let mut seen = HashSet::new();
+    for event in events {
+        let (frame_number, time) = event_frame_and_time(frame, event.timing);
+        let player = (event.has_player != 0).then_some(player_id(event.player_index));
+        let team_is_team_0 = event.is_team_0 != 0;
+        if !seen.insert((frame_number, player.clone(), team_is_team_0)) {
+            continue;
+        }
+        accepted.push(TouchEvent {
+            time,
+            frame: frame_number,
+            team_is_team_0,
+            player,
+            closest_approach_distance: (event.has_closest_approach_distance != 0)
+                .then_some(event.closest_approach_distance),
+        });
+    }
+    accepted
 }
 
 fn explicit_dodge_refresh_keys(
@@ -9616,6 +9621,73 @@ mod tests {
         );
         assert_eq!(
             touch_state.touch_events[0].closest_approach_distance,
+            Some(12.0)
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn duplicate_explicit_live_touches_are_suppressed_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let touches = [
+            SaTouchEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                has_player: 1,
+                is_team_0: 1,
+                closest_approach_distance: 12.0,
+                has_closest_approach_distance: 1,
+            },
+            SaTouchEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                has_player: 1,
+                is_team_0: 1,
+                closest_approach_distance: 16.0,
+                has_closest_approach_distance: 1,
+            },
+        ];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert_eq!(
+            frame_events.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
+        );
+        assert_eq!(
+            frame_events.touch_events[0].closest_approach_distance,
             Some(12.0)
         );
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
