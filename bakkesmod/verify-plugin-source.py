@@ -95,6 +95,15 @@ EVENT_FAMILIES = (
     ),
 )
 
+DERIVED_EVENT_FIELDS = {
+    "active_demos": (
+        "sync_active_demos(",
+        "self.active_demos",
+        ".live_events",
+        "DEMO_ACTIVE_DURATION_SECONDS",
+    ),
+}
+
 
 def quoted_strings(value: str) -> list[str]:
     return re.findall(r'"([^"]+)"', value)
@@ -153,6 +162,7 @@ def main() -> int:
 
     required_event_fields = set(rust_array(rust_source, "REQUIRED_EVENT_HISTORY_FIELD_NAMES"))
     covered_event_fields = {family.graph_field for family in EVENT_FAMILIES}
+    covered_event_fields.update(DERIVED_EVENT_FIELDS)
     missing_coverage = sorted(required_event_fields - covered_event_fields)
     if missing_coverage:
         errors.append(f"required event fields missing C++ producer contract: {missing_coverage}")
@@ -199,6 +209,14 @@ def main() -> int:
                 plugin_source,
                 producer,
                 f"{family.graph_field} producer path",
+                errors,
+            )
+    for graph_field, required_paths in DERIVED_EVENT_FIELDS.items():
+        for producer in required_paths:
+            require_contains(
+                rust_source + "\n" + plugin_source,
+                producer,
+                f"{graph_field} derived event path",
                 errors,
             )
     require_contains(

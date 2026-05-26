@@ -3054,7 +3054,8 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
 }
 
 void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string>) {
-  if (!loaded || !engineCreate || !engineDestroy || !processFrame || !engineFinish) {
+  if (!loaded || !engineCreate || !engineDestroy || !processFrame || !engineFinish ||
+      !graphOutputJsonLen || !writeGraphOutputJson) {
     cvarManager->log("subtr-actor: graph self-test requested before ABI was loaded");
     return;
   }
@@ -3197,6 +3198,22 @@ void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string>) {
           frame.frame_number,
           result));
       break;
+    }
+  }
+
+  if (processed) {
+    const std::string eventHistoryJson =
+        readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "event_history");
+    const auto activeDemoCount =
+        parseJsonArrayPropertyElementCount(eventHistoryJson, "active_demos");
+    if (!activeDemoCount || *activeDemoCount == 0) {
+      processed = false;
+      cvarManager->log(
+          "subtr-actor: graph self-test failed to derive active_demos from demolish event");
+    } else {
+      cvarManager->log(std::format(
+          "subtr-actor: graph self-test derived active_demos from demolish event ({} entries)",
+          *activeDemoCount));
     }
   }
 
