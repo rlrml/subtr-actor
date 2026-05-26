@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <format>
 #include <type_traits>
@@ -257,6 +258,27 @@ std::vector<std::string> parseJsonStringArray(const std::string &json) {
   }
   skipJsonWhitespace(json, offset);
   return offset == json.size() ? *values : std::vector<std::string>{};
+}
+
+bool isAbsoluteWindowsPath(const std::string &path) {
+  return path.size() >= 3 && std::isalpha(static_cast<unsigned char>(path[0])) != 0 &&
+         path[1] == ':' && (path[2] == '\\' || path[2] == '/');
+}
+
+std::optional<std::filesystem::path> existingReplayPathCandidate(
+    const std::filesystem::path &path) {
+  std::error_code error;
+  if (!std::filesystem::exists(path, error)) {
+    return std::nullopt;
+  }
+  const auto canonical = std::filesystem::weakly_canonical(path, error);
+  return error ? path : canonical;
+}
+
+std::string normalizedReplayPathString(const std::filesystem::path &path) {
+  std::error_code error;
+  const auto canonical = std::filesystem::weakly_canonical(path, error);
+  return (error ? path : canonical).string();
 }
 
 std::vector<std::string> parseJsonStringArrayProperty(
@@ -1471,6 +1493,30 @@ std::optional<std::string> SubtrActorPlugin::currentReplayPath(ReplayServerWrapp
   if (replayPath.empty()) {
     return std::nullopt;
   }
+
+  if (isAbsoluteWindowsPath(replayPath)) {
+    return normalizedReplayPathString(std::filesystem::path(replayPath));
+  }
+
+  if (const auto path = existingReplayPathCandidate(std::filesystem::path(replayPath))) {
+    return path->string();
+  }
+
+  const char *userProfile = std::getenv("USERPROFILE");
+  if (userProfile != nullptr && *userProfile != '\0') {
+    const std::filesystem::path rocketLeagueDocuments =
+        std::filesystem::path(userProfile) / "Documents" / "My Games" / "Rocket League";
+    for (const auto &base : {
+             rocketLeagueDocuments / "TAGame" / "Logs",
+             rocketLeagueDocuments / "TAGame" / "Cache" / "WebCache",
+             rocketLeagueDocuments,
+         }) {
+      if (const auto path = existingReplayPathCandidate(base / replayPath)) {
+        return path->string();
+      }
+    }
+  }
+
   return replayPath;
 }
 
@@ -1492,6 +1538,7 @@ void SubtrActorPlugin::tickReplayAnnotations() {
   if (!replayPath) {
     return;
   }
+  const std::string rawReplayPath = replayServer.GetReplay().GetFilePath().ToString();
 
   if (!replayAnnotations && replayAnnotationLoadFailed && replayAnnotationPath == *replayPath) {
     return;
@@ -1505,7 +1552,10 @@ void SubtrActorPlugin::tickReplayAnnotations() {
     if (!replayAnnotations) {
       if (!replayAnnotationLoadFailed) {
         cvarManager->log(
-            std::format("subtr-actor: failed to process replay annotations for {}", *replayPath));
+            std::format(
+                "subtr-actor: failed to process replay annotations for {} (raw path {})",
+                *replayPath,
+                rawReplayPath));
       }
       replayAnnotationLoadFailed = true;
       return;
@@ -1514,8 +1564,9 @@ void SubtrActorPlugin::tickReplayAnnotations() {
     const size_t annotationCount =
         replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
     cvarManager->log(std::format(
-        "subtr-actor: loaded {} replay annotations from normal replay processor",
-        annotationCount));
+        "subtr-actor: loaded {} replay annotations from normal replay processor for {}",
+        annotationCount,
+        *replayPath));
   }
 
   std::array<SaMechanicEvent, 64> replayEvents{};
