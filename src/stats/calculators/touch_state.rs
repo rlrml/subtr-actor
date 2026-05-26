@@ -8,7 +8,7 @@ pub struct TouchState {
     pub last_touch_team_is_team_0: Option<bool>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct TouchStateCalculator {
     previous_ball_linear_velocity: Option<glam::Vec3>,
     previous_ball_angular_velocity: Option<glam::Vec3>,

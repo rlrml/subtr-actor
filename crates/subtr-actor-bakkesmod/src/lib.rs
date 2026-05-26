@@ -391,7 +391,7 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
     .unwrap_or_default()
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct SaLiveEventGenerator {
     touch_state: TouchStateCalculator,
     live_play_tracker: subtr_actor::LivePlayTracker,
@@ -399,7 +399,7 @@ struct SaLiveEventGenerator {
     active_demos: Vec<SaActiveDemo>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct SaLiveEventHistory {
     demo_events: Vec<DemolishInfo>,
     boost_pad_events: Vec<BoostPadEvent>,
@@ -1366,8 +1366,10 @@ impl SaLiveEventGenerator {
     }
 }
 
-fn frame_input(
-    engine: &mut SaEngine,
+fn frame_input_from_live_state(
+    live_events: &mut SaLiveEventGenerator,
+    live_event_history: &mut SaLiveEventHistory,
+    replay_meta: Option<&ReplayMeta>,
     frame: &SaLiveFrame,
     sampled_players: &[SaPlayerFrame],
     explicit_events: &SaFrameEventSlices<'_>,
@@ -1377,7 +1379,7 @@ fn frame_input(
     let players = player_state(sampled_players);
     let gameplay = gameplay_state(frame, sampled_players);
     let explicit_live_play = explicit_live_play_state(frame);
-    let (frame_events, live_play) = engine.live_events.frame_events(
+    let (frame_events, live_play) = live_events.frame_events(
         &frame_info,
         &ball,
         &players,
@@ -1385,14 +1387,13 @@ fn frame_input(
         explicit_live_play,
         explicit_events,
     );
-    engine.live_event_history.append_frame_events(&frame_events);
-    let replay_meta = engine.live_replay_meta.as_ref();
+    live_event_history.append_frame_events(&frame_events);
     let processor = SaLiveProcessorView::new(
         replay_meta,
         frame,
         sampled_players,
         frame_events,
-        &engine.live_event_history,
+        live_event_history,
     );
     FrameInput::timeline_with_live_play_state(
         &processor,
@@ -1400,6 +1401,23 @@ fn frame_input(
         frame.time,
         frame.dt,
         live_play,
+    )
+}
+
+#[cfg(test)]
+fn frame_input(
+    engine: &mut SaEngine,
+    frame: &SaLiveFrame,
+    sampled_players: &[SaPlayerFrame],
+    explicit_events: &SaFrameEventSlices<'_>,
+) -> FrameInput {
+    frame_input_from_live_state(
+        &mut engine.live_events,
+        &mut engine.live_event_history,
+        engine.live_replay_meta.as_ref(),
+        frame,
+        sampled_players,
+        explicit_events,
     )
 }
 
@@ -2274,11 +2292,22 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     if sync_live_replay_meta(engine, players).is_err() {
         return -2;
     }
-    let frame_input = frame_input(engine, frame, players, &explicit_events);
+    let mut live_events = engine.live_events.clone();
+    let mut live_event_history = engine.live_event_history.clone();
+    let frame_input = frame_input_from_live_state(
+        &mut live_events,
+        &mut live_event_history,
+        engine.live_replay_meta.as_ref(),
+        frame,
+        players,
+        &explicit_events,
+    );
     if engine.graph.evaluate_with_state(&frame_input).is_err() {
         return -2;
     }
 
+    engine.live_events = live_events;
+    engine.live_event_history = live_event_history;
     refresh_timeline_graph_views(engine);
     0
 }
@@ -4723,6 +4752,92 @@ mod tests {
         assert_eq!(gameplay.current_score(), Some((2, 1)));
         assert_eq!(gameplay.possession_team_is_team_0, Some(true));
         assert_eq!(gameplay.scored_on_team_is_team_0, Some(false));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn process_frame_does_not_commit_live_event_history_when_graph_evaluation_fails() {
+        struct RequiresStringInputNode {
+            state: (),
+        }
+
+        impl subtr_actor::stats::analysis_graph::AnalysisNode for RequiresStringInputNode {
+            type State = ();
+
+            fn name(&self) -> &'static str {
+                "requires_string_input"
+            }
+
+            fn dependencies(&self) -> Vec<subtr_actor::stats::analysis_graph::AnalysisDependency> {
+                vec![subtr_actor::stats::analysis_graph::AnalysisDependency::required::<String>()]
+            }
+
+            fn evaluate(
+                &mut self,
+                _ctx: &subtr_actor::stats::analysis_graph::AnalysisStateContext<'_>,
+            ) -> SubtrActorResult<()> {
+                Ok(())
+            }
+
+            fn state(&self) -> &Self::State {
+                &self.state
+            }
+        }
+
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let engine_ref = unsafe { engine.as_mut().expect("engine should be valid") };
+        engine_ref.graph = AnalysisGraph::new()
+            .with_input_state_type::<String>()
+            .with_node(RequiresStringInputNode { state: () });
+
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 20.0,
+            },
+        )];
+        let touches = [SaTouchEvent {
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 0.0,
+            has_closest_approach_distance: 1,
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 120.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            -2
+        );
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        assert!(
+            engine_ref.live_event_history.touch_events.is_empty(),
+            "failed graph evaluation should not commit live touch history"
+        );
+        assert!(
+            engine_ref
+                .live_event_history
+                .dodge_refreshed_events
+                .is_empty(),
+            "failed graph evaluation should not commit inferred dodge-refresh history"
+        );
+        assert_eq!(engine_ref.pending_events.len(), 0);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
