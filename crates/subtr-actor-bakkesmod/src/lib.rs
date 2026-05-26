@@ -4464,6 +4464,225 @@ mod tests {
         serde_json::from_slice(&bytes).expect("analysis node names json should be valid")
     }
 
+    struct ExplicitEventFamilyFixture {
+        players: [SaPlayerFrame; 2],
+        touches: [SaTouchEvent; 1],
+        dodge_refreshes: [SaDodgeRefreshedEvent; 1],
+        boost_pad_events: [SaBoostPadEvent; 1],
+        goals: [SaGoalEvent; 1],
+        player_stat_events: [SaPlayerStatEvent; 3],
+        demolishes: [SaDemolishEvent; 1],
+    }
+
+    impl ExplicitEventFamilyFixture {
+        fn new() -> Self {
+            let shot_ball = rigid_body(
+                SaVec3 {
+                    x: 300.0,
+                    y: 100.0,
+                    z: 120.0,
+                },
+                SaVec3 {
+                    x: 1000.0,
+                    y: 500.0,
+                    z: 100.0,
+                },
+            );
+            let shot_player = rigid_body(
+                SaVec3 {
+                    x: 240.0,
+                    y: 90.0,
+                    z: 92.75,
+                },
+                SaVec3 {
+                    x: 800.0,
+                    y: 300.0,
+                    z: 0.0,
+                },
+            );
+
+            Self {
+                players: [
+                    player_at_index(
+                        0,
+                        true,
+                        SaVec3 {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 92.75,
+                        },
+                    ),
+                    player_at_index(
+                        1,
+                        false,
+                        SaVec3 {
+                            x: 120.0,
+                            y: 0.0,
+                            z: 92.75,
+                        },
+                    ),
+                ],
+                touches: [SaTouchEvent {
+                    timing: SaEventTiming::default(),
+                    player_index: 0,
+                    has_player: 1,
+                    is_team_0: 1,
+                    closest_approach_distance: 12.0,
+                    has_closest_approach_distance: 1,
+                }],
+                dodge_refreshes: [SaDodgeRefreshedEvent {
+                    timing: SaEventTiming::default(),
+                    player_index: 0,
+                    is_team_0: 1,
+                    counter_value: 1,
+                }],
+                boost_pad_events: [SaBoostPadEvent {
+                    timing: SaEventTiming::default(),
+                    pad_id: 34,
+                    kind: SaBoostPadEventKind::PickedUp,
+                    sequence: 1,
+                    player_index: 0,
+                    has_player: 1,
+                }],
+                goals: [SaGoalEvent {
+                    timing: SaEventTiming::default(),
+                    scoring_team_is_team_0: 1,
+                    player_index: 0,
+                    has_player: 1,
+                    team_zero_score: 1,
+                    has_team_zero_score: 1,
+                    team_one_score: 0,
+                    has_team_one_score: 1,
+                }],
+                player_stat_events: [
+                    SaPlayerStatEvent {
+                        timing: SaEventTiming::default(),
+                        player_index: 0,
+                        is_team_0: 1,
+                        kind: SaPlayerStatEventKind::Shot,
+                        has_shot_ball: 1,
+                        shot_ball,
+                        has_shot_player: 1,
+                        shot_player,
+                    },
+                    SaPlayerStatEvent {
+                        timing: SaEventTiming::default(),
+                        player_index: 1,
+                        is_team_0: 0,
+                        kind: SaPlayerStatEventKind::Save,
+                        has_shot_ball: 0,
+                        shot_ball: SaRigidBody::default(),
+                        has_shot_player: 0,
+                        shot_player: SaRigidBody::default(),
+                    },
+                    SaPlayerStatEvent {
+                        timing: SaEventTiming::default(),
+                        player_index: 0,
+                        is_team_0: 1,
+                        kind: SaPlayerStatEventKind::Assist,
+                        has_shot_ball: 0,
+                        shot_ball: SaRigidBody::default(),
+                        has_shot_player: 0,
+                        shot_player: SaRigidBody::default(),
+                    },
+                ],
+                demolishes: [SaDemolishEvent {
+                    timing: SaEventTiming::default(),
+                    attacker_index: 0,
+                    victim_index: 1,
+                    attacker_velocity: SaVec3 {
+                        x: 2300.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    victim_velocity: SaVec3::default(),
+                    victim_location: SaVec3 {
+                        x: 120.0,
+                        y: 0.0,
+                        z: 92.75,
+                    },
+                    active_duration_seconds: 0.25,
+                }],
+            }
+        }
+
+        fn frames(&self) -> Vec<SaLiveFrame> {
+            let mut frames = (1..=3)
+                .map(|frame_number| {
+                    let mut frame = live_frame(
+                        frame_number,
+                        rigid_body(
+                            SaVec3 {
+                                x: frame_number as f32 * 25.0,
+                                y: 0.0,
+                                z: 120.0,
+                            },
+                            SaVec3::default(),
+                        ),
+                        &self.players,
+                    );
+                    frame.has_live_play = 1;
+                    frame
+                })
+                .collect::<Vec<_>>();
+            frames[0].touches = self.touches.as_ptr();
+            frames[0].touch_count = self.touches.len();
+            frames[0].dodge_refreshes = self.dodge_refreshes.as_ptr();
+            frames[0].dodge_refresh_count = self.dodge_refreshes.len();
+            frames[0].boost_pad_events = self.boost_pad_events.as_ptr();
+            frames[0].boost_pad_event_count = self.boost_pad_events.len();
+            frames[0].goals = self.goals.as_ptr();
+            frames[0].goal_count = self.goals.len();
+            frames[0].player_stat_events = self.player_stat_events.as_ptr();
+            frames[0].player_stat_event_count = self.player_stat_events.len();
+            frames[0].demolishes = self.demolishes.as_ptr();
+            frames[0].demolish_count = self.demolishes.len();
+            frames
+        }
+    }
+
+    fn write_json_file(path: &std::path::Path, value: serde_json::Value) {
+        let bytes = serde_json::to_vec(&value).expect("graph dump JSON should serialize");
+        std::fs::write(path, bytes)
+            .unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
+    }
+
+    fn validate_graph_dump_with_python(dump_dir: &std::path::Path) {
+        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let validator = repo_root.join("bakkesmod").join("verify-graph-dump.py");
+        let python_candidates = if cfg!(windows) {
+            ["python", "python3"]
+        } else {
+            ["python3", "python"]
+        };
+
+        for python in python_candidates {
+            let output = match std::process::Command::new(python)
+                .arg(&validator)
+                .arg(dump_dir)
+                .arg("--require-event-history")
+                .arg("--require-graph-events")
+                .output()
+            {
+                Ok(output) => output,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => panic!("failed to run {python}: {error}"),
+            };
+            assert!(
+                output.status.success(),
+                "graph dump validator failed with {python}\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        panic!("failed to find python executable for graph dump validator");
+    }
+
     fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value {
         let mut engine = SaEngine::default();
         let players = unsafe {
@@ -8999,6 +9218,65 @@ mod tests {
             );
         }
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn synthetic_live_graph_dump_passes_bakkesmod_validator() {
+        let fixture = ExplicitEventFamilyFixture::new();
+        let frames = fixture.frames();
+        let engine = subtr_actor_bakkesmod_engine_create();
+        for frame in &frames {
+            assert_eq!(
+                unsafe { subtr_actor_bakkesmod_process_frame(engine, frame) },
+                0
+            );
+        }
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+
+        let dump_dir = std::env::temp_dir().join(format!(
+            "subtr-actor-bakkesmod-graph-dump-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock should be after epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dump_dir)
+            .unwrap_or_else(|error| panic!("failed to create {}: {error}", dump_dir.display()));
+
+        write_json_file(
+            &dump_dir.join("graph-events.json"),
+            live_events_json_value(engine),
+        );
+        write_json_file(
+            &dump_dir.join("graph-frame.json"),
+            live_frame_json_value(engine),
+        );
+        write_json_file(
+            &dump_dir.join("graph-timeline.json"),
+            live_timeline_json_value(engine),
+        );
+        write_json_file(
+            &dump_dir.join("graph-stats.json"),
+            live_stats_json_value(engine),
+        );
+        write_json_file(
+            &dump_dir.join("graph-analysis-nodes.json"),
+            live_graph_output_json_value(engine, "analysis_nodes"),
+        );
+        write_json_file(
+            &dump_dir.join("graph-event-history.json"),
+            live_graph_output_json_value(engine, "event_history"),
+        );
+        write_json_file(
+            &dump_dir.join("graph-info.json"),
+            live_graph_info_json_value(engine),
+        );
+
+        validate_graph_dump_with_python(&dump_dir);
+
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+        let _ = std::fs::remove_dir_all(&dump_dir);
     }
 
     #[test]
