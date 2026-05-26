@@ -4,6 +4,19 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.9.0 - 2026-05-26
+
+- Treat demolition timeline events as authoritative in the replay player so
+  demoed cars, boost trails, boost meters, and attached cameras disappear during
+  the respawn window even when replay frames still contain stale player samples.
+- Keep boost removed by demolitions from counting as boost usage while still
+  accounting for the later demo respawn boost grant.
+- Serve mechanics review playlists through the stats player and route the
+  GitHub Pages `/review/` build to that shared app.
+- Install Nix directly in the GitHub Pages workflow to avoid release failures
+  when the external Nix setup action archive is unavailable.
+- Refresh Rust, Python, and JavaScript release metadata to `0.9.0`.
+
 ## v0.8.16 - 2026-05-26
 
 - Treat demolition timeline events as authoritative in the replay player so
