@@ -54,7 +54,7 @@ events, dodge-refresh transitions, and control state:
 - the shared `StatsCollector` module-keyed stats surface through
   `subtr_actor_bakkesmod_stats_json_len` and
   `subtr_actor_bakkesmod_write_stats_json`
-- the full builtin analysis-node output map through the `analysis_nodes` named
+- the full callable analysis-node output map through the `analysis_nodes` named
   graph output, using `subtr_actor_bakkesmod_graph_output_json_len` and
   `subtr_actor_bakkesmod_write_graph_output_json`
 - the resolved graph DAG, callable node registry, builtin node registry, and stats module registry through
@@ -132,8 +132,8 @@ acceptance check for live graph callability and event-generation parity.
    `graph-info.json` should list `analysis_nodes` in `graph_output_names`, and
    `callable_analysis_node_names` should match the names verified by
    `subtr_actor_verify_graph`.
-   `graph-analysis-nodes.json` should contain keys for the builtin analysis
-   nodes reported by `builtin_analysis_node_names`.
+   `graph-analysis-nodes.json` should contain keys for every node reported by
+   `callable_analysis_node_names`.
 5. Spot-check individual call paths:
 
    ```text

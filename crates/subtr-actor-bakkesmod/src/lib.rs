@@ -8,10 +8,9 @@ use std::slice;
 
 use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
-    boost_amount_to_percent, builtin_analysis_node_json, builtin_analysis_nodes_json,
-    builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
-    builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
-    default_stats_timeline_config,
+    boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
+    builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
+    builtin_stats_module_names, default_stats_timeline_config,
     geometry::apply_velocities_to_rigid_body,
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
@@ -2231,10 +2230,21 @@ fn serialize_stats_graph_snapshot(engine: &SaEngine) -> Vec<u8> {
 }
 
 fn serialize_analysis_nodes_snapshot(engine: &SaEngine) -> Vec<u8> {
-    match builtin_analysis_nodes_json(&engine.graph) {
+    match callable_analysis_nodes_json(&engine.graph) {
         Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
         Err(_) => Vec::new(),
     }
+}
+
+fn callable_analysis_nodes_json(graph: &AnalysisGraph) -> SubtrActorResult<serde_json::Value> {
+    let mut values = serde_json::Map::new();
+    for node_name in callable_analysis_node_names_for_graph(graph) {
+        values.insert(
+            node_name.clone(),
+            builtin_analysis_node_json(&node_name, graph)?,
+        );
+    }
+    Ok(serde_json::Value::Object(values))
 }
 
 unsafe fn serialize_named_analysis_node(
@@ -4633,8 +4643,8 @@ mod tests {
         }
 
         graph.finish().expect("direct graph should finish");
-        let value = builtin_analysis_nodes_json(&graph)
-            .expect("direct graph should serialize all analysis nodes");
+        let value = callable_analysis_nodes_json(&graph)
+            .expect("direct graph should serialize all callable analysis nodes");
         let bytes =
             serde_json::to_vec(&value).expect("direct graph analysis nodes should serialize");
         serde_json::from_slice(&bytes).expect("direct graph analysis nodes json should be valid")
@@ -8229,13 +8239,18 @@ mod tests {
             direct_full_graph_analysis_nodes_json_value(&frames),
             "named all-node graph output should match the shared full graph"
         );
-        for node_name in builtin_analysis_node_names() {
+        let callable_node_names = callable_analysis_node_names(unsafe {
+            engine
+                .as_ref()
+                .expect("engine should remain valid while checking callable node names")
+        });
+        for node_name in callable_node_names {
             assert_eq!(
                 analysis_nodes
-                    .get(*node_name)
+                    .get(&node_name)
                     .unwrap_or_else(|| panic!("analysis_nodes should include {node_name}")),
-                &live_analysis_node_json_value(engine, node_name),
-                "analysis_nodes output should include the same payload as named node {node_name}"
+                &live_analysis_node_json_value(engine, &node_name),
+                "analysis_nodes output should include the same payload as callable node {node_name}"
             );
         }
         assert_eq!(
