@@ -312,9 +312,9 @@ fn build_mechanic_events(
         let mut mechanic_event = span_mechanic_event(
             "wall_aerial_shot",
             index,
-            event.wall_contact_frame,
+            event.takeoff_frame,
             event.frame,
-            event.wall_contact_time,
+            event.takeoff_time,
             event.time,
             event.player.clone(),
             event.is_team_0,

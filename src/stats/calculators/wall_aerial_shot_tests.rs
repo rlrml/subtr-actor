@@ -112,6 +112,90 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
 }
 
 #[test]
+fn rejects_wall_aerial_shot_after_returning_low_from_wall() {
+    let player = boxcars::RemoteId::Steam(1);
+    let mut calculator = WallAerialShotCalculator::new();
+
+    calculator
+        .update(
+            &frame(1, 0.0),
+            &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 0.2),
+            &players(glam::Vec3::new(2500.0, 0.0, 80.0)),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    let shot_ball = rigid_body(
+        glam::Vec3::new(3300.0, 0.0, 410.0),
+        glam::Vec3::new(-300.0, 1400.0, 20.0),
+    );
+    calculator
+        .update(
+            &frame(3, 0.4),
+            &players(glam::Vec3::new(3350.0, 0.0, 340.0)),
+            &FrameEventsState {
+                player_stat_events: vec![shot_event(3, 0.4, &shot_ball)],
+                ..FrameEventsState::default()
+            },
+            true,
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn rejects_wall_aerial_shot_from_stale_wall_contact() {
+    let player = boxcars::RemoteId::Steam(1);
+    let mut calculator = WallAerialShotCalculator::new();
+
+    calculator
+        .update(
+            &frame(1, 0.0),
+            &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 2.6),
+            &players(glam::Vec3::new(3350.0, 0.0, 330.0)),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    let shot_ball = rigid_body(
+        glam::Vec3::new(3300.0, 0.0, 410.0),
+        glam::Vec3::new(-300.0, 1400.0, 20.0),
+    );
+    calculator
+        .update(
+            &frame(3, 2.8),
+            &players(glam::Vec3::new(3350.0, 0.0, 340.0)),
+            &FrameEventsState {
+                player_stat_events: vec![shot_event(3, 2.8, &shot_ball)],
+                ..FrameEventsState::default()
+            },
+            true,
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
 fn rejects_wall_aerial_shot_without_wall_takeoff() {
     let player = boxcars::RemoteId::Steam(1);
     let mut calculator = WallAerialShotCalculator::new();

@@ -1,9 +1,12 @@
 use super::wall_aerial::{
     wall_aerial_normalize_score, wall_aerial_wall_for_position, WALL_AERIAL_HIGH_CONFIDENCE,
-    WALL_AERIAL_MAX_TAKEOFF_TO_SHOT_SECONDS, WALL_AERIAL_MIN_TOUCH_BALL_Z,
-    WALL_AERIAL_MIN_TOUCH_PLAYER_Z,
+    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z,
 };
 use super::*;
+
+const WALL_AERIAL_SHOT_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS: f32 = 2.25;
+const WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS: f32 = 2.25;
+const WALL_AERIAL_SHOT_GROUND_CONTACT_MAX_PLAYER_Z: f32 = 80.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -129,6 +132,12 @@ impl WallAerialShotCalculator {
             let Some(position) = player.position() else {
                 continue;
             };
+            if position.z <= WALL_AERIAL_SHOT_GROUND_CONTACT_MAX_PLAYER_Z {
+                self.recent_wall_contacts.remove(&player.player_id);
+                self.armed_shots.remove(&player.player_id);
+                continue;
+            }
+
             if let Some(wall) = wall_aerial_wall_for_position(position) {
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),
@@ -149,10 +158,14 @@ impl WallAerialShotCalculator {
                 continue;
             }
 
-            let Some(contact) = self.recent_wall_contacts.get(&player.player_id).cloned() else {
+            if self.armed_shots.contains_key(&player.player_id) {
+                continue;
+            }
+
+            let Some(contact) = self.recent_wall_contacts.remove(&player.player_id) else {
                 continue;
             };
-            if self.armed_shots.contains_key(&player.player_id) {
+            if frame.time - contact.time > WALL_AERIAL_SHOT_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS {
                 continue;
             }
             self.armed_shots.insert(
@@ -174,7 +187,7 @@ impl WallAerialShotCalculator {
 
     fn prune_armed_shots(&mut self, current_time: f32) {
         self.armed_shots.retain(|_, armed| {
-            current_time - armed.takeoff_time <= WALL_AERIAL_MAX_TAKEOFF_TO_SHOT_SECONDS
+            current_time - armed.takeoff_time <= WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS
         });
     }
 
@@ -196,7 +209,7 @@ impl WallAerialShotCalculator {
         }
         let armed = self.armed_shots.get(&event.player)?;
         let time_since_takeoff = event.time - armed.takeoff_time;
-        if !(0.0..=WALL_AERIAL_MAX_TAKEOFF_TO_SHOT_SECONDS).contains(&time_since_takeoff) {
+        if !(0.0..=WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS).contains(&time_since_takeoff) {
             return None;
         }
 
@@ -224,7 +237,7 @@ impl WallAerialShotCalculator {
                     - wall_aerial_normalize_score(
                         time_since_takeoff,
                         0.15,
-                        WALL_AERIAL_MAX_TAKEOFF_TO_SHOT_SECONDS,
+                        WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS,
                     ))
             + 0.16
                 * wall_aerial_normalize_score(
@@ -275,6 +288,8 @@ impl WallAerialShotCalculator {
         stats.cumulative_shot_height += event.player_position[2];
 
         self.current_last_wall_aerial_shot_player = Some(event.player.clone());
+        self.recent_wall_contacts.remove(&event.player);
+        self.armed_shots.remove(&event.player);
         self.events.push(event);
     }
 
