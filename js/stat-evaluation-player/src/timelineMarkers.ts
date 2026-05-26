@@ -26,21 +26,6 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
 const RANGE_ONLY_MECHANIC_KINDS = new Set(["air_dribble", "ball_carry"]);
-const GENERIC_MECHANIC_EVENT_MODULE_IDS = new Set([
-  "center",
-  "ceiling-shot",
-  "double-tap",
-  "flick",
-  "half-flip",
-  "half-volley",
-  "musty-flick",
-  "one-timer",
-  "pass",
-  "speed-flip",
-  "wall-aerial",
-  "wall-aerial-shot",
-]);
-
 function getReplayPlayerName(replay: ReplayModel, playerId: string): string {
   return replay.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
@@ -88,16 +73,20 @@ export function isVisibleMechanicKind(kind: string): boolean {
   return !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
+export function isRangeOnlyMechanicKind(kind: string): boolean {
+  return RANGE_ONLY_MECHANIC_KINDS.has(kind);
+}
+
 export function getMechanicTimelineEventKinds(statsTimeline: StatsTimeline | null): string[] {
-  return getMechanicKinds(statsTimeline).filter(
-    (kind) =>
-      !RANGE_ONLY_MECHANIC_KINDS.has(kind) &&
-      GENERIC_MECHANIC_EVENT_MODULE_IDS.has(mechanicKindToModuleId(kind)),
-  );
+  return getMechanicKinds(statsTimeline).filter((kind) => !isRangeOnlyMechanicKind(kind));
 }
 
 export function mechanicKindToModuleId(kind: string): string {
   return kind.replaceAll("_", "-");
+}
+
+export function getMechanicTimelineModuleIds(statsTimeline: StatsTimeline | null): Set<string> {
+  return new Set(getMechanicKinds(statsTimeline).map(mechanicKindToModuleId));
 }
 
 export function getMechanicTimelineEventModuleIds(
@@ -110,7 +99,7 @@ export function getNonMechanicTimelineEventModuleIds(
   moduleIds: Iterable<string>,
   statsTimeline: StatsTimeline | null,
 ): Set<string> {
-  const mechanicModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
   return new Set([...moduleIds].filter((moduleId) => !mechanicModuleIds.has(moduleId)));
 }
 
@@ -126,7 +115,7 @@ export function buildMechanicTimelineEvents(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.kind) &&
-        !RANGE_ONLY_MECHANIC_KINDS.has(event.kind) &&
+        !isRangeOnlyMechanicKind(event.kind) &&
         (!enabled || enabled.has(event.kind)),
     )
     .map((event) => {

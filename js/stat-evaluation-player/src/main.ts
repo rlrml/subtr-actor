@@ -48,8 +48,7 @@ import {
   formatMechanicKind,
   buildGoalTagTimelineEvents,
   getMechanicKinds,
-  getMechanicTimelineEventKinds,
-  getMechanicTimelineEventModuleIds,
+  getMechanicTimelineModuleIds,
   getNonMechanicTimelineEventModuleIds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
@@ -85,6 +84,7 @@ import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
+const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
 let replayPlayer: ReplayPlayer | null = null;
@@ -94,6 +94,7 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 let removeRenderHook: (() => void) | null = null;
+let lastPlayingSnapshotUiUpdateAt = 0;
 
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
@@ -260,7 +261,9 @@ let mechanicsReviewConfirm!: HTMLButtonElement;
 let mechanicsReviewReject!: HTMLButtonElement;
 let mechanicsReviewUncertain!: HTMLButtonElement;
 let mechanicsReviewReplayLoadSummary!: HTMLElement;
-let mechanicsReviewReplayLoads!: HTMLDivElement;
+let replayLoadingSummary!: HTMLElement;
+let replayLoadingActive!: HTMLElement;
+let replayLoadingList!: HTMLDivElement;
 let mechanicsReviewCount!: HTMLElement;
 let mechanicsReviewList!: HTMLDivElement;
 let boostPickupFiltersWindowBody!: HTMLDivElement;
@@ -351,6 +354,7 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "mechanics",
   "event-playlist",
   "mechanics-review",
+  "replay-loading",
   "boost-pickups",
   "touch-controls",
 ];
@@ -420,6 +424,7 @@ interface ActiveMechanicsReview {
   replayLoadCache: Map<string, Promise<ReplayLoadBundle>>;
   currentIndex: number;
   loading: boolean;
+  preloading: boolean;
   currentReplayId: string | null;
   currentClip: { startTime: number; endTime: number } | null;
 }
@@ -510,7 +515,7 @@ function setupActiveModules(): void {
 }
 
 function migrateMechanicBackedTimelineEventSelections(): void {
-  for (const kind of getMechanicTimelineEventKinds(statsTimeline)) {
+  for (const kind of getMechanicKinds(statsTimeline)) {
     const moduleId = mechanicKindToModuleId(kind);
     if (activeTimelineEventModuleIds.delete(moduleId)) {
       activeMechanicTimelineKinds.add(kind);
@@ -1160,7 +1165,7 @@ function renderModuleSummary(): void {
 
   const timelineToggles: HTMLButtonElement[] = [];
   const inGameVisualizationToggles: HTMLButtonElement[] = [];
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
 
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -1168,7 +1173,7 @@ function renderModuleSummary(): void {
       continue;
     }
 
-    if (mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id)) {
+    if (mod.getTimelineEvents && !mechanicModuleIds.has(mod.id)) {
       timelineToggles.push(
         renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
       );
@@ -1234,10 +1239,10 @@ function renderEventTimelineControls(): void {
   for (const event of statsTimeline?.events.mechanics ?? []) {
     mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
   }
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
 
   const moduleEventSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
   ).map((mod) => ({
     id: mod.id,
     label: mod.label,
@@ -1441,9 +1446,9 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
   }
 
   const visibleMechanicKinds = getMechanicKinds(ctx.statsTimeline);
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(ctx.statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(ctx.statsTimeline);
   const moduleSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
   )
     .map((mod) => ({
       id: `module:${mod.id}`,
@@ -1900,7 +1905,16 @@ function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): str
     return path;
   }
   if (path.startsWith("/")) {
-    return isLikelyLocalFilePath(path) ? `/@fs${path}` : path;
+    if (isLikelyLocalFilePath(path)) {
+      return `/@fs${path}`;
+    }
+    if (sourceUrl) {
+      const base = new URL(sourceUrl, window.location.href);
+      if (base.origin !== window.location.origin) {
+        return new URL(path, base.origin).href;
+      }
+    }
+    return path;
   }
   return sourceUrl ? new URL(path, sourceUrl).href : path;
 }
@@ -2230,7 +2244,7 @@ function mechanicsReviewReplayLoadProgressValue(state: MechanicsReviewReplayLoad
 }
 
 function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null): void {
-  if (!mechanicsReviewReplayLoads || !mechanicsReviewReplayLoadSummary) {
+  if (!mechanicsReviewReplayLoadSummary || !replayLoadingSummary || !replayLoadingList) {
     return;
   }
 
@@ -2238,19 +2252,34 @@ function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null):
   const loaded = states.filter((state) => state.status === "loaded").length;
   const loading = states.filter((state) => state.status === "loading").length;
   const failed = states.filter((state) => state.status === "error").length;
-  mechanicsReviewReplayLoadSummary.textContent =
+  const pending = states.filter((state) => state.status === "idle").length;
+  const summaryText =
     states.length === 0
       ? "0 replays"
       : `${loaded}/${states.length} loaded${loading > 0 ? `, ${loading} loading` : ""}${
           failed > 0 ? `, ${failed} failed` : ""
         }`;
+  mechanicsReviewReplayLoadSummary.textContent = summaryText;
+  replayLoadingSummary.textContent = summaryText;
+  replayLoadingActive.textContent =
+    states.length === 0
+      ? "No playlist"
+      : loading > 0
+        ? `${loading} active, ${pending} pending`
+        : failed > 0
+          ? `${failed} failed`
+          : review?.preloading
+            ? `Background queue, ${pending} pending`
+            : loaded === states.length
+              ? "Complete"
+              : `${pending} pending`;
 
-  mechanicsReviewReplayLoads.replaceChildren();
+  replayLoadingList.replaceChildren();
   if (!review || states.length === 0) {
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
     empty.textContent = "No replay sources.";
-    mechanicsReviewReplayLoads.append(empty);
+    replayLoadingList.append(empty);
     return;
   }
 
@@ -2285,7 +2314,7 @@ function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null):
     progress.append(bar);
 
     row.append(main, status, progress);
-    mechanicsReviewReplayLoads.append(row);
+    replayLoadingList.append(row);
   }
 }
 
@@ -2293,14 +2322,30 @@ function preloadMechanicsReviewReplays(
   review: ActiveMechanicsReview,
   currentReplayId: string,
 ): void {
-  for (const [replayId, item] of getMechanicsReviewReplayItems(review)) {
-    if (replayId === currentReplayId) {
-      continue;
-    }
-    void loadMechanicsReviewReplayBundle(item, review).catch(() => {
-      // Background preload failures are rendered in the replay load panel.
-    });
+  if (review.preloading) {
+    return;
   }
+  review.preloading = true;
+  void (async () => {
+    try {
+      for (const [replayId, item] of getMechanicsReviewReplayItems(review)) {
+        if (replayId === currentReplayId) {
+          continue;
+        }
+        const state = review.replayLoadStates.get(replayId);
+        if (state?.status === "loaded" || state?.status === "loading") {
+          continue;
+        }
+        try {
+          await loadMechanicsReviewReplayBundle(item, review);
+        } catch {
+          // Background preload failures are rendered in the replay load window.
+        }
+      }
+    } finally {
+      review.preloading = false;
+    }
+  })();
 }
 
 function loadMechanicsReviewReplayBundle(
@@ -2436,10 +2481,12 @@ async function loadMechanicsReviewPlaylist(
     replayLoadCache: new Map(),
     currentIndex: 0,
     loading: false,
+    preloading: false,
     currentReplayId: null,
     currentClip: null,
   };
   initializeMechanicsReviewReplayLoadStates(activeMechanicsReview);
+  showWindow("replay-loading");
   setMechanicsReviewStatus(
     manifest.label ? `Loaded ${manifest.label}.` : `Loaded review playlist.`,
   );
@@ -2484,12 +2531,10 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
     if (!replayPlayer || review.currentReplayId !== item.replay) {
       const source = createMechanicsReviewReplaySource(item, review);
       const replayBundlePromise = loadMechanicsReviewReplayBundle(item, review);
-      preloadMechanicsReviewReplays(review, item.replay);
       await loadReplayBundleForDisplay(source, replayBundlePromise);
       review.currentReplayId = item.replay;
-    } else {
-      preloadMechanicsReviewReplays(review, item.replay);
     }
+    preloadMechanicsReviewReplays(review, item.replay);
 
     const startTime = Math.max(0, getMechanicsReviewBoundTime(item.start));
     const endTime = Math.min(
@@ -3900,6 +3945,12 @@ function renderSnapshot(state: ReplayPlayerState): void {
     return;
   }
 
+  const now = performance.now();
+  if (state.playing && now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS) {
+    return;
+  }
+  lastPlayingSnapshotUiUpdateAt = now;
+
   timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${state.frameIndex}`;
   durationReadout.textContent = `${state.duration.toFixed(2)}s`;
@@ -4182,7 +4233,9 @@ export function mountStatEvaluationPlayer(
     root,
     "#mechanics-review-replay-load-summary",
   );
-  mechanicsReviewReplayLoads = mustElement<HTMLDivElement>(root, "#mechanics-review-replay-loads");
+  replayLoadingSummary = mustElement<HTMLElement>(root, "#replay-loading-summary");
+  replayLoadingActive = mustElement<HTMLElement>(root, "#replay-loading-active");
+  replayLoadingList = mustElement<HTMLDivElement>(root, "#replay-loading-list");
   mechanicsReviewCount = mustElement<HTMLElement>(root, "#mechanics-review-count");
   mechanicsReviewList = mustElement<HTMLDivElement>(root, "#mechanics-review-list");
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(

@@ -32,6 +32,7 @@ impl AnalysisNode for CenterNode {
             frame_info_dependency(),
             ball_frame_state_dependency(),
             touch_state_dependency(),
+            frame_events_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -41,6 +42,7 @@ impl AnalysisNode for CenterNode {
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
             ctx.get::<TouchState>()?,
+            ctx.get::<FrameEventsState>()?,
             ctx.get::<LivePlayState>()?.is_live_play,
         )
     }

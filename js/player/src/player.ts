@@ -17,6 +17,7 @@ import {
 } from "./player-internals/timeline";
 import {
   getFreeCameraPreset,
+  interpolateQuaternion,
   interpolatePosition,
   rootPosition,
   updateFreeCameraTransition,
@@ -634,13 +635,13 @@ export class ReplayPlayer extends EventTarget {
     if (interpolatedBallPosition) {
       this.sceneState.ballMesh.visible = true;
       this.sceneState.ballMesh.position.copy(rootPosition(interpolatedBallPosition));
-      if (ballFrame?.rotation) {
-        this.sceneState.ballMesh.quaternion.set(
-          ballFrame.rotation.x,
-          ballFrame.rotation.y,
-          ballFrame.rotation.z,
-          ballFrame.rotation.w,
-        );
+      const ballRotation = interpolateQuaternion(
+        ballFrame?.rotation ?? null,
+        nextBallFrame?.rotation ?? null,
+        frameWindow.alpha,
+      );
+      if (ballRotation) {
+        this.sceneState.ballMesh.quaternion.copy(ballRotation);
       } else {
         this.sceneState.ballMesh.quaternion.identity();
       }
@@ -730,8 +731,13 @@ export class ReplayPlayer extends EventTarget {
       }
       renderPosition = interpolatedPosition;
       mesh.position.copy(rootPosition(interpolatedPosition));
-      if (frame?.rotation) {
-        mesh.quaternion.set(frame.rotation.x, frame.rotation.y, frame.rotation.z, frame.rotation.w);
+      const rotation = interpolateQuaternion(
+        frame?.rotation ?? null,
+        nextFrame?.rotation ?? null,
+        frameWindow.alpha,
+      );
+      if (rotation) {
+        mesh.quaternion.copy(rotation);
       } else {
         mesh.quaternion.identity();
       }

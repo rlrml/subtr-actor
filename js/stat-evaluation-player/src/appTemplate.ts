@@ -29,6 +29,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-window-toggle="mechanics">Events</button>
               <button type="button" data-window-toggle="event-playlist">Event playlist</button>
               <button type="button" data-window-toggle="mechanics-review">Mechanics review</button>
+              <button type="button" data-window-toggle="replay-loading">Replay loading</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
@@ -449,16 +450,35 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                   <span>Replays</span>
                   <span id="mechanics-review-replay-load-summary">0 replays</span>
                 </div>
-                <div
-                  id="mechanics-review-replay-loads"
-                  class="mechanics-review-replay-loads"
-                ></div>
               </section>
               <div class="mechanics-review-list-header">
                 <span>Playlist</span>
                 <span id="mechanics-review-count">0 items</span>
               </div>
               <div id="mechanics-review-list" class="mechanics-review-list"></div>
+            </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-replay-loading"
+            data-window-id="replay-loading"
+            hidden
+            style="--window-x: calc(100vw - 33rem); --window-y: 4.25rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Replay loading</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="replay-loading">
+                Hide
+              </button>
+            </header>
+            <div id="replay-loading-window-body" class="replay-loading-window-body">
+              <div class="replay-loading-summary">
+                <span id="replay-loading-summary">0 replays</span>
+                <span id="replay-loading-active">Idle</span>
+              </div>
+              <div id="replay-loading-list" class="replay-loading-list"></div>
             </div>
           </section>
 

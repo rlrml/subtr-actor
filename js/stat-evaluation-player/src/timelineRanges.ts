@@ -1,6 +1,10 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
 import type { PlayerStatsSnapshot, StatsTimeline } from "./statsTimeline.ts";
-import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
+import {
+  formatMechanicKind,
+  isRangeOnlyMechanicKind,
+  isVisibleMechanicKind,
+} from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -99,6 +103,7 @@ export function buildMechanicTimelineRanges(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.kind) &&
+        isRangeOnlyMechanicKind(event.kind) &&
         event.timing.type === "span" &&
         (!enabled || enabled.has(event.kind)),
     )

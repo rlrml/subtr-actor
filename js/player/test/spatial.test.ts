@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 
-import { updateAttachedCamera } from "../src/player-internals/spatial";
+import { interpolateQuaternion, updateAttachedCamera } from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
 import type { ReplayScene } from "../src/scene";
 
@@ -93,4 +93,20 @@ test("ball cam stays behind the attached player when the ball is ahead", () => {
     "expected ball cam to keep the camera behind the player, not between the car and ball",
   );
   assert.ok(desiredLookTarget.x > 0, "expected ball cam to keep looking toward the ball");
+});
+
+test("interpolateQuaternion blends rotation samples instead of holding the previous frame", () => {
+  const current = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0);
+  const next = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI);
+
+  const halfway = interpolateQuaternion(
+    { x: current.x, y: current.y, z: current.z, w: current.w },
+    { x: next.x, y: next.y, z: next.z, w: next.w },
+    0.5,
+  );
+  assert.ok(halfway);
+
+  const rotated = new THREE.Vector3(1, 0, 0).applyQuaternion(halfway);
+  assert.ok(Math.abs(rotated.x) < 1e-10);
+  assert.ok(rotated.y > 0.999);
 });

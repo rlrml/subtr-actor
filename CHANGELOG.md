@@ -4,6 +4,24 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.13 - 2026-05-26
+
+- Smoothly interpolate replay ball and car rotations between frames.
+- Resolve mechanics-review absolute replay paths against remote manifest origins
+  when hosted review bundles point at non-local assets.
+- Throttle stats-player snapshot UI updates during playback.
+- Consolidate mechanic timeline sources so event windows include all configured
+  mechanics while avoiding duplicate timeline spans.
+- Ignore center detections that later resolve as shots or goals.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.13`.
+
+## v0.8.12 - 2026-05-26
+
+- Add a dedicated replay-loading window to the mechanics review player.
+- Show active, pending, loaded, and failed replay preload state outside the main
+  mechanics review playlist.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.12`.
+
 ## v0.8.11 - 2026-05-26
 
 - Improve wall-to-air setup detection for air-based mechanics.
