@@ -1283,79 +1283,6 @@ fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Ve
         .collect()
 }
 
-fn infer_dodge_refreshed_events(
-    frame: &FrameInfo,
-    ball: &BallFrameState,
-    players: &PlayerFrameState,
-    touch_events: &[subtr_actor::TouchEvent],
-    counters: &mut Vec<(RemoteId, i32)>,
-    suppressed_keys: &HashSet<(RemoteId, usize)>,
-) -> Vec<DodgeRefreshedEvent> {
-    const MIN_PLAYER_HEIGHT: f32 = 95.0;
-    const MIN_BALL_HEIGHT: f32 = 80.0;
-    const MAX_CENTER_DISTANCE: f32 = 180.0;
-    const MAX_LOCAL_VERTICAL_OFFSET: f32 = 140.0;
-
-    let Some(ball) = ball.sample() else {
-        return Vec::new();
-    };
-    let ball_position = subtr_actor::vec_to_glam(&ball.rigid_body.location);
-    if ball_position.z < MIN_BALL_HEIGHT {
-        return Vec::new();
-    }
-
-    let mut events = Vec::new();
-    for touch in touch_events {
-        let Some(player_id) = touch.player.as_ref() else {
-            continue;
-        };
-        if suppressed_keys.contains(&(player_id.clone(), frame.frame_number)) {
-            continue;
-        }
-        let Some(player) = players
-            .players
-            .iter()
-            .find(|player| &player.player_id == player_id)
-        else {
-            continue;
-        };
-        let Some(player_rigid_body) = player.rigid_body.as_ref() else {
-            continue;
-        };
-
-        let player_position = subtr_actor::vec_to_glam(&player_rigid_body.location);
-        if player_position.z < MIN_PLAYER_HEIGHT {
-            continue;
-        }
-
-        let relative_ball_position = ball_position - player_position;
-        if !relative_ball_position.is_finite()
-            || relative_ball_position.length() > MAX_CENTER_DISTANCE
-        {
-            continue;
-        }
-
-        let player_rotation = subtr_actor::quat_to_glam(&player_rigid_body.rotation);
-        let local_ball_position = player_rotation.inverse() * relative_ball_position;
-        if local_ball_position.z > MAX_LOCAL_VERTICAL_OFFSET {
-            continue;
-        }
-
-        let previous = find_counter(counters, player_id).unwrap_or(0);
-        let counter_value = previous + 1;
-        set_counter(counters, player_id.clone(), counter_value);
-        events.push(DodgeRefreshedEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            player: player_id.clone(),
-            is_team_0: player.is_team_0,
-            counter_value,
-        });
-    }
-
-    events
-}
-
 impl SaLiveEventGenerator {
     fn explicit_dodge_refreshed_events(
         &mut self,
@@ -1576,16 +1503,7 @@ impl SaLiveEventGenerator {
         if touch_events.is_empty() && has_explicit_touch_events {
             touch_events = touch_tracker_events.touch_events.clone();
         }
-        let inferred_dodge_refreshed_events = infer_dodge_refreshed_events(
-            frame,
-            ball,
-            players,
-            &touch_events,
-            &mut self.dodge_refresh_counters,
-            &explicit_dodge_refresh_keys,
-        );
         let mut dodge_refreshed_events = explicit_dodge_refreshed_events;
-        dodge_refreshed_events.extend(inferred_dodge_refreshed_events);
         dodge_refreshed_events.sort_by_key(|event| event.counter_value);
 
         (
@@ -6440,7 +6358,7 @@ mod tests {
     }
 
     #[test]
-    fn process_frame_generates_live_dodge_refreshed_events_for_airborne_ball_touches() {
+    fn process_frame_does_not_infer_live_dodge_refreshed_events_from_touch_geometry() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let players = [player_at(SaVec3 {
             x: 0.0,
@@ -6490,11 +6408,7 @@ mod tests {
             .graph
             .state::<FrameEventsState>()
             .expect("full analysis graph should expose frame events state");
-        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
-        assert_eq!(
-            frame_events.dodge_refreshed_events[0].player,
-            RemoteId::SplitScreen(0)
-        );
+        assert!(frame_events.dodge_refreshed_events.is_empty());
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 

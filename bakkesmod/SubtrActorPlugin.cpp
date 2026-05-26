@@ -1019,7 +1019,7 @@ void SubtrActorPlugin::onLoad() {
       1);
   cvarManager->registerCvar(
       "subtr_actor_sample_interval_ms",
-      "50",
+      "8",
       "Minimum elapsed game time between live frame samples.",
       true,
       true,
@@ -1676,6 +1676,7 @@ void SubtrActorPlugin::resetLiveState() {
   lastPlayerStats.clear();
   suppressedPlayerStatDeltas.clear();
   lastDoubleJumped.clear();
+  lastCanJump.clear();
   lastBallTouchFrames.clear();
   dodgeRefreshCounters.clear();
   boostPadIds.clear();
@@ -1781,20 +1782,20 @@ void SubtrActorPlugin::recordDodgeRefreshFromJumpState(
     return;
   }
 
-  const bool doubleJumped = car.GetbDoubleJumped() != 0;
   const bool canJump = car.GetbCanJump() != 0;
   const bool onGround = car.GetbOnGround() != 0 || car.IsOnGround();
-  const auto previousDoubleJumped = lastDoubleJumped.find(playerIndex);
-  const bool hadSpentDodge =
-      previousDoubleJumped != lastDoubleJumped.end() && previousDoubleJumped->second;
-  lastDoubleJumped[playerIndex] = doubleJumped;
+  lastDoubleJumped[playerIndex] = car.GetbDoubleJumped() != 0;
+  const auto previousCanJump = lastCanJump.find(playerIndex);
+  const bool canJumpWasKnown = previousCanJump != lastCanJump.end();
+  const bool regainedJump = canJumpWasKnown && !previousCanJump->second && canJump;
+  lastCanJump[playerIndex] = canJump;
 
   const auto touchFrame = lastBallTouchFrames.find(playerIndex);
   const bool recentlyTouchedBall =
       touchFrame != lastBallTouchFrames.end() &&
       frameNumber >= touchFrame->second &&
       frameNumber - touchFrame->second <= DODGE_REFRESH_TOUCH_FRAME_WINDOW;
-  if (!hadSpentDodge || doubleJumped || !canJump || onGround || !recentlyTouchedBall) {
+  if (!regainedJump || onGround || !recentlyTouchedBall) {
     return;
   }
 

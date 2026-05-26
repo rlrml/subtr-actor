@@ -147,6 +147,7 @@ private:
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> suppressedPlayerStatDeltas;
   std::unordered_map<uint32_t, bool> lastDoubleJumped;
+  std::unordered_map<uint32_t, bool> lastCanJump;
   std::unordered_map<uint32_t, uint64_t> lastBallTouchFrames;
   std::unordered_map<uint32_t, int32_t> dodgeRefreshCounters;
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
