@@ -1374,10 +1374,14 @@ impl SaLiveEventGenerator {
         };
         let live_play = explicit_live_play.unwrap_or_else(|| {
             let mut gameplay = gameplay.clone();
-            if (has_explicit_touch_events || has_explicit_dodge_refreshed_events)
-                && gameplay.ball_has_been_hit == Some(false)
-            {
-                gameplay.ball_has_been_hit = Some(true);
+            if has_explicit_touch_events || has_explicit_dodge_refreshed_events {
+                if gameplay.ball_has_been_hit == Some(false) {
+                    gameplay.ball_has_been_hit = Some(true);
+                }
+                if gameplay.kickoff_countdown_time.is_some_and(|time| time > 0) {
+                    gameplay.kickoff_countdown_time = Some(0);
+                    gameplay.game_state = None;
+                }
             }
             self.live_play_tracker.state_parts(&gameplay, &base_events)
         });
@@ -8654,6 +8658,72 @@ mod tests {
             ),
             &players,
         );
+        frame.ball_has_been_hit = 0;
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let live_play = engine_ref
+            .graph
+            .state::<LivePlayState>()
+            .expect("full analysis graph should expose live play state");
+        assert_eq!(live_play.gameplay_phase, GameplayPhase::ActivePlay);
+        assert!(live_play.is_live_play);
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert_eq!(
+            frame_events.touch_events[0].player,
+            Some(RemoteId::SplitScreen(0))
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn explicit_live_touch_marks_stale_kickoff_countdown_frame_as_active_play() {
+        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
+
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 12.0,
+            has_closest_approach_distance: 1,
+        }];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.game_state = GAME_STATE_KICKOFF_COUNTDOWN;
+        frame.has_game_state = 1;
+        frame.kickoff_countdown_time = 3;
+        frame.has_kickoff_countdown_time = 1;
         frame.ball_has_been_hit = 0;
         frame.touches = touches.as_ptr();
         frame.touch_count = touches.len();
