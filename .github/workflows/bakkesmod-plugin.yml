@@ -87,6 +87,7 @@ jobs:
           Assert-Contains $pluginText "subtr_actor_self_test_graph" "BakkesMod synthetic graph self-test command"
           Assert-Contains $pluginText "graph self-test fed every required event family" "BakkesMod synthetic graph self-test diagnostics"
           Assert-Contains $pluginText "graph self-test derived active_demos from demolish event" "BakkesMod derived active-demo self-test diagnostics"
+          Assert-Contains $pluginText "graph self-test writing synthetic graph dump" "BakkesMod synthetic graph dump diagnostics"
           Assert-Contains $pluginText "require_event_history" "BakkesMod strict event-history verification mode"
           Assert-Contains $pluginText "require_graph_events" "BakkesMod strict graph-events verification mode"
           Assert-Contains $pluginText "every callable analysis node" "BakkesMod graph verification scope"

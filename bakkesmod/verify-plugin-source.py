@@ -227,6 +227,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "graph self-test writing synthetic graph dump",
+        "synthetic graph self-test dump mode",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "require_event_history",
         "strict self-test event-history mode",
         errors,

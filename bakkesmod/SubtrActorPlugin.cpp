@@ -1045,7 +1045,8 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_self_test_graph",
       [this](std::vector<std::string> params) { selfTestGraphRuntime(params); },
       "Feeds a synthetic live frame with every required event family, then runs "
-      "strict graph verification against a temporary Rust engine.",
+      "strict graph verification against a temporary Rust engine. Pass 'dump' "
+      "to also write synthetic graph JSON snapshots.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -3053,12 +3054,16 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
                        : "subtr-actor: graph verification failed; enter gameplay/replay and try again");
 }
 
-void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string>) {
+void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string> params) {
   if (!loaded || !engineCreate || !engineDestroy || !processFrame || !engineFinish ||
       !graphOutputJsonLen || !writeGraphOutputJson) {
     cvarManager->log("subtr-actor: graph self-test requested before ABI was loaded");
     return;
   }
+  const bool shouldDump =
+      std::find_if(params.begin(), params.end(), [](const std::string &param) {
+        return param == "dump" || param == "write_dump" || param == "write-dump";
+      }) != params.end();
 
   SaEngine *selfTestEngine = engineCreate();
   if (!selfTestEngine) {
@@ -3221,6 +3226,10 @@ void SubtrActorPlugin::selfTestGraphRuntime(std::vector<std::string>) {
     cvarManager->log(
         "subtr-actor: graph self-test fed every required event family");
     verifyGraphRuntime({"finish", "require_event_history", "require_graph_events"});
+    if (shouldDump) {
+      cvarManager->log("subtr-actor: graph self-test writing synthetic graph dump");
+      dumpGraphJson({"subtr_actor_dump_graph", "finish"});
+    }
   }
   messages = liveMessages;
   engine = liveEngine;

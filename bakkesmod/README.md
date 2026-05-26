@@ -140,6 +140,12 @@ acceptance check for live graph callability and event-generation parity.
    The console should log that the self-test derived `active_demos` from the
    synthetic demolition, fed every required event family, and then
    `subtr-actor: graph verification passed` from the strict verifier.
+   To also write a strict synthetic dump under `data\subtr-actor` for the dump
+   validator, run:
+
+   ```text
+   subtr_actor_self_test_graph dump
+   ```
 3. Exercise live events that should be visible to the graph: touch the ball,
    trigger a dodge refresh or flip reset setup when possible, pick up a boost
    pad, generate shot/save/assist match-stat deltas, score a goal, and trigger
