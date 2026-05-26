@@ -56,6 +56,34 @@ constexpr std::array<const char *, 6> REQUIRED_EVENT_HISTORY_FIELDS{
     "player_stat_events",
     "goal_events",
 };
+constexpr std::array<const char *, 21> GRAPH_EVENT_FIELDS{
+    "timeline",
+    "mechanics",
+    "goal_context",
+    "backboard",
+    "ceiling_shot",
+    "wall_aerial",
+    "wall_aerial_shot",
+    "center",
+    "double_tap",
+    "fifty_fifty",
+    "one_timer",
+    "pass",
+    "goal_tags",
+    "rush",
+    "speed_flip",
+    "half_flip",
+    "half_volley",
+    "wavedash",
+    "whiff",
+    "boost_pickups",
+    "bump",
+};
+constexpr std::array<const char *, 3> REQUIRED_GRAPH_EVENT_FIELDS{
+    "timeline",
+    "goal_context",
+    "boost_pickups",
+};
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
@@ -74,22 +102,37 @@ bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
          }) != params.end();
 }
 
-std::vector<std::string> defaultEventHistoryFields() {
-  std::vector<std::string> fields;
-  fields.reserve(FRAME_EVENTS_STATE_EVENT_FIELDS.size());
-  for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
-    fields.emplace_back(fieldName);
+bool wantsRequiredGraphEvents(const std::vector<std::string> &params) {
+  return std::find_if(params.begin(), params.end(), [](const std::string &param) {
+           return param == "require_graph_events" || param == "require-graph-events" ||
+                  param == "require_timeline_events" || param == "require-timeline-events";
+         }) != params.end();
+}
+
+template <typename Array>
+std::vector<std::string> stringVectorFromArray(const Array &values) {
+  std::vector<std::string> strings;
+  strings.reserve(values.size());
+  for (const char *value : values) {
+    strings.emplace_back(value);
   }
-  return fields;
+  return strings;
+}
+
+std::vector<std::string> defaultGraphEventFields() {
+  return stringVectorFromArray(GRAPH_EVENT_FIELDS);
+}
+
+std::vector<std::string> defaultRequiredGraphEventFields() {
+  return stringVectorFromArray(REQUIRED_GRAPH_EVENT_FIELDS);
+}
+
+std::vector<std::string> defaultEventHistoryFields() {
+  return stringVectorFromArray(FRAME_EVENTS_STATE_EVENT_FIELDS);
 }
 
 std::vector<std::string> defaultRequiredEventHistoryFields() {
-  std::vector<std::string> fields;
-  fields.reserve(REQUIRED_EVENT_HISTORY_FIELDS.size());
-  for (const char *fieldName : REQUIRED_EVENT_HISTORY_FIELDS) {
-    fields.emplace_back(fieldName);
-  }
-  return fields;
+  return stringVectorFromArray(REQUIRED_EVENT_HISTORY_FIELDS);
 }
 
 bool containsString(const std::vector<std::string> &values, std::string_view value) {
@@ -943,7 +986,8 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_verify_graph",
       [this](std::vector<std::string> params) { verifyGraphRuntime(params); },
       "Calls the live graph outputs and every callable analysis node, logging byte sizes. "
-      "Pass 'finish' to flush delayed graph events first.",
+      "Pass 'finish' to flush delayed graph events first; pass 'require_graph_events' "
+      "or 'require_event_history' for strict event checks.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -2412,6 +2456,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         return param == "finish" || param == "finalize";
       }) != params.end();
   const bool requireEventHistory = wantsRequiredEventHistory(params);
+  const bool requireGraphEvents = wantsRequiredGraphEvents(params);
   if (shouldFinish) {
     if (!engineFinish) {
       cvarManager->log(
@@ -2454,6 +2499,72 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     cvarManager->log(std::format(
         "subtr-actor: graph_info declares all {} required graph outputs",
         VERIFY_GRAPH_OUTPUTS.size()));
+  }
+  std::vector<std::string> graphEventFieldNames =
+      parseJsonStringArrayProperty(graphInfoJson, "graph_event_field_names");
+  if (graphEventFieldNames.empty()) {
+    if (!graphInfoJson.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not read graph event field names from graph_info");
+    }
+    graphEventFieldNames = defaultGraphEventFields();
+  }
+  bool missingKnownGraphEventField = false;
+  for (const char *fieldName : GRAPH_EVENT_FIELDS) {
+    if (!containsString(graphEventFieldNames, fieldName)) {
+      ok = false;
+      missingKnownGraphEventField = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification graph_info missing required graph event field '{}'",
+          fieldName));
+    }
+  }
+  if (!missingKnownGraphEventField) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares all {} known graph event fields",
+        GRAPH_EVENT_FIELDS.size()));
+  }
+  std::vector<std::string> requiredGraphEventFieldNames =
+      parseJsonStringArrayProperty(graphInfoJson, "required_graph_event_field_names");
+  if (requiredGraphEventFieldNames.empty()) {
+    if (!graphInfoJson.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not read required graph event field names from graph_info");
+    }
+    requiredGraphEventFieldNames = defaultRequiredGraphEventFields();
+  }
+  bool missingKnownRequiredGraphEventField = false;
+  for (const char *fieldName : REQUIRED_GRAPH_EVENT_FIELDS) {
+    if (!containsString(requiredGraphEventFieldNames, fieldName)) {
+      ok = false;
+      missingKnownRequiredGraphEventField = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification graph_info missing strict graph event field '{}'",
+          fieldName));
+    }
+  }
+  if (!missingKnownRequiredGraphEventField) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares all {} strict graph event fields",
+        REQUIRED_GRAPH_EVENT_FIELDS.size()));
+  }
+  bool requiredGraphEventFieldNotDeclared = false;
+  for (const std::string &fieldName : requiredGraphEventFieldNames) {
+    if (!containsString(graphEventFieldNames, fieldName)) {
+      ok = false;
+      requiredGraphEventFieldNotDeclared = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification required graph event field '{}' is not declared",
+          fieldName));
+    }
+  }
+  if (!requiredGraphEventFieldNotDeclared) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares {} graph event fields and {} required graph event fields",
+        graphEventFieldNames.size(),
+        requiredGraphEventFieldNames.size()));
   }
   std::vector<std::string> eventHistoryFieldNames =
       parseJsonStringArrayProperty(graphInfoJson, "event_history_field_names");
@@ -2523,6 +2634,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   }
 
   std::string analysisNodesJson;
+  std::string graphEventsJson;
   std::string eventHistoryJson;
   for (const std::string &outputName : outputNames) {
     const std::string outputJson =
@@ -2561,7 +2673,9 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
             outputName));
       }
     }
-    if (outputName == "analysis_nodes") {
+    if (outputName == "events") {
+      graphEventsJson = outputJson;
+    } else if (outputName == "analysis_nodes") {
       analysisNodesJson = outputJson;
     } else if (outputName == "event_history") {
       eventHistoryJson = outputJson;
@@ -2571,6 +2685,63 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     cvarManager->log(std::format(
         "subtr-actor: verified {} graph outputs by name",
         outputNames.size()));
+  }
+
+  std::vector<std::string> graphEventKeys = parseJsonObjectKeys(graphEventsJson);
+  if (graphEventKeys.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not inspect events graph output fields");
+  } else {
+    std::sort(graphEventKeys.begin(), graphEventKeys.end());
+    bool missingGraphEventField = false;
+    bool missingRequiredGraphEvent = false;
+    for (const std::string &fieldName : graphEventFieldNames) {
+      if (!std::binary_search(graphEventKeys.begin(), graphEventKeys.end(), fieldName)) {
+        ok = false;
+        missingGraphEventField = true;
+        if (requireGraphEvents && containsString(requiredGraphEventFieldNames, fieldName)) {
+          missingRequiredGraphEvent = true;
+        }
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification events output missing graph event field '{}'",
+            fieldName));
+        continue;
+      }
+      const auto eventCount = parseJsonArrayPropertyElementCount(graphEventsJson, fieldName);
+      if (!eventCount) {
+        ok = false;
+        if (requireGraphEvents && containsString(requiredGraphEventFieldNames, fieldName)) {
+          missingRequiredGraphEvent = true;
+        }
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification events output field '{}' is not an array",
+            fieldName));
+        continue;
+      }
+      cvarManager->log(std::format(
+          "subtr-actor: events output field '{}' has {} entries",
+          fieldName,
+          *eventCount));
+      if (requireGraphEvents && containsString(requiredGraphEventFieldNames, fieldName) &&
+          *eventCount == 0) {
+        ok = false;
+        missingRequiredGraphEvent = true;
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification events required graph event field '{}' has no entries",
+            fieldName));
+      }
+    }
+    if (!missingGraphEventField) {
+      cvarManager->log(std::format(
+          "subtr-actor: events output exposes {} graph event fields",
+          graphEventFieldNames.size()));
+    }
+    if (requireGraphEvents && !requiredGraphEventFieldNotDeclared &&
+        !missingRequiredGraphEvent && !missingGraphEventField) {
+      cvarManager->log(
+          "subtr-actor: events required graph event fields are nonzero");
+    }
   }
 
   const std::vector<std::string> moduleNames =

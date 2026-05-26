@@ -377,6 +377,30 @@ const REQUIRED_EVENT_HISTORY_FIELD_NAMES: &[&str] = &[
     "player_stat_events",
     "goal_events",
 ];
+const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
+    "timeline",
+    "mechanics",
+    "goal_context",
+    "backboard",
+    "ceiling_shot",
+    "wall_aerial",
+    "wall_aerial_shot",
+    "center",
+    "double_tap",
+    "fifty_fifty",
+    "one_timer",
+    "pass",
+    "goal_tags",
+    "rush",
+    "speed_flip",
+    "half_flip",
+    "half_volley",
+    "wavedash",
+    "whiff",
+    "boost_pickups",
+    "bump",
+];
+const REQUIRED_GRAPH_EVENT_FIELD_NAMES: &[&str] = &["timeline", "goal_context", "boost_pickups"];
 
 impl Default for SaEngine {
     fn default() -> Self {
@@ -421,6 +445,8 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
         "callable_analysis_node_names": callable_analysis_node_names,
         "builtin_stats_module_names": builtin_stats_module_names(),
         "graph_output_names": LIVE_GRAPH_OUTPUT_NAMES,
+        "graph_event_field_names": LIVE_GRAPH_EVENT_FIELD_NAMES,
+        "required_graph_event_field_names": REQUIRED_GRAPH_EVENT_FIELD_NAMES,
         "event_history_field_names": LIVE_EVENT_HISTORY_FIELD_NAMES,
         "required_event_history_field_names": REQUIRED_EVENT_HISTORY_FIELD_NAMES,
         "node_names": node_names,
@@ -5671,29 +5697,10 @@ mod tests {
             .keys()
             .map(String::as_str)
             .collect::<HashSet<_>>();
-        let accounted_fields = HashSet::from([
-            "timeline",
-            "mechanics",
-            "goal_context",
-            "backboard",
-            "ceiling_shot",
-            "wall_aerial",
-            "wall_aerial_shot",
-            "center",
-            "double_tap",
-            "fifty_fifty",
-            "one_timer",
-            "pass",
-            "goal_tags",
-            "rush",
-            "speed_flip",
-            "half_flip",
-            "half_volley",
-            "wavedash",
-            "whiff",
-            "boost_pickups",
-            "bump",
-        ]);
+        let accounted_fields = LIVE_GRAPH_EVENT_FIELD_NAMES
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>();
         assert_eq!(
             fields, accounted_fields,
             "new timeline event fields need an explicit live drain/export decision"
@@ -5774,6 +5781,31 @@ mod tests {
             assert!(
                 graph_output_names.iter().any(|name| name == output_name),
                 "graph info should expose graph output {output_name}"
+            );
+        }
+        let graph_event_fields = value["graph_event_field_names"]
+            .as_array()
+            .expect("graph event field names should be an array");
+        assert_eq!(graph_event_fields.len(), LIVE_GRAPH_EVENT_FIELD_NAMES.len());
+        for field_name in LIVE_GRAPH_EVENT_FIELD_NAMES {
+            assert!(
+                graph_event_fields.iter().any(|name| name == field_name),
+                "graph info should expose graph event field {field_name}"
+            );
+        }
+        let required_graph_event_fields = value["required_graph_event_field_names"]
+            .as_array()
+            .expect("required graph event field names should be an array");
+        assert_eq!(
+            required_graph_event_fields.len(),
+            REQUIRED_GRAPH_EVENT_FIELD_NAMES.len()
+        );
+        for field_name in REQUIRED_GRAPH_EVENT_FIELD_NAMES {
+            assert!(
+                required_graph_event_fields
+                    .iter()
+                    .any(|name| name == field_name),
+                "graph info should expose required graph event field {field_name}"
             );
         }
         let event_history_fields = value["event_history_field_names"]

@@ -141,6 +141,17 @@ acceptance check for live graph callability and event-generation parity.
    zero for touch, dodge refresh, boost pad, player stat, goal, or demolition
    event arrays. `active_demos` is current state, not cumulative history, so it
    is intentionally not required by this mode.
+   To also require graph-generated timeline output after exercising the goal,
+   boost pickup, and player stat/demo portions of the checklist, run:
+
+   ```text
+   subtr_actor_verify_graph require_graph_events finish
+   ```
+
+   This mode fails if the cumulative `events` graph output still has zero
+   entries for the required graph event families (`timeline`, `goal_context`,
+   and `boost_pickups`). You can combine both strict checks in one run:
+   `subtr_actor_verify_graph require_event_history require_graph_events finish`.
 4. Dump the complete live graph surface:
 
    ```text
@@ -155,10 +166,11 @@ acceptance check for live graph callability and event-generation parity.
    `graph_output_names`, and `callable_analysis_node_names` should match the names verified by
    `subtr_actor_verify_graph`.
    It should also list `event_history_field_names` and
-   `required_event_history_field_names`; the verifier uses those Rust-declared
-   registries when checking `frame_events_state` and cumulative `event_history`
-   fields, and fails if the registries omit a graph output or live event field
-   required by the plugin ABI.
+   `required_event_history_field_names`, plus `graph_event_field_names` and
+   `required_graph_event_field_names`; the verifier uses those Rust-declared
+   registries when checking `frame_events_state`, cumulative `event_history`,
+   and graph-generated `events` fields, and fails if the registries omit a graph
+   output or live event field required by the plugin ABI.
    `graph-analysis-nodes.json` should contain keys for every node reported by
    `callable_analysis_node_names`.
    `graph-event-history.json` should contain cumulative raw live event-family
