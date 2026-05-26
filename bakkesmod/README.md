@@ -230,8 +230,20 @@ acceptance check for live graph callability and event-generation parity.
 
 ## Linux/Nix support
 
-The optional shell can build the Rust ABI and has an experimental Linux-side
-MSVC-ABI plugin build path:
+The flake can build the Windows plugin artifacts from Linux:
+
+```sh
+nix build .#bakkesmod-plugin
+```
+
+The package output contains `SubtrActorPlugin.dll`, `subtr_actor_bakkesmod.dll`,
+and a `bakkesmod-install` directory with the same install layout as the Windows
+build. The derivation builds against a pinned `xwin` MSVC/Windows SDK sysroot,
+so the DLL build itself does not download the Microsoft toolchain during the
+package build.
+
+The optional shell can also build the Rust ABI and has an experimental
+Linux-side MSVC-ABI plugin build path:
 
 ```sh
 nix develop .#bakkesmod

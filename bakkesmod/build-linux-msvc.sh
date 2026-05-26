@@ -21,12 +21,12 @@ require_command cargo
 require_command cmake
 require_command ninja
 require_command python3
-require_command xwin
 require_command clang-cl
 require_command lld-link
 require_command llvm-lib
 
 if [[ ! -d "$xwin_sysroot/VC/Tools/MSVC" || ! -d "$xwin_sysroot/Windows Kits/10" ]]; then
+  require_command xwin
   xwin \
     --accept-license \
     --cache-dir "$xwin_cache_dir" \

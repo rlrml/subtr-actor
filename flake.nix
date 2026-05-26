@@ -77,6 +77,30 @@
         };
         projectVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
         mingw = pkgs.pkgsCross.mingwW64;
+        xwinMsvcSysroot = pkgs.stdenvNoCC.mkDerivation {
+          pname = "xwin-msvc-sysroot";
+          version = "x86_64-desktop";
+          dontUnpack = true;
+          nativeBuildInputs = [ pkgs.xwin ];
+          outputHashAlgo = "sha256";
+          outputHashMode = "recursive";
+          outputHash = "sha256-PMJqIj13w/ssarSzm0yKzqh4uUfBrOVFe+CmzZPv3xM=";
+          installPhase = ''
+            runHook preInstall
+            export HOME="$TMPDIR"
+            xwin \
+              --accept-license \
+              --cache-dir "$TMPDIR/xwin-cache" \
+              --arch x86_64 \
+              --variant desktop \
+              splat \
+              --output "$out" \
+              --use-winsysroot-style \
+              --preserve-ms-arch-notation \
+              --copy
+            runHook postInstall
+          '';
+        };
         shellPackages = [
           pythonEnv
           pkgs.uv
@@ -150,6 +174,39 @@
             cp -r js/stat-evaluation-player/dist/. $out/review/
             runHook postInstall
           '';
+        };
+        packages.xwin-msvc-sysroot = xwinMsvcSysroot;
+        packages.bakkesmod-plugin = rustPlatform.buildRustPackage {
+          pname = "subtr-actor-bakkesmod-plugin";
+          version = projectVersion;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.llvmPackages_21.clang-unwrapped
+            pkgs.llvmPackages_21.llvm
+            pkgs.lld
+            pkgs.ninja
+            pkgs.python3
+          ];
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            export BUILD_DIR="$TMPDIR/bakkesmod-build"
+            export XWIN_SYSROOT="${xwinMsvcSysroot}"
+            export BAKKESMODSDK_DIR="${bakkesmod-sdk}"
+            export BAKKESMOD_SDK_DIR="$BAKKESMODSDK_DIR"
+            bash bakkesmod/build-linux-msvc.sh
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            mkdir -p "$out"
+            cp -r "$BUILD_DIR/Release/." "$out/"
+            runHook postInstall
+          '';
+          doCheck = false;
+          dontCargoInstall = true;
         };
 
         devShells.default = pkgs.mkShell {
