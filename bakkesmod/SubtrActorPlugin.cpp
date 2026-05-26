@@ -2462,20 +2462,31 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
       cvarManager->log(
           "subtr-actor: graph verification could not parse analysis_nodes output keys");
     } else {
+      std::vector<std::string> sortedNodeNames = nodeNames;
+      std::sort(sortedNodeNames.begin(), sortedNodeNames.end());
       std::sort(analysisNodeKeys.begin(), analysisNodeKeys.end());
-      bool missingNode = false;
+      bool nodeSetMismatch = false;
       for (const std::string &nodeName : nodeNames) {
         if (!std::binary_search(analysisNodeKeys.begin(), analysisNodeKeys.end(), nodeName)) {
           ok = false;
-          missingNode = true;
+          nodeSetMismatch = true;
           cvarManager->log(std::format(
               "subtr-actor: graph verification analysis_nodes output missing callable node '{}'",
               nodeName));
         }
       }
-      if (!missingNode) {
+      for (const std::string &nodeName : analysisNodeKeys) {
+        if (!std::binary_search(sortedNodeNames.begin(), sortedNodeNames.end(), nodeName)) {
+          ok = false;
+          nodeSetMismatch = true;
+          cvarManager->log(std::format(
+              "subtr-actor: graph verification analysis_nodes output has unexpected node '{}'",
+              nodeName));
+        }
+      }
+      if (!nodeSetMismatch) {
         cvarManager->log(std::format(
-            "subtr-actor: analysis_nodes output contains {} callable analysis nodes",
+            "subtr-actor: analysis_nodes output contains {} callable analysis nodes exactly",
             nodeNames.size()));
       }
     }
