@@ -414,6 +414,7 @@ struct SaLiveEventGenerator {
     live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
     active_demos: Vec<SaActiveDemo>,
+    last_goal_event: Option<GoalEvent>,
 }
 
 #[derive(Clone, Default)]
@@ -1155,21 +1156,23 @@ fn explicit_boost_pad_events(frame: &FrameInfo, events: &[SaBoostPadEvent]) -> V
         .collect()
 }
 
-fn explicit_goal_events(frame: &FrameInfo, events: &[SaGoalEvent]) -> Vec<GoalEvent> {
-    events
-        .iter()
-        .map(|event| {
-            let (frame_number, time) = event_frame_and_time(frame, event.timing);
-            GoalEvent {
-                time,
-                frame: frame_number,
-                scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
-                player: (event.has_player != 0).then_some(player_id(event.player_index)),
-                team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
-                team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
-            }
-        })
-        .collect()
+const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
+
+fn goal_event_is_duplicate(previous: &GoalEvent, candidate: &GoalEvent) -> bool {
+    match (
+        candidate.team_zero_score,
+        candidate.team_one_score,
+        previous.team_zero_score,
+        previous.team_one_score,
+    ) {
+        (Some(team_zero), Some(team_one), Some(prev_team_zero), Some(prev_team_one)) => {
+            team_zero == prev_team_zero && team_one == prev_team_one
+        }
+        _ => {
+            previous.scoring_team_is_team_0 == candidate.scoring_team_is_team_0
+                && (candidate.time - previous.time).abs() <= GOAL_EVENT_DEDUPE_WINDOW_SECONDS
+        }
+    }
 }
 
 fn explicit_player_stat_events(
@@ -1344,6 +1347,35 @@ impl SaLiveEventGenerator {
             .collect()
     }
 
+    fn explicit_goal_events(
+        &mut self,
+        frame: &FrameInfo,
+        events: &[SaGoalEvent],
+    ) -> Vec<GoalEvent> {
+        let mut goal_events = Vec::new();
+        for event in events {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            let goal_event = GoalEvent {
+                time,
+                frame: frame_number,
+                scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
+                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
+                team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
+            };
+            if self
+                .last_goal_event
+                .as_ref()
+                .is_some_and(|previous| goal_event_is_duplicate(previous, &goal_event))
+            {
+                continue;
+            }
+            self.last_goal_event = Some(goal_event.clone());
+            goal_events.push(goal_event);
+        }
+        goal_events
+    }
+
     fn frame_events(
         &mut self,
         frame: &FrameInfo,
@@ -1363,7 +1395,7 @@ impl SaLiveEventGenerator {
         let boost_pad_events = explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
         let player_stat_events =
             explicit_player_stat_events(frame, explicit_events.player_stat_events);
-        let goal_events = explicit_goal_events(frame, explicit_events.goals);
+        let goal_events = self.explicit_goal_events(frame, explicit_events.goals);
         let base_events = FrameEventsState {
             active_demos,
             demo_events,
@@ -6388,6 +6420,78 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn duplicate_explicit_live_goal_events_are_suppressed_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let goals = [
+            SaGoalEvent {
+                timing: SaEventTiming::default(),
+                scoring_team_is_team_0: 1,
+                player_index: 0,
+                has_player: 1,
+                team_zero_score: 1,
+                has_team_zero_score: 1,
+                team_one_score: 0,
+                has_team_one_score: 1,
+            },
+            SaGoalEvent {
+                timing: SaEventTiming::default(),
+                scoring_team_is_team_0: 1,
+                player_index: 0,
+                has_player: 1,
+                team_zero_score: 1,
+                has_team_zero_score: 1,
+                team_one_score: 0,
+                has_team_one_score: 1,
+            },
+        ];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.goals = goals.as_ptr();
+        frame.goal_count = goals.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.goal_events.len(), 1);
+        assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
+        let event_json = live_events_json_value(engine);
+        let goal_count = event_json["timeline"]
+            .as_array()
+            .expect("events json timeline should be an array")
+            .iter()
+            .filter(|event| event["kind"] == serde_json::json!("Goal"))
+            .count();
+        assert_eq!(goal_count, 1);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
