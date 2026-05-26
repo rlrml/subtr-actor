@@ -129,6 +129,13 @@ mechanic_goal_tag_node!(
     OneTimerCalculator
 );
 mechanic_goal_tag_node!(
+    PassingGoalNode,
+    PassingGoalCalculator,
+    "passing_goal",
+    pass_dependency,
+    PassCalculator
+);
+mechanic_goal_tag_node!(
     AirDribbleGoalNode,
     AirDribbleGoalCalculator,
     "air_dribble_goal",
@@ -218,6 +225,10 @@ pub(crate) fn boxed_double_tap_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_one_timer_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(OneTimerGoalNode::new())
+}
+
+pub(crate) fn boxed_passing_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(PassingGoalNode::new())
 }
 
 pub(crate) fn boxed_air_dribble_goal() -> Box<dyn AnalysisNodeDyn> {

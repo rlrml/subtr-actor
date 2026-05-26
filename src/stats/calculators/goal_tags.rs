@@ -12,6 +12,7 @@ const DEFAULT_EMPTY_NET_MAX_TOUCH_ATTACKING_Y: f32 = 3600.0;
 const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_DOUBLE_TAP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_PASSING_GOAL_MAX_PASS_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
@@ -30,6 +31,7 @@ pub enum GoalTagKind {
     FlickGoal,
     DoubleTapGoal,
     OneTimerGoal,
+    PassingGoal,
     AirDribbleGoal,
     FlipResetGoal,
     HalfVolleyGoal,
@@ -46,6 +48,7 @@ pub enum GoalTagEvidenceKind {
     Flick,
     DoubleTap,
     OneTimer,
+    Pass,
     AirDribble,
     FlipReset,
     HalfVolley,
@@ -201,6 +204,20 @@ impl Default for OneTimerGoalCalculatorConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
+pub struct PassingGoalCalculatorConfig {
+    pub max_pass_to_goal_seconds: f32,
+}
+
+impl Default for PassingGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_pass_to_goal_seconds: DEFAULT_PASSING_GOAL_MAX_PASS_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct AirDribbleGoalCalculatorConfig {
     pub max_end_to_goal_seconds: f32,
 }
@@ -303,6 +320,12 @@ pub struct OneTimerGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PassingGoalCalculator {
+    config: PassingGoalCalculatorConfig,
+    events: Vec<GoalTagEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct AirDribbleGoalCalculator {
     config: AirDribbleGoalCalculatorConfig,
     events: Vec<GoalTagEvent>,
@@ -359,6 +382,7 @@ impl_goal_tag_calculator!(EmptyNetGoalCalculator, EmptyNetGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlickGoalCalculator, FlickGoalCalculatorConfig);
 impl_goal_tag_calculator!(DoubleTapGoalCalculator, DoubleTapGoalCalculatorConfig);
 impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
+impl_goal_tag_calculator!(PassingGoalCalculator, PassingGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
 
@@ -584,6 +608,45 @@ impl OneTimerGoalCalculator {
             GoalTagKind::OneTimerGoal,
             self.config.max_event_to_goal_seconds,
         )
+    }
+}
+
+impl PassingGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        pass: &PassCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events = self.tag_goals(match_stats.goal_context_events(), pass.events());
+        Ok(())
+    }
+
+    fn tag_goals(&self, goals: &[GoalContextEvent], events: &[PassEvent]) -> Vec<GoalTagEvent> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index, goal };
+            let Some(event) = events
+                .iter()
+                .filter(|event| pass_event_matches_goal(event, goal))
+                .filter(|event| goal.time - event.time <= self.config.max_pass_to_goal_seconds)
+                .max_by(|left, right| {
+                    left.time
+                        .total_cmp(&right.time)
+                        .then_with(|| left.frame.cmp(&right.frame))
+                })
+            else {
+                continue;
+            };
+
+            tags.push(goal_tag_with_modifiers(
+                ctx,
+                GoalTagKind::PassingGoal,
+                1.0,
+                mechanic_goal_modifiers(goal, &event.receiver),
+                mechanic_goal_evidence(goal, pass_evidence(event)),
+            ));
+        }
+        tags
     }
 }
 
@@ -944,6 +1007,19 @@ fn point_event_matches_goal<E: GoalMechanicPointEvent>(event: &E, goal: &GoalCon
         && event.event_frame() <= goal.frame
 }
 
+fn pass_event_matches_goal(event: &PassEvent, goal: &GoalContextEvent) -> bool {
+    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+
+    event.is_team_0 == goal.scoring_team_is_team_0
+        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event.frame <= goal.frame
+        && goal.scorer.as_ref() == Some(&event.receiver)
+        && goal
+            .scorer_last_touch
+            .as_ref()
+            .is_some_and(|touch| touch.player == event.receiver && touch.frame == event.frame)
+}
+
 fn tag_goals_by_air_dribble_event(
     goals: &[GoalContextEvent],
     events: &[BallCarryEvent],
@@ -1032,6 +1108,15 @@ fn point_mechanic_evidence(event: &impl GoalMechanicPointEvent) -> GoalTagEviden
         time: event.event_time(),
         frame: event.event_frame(),
         player: Some(event.event_player().clone()),
+    }
+}
+
+fn pass_evidence(event: &PassEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::Pass,
+        time: event.time,
+        frame: event.frame,
+        player: Some(event.passer.clone()),
     }
 }
 
