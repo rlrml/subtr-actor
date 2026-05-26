@@ -8975,6 +8975,18 @@ mod tests {
             direct_full_graph_analysis_nodes_json_value(&frames),
             "bulk analysis_nodes output should match the direct full graph after every explicit live event family"
         );
+        let events = live_graph_output_json_value(engine, "events");
+        for field_name in REQUIRED_GRAPH_EVENT_FIELD_NAMES {
+            let entries = events
+                .get(*field_name)
+                .unwrap_or_else(|| panic!("events output should include {field_name}"))
+                .as_array()
+                .unwrap_or_else(|| panic!("events output {field_name} should be an array"));
+            assert!(
+                !entries.is_empty(),
+                "required graph event field {field_name} should be nonzero after explicit live event families"
+            );
+        }
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
