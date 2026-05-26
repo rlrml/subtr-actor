@@ -6863,6 +6863,17 @@ mod tests {
         );
         assert_eq!(event_history["demo_events"].as_array().unwrap().len(), 1);
         assert_eq!(event_history["active_demos"].as_array().unwrap().len(), 1);
+        for field_name in REQUIRED_EVENT_HISTORY_FIELD_NAMES {
+            let entries = event_history
+                .get(*field_name)
+                .unwrap_or_else(|| panic!("event_history output should include {field_name}"))
+                .as_array()
+                .unwrap_or_else(|| panic!("event_history output {field_name} should be an array"));
+            assert!(
+                !entries.is_empty(),
+                "required event_history field {field_name} should be nonzero after explicit live event arrays"
+            );
+        }
         let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
         assert!(json_len > 0);
         let mut event_json_bytes = vec![0; json_len];
