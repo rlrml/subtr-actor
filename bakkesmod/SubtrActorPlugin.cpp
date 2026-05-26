@@ -953,6 +953,7 @@ SaLiveFrame SubtrActorPlugin::sampleFrame() {
       frame.has_game_state = 1;
     }
     sampleTeamScores(server, frame);
+    rememberTeamScores(frame);
     const unsigned char scoredOnTeam = server.GetReplicatedScoredOnTeam();
     if (scoredOnTeam == 0 || scoredOnTeam == 1) {
       frame.scored_on_team_is_team_0 = scoredOnTeam == 0 ? 1 : 0;
@@ -1126,6 +1127,7 @@ void SubtrActorPlugin::resetLiveState() {
   dodgeRefreshCounters.clear();
   boostPadIds.clear();
   boostPadSequences.clear();
+  lastTeamScores.reset();
   lastTouch.reset();
   nextPlayerIndex = 0;
   nextBoostPadId = 1;
@@ -1270,7 +1272,10 @@ void SubtrActorPlugin::recordGoal(
     int assistIndex) {
   SaGoalEvent event{};
   event.timing = currentEventTiming();
-  if (!goal.IsNull()) {
+  sampleTeamScores(server, event);
+  if (auto scoringTeam = scoringTeamFromScoreDelta(event)) {
+    event.scoring_team_is_team_0 = *scoringTeam ? 1 : 0;
+  } else if (!goal.IsNull()) {
     event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
   } else if (!server.IsNull()) {
     const unsigned char scoredOnTeam = server.GetReplicatedScoredOnTeam();
@@ -1285,7 +1290,7 @@ void SubtrActorPlugin::recordGoal(
     event.player_index = lastTouch->player_index;
     event.has_player = 1;
   }
-  sampleTeamScores(server, event);
+  rememberTeamScores(event);
   pendingGoals.push_back(event);
 
   recordExplicitPlayerStat(priForScoreIndex(server, assistIndex), SaPlayerStatEventKindAssist);
@@ -1605,6 +1610,32 @@ void SubtrActorPlugin::sampleTeamScores(ServerWrapper server, SaGoalEvent &goal)
       goal.team_one_score = team.GetScore();
       goal.has_team_one_score = 1;
     }
+  }
+}
+
+std::optional<bool> SubtrActorPlugin::scoringTeamFromScoreDelta(
+    const SaGoalEvent &goal) const {
+  if (!lastTeamScores || goal.has_team_zero_score == 0 || goal.has_team_one_score == 0) {
+    return std::nullopt;
+  }
+
+  const bool teamZeroScored = goal.team_zero_score > lastTeamScores->first;
+  const bool teamOneScored = goal.team_one_score > lastTeamScores->second;
+  if (teamZeroScored == teamOneScored) {
+    return std::nullopt;
+  }
+  return teamZeroScored;
+}
+
+void SubtrActorPlugin::rememberTeamScores(const SaLiveFrame &frame) {
+  if (frame.has_team_zero_score != 0 && frame.has_team_one_score != 0) {
+    lastTeamScores = std::make_pair(frame.team_zero_score, frame.team_one_score);
+  }
+}
+
+void SubtrActorPlugin::rememberTeamScores(const SaGoalEvent &goal) {
+  if (goal.has_team_zero_score != 0 && goal.has_team_one_score != 0) {
+    lastTeamScores = std::make_pair(goal.team_zero_score, goal.team_one_score);
   }
 }
 

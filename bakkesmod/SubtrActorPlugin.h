@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <windows.h>
 
@@ -142,6 +143,7 @@ private:
   std::unordered_map<uint32_t, int32_t> dodgeRefreshCounters;
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
   std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
+  std::optional<std::pair<int, int>> lastTeamScores;
   std::optional<TouchAttribution> lastTouch;
   uint32_t nextPlayerIndex = 0;
   uint32_t nextBoostPadId = 1;
@@ -196,4 +198,7 @@ private:
   uint32_t boostPadId(ActorWrapper pickup);
   void sampleTeamScores(ServerWrapper server, SaLiveFrame &frame);
   void sampleTeamScores(ServerWrapper server, SaGoalEvent &goal);
+  std::optional<bool> scoringTeamFromScoreDelta(const SaGoalEvent &goal) const;
+  void rememberTeamScores(const SaLiveFrame &frame);
+  void rememberTeamScores(const SaGoalEvent &goal);
 };
