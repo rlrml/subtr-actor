@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.15 - 2026-05-26
+
+- Convert stats timeline output to the event-backed transfer path.
+- Project rush, whiff, and labeled stat observations through the timeline
+  snapshot derivation pipeline.
+- Keep lazy stat derivation out of replay load progress reporting.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.15`.
+
 ## v0.8.14 - 2026-05-26
 
 - Consolidate mechanic timeline sources so event windows include all configured
