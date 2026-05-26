@@ -40,6 +40,7 @@ constexpr std::array<const char *, 6> VERIFY_GRAPH_OUTPUTS{
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
+constexpr float GOAL_EVENT_DEDUPE_WINDOW_SECONDS = 3.0f;
 constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
 constexpr uint64_t DODGE_REFRESH_TOUCH_FRAME_WINDOW = 2;
 constexpr int GAME_STATE_KICKOFF_COUNTDOWN = 55;
@@ -1128,6 +1129,7 @@ void SubtrActorPlugin::resetLiveState() {
   boostPadIds.clear();
   boostPadSequences.clear();
   lastTeamScores.reset();
+  lastGoalEvent.reset();
   lastTouch.reset();
   nextPlayerIndex = 0;
   nextBoostPadId = 1;
@@ -1290,7 +1292,11 @@ void SubtrActorPlugin::recordGoal(
     event.player_index = lastTouch->player_index;
     event.has_player = 1;
   }
+  if (goalEventIsDuplicate(event)) {
+    return;
+  }
   rememberTeamScores(event);
+  lastGoalEvent = event;
   pendingGoals.push_back(event);
 
   recordExplicitPlayerStat(priForScoreIndex(server, assistIndex), SaPlayerStatEventKindAssist);
@@ -1637,6 +1643,23 @@ void SubtrActorPlugin::rememberTeamScores(const SaGoalEvent &goal) {
   if (goal.has_team_zero_score != 0 && goal.has_team_one_score != 0) {
     lastTeamScores = std::make_pair(goal.team_zero_score, goal.team_one_score);
   }
+}
+
+bool SubtrActorPlugin::goalEventIsDuplicate(const SaGoalEvent &goal) const {
+  if (!lastGoalEvent) {
+    return false;
+  }
+
+  const SaGoalEvent &previous = *lastGoalEvent;
+  if (goal.has_team_zero_score != 0 && goal.has_team_one_score != 0 &&
+      previous.has_team_zero_score != 0 && previous.has_team_one_score != 0) {
+    return goal.team_zero_score == previous.team_zero_score &&
+           goal.team_one_score == previous.team_one_score;
+  }
+
+  return goal.scoring_team_is_team_0 == previous.scoring_team_is_team_0 &&
+         std::abs(goal.timing.time - previous.timing.time) <=
+             GOAL_EVENT_DEDUPE_WINDOW_SECONDS;
 }
 
 std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {

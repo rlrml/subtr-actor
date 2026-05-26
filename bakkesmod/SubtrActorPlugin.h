@@ -144,6 +144,7 @@ private:
   std::unordered_map<uintptr_t, uint32_t> boostPadIds;
   std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
   std::optional<std::pair<int, int>> lastTeamScores;
+  std::optional<SaGoalEvent> lastGoalEvent;
   std::optional<TouchAttribution> lastTouch;
   uint32_t nextPlayerIndex = 0;
   uint32_t nextBoostPadId = 1;
@@ -201,4 +202,5 @@ private:
   std::optional<bool> scoringTeamFromScoreDelta(const SaGoalEvent &goal) const;
   void rememberTeamScores(const SaLiveFrame &frame);
   void rememberTeamScores(const SaGoalEvent &goal);
+  bool goalEventIsDuplicate(const SaGoalEvent &goal) const;
 };
