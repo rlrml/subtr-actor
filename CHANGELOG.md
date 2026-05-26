@@ -4,7 +4,7 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
-## v0.9.0 - 2026-05-26
+## v0.9.1 - 2026-05-26
 
 - Treat demolition timeline events as authoritative in the replay player so
   demoed cars, boost trails, boost meters, and attached cameras disappear during
@@ -13,9 +13,14 @@ README, or refactor-only commit.
   accounting for the later demo respawn boost grant.
 - Serve mechanics review playlists through the stats player and route the
   GitHub Pages `/review/` build to that shared app.
-- Install Nix directly in the GitHub Pages workflow to avoid release failures
-  when the external Nix setup action archive is unavailable.
-- Refresh Rust, Python, and JavaScript release metadata to `0.9.0`.
+- Use unauthenticated public git fetches for GitHub Actions checkout steps so
+  CI and release jobs are not blocked when the default Actions token cannot
+  fetch the public repository.
+- Remove Rust cache action setup from CI to keep jobs moving when third-party
+  action archive downloads fail.
+- Build Python wheels and publish artifacts with direct `maturin` and `uv`
+  commands instead of release helper actions.
+- Refresh Rust, Python, and JavaScript release metadata to `0.9.1`.
 
 ## v0.8.16 - 2026-05-26
 

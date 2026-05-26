@@ -24,16 +24,20 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Check release metadata consistency
       run: python3 scripts/check_release_versions.py
@@ -52,16 +56,20 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Run Rust tests
       run: |
@@ -77,16 +85,20 @@ jobs:
     if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Run exhaustive Rust replay tests
       run: |
@@ -100,16 +112,20 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Build release
       run: cargo build --release --verbose
@@ -119,16 +135,20 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Install Node.js
       uses: actions/setup-node@v6
@@ -165,16 +185,20 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Install Node.js
       uses: actions/setup-node@v6
@@ -214,16 +238,20 @@ jobs:
     if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
 
     - name: Install Rust
       shell: bash
       run: |
         rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
         rustup default stable
-
-    - name: Cache Rust build outputs
-      uses: Swatinem/rust-cache@v2
 
     - name: Install Node.js
       uses: actions/setup-node@v6

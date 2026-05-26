@@ -16,7 +16,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+          git checkout --detach refs/github/checkout
 
       - name: Set up Rust
         shell: bash

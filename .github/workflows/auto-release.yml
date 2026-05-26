@@ -16,9 +16,15 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-release]')
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+          git fetch --depth=1 origin "+refs/tags/*:refs/tags/*"
+          git checkout --detach refs/github/checkout
 
       - name: Check release metadata consistency
         run: python3 scripts/check_release_versions.py

@@ -18,9 +18,14 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+          git checkout --detach refs/github/checkout
 
       - name: Determine release version
         id: release
