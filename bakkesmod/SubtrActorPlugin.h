@@ -120,9 +120,10 @@ private:
     uint32_t id = 0;
     UiStatsWindowKind kind = UiStatsWindowKind::Player;
     bool open = true;
+    bool picker_open = false;
     uint32_t selected_player_index = 0;
     uint8_t selected_team_is_team_0 = 1;
-    std::string selected_stat_type = "all";
+    std::vector<std::string> entries;
   };
 
   struct PlayerStatSnapshot {
@@ -252,15 +253,22 @@ private:
   void renderStatsWindows();
   void renderStatsWindow(UiStatsWindow &window);
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
-  void renderPlayerStatsTable(const SaPlayerFrame &player);
-  void renderTeamStatsTable(uint8_t isTeam0);
-  void renderAllPlayersStatsTable();
-  void renderAllTeamsStatsTable();
-  void renderGoalsOverviewStats();
+  void renderStatsWindowAddControl(UiStatsWindow &window);
+  void renderStatsWindowEntries(UiStatsWindow &window);
+  void renderPlayerStatsTable(UiStatsWindow &window, const SaPlayerFrame &player);
+  void renderTeamStatsTable(UiStatsWindow &window, uint8_t isTeam0);
+  void renderAllPlayersStatsTable(UiStatsWindow &window);
+  void renderAllTeamsStatsTable(UiStatsWindow &window);
+  void renderGoalsOverviewStats(UiStatsWindow &window);
   void renderAdHocStatsWindow(UiStatsWindow &window);
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
+  void initializeStatsWindowEntries(UiStatsWindow &window);
+  bool statsWindowSupportsStat(const UiStatsWindow &window, std::string_view statId) const;
+  bool statsWindowHasStat(const UiStatsWindow &window, std::string_view statId) const;
+  std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
+  std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
   int recentEventCountForActor(std::string_view actor) const;
   int recentEventCountForTeam(uint8_t isTeam0) const;
   int recentEventCountForType(std::string_view type) const;
