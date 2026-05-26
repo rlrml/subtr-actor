@@ -88,10 +88,14 @@ export function isVisibleMechanicKind(kind: string): boolean {
   return !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
+export function isRangeOnlyMechanicKind(kind: string): boolean {
+  return RANGE_ONLY_MECHANIC_KINDS.has(kind);
+}
+
 export function getMechanicTimelineEventKinds(statsTimeline: StatsTimeline | null): string[] {
   return getMechanicKinds(statsTimeline).filter(
     (kind) =>
-      !RANGE_ONLY_MECHANIC_KINDS.has(kind) &&
+      !isRangeOnlyMechanicKind(kind) &&
       GENERIC_MECHANIC_EVENT_MODULE_IDS.has(mechanicKindToModuleId(kind)),
   );
 }
@@ -126,7 +130,7 @@ export function buildMechanicTimelineEvents(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.kind) &&
-        !RANGE_ONLY_MECHANIC_KINDS.has(event.kind) &&
+        !isRangeOnlyMechanicKind(event.kind) &&
         (!enabled || enabled.has(event.kind)),
     )
     .map((event) => {

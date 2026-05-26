@@ -5,12 +5,80 @@ import type { ReplayModel } from "subtr-actor-player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBoostPickupTimelineRanges,
+  buildMechanicTimelineRanges,
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
   buildRushTimelineRanges,
   buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
+
+test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", () => {
+  const replay = {
+    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+  const timeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "wall_aerial:1:3:0",
+        kind: "wall_aerial",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
+      {
+        id: "wall_aerial_shot:2:4:0",
+        kind: "wall_aerial_shot",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 2,
+          end_frame: 4,
+          start_time: 2,
+          end_time: 4,
+        },
+        properties: [],
+      },
+      {
+        id: "ball_carry:1:5:0",
+        kind: "ball_carry",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 5,
+          start_time: 1,
+          end_time: 5,
+        },
+        properties: [],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    buildMechanicTimelineRanges(timeline, replay, [
+      "wall_aerial",
+      "wall_aerial_shot",
+      "ball_carry",
+    ]).map((range) => range.id),
+    ["ball_carry:1:5:0"],
+  );
+});
 
 test("buildPossessionTimelineRanges derives merged team and neutral control spans", () => {
   const timeline = {
