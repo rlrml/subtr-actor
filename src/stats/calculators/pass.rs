@@ -1,6 +1,6 @@
 use super::*;
 
-const PASS_MAX_DURATION_SECONDS: f32 = 3.0;
+const PASS_MAX_DURATION_SECONDS: f32 = 3.5;
 const PASS_MIN_BALL_TRAVEL_DISTANCE: f32 = 500.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]

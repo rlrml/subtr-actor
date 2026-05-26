@@ -232,6 +232,28 @@ fn ignores_passes_outside_duration_window() {
 }
 
 #[test]
+fn counts_slow_layoff_within_extended_duration_window() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let mut calculator = PassCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(0.0),
+        vec![touch(10, 1.0, Some(passer), true)],
+    );
+    update(
+        &mut calculator,
+        frame(45, 4.49),
+        ball(1500.0),
+        vec![touch(45, 4.49, Some(receiver), true)],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+}
+
+#[test]
 fn classifies_backboard_passes() {
     let passer = PlayerId::Steam(1);
     let receiver = PlayerId::Steam(2);
