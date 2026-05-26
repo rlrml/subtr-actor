@@ -124,6 +124,21 @@ private:
     uint32_t selected_player_index = 0;
     uint8_t selected_team_is_team_0 = 1;
     std::vector<std::string> entries;
+    bool has_placement = false;
+    bool pending_apply_placement = false;
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 540.0f;
+    float height = 330.0f;
+  };
+
+  struct UiWindowPlacement {
+    bool has_placement = false;
+    bool pending_apply_placement = false;
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
   };
 
   struct PlayerStatSnapshot {
@@ -227,6 +242,10 @@ private:
   uint32_t nextUiStatsWindowId = 1;
   std::deque<UiEventRecord> recentUiEvents;
   std::vector<UiStatsWindow> uiStatsWindows;
+  UiWindowPlacement launcherPlacement;
+  UiWindowPlacement scoreboardPlacement;
+  UiWindowPlacement eventsPlacement;
+  UiWindowPlacement statusPlacement;
 
   bool loadRustLibrary();
   void unloadRustLibrary();
@@ -250,6 +269,15 @@ private:
   void renderEventsWindow();
   void renderStatusWindow();
   void createStatsWindow(UiStatsWindowKind kind);
+  void applyWindowPlacement(
+      UiWindowPlacement &placement,
+      float x,
+      float y,
+      float width,
+      float height);
+  void captureWindowPlacement(UiWindowPlacement &placement);
+  void applyStatsWindowPlacement(UiStatsWindow &window);
+  void captureStatsWindowPlacement(UiStatsWindow &window);
   void renderStatsWindows();
   void renderStatsWindow(UiStatsWindow &window);
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
@@ -269,6 +297,9 @@ private:
   bool statsWindowHasStat(const UiStatsWindow &window, std::string_view statId) const;
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
+  std::filesystem::path uiConfigPath() const;
+  void loadUiConfig();
+  void saveUiConfig();
   int recentEventCountForActor(std::string_view actor) const;
   int recentEventCountForTeam(uint8_t isTeam0) const;
   int recentEventCountForType(std::string_view type) const;

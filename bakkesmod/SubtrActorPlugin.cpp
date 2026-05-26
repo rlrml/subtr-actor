@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <format>
+#include <iterator>
 #include <type_traits>
 
 #include "imgui/imgui.h"
@@ -572,6 +573,168 @@ std::optional<size_t> parseJsonArrayPropertyElementCount(
     return std::nullopt;
   }
   return std::nullopt;
+}
+
+std::string escapeJsonString(std::string_view value) {
+  std::string escaped;
+  escaped.reserve(value.size() + 8);
+  for (const char ch : value) {
+    switch (ch) {
+    case '"':
+      escaped += "\\\"";
+      break;
+    case '\\':
+      escaped += "\\\\";
+      break;
+    case '\b':
+      escaped += "\\b";
+      break;
+    case '\f':
+      escaped += "\\f";
+      break;
+    case '\n':
+      escaped += "\\n";
+      break;
+    case '\r':
+      escaped += "\\r";
+      break;
+    case '\t':
+      escaped += "\\t";
+      break;
+    default:
+      escaped.push_back(ch);
+      break;
+    }
+  }
+  return escaped;
+}
+
+bool findJsonPropertyValueOffset(
+    const std::string &json,
+    const std::string &propertyName,
+    size_t &offset) {
+  const std::string needle = std::format("\"{}\"", propertyName);
+  offset = json.find(needle);
+  if (offset == std::string::npos) {
+    return false;
+  }
+  offset += needle.size();
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != ':') {
+    return false;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  return offset < json.size();
+}
+
+std::optional<std::string> parseJsonStringProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, propertyName, offset)) {
+    return std::nullopt;
+  }
+  return parseJsonString(json, offset);
+}
+
+std::optional<bool> parseJsonBoolProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, propertyName, offset)) {
+    return std::nullopt;
+  }
+  if (json.compare(offset, 4, "true") == 0) {
+    return true;
+  }
+  if (json.compare(offset, 5, "false") == 0) {
+    return false;
+  }
+  return std::nullopt;
+}
+
+std::optional<double> parseJsonNumberProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, propertyName, offset)) {
+    return std::nullopt;
+  }
+  const size_t start = offset;
+  if (offset < json.size() && json[offset] == '-') {
+    ++offset;
+  }
+  while (offset < json.size() &&
+         std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+    ++offset;
+  }
+  if (offset < json.size() && json[offset] == '.') {
+    ++offset;
+    while (offset < json.size() &&
+           std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+      ++offset;
+    }
+  }
+  if (offset == start) {
+    return std::nullopt;
+  }
+  try {
+    return std::stod(json.substr(start, offset - start));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::vector<std::string> parseJsonObjectArrayProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  std::vector<std::string> objects;
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, propertyName, offset) || json[offset] != '[') {
+    return objects;
+  }
+  ++offset;
+  while (offset < json.size()) {
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ']') {
+      break;
+    }
+    if (offset >= json.size() || json[offset] != '{') {
+      return {};
+    }
+    const size_t start = offset;
+    size_t end = offset;
+    if (!skipJsonValue(json, end)) {
+      return {};
+    }
+    objects.push_back(json.substr(start, end - start));
+    offset = end;
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      continue;
+    }
+    if (offset < json.size() && json[offset] == ']') {
+      break;
+    }
+  }
+  return objects;
+}
+
+std::optional<std::string> parseJsonObjectProperty(
+    const std::string &json,
+    const std::string &propertyName) {
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, propertyName, offset) || json[offset] != '{') {
+    return std::nullopt;
+  }
+  const size_t start = offset;
+  size_t end = offset;
+  if (!skipJsonValue(json, end)) {
+    return std::nullopt;
+  }
+  return json.substr(start, end - start);
 }
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
@@ -1350,6 +1513,8 @@ void SubtrActorPlugin::onLoad() {
       true,
       10000);
 
+  loadUiConfig();
+
   loaded = loadRustLibrary();
   if (!loaded) {
     cvarManager->log("subtr-actor: failed to load subtr_actor_bakkesmod.dll");
@@ -1426,6 +1591,7 @@ void SubtrActorPlugin::onLoad() {
 }
 
 void SubtrActorPlugin::onUnload() {
+  saveUiConfig();
   if (liveTickCancelled) {
     *liveTickCancelled = true;
   }
@@ -1743,6 +1909,194 @@ void SubtrActorPlugin::setCvarString(const char *name, std::string_view value) {
   if (static_cast<bool>(cvar)) {
     cvar.setValue(std::string(value));
   }
+}
+
+std::filesystem::path SubtrActorPlugin::uiConfigPath() const {
+  if (gameWrapper) {
+    return gameWrapper->GetDataFolder() / "subtr-actor" / "ui-config.json";
+  }
+  const auto moduleDirectory = currentModuleDirectory();
+  return moduleDirectory.empty() ? std::filesystem::path{"ui-config.json"}
+                                 : moduleDirectory / "ui-config.json";
+}
+
+void SubtrActorPlugin::loadUiConfig() {
+  const auto path = uiConfigPath();
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    return;
+  }
+
+  const std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+  auto loadPlacement = [](const std::string &parent, const char *name, UiWindowPlacement &out) {
+    const auto object = parseJsonObjectProperty(parent, name);
+    if (!object) {
+      return;
+    }
+    out.has_placement = parseJsonBoolProperty(*object, "has_placement").value_or(true);
+    out.pending_apply_placement = out.has_placement;
+    out.x = static_cast<float>(parseJsonNumberProperty(*object, "x").value_or(out.x));
+    out.y = static_cast<float>(parseJsonNumberProperty(*object, "y").value_or(out.y));
+    out.width =
+        static_cast<float>(parseJsonNumberProperty(*object, "width").value_or(out.width));
+    out.height =
+        static_cast<float>(parseJsonNumberProperty(*object, "height").value_or(out.height));
+  };
+
+  uiLauncherOpen = parseJsonBoolProperty(json, "launcher_open").value_or(uiLauncherOpen);
+  uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
+  uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
+  uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
+
+  if (const auto placements = parseJsonObjectProperty(json, "placements")) {
+    loadPlacement(*placements, "launcher", launcherPlacement);
+    loadPlacement(*placements, "scoreboard", scoreboardPlacement);
+    loadPlacement(*placements, "events", eventsPlacement);
+    loadPlacement(*placements, "status", statusPlacement);
+  }
+
+  uiStatsWindows.clear();
+  nextUiStatsWindowId = 1;
+  for (const std::string &object : parseJsonObjectArrayProperty(json, "stats_windows")) {
+    const auto kind = parseJsonStringProperty(object, "kind");
+    if (!kind) {
+      continue;
+    }
+
+    UiStatsWindow window{};
+    if (*kind == "player") {
+      window.kind = UiStatsWindowKind::Player;
+    } else if (*kind == "team") {
+      window.kind = UiStatsWindowKind::Team;
+    } else if (*kind == "all-players") {
+      window.kind = UiStatsWindowKind::AllPlayers;
+    } else if (*kind == "all-teams") {
+      window.kind = UiStatsWindowKind::AllTeams;
+    } else if (*kind == "goals-overview") {
+      window.kind = UiStatsWindowKind::GoalsOverview;
+    } else if (*kind == "ad-hoc") {
+      window.kind = UiStatsWindowKind::AdHoc;
+    } else {
+      continue;
+    }
+
+    window.id = static_cast<uint32_t>(parseJsonNumberProperty(object, "id").value_or(0.0));
+    if (window.id == 0) {
+      window.id = nextUiStatsWindowId;
+    }
+    nextUiStatsWindowId = std::max(nextUiStatsWindowId, window.id + 1);
+    window.open = parseJsonBoolProperty(object, "open").value_or(true);
+    window.selected_player_index = static_cast<uint32_t>(
+        std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
+    window.selected_team_is_team_0 =
+        parseJsonBoolProperty(object, "selected_team_is_team_0").value_or(true) ? 1 : 0;
+    window.entries = parseJsonStringArrayProperty(object, "entries");
+    if (window.entries.empty()) {
+      initializeStatsWindowEntries(window);
+    }
+    window.has_placement = parseJsonBoolProperty(object, "has_placement").value_or(false);
+    window.pending_apply_placement = window.has_placement;
+    window.x = static_cast<float>(parseJsonNumberProperty(object, "x").value_or(window.x));
+    window.y = static_cast<float>(parseJsonNumberProperty(object, "y").value_or(window.y));
+    window.width =
+        static_cast<float>(parseJsonNumberProperty(object, "width").value_or(window.width));
+    window.height =
+        static_cast<float>(parseJsonNumberProperty(object, "height").value_or(window.height));
+    uiStatsWindows.push_back(std::move(window));
+  }
+
+  if (!uiStatsWindows.empty()) {
+    cvarManager->log(std::format(
+        "subtr-actor: loaded {} UI stats windows from {}",
+        uiStatsWindows.size(),
+        path.string()));
+  }
+}
+
+void SubtrActorPlugin::saveUiConfig() {
+  const auto path = uiConfigPath();
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error) {
+    cvarManager->log(
+        std::format("subtr-actor: failed to create UI config directory: {}", error.message()));
+    return;
+  }
+
+  auto kindValue = [](UiStatsWindowKind kind) {
+    switch (kind) {
+    case UiStatsWindowKind::Player:
+      return "player";
+    case UiStatsWindowKind::Team:
+      return "team";
+    case UiStatsWindowKind::AllPlayers:
+      return "all-players";
+    case UiStatsWindowKind::AllTeams:
+      return "all-teams";
+    case UiStatsWindowKind::GoalsOverview:
+      return "goals-overview";
+    case UiStatsWindowKind::AdHoc:
+      return "ad-hoc";
+    default:
+      return "player";
+    }
+  };
+
+  auto writePlacement = [](std::ostream &out, const UiWindowPlacement &placement) {
+    out << "{\"has_placement\":" << (placement.has_placement ? "true" : "false")
+        << ",\"x\":" << placement.x << ",\"y\":" << placement.y
+        << ",\"width\":" << placement.width << ",\"height\":" << placement.height << "}";
+  };
+
+  std::ofstream file(path, std::ios::binary);
+  if (!file) {
+    cvarManager->log(std::format("subtr-actor: failed to write UI config {}", path.string()));
+    return;
+  }
+
+  file << "{\n";
+  file << "  \"version\": 1,\n";
+  file << "  \"launcher_open\": " << (uiLauncherOpen ? "true" : "false") << ",\n";
+  file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
+  file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
+  file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
+  file << "  \"placements\": {\n";
+  file << "    \"launcher\": ";
+  writePlacement(file, launcherPlacement);
+  file << ",\n    \"scoreboard\": ";
+  writePlacement(file, scoreboardPlacement);
+  file << ",\n    \"events\": ";
+  writePlacement(file, eventsPlacement);
+  file << ",\n    \"status\": ";
+  writePlacement(file, statusPlacement);
+  file << "\n  },\n";
+  file << "  \"stats_windows\": [\n";
+  for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
+    const UiStatsWindow &window = uiStatsWindows[i];
+    file << "    {\"id\":" << window.id << ",\"kind\":\"" << kindValue(window.kind)
+         << "\",\"open\":" << (window.open ? "true" : "false")
+         << ",\"selected_player_index\":" << window.selected_player_index
+         << ",\"selected_team_is_team_0\":"
+         << (window.selected_team_is_team_0 != 0 ? "true" : "false")
+         << ",\"has_placement\":" << (window.has_placement ? "true" : "false")
+         << ",\"x\":" << window.x << ",\"y\":" << window.y
+         << ",\"width\":" << window.width << ",\"height\":" << window.height
+         << ",\"entries\":[";
+    for (size_t j = 0; j < window.entries.size(); j += 1) {
+      if (j != 0) {
+        file << ",";
+      }
+      file << "\"" << escapeJsonString(window.entries[j]) << "\"";
+    }
+    file << "]}";
+    if (i + 1 != uiStatsWindows.size()) {
+      file << ",";
+    }
+    file << "\n";
+  }
+  file << "  ]\n";
+  file << "}\n";
 }
 
 float SubtrActorPlugin::sampleIntervalSeconds() {
@@ -2231,8 +2585,6 @@ void SubtrActorPlugin::resetLiveState() {
   nextBoostPadId = 1;
   messages.clear();
   recentUiEvents.clear();
-  uiStatsWindows.clear();
-  nextUiStatsWindowId = 1;
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -4270,13 +4622,72 @@ void SubtrActorPlugin::renderSharedSettingsControls() {
   }
 }
 
+void SubtrActorPlugin::applyWindowPlacement(
+    UiWindowPlacement &placement,
+    float x,
+    float y,
+    float width,
+    float height) {
+  if (placement.has_placement) {
+    const ImGuiCond condition =
+        placement.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+    ImGui::SetNextWindowPos(ImVec2{placement.x, placement.y}, condition);
+    ImGui::SetNextWindowSize(
+        ImVec2{std::max(120.0f, placement.width), std::max(80.0f, placement.height)},
+        condition);
+    placement.pending_apply_placement = false;
+    return;
+  }
+  ImGui::SetNextWindowPos(ImVec2{x, y}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
+}
+
+void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
+  const ImVec2 position = ImGui::GetWindowPos();
+  const ImVec2 size = ImGui::GetWindowSize();
+  placement.has_placement = true;
+  placement.x = position.x;
+  placement.y = position.y;
+  placement.width = size.x;
+  placement.height = size.y;
+}
+
+void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
+  if (window.has_placement) {
+    const ImGuiCond condition =
+        window.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+    ImGui::SetNextWindowPos(ImVec2{window.x, window.y}, condition);
+    ImGui::SetNextWindowSize(
+        ImVec2{std::max(180.0f, window.width), std::max(120.0f, window.height)},
+        condition);
+    window.pending_apply_placement = false;
+    return;
+  }
+  const float offset = static_cast<float>((window.id - 1) * 24);
+  ImGui::SetNextWindowPos(ImVec2{96.0f + offset, 96.0f + offset}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{540.0f, 330.0f}, ImGuiCond_FirstUseEver);
+}
+
+void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
+  const ImVec2 position = ImGui::GetWindowPos();
+  const ImVec2 size = ImGui::GetWindowSize();
+  window.has_placement = true;
+  window.x = position.x;
+  window.y = position.y;
+  window.width = size.x;
+  window.height = size.y;
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
-  ImGui::SetNextWindowPos(ImVec2{16.0f, 68.0f}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{340.0f, 430.0f}, ImGuiCond_FirstUseEver);
+  if (!uiLauncherOpen) {
+    return;
+  }
+  applyWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f);
   if (!ImGui::Begin("subtr-actor", nullptr)) {
     ImGui::End();
     return;
   }
+  captureWindowPlacement(launcherPlacement);
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
@@ -4303,6 +4714,13 @@ void SubtrActorPlugin::renderLauncherWindow() {
   if (ImGui::Button("New ad hoc stats")) {
     createStatsWindow(UiStatsWindowKind::AdHoc);
   }
+  if (ImGui::Button("Save layout")) {
+    saveUiConfig();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reload layout")) {
+    loadUiConfig();
+  }
   ImGui::Text("%zu stats windows open", uiStatsWindows.size());
 
   ImGui::Separator();
@@ -4314,12 +4732,12 @@ void SubtrActorPlugin::renderScoreboardWindow() {
   if (!uiScoreboardOpen) {
     return;
   }
-  ImGui::SetNextWindowPos(ImVec2{760.0f, 18.0f}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{210.0f, 78.0f}, ImGuiCond_FirstUseEver);
+  applyWindowPlacement(scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f);
   if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen)) {
     ImGui::End();
     return;
   }
+  captureWindowPlacement(scoreboardPlacement);
 
   if (lastTeamScores) {
     ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", lastTeamScores->first);
@@ -4337,12 +4755,12 @@ void SubtrActorPlugin::renderEventsWindow() {
   if (!uiEventsOpen) {
     return;
   }
-  ImGui::SetNextWindowPos(ImVec2{16.0f, 505.0f}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{520.0f, 360.0f}, ImGuiCond_FirstUseEver);
+  applyWindowPlacement(eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f);
   if (!ImGui::Begin("Events##subtr-actor", &uiEventsOpen)) {
     ImGui::End();
     return;
   }
+  captureWindowPlacement(eventsPlacement);
 
   std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
   if (ImGui::BeginCombo("Filter", eventFilterLabel(currentFilter))) {
@@ -4404,12 +4822,12 @@ void SubtrActorPlugin::renderStatusWindow() {
   if (!uiStatusOpen) {
     return;
   }
-  ImGui::SetNextWindowPos(ImVec2{1230.0f, 68.0f}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{330.0f, 220.0f}, ImGuiCond_FirstUseEver);
+  applyWindowPlacement(statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f);
   if (!ImGui::Begin("Status##subtr-actor", &uiStatusOpen)) {
     ImGui::End();
     return;
   }
+  captureWindowPlacement(statusPlacement);
 
   ImGui::Text("Mode: %s", liveProcessingEnabled() ? "live analysis" : "idle");
   ImGui::Text("Replay annotations: %s", replayAnnotations ? "loaded" : "not loaded");
@@ -4647,14 +5065,13 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
 }
 
 void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
-  const float offset = static_cast<float>((window.id - 1) * 24);
-  ImGui::SetNextWindowPos(ImVec2{96.0f + offset, 96.0f + offset}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{540.0f, 330.0f}, ImGuiCond_FirstUseEver);
+  applyStatsWindowPlacement(window);
   const std::string title = statsWindowTitle(window);
   if (!ImGui::Begin(title.c_str(), &window.open)) {
     ImGui::End();
     return;
   }
+  captureStatsWindowPlacement(window);
 
   renderStatsWindowScopeSelector(window);
   renderStatsWindowAddControl(window);
