@@ -157,7 +157,7 @@ export async function loadReplayBundleInWorker(
         message.statsTimelineParts,
         options.onProgress,
       );
-      const statsFrameLookup = createStatsFrameLookup(statsTimeline, options.onProgress);
+      const statsFrameLookup = createStatsFrameLookup(statsTimeline);
       resolve({
         replay,
         statsTimeline,
