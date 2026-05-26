@@ -2404,6 +2404,8 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   const std::vector<std::string> nodeNames = parseJsonStringArray(nodeNamesJson);
   const std::vector<std::string> graphInfoNodeNames =
       parseJsonStringArrayProperty(graphInfoJson, "callable_analysis_node_names");
+  const std::vector<std::string> resolvedGraphNodeNames =
+      parseJsonStringArrayProperty(graphInfoJson, "node_names");
   if (nodeNames.empty()) {
     ok = false;
     cvarManager->log(
@@ -2422,6 +2424,31 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   } else if (!nodeNames.empty()) {
     cvarManager->log(
         "subtr-actor: callable analysis node registry matches graph_info");
+  }
+
+  if (resolvedGraphNodeNames.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not read resolved graph node names from graph_info");
+  } else if (!nodeNames.empty()) {
+    std::vector<std::string> sortedNodeNames = nodeNames;
+    std::sort(sortedNodeNames.begin(), sortedNodeNames.end());
+    bool missingResolvedNode = false;
+    for (const std::string &resolvedNodeName : resolvedGraphNodeNames) {
+      if (!std::binary_search(
+              sortedNodeNames.begin(), sortedNodeNames.end(), resolvedNodeName)) {
+        ok = false;
+        missingResolvedNode = true;
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification resolved node '{}' is not callable by name",
+            resolvedNodeName));
+      }
+    }
+    if (!missingResolvedNode) {
+      cvarManager->log(std::format(
+          "subtr-actor: all {} resolved analysis graph nodes are callable by name",
+          resolvedGraphNodeNames.size()));
+    }
   }
 
   if (analysisNodesJson.empty()) {
