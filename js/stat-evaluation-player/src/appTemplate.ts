@@ -358,7 +358,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 Hide
               </button>
             </header>
-            <div id="mechanics-timeline-window-body"></div>
+            <div id="mechanics-timeline-window-body" class="mechanics-timeline-window-body"></div>
           </section>
 
           <section

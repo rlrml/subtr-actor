@@ -10,22 +10,10 @@ import { createBoostPickupFilterController } from "../boostPickupFilters.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 import {
   buildBackboardTimelineEvents,
-  buildBallCarryTimelineEvents,
   buildBumpTimelineEvents,
-  buildCeilingShotTimelineEvents,
-  buildDodgeResetTimelineEvents,
-  buildDoubleTapTimelineEvents,
-  buildFlickTimelineEvents,
-  buildHalfFlipTimelineEvents,
-  buildOneTimerTimelineEvents,
-  buildPassTimelineEvents,
-  buildMustyFlickTimelineEvents,
   buildPowerslideTimelineEvents,
-  buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   buildWavedashTimelineEvents,
-  buildWallAerialTimelineEvents,
-  buildWallAerialShotTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
@@ -174,10 +162,6 @@ export function createCeilingShotModule(): StatModule {
       overlay?.update(info.currentTime);
     },
 
-    getTimelineEvents(ctx) {
-      return buildCeilingShotTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
@@ -213,10 +197,6 @@ export function createWallAerialModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildWallAerialTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
@@ -254,10 +234,6 @@ export function createWallAerialShotModule(): StatModule {
 
     onBeforeRender() {},
 
-    getTimelineEvents(ctx) {
-      return buildWallAerialShotTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
@@ -289,9 +265,6 @@ export function createBallCarryModule(): StatModule {
     label: "Ball Carry",
     select: (player) => player.ball_carry,
     render: (ballCarry) => renderBallCarryStats(ballCarry),
-    getTimelineEvents(ctx) {
-      return buildBallCarryTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
   });
 }
 
@@ -310,9 +283,6 @@ export function createDodgeResetModule(): StatModule {
     label: "Dodge Refresh",
     select: (player) => player.dodge_reset,
     render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
-    getTimelineEvents(ctx) {
-      return buildDodgeResetTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
   });
 }
 
@@ -322,9 +292,6 @@ export function createDoubleTapModule(): StatModule {
     label: "Double Tap",
     select: (player) => player.double_tap,
     render: (doubleTap) => renderDoubleTapStats(doubleTap),
-    getTimelineEvents(ctx) {
-      return buildDoubleTapTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
   });
 }
 
@@ -334,9 +301,6 @@ export function createPassModule(): StatModule {
     label: "Pass",
     select: (player) => player.pass,
     render: (pass) => renderPassStats(pass),
-    getTimelineEvents(ctx) {
-      return buildPassTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
   });
 }
 
@@ -346,9 +310,6 @@ export function createOneTimerModule(): StatModule {
     label: "One-timer",
     select: (player) => player.one_timer,
     render: (oneTimer) => renderOneTimerStats(oneTimer),
-    getTimelineEvents(ctx) {
-      return buildOneTimerTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
   });
 }
 
@@ -362,10 +323,6 @@ export function createMustyFlickModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildMustyFlickTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
@@ -402,10 +359,6 @@ export function createFlickModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildFlickTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
@@ -457,10 +410,6 @@ export function createSpeedFlipModule(): StatModule {
       overlay?.update(info.currentTime);
     },
 
-    getTimelineEvents(ctx) {
-      return buildSpeedFlipTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       if (!statsFrame) return "";
@@ -496,10 +445,6 @@ export function createHalfFlipModule(): StatModule {
     teardown() {},
 
     onBeforeRender() {},
-
-    getTimelineEvents(ctx) {
-      return buildHalfFlipTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
