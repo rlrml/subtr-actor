@@ -4,6 +4,19 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.16 - 2026-05-26
+
+- Treat demolition timeline events as authoritative in the replay player so
+  demoed cars, boost trails, boost meters, and attached cameras disappear during
+  the respawn window even when replay frames still contain stale player samples.
+- Keep boost removed by demolitions from counting as boost usage while still
+  accounting for the later demo respawn boost grant.
+- Include passing-goal tags in legacy stats timeline conversion so sampled
+  timeline collectors agree with the direct event timeline.
+- Serve mechanics review playlists through the stats player and route the
+  GitHub Pages `/review/` build to that shared app.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.16`.
+
 ## v0.8.15 - 2026-05-26
 
 - Convert stats timeline output to the event-backed transfer path.

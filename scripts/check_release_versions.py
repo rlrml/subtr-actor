@@ -15,14 +15,12 @@ JS_PACKAGE_PATHS = [
     "js/player/package.json",
     "js/stat-evaluation-player/package.json",
     "js/pages/package.json",
-    "js/mechanic-review-player/package.json",
 ]
 
 JS_PACKAGE_LOCK_PATHS = [
     "js/package-lock.json",
     "js/player/package-lock.json",
     "js/stat-evaluation-player/package-lock.json",
-    "js/mechanic-review-player/package-lock.json",
 ]
 
 

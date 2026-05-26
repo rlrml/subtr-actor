@@ -31,6 +31,37 @@ player.destroy();
 The mounted UI exposes the same replay file chooser, replay camera controls,
 timeline overlays, and per-module stat panels as the in-repo demo app.
 
+## Mechanics Review Playlists
+
+The stats player includes the mechanics review workflow that used to live in the
+dedicated review app. It accepts playlist manifests from the file picker, the
+Mechanics review window URL field, or the `playlist` / `playlistUrl` query
+parameters.
+
+Generate a review playlist with:
+
+```sh
+BALLCHASING_API_KEY="$(pass show ballchasing.com | sed -n 's/^api-key: //p')" \
+  cargo run -p subtr-actor-tools --bin build_mechanic_review_playlist -- \
+  --count 10 \
+  --playlist ranked-duels \
+  --mechanic default \
+  --output .cache/mechanic-review-playlists/latest-mechanic-review.json
+```
+
+Then open the stats player with the playlist URL:
+
+```text
+http://127.0.0.1:5173/?playlistUrl=/@fs/home/imalison/Projects/subtr-actor/.cache/mechanic-review-playlists/latest-mechanic-review.json
+```
+
+The GitHub Pages build also serves the stats player under `/review/` for
+backward-compatible review links:
+
+```text
+https://rlrml.github.io/subtr-actor/review/?playlist=https://example.com/playlist.json
+```
+
 The package also exposes two lighter composition surfaces:
 
 ```ts
