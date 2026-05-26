@@ -166,6 +166,174 @@ std::vector<std::string> parseJsonStringArrayProperty(
   return values.value_or(std::vector<std::string>{});
 }
 
+bool skipJsonValue(const std::string &json, size_t &offset) {
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size()) {
+    return false;
+  }
+
+  if (json[offset] == '"') {
+    return parseJsonString(json, offset).has_value();
+  }
+
+  if (json[offset] == '{') {
+    ++offset;
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == '}') {
+      ++offset;
+      return true;
+    }
+    while (offset < json.size()) {
+      if (!parseJsonString(json, offset)) {
+        return false;
+      }
+      skipJsonWhitespace(json, offset);
+      if (offset >= json.size() || json[offset] != ':') {
+        return false;
+      }
+      ++offset;
+      if (!skipJsonValue(json, offset)) {
+        return false;
+      }
+      skipJsonWhitespace(json, offset);
+      if (offset < json.size() && json[offset] == ',') {
+        ++offset;
+        skipJsonWhitespace(json, offset);
+        continue;
+      }
+      if (offset < json.size() && json[offset] == '}') {
+        ++offset;
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  if (json[offset] == '[') {
+    ++offset;
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ']') {
+      ++offset;
+      return true;
+    }
+    while (offset < json.size()) {
+      if (!skipJsonValue(json, offset)) {
+        return false;
+      }
+      skipJsonWhitespace(json, offset);
+      if (offset < json.size() && json[offset] == ',') {
+        ++offset;
+        skipJsonWhitespace(json, offset);
+        continue;
+      }
+      if (offset < json.size() && json[offset] == ']') {
+        ++offset;
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  if (json.compare(offset, 4, "true") == 0) {
+    offset += 4;
+    return true;
+  }
+  if (json.compare(offset, 5, "false") == 0) {
+    offset += 5;
+    return true;
+  }
+  if (json.compare(offset, 4, "null") == 0) {
+    offset += 4;
+    return true;
+  }
+
+  const size_t start = offset;
+  if (json[offset] == '-') {
+    ++offset;
+  }
+  const size_t integerStart = offset;
+  while (offset < json.size() &&
+         std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+    ++offset;
+  }
+  if (offset == integerStart) {
+    return false;
+  }
+  if (offset < json.size() && json[offset] == '.') {
+    ++offset;
+    const size_t fractionStart = offset;
+    while (offset < json.size() &&
+           std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+      ++offset;
+    }
+    if (offset == fractionStart) {
+      return false;
+    }
+  }
+  if (offset < json.size() && (json[offset] == 'e' || json[offset] == 'E')) {
+    ++offset;
+    if (offset < json.size() && (json[offset] == '+' || json[offset] == '-')) {
+      ++offset;
+    }
+    const size_t exponentStart = offset;
+    while (offset < json.size() &&
+           std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+      ++offset;
+    }
+    if (offset == exponentStart) {
+      return false;
+    }
+  }
+  return offset > start;
+}
+
+std::vector<std::string> parseJsonObjectKeys(const std::string &json) {
+  std::vector<std::string> keys;
+  size_t offset = 0;
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '{') {
+    return {};
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  if (offset < json.size() && json[offset] == '}') {
+    ++offset;
+    skipJsonWhitespace(json, offset);
+    return offset == json.size() ? keys : std::vector<std::string>{};
+  }
+
+  while (offset < json.size()) {
+    auto key = parseJsonString(json, offset);
+    if (!key) {
+      return {};
+    }
+    skipJsonWhitespace(json, offset);
+    if (offset >= json.size() || json[offset] != ':') {
+      return {};
+    }
+    ++offset;
+    if (!skipJsonValue(json, offset)) {
+      return {};
+    }
+    keys.push_back(*key);
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == '}') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      return offset == json.size() ? keys : std::vector<std::string>{};
+    }
+    return {};
+  }
+  return {};
+}
+
 static_assert(sizeof(SaBoostPadEventKind) == 4);
 static_assert(sizeof(SaPlayerStatEventKind) == 4);
 
@@ -2170,6 +2338,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     outputNames.assign(VERIFY_GRAPH_OUTPUTS.begin(), VERIFY_GRAPH_OUTPUTS.end());
   }
 
+  std::string analysisNodesJson;
   for (const std::string &outputName : outputNames) {
     const std::string outputJson =
         readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, outputName);
@@ -2183,6 +2352,9 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         "subtr-actor: graph output '{}' callable ({} bytes)",
         outputName,
         outputJson.size()));
+    if (outputName == "analysis_nodes") {
+      analysisNodesJson = outputJson;
+    }
   }
   if (!outputNames.empty()) {
     cvarManager->log(std::format(
@@ -2250,6 +2422,36 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   } else if (!nodeNames.empty()) {
     cvarManager->log(
         "subtr-actor: callable analysis node registry matches graph_info");
+  }
+
+  if (analysisNodesJson.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not inspect analysis_nodes output");
+  } else if (!nodeNames.empty()) {
+    std::vector<std::string> analysisNodeKeys = parseJsonObjectKeys(analysisNodesJson);
+    if (analysisNodeKeys.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not parse analysis_nodes output keys");
+    } else {
+      std::sort(analysisNodeKeys.begin(), analysisNodeKeys.end());
+      bool missingNode = false;
+      for (const std::string &nodeName : nodeNames) {
+        if (!std::binary_search(analysisNodeKeys.begin(), analysisNodeKeys.end(), nodeName)) {
+          ok = false;
+          missingNode = true;
+          cvarManager->log(std::format(
+              "subtr-actor: graph verification analysis_nodes output missing callable node '{}'",
+              nodeName));
+        }
+      }
+      if (!missingNode) {
+        cvarManager->log(std::format(
+            "subtr-actor: analysis_nodes output contains {} callable analysis nodes",
+            nodeNames.size()));
+      }
+    }
   }
 
   for (const std::string &nodeName : nodeNames) {
