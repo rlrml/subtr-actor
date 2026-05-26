@@ -115,7 +115,8 @@ acceptance check for live graph callability and event-generation parity.
    `graph_info`, every builtin stats module surface (`module`, `frame`, and
    `config`), and every name reported by the callable analysis-node name
    registry. It should also log that every resolved graph node is callable by
-   name and that `analysis_nodes` contains exactly the callable analysis nodes.
+   name, that `analysis_nodes` contains exactly the callable analysis nodes,
+   and that `frame_events_state` exposes every live event family field.
 3. Exercise live events that should be visible to the graph: touch the ball,
    pick up a boost pad, score a goal, and trigger a demolition when possible.
    Overlay labels should appear for drainable graph events.

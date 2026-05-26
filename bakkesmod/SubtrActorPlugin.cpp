@@ -37,6 +37,16 @@ constexpr std::array<const char *, 6> VERIFY_GRAPH_OUTPUTS{
     "analysis_nodes",
     "graph_info",
 };
+constexpr char FRAME_EVENTS_STATE_NODE[] = "frame_events_state";
+constexpr std::array<const char *, 7> FRAME_EVENTS_STATE_EVENT_FIELDS{
+    "active_demos",
+    "demo_events",
+    "boost_pad_events",
+    "touch_events",
+    "dodge_refreshed_events",
+    "player_stat_events",
+    "goal_events",
+};
 constexpr float BOOST_PICKUP_ATTRIBUTION_RADIUS = 450.0f;
 constexpr float STANDARD_BOOST_PAD_MATCH_RADIUS = 900.0f;
 constexpr float DEMO_ACTIVE_DURATION_SECONDS = 3.0f;
@@ -2510,6 +2520,32 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     cvarManager->log(std::format(
         "subtr-actor: verified {} callable analysis nodes by name",
         nodeNames.size()));
+  }
+
+  const std::string frameEventsJson =
+      readNamedJsonBuffer(analysisNodeJsonLen, writeAnalysisNodeJson, FRAME_EVENTS_STATE_NODE);
+  std::vector<std::string> frameEventKeys = parseJsonObjectKeys(frameEventsJson);
+  if (frameEventKeys.empty()) {
+    ok = false;
+    cvarManager->log(
+        "subtr-actor: graph verification could not inspect frame_events_state event fields");
+  } else {
+    std::sort(frameEventKeys.begin(), frameEventKeys.end());
+    bool missingEventField = false;
+    for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
+      if (!std::binary_search(frameEventKeys.begin(), frameEventKeys.end(), fieldName)) {
+        ok = false;
+        missingEventField = true;
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification frame_events_state missing event field '{}'",
+            fieldName));
+      }
+    }
+    if (!missingEventField) {
+      cvarManager->log(std::format(
+          "subtr-actor: frame_events_state exposes {} live event fields",
+          FRAME_EVENTS_STATE_EVENT_FIELDS.size()));
+    }
   }
 
   cvarManager->log(ok
