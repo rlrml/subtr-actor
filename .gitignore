@@ -12,6 +12,8 @@ perf.data.old
 flamegraph.svg
 .worktrees
 .cache/
+.xwin-cache/
+.xwin-msvc/
 .envrc.local
 .playwright-cli/
 .agents/local/

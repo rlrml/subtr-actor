@@ -50,6 +50,7 @@
         rustToolchain = fenix.packages.${system}.combine [
           fenix.packages.${system}.stable.toolchain
           fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+          fenix.packages.${system}.targets.x86_64-pc-windows-msvc.stable.rust-std
         ];
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rustToolchain;
@@ -169,8 +170,12 @@
             mingw.stdenv.cc
             pkgs.cmake
             pkgs.file
+            pkgs.llvmPackages_21.clang-unwrapped
+            pkgs.llvmPackages_21.llvm
+            pkgs.lld
             pkgs.ninja
             pkgs.python3
+            pkgs.xwin
           ];
 
           env = {
@@ -188,7 +193,8 @@
             echo "subtr-actor BakkesMod shell"
             echo "  Rust ABI: cargo build -p subtr-actor-bakkesmod --release"
             echo "  SDK:      $BAKKESMODSDK_DIR"
-            echo "  C++ note: MinGW can smoke-compile headers, but SDK linking generally needs MSVC."
+            echo "  Linux MSVC build: bakkesmod/build-linux-msvc.sh"
+            echo "  MinGW note: MinGW can smoke-compile headers, but final plugin linking needs MSVC ABI."
           '';
         };
       }

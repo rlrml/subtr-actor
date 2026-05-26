@@ -208,14 +208,20 @@ acceptance check for live graph callability and event-generation parity.
 
 ## Linux/Nix support
 
-The optional shell is for Linux-side Rust development and MinGW smoke checks:
+The optional shell can build the Rust ABI and has an experimental Linux-side
+MSVC-ABI plugin build path:
 
 ```sh
 nix develop .#bakkesmod
+bakkesmod/build-linux-msvc.sh
 ```
 
-This Linux workspace can build and check the Rust ABI, but cannot fully compile
-or load the C++ BakkesMod plugin without the Windows SDK and Rocket League
-runtime. The `.#bakkesmod` shell includes MinGW for header/smoke builds, but
-the official `pluginsdk.lib` is MSVC ABI, so SDK-linking plugin builds still
-need MSVC or a compatible Windows build environment.
+This uses `xwin` to download/splat the Microsoft CRT and Windows SDK, then
+builds the plugin with `clang-cl` and `lld-link` for the
+`x86_64-pc-windows-msvc` ABI. That ABI matters: BakkesMod's `pluginsdk.lib` is
+a MSVC C++ library, so a plain MinGW build is useful for header smoke checks but
+is not expected to produce a compatible final plugin DLL.
+
+The script produces the C++ plugin DLL and copies the Rust ABI DLL into the same
+configuration directory. Runtime validation still needs Windows, BakkesMod, and
+Rocket League.
