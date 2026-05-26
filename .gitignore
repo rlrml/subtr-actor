@@ -13,5 +13,6 @@ flamegraph.svg
 .worktrees
 .cache/
 .envrc.local
+.playwright-cli/
 .agents/local/
 .agents/feature-checklists/
