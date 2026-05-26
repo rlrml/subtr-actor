@@ -32,7 +32,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate graph dump helper
-        run: python -m py_compile bakkesmod/verify-graph-dump.py
+        run: |
+          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py
+          python bakkesmod/verify-plugin-source.py
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
