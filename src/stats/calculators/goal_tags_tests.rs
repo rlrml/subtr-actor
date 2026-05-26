@@ -97,6 +97,8 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
     FlickEvent {
         time,
         frame,
+        sample_time: time,
+        sample_frame: frame,
         player,
         is_team_0: true,
         dodge_time: time - 0.1,
@@ -185,6 +187,8 @@ fn half_volley_event(time: f32, frame: usize, player: PlayerId) -> HalfVolleyEve
     HalfVolleyEvent {
         time,
         frame,
+        sample_time: time,
+        sample_frame: frame,
         player,
         is_team_0: true,
         bounce_time: time - 0.2,

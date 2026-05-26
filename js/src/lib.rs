@@ -5,7 +5,7 @@ use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector},
     collector::CallbackCollector,
     Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, ResolvedBoostPadCollector,
-    StatsCollector, StatsTimelineCollector, SubtrActorError, SubtrActorErrorVariant,
+    StatsCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
     SubtrActorResult,
 };
 use wasm_bindgen::prelude::*;
@@ -155,12 +155,12 @@ fn collect_replay_data_with_optional_progress(
 fn collect_replay_bundle_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
-) -> Result<(ReplayData, subtr_actor::ReplayStatsTimeline), JsValue> {
+) -> Result<(ReplayData, subtr_actor::ReplayStatsTimelineScaffold), JsValue> {
     let total_frames = get_total_frames(replay)?;
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut stats_collector = StatsTimelineCollector::new();
+    let mut stats_collector = StatsTimelineEventCollector::new();
     let mut boost_pad_collector = ResolvedBoostPadCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -201,7 +201,7 @@ fn collect_replay_bundle_with_optional_progress(
     }
 
     let stats_timeline = stats_collector
-        .into_replay_stats_timeline()
+        .into_replay_stats_timeline_scaffold()
         .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
     if let Some((callback, _)) = progress {
         emit_stage_progress(callback, "building-stats", 1.0)
@@ -234,7 +234,7 @@ fn set_json_bytes<T: serde::Serialize>(
 }
 
 fn stats_timeline_json_parts(
-    timeline: subtr_actor::ReplayStatsTimeline,
+    timeline: subtr_actor::ReplayStatsTimelineScaffold,
     max_frame_chunk_bytes: Option<usize>,
     progress: Option<(&Function, usize, f64, f64)>,
 ) -> Result<JsValue, JsValue> {
@@ -529,13 +529,13 @@ pub fn get_replay_bundle_json_parts_with_progress(
     Ok(result.into())
 }
 
-/// Get cumulative stats snapshots for each replay sample.
+/// Get compact event-backed stats frames for each replay sample.
 #[wasm_bindgen]
 pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
@@ -546,8 +546,20 @@ pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
 pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+
+    serde_json::to_vec(&stats_timeline)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn get_legacy_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+
     let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)
@@ -561,8 +573,8 @@ pub fn get_stats_timeline_json_parts(
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes, None)

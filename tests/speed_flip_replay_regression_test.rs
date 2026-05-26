@@ -30,7 +30,7 @@ fn player_ids_by_name<'a>(
 fn colonelpanic_replay_has_no_speed_flip_at_normalized_28_1_seconds() {
     let replay = parse_replay(COLONELPANIC_NO_SPEED_FLIP_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("stats timeline should build");
     let colonelpanic_ids = player_ids_by_name(&timeline, "colonelpanic8");
     assert!(

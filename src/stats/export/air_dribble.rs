@@ -112,5 +112,14 @@ impl StatFieldProvider for AirDribbleStats {
             StatUnit::UnrealUnits,
             self.average_vertical_gap(),
         ));
+        for entry in self.complete_labeled_event_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "air_dribble",
+                "count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }

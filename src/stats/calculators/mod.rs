@@ -8,6 +8,32 @@ use serde::{Deserialize, Serialize};
 use super::boost_invariants::{boost_invariant_violations, BoostInvariantKind};
 use crate::*;
 
+const CONFIDENCE_BAND_LABELS: [StatLabel; 2] = [
+    StatLabel::new("confidence_band", "standard"),
+    StatLabel::new("confidence_band", "high"),
+];
+
+const VERTICAL_STATE_LABELS: [StatLabel; 2] = [
+    StatLabel::new("vertical_state", "grounded"),
+    StatLabel::new("vertical_state", "aerial"),
+];
+
+fn confidence_band_label(high_confidence: bool) -> StatLabel {
+    if high_confidence {
+        StatLabel::new("confidence_band", "high")
+    } else {
+        StatLabel::new("confidence_band", "standard")
+    }
+}
+
+fn vertical_state_label(aerial: bool) -> StatLabel {
+    if aerial {
+        StatLabel::new("vertical_state", "aerial")
+    } else {
+        StatLabel::new("vertical_state", "grounded")
+    }
+}
+
 mod frame_input;
 pub use frame_input::*;
 mod frame_components;

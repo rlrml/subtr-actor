@@ -208,5 +208,23 @@ impl StatFieldProvider for BoostStats {
             StatUnit::Percent,
             self.boost_75_100_pct(),
         ));
+        for entry in &self.labeled_amounts.entries {
+            visitor(ExportedStat::float_labeled(
+                "boost",
+                "amount",
+                StatUnit::Boost,
+                entry.labels.clone(),
+                entry.value,
+            ));
+        }
+        for entry in &self.labeled_counts.entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "boost",
+                "count",
+                StatUnit::Count,
+                entry.labels.clone(),
+                entry.count,
+            ));
+        }
     }
 }

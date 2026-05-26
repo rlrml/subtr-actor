@@ -6,6 +6,7 @@ export type ReplayLoadStage =
   | "serializing-stats"
   | "decoding-replay"
   | "decoding-stats"
+  | "deriving-stats"
   | "normalizing"
   | "stats-timeline";
 
@@ -35,7 +36,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "validating",
     index: 1,
-    total: 8,
+    total: 9,
     label: "Parse replay",
     start: 0,
     end: 0.08,
@@ -43,7 +44,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "processing",
     index: 2,
-    total: 8,
+    total: 9,
     label: "Process replay frames",
     start: 0.08,
     end: 0.62,
@@ -51,15 +52,15 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "building-stats",
     index: 3,
-    total: 8,
-    label: "Build stats snapshots",
+    total: 9,
+    label: "Build stats events",
     start: 0.62,
     end: 0.7,
   },
   {
     stage: "serializing-replay",
     index: 4,
-    total: 8,
+    total: 9,
     label: "Serialize replay data",
     start: 0.7,
     end: 0.76,
@@ -67,7 +68,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "serializing-stats",
     index: 5,
-    total: 8,
+    total: 9,
     label: "Serialize stats timeline",
     start: 0.76,
     end: 0.86,
@@ -75,7 +76,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "normalizing",
     index: 6,
-    total: 8,
+    total: 9,
     label: "Normalize replay model",
     start: 0.86,
     end: 0.91,
@@ -83,7 +84,7 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "decoding-replay",
     index: 7,
-    total: 8,
+    total: 9,
     label: "Decode replay data",
     start: 0.91,
     end: 0.94,
@@ -91,10 +92,18 @@ const REPLAY_LOAD_PHASES: Array<ReplayLoadPhase & { start: number; end: number }
   {
     stage: "decoding-stats",
     index: 8,
-    total: 8,
+    total: 9,
     label: "Decode stats chunks",
     start: 0.94,
-    end: 0.99,
+    end: 0.96,
+  },
+  {
+    stage: "deriving-stats",
+    index: 9,
+    total: 9,
+    label: "Derive stats snapshots",
+    start: 0.96,
+    end: 1,
   },
 ];
 
@@ -229,11 +238,11 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
     case "building-stats":
       if (percent !== null) {
         if (normalizedProgress.totalFrames !== undefined) {
-          return `Building stats snapshots... ${percent}% (${normalizedProgress.processedFrames ?? 0}/${normalizedProgress.totalFrames})`;
+          return `Building stats events... ${percent}% (${normalizedProgress.processedFrames ?? 0}/${normalizedProgress.totalFrames})`;
         }
-        return `Building stats snapshots... ${percent}%`;
+        return `Building stats events... ${percent}%`;
       }
-      return "Building stats snapshots...";
+      return "Building stats events...";
     case "serializing-replay":
       if (percent !== null) {
         return `Serializing replay data... ${percent}%`;
@@ -257,6 +266,11 @@ export function formatReplayLoadProgress(progress: ReplayLoadProgress): string {
         return `Decoding stats chunks... ${percent}%`;
       }
       return "Decoding stats chunks...";
+    case "deriving-stats":
+      if (percent !== null) {
+        return `Deriving stats snapshots... ${percent}%`;
+      }
+      return "Deriving stats snapshots...";
     case "normalizing":
       if (percent !== null) {
         return `Normalizing replay model... ${percent}%`;

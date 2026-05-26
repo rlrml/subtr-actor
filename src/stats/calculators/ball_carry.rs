@@ -13,6 +13,8 @@ pub struct BallCarryStats {
     pub carry_speed_sum: f32,
     pub average_horizontal_gap_sum: f32,
     pub average_vertical_gap_sum: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl BallCarryStats {
@@ -47,10 +49,29 @@ impl BallCarryStats {
     pub fn average_vertical_gap(&self) -> f32 {
         self.pct_count_average(self.average_vertical_gap_sum)
     }
+
+    fn record_event(&mut self, event: &BallCarryEvent) {
+        self.labeled_event_counts
+            .increment([ball_carry_kind_label(event.kind)]);
+        self.carry_count = self.labeled_event_counts.total();
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[&BALL_CARRY_KIND_LABELS],
+            &self.labeled_event_counts,
+        )
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BallCarryEvent {
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub is_team_0: bool,
     pub kind: BallCarryKind,
@@ -76,6 +97,18 @@ pub struct BallCarryEvent {
 pub enum BallCarryKind {
     Carry,
     AirDribble,
+}
+
+const BALL_CARRY_KIND_LABELS: [StatLabel; 2] = [
+    StatLabel::new("kind", "carry"),
+    StatLabel::new("kind", "air_dribble"),
+];
+
+fn ball_carry_kind_label(kind: BallCarryKind) -> StatLabel {
+    match kind {
+        BallCarryKind::Carry => StatLabel::new("kind", "carry"),
+        BallCarryKind::AirDribble => StatLabel::new("kind", "air_dribble"),
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -316,7 +349,7 @@ impl BallCarryCalculator {
     }
 
     fn apply_carry_event(stats: &mut BallCarryStats, event: &BallCarryEvent) {
-        stats.carry_count += 1;
+        stats.record_event(event);
         stats.total_carry_time += event.duration;
         stats.total_straight_line_distance += event.straight_line_distance;
         stats.total_path_distance += event.path_distance;

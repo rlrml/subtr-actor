@@ -1,5 +1,6 @@
 use crate::*;
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -49,10 +50,56 @@ impl ReplayStatsTimeline {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsTimelineScaffold {
+    pub config: StatsTimelineConfig,
+    pub replay_meta: ReplayMeta,
+    pub events: ReplayStatsTimelineEvents,
+    pub frames: Vec<ReplayStatsFrameScaffold>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsFrameScaffold {
+    pub frame_number: usize,
+    pub time: f32,
+    pub dt: f32,
+    pub seconds_remaining: Option<i32>,
+    pub game_state: Option<i32>,
+    pub ball_has_been_hit: Option<bool>,
+    pub kickoff_countdown_time: Option<i32>,
+    pub gameplay_phase: GameplayPhase,
+    pub is_live_play: bool,
+    #[ts(type = "Record<string, unknown>")]
+    pub team_zero: BTreeMap<String, serde_json::Value>,
+    #[ts(type = "Record<string, unknown>")]
+    pub team_one: BTreeMap<String, serde_json::Value>,
+    pub players: Vec<ReplayStatsPlayerIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsPlayerIdentity {
+    #[serde(rename = "player_id")]
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub name: String,
+    pub is_team_0: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ReplayStatsTimelineEvents {
     pub timeline: Vec<TimelineEvent>,
+    pub core_player: Vec<CorePlayerStatsEvent>,
+    pub core_team: Vec<CoreTeamStatsEvent>,
+    pub possession: Vec<PossessionEvent>,
+    pub pressure: Vec<PressureEvent>,
+    pub movement: Vec<MovementEvent>,
+    pub positioning: Vec<PositioningEvent>,
+    pub rotation_player: Vec<RotationPlayerEvent>,
+    pub rotation_team: Vec<RotationTeamEvent>,
     pub mechanics: Vec<MechanicEvent>,
     pub goal_context: Vec<GoalContextEvent>,
     pub backboard: Vec<BackboardBounceEvent>,
@@ -60,10 +107,15 @@ pub struct ReplayStatsTimelineEvents {
     pub wall_aerial: Vec<WallAerialEvent>,
     pub wall_aerial_shot: Vec<WallAerialShotEvent>,
     pub center: Vec<CenterEvent>,
+    pub flick: Vec<FlickEvent>,
+    pub musty_flick: Vec<MustyFlickEvent>,
+    pub dodge_reset: Vec<DodgeResetEvent>,
     pub double_tap: Vec<DoubleTapEvent>,
     pub fifty_fifty: Vec<FiftyFiftyEvent>,
     pub one_timer: Vec<OneTimerEvent>,
     pub pass: Vec<PassEvent>,
+    pub pass_last_completed: Vec<PassLastCompletedEvent>,
+    pub ball_carry: Vec<BallCarryEvent>,
     pub goal_tags: Vec<GoalTagEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
@@ -71,7 +123,13 @@ pub struct ReplayStatsTimelineEvents {
     pub half_volley: Vec<HalfVolleyEvent>,
     pub wavedash: Vec<WavedashEvent>,
     pub whiff: Vec<WhiffEvent>,
+    pub powerslide: Vec<PowerslideEvent>,
+    pub touch: Vec<TouchStatsEvent>,
+    pub touch_ball_movement: Vec<TouchBallMovementEvent>,
+    pub touch_last_touch: Vec<TouchLastTouchEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
+    pub boost_ledger: Vec<BoostLedgerEvent>,
+    pub boost_state: Vec<BoostStateEvent>,
     pub bump: Vec<BumpEvent>,
 }
 
@@ -129,6 +187,8 @@ pub struct ReplayStatsFrame {
     pub dt: f32,
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
+    pub ball_has_been_hit: Option<bool>,
+    pub kickoff_countdown_time: Option<i32>,
     pub gameplay_phase: GameplayPhase,
     pub is_live_play: bool,
     pub team_zero: TeamStatsSnapshot,

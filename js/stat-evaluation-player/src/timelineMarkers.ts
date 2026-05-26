@@ -147,54 +147,6 @@ export function buildMechanicTimelineEvents(
     });
 }
 
-function buildPlayerCountTimelineEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-  options: {
-    kind: ReplayTimelineEventKind;
-    idPrefix: string;
-    shortLabel: string;
-    getCount: (player: StatsTimeline["frames"][number]["players"][number]) => number;
-    buildLabel: (player: StatsTimeline["frames"][number]["players"][number]) => string;
-  },
-): ReplayTimelineEvent[] {
-  const events: ReplayTimelineEvent[] = [];
-  const previousCounts = new Map<string, number>();
-
-  for (const frame of statsTimeline.frames) {
-    for (const player of frame.players) {
-      const playerId = playerIdToString(player.player_id);
-      const currentCount = options.getCount(player);
-      const previousCount = previousCounts.get(playerId) ?? 0;
-      previousCounts.set(playerId, currentCount);
-
-      const delta = Math.max(0, currentCount - previousCount);
-      if (delta === 0) {
-        continue;
-      }
-
-      const eventTime = getReplayFrameTime(replay, frame.frame_number, frame.time);
-      for (let index = 0; index < delta; index += 1) {
-        const sequence = currentCount - delta + index + 1;
-        events.push({
-          id: `${options.idPrefix}:${frame.frame_number}:${playerId}:${sequence}`,
-          time: eventTime,
-          frame: frame.frame_number,
-          kind: options.kind,
-          label: options.buildLabel(player),
-          shortLabel: options.shortLabel,
-          playerId,
-          playerName: player.name,
-          isTeamZero: player.is_team_0,
-          color: player.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-        });
-      }
-    }
-  }
-
-  return events;
-}
-
 export function getReplayTimelineEventKinds(
   activeModuleIds: Iterable<string>,
 ): ReplayTimelineEventKind[] {
@@ -247,86 +199,44 @@ export function buildMustyFlickTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  const events: ReplayTimelineEvent[] = [];
-  const previousCounts = new Map<string, number>();
-
-  for (const frame of statsTimeline.frames) {
-    for (const player of frame.players) {
-      const playerId = playerIdToString(player.player_id);
-      const currentCount = player.musty_flick?.count ?? 0;
-      const previousCount = previousCounts.get(playerId) ?? 0;
-      previousCounts.set(playerId, currentCount);
-
-      const delta = Math.max(0, currentCount - previousCount);
-      if (delta === 0) {
-        continue;
-      }
-
-      const eventFrame = player.musty_flick?.last_musty_frame ?? frame.frame_number;
-      const eventTime =
-        replay.frames[eventFrame]?.time ?? player.musty_flick?.last_musty_time ?? frame.time;
-
-      for (let index = 0; index < delta; index += 1) {
-        events.push({
-          id: `musty-flick:${eventFrame}:${playerId}:${currentCount - delta + index + 1}`,
-          time: eventTime,
-          frame: eventFrame,
-          kind: "musty-flick",
-          label: `${player.name} musty flick`,
-          shortLabel: "M",
-          playerId,
-          playerName: player.name,
-          isTeamZero: player.is_team_0,
-          color: player.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-        });
-      }
-    }
-  }
-
-  return events;
+  return (statsTimeline.events?.musty_flick ?? []).map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = getReplayPlayerName(replay, playerId);
+    return {
+      id: `musty-flick:${event.frame}:${playerId}:${index + 1}`,
+      time: getReplayFrameTime(replay, event.frame, event.time),
+      frame: event.frame,
+      kind: "musty-flick",
+      label: `${playerName} musty flick`,
+      shortLabel: "M",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
 }
 
 export function buildFlickTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  const events: ReplayTimelineEvent[] = [];
-  const previousCounts = new Map<string, number>();
-
-  for (const frame of statsTimeline.frames) {
-    for (const player of frame.players) {
-      const playerId = playerIdToString(player.player_id);
-      const currentCount = player.flick?.count ?? 0;
-      const previousCount = previousCounts.get(playerId) ?? 0;
-      previousCounts.set(playerId, currentCount);
-
-      const delta = Math.max(0, currentCount - previousCount);
-      if (delta === 0) {
-        continue;
-      }
-
-      const eventFrame = player.flick?.last_flick_frame ?? frame.frame_number;
-      const eventTime =
-        replay.frames[eventFrame]?.time ?? player.flick?.last_flick_time ?? frame.time;
-
-      for (let index = 0; index < delta; index += 1) {
-        events.push({
-          id: `flick:${eventFrame}:${playerId}:${currentCount - delta + index + 1}`,
-          time: eventTime,
-          frame: eventFrame,
-          kind: "flick",
-          label: `${player.name} flick`,
-          shortLabel: "F",
-          playerId,
-          playerName: player.name,
-          isTeamZero: player.is_team_0,
-          color: player.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-        });
-      }
-    }
-  }
-
-  return events;
+  return (statsTimeline.events?.flick ?? []).map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = getReplayPlayerName(replay, playerId);
+    return {
+      id: `flick:${event.frame}:${playerId}:${index + 1}`,
+      time: getReplayFrameTime(replay, event.frame, event.time),
+      frame: event.frame,
+      kind: "flick",
+      label: `${playerName} flick`,
+      shortLabel: "F",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
 }
 
 export function buildTouchTimelineEvents(
@@ -656,75 +566,72 @@ export function buildDodgeResetTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  const events: ReplayTimelineEvent[] = [];
-  const previousCounts = new Map<string, number>();
-  const previousOnBallCounts = new Map<string, number>();
-
-  for (const frame of statsTimeline.frames) {
-    const eventTime = getReplayFrameTime(replay, frame.frame_number, frame.time);
-
-    for (const player of frame.players) {
-      const playerId = playerIdToString(player.player_id);
-      const currentCount = player.dodge_reset?.count ?? 0;
-      const previousCount = previousCounts.get(playerId) ?? 0;
-      previousCounts.set(playerId, currentCount);
-
-      const currentOnBallCount = player.dodge_reset?.on_ball_count ?? 0;
-      const previousOnBallCount = previousOnBallCounts.get(playerId) ?? 0;
-      previousOnBallCounts.set(playerId, currentOnBallCount);
-
-      const delta = Math.max(0, currentCount - previousCount);
-      const onBallDelta = Math.min(delta, Math.max(0, currentOnBallCount - previousOnBallCount));
-
-      for (let index = 0; index < delta; index += 1) {
-        const sequence = currentCount - delta + index + 1;
-        const onBall = index < onBallDelta;
-        if (onBall) {
-          continue;
-        }
-        events.push({
-          id: `dodge-reset:${frame.frame_number}:${playerId}:${sequence}:air`,
-          time: eventTime,
-          frame: frame.frame_number,
-          kind: "dodge-reset",
-          label: `${player.name} dodge refresh`,
-          shortLabel: "DR",
-          playerId,
-          playerName: player.name,
-          isTeamZero: player.is_team_0,
-          color: player.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-        });
-      }
-    }
-  }
-
-  return events;
+  return (statsTimeline.events?.dodge_reset ?? [])
+    .filter((event) => !event.on_ball)
+    .map((event) => {
+      const playerId = playerIdToString(event.player);
+      const playerName = getReplayPlayerName(replay, playerId);
+      return {
+        id: `dodge-reset:${event.frame}:${playerId}:${event.counter_value}:air`,
+        time: getReplayFrameTime(replay, event.frame, event.time),
+        frame: event.frame,
+        kind: "dodge-reset",
+        label: `${playerName} dodge refresh`,
+        shortLabel: "DR",
+        playerId,
+        playerName,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
 }
 
 export function buildBallCarryTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return buildPlayerCountTimelineEvents(statsTimeline, replay, {
-    kind: "ball-carry",
-    idPrefix: "ball-carry",
-    shortLabel: "BC",
-    getCount: (player) => player.ball_carry?.carry_count ?? 0,
-    buildLabel: (player) => `${player.name} ball carry`,
-  });
+  return (statsTimeline.events?.ball_carry ?? [])
+    .filter((event) => event.kind === "carry")
+    .map((event, index) => {
+      const playerId = playerIdToString(event.player_id);
+      const playerName = getReplayPlayerName(replay, playerId);
+      return {
+        id: `ball-carry:${event.end_frame}:${playerId}:${index + 1}`,
+        time: getReplayFrameTime(replay, event.end_frame, event.end_time),
+        frame: event.end_frame,
+        kind: "ball-carry",
+        label: `${playerName} ball carry`,
+        shortLabel: "BC",
+        playerId,
+        playerName,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
 }
 
 export function buildPowerslideTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return buildPlayerCountTimelineEvents(statsTimeline, replay, {
-    kind: "powerslide",
-    idPrefix: "powerslide",
-    shortLabel: "PS",
-    getCount: (player) => player.powerslide?.press_count ?? 0,
-    buildLabel: (player) => `${player.name} powerslide`,
-  });
+  return (statsTimeline.events?.powerslide ?? [])
+    .filter((event) => event.active)
+    .map((event, index) => {
+      const playerId = playerIdToString(event.player);
+      const playerName = getReplayPlayerName(replay, playerId);
+      return {
+        id: `powerslide:${event.frame}:${playerId}:${index + 1}`,
+        time: getReplayFrameTime(replay, event.frame, event.time),
+        frame: event.frame,
+        kind: "powerslide",
+        label: `${playerName} powerslide`,
+        shortLabel: "PS",
+        playerId,
+        playerName,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
 }
 
 export function buildSpeedFlipTimelineEvents(

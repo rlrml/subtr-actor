@@ -17,87 +17,101 @@ impl StatsTimelineEventsNode {
             state: StatsTimelineEventsState::default(),
         }
     }
-}
 
-impl_analysis_node! {
-    node = StatsTimelineEventsNode,
-    state = StatsTimelineEventsState,
-    name = "stats_timeline_events",
-    dependencies = [
-        match_stats_dependency(),
-        demo_dependency(),
-        backboard_dependency(),
-        ball_carry_dependency(),
-        ceiling_shot_dependency(),
-        wall_aerial_dependency(),
-        wall_aerial_shot_dependency(),
-        center_dependency(),
-        dodge_reset_dependency(),
-        double_tap_dependency(),
-        one_timer_dependency(),
-        pass_dependency(),
-        fifty_fifty_dependency(),
-        flick_dependency(),
-        musty_flick_dependency(),
-        aerial_goal_dependency(),
-        high_aerial_goal_dependency(),
-        long_distance_goal_dependency(),
-        own_half_goal_dependency(),
-        empty_net_goal_dependency(),
-        counter_attack_goal_dependency(),
-        flick_goal_dependency(),
-        double_tap_goal_dependency(),
-        one_timer_goal_dependency(),
-        air_dribble_goal_dependency(),
-        flip_reset_goal_dependency(),
-        half_volley_goal_dependency(),
-        rush_dependency(),
-        speed_flip_dependency(),
-        half_flip_dependency(),
-        half_volley_dependency(),
-        wavedash_dependency(),
-        whiff_dependency(),
-        boost_dependency(),
-        bump_dependency(),
-    ],
-    inputs = {
-        match_stats: MatchStatsCalculator,
-        demo: DemoCalculator,
-        backboard: BackboardCalculator,
-        ball_carry: BallCarryCalculator,
-        ceiling_shot: CeilingShotCalculator,
-        wall_aerial: WallAerialCalculator,
-        wall_aerial_shot: WallAerialShotCalculator,
-        center: CenterCalculator,
-        dodge_reset: DodgeResetCalculator,
-        double_tap: DoubleTapCalculator,
-        one_timer: OneTimerCalculator,
-        pass: PassCalculator,
-        fifty_fifty: FiftyFiftyCalculator,
-        flick: FlickCalculator,
-        musty_flick: MustyFlickCalculator,
-        aerial_goal: AerialGoalCalculator,
-        high_aerial_goal: HighAerialGoalCalculator,
-        long_distance_goal: LongDistanceGoalCalculator,
-        own_half_goal: OwnHalfGoalCalculator,
-        empty_net_goal: EmptyNetGoalCalculator,
-        counter_attack_goal: CounterAttackGoalCalculator,
-        flick_goal: FlickGoalCalculator,
-        double_tap_goal: DoubleTapGoalCalculator,
-        one_timer_goal: OneTimerGoalCalculator,
-        air_dribble_goal: AirDribbleGoalCalculator,
-        flip_reset_goal: FlipResetGoalCalculator,
-        half_volley_goal: HalfVolleyGoalCalculator,
-        rush: RushCalculator,
-        speed_flip: SpeedFlipCalculator,
-        half_flip: HalfFlipCalculator,
-        half_volley: HalfVolleyCalculator,
-        wavedash: WavedashCalculator,
-        whiff: WhiffCalculator,
-        boost: BoostCalculator,
-        bump: BumpCalculator,
-    },
-    evaluate = |node| {
+    fn dependencies() -> NodeDependencies {
+        vec![
+            frame_info_dependency(),
+            gameplay_state_dependency(),
+            live_play_dependency(),
+            match_stats_dependency(),
+            backboard_dependency(),
+            ceiling_shot_dependency(),
+            wall_aerial_dependency(),
+            wall_aerial_shot_dependency(),
+            double_tap_dependency(),
+            one_timer_dependency(),
+            pass_dependency(),
+            fifty_fifty_dependency(),
+            possession_dependency(),
+            pressure_dependency(),
+            rotation_dependency(),
+            rush_dependency(),
+            touch_dependency(),
+            whiff_dependency(),
+            wavedash_dependency(),
+            speed_flip_dependency(),
+            half_flip_dependency(),
+            flick_dependency(),
+            musty_flick_dependency(),
+            dodge_reset_dependency(),
+            ball_carry_dependency(),
+            boost_dependency(),
+            bump_dependency(),
+            half_volley_dependency(),
+            movement_dependency(),
+            positioning_dependency(),
+            powerslide_dependency(),
+            demo_dependency(),
+            center_dependency(),
+            aerial_goal_dependency(),
+            high_aerial_goal_dependency(),
+            long_distance_goal_dependency(),
+            own_half_goal_dependency(),
+            empty_net_goal_dependency(),
+            counter_attack_goal_dependency(),
+            flick_goal_dependency(),
+            double_tap_goal_dependency(),
+            one_timer_goal_dependency(),
+            air_dribble_goal_dependency(),
+            flip_reset_goal_dependency(),
+            half_volley_goal_dependency(),
+        ]
+    }
+
+    fn capture_events(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        let match_stats = ctx.get::<MatchStatsCalculator>()?;
+        let possession = ctx.get::<PossessionCalculator>()?;
+        let pressure = ctx.get::<PressureCalculator>()?;
+        let movement = ctx.get::<MovementCalculator>()?;
+        let positioning = ctx.get::<PositioningCalculator>()?;
+        let rotation = ctx.get::<RotationCalculator>()?;
+        let demo = ctx.get::<DemoCalculator>()?;
+        let backboard = ctx.get::<BackboardCalculator>()?;
+        let ball_carry = ctx.get::<BallCarryCalculator>()?;
+        let ceiling_shot = ctx.get::<CeilingShotCalculator>()?;
+        let wall_aerial = ctx.get::<WallAerialCalculator>()?;
+        let wall_aerial_shot = ctx.get::<WallAerialShotCalculator>()?;
+        let center = ctx.get::<CenterCalculator>()?;
+        let dodge_reset = ctx.get::<DodgeResetCalculator>()?;
+        let double_tap = ctx.get::<DoubleTapCalculator>()?;
+        let one_timer = ctx.get::<OneTimerCalculator>()?;
+        let pass = ctx.get::<PassCalculator>()?;
+        let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
+        let flick = ctx.get::<FlickCalculator>()?;
+        let musty_flick = ctx.get::<MustyFlickCalculator>()?;
+        let aerial_goal = ctx.get::<AerialGoalCalculator>()?;
+        let high_aerial_goal = ctx.get::<HighAerialGoalCalculator>()?;
+        let long_distance_goal = ctx.get::<LongDistanceGoalCalculator>()?;
+        let own_half_goal = ctx.get::<OwnHalfGoalCalculator>()?;
+        let empty_net_goal = ctx.get::<EmptyNetGoalCalculator>()?;
+        let counter_attack_goal = ctx.get::<CounterAttackGoalCalculator>()?;
+        let flick_goal = ctx.get::<FlickGoalCalculator>()?;
+        let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
+        let one_timer_goal = ctx.get::<OneTimerGoalCalculator>()?;
+        let air_dribble_goal = ctx.get::<AirDribbleGoalCalculator>()?;
+        let flip_reset_goal = ctx.get::<FlipResetGoalCalculator>()?;
+        let half_volley_goal = ctx.get::<HalfVolleyGoalCalculator>()?;
+        let rush = ctx.get::<RushCalculator>()?;
+        let speed_flip = ctx.get::<SpeedFlipCalculator>()?;
+        let half_flip = ctx.get::<HalfFlipCalculator>()?;
+        let half_volley = ctx.get::<HalfVolleyCalculator>()?;
+        let wavedash = ctx.get::<WavedashCalculator>()?;
+        let whiff = ctx.get::<WhiffCalculator>()?;
+        let powerslide = ctx.get::<PowerslideCalculator>()?;
+        let touch = ctx.get::<TouchCalculator>()?;
+        let boost = ctx.get::<BoostCalculator>()?;
+        let bump = ctx.get::<BumpCalculator>()?;
+
         let mut timeline = match_stats.timeline().to_vec();
         timeline.extend(demo.timeline().to_vec());
         timeline.sort_by(|left, right| left.time.total_cmp(&right.time));
@@ -116,8 +130,16 @@ impl_analysis_node! {
             half_volley_goal.events(),
         ]);
 
-        node.state.events = ReplayStatsTimelineEvents {
+        self.state.events = ReplayStatsTimelineEvents {
             timeline,
+            core_player: match_stats.core_player_events().to_vec(),
+            core_team: match_stats.core_team_events().to_vec(),
+            possession: possession.events().to_vec(),
+            pressure: pressure.events().to_vec(),
+            movement: movement.events().to_vec(),
+            positioning: positioning.events().to_vec(),
+            rotation_player: rotation.player_events().to_vec(),
+            rotation_team: rotation.team_events().to_vec(),
             mechanics: build_mechanic_events(
                 ball_carry,
                 ceiling_shot,
@@ -141,9 +163,14 @@ impl_analysis_node! {
             wall_aerial: wall_aerial.events().to_vec(),
             wall_aerial_shot: wall_aerial_shot.events().to_vec(),
             center: center.events().to_vec(),
+            flick: flick.events().to_vec(),
+            musty_flick: musty_flick.events().to_vec(),
+            dodge_reset: dodge_reset.events().to_vec(),
             double_tap: double_tap.events().to_vec(),
             one_timer: one_timer.events().to_vec(),
             pass: pass.events().to_vec(),
+            pass_last_completed: pass.last_completed_events().to_vec(),
+            ball_carry: ball_carry.carry_events().to_vec(),
             fifty_fifty: fifty_fifty.events().to_vec(),
             goal_tags,
             rush: rush.events().to_vec(),
@@ -152,12 +179,51 @@ impl_analysis_node! {
             half_volley: half_volley.events().to_vec(),
             wavedash: wavedash.events().to_vec(),
             whiff: whiff.events().to_vec(),
+            powerslide: powerslide.events().to_vec(),
+            touch: touch.events().to_vec(),
+            touch_ball_movement: touch.ball_movement_events().to_vec(),
+            touch_last_touch: touch.last_touch_events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
+            boost_ledger: boost.ledger_events().to_vec(),
+            boost_state: boost.state_events().to_vec(),
             bump: bump.events().to_vec(),
         };
         Ok(())
-    },
-    state_ref = |node| &node.state,
+    }
+}
+
+impl Default for StatsTimelineEventsNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AnalysisNode for StatsTimelineEventsNode {
+    type State = StatsTimelineEventsState;
+
+    fn name(&self) -> &'static str {
+        "stats_timeline_events"
+    }
+
+    fn dependencies(&self) -> Vec<AnalysisDependency> {
+        Self::dependencies()
+    }
+
+    fn evaluate(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        Ok(())
+    }
+
+    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.capture_events(ctx)
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.state
+    }
+}
+
+pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(StatsTimelineEventsNode::new())
 }
 
 fn moment_mechanic_event(

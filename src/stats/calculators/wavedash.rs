@@ -41,6 +41,8 @@ pub struct WavedashStats {
     pub last_quality: Option<f32>,
     pub best_quality: f32,
     pub cumulative_quality: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl WavedashStats {
@@ -50,6 +52,34 @@ impl WavedashStats {
         } else {
             self.cumulative_quality / self.count as f32
         }
+    }
+
+    fn record_event(&mut self, event: &WavedashEvent) {
+        self.labeled_event_counts.increment([confidence_band_label(
+            event.confidence >= WAVEDASH_HIGH_CONFIDENCE,
+        )]);
+        self.sync_legacy_counts();
+        self.last_wavedash_time = Some(event.time);
+        self.last_wavedash_frame = Some(event.frame);
+        self.last_quality = Some(event.confidence);
+        self.best_quality = self.best_quality.max(event.confidence);
+        self.cumulative_quality += event.confidence;
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[&CONFIDENCE_BAND_LABELS],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.high_confidence_count = self.event_count_with_labels(&[confidence_band_label(true)]);
     }
 }
 
@@ -199,18 +229,10 @@ impl WavedashCalculator {
         }
 
         let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.count += 1;
-        if event.confidence >= WAVEDASH_HIGH_CONFIDENCE {
-            stats.high_confidence_count += 1;
-        }
+        stats.record_event(&event);
         stats.is_last_wavedash = true;
-        stats.last_wavedash_time = Some(event.time);
-        stats.last_wavedash_frame = Some(event.frame);
         stats.time_since_last_wavedash = Some(0.0);
         stats.frames_since_last_wavedash = Some(0);
-        stats.last_quality = Some(event.confidence);
-        stats.best_quality = stats.best_quality.max(event.confidence);
-        stats.cumulative_quality += event.confidence;
 
         self.current_last_wavedash_player = Some(event.player.clone());
         self.events.push(event);

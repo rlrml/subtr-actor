@@ -44,6 +44,10 @@ stats_snapshot_data = subtr_actor.get_stats_snapshot_data(
 )
 stats_timeline = subtr_actor.get_stats_timeline(
     replay_path,
+    frame_step_seconds=1.0,
+)
+legacy_stats_timeline = subtr_actor.get_legacy_stats_timeline(
+    replay_path,
     module_names=["core", "boost", "movement"],
     frame_step_seconds=1.0,
 )
@@ -54,8 +58,14 @@ print(replay_meta["map_name"])
 print(stats_module_names)
 print(stats["modules"]["core"]["team_zero"]["score"])
 print(stats_snapshot_data["frames"][-1]["modules"]["boost"]["team_zero"]["amount_collected"])
-print(stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
+print(stats_timeline["events"]["boost_ledger"][-1])
+print(legacy_stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
 ```
+
+`get_stats_timeline` is the compact event-backed timeline. Its `frames` contain
+timing, gameplay state, and player identity scaffolding only; stat deltas live
+under `events`. Use `get_legacy_stats_timeline` only for compatibility code that
+still needs serialized per-frame team/player snapshots.
 
 ## API Surface
 
@@ -90,7 +100,7 @@ Get structured frame-by-frame game state data with no FPS resampling.
 ### `get_stats_module_names() -> list[str]`
 
 List the builtin stats modules that can be selected in `get_stats`,
-`get_stats_snapshot_data`, and `get_stats_timeline`.
+`get_stats_snapshot_data`, and `get_legacy_stats_timeline`.
 
 ### `get_stats(filepath, module_names=None) -> dict`
 
@@ -118,9 +128,30 @@ Parameters:
 - `frame_step_seconds`: optional positive sampling interval in seconds. By
   default every replay frame is captured.
 
-### `get_stats_timeline(filepath, module_names=None, frame_step_seconds=None) -> dict`
+### `get_stats_timeline(filepath, frame_step_seconds=None) -> dict`
+
+Get the compact event-backed stats timeline for each replay sample.
+
+Frames contain timing, gameplay state, and player identity scaffolding only;
+stat state changes are transferred through `events`, and full team/player
+snapshots can be derived by clients that need them.
+
+Parameters:
+
+- `filepath`: path to the replay file
+- `frame_step_seconds`: optional positive sampling interval in seconds. By
+  default every replay frame is captured.
+
+`module_names` filtering is not supported for compact event timelines. Passing
+it raises `ValueError`; use `get_legacy_stats_timeline` if filtered full
+snapshot timelines are needed.
+
+### `get_legacy_stats_timeline(filepath, module_names=None, frame_step_seconds=None) -> dict`
 
 Get cumulative typed stats snapshots for each replay sample.
+
+This preserves the pre-compact timeline behavior for compatibility and for
+explicit parity checks, but it serializes the full team/player partial sums.
 
 Parameters:
 

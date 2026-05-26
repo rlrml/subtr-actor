@@ -230,7 +230,8 @@ export function mountReplayReview(
       return;
     }
     const statsTimeline = getStatsTimeline();
-    if (!statsTimeline) {
+    const bundle = getBundle();
+    if (!statsTimeline && !bundle) {
       renderEmpty();
       setStatus("No replay loaded");
       return;
@@ -241,10 +242,19 @@ export function mountReplayReview(
         text: "Loading stats...",
       }),
     );
+    const loadedBundle = await bundle;
+    const loadedStatsTimeline =
+      loadedBundle?.statsTimeline ?? (statsTimeline ? await statsTimeline : null);
+    if (!loadedStatsTimeline) {
+      renderEmpty();
+      setStatus("No replay loaded");
+      return;
+    }
     const data: StatsReportData = {
       fileName: provider?.replayName ?? "replay",
       replayUrl: provider?.replayUrl ?? null,
-      statsTimeline: await statsTimeline,
+      statsTimeline: loadedStatsTimeline,
+      statsFrameLookup: loadedBundle?.statsFrameLookup,
     };
     if (disposed) {
       return;

@@ -9,9 +9,11 @@ import {
   type StatsPlayerConfig,
 } from "./playerConfig.ts";
 import { playerIdToString } from "./touchOverlay.ts";
+import { createStatsFrameLookup } from "./statsTimeline.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
+  StatsFrameLookup,
   StatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
@@ -28,6 +30,7 @@ export interface StatsReportData {
   fileName: string;
   replayUrl: URL | null;
   statsTimeline: StatsTimeline;
+  statsFrameLookup?: StatsFrameLookup;
 }
 
 export interface StatsReportGoalWatchRequest {
@@ -49,7 +52,7 @@ export interface StatsReportHandle {
   destroy(): void;
 }
 
-type ReportState = StatsReportData;
+type ReportState = StatsReportData & { statsFrameLookup: StatsFrameLookup };
 
 interface ChartSpec {
   statId: string;
@@ -175,8 +178,12 @@ function getChartTargetColor(target: StatsTarget, scope: StatScopeKind, index: n
     : TEAM_COLORS[index % TEAM_COLORS.length]!;
 }
 
-function getFinalFrame(statsTimeline: StatsTimeline): StatsFrame | null {
-  return statsTimeline.frames.at(-1) ?? null;
+function getFinalFrame(
+  statsTimeline: StatsTimeline,
+  statsFrameLookup: StatsFrameLookup,
+): StatsFrame | null {
+  const finalFrame = statsTimeline.frames.at(-1);
+  return finalFrame ? (statsFrameLookup.get(finalFrame.frame_number) ?? null) : null;
 }
 
 function readNumber(definition: StatDefinition, target: StatsTarget): number | null {
@@ -1418,7 +1425,7 @@ function createHeader(statusText?: string): HTMLElement {
 }
 
 function renderReport(root: HTMLElement, state: ReportState): void {
-  const finalFrame = getFinalFrame(state.statsTimeline);
+  const finalFrame = getFinalFrame(state.statsTimeline, state.statsFrameLookup);
   if (!finalFrame) {
     root.replaceChildren(
       el("main", {
@@ -1453,6 +1460,13 @@ function renderReport(root: HTMLElement, state: ReportState): void {
   root.replaceChildren(main);
 }
 
+function normalizeStatsReportData(data: StatsReportData): ReportState {
+  return {
+    ...data,
+    statsFrameLookup: data.statsFrameLookup ?? createStatsFrameLookup(data.statsTimeline),
+  };
+}
+
 function renderLoading(root: HTMLElement, message: string): void {
   const main = el("main", { className: "stats-report" });
   main.append(createHeader(message));
@@ -1476,6 +1490,7 @@ async function loadReplayBytes(
     fileName,
     replayUrl,
     statsTimeline: bundle.statsTimeline,
+    statsFrameLookup: bundle.statsFrameLookup,
   });
 }
 
@@ -1515,7 +1530,7 @@ export function mountStatsReport(
   currentReportOptions = options;
 
   if (options.initialData) {
-    renderReport(root, options.initialData);
+    renderReport(root, normalizeStatsReportData(options.initialData));
   } else {
     const main = el("main", { className: "stats-report" });
     main.append(createHeader());
@@ -1536,7 +1551,7 @@ export function mountStatsReport(
   return {
     root,
     render(data) {
-      renderReport(root, data);
+      renderReport(root, normalizeStatsReportData(data));
     },
     destroy() {
       if (currentReportRoot === root) {

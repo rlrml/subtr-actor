@@ -30,6 +30,8 @@ impl Default for HalfVolleyCalculatorConfig {
 pub struct HalfVolleyEvent {
     pub time: f32,
     pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
@@ -228,6 +230,8 @@ impl HalfVolleyCalculator {
         Some(HalfVolleyEvent {
             time: touch.time,
             frame: touch.frame,
+            sample_time: touch.time,
+            sample_frame: touch.frame,
             player,
             is_team_0: touch.team_is_team_0,
             bounce_time: bounce.time,
@@ -238,7 +242,9 @@ impl HalfVolleyCalculator {
         })
     }
 
-    fn record_half_volley(&mut self, frame: &FrameInfo, event: HalfVolleyEvent) {
+    fn record_half_volley(&mut self, frame: &FrameInfo, mut event: HalfVolleyEvent) {
+        event.sample_time = frame.time;
+        event.sample_frame = frame.frame_number;
         let player_stats = self.player_stats.entry(event.player.clone()).or_default();
         player_stats.count += 1;
         player_stats.total_ball_speed += event.ball_speed;

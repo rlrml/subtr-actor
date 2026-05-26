@@ -65,6 +65,102 @@ pub struct FiftyFiftyEvent {
     pub possession_team_is_team_0: Option<bool>,
 }
 
+const FIFTY_FIFTY_PHASE_LABELS: [StatLabel; 2] = [
+    StatLabel::new("phase", "open_play"),
+    StatLabel::new("phase", "kickoff"),
+];
+const FIFTY_FIFTY_TEAM_OUTCOME_LABELS: [StatLabel; 3] = [
+    StatLabel::new("winning_team", "team_zero"),
+    StatLabel::new("winning_team", "team_one"),
+    StatLabel::new("winning_team", "neutral"),
+];
+const FIFTY_FIFTY_POSSESSION_LABELS: [StatLabel; 3] = [
+    StatLabel::new("possession_after", "team_zero"),
+    StatLabel::new("possession_after", "team_one"),
+    StatLabel::new("possession_after", "neutral"),
+];
+const FIFTY_FIFTY_PLAYER_OUTCOME_LABELS: [StatLabel; 3] = [
+    StatLabel::new("outcome", "win"),
+    StatLabel::new("outcome", "loss"),
+    StatLabel::new("outcome", "neutral"),
+];
+const FIFTY_FIFTY_PLAYER_POSSESSION_LABELS: [StatLabel; 3] = [
+    StatLabel::new("possession_after", "self"),
+    StatLabel::new("possession_after", "opponent"),
+    StatLabel::new("possession_after", "neutral"),
+];
+
+fn fifty_fifty_phase_label(is_kickoff: bool) -> StatLabel {
+    if is_kickoff {
+        StatLabel::new("phase", "kickoff")
+    } else {
+        StatLabel::new("phase", "open_play")
+    }
+}
+
+fn fifty_fifty_team_outcome_label(team_is_team_0: Option<bool>) -> StatLabel {
+    match team_is_team_0 {
+        Some(true) => StatLabel::new("winning_team", "team_zero"),
+        Some(false) => StatLabel::new("winning_team", "team_one"),
+        None => StatLabel::new("winning_team", "neutral"),
+    }
+}
+
+fn fifty_fifty_possession_label(team_is_team_0: Option<bool>) -> StatLabel {
+    match team_is_team_0 {
+        Some(true) => StatLabel::new("possession_after", "team_zero"),
+        Some(false) => StatLabel::new("possession_after", "team_one"),
+        None => StatLabel::new("possession_after", "neutral"),
+    }
+}
+
+fn fifty_fifty_player_outcome_label(
+    player_team_is_team_0: bool,
+    winning_team_is_team_0: Option<bool>,
+) -> StatLabel {
+    match winning_team_is_team_0 {
+        Some(team_is_team_0) if team_is_team_0 == player_team_is_team_0 => {
+            StatLabel::new("outcome", "win")
+        }
+        Some(_) => StatLabel::new("outcome", "loss"),
+        None => StatLabel::new("outcome", "neutral"),
+    }
+}
+
+fn fifty_fifty_player_possession_label(
+    player_team_is_team_0: bool,
+    possession_team_is_team_0: Option<bool>,
+) -> StatLabel {
+    match possession_team_is_team_0 {
+        Some(team_is_team_0) if team_is_team_0 == player_team_is_team_0 => {
+            StatLabel::new("possession_after", "self")
+        }
+        Some(_) => StatLabel::new("possession_after", "opponent"),
+        None => StatLabel::new("possession_after", "neutral"),
+    }
+}
+
+impl FiftyFiftyEvent {
+    fn labels(&self) -> [StatLabel; 3] {
+        [
+            fifty_fifty_phase_label(self.is_kickoff),
+            fifty_fifty_team_outcome_label(self.winning_team_is_team_0),
+            fifty_fifty_possession_label(self.possession_team_is_team_0),
+        ]
+    }
+
+    fn player_labels(&self, player_team_is_team_0: bool) -> [StatLabel; 3] {
+        [
+            fifty_fifty_phase_label(self.is_kickoff),
+            fifty_fifty_player_outcome_label(player_team_is_team_0, self.winning_team_is_team_0),
+            fifty_fifty_player_possession_label(
+                player_team_is_team_0,
+                self.possession_team_is_team_0,
+            ),
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FiftyFiftyStats {
@@ -82,6 +178,8 @@ pub struct FiftyFiftyStats {
     pub kickoff_team_zero_possession_after_count: u32,
     pub kickoff_team_one_possession_after_count: u32,
     pub kickoff_neutral_possession_after_count: u32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -97,9 +195,72 @@ pub struct FiftyFiftyPlayerStats {
     pub kickoff_neutral_outcomes: u32,
     pub possession_after_count: u32,
     pub kickoff_possession_after_count: u32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_event_counts: LabeledCounts,
 }
 
 impl FiftyFiftyStats {
+    fn record_event(&mut self, event: &FiftyFiftyEvent) {
+        self.labeled_event_counts.increment(event.labels());
+        self.sync_legacy_counts();
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[
+                &FIFTY_FIFTY_PHASE_LABELS,
+                &FIFTY_FIFTY_TEAM_OUTCOME_LABELS,
+                &FIFTY_FIFTY_POSSESSION_LABELS,
+            ],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.team_zero_wins =
+            self.event_count_with_labels(&[fifty_fifty_team_outcome_label(Some(true))]);
+        self.team_one_wins =
+            self.event_count_with_labels(&[fifty_fifty_team_outcome_label(Some(false))]);
+        self.neutral_outcomes =
+            self.event_count_with_labels(&[fifty_fifty_team_outcome_label(None)]);
+        self.kickoff_count = self.event_count_with_labels(&[fifty_fifty_phase_label(true)]);
+        self.kickoff_team_zero_wins = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_team_outcome_label(Some(true)),
+        ]);
+        self.kickoff_team_one_wins = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_team_outcome_label(Some(false)),
+        ]);
+        self.kickoff_neutral_outcomes = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_team_outcome_label(None),
+        ]);
+        self.team_zero_possession_after_count =
+            self.event_count_with_labels(&[fifty_fifty_possession_label(Some(true))]);
+        self.team_one_possession_after_count =
+            self.event_count_with_labels(&[fifty_fifty_possession_label(Some(false))]);
+        self.neutral_possession_after_count =
+            self.event_count_with_labels(&[fifty_fifty_possession_label(None)]);
+        self.kickoff_team_zero_possession_after_count = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_possession_label(Some(true)),
+        ]);
+        self.kickoff_team_one_possession_after_count = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_possession_label(Some(false)),
+        ]);
+        self.kickoff_neutral_possession_after_count = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            fifty_fifty_possession_label(None),
+        ]);
+    }
+
     pub fn team_zero_win_pct(&self) -> f32 {
         if self.count == 0 {
             0.0
@@ -134,6 +295,54 @@ impl FiftyFiftyStats {
 }
 
 impl FiftyFiftyPlayerStats {
+    fn record_event(&mut self, player_team_is_team_0: bool, event: &FiftyFiftyEvent) {
+        self.labeled_event_counts
+            .increment(event.player_labels(player_team_is_team_0));
+        self.sync_legacy_counts();
+    }
+
+    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_event_counts.count_matching(labels)
+    }
+
+    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
+        LabeledCounts::complete_from_label_sets(
+            &[
+                &FIFTY_FIFTY_PHASE_LABELS,
+                &FIFTY_FIFTY_PLAYER_OUTCOME_LABELS,
+                &FIFTY_FIFTY_PLAYER_POSSESSION_LABELS,
+            ],
+            &self.labeled_event_counts,
+        )
+    }
+
+    fn sync_legacy_counts(&mut self) {
+        self.count = self.labeled_event_counts.total();
+        self.wins = self.event_count_with_labels(&[StatLabel::new("outcome", "win")]);
+        self.losses = self.event_count_with_labels(&[StatLabel::new("outcome", "loss")]);
+        self.neutral_outcomes =
+            self.event_count_with_labels(&[StatLabel::new("outcome", "neutral")]);
+        self.kickoff_count = self.event_count_with_labels(&[fifty_fifty_phase_label(true)]);
+        self.kickoff_wins = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            StatLabel::new("outcome", "win"),
+        ]);
+        self.kickoff_losses = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            StatLabel::new("outcome", "loss"),
+        ]);
+        self.kickoff_neutral_outcomes = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            StatLabel::new("outcome", "neutral"),
+        ]);
+        self.possession_after_count =
+            self.event_count_with_labels(&[StatLabel::new("possession_after", "self")]);
+        self.kickoff_possession_after_count = self.event_count_with_labels(&[
+            fifty_fifty_phase_label(true),
+            StatLabel::new("possession_after", "self"),
+        ]);
+    }
+
     pub fn win_pct(&self) -> f32 {
         if self.count == 0 {
             0.0
@@ -248,122 +457,16 @@ impl FiftyFiftyCalculator {
         &self.events
     }
 
-    fn apply_team_outcome(
-        stats: &mut FiftyFiftyStats,
-        winning_team_is_team_0: Option<bool>,
-        is_kickoff: bool,
-    ) {
-        match winning_team_is_team_0 {
-            Some(true) => {
-                stats.team_zero_wins += 1;
-                if is_kickoff {
-                    stats.kickoff_team_zero_wins += 1;
-                }
-            }
-            Some(false) => {
-                stats.team_one_wins += 1;
-                if is_kickoff {
-                    stats.kickoff_team_one_wins += 1;
-                }
-            }
-            None => {
-                stats.neutral_outcomes += 1;
-                if is_kickoff {
-                    stats.kickoff_neutral_outcomes += 1;
-                }
-            }
-        }
-    }
-
-    fn apply_possession_outcome(
-        stats: &mut FiftyFiftyStats,
-        possession_team_is_team_0: Option<bool>,
-        is_kickoff: bool,
-    ) {
-        match possession_team_is_team_0 {
-            Some(true) => {
-                stats.team_zero_possession_after_count += 1;
-                if is_kickoff {
-                    stats.kickoff_team_zero_possession_after_count += 1;
-                }
-            }
-            Some(false) => {
-                stats.team_one_possession_after_count += 1;
-                if is_kickoff {
-                    stats.kickoff_team_one_possession_after_count += 1;
-                }
-            }
-            None => {
-                stats.neutral_possession_after_count += 1;
-                if is_kickoff {
-                    stats.kickoff_neutral_possession_after_count += 1;
-                }
-            }
-        }
-    }
-
-    fn apply_player_outcome(
-        player_stats: &mut FiftyFiftyPlayerStats,
-        player_team_is_team_0: bool,
-        event: &FiftyFiftyEvent,
-    ) {
-        player_stats.count += 1;
-        if event.is_kickoff {
-            player_stats.kickoff_count += 1;
-        }
-
-        match event.winning_team_is_team_0 {
-            Some(team_is_team_0) if team_is_team_0 == player_team_is_team_0 => {
-                player_stats.wins += 1;
-                if event.is_kickoff {
-                    player_stats.kickoff_wins += 1;
-                }
-            }
-            Some(_) => {
-                player_stats.losses += 1;
-                if event.is_kickoff {
-                    player_stats.kickoff_losses += 1;
-                }
-            }
-            None => {
-                player_stats.neutral_outcomes += 1;
-                if event.is_kickoff {
-                    player_stats.kickoff_neutral_outcomes += 1;
-                }
-            }
-        }
-
-        if event.possession_team_is_team_0 == Some(player_team_is_team_0) {
-            player_stats.possession_after_count += 1;
-            if event.is_kickoff {
-                player_stats.kickoff_possession_after_count += 1;
-            }
-        }
-    }
-
     fn apply_event(&mut self, event: &FiftyFiftyEvent) {
-        self.stats.count += 1;
-        if event.is_kickoff {
-            self.stats.kickoff_count += 1;
-        }
-        Self::apply_team_outcome(
-            &mut self.stats,
-            event.winning_team_is_team_0,
-            event.is_kickoff,
-        );
-        Self::apply_possession_outcome(
-            &mut self.stats,
-            event.possession_team_is_team_0,
-            event.is_kickoff,
-        );
+        self.stats.record_event(event);
 
         if let Some(player_id) = event.team_zero_player.as_ref() {
             let stats = self.player_stats.entry(player_id.clone()).or_default();
-            Self::apply_player_outcome(stats, true, event);
+            stats.record_event(true, event);
         }
         if let Some(player_id) = event.team_one_player.as_ref() {
             let stats = self.player_stats.entry(player_id.clone()).or_default();
-            Self::apply_player_outcome(stats, false, event);
+            stats.record_event(false, event);
         }
 
         self.events.push(event.clone());

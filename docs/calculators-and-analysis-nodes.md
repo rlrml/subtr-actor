@@ -14,6 +14,30 @@ This is the short map of the current stats runtime.
 In practice: calculators know how to compute; nodes know where a calculator fits
 in the dependency graph.
 
+## Observation-first stats
+
+For stats that emit meaningful domain facts, prefer making those facts the
+canonical internal record and deriving counters from them. A calculator can
+still keep private state for detection, such as active candidates, previous
+frame samples, pending touch windows, or boost reconciliation state. The public
+stats shape should avoid hand-maintaining independent cartesian counters when
+the same information is naturally represented as labels on an observation.
+
+Use these observation shapes:
+
+- Discrete events: touches, whiffs, rushes, flicks, goal tags, demos.
+- Intervals or episodes: powerslides, ball carries, air dribbles, possession
+  spans, pressure spans.
+- Quantity ledger entries: boost collected, used, stolen, overfilled, or
+  respawned.
+- Time-weighted samples: boost amount, speed bands, height bands, possession
+  state, and other continuous signals integrated over `dt`.
+
+Subcounts should usually be labeled projections over those observations. For
+example, a rush count is one stat with labels such as `team=team_zero`,
+`attackers=2`, and `defenders=1`, while legacy fields like
+`team_zero_two_v_one_count` can remain compatibility projections.
+
 ## What lives where
 
 ### `src/stats/calculators/`

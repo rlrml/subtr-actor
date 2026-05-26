@@ -14,13 +14,16 @@ const ALL_MOVEMENT_SPEED_BANDS: [MovementSpeedBand; 3] = [
 ];
 
 impl MovementSpeedBand {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::Slow => "slow",
             Self::Boost => "boost",
             Self::Supersonic => "supersonic",
-        };
-        StatLabel::new("speed_band", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("speed_band", self.as_label_value())
     }
 }
 
@@ -50,6 +53,21 @@ pub struct MovementStats {
     pub time_high_air: f32,
     #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
     pub labeled_tracked_time: LabeledFloatSums,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct MovementEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub dt: f32,
+    pub speed: f32,
+    pub distance: f32,
+    pub speed_band: String,
+    pub height_band: String,
 }
 
 impl MovementStats {
@@ -150,6 +168,7 @@ pub struct MovementCalculator {
     previous_positions: HashMap<PlayerId, glam::Vec3>,
     team_zero_stats: MovementStats,
     team_one_stats: MovementStats,
+    events: Vec<MovementEvent>,
 }
 
 impl MovementCalculator {
@@ -167,6 +186,10 @@ impl MovementCalculator {
 
     pub fn team_one_stats(&self) -> &MovementStats {
         &self.team_one_stats
+    }
+
+    pub fn events(&self) -> &[MovementEvent] {
+        &self.events
     }
 
     fn classify_movement(speed: f32, height_band: PlayerVerticalBand) -> MovementClassification {
@@ -244,8 +267,14 @@ impl MovementCalculator {
                 team_stats.tracked_time += frame.dt;
                 team_stats.speed_integral += speed * frame.dt;
 
-                if let Some(previous_position) = self.previous_positions.get(&player.player_id) {
-                    let distance = position.distance(*previous_position);
+                let distance = if let Some(previous_position) =
+                    self.previous_positions.get(&player.player_id)
+                {
+                    position.distance(*previous_position)
+                } else {
+                    0.0
+                };
+                if distance > 0.0 {
                     stats.total_distance += distance;
                     team_stats.total_distance += distance;
                 }
@@ -256,6 +285,17 @@ impl MovementCalculator {
                 let classification = Self::classify_movement(speed, height_band);
                 Self::apply_classification(stats, classification, frame.dt);
                 Self::apply_classification(team_stats, classification, frame.dt);
+                self.events.push(MovementEvent {
+                    time: frame.time,
+                    frame: frame.frame_number,
+                    player: player.player_id.clone(),
+                    is_team_0: player.is_team_0,
+                    dt: frame.dt,
+                    speed,
+                    distance,
+                    speed_band: classification.speed_band.as_label_value().to_owned(),
+                    height_band: classification.height_band.as_label().value.to_owned(),
+                });
             }
 
             self.previous_positions

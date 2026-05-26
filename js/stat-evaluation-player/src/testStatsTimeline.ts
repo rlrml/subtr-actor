@@ -2,7 +2,7 @@ import type {
   PlayerStatsSnapshot,
   StatsEvents,
   StatsFrame,
-  StatsTimeline,
+  MaterializedStatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
 import {
@@ -17,6 +17,14 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
   return merge<StatsEvents>(
     {
       timeline: [],
+      core_player: [],
+      core_team: [],
+      possession: [],
+      pressure: [],
+      movement: [],
+      positioning: [],
+      rotation_player: [],
+      rotation_team: [],
       mechanics: [],
       goal_context: [],
       backboard: [],
@@ -24,10 +32,15 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       wall_aerial: [],
       wall_aerial_shot: [],
       center: [],
+      flick: [],
+      musty_flick: [],
+      dodge_reset: [],
       double_tap: [],
       fifty_fifty: [],
       one_timer: [],
       pass: [],
+      pass_last_completed: [],
+      ball_carry: [],
       goal_tags: [],
       rush: [],
       speed_flip: [],
@@ -35,7 +48,13 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       half_volley: [],
       wavedash: [],
       whiff: [],
+      powerslide: [],
+      touch: [],
+      touch_ball_movement: [],
+      touch_last_touch: [],
       boost_pickups: [],
+      boost_ledger: [],
+      boost_state: [],
       bump: [],
     },
     overrides,
@@ -68,6 +87,8 @@ export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFram
       dt: 0,
       seconds_remaining: null,
       game_state: null,
+      ball_has_been_hit: null,
+      kickoff_countdown_time: null,
       gameplay_phase: "unknown",
       is_live_play: true,
       team_zero: createTeamStatsSnapshot(),
@@ -85,8 +106,10 @@ export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFram
   return merged;
 }
 
-export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): StatsTimeline {
-  const merged = merge<StatsTimeline>(
+export function createStatsTimeline(
+  overrides?: DeepPartial<MaterializedStatsTimeline>,
+): MaterializedStatsTimeline {
+  const merged = merge<MaterializedStatsTimeline>(
     {
       config: {
         most_back_forward_threshold_y: 0,
@@ -133,17 +156,21 @@ export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): Sta
 }
 
 export function createLegacyStatsTimeline(
-  overrides: DeepPartial<StatsTimeline> & {
+  overrides: DeepPartial<MaterializedStatsTimeline> & {
     timeline_events?: StatsEvents["timeline"];
     backboard_events?: StatsEvents["backboard"];
     ceiling_shot_events?: StatsEvents["ceiling_shot"];
     wall_aerial_events?: StatsEvents["wall_aerial"];
     wall_aerial_shot_events?: StatsEvents["wall_aerial_shot"];
     center_events?: StatsEvents["center"];
+    flick_events?: StatsEvents["flick"];
+    musty_flick_events?: StatsEvents["musty_flick"];
+    dodge_reset_events?: StatsEvents["dodge_reset"];
     double_tap_events?: StatsEvents["double_tap"];
     fifty_fifty_events?: StatsEvents["fifty_fifty"];
     one_timer_events?: StatsEvents["one_timer"];
     pass_events?: StatsEvents["pass"];
+    ball_carry_events?: StatsEvents["ball_carry"];
     goal_tag_events?: StatsEvents["goal_tags"];
     mechanic_events?: StatsEvents["mechanics"];
     rush_events?: StatsEvents["rush"];
@@ -152,10 +179,16 @@ export function createLegacyStatsTimeline(
     half_volley_events?: StatsEvents["half_volley"];
     wavedash_events?: StatsEvents["wavedash"];
     whiff_events?: StatsEvents["whiff"];
+    powerslide_events?: StatsEvents["powerslide"];
+    positioning_events?: StatsEvents["positioning"];
+    rotation_player_events?: StatsEvents["rotation_player"];
+    rotation_team_events?: StatsEvents["rotation_team"];
     boost_pickups?: StatsEvents["boost_pickups"];
+    boost_ledger?: StatsEvents["boost_ledger"];
+    boost_state?: StatsEvents["boost_state"];
     bump_events?: StatsEvents["bump"];
   } = {},
-): StatsTimeline {
+): MaterializedStatsTimeline {
   return createStatsTimeline({
     ...overrides,
     events: {
@@ -168,10 +201,14 @@ export function createLegacyStatsTimeline(
       wall_aerial_shot:
         overrides.wall_aerial_shot_events ?? overrides.events?.wall_aerial_shot ?? [],
       center: overrides.center_events ?? overrides.events?.center ?? [],
+      flick: overrides.flick_events ?? overrides.events?.flick ?? [],
+      musty_flick: overrides.musty_flick_events ?? overrides.events?.musty_flick ?? [],
+      dodge_reset: overrides.dodge_reset_events ?? overrides.events?.dodge_reset ?? [],
       double_tap: overrides.double_tap_events ?? overrides.events?.double_tap ?? [],
       fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
       one_timer: overrides.one_timer_events ?? overrides.events?.one_timer ?? [],
       pass: overrides.pass_events ?? overrides.events?.pass ?? [],
+      ball_carry: overrides.ball_carry_events ?? overrides.events?.ball_carry ?? [],
       goal_tags: overrides.goal_tag_events ?? overrides.events?.goal_tags ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
@@ -179,7 +216,13 @@ export function createLegacyStatsTimeline(
       half_volley: overrides.half_volley_events ?? overrides.events?.half_volley ?? [],
       wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
+      powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
+      positioning: overrides.positioning_events ?? overrides.events?.positioning ?? [],
+      rotation_player: overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
+      rotation_team: overrides.rotation_team_events ?? overrides.events?.rotation_team ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
+      boost_ledger: overrides.boost_ledger ?? overrides.events?.boost_ledger ?? [],
+      boost_state: overrides.boost_state ?? overrides.events?.boost_state ?? [],
       bump: overrides.bump_events ?? overrides.events?.bump ?? [],
     },
   });

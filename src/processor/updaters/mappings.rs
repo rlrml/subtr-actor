@@ -144,13 +144,11 @@ impl<'a> ReplayProcessor<'a> {
 
             match update.object_id {
                 object_id if object_id == ctx.unique_id_object_id => {
-                    maintain_link!(
-                        self.player_to_actor_id,
-                        ctx.player_type_actor_ids,
-                        |_, unique_id: &boxcars::UniqueId| unique_id.remote_id.clone(),
-                        use_update_actor,
-                        boxcars::Attribute::UniqueId
-                    );
+                    if ctx.player_type_actor_ids.contains(&update.actor_id) {
+                        let unique_id =
+                            attribute_match!(&update.attribute, boxcars::Attribute::UniqueId)?;
+                        self.insert_player_actor_id(unique_id.remote_id.clone(), update.actor_id);
+                    }
                 }
                 object_id if object_id == ctx.team_object_id => {
                     maintain_link!(
@@ -173,8 +171,10 @@ impl<'a> ReplayProcessor<'a> {
                             .values()
                             .any(|actor_id| *actor_id == update.actor_id)
                     {
-                        self.player_to_actor_id
-                            .insert(synthetic_bot_player_id(update.actor_id), update.actor_id);
+                        self.insert_player_actor_id(
+                            synthetic_bot_player_id(update.actor_id),
+                            update.actor_id,
+                        );
                     }
                 }
                 object_id if object_id == ctx.player_replication_object_id => {

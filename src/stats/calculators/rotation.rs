@@ -90,6 +90,54 @@ pub struct RotationTeamStats {
     pub rotation_count: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RotationPlayerEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub active: bool,
+    pub became_first_man_count: u32,
+    pub lost_first_man_count: u32,
+    pub current_role_state: RoleState,
+    pub current_depth_state: PlayDepthState,
+}
+
+impl RotationPlayerEvent {
+    fn new(
+        frame: &FrameInfo,
+        player: PlayerId,
+        is_team_0: bool,
+        active: bool,
+        current_role_state: RoleState,
+        current_depth_state: PlayDepthState,
+    ) -> Self {
+        Self {
+            time: frame.time,
+            frame: frame.frame_number,
+            player,
+            is_team_0,
+            active,
+            became_first_man_count: 0,
+            lost_first_man_count: 0,
+            current_role_state,
+            current_depth_state,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RotationTeamEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub is_team_0: bool,
+    pub first_man_changes_for_team: u32,
+    pub rotation_count: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct RotationCalculatorConfig {
     pub role_depth_margin: f32,
@@ -168,6 +216,13 @@ impl TeamFirstManTracker {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RotationPlayerEventState {
+    active: bool,
+    current_role_state: RoleState,
+    current_depth_state: PlayDepthState,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,
@@ -176,6 +231,9 @@ pub struct RotationCalculator {
     team_one_stats: RotationTeamStats,
     team_zero_tracker: TeamFirstManTracker,
     team_one_tracker: TeamFirstManTracker,
+    player_events: Vec<RotationPlayerEvent>,
+    team_events: Vec<RotationTeamEvent>,
+    last_emitted_player_states: HashMap<PlayerId, RotationPlayerEventState>,
 }
 
 impl RotationCalculator {
@@ -206,6 +264,14 @@ impl RotationCalculator {
         &self.team_one_stats
     }
 
+    pub fn player_events(&self) -> &[RotationPlayerEvent] {
+        &self.player_events
+    }
+
+    pub fn team_events(&self) -> &[RotationTeamEvent] {
+        &self.team_events
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -221,11 +287,13 @@ impl RotationCalculator {
 
         let Some(ball) = ball.sample() else {
             self.reset_trackers();
+            self.emit_inactive_player_events(frame, players);
             return Ok(());
         };
 
         if !live_play || !events.goal_events.is_empty() {
             self.reset_trackers();
+            self.emit_inactive_player_events(frame, players);
             return Ok(());
         }
 
@@ -256,9 +324,67 @@ impl RotationCalculator {
         Ok(())
     }
 
+    fn emit_inactive_player_events(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        for player in &players.players {
+            let stats = self
+                .player_stats
+                .entry(player.player_id.clone())
+                .or_default();
+            let current_role_state = stats.current_role_state;
+            let current_depth_state = stats.current_depth_state;
+            self.emit_player_event_if_changed(
+                frame,
+                &player.player_id,
+                player.is_team_0,
+                false,
+                current_role_state,
+                current_depth_state,
+                0,
+                0,
+            );
+        }
+    }
+
     fn reset_trackers(&mut self) {
         self.team_zero_tracker.reset();
         self.team_one_tracker.reset();
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_player_event_if_changed(
+        &mut self,
+        frame: &FrameInfo,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        active: bool,
+        current_role_state: RoleState,
+        current_depth_state: PlayDepthState,
+        became_first_man_count: u32,
+        lost_first_man_count: u32,
+    ) {
+        let state = RotationPlayerEventState {
+            active,
+            current_role_state,
+            current_depth_state,
+        };
+        let state_changed = self.last_emitted_player_states.get(player_id) != Some(&state);
+        if !state_changed && became_first_man_count == 0 && lost_first_man_count == 0 {
+            return;
+        }
+
+        let mut event = RotationPlayerEvent::new(
+            frame,
+            player_id.clone(),
+            is_team_0,
+            active,
+            current_role_state,
+            current_depth_state,
+        );
+        event.became_first_man_count = became_first_man_count;
+        event.lost_first_man_count = lost_first_man_count;
+        self.player_events.push(event);
+        self.last_emitted_player_states
+            .insert(player_id.clone(), state);
     }
 
     fn update_team(
@@ -294,14 +420,30 @@ impl RotationCalculator {
                 .iter()
                 .filter(|player| player.is_team_0 == is_team_0)
             {
-                self.player_stats
-                    .entry(player.player_id.clone())
-                    .or_default()
-                    .current_role_state = RoleState::Unknown;
+                let (current_role_state, current_depth_state) = {
+                    let stats = self
+                        .player_stats
+                        .entry(player.player_id.clone())
+                        .or_default();
+                    stats.current_role_state = RoleState::Unknown;
+                    (stats.current_role_state, stats.current_depth_state)
+                };
+                self.emit_player_event_if_changed(
+                    frame,
+                    &player.player_id,
+                    player.is_team_0,
+                    false,
+                    current_role_state,
+                    current_depth_state,
+                    0,
+                    0,
+                );
             }
             return;
         }
 
+        let mut became_first_man_counts = HashMap::<PlayerId, u32>::new();
+        let mut lost_first_man_counts = HashMap::<PlayerId, u32>::new();
         let mut scored_players: Vec<_> = team_players
             .iter()
             .map(|(player, position)| {
@@ -324,14 +466,19 @@ impl RotationCalculator {
             let team_stats = self.team_stats_mut(is_team_0);
             team_stats.first_man_changes_for_team += 1;
             team_stats.rotation_count += 1;
-            self.player_stats
-                .entry(previous)
-                .or_default()
-                .lost_first_man_count += 1;
-            self.player_stats
-                .entry(next)
-                .or_default()
-                .became_first_man_count += 1;
+            self.team_events.push(RotationTeamEvent {
+                time: frame.time,
+                frame: frame.frame_number,
+                is_team_0,
+                first_man_changes_for_team: 1,
+                rotation_count: 1,
+            });
+            let previous_stats = self.player_stats.entry(previous.clone()).or_default();
+            previous_stats.lost_first_man_count += 1;
+            *lost_first_man_counts.entry(previous).or_default() += 1;
+            let next_stats = self.player_stats.entry(next.clone()).or_default();
+            next_stats.became_first_man_count += 1;
+            *became_first_man_counts.entry(next).or_default() += 1;
         }
 
         let stable_first_man = raw_first_man
@@ -350,29 +497,96 @@ impl RotationCalculator {
                 ball_position,
                 self.config.role_depth_margin,
             );
-            let stats = self
-                .player_stats
-                .entry(player.player_id.clone())
-                .or_default();
-            stats.active_game_time += frame.dt;
-            stats.tracked_time += frame.dt;
-            stats.current_role_state = role_state;
-            stats.current_depth_state = depth_state;
+            let (current_role_state, current_depth_state) = {
+                let stats = self
+                    .player_stats
+                    .entry(player.player_id.clone())
+                    .or_default();
+                stats.active_game_time += frame.dt;
+                stats.tracked_time += frame.dt;
+                stats.current_role_state = role_state;
+                stats.current_depth_state = depth_state;
 
-            match role_state {
-                RoleState::FirstMan => stats.time_first_man += frame.dt,
-                RoleState::SecondMan => stats.time_second_man += frame.dt,
-                RoleState::ThirdMan => stats.time_third_man += frame.dt,
-                RoleState::Ambiguous => stats.time_ambiguous_role += frame.dt,
-                RoleState::Unknown => {}
-            }
+                match role_state {
+                    RoleState::FirstMan => {
+                        stats.time_first_man += frame.dt;
+                    }
+                    RoleState::SecondMan => {
+                        stats.time_second_man += frame.dt;
+                    }
+                    RoleState::ThirdMan => {
+                        stats.time_third_man += frame.dt;
+                    }
+                    RoleState::Ambiguous => {
+                        stats.time_ambiguous_role += frame.dt;
+                    }
+                    RoleState::Unknown => {}
+                }
 
-            match depth_state {
-                PlayDepthState::BehindPlay => stats.time_behind_play += frame.dt,
-                PlayDepthState::LevelWithPlay => stats.time_level_with_play += frame.dt,
-                PlayDepthState::AheadOfPlay => stats.time_ahead_of_play += frame.dt,
-                PlayDepthState::Unknown => {}
-            }
+                match depth_state {
+                    PlayDepthState::BehindPlay => {
+                        stats.time_behind_play += frame.dt;
+                    }
+                    PlayDepthState::LevelWithPlay => {
+                        stats.time_level_with_play += frame.dt;
+                    }
+                    PlayDepthState::AheadOfPlay => {
+                        stats.time_ahead_of_play += frame.dt;
+                    }
+                    PlayDepthState::Unknown => {}
+                }
+
+                (stats.current_role_state, stats.current_depth_state)
+            };
+            let became_first_man_count = became_first_man_counts
+                .remove(&player.player_id)
+                .unwrap_or_default();
+            let lost_first_man_count = lost_first_man_counts
+                .remove(&player.player_id)
+                .unwrap_or_default();
+            self.emit_player_event_if_changed(
+                frame,
+                &player.player_id,
+                player.is_team_0,
+                true,
+                current_role_state,
+                current_depth_state,
+                became_first_man_count,
+                lost_first_man_count,
+            );
+        }
+
+        for (player_id, count) in became_first_man_counts {
+            let (current_role_state, current_depth_state) = {
+                let stats = self.player_stats.entry(player_id.clone()).or_default();
+                (stats.current_role_state, stats.current_depth_state)
+            };
+            self.emit_player_event_if_changed(
+                frame,
+                &player_id,
+                is_team_0,
+                false,
+                current_role_state,
+                current_depth_state,
+                count,
+                0,
+            );
+        }
+        for (player_id, count) in lost_first_man_counts {
+            let (current_role_state, current_depth_state) = {
+                let stats = self.player_stats.entry(player_id.clone()).or_default();
+                (stats.current_role_state, stats.current_depth_state)
+            };
+            self.emit_player_event_if_changed(
+                frame,
+                &player_id,
+                is_team_0,
+                false,
+                current_role_state,
+                current_depth_state,
+                0,
+                count,
+            );
         }
     }
 

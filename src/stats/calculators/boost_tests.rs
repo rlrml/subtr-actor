@@ -101,6 +101,122 @@ fn records_inactive_pickup_without_active_collection() {
 }
 
 #[test]
+fn boost_ledger_replays_respawn_collection_and_use_totals() {
+    let mut calculator = BoostCalculator::new();
+    let player_id = PlayerId::Steam(1);
+    let (pad_position, _) = standard_soccar_boost_pad_layout()
+        .iter()
+        .find(|(_, size)| *size == BoostPadSize::Small)
+        .copied()
+        .expect("standard layout should include small pads");
+    let active_gameplay = GameplayState {
+        ball_has_been_hit: Some(true),
+        ..GameplayState::default()
+    };
+
+    calculator
+        .update_parts(
+            &FrameInfo {
+                frame_number: 1,
+                time: 1.0,
+                dt: 1.0 / 30.0,
+                seconds_remaining: None,
+            },
+            &active_gameplay,
+            &PlayerFrameState {
+                players: vec![test_player(
+                    player_id.clone(),
+                    BOOST_KICKOFF_START_AMOUNT,
+                    BOOST_KICKOFF_START_AMOUNT,
+                    pad_position,
+                )],
+            },
+            &FrameEventsState::default(),
+            &PlayerVerticalState::default(),
+            true,
+        )
+        .expect("initial boost update should succeed");
+
+    calculator
+        .update_parts(
+            &FrameInfo {
+                frame_number: 2,
+                time: 1.1,
+                dt: 1.0 / 30.0,
+                seconds_remaining: None,
+            },
+            &active_gameplay,
+            &PlayerFrameState {
+                players: vec![test_player(player_id.clone(), 20.0, 33.0, pad_position)],
+            },
+            &FrameEventsState::default(),
+            &PlayerVerticalState::default(),
+            true,
+        )
+        .expect("boost use update should succeed");
+
+    calculator
+        .update_parts(
+            &FrameInfo {
+                frame_number: 3,
+                time: 1.2,
+                dt: 1.0 / 30.0,
+                seconds_remaining: None,
+            },
+            &active_gameplay,
+            &PlayerFrameState {
+                players: vec![test_player(
+                    player_id.clone(),
+                    20.0 + SMALL_PAD_AMOUNT_RAW,
+                    20.0,
+                    pad_position,
+                )],
+            },
+            &FrameEventsState {
+                boost_pad_events: vec![BoostPadEvent {
+                    time: 1.2,
+                    frame: 3,
+                    pad_id: "ledger-small-pad".to_string(),
+                    player: Some(player_id.clone()),
+                    kind: BoostPadEventKind::PickedUp { sequence: 1 },
+                }],
+                ..FrameEventsState::default()
+            },
+            &PlayerVerticalState::default(),
+            true,
+        )
+        .expect("boost collection update should succeed");
+
+    let player_stats = calculator
+        .player_stats()
+        .get(&player_id)
+        .expect("player stats should be recorded");
+    let ledger_sum = |transaction| {
+        calculator
+            .ledger_events()
+            .iter()
+            .filter(|event| event.transaction == transaction && event.player_id == player_id)
+            .map(|event| event.amount)
+            .sum::<f32>()
+    };
+
+    assert!(
+        (ledger_sum(BoostLedgerTransactionKind::Respawn) - player_stats.amount_respawned).abs()
+            < 0.001
+    );
+    assert!(
+        (ledger_sum(BoostLedgerTransactionKind::Collected) - player_stats.amount_collected).abs()
+            < 0.001
+    );
+    assert!(
+        (ledger_sum(BoostLedgerTransactionKind::Stolen) - player_stats.amount_stolen).abs() < 0.001
+    );
+    assert!(
+        (ledger_sum(BoostLedgerTransactionKind::Used) - player_stats.amount_used).abs() < 0.001
+    );
+}
+
+#[test]
 fn counts_reused_pickup_sequence_after_pad_respawn() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);

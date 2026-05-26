@@ -38,6 +38,7 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_stats, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_snapshot_data, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_timeline, m)?)?;
+    m.add_function(wrap_pyfunction!(get_legacy_stats_timeline, m)?)?;
     Ok(())
 }
 
@@ -163,6 +164,13 @@ fn build_stats_collector(
     .map_err(handle_subtr_actor_exception)?;
 
     Ok(collector.with_frame_resolution(parse_stats_frame_resolution(frame_step_seconds)?))
+}
+
+fn build_stats_timeline_event_collector(
+    frame_step_seconds: Option<f32>,
+) -> PyResult<subtr_actor::StatsTimelineEventCollector> {
+    Ok(subtr_actor::StatsTimelineEventCollector::new()
+        .with_frame_resolution(parse_stats_frame_resolution(frame_step_seconds)?))
 }
 
 fn get_ndarray_with_info_for_type<'p, F>(
@@ -434,9 +442,35 @@ fn get_stats_timeline<'p>(
     module_names: Option<Vec<String>>,
     frame_step_seconds: Option<f32>,
 ) -> PyResult<Py<PyAny>> {
+    if module_names.is_some() {
+        return Err(PyErr::new::<exceptions::PyValueError, _>(
+            "module_names filtering is not supported by compact event stats timelines; use get_legacy_stats_timeline for filtered snapshot timelines",
+        ));
+    }
+
+    let replay = replay_from_filepath(&filepath)?;
+    let timeline = build_stats_timeline_event_collector(frame_step_seconds)?
+        .get_replay_stats_timeline_scaffold(&replay)
+        .map_err(handle_subtr_actor_exception)?;
+
+    Ok(convert_to_py(
+        py,
+        &serde_json::to_value(timeline).map_err(to_py_error)?,
+    ))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
+#[pyo3(signature = (filepath, module_names=None, frame_step_seconds=None))]
+fn get_legacy_stats_timeline<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    module_names: Option<Vec<String>>,
+    frame_step_seconds: Option<f32>,
+) -> PyResult<Py<PyAny>> {
     let replay = replay_from_filepath(&filepath)?;
     let timeline = build_stats_collector(module_names, frame_step_seconds)?
-        .get_stats_timeline_value(&replay)
+        .get_legacy_stats_timeline_value(&replay)
         .map_err(handle_subtr_actor_exception)?;
 
     Ok(convert_to_py(py, &timeline))

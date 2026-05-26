@@ -94,6 +94,15 @@ impl StatFieldProvider for FiftyFiftyStats {
             StatUnit::Percent,
             self.kickoff_team_one_win_pct(),
         ));
+        for entry in self.complete_labeled_event_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "fifty_fifty",
+                "count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }
 
@@ -171,5 +180,14 @@ impl StatFieldProvider for FiftyFiftyPlayerStats {
             StatUnit::Percent,
             self.kickoff_win_pct(),
         ));
+        for entry in self.complete_labeled_event_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "fifty_fifty",
+                "count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
     }
 }

@@ -8,7 +8,7 @@ const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-
 fn detects_colonelpanic8_air_dribble_goal_roughly_at_goal_sequence() {
     let replay = common::parse_replay(AIR_DRIBBLE_GOAL_MOUTH_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("failed to collect stats timeline for air dribble goal replay");
 
     let event = common::assert_mechanic_event_roughly_at(
@@ -34,7 +34,7 @@ fn detects_colonelpanic8_air_dribble_goal_roughly_at_goal_sequence() {
 fn does_not_tag_sixth_goal_as_half_volley() {
     let replay = common::parse_replay(AIR_DRIBBLE_GOAL_MOUTH_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("failed to collect stats timeline for air dribble goal replay");
 
     assert!(

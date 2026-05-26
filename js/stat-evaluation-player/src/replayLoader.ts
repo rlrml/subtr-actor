@@ -1,5 +1,5 @@
 import type { ReplayModel } from "subtr-actor-player";
-import type { StatsTimeline } from "./statsTimeline";
+import { createStatsFrameLookup, type StatsFrameLookup, type StatsTimeline } from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
 export {
   formatReplayLoadProgress,
@@ -13,6 +13,7 @@ import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 export interface ReplayLoadBundle {
   replay: ReplayModel;
   statsTimeline: StatsTimeline;
+  statsFrameLookup: StatsFrameLookup;
 }
 
 interface ReplayLoadRequest {
@@ -66,11 +67,11 @@ async function parseStatsTimelineParts(
   onProgress?.({ stage: "decoding-stats", progress: 0.15 });
   await waitForNextPaint();
 
-  const frames: StatsTimeline["frames"] = [];
+  const frames: Array<StatsTimeline["frames"][number]> = [];
   const totalChunks = parts.frameChunkBuffers.length;
   for (let index = 0; index < totalChunks; index += 1) {
     const buffer = parts.frameChunkBuffers[index]!;
-    frames.push(...parseJsonBuffer<StatsTimeline["frames"]>(decoder, buffer));
+    frames.push(...parseJsonBuffer<Array<StatsTimeline["frames"][number]>>(decoder, buffer));
     onProgress?.({
       stage: "decoding-stats",
       processedChunks: index + 1,
@@ -147,9 +148,11 @@ export async function loadReplayBundleInWorker(
         message.statsTimelineParts,
         options.onProgress,
       );
+      const statsFrameLookup = createStatsFrameLookup(statsTimeline);
       resolve({
         replay,
         statsTimeline,
+        statsFrameLookup,
       });
     };
 

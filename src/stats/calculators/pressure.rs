@@ -9,14 +9,23 @@ enum PressureHalfLabel {
     Neutral,
 }
 
+impl Default for PressureHalfLabel {
+    fn default() -> Self {
+        Self::Neutral
+    }
+}
+
 impl PressureHalfLabel {
-    fn as_label(self) -> StatLabel {
-        let value = match self {
+    fn as_label_value(self) -> &'static str {
+        match self {
             Self::TeamZeroSide => "team_zero_side",
             Self::TeamOneSide => "team_one_side",
             Self::Neutral => "neutral",
-        };
-        StatLabel::new("field_half", value)
+        }
+    }
+
+    fn as_label(self) -> StatLabel {
+        StatLabel::new("field_half", self.as_label_value())
     }
 }
 
@@ -98,6 +107,15 @@ pub struct PressureTeamStats {
     pub labeled_time: LabeledFloatSums,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PressureEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub active: bool,
+    pub field_half: String,
+}
+
 fn team_relative_pressure_label(label: &StatLabel, is_team_zero: bool) -> StatLabel {
     match (label.key, label.value) {
         ("field_half", "team_zero_side") => StatLabel::new(
@@ -137,6 +155,14 @@ impl Default for PressureCalculatorConfig {
 pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     stats: PressureStats,
+    events: Vec<PressureEvent>,
+    last_emitted_event_state: Option<PressureEventState>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PressureEventState {
+    active: bool,
+    field_half: PressureHalfLabel,
 }
 
 impl PressureCalculator {
@@ -153,6 +179,10 @@ impl PressureCalculator {
 
     pub fn stats(&self) -> &PressureStats {
         &self.stats
+    }
+
+    pub fn events(&self) -> &[PressureEvent] {
+        &self.events
     }
 
     pub fn config(&self) -> &PressureCalculatorConfig {
@@ -196,6 +226,25 @@ impl PressureCalculator {
         stats.labeled_time.add([half.as_label()], dt);
     }
 
+    fn emit_event_if_changed(
+        &mut self,
+        frame: &FrameInfo,
+        active: bool,
+        field_half: PressureHalfLabel,
+    ) {
+        let event_state = PressureEventState { active, field_half };
+        if self.last_emitted_event_state == Some(event_state) {
+            return;
+        }
+        self.events.push(PressureEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            active,
+            field_half: field_half.as_label_value().to_owned(),
+        });
+        self.last_emitted_event_state = Some(event_state);
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -203,6 +252,7 @@ impl PressureCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         if !live_play_state.is_live_play {
+            self.emit_event_if_changed(frame, false, PressureHalfLabel::Neutral);
             return Ok(());
         }
         if let Some(ball) = ball.sample() {
@@ -216,6 +266,9 @@ impl PressureCalculator {
                 PressureHalfLabel::TeamOneSide
             };
             Self::apply_pressure_time(&mut self.stats, half, frame.dt);
+            self.emit_event_if_changed(frame, true, half);
+        } else {
+            self.emit_event_if_changed(frame, false, PressureHalfLabel::Neutral);
         }
         Ok(())
     }

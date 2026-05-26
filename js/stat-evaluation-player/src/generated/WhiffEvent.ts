@@ -2,4 +2,4 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { WhiffEventKind } from "./WhiffEventKind.ts";
 
-export type WhiffEvent = { kind: WhiffEventKind, time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, closest_approach_distance: number, forward_alignment: number, approach_speed: number, dodge_active: boolean, aerial: boolean, };
+export type WhiffEvent = { kind: WhiffEventKind, time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, closest_approach_distance: number, forward_alignment: number, approach_speed: number, dodge_active: boolean, aerial: boolean, };

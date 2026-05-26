@@ -38,6 +38,108 @@ pub struct PositioningStats {
     pub times_caught_ahead_of_play_on_conceded_goals: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub active_game_time: f32,
+    pub tracked_time: f32,
+    pub sum_distance_to_teammates: f32,
+    pub sum_distance_to_ball: f32,
+    pub sum_distance_to_ball_has_possession: f32,
+    pub time_has_possession: f32,
+    pub sum_distance_to_ball_no_possession: f32,
+    pub time_no_possession: f32,
+    pub time_demolished: f32,
+    pub time_no_teammates: f32,
+    pub time_most_back: f32,
+    pub time_most_forward: f32,
+    pub time_mid_role: f32,
+    pub time_other_role: f32,
+    #[serde(rename = "time_defensive_third")]
+    pub time_defensive_zone: f32,
+    #[serde(rename = "time_neutral_third")]
+    pub time_neutral_zone: f32,
+    #[serde(rename = "time_offensive_third")]
+    pub time_offensive_zone: f32,
+    pub time_defensive_half: f32,
+    pub time_offensive_half: f32,
+    pub time_closest_to_ball: f32,
+    pub time_farthest_from_ball: f32,
+    pub time_behind_ball: f32,
+    pub time_level_with_ball: f32,
+    pub time_in_front_of_ball: f32,
+    pub times_caught_ahead_of_play_on_conceded_goals: u32,
+}
+
+impl PositioningEvent {
+    fn new(frame: &FrameInfo, player: PlayerId, is_team_0: bool) -> Self {
+        Self {
+            time: frame.time,
+            frame: frame.frame_number,
+            player,
+            is_team_0,
+            active_game_time: 0.0,
+            tracked_time: 0.0,
+            sum_distance_to_teammates: 0.0,
+            sum_distance_to_ball: 0.0,
+            sum_distance_to_ball_has_possession: 0.0,
+            time_has_possession: 0.0,
+            sum_distance_to_ball_no_possession: 0.0,
+            time_no_possession: 0.0,
+            time_demolished: 0.0,
+            time_no_teammates: 0.0,
+            time_most_back: 0.0,
+            time_most_forward: 0.0,
+            time_mid_role: 0.0,
+            time_other_role: 0.0,
+            time_defensive_zone: 0.0,
+            time_neutral_zone: 0.0,
+            time_offensive_zone: 0.0,
+            time_defensive_half: 0.0,
+            time_offensive_half: 0.0,
+            time_closest_to_ball: 0.0,
+            time_farthest_from_ball: 0.0,
+            time_behind_ball: 0.0,
+            time_level_with_ball: 0.0,
+            time_in_front_of_ball: 0.0,
+            times_caught_ahead_of_play_on_conceded_goals: 0,
+        }
+    }
+
+    fn has_delta(&self) -> bool {
+        self.active_game_time != 0.0
+            || self.tracked_time != 0.0
+            || self.sum_distance_to_teammates != 0.0
+            || self.sum_distance_to_ball != 0.0
+            || self.sum_distance_to_ball_has_possession != 0.0
+            || self.time_has_possession != 0.0
+            || self.sum_distance_to_ball_no_possession != 0.0
+            || self.time_no_possession != 0.0
+            || self.time_demolished != 0.0
+            || self.time_no_teammates != 0.0
+            || self.time_most_back != 0.0
+            || self.time_most_forward != 0.0
+            || self.time_mid_role != 0.0
+            || self.time_other_role != 0.0
+            || self.time_defensive_zone != 0.0
+            || self.time_neutral_zone != 0.0
+            || self.time_offensive_zone != 0.0
+            || self.time_defensive_half != 0.0
+            || self.time_offensive_half != 0.0
+            || self.time_closest_to_ball != 0.0
+            || self.time_farthest_from_ball != 0.0
+            || self.time_behind_ball != 0.0
+            || self.time_level_with_ball != 0.0
+            || self.time_in_front_of_ball != 0.0
+            || self.times_caught_ahead_of_play_on_conceded_goals != 0
+    }
+}
+
 impl PositioningStats {
     pub fn average_distance_to_teammates(&self) -> f32 {
         if self.tracked_time == 0.0 {
@@ -169,6 +271,7 @@ pub struct PositioningCalculator {
     player_stats: HashMap<PlayerId, PositioningStats>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
+    events: Vec<PositioningEvent>,
 }
 
 impl PositioningCalculator {
@@ -191,11 +294,28 @@ impl PositioningCalculator {
         &self.player_stats
     }
 
+    pub fn events(&self) -> &[PositioningEvent] {
+        &self.events
+    }
+
+    fn event_delta<'a>(
+        deltas: &'a mut HashMap<PlayerId, PositioningEvent>,
+        frame: &FrameInfo,
+        player_id: &PlayerId,
+        is_team_0: bool,
+    ) -> &'a mut PositioningEvent {
+        deltas
+            .entry(player_id.clone())
+            .or_insert_with(|| PositioningEvent::new(frame, player_id.clone(), is_team_0))
+    }
+
     fn record_goal_positioning_events(
         &mut self,
+        frame: &FrameInfo,
         players: &PlayerFrameState,
         events: &FrameEventsState,
         ball_position: glam::Vec3,
+        event_deltas: &mut HashMap<PlayerId, PositioningEvent>,
     ) {
         for goal_event in &events.goal_events {
             let defending_team_is_team_0 = !goal_event.scoring_team_is_team_0;
@@ -223,6 +343,8 @@ impl PositioningCalculator {
                 self.player_stats
                     .entry(player.player_id.clone())
                     .or_default()
+                    .times_caught_ahead_of_play_on_conceded_goals += 1;
+                Self::event_delta(event_deltas, frame, &player.player_id, player.is_team_0)
                     .times_caught_ahead_of_play_on_conceded_goals += 1;
             }
         }
@@ -256,8 +378,15 @@ impl PositioningCalculator {
             return Ok(());
         };
         let ball_position = ball.position();
+        let mut event_deltas = HashMap::new();
         if !events.goal_events.is_empty() {
-            self.record_goal_positioning_events(players, events, ball_position);
+            self.record_goal_positioning_events(
+                frame,
+                players,
+                events,
+                ball_position,
+                &mut event_deltas,
+            );
         }
         let demoed_players: HashSet<_> = events
             .active_demos
@@ -274,6 +403,14 @@ impl PositioningCalculator {
                     .or_default();
                 stats.active_game_time += frame.dt;
                 stats.time_demolished += frame.dt;
+                let delta = Self::event_delta(
+                    &mut event_deltas,
+                    frame,
+                    &player.player_id,
+                    player.is_team_0,
+                );
+                delta.active_game_time += frame.dt;
+                delta.time_demolished += frame.dt;
                 continue;
             }
 
@@ -298,16 +435,28 @@ impl PositioningCalculator {
             if live_play {
                 stats.active_game_time += frame.dt;
                 stats.tracked_time += frame.dt;
-                stats.sum_distance_to_ball += position.distance(ball_position) * frame.dt;
+                let distance_to_ball = position.distance(ball_position);
+                stats.sum_distance_to_ball += distance_to_ball * frame.dt;
+                let delta = Self::event_delta(
+                    &mut event_deltas,
+                    frame,
+                    &player.player_id,
+                    player.is_team_0,
+                );
+                delta.active_game_time += frame.dt;
+                delta.tracked_time += frame.dt;
+                delta.sum_distance_to_ball += distance_to_ball * frame.dt;
 
                 if possession_player_before_sample == Some(&player.player_id) {
                     stats.time_has_possession += frame.dt;
-                    stats.sum_distance_to_ball_has_possession +=
-                        position.distance(ball_position) * frame.dt;
+                    stats.sum_distance_to_ball_has_possession += distance_to_ball * frame.dt;
+                    delta.time_has_possession += frame.dt;
+                    delta.sum_distance_to_ball_has_possession += distance_to_ball * frame.dt;
                 } else if possession_player_before_sample.is_some() {
                     stats.time_no_possession += frame.dt;
-                    stats.sum_distance_to_ball_no_possession +=
-                        position.distance(ball_position) * frame.dt;
+                    stats.sum_distance_to_ball_no_possession += distance_to_ball * frame.dt;
+                    delta.time_no_possession += frame.dt;
+                    delta.sum_distance_to_ball_no_possession += distance_to_ball * frame.dt;
                 }
 
                 let defensive_zone_fraction = interval_fraction_below_threshold(
@@ -329,6 +478,9 @@ impl PositioningCalculator {
                 stats.time_defensive_zone += frame.dt * defensive_zone_fraction;
                 stats.time_neutral_zone += frame.dt * neutral_zone_fraction;
                 stats.time_offensive_zone += frame.dt * offensive_zone_fraction;
+                delta.time_defensive_zone += frame.dt * defensive_zone_fraction;
+                delta.time_neutral_zone += frame.dt * neutral_zone_fraction;
+                delta.time_offensive_zone += frame.dt * offensive_zone_fraction;
 
                 let defensive_half_fraction = interval_fraction_below_threshold(
                     normalized_previous_position_y,
@@ -337,6 +489,8 @@ impl PositioningCalculator {
                 );
                 stats.time_defensive_half += frame.dt * defensive_half_fraction;
                 stats.time_offensive_half += frame.dt * (1.0 - defensive_half_fraction);
+                delta.time_defensive_half += frame.dt * defensive_half_fraction;
+                delta.time_offensive_half += frame.dt * (1.0 - defensive_half_fraction);
 
                 let previous_ball_delta =
                     normalized_previous_position_y - normalized_previous_ball_y;
@@ -350,6 +504,9 @@ impl PositioningCalculator {
                 stats.time_behind_ball += frame.dt * behind_ball_fraction;
                 stats.time_level_with_ball += frame.dt * level_ball_fraction;
                 stats.time_in_front_of_ball += frame.dt * in_front_ball_fraction;
+                delta.time_behind_ball += frame.dt * behind_ball_fraction;
+                delta.time_level_with_ball += frame.dt * level_ball_fraction;
+                delta.time_in_front_of_ball += frame.dt * in_front_ball_fraction;
             }
         }
 
@@ -393,6 +550,14 @@ impl PositioningCalculator {
                             .or_default();
                         stats.sum_distance_to_teammates +=
                             teammate_distance_sum * frame.dt / teammate_count as f32;
+                        Self::event_delta(
+                            &mut event_deltas,
+                            frame,
+                            &player.player_id,
+                            player.is_team_0,
+                        )
+                        .sum_distance_to_teammates +=
+                            teammate_distance_sum * frame.dt / teammate_count as f32;
                     }
                 }
 
@@ -405,6 +570,13 @@ impl PositioningCalculator {
                             .entry(player.player_id.clone())
                             .or_default()
                             .time_no_teammates += frame.dt;
+                        Self::event_delta(
+                            &mut event_deltas,
+                            frame,
+                            &player.player_id,
+                            player.is_team_0,
+                        )
+                        .time_no_teammates += frame.dt;
                     }
                 } else {
                     let mut sorted_team: Vec<_> = team_players
@@ -421,6 +593,8 @@ impl PositioningCalculator {
                             self.player_stats
                                 .entry(player_id.clone())
                                 .or_default()
+                                .time_other_role += frame.dt;
+                            Self::event_delta(&mut event_deltas, frame, player_id, is_team_0)
                                 .time_other_role += frame.dt;
                         }
                     } else {
@@ -439,21 +613,49 @@ impl PositioningCalculator {
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_most_back += frame.dt;
+                                Self::event_delta(
+                                    &mut event_deltas,
+                                    frame,
+                                    player_id,
+                                    is_team_0,
+                                )
+                                .time_most_back += frame.dt;
                             } else if near_front && !near_back {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_most_forward += frame.dt;
+                                Self::event_delta(
+                                    &mut event_deltas,
+                                    frame,
+                                    player_id,
+                                    is_team_0,
+                                )
+                                .time_most_forward += frame.dt;
                             } else if can_assign_mid_role {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_mid_role += frame.dt;
+                                Self::event_delta(
+                                    &mut event_deltas,
+                                    frame,
+                                    player_id,
+                                    is_team_0,
+                                )
+                                .time_mid_role += frame.dt;
                             } else {
                                 self.player_stats
                                     .entry(player_id.clone())
                                     .or_default()
                                     .time_other_role += frame.dt;
+                                Self::event_delta(
+                                    &mut event_deltas,
+                                    frame,
+                                    player_id,
+                                    is_team_0,
+                                )
+                                .time_other_role += frame.dt;
                             }
                         }
                     }
@@ -468,6 +670,13 @@ impl PositioningCalculator {
                         .entry(closest_player.player_id.clone())
                         .or_default()
                         .time_closest_to_ball += frame.dt;
+                    Self::event_delta(
+                        &mut event_deltas,
+                        frame,
+                        &closest_player.player_id,
+                        closest_player.is_team_0,
+                    )
+                    .time_closest_to_ball += frame.dt;
                 }
 
                 if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
@@ -479,9 +688,25 @@ impl PositioningCalculator {
                         .entry(farthest_player.player_id.clone())
                         .or_default()
                         .time_farthest_from_ball += frame.dt;
+                    Self::event_delta(
+                        &mut event_deltas,
+                        frame,
+                        &farthest_player.player_id,
+                        farthest_player.is_team_0,
+                    )
+                    .time_farthest_from_ball += frame.dt;
                 }
             }
         }
+
+        let mut frame_events: Vec<_> = event_deltas
+            .into_values()
+            .filter(PositioningEvent::has_delta)
+            .collect();
+        frame_events.sort_by(|left, right| {
+            format!("{:?}", left.player).cmp(&format!("{:?}", right.player))
+        });
+        self.events.extend(frame_events);
 
         self.previous_ball_position = Some(ball_position);
         for player in &players.players {
