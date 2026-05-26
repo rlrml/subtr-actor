@@ -162,6 +162,14 @@ acceptance check for live graph callability and event-generation parity.
    `graph-events.json`, `graph-frame.json`, `graph-timeline.json`,
    `graph-stats.json`, `graph-analysis-nodes.json`,
    `graph-event-history.json`, and `graph-info.json`.
+   You can validate the dumped files from this repository with:
+
+   ```sh
+   python3 bakkesmod/verify-graph-dump.py <path-to-BakkesMod-data>/subtr-actor \
+     --require-event-history \
+     --require-graph-events
+   ```
+
    `graph-info.json` should list `analysis_nodes` and `event_history` in
    `graph_output_names`, and `callable_analysis_node_names` should match the names verified by
    `subtr_actor_verify_graph`.

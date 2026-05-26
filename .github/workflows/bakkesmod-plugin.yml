@@ -31,6 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate graph dump helper
+        run: python -m py_compile bakkesmod/verify-graph-dump.py
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
