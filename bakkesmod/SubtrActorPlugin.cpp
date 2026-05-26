@@ -150,6 +150,17 @@ constexpr std::array<EventFilterOption, 24> EVENT_FILTER_OPTIONS{{
     {"goal", "Goal"},
 }};
 
+constexpr std::array<EventFilterOption, 8> AD_HOC_STAT_OPTIONS{{
+    {"all", "All events"},
+    {"goal", "Goals"},
+    {"shot", "Shots"},
+    {"save", "Saves"},
+    {"assist", "Assists"},
+    {"demo", "Demos"},
+    {"flip_reset", "Flip resets"},
+    {"wavedash", "Wavedashes"},
+}};
+
 bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
   return std::find_if(params.begin(), params.end(), [](const std::string &param) {
            return param == "require_event_history" || param == "require-event-history" ||
@@ -2189,6 +2200,8 @@ void SubtrActorPlugin::resetLiveState() {
   nextBoostPadId = 1;
   messages.clear();
   recentUiEvents.clear();
+  uiStatsWindows.clear();
+  nextUiStatsWindowId = 1;
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -4169,7 +4182,7 @@ void SubtrActorPlugin::Render() {
   renderScoreboardWindow();
   renderEventsWindow();
   renderStatusWindow();
-  renderStatsWindow();
+  renderStatsWindows();
 }
 
 void SubtrActorPlugin::RenderSettings() {
@@ -4238,7 +4251,28 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
   ImGui::Checkbox("Events", &uiEventsOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
-  ImGui::Checkbox("Player stats", &uiStatsOpen);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+  if (ImGui::Button("New player stats")) {
+    createStatsWindow(UiStatsWindowKind::Player);
+  }
+  if (ImGui::Button("New team stats")) {
+    createStatsWindow(UiStatsWindowKind::Team);
+  }
+  if (ImGui::Button("New all players stats")) {
+    createStatsWindow(UiStatsWindowKind::AllPlayers);
+  }
+  if (ImGui::Button("New all teams stats")) {
+    createStatsWindow(UiStatsWindowKind::AllTeams);
+  }
+  if (ImGui::Button("New goal labels")) {
+    createStatsWindow(UiStatsWindowKind::GoalsOverview);
+  }
+  if (ImGui::Button("New ad hoc stats")) {
+    createStatsWindow(UiStatsWindowKind::AdHoc);
+  }
+  ImGui::Text("%zu stats windows open", uiStatsWindows.size());
 
   ImGui::Separator();
   renderSharedSettingsControls();
@@ -4358,24 +4392,263 @@ void SubtrActorPlugin::renderStatusWindow() {
   ImGui::End();
 }
 
-void SubtrActorPlugin::renderStatsWindow() {
-  if (!uiStatsOpen) {
-    return;
+void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
+  UiStatsWindow window{};
+  window.id = nextUiStatsWindowId++;
+  window.kind = kind;
+  if (!sampledPlayers.empty()) {
+    window.selected_player_index = sampledPlayers.front().player_index;
+    window.selected_team_is_team_0 = sampledPlayers.front().is_team_0;
   }
-  ImGui::SetNextWindowPos(ImVec2{1230.0f, 310.0f}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{520.0f, 300.0f}, ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Player stats##subtr-actor", &uiStatsOpen)) {
+  uiStatsWindows.push_back(window);
+}
+
+void SubtrActorPlugin::renderStatsWindows() {
+  for (UiStatsWindow &window : uiStatsWindows) {
+    renderStatsWindow(window);
+  }
+  uiStatsWindows.erase(
+      std::remove_if(
+          uiStatsWindows.begin(),
+          uiStatsWindows.end(),
+          [](const UiStatsWindow &window) { return !window.open; }),
+      uiStatsWindows.end());
+}
+
+const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const {
+  switch (kind) {
+  case UiStatsWindowKind::Player:
+    return "Player stats";
+  case UiStatsWindowKind::Team:
+    return "Team stats";
+  case UiStatsWindowKind::AllPlayers:
+    return "All players stats";
+  case UiStatsWindowKind::AllTeams:
+    return "All teams stats";
+  case UiStatsWindowKind::GoalsOverview:
+    return "Goal labels";
+  case UiStatsWindowKind::AdHoc:
+    return "Ad hoc stats";
+  default:
+    return "Stats";
+  }
+}
+
+std::string SubtrActorPlugin::statsWindowTitle(const UiStatsWindow &window) const {
+  return std::format("{}##subtr-actor-stats-{}", statsWindowKindLabel(window.kind), window.id);
+}
+
+const SaPlayerFrame *SubtrActorPlugin::sampledPlayerByIndex(uint32_t playerIndex) const {
+  const auto found = std::find_if(
+      sampledPlayers.begin(),
+      sampledPlayers.end(),
+      [playerIndex](const SaPlayerFrame &player) {
+        return player.player_index == playerIndex;
+      });
+  return found == sampledPlayers.end() ? nullptr : &*found;
+}
+
+int SubtrActorPlugin::recentEventCountForActor(std::string_view actor) const {
+  return static_cast<int>(std::count_if(
+      recentUiEvents.begin(),
+      recentUiEvents.end(),
+      [actor](const UiEventRecord &event) { return event.actor == actor; }));
+}
+
+int SubtrActorPlugin::recentEventCountForTeam(uint8_t isTeam0) const {
+  const std::string label = teamLabel(isTeam0);
+  return static_cast<int>(std::count_if(
+      recentUiEvents.begin(),
+      recentUiEvents.end(),
+      [&label](const UiEventRecord &event) { return event.actor == label; }));
+}
+
+int SubtrActorPlugin::recentEventCountForType(std::string_view type) const {
+  return static_cast<int>(std::count_if(
+      recentUiEvents.begin(),
+      recentUiEvents.end(),
+      [type](const UiEventRecord &event) {
+        return type == "all" || event.type == type || event.category == type;
+      }));
+}
+
+void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
+  const float offset = static_cast<float>((window.id - 1) * 24);
+  ImGui::SetNextWindowPos(ImVec2{96.0f + offset, 96.0f + offset}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{540.0f, 330.0f}, ImGuiCond_FirstUseEver);
+  const std::string title = statsWindowTitle(window);
+  if (!ImGui::Begin(title.c_str(), &window.open)) {
     ImGui::End();
     return;
   }
 
+  renderStatsWindowScopeSelector(window);
+  switch (window.kind) {
+  case UiStatsWindowKind::Player:
+    if (const SaPlayerFrame *player = sampledPlayerByIndex(window.selected_player_index)) {
+      renderPlayerStatsTable(*player);
+    } else {
+      ImGui::Text("Waiting for selected player.");
+    }
+    break;
+  case UiStatsWindowKind::Team:
+    renderTeamStatsTable(window.selected_team_is_team_0);
+    break;
+  case UiStatsWindowKind::AllPlayers:
+    renderAllPlayersStatsTable();
+    break;
+  case UiStatsWindowKind::AllTeams:
+    renderAllTeamsStatsTable();
+    break;
+  case UiStatsWindowKind::GoalsOverview:
+    renderGoalsOverviewStats();
+    break;
+  case UiStatsWindowKind::AdHoc:
+    renderAdHocStatsWindow(window);
+    break;
+  }
+
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
+  if (window.kind == UiStatsWindowKind::Player) {
+    const SaPlayerFrame *selected = sampledPlayerByIndex(window.selected_player_index);
+    const std::string selectedLabel =
+        selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
+    if (ImGui::BeginCombo("Player", selectedLabel.c_str())) {
+      for (const SaPlayerFrame &player : sampledPlayers) {
+        const std::string label = playerLabel(player.player_index, player.is_team_0);
+        const bool isSelected = player.player_index == window.selected_player_index;
+        if (ImGui::Selectable(label.c_str(), isSelected)) {
+          window.selected_player_index = player.player_index;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::Separator();
+    return;
+  }
+
+  if (window.kind == UiStatsWindowKind::Team) {
+    const char *selectedTeam = window.selected_team_is_team_0 != 0 ? "Blue" : "Orange";
+    if (ImGui::BeginCombo("Team", selectedTeam)) {
+      if (ImGui::Selectable("Blue", window.selected_team_is_team_0 != 0)) {
+        window.selected_team_is_team_0 = 1;
+      }
+      if (ImGui::Selectable("Orange", window.selected_team_is_team_0 == 0)) {
+        window.selected_team_is_team_0 = 0;
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::Separator();
+  }
+}
+
+void SubtrActorPlugin::renderPlayerStatsTable(const SaPlayerFrame &player) {
+  const std::string label = playerLabel(player.player_index, player.is_team_0);
+  const LinearColor color =
+      player.is_team_0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+  ImGui::TextColored(toImVec4(color), "%s", label.c_str());
+  ImGui::Columns(2, "player-stat-rows", false);
+  ImGui::Text("Score");
+  ImGui::NextColumn();
+  ImGui::Text("%d", player.has_match_stats != 0 ? player.match_score : 0);
+  ImGui::NextColumn();
+  ImGui::Text("Goals");
+  ImGui::NextColumn();
+  ImGui::Text("%d", player.has_match_stats != 0 ? player.match_goals : 0);
+  ImGui::NextColumn();
+  ImGui::Text("Assists");
+  ImGui::NextColumn();
+  ImGui::Text("%d", player.has_match_stats != 0 ? player.match_assists : 0);
+  ImGui::NextColumn();
+  ImGui::Text("Saves");
+  ImGui::NextColumn();
+  ImGui::Text("%d", player.has_match_stats != 0 ? player.match_saves : 0);
+  ImGui::NextColumn();
+  ImGui::Text("Shots");
+  ImGui::NextColumn();
+  ImGui::Text("%d", player.has_match_stats != 0 ? player.match_shots : 0);
+  ImGui::NextColumn();
+  ImGui::Text("Boost");
+  ImGui::NextColumn();
+  ImGui::Text("%.0f", player.boost_amount);
+  ImGui::NextColumn();
+  ImGui::Text("Recent events");
+  ImGui::NextColumn();
+  ImGui::Text("%d", recentEventCountForActor(label));
+  ImGui::Columns(1);
+}
+
+void SubtrActorPlugin::renderTeamStatsTable(uint8_t isTeam0) {
+  int players = 0;
+  int score = 0;
+  int goals = 0;
+  int assists = 0;
+  int saves = 0;
+  int shots = 0;
+  float boost = 0.0f;
+  for (const SaPlayerFrame &player : sampledPlayers) {
+    if ((player.is_team_0 != 0) != (isTeam0 != 0)) {
+      continue;
+    }
+    players += 1;
+    if (player.has_match_stats != 0) {
+      score += player.match_score;
+      goals += player.match_goals;
+      assists += player.match_assists;
+      saves += player.match_saves;
+      shots += player.match_shots;
+    }
+    boost += player.boost_amount;
+  }
+
+  const LinearColor color =
+      isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+  ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
+  ImGui::Columns(2, "team-stat-rows", false);
+  ImGui::Text("Players");
+  ImGui::NextColumn();
+  ImGui::Text("%d", players);
+  ImGui::NextColumn();
+  ImGui::Text("Score");
+  ImGui::NextColumn();
+  ImGui::Text("%d", score);
+  ImGui::NextColumn();
+  ImGui::Text("Goals");
+  ImGui::NextColumn();
+  ImGui::Text("%d", goals);
+  ImGui::NextColumn();
+  ImGui::Text("Assists");
+  ImGui::NextColumn();
+  ImGui::Text("%d", assists);
+  ImGui::NextColumn();
+  ImGui::Text("Saves");
+  ImGui::NextColumn();
+  ImGui::Text("%d", saves);
+  ImGui::NextColumn();
+  ImGui::Text("Shots");
+  ImGui::NextColumn();
+  ImGui::Text("%d", shots);
+  ImGui::NextColumn();
+  ImGui::Text("Average boost");
+  ImGui::NextColumn();
+  ImGui::Text("%.0f", players == 0 ? 0.0f : boost / static_cast<float>(players));
+  ImGui::NextColumn();
+  ImGui::Text("Recent team events");
+  ImGui::NextColumn();
+  ImGui::Text("%d", recentEventCountForTeam(isTeam0));
+  ImGui::Columns(1);
+}
+
+void SubtrActorPlugin::renderAllPlayersStatsTable() {
   if (sampledPlayers.empty()) {
     ImGui::Text("Waiting for sampled players.");
-    ImGui::End();
     return;
   }
 
-  ImGui::Columns(7, "player-stats-columns", true);
+  ImGui::Columns(8, "all-player-stats-columns", true);
   ImGui::Text("Player");
   ImGui::NextColumn();
   ImGui::Text("Score");
@@ -4390,12 +4663,16 @@ void SubtrActorPlugin::renderStatsWindow() {
   ImGui::NextColumn();
   ImGui::Text("Boost");
   ImGui::NextColumn();
+  ImGui::Text("Events");
+  ImGui::NextColumn();
   ImGui::Separator();
 
   for (const SaPlayerFrame &player : sampledPlayers) {
+    const std::string label = playerLabel(player.player_index, player.is_team_0);
     const LinearColor color =
-        player.is_team_0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
-    ImGui::TextColored(toImVec4(color), "%s", playerLabel(player.player_index, player.is_team_0).c_str());
+        player.is_team_0 != 0 ? LinearColor{80, 190, 255, 255}
+                              : LinearColor{255, 175, 80, 255};
+    ImGui::TextColored(toImVec4(color), "%s", label.c_str());
     ImGui::NextColumn();
     ImGui::Text("%d", player.has_match_stats != 0 ? player.match_score : 0);
     ImGui::NextColumn();
@@ -4409,10 +4686,62 @@ void SubtrActorPlugin::renderStatsWindow() {
     ImGui::NextColumn();
     ImGui::Text("%.0f", player.boost_amount);
     ImGui::NextColumn();
+    ImGui::Text("%d", recentEventCountForActor(label));
+    ImGui::NextColumn();
   }
-
   ImGui::Columns(1);
-  ImGui::End();
+}
+
+void SubtrActorPlugin::renderAllTeamsStatsTable() {
+  renderTeamStatsTable(1);
+  ImGui::Separator();
+  renderTeamStatsTable(0);
+}
+
+void SubtrActorPlugin::renderGoalsOverviewStats() {
+  if (lastTeamScores) {
+    ImGui::Text("Score: Blue %d - Orange %d", lastTeamScores->first, lastTeamScores->second);
+  } else {
+    ImGui::Text("Waiting for score data.");
+  }
+  ImGui::Separator();
+  ImGui::BeginChild("goal-labels", ImVec2{0.0f, 0.0f}, true);
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (event.category != "goal_context" && event.type != "goal") {
+      continue;
+    }
+    ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", event.label.c_str());
+  }
+  ImGui::EndChild();
+}
+
+void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
+  std::string filter = window.selected_stat_type;
+  if (ImGui::BeginCombo("Metric", eventFilterLabel(filter))) {
+    for (const EventFilterOption &option : AD_HOC_STAT_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(filter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        window.selected_stat_type = option.value;
+        filter = window.selected_stat_type;
+      }
+    }
+    ImGui::EndCombo();
+  }
+  const std::string normalized = normalizeEventFilterToken(filter);
+  ImGui::Text("Recent count: %d", recentEventCountForType(normalized));
+  ImGui::Separator();
+  ImGui::BeginChild("ad-hoc-events", ImVec2{0.0f, 0.0f}, true);
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (!eventFilterAllows(normalized, event.category, event.type)) {
+      continue;
+    }
+    ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", event.label.c_str());
+  }
+  ImGui::EndChild();
 }
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {

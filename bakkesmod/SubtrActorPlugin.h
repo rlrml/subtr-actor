@@ -107,6 +107,24 @@ private:
     float time = 0.0f;
   };
 
+  enum class UiStatsWindowKind {
+    Player,
+    Team,
+    AllPlayers,
+    AllTeams,
+    GoalsOverview,
+    AdHoc,
+  };
+
+  struct UiStatsWindow {
+    uint32_t id = 0;
+    UiStatsWindowKind kind = UiStatsWindowKind::Player;
+    bool open = true;
+    uint32_t selected_player_index = 0;
+    uint8_t selected_team_is_team_0 = 1;
+    std::string selected_stat_type = "all";
+  };
+
   struct PlayerStatSnapshot {
     int shots = 0;
     int saves = 0;
@@ -205,8 +223,9 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
-  bool uiStatsOpen = false;
+  uint32_t nextUiStatsWindowId = 1;
   std::deque<UiEventRecord> recentUiEvents;
+  std::vector<UiStatsWindow> uiStatsWindows;
 
   bool loadRustLibrary();
   void unloadRustLibrary();
@@ -229,7 +248,22 @@ private:
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderStatusWindow();
-  void renderStatsWindow();
+  void createStatsWindow(UiStatsWindowKind kind);
+  void renderStatsWindows();
+  void renderStatsWindow(UiStatsWindow &window);
+  void renderStatsWindowScopeSelector(UiStatsWindow &window);
+  void renderPlayerStatsTable(const SaPlayerFrame &player);
+  void renderTeamStatsTable(uint8_t isTeam0);
+  void renderAllPlayersStatsTable();
+  void renderAllTeamsStatsTable();
+  void renderGoalsOverviewStats();
+  void renderAdHocStatsWindow(UiStatsWindow &window);
+  const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
+  std::string statsWindowTitle(const UiStatsWindow &window) const;
+  const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
+  int recentEventCountForActor(std::string_view actor) const;
+  int recentEventCountForTeam(uint8_t isTeam0) const;
+  int recentEventCountForType(std::string_view type) const;
   void renderSharedSettingsControls();
   bool uiEnabled();
   bool cvarBool(const char *name, bool defaultValue);
