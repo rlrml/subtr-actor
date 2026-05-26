@@ -117,7 +117,8 @@ acceptance check for live graph callability and event-generation parity.
    registry. It should also log that every resolved graph node is callable by
    name, that named graph outputs match the fixed ABI outputs, that
    `analysis_nodes` contains exactly the callable analysis nodes, and that
-   `frame_events_state` exposes every live event family field.
+   `frame_events_state` exposes every live event family field with an entry
+   count for each field.
 3. Exercise live events that should be visible to the graph: touch the ball,
    trigger a dodge refresh or flip reset setup when possible, pick up a boost
    pad, generate shot/save/assist match-stat deltas, score a goal, and trigger
@@ -152,7 +153,9 @@ acceptance check for live graph callability and event-generation parity.
    should expose the event-family arrays checked by `subtr_actor_verify_graph`
    (`touch_events`, `dodge_refreshed_events`, `boost_pad_events`,
    `player_stat_events`, `goal_events`, `demo_events`, and `active_demos`), and
-   the arrays corresponding to exercised events should contain entries.
+   the arrays corresponding to exercised events should contain entries. The
+   verifier log should also report nonzero entry counts for the matching
+   exercised event-family fields.
 
 ## Linux/Nix support
 

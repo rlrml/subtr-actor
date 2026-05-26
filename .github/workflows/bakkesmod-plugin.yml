@@ -87,6 +87,8 @@ jobs:
           Assert-Contains $pluginText "analysis_nodes output has unexpected node" "BakkesMod unexpected analysis node verification"
           Assert-Contains $pluginText "frame_events_state exposes {} live event fields" "BakkesMod frame event surface verification"
           Assert-Contains $pluginText "frame_events_state missing event field" "BakkesMod frame event missing-field diagnostics"
+          Assert-Contains $pluginText "frame_events_state event field '{}' has {} entries" "BakkesMod frame event count diagnostics"
+          Assert-Contains $pluginText "frame_events_state event field '{}' is not an array" "BakkesMod frame event array diagnostics"
           Assert-Contains $pluginText "touch_events" "BakkesMod touch event-family field verification"
           Assert-Contains $pluginText "dodge_refreshed_events" "BakkesMod dodge-refresh event-family field verification"
           Assert-Contains $pluginText "boost_pad_events" "BakkesMod boost-pad event-family field verification"

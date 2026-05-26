@@ -344,6 +344,50 @@ std::vector<std::string> parseJsonObjectKeys(const std::string &json) {
   return {};
 }
 
+std::optional<size_t> parseJsonArrayPropertyElementCount(
+    const std::string &json,
+    const std::string &propertyName) {
+  const std::string needle = std::format("\"{}\"", propertyName);
+  size_t offset = json.find(needle);
+  if (offset == std::string::npos) {
+    return std::nullopt;
+  }
+  offset += needle.size();
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != ':') {
+    return std::nullopt;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '[') {
+    return std::nullopt;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  if (offset < json.size() && json[offset] == ']') {
+    return 0;
+  }
+
+  size_t count = 0;
+  while (offset < json.size()) {
+    if (!skipJsonValue(json, offset)) {
+      return std::nullopt;
+    }
+    count += 1;
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == ']') {
+      return count;
+    }
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
 static_assert(sizeof(SaBoostPadEventKind) == 4);
 static_assert(sizeof(SaPlayerStatEventKind) == 4);
 
@@ -2563,7 +2607,20 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         cvarManager->log(std::format(
             "subtr-actor: graph verification frame_events_state missing event field '{}'",
             fieldName));
+        continue;
       }
+      const auto eventCount = parseJsonArrayPropertyElementCount(frameEventsJson, fieldName);
+      if (!eventCount) {
+        ok = false;
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification frame_events_state event field '{}' is not an array",
+            fieldName));
+        continue;
+      }
+      cvarManager->log(std::format(
+          "subtr-actor: frame_events_state event field '{}' has {} entries",
+          fieldName,
+          *eventCount));
     }
     if (!missingEventField) {
       cvarManager->log(std::format(
