@@ -46,7 +46,30 @@ jobs:
         run: |
           python3 scripts/extract_release_notes.py "${{ steps.release.outputs.version }}" > release-notes.md
 
+      - name: Check GitHub token
+        id: github_token
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if output="$(gh api rate_limit 2>&1)"; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if grep -qi "account was suspended" <<<"$output"; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub rejected the default Actions token as suspended. Skipping GitHub release creation in CI."
+            exit 0
+          fi
+
+          echo "$output"
+          exit 1
+
       - name: Create or update GitHub release
+        if: steps.github_token.outputs.available == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,6 +93,11 @@ jobs:
       - name: Summary
         run: |
           {
-            echo "### GitHub Release Published"
-            echo "Created or updated the release page for ${{ steps.release.outputs.tag_name }}."
+            if [[ "${{ steps.github_token.outputs.available }}" == "true" ]]; then
+              echo "### GitHub Release Published"
+              echo "Created or updated the release page for ${{ steps.release.outputs.tag_name }}."
+            else
+              echo "### GitHub Release Skipped"
+              echo "GitHub rejected the default Actions token as suspended, so CI skipped release page creation."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

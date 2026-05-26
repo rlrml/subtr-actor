@@ -35,7 +35,7 @@ jobs:
           rustup default stable
 
       - name: Install maturin
-        run: python -m pip install --upgrade pip maturin
+        run: python -m pip install --upgrade pip 'maturin>=1.0,<1.11'
 
       - name: Build wheels
         run: python -m maturin build --manifest-path python/Cargo.toml --release --out python/dist
@@ -44,42 +44,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
-          path: python/dist/*.whl
-
-  # Build for additional Linux architectures
-  build-linux-cross:
-    name: Build wheels for Linux ${{ matrix.target }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [aarch64]
-
-    steps:
-      - name: Checkout repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
-          git checkout --detach refs/github/checkout
-
-      - name: Set up Rust
-        shell: bash
-        run: |
-          rustup toolchain install stable --profile minimal --target aarch64-unknown-linux-gnu --no-self-update
-          rustup default stable
-
-      - name: Install maturin
-        run: python -m pip install --upgrade pip maturin
-
-      - name: Build wheels
-        run: python -m maturin build --manifest-path python/Cargo.toml --release --out python/dist --target ${{ matrix.target }}-unknown-linux-gnu
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v7
-        with:
-          name: wheels-linux-${{ matrix.target }}
           path: python/dist/*.whl
 
   # Build source distribution
@@ -97,7 +61,7 @@ jobs:
           git checkout --detach refs/github/checkout
 
       - name: Install maturin
-        run: python -m pip install --upgrade pip maturin
+        run: python -m pip install --upgrade pip 'maturin>=1.0,<1.11'
 
       - name: Build sdist
         run: python -m maturin sdist --manifest-path python/Cargo.toml --out python/dist
@@ -110,7 +74,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [build-wheels, build-linux-cross, build-sdist]
+    needs: [build-wheels, build-sdist]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

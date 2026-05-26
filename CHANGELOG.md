@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.9.2 - 2026-05-26
+
+- Remove the broken Linux aarch64 cross-wheel job from Python releases so PyPI
+  publishing is not blocked after moving away from the third-party action wrapper.
+- Keep the GitHub release workflow green when GitHub rejects the default Actions
+  token with the transient account-suspended response.
+- Refresh Rust, Python, and JavaScript release metadata to `0.9.2`.
+
 ## v0.9.1 - 2026-05-26
 
 - Treat demolition timeline events as authoritative in the replay player so
