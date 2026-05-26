@@ -388,6 +388,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "core_team",
     "possession",
     "pressure",
+    "territorial_pressure",
     "movement",
     "positioning",
     "rotation_player",

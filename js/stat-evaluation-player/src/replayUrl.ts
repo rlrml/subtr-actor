@@ -3,7 +3,7 @@ import {
   getBallchasingReplayFileName,
   getBallchasingReplayFileUrl,
   normalizeBallchasingReplayId,
-} from "subtr-actor-player";
+} from "@rlrml/subtr-actor-player";
 
 const REPLAY_URL_QUERY_PARAMS = ["replayUrl", "replay_url", "replay"] as const;
 const COMPRESSED_REPLAY_URL_QUERY_PARAMS = ["r", "replayUrlZ", "replay_url_z"] as const;

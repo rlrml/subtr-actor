@@ -1,1 +1,1 @@
-export type { SwitchIdTs } from "subtr-actor-player/generated/SwitchIdTs";
+export type { SwitchIdTs } from "@rlrml/subtr-actor-player/generated/SwitchIdTs";

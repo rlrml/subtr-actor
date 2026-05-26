@@ -83,6 +83,10 @@ import {
   createPressureEventDerivedStatsAccumulator,
 } from "./pressureEventDerivation.ts";
 import {
+  applyTerritorialPressureEventDerivedStats,
+  createTerritorialPressureEventDerivedStatsAccumulator,
+} from "./territorialPressureEventDerivation.ts";
+import {
   applyRotationEventDerivedStats,
   createRotationEventDerivedStatsAccumulator,
 } from "./rotationEventDerivation.ts";
@@ -164,6 +168,13 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: ["pressure"],
     apply: applyPressureEventDerivedStats,
     createFrameAccumulator: createPressureEventDerivedStatsAccumulator,
+  },
+  {
+    id: "territorial-pressure",
+    playerModules: [],
+    teamModules: ["territorial_pressure"],
+    apply: applyTerritorialPressureEventDerivedStats,
+    createFrameAccumulator: createTerritorialPressureEventDerivedStatsAccumulator,
   },
   {
     id: "movement",

@@ -29,10 +29,7 @@ generatedPackage.name = sourcePackage.name;
 generatedPackage.version = sourcePackage.version;
 generatedPackage.description = sourcePackage.description;
 generatedPackage.type = "module";
-generatedPackage.repository =
-  typeof sourcePackage.repository === "string"
-    ? sourcePackage.repository
-    : sourcePackage.repository?.url;
+generatedPackage.repository = sourcePackage.repository;
 generatedPackage.keywords = sourcePackage.keywords;
 generatedPackage.author = sourcePackage.author;
 generatedPackage.license = sourcePackage.license;

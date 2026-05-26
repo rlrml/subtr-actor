@@ -1,4 +1,8 @@
-import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
+import type {
+  ReplayBoostPadSize,
+  ReplayModel,
+  ReplayTimelineRange,
+} from "@rlrml/subtr-actor-player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";

@@ -1,1 +1,1 @@
-export type { Ps4IdTs } from "subtr-actor-player/generated/Ps4IdTs";
+export type { Ps4IdTs } from "@rlrml/subtr-actor-player/generated/Ps4IdTs";

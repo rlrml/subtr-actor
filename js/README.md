@@ -6,14 +6,14 @@ This package mirrors the Python binding at a JavaScript/TypeScript-friendly boun
 
 Related npm packages:
 
-- [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor): low-level WebAssembly bindings
-- [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player): replay player package built on top of these bindings
-- [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player): stats-focused replay viewer UI built on top of the player package
+- [`@rlrml/subtr-actor`](https://www.npmjs.com/package/@rlrml/subtr-actor): low-level WebAssembly bindings
+- [`@rlrml/subtr-actor-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-player): replay player package built on top of these bindings
+- [`@rlrml/subtr-actor-stats-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player): stats-focused replay viewer UI built on top of the player package
 
 ## Installation
 
 ```bash
-npm install @colonelpanic8/subtr-actor
+npm install @rlrml/subtr-actor
 ```
 
 ## Runtime Support
@@ -41,7 +41,7 @@ import init, {
   get_replay_info,
   get_replay_meta,
   validate_replay,
-} from "@colonelpanic8/subtr-actor";
+} from "@rlrml/subtr-actor";
 
 await init();
 
@@ -197,8 +197,8 @@ npm --prefix js test
 
 Local packages built on top of these bindings:
 
-- [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
-- [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) / [`js/stat-evaluation-player`](./stat-evaluation-player/README.md): stats-focused replay viewer package with timeline overlays and per-module stat panels.
+- [`@rlrml/subtr-actor-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-player) / [`js/player`](./player/README.md): reusable replay player library with imperative playback and camera APIs.
+- [`@rlrml/subtr-actor-stats-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player) / [`js/stat-evaluation-player`](./stat-evaluation-player/README.md): stats-focused replay viewer package with timeline overlays and per-module stat panels.
 
 The mechanics evaluation player was moved to the sibling `subtr-actor-mechanics`
 project because it is tied to mechanics-specific datasets and review workflows.

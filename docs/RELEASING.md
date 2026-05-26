@@ -5,25 +5,30 @@ This document describes how to release new versions of subtr-actor to GitHub Rel
 ## Overview
 
 The project publishes five packages:
+
 - **Rust**: `subtr-actor` on [crates.io](https://crates.io/crates/subtr-actor)
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
-- **JavaScript bindings**: `@colonelpanic8/subtr-actor` on [npm](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
-- **JavaScript player**: `subtr-actor-player` on [npm](https://www.npmjs.com/package/subtr-actor-player)
-- **JavaScript stats player**: `subtr-actor-stats-player` on [npm](https://www.npmjs.com/package/subtr-actor-stats-player)
+- **JavaScript bindings**: `@rlrml/subtr-actor` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor)
+- **JavaScript player**: `@rlrml/subtr-actor-player` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor-player)
+- **JavaScript stats player**: `@rlrml/subtr-actor-stats-player` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player)
 
 ## Automated Releases (GitHub Actions)
 
 When you push a tag starting with `v` (e.g., `v0.1.11`), the following workflows run automatically:
 
 ### GitHub (`release-github.yml`)
+
 Creates or updates the GitHub Release page for the tag using the matching
 section from [`CHANGELOG.md`](../CHANGELOG.md).
 
 ### Rust (`release-rust.yml`)
+
 Publishes the Rust crate to crates.io.
 
 ### Python (`release-python.yml`)
+
 Builds wheels for multiple platforms:
+
 - Linux x86_64 (manylinux) - compatible with AWS Lambda, Docker, etc.
 - Linux aarch64 (ARM)
 - Windows x86_64
@@ -33,6 +38,7 @@ Builds wheels for multiple platforms:
 All artifacts are published to PyPI.
 
 ### JavaScript (`release-js.yml`)
+
 Builds the WebAssembly bindings package, builds the player package, smoke-tests
 the packed player artifact in a fresh consumer app, builds the stats player
 package, smoke-tests that packed artifact in a fresh consumer app, and publishes
@@ -41,7 +47,9 @@ all three npm packages.
 ## Setup Required (One-Time)
 
 ### PyPI Publishing
+
 Option A: **Trusted Publishing** (Recommended)
+
 1. Go to PyPI → Account Settings → Publishing
 2. Add a new pending publisher:
    - Owner: `rlrml`
@@ -50,11 +58,13 @@ Option A: **Trusted Publishing** (Recommended)
    - Environment: `pypi`
 
 Option B: **API Token**
+
 1. Create a PyPI API token at https://pypi.org/manage/account/token/
 2. Add it as a GitHub secret named `PYPI_TOKEN`
 3. Update the workflow to use the token instead of trusted publishing
 
 ### npm Publishing
+
 1. Create an npm access token at https://www.npmjs.com/settings/~/tokens
 2. Add it as a GitHub secret named `NPM_TOKEN`
 
@@ -71,6 +81,7 @@ python3 scripts/check_release_versions.py
 ```
 
 Or use the justfile helper:
+
 ```bash
 just bump 0.1.11
 ```
@@ -92,15 +103,16 @@ git push origin master --tags
   - https://github.com/rlrml/subtr-actor/releases
   - https://crates.io/crates/subtr-actor
   - https://pypi.org/project/subtr-actor-py/
-  - https://www.npmjs.com/package/@colonelpanic8/subtr-actor
-  - https://www.npmjs.com/package/subtr-actor-player
-  - https://www.npmjs.com/package/subtr-actor-stats-player
+  - https://www.npmjs.com/package/@rlrml/subtr-actor
+  - https://www.npmjs.com/package/@rlrml/subtr-actor-player
+  - https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player
 
 ## Manual Release (Alternative)
 
 If you need to release manually:
 
 ### Python
+
 ```bash
 cd python
 maturin build --release
@@ -108,6 +120,7 @@ twine upload target/wheels/*
 ```
 
 ### JavaScript
+
 ```bash
 cd js
 wasm-pack build --target bundler --out-dir pkg
@@ -125,14 +138,17 @@ package_dir="$(npm run --silent prepare:package)"
 ## Troubleshooting
 
 ### Python wheel build fails
+
 - Ensure Rust toolchain is installed
 - Check maturin version compatibility in `pyproject.toml`
 
 ### Linux wheel missing
+
 - The `manylinux: auto` setting should produce compatible wheels
 - If issues persist, try `manylinux: 2014` or `manylinux: 2_28`
 
 ### npm publish fails
+
 - Verify `NPM_TOKEN` secret is set
 - Check that the package name isn't taken
 - Ensure version number is incremented

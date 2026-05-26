@@ -1,5 +1,5 @@
 import { HalfFieldOverlay } from "../overlays.ts";
-import type { ReplayModel } from "subtr-actor-player";
+import type { ReplayModel } from "@rlrml/subtr-actor-player";
 import { renderPlayerFiftyFiftyStats, renderFiftyFiftySummary } from "../fiftyFiftyFormatting.ts";
 import { renderPossessionStats } from "../possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "../possessionFormatting.ts";

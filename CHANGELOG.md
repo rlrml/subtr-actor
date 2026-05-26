@@ -6,6 +6,8 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.11.0 - 2026-05-26
+
 - Add territorial pressure stats to the Rust timeline, serialized stats output,
   and stats-player generated bindings.
 - Track first-man stint counts plus average and longest stint duration in

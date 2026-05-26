@@ -46,6 +46,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "possession",
     "possession_state",
     "pressure",
+    "territorial_pressure",
     "rotation",
     "rush",
     "touch",

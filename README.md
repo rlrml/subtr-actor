@@ -6,11 +6,11 @@
 
 [![Python version](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square&label=python)](https://pypi.org/project/subtr-actor-py/)
 
-[![JS bindings version](https://img.shields.io/npm/v/%40colonelpanic8%2Fsubtr-actor?style=flat-square&label=js%20bindings)](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
+[![JS bindings version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor?style=flat-square&label=js%20bindings)](https://www.npmjs.com/package/@rlrml/subtr-actor)
 
-[![JS player version](https://img.shields.io/npm/v/subtr-actor-player?style=flat-square&label=js%20player)](https://www.npmjs.com/package/subtr-actor-player)
+[![JS player version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor-player?style=flat-square&label=js%20player)](https://www.npmjs.com/package/@rlrml/subtr-actor-player)
 
-[![JS stats player version](https://img.shields.io/npm/v/subtr-actor-stats-player?style=flat-square&label=js%20stats%20player)](https://www.npmjs.com/package/subtr-actor-stats-player)
+[![JS stats player version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor-stats-player?style=flat-square&label=js%20stats%20player)](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player)
 
 `subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
 
@@ -25,9 +25,9 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 - Rust: [`subtr-actor`](https://crates.io/crates/subtr-actor)
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
-- JavaScript / WASM bindings: [`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor)
-- JavaScript replay player: [`subtr-actor-player`](https://www.npmjs.com/package/subtr-actor-player)
-- JavaScript stats player: [`subtr-actor-stats-player`](https://www.npmjs.com/package/subtr-actor-stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay))
+- JavaScript / WASM bindings: [`@rlrml/subtr-actor`](https://www.npmjs.com/package/@rlrml/subtr-actor)
+- JavaScript replay player: [`@rlrml/subtr-actor-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-player)
+- JavaScript stats player: [`@rlrml/subtr-actor-stats-player`](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay))
 
 ## What You Get
 
@@ -55,13 +55,13 @@ pip install subtr-actor-py
 ### JavaScript
 
 ```bash
-npm install @colonelpanic8/subtr-actor
+npm install @rlrml/subtr-actor
 ```
 
 ### JavaScript Player
 
 ```bash
-npm install subtr-actor-player three
+npm install @rlrml/subtr-actor-player three
 ```
 
 ## Quick Start
@@ -148,12 +148,15 @@ print(meta["column_headers"]["player_headers"][:5])
 ### JavaScript
 
 ```javascript
-import init, { get_ndarray_with_info, validate_replay } from "@colonelpanic8/subtr-actor";
+import init, {
+  get_ndarray_with_info,
+  validate_replay,
+} from "@rlrml/subtr-actor";
 
 await init();
 
 const replayData = new Uint8Array(
-  await fetch("example.replay").then((response) => response.arrayBuffer())
+  await fetch("example.replay").then((response) => response.arrayBuffer()),
 );
 
 const validation = validate_replay(replayData);
@@ -165,7 +168,7 @@ const result = get_ndarray_with_info(
   replayData,
   ["BallRigidBody", "SecondsRemaining"],
   ["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
-  10.0
+  10.0,
 );
 
 console.log(result.shape);

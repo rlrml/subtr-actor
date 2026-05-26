@@ -1,4 +1,4 @@
-import type { ReplayModel } from "subtr-actor-player";
+import type { ReplayModel } from "@rlrml/subtr-actor-player";
 import { createStatsFrameLookup, type StatsFrameLookup, type StatsTimeline } from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
 export {
