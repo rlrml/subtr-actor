@@ -1005,6 +1005,14 @@ fn find_counter(counters: &[(RemoteId, i32)], player_id: &RemoteId) -> Option<i3
         .find_map(|(id, value)| (id == player_id).then_some(*value))
 }
 
+fn set_counter(counters: &mut Vec<(RemoteId, i32)>, player_id: RemoteId, value: i32) {
+    if let Some((_, counter)) = counters.iter_mut().find(|(id, _)| id == &player_id) {
+        *counter = value;
+    } else {
+        counters.push((player_id, value));
+    }
+}
+
 fn frame_info(frame: &SaLiveFrame) -> FrameInfo {
     FrameInfo {
         frame_number: frame.frame_number as usize,
@@ -1118,21 +1126,15 @@ fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<Touc
         .collect()
 }
 
-fn explicit_dodge_refreshed_events(
+fn explicit_dodge_refresh_keys(
     frame: &FrameInfo,
     events: &[SaDodgeRefreshedEvent],
-) -> Vec<DodgeRefreshedEvent> {
+) -> HashSet<(RemoteId, usize)> {
     events
         .iter()
         .map(|event| {
-            let (frame_number, time) = event_frame_and_time(frame, event.timing);
-            DodgeRefreshedEvent {
-                time,
-                frame: frame_number,
-                player: player_id(event.player_index),
-                is_team_0: event.is_team_0 != 0,
-                counter_value: event.counter_value,
-            }
+            let (frame_number, _) = event_frame_and_time(frame, event.timing);
+            (player_id(event.player_index), frame_number)
         })
         .collect()
 }
@@ -1247,6 +1249,7 @@ fn infer_dodge_refreshed_events(
     players: &PlayerFrameState,
     touch_events: &[subtr_actor::TouchEvent],
     counters: &mut Vec<(RemoteId, i32)>,
+    suppressed_keys: &HashSet<(RemoteId, usize)>,
 ) -> Vec<DodgeRefreshedEvent> {
     const MIN_PLAYER_HEIGHT: f32 = 95.0;
     const MIN_BALL_HEIGHT: f32 = 80.0;
@@ -1266,6 +1269,9 @@ fn infer_dodge_refreshed_events(
         let Some(player_id) = touch.player.as_ref() else {
             continue;
         };
+        if suppressed_keys.contains(&(player_id.clone(), frame.frame_number)) {
+            continue;
+        }
         let Some(player) = players
             .players
             .iter()
@@ -1297,11 +1303,7 @@ fn infer_dodge_refreshed_events(
 
         let previous = find_counter(counters, player_id).unwrap_or(0);
         let counter_value = previous + 1;
-        if let Some((_, value)) = counters.iter_mut().find(|(id, _)| id == player_id) {
-            *value = counter_value;
-        } else {
-            counters.push((player_id.clone(), counter_value));
-        }
+        set_counter(counters, player_id.clone(), counter_value);
         events.push(DodgeRefreshedEvent {
             time: frame.time,
             frame: frame.frame_number,
@@ -1315,6 +1317,36 @@ fn infer_dodge_refreshed_events(
 }
 
 impl SaLiveEventGenerator {
+    fn explicit_dodge_refreshed_events(
+        &mut self,
+        frame: &FrameInfo,
+        events: &[SaDodgeRefreshedEvent],
+    ) -> Vec<DodgeRefreshedEvent> {
+        let mut dodge_refreshed_events = Vec::new();
+        for event in events {
+            let player = player_id(event.player_index);
+            if find_counter(&self.dodge_refresh_counters, &player)
+                .is_some_and(|previous| event.counter_value <= previous)
+            {
+                continue;
+            }
+            set_counter(
+                &mut self.dodge_refresh_counters,
+                player.clone(),
+                event.counter_value,
+            );
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            dodge_refreshed_events.push(DodgeRefreshedEvent {
+                time,
+                frame: frame_number,
+                player,
+                is_team_0: event.is_team_0 != 0,
+                counter_value: event.counter_value,
+            });
+        }
+        dodge_refreshed_events
+    }
+
     fn explicit_demolish_events(
         &mut self,
         frame: &FrameInfo,
@@ -1458,9 +1490,11 @@ impl SaLiveEventGenerator {
     ) -> (FrameEventsState, LivePlayState) {
         let explicit_touch_events = explicit_touch_events(frame, explicit_events.touches);
         let has_explicit_touch_events = !explicit_touch_events.is_empty();
+        let explicit_dodge_refresh_keys =
+            explicit_dodge_refresh_keys(frame, explicit_events.dodge_refreshes);
+        let has_explicit_dodge_refreshed_events = !explicit_dodge_refresh_keys.is_empty();
         let explicit_dodge_refreshed_events =
-            explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
-        let has_explicit_dodge_refreshed_events = !explicit_dodge_refreshed_events.is_empty();
+            self.explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
         let explicit_demolishes = self.explicit_demolish_events(frame, explicit_events.demolishes);
         let demo_events = explicit_demolish_events(frame, &explicit_demolishes);
         let active_demos = self.sync_active_demos(frame, &explicit_demolishes);
@@ -1508,15 +1542,10 @@ impl SaLiveEventGenerator {
             players,
             &touch_events,
             &mut self.dodge_refresh_counters,
+            &explicit_dodge_refresh_keys,
         );
-        let explicit_dodge_refresh_keys = explicit_dodge_refreshed_events
-            .iter()
-            .map(|event| (event.player.clone(), event.frame))
-            .collect::<HashSet<_>>();
         let mut dodge_refreshed_events = explicit_dodge_refreshed_events;
-        dodge_refreshed_events.extend(inferred_dodge_refreshed_events.into_iter().filter(
-            |event| !explicit_dodge_refresh_keys.contains(&(event.player.clone(), event.frame)),
-        ));
+        dodge_refreshed_events.extend(inferred_dodge_refreshed_events);
         dodge_refreshed_events.sort_by_key(|event| event.counter_value);
 
         (
@@ -6051,6 +6080,221 @@ mod tests {
             frame_events.dodge_refreshed_events[0].player,
             RemoteId::SplitScreen(0)
         );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn duplicate_explicit_live_dodge_refresh_counters_are_suppressed_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 180.0,
+        })];
+        let dodge_refreshes = [
+            SaDodgeRefreshedEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                is_team_0: 1,
+                counter_value: 7,
+            },
+            SaDodgeRefreshedEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                is_team_0: 1,
+                counter_value: 7,
+            },
+        ];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.dodge_refreshes = dodge_refreshes.as_ptr();
+        frame.dodge_refresh_count = dodge_refreshes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
+        assert_eq!(frame_events.dodge_refreshed_events[0].counter_value, 7);
+        assert_eq!(
+            frame_events.dodge_refreshed_events[0].player,
+            RemoteId::SplitScreen(0)
+        );
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn explicit_live_dodge_refresh_counters_are_monotonic_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 180.0,
+        })];
+        let first_dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 7,
+        }];
+        let second_dodge_refreshes = [
+            SaDodgeRefreshedEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                is_team_0: 1,
+                counter_value: 7,
+            },
+            SaDodgeRefreshedEvent {
+                timing: SaEventTiming::default(),
+                player_index: 0,
+                is_team_0: 1,
+                counter_value: 8,
+            },
+        ];
+        let mut first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        let mut second = live_frame(
+            2,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        first.dodge_refreshes = first_dodge_refreshes.as_ptr();
+        first.dodge_refresh_count = first_dodge_refreshes.len();
+        second.dodge_refreshes = second_dodge_refreshes.as_ptr();
+        second.dodge_refresh_count = second_dodge_refreshes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.dodge_refreshed_events.len(), 1);
+        assert_eq!(frame_events.dodge_refreshed_events[0].counter_value, 8);
+        assert_eq!(frame_events.dodge_refreshed_events[0].frame, 2);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn stale_explicit_live_dodge_refresh_suppresses_inferred_duplicate() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at(SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 180.0,
+        })];
+        let first_dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 7,
+        }];
+        let stale_dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 7,
+        }];
+        let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 10.0,
+            has_closest_approach_distance: 1,
+        }];
+        let mut first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        let mut second = live_frame(
+            2,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3 {
+                    x: 300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            ),
+            &players,
+        );
+        first.dodge_refreshes = first_dodge_refreshes.as_ptr();
+        first.dodge_refresh_count = first_dodge_refreshes.len();
+        second.touches = touches.as_ptr();
+        second.touch_count = touches.len();
+        second.dodge_refreshes = stale_dodge_refreshes.as_ptr();
+        second.dodge_refresh_count = stale_dodge_refreshes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events.len(), 1);
+        assert!(frame_events.dodge_refreshed_events.is_empty());
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
