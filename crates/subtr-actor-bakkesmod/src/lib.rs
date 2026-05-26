@@ -414,6 +414,7 @@ struct SaLiveEventGenerator {
     live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
     active_demos: Vec<SaActiveDemo>,
+    boost_pad_pickup_sequence_times: HashMap<(String, u8), f32>,
     last_goal_event: Option<GoalEvent>,
 }
 
@@ -1135,28 +1136,22 @@ fn explicit_dodge_refreshed_events(
         .collect()
 }
 
-fn explicit_boost_pad_events(frame: &FrameInfo, events: &[SaBoostPadEvent]) -> Vec<BoostPadEvent> {
-    events
-        .iter()
-        .map(|event| {
-            let (frame_number, time) = event_frame_and_time(frame, event.timing);
-            BoostPadEvent {
-                time,
-                frame: frame_number,
-                pad_id: event.pad_id.to_string(),
-                player: (event.has_player != 0).then_some(player_id(event.player_index)),
-                kind: match event.kind {
-                    SaBoostPadEventKind::PickedUp => BoostPadEventKind::PickedUp {
-                        sequence: event.sequence,
-                    },
-                    SaBoostPadEventKind::Available => BoostPadEventKind::Available,
-                },
-            }
-        })
-        .collect()
-}
-
+const MIN_BOOST_PAD_RESPAWN_SECONDS: f32 = 4.0;
 const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
+
+fn boost_pad_pickup_sequence_is_recent(
+    sequence_times: &HashMap<(String, u8), f32>,
+    pad_id: &str,
+    sequence: u8,
+    event_time: f32,
+) -> bool {
+    sequence_times
+        .get(&(pad_id.to_owned(), sequence))
+        .is_some_and(|last_time| {
+            let elapsed = event_time - *last_time;
+            (0.0..MIN_BOOST_PAD_RESPAWN_SECONDS).contains(&elapsed)
+        })
+}
 
 fn goal_event_is_duplicate(previous: &GoalEvent, candidate: &GoalEvent) -> bool {
     match (
@@ -1347,6 +1342,44 @@ impl SaLiveEventGenerator {
             .collect()
     }
 
+    fn explicit_boost_pad_events(
+        &mut self,
+        frame: &FrameInfo,
+        events: &[SaBoostPadEvent],
+    ) -> Vec<BoostPadEvent> {
+        let mut boost_pad_events = Vec::new();
+        for event in events {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            let pad_id = event.pad_id.to_string();
+            let kind = match event.kind {
+                SaBoostPadEventKind::PickedUp => {
+                    if boost_pad_pickup_sequence_is_recent(
+                        &self.boost_pad_pickup_sequence_times,
+                        &pad_id,
+                        event.sequence,
+                        time,
+                    ) {
+                        continue;
+                    }
+                    self.boost_pad_pickup_sequence_times
+                        .insert((pad_id.clone(), event.sequence), time);
+                    BoostPadEventKind::PickedUp {
+                        sequence: event.sequence,
+                    }
+                }
+                SaBoostPadEventKind::Available => BoostPadEventKind::Available,
+            };
+            boost_pad_events.push(BoostPadEvent {
+                time,
+                frame: frame_number,
+                pad_id,
+                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                kind,
+            });
+        }
+        boost_pad_events
+    }
+
     fn explicit_goal_events(
         &mut self,
         frame: &FrameInfo,
@@ -1392,7 +1425,8 @@ impl SaLiveEventGenerator {
         let has_explicit_dodge_refreshed_events = !explicit_dodge_refreshed_events.is_empty();
         let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
         let active_demos = self.sync_active_demos(frame, explicit_events.demolishes);
-        let boost_pad_events = explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
+        let boost_pad_events =
+            self.explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
         let player_stat_events =
             explicit_player_stat_events(frame, explicit_events.player_stat_events);
         let goal_events = self.explicit_goal_events(frame, explicit_events.goals);
@@ -6420,6 +6454,149 @@ mod tests {
         assert_eq!(player_frame.players[1].match_saves, Some(3));
         assert_eq!(player_frame.players[1].match_shots, Some(4));
         assert_eq!(player_frame.players[1].match_score, Some(101));
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn duplicate_explicit_live_boost_pickup_sequences_are_suppressed_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 1024.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let boost_pad_events = [
+            SaBoostPadEvent {
+                timing: SaEventTiming::default(),
+                pad_id: 34,
+                kind: SaBoostPadEventKind::PickedUp,
+                sequence: 7,
+                player_index: 0,
+                has_player: 1,
+            },
+            SaBoostPadEvent {
+                timing: SaEventTiming::default(),
+                pad_id: 34,
+                kind: SaBoostPadEventKind::PickedUp,
+                sequence: 7,
+                player_index: 0,
+                has_player: 1,
+            },
+        ];
+        let mut frame = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 1024.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.boost_pad_events = boost_pad_events.as_ptr();
+        frame.boost_pad_event_count = boost_pad_events.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.boost_pad_events.len(), 1);
+        assert_eq!(frame_events.boost_pad_events[0].pad_id, "34");
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn explicit_live_boost_pickup_sequence_can_repeat_after_respawn_window() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [player_at_index(
+            0,
+            true,
+            SaVec3 {
+                x: 1024.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        )];
+        let first_boost_pad_events = [SaBoostPadEvent {
+            timing: SaEventTiming::default(),
+            pad_id: 34,
+            kind: SaBoostPadEventKind::PickedUp,
+            sequence: 7,
+            player_index: 0,
+            has_player: 1,
+        }];
+        let mut first = live_frame(
+            1,
+            rigid_body(
+                SaVec3 {
+                    x: 1024.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        first.boost_pad_events = first_boost_pad_events.as_ptr();
+        first.boost_pad_event_count = first_boost_pad_events.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+
+        let second_boost_pad_events = [SaBoostPadEvent {
+            timing: SaEventTiming {
+                frame_number: 50,
+                time: 5.0,
+                seconds_remaining: 295,
+                has_timing: 1,
+                has_seconds_remaining: 1,
+            },
+            pad_id: 34,
+            kind: SaBoostPadEventKind::PickedUp,
+            sequence: 7,
+            player_index: 0,
+            has_player: 1,
+        }];
+        let mut second = live_frame(
+            50,
+            rigid_body(
+                SaVec3 {
+                    x: 1024.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        second.boost_pad_events = second_boost_pad_events.as_ptr();
+        second.boost_pad_event_count = second_boost_pad_events.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.boost_pad_events.len(), 1);
+        assert_eq!(frame_events.boost_pad_events[0].frame, 50);
+        assert_eq!(frame_events.boost_pad_events[0].time, 5.0);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
