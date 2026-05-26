@@ -338,12 +338,6 @@ pub struct SaEngine {
     emitted_mechanic_ids: HashSet<String>,
     emitted_team_event_ids: HashSet<String>,
     emitted_goal_context_ids: HashSet<String>,
-    events_json: Vec<u8>,
-    frame_json: Vec<u8>,
-    timeline_json: Vec<u8>,
-    stats_json: Vec<u8>,
-    analysis_nodes_json: Vec<u8>,
-    event_history_json: Vec<u8>,
     graph_info_json: Vec<u8>,
     timeline_frames: Vec<ReplayStatsFrame>,
     pending_events: Vec<SaMechanicEvent>,
@@ -416,12 +410,6 @@ impl Default for SaEngine {
             emitted_mechanic_ids: HashSet::new(),
             emitted_team_event_ids: HashSet::new(),
             emitted_goal_context_ids: HashSet::new(),
-            events_json: Vec::new(),
-            frame_json: Vec::new(),
-            timeline_json: Vec::new(),
-            stats_json: Vec::new(),
-            analysis_nodes_json: Vec::new(),
-            event_history_json: Vec::new(),
             graph_info_json,
             timeline_frames: Vec::new(),
             pending_events: Vec::new(),
@@ -2396,19 +2384,6 @@ unsafe fn serialize_named_stats_module_config(
     }
 }
 
-fn live_graph_output_bytes<'a>(engine: &'a SaEngine, output_name: &str) -> Option<&'a [u8]> {
-    match output_name {
-        "events" => Some(&engine.events_json),
-        "frame" => Some(&engine.frame_json),
-        "timeline" => Some(&engine.timeline_json),
-        "stats" => Some(&engine.stats_json),
-        "analysis_nodes" => Some(&engine.analysis_nodes_json),
-        "event_history" => Some(&engine.event_history_json),
-        "graph_info" => Some(&engine.graph_info_json),
-        _ => None,
-    }
-}
-
 fn serialize_live_event_history(engine: &SaEngine) -> Vec<u8> {
     let active_demos: Vec<_> = engine
         .live_events
@@ -2433,18 +2408,39 @@ fn serialize_live_event_history(engine: &SaEngine) -> Vec<u8> {
     .unwrap_or_default()
 }
 
-fn refresh_timeline_graph_views(engine: &mut SaEngine) {
+fn current_timeline_events(graph: &AnalysisGraph) -> Option<ReplayStatsTimelineEvents> {
+    graph
+        .state::<StatsTimelineEventsState>()
+        .map(|state| state.events.clone())
+}
+
+fn serialize_live_graph_output(engine: &SaEngine, output_name: &str) -> Option<Vec<u8>> {
+    match output_name {
+        "events" => current_timeline_events(&engine.graph)
+            .map(|events| serde_json::to_vec(&events).unwrap_or_default()),
+        "frame" => current_timeline_frame(&engine.graph)
+            .map(|frame| serde_json::to_vec(&frame).unwrap_or_default()),
+        "timeline" => current_timeline_events(&engine.graph).map(|events| {
+            serialize_live_timeline(
+                engine.live_replay_meta.as_ref(),
+                events,
+                engine.timeline_frames.clone(),
+            )
+        }),
+        "stats" => Some(serialize_stats_graph_snapshot(engine)),
+        "analysis_nodes" => Some(serialize_analysis_nodes_snapshot(engine)),
+        "event_history" => Some(serialize_live_event_history(engine)),
+        "graph_info" => Some(engine.graph_info_json.clone()),
+        _ => None,
+    }
+}
+
+fn refresh_timeline_graph_state(engine: &mut SaEngine) {
     let Some(events) = engine
         .graph
         .state::<StatsTimelineEventsState>()
         .map(|state| state.events.clone())
     else {
-        engine.events_json.clear();
-        engine.frame_json.clear();
-        engine.timeline_json.clear();
-        engine.stats_json.clear();
-        engine.analysis_nodes_json.clear();
-        engine.event_history_json = serialize_live_event_history(engine);
         return;
     };
     push_drainable_events_from_timeline(
@@ -2456,22 +2452,9 @@ fn refresh_timeline_graph_views(engine: &mut SaEngine) {
         &mut engine.emitted_goal_context_ids,
         &events,
     );
-    engine.events_json = serde_json::to_vec(&events).unwrap_or_default();
-
     if let Some(frame) = current_timeline_frame(&engine.graph) {
         record_timeline_frame(&mut engine.timeline_frames, frame.clone());
-        engine.frame_json = serde_json::to_vec(&frame).unwrap_or_default();
-    } else {
-        engine.frame_json.clear();
     }
-    engine.timeline_json = serialize_live_timeline(
-        engine.live_replay_meta.as_ref(),
-        events,
-        engine.timeline_frames.clone(),
-    );
-    engine.stats_json = serialize_stats_graph_snapshot(engine);
-    engine.analysis_nodes_json = serialize_analysis_nodes_snapshot(engine);
-    engine.event_history_json = serialize_live_event_history(engine);
 }
 
 /// Creates an opaque live-analysis engine.
@@ -2532,7 +2515,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_finish(engine: *mut SaEngine) -> 
     if engine.graph.finish().is_err() {
         return -2;
     }
-    refresh_timeline_graph_views(engine);
+    refresh_timeline_graph_state(engine);
     0
 }
 
@@ -2591,7 +2574,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
 
     engine.live_events = live_events;
     engine.live_event_history = live_event_history;
-    refresh_timeline_graph_views(engine);
+    refresh_timeline_graph_state(engine);
     0
 }
 
@@ -2656,7 +2639,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_events_json_len(engine: *const SaEngine) -> usize {
     engine
         .as_ref()
-        .map(|engine| engine.events_json.len())
+        .and_then(|engine| serialize_live_graph_output(engine, "events"))
+        .map(|bytes| bytes.len())
         .unwrap_or(0)
 }
 
@@ -2682,8 +2666,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
         return 0;
     }
 
-    let count = max_bytes.min(engine.events_json.len());
-    ptr::copy_nonoverlapping(engine.events_json.as_ptr(), out_bytes, count);
+    let Some(bytes) = serialize_live_graph_output(engine, "events") else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
 }
 
@@ -2700,7 +2687,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_frame_json_len(engine: *const SaEngine) -> usize {
     engine
         .as_ref()
-        .map(|engine| engine.frame_json.len())
+        .and_then(|engine| serialize_live_graph_output(engine, "frame"))
+        .map(|bytes| bytes.len())
         .unwrap_or(0)
 }
 
@@ -2726,8 +2714,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
         return 0;
     }
 
-    let count = max_bytes.min(engine.frame_json.len());
-    ptr::copy_nonoverlapping(engine.frame_json.as_ptr(), out_bytes, count);
+    let Some(bytes) = serialize_live_graph_output(engine, "frame") else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
 }
 
@@ -2745,7 +2736,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_timeline_json_len(engine: *const SaEngine) -> usize {
     engine
         .as_ref()
-        .map(|engine| engine.timeline_json.len())
+        .and_then(|engine| serialize_live_graph_output(engine, "timeline"))
+        .map(|bytes| bytes.len())
         .unwrap_or(0)
 }
 
@@ -2772,8 +2764,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
         return 0;
     }
 
-    let count = max_bytes.min(engine.timeline_json.len());
-    ptr::copy_nonoverlapping(engine.timeline_json.as_ptr(), out_bytes, count);
+    let Some(bytes) = serialize_live_graph_output(engine, "timeline") else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
 }
 
@@ -2792,7 +2787,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_json_len(engine: *const SaEngine) -> usize {
     engine
         .as_ref()
-        .map(|engine| engine.stats_json.len())
+        .and_then(|engine| serialize_live_graph_output(engine, "stats"))
+        .map(|bytes| bytes.len())
         .unwrap_or(0)
 }
 
@@ -2818,8 +2814,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_json(
         return 0;
     }
 
-    let count = max_bytes.min(engine.stats_json.len());
-    ptr::copy_nonoverlapping(engine.stats_json.as_ptr(), out_bytes, count);
+    let Some(bytes) = serialize_live_graph_output(engine, "stats") else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
     count
 }
 
@@ -2980,7 +2979,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_output_json_len(
     let Some(output_name) = c_string_arg(output_name) else {
         return 0;
     };
-    live_graph_output_bytes(engine, &output_name)
+    serialize_live_graph_output(engine, &output_name)
         .map(|bytes| bytes.len())
         .unwrap_or(0)
 }
@@ -3009,7 +3008,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
     let Some(output_name) = c_string_arg(output_name) else {
         return 0;
     };
-    let Some(bytes) = live_graph_output_bytes(engine, &output_name) else {
+    let Some(bytes) = serialize_live_graph_output(engine, &output_name) else {
         return 0;
     };
     if out_bytes.is_null() || max_bytes == 0 {

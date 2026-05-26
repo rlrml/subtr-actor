@@ -20,7 +20,6 @@ namespace {
 constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
-constexpr char TICK_EVENT[] = "Function TAGame.Car_TA.SetVehicleInput";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
 constexpr char BOOST_SPAWNED_EVENT[] = "Function TAGame.VehiclePickup_TA.EventSpawned";
@@ -1010,14 +1009,32 @@ void SubtrActorPlugin::onLoad() {
       true,
       1);
   cvarManager->registerCvar(
-      "subtr_actor_sample_every_ticks",
-      "4",
-      "Only process one live frame every N vehicle-input ticks. Use 1 for every tick.",
+      "subtr_actor_sample_interval_ms",
+      "50",
+      "Minimum elapsed game time between live frame samples.",
       true,
       true,
       1,
       true,
-      240);
+      1000);
+  cvarManager->registerCvar(
+      "subtr_actor_profile_enabled",
+      "0",
+      "Log average live sampling, graph processing, and event drain timings.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_profile_log_every",
+      "120",
+      "Number of processed live samples per profiling log line.",
+      true,
+      true,
+      1,
+      true,
+      10000);
 
   loaded = loadRustLibrary();
   if (!loaded) {
@@ -1025,8 +1042,9 @@ void SubtrActorPlugin::onLoad() {
     return;
   }
 
+  liveTickCancelled = std::make_shared<bool>(false);
   gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) { render(canvas); });
-  gameWrapper->HookEvent(TICK_EVENT, [this](std::string eventName) { tick(eventName); });
+  scheduleLiveTick();
   cvarManager->registerNotifier(
       "subtr_actor_dump_graph",
       [this](std::vector<std::string> params) { dumpGraphJson(params); },
@@ -1082,8 +1100,10 @@ void SubtrActorPlugin::onLoad() {
 }
 
 void SubtrActorPlugin::onUnload() {
+  if (liveTickCancelled) {
+    *liveTickCancelled = true;
+  }
   gameWrapper->UnregisterDrawables();
-  gameWrapper->UnhookEvent(TICK_EVENT);
   unhookGameEvents();
   unloadRustLibrary();
 }
@@ -1092,6 +1112,9 @@ void SubtrActorPlugin::hookGameEvents() {
   gameWrapper->HookEventWithCallerPost<BallWrapper>(
       BALL_TOUCH_EVENT,
       [this](BallWrapper, void *params, std::string) {
+        if (!liveProcessingEnabled()) {
+          return;
+        }
         if (!params) {
           return;
         }
@@ -1102,17 +1125,26 @@ void SubtrActorPlugin::hookGameEvents() {
   gameWrapper->HookEventWithCallerPost<ActorWrapper>(
       BOOST_PICKED_UP_EVENT,
       [this](ActorWrapper pickup, void *, std::string) {
+        if (!liveProcessingEnabled()) {
+          return;
+        }
         recordBoostPadEvent(pickup, SaBoostPadEventKindPickedUp);
       });
   gameWrapper->HookEventWithCallerPost<ActorWrapper>(
       BOOST_SPAWNED_EVENT,
       [this](ActorWrapper pickup, void *, std::string) {
+        if (!liveProcessingEnabled()) {
+          return;
+        }
         recordBoostPadEvent(pickup, SaBoostPadEventKindAvailable);
       });
 
   gameWrapper->HookEventWithCallerPost<ServerWrapper>(
       GOAL_SCORED_EVENT,
       [this](ServerWrapper server, void *params, std::string) {
+        if (!liveProcessingEnabled()) {
+          return;
+        }
         auto goal = GoalWrapper(0);
         int scoreIndex = -1;
         int assistIndex = -1;
@@ -1128,6 +1160,9 @@ void SubtrActorPlugin::hookGameEvents() {
   gameWrapper->HookEventWithCallerPost<CarWrapper>(
       CAR_DEMOLISHED_EVENT,
       [this](CarWrapper victim, void *params, std::string) {
+        if (!liveProcessingEnabled()) {
+          return;
+        }
         if (!params) {
           return;
         }
@@ -1281,14 +1316,85 @@ void SubtrActorPlugin::unloadRustLibrary() {
   drainGoalContextEvents = nullptr;
 }
 
+void SubtrActorPlugin::scheduleLiveTick(float delaySeconds) {
+  auto cancelled = liveTickCancelled;
+  gameWrapper->SetTimeout(
+      [this, cancelled](GameWrapper *) {
+        if (!cancelled || *cancelled) {
+          return;
+        }
+
+        tick("");
+        const float nextDelay = liveProcessingEnabled() ? sampleIntervalSeconds() : 0.25f;
+        scheduleLiveTick(nextDelay);
+      },
+      delaySeconds);
+}
+
+bool SubtrActorPlugin::liveProcessingEnabled() {
+  auto enabledCvar = cvarManager->getCvar("subtr_actor_enabled");
+  return static_cast<bool>(enabledCvar) && enabledCvar.getBoolValue();
+}
+
+float SubtrActorPlugin::sampleIntervalSeconds() {
+  auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
+  const float intervalMs =
+      std::clamp(static_cast<bool>(intervalCvar) ? intervalCvar.getFloatValue() : 50.0f,
+                 1.0f,
+                 1000.0f);
+  return intervalMs / 1000.0f;
+}
+
+bool SubtrActorPlugin::profileTimingEnabled() {
+  auto profileCvar = cvarManager->getCvar("subtr_actor_profile_enabled");
+  return static_cast<bool>(profileCvar) && profileCvar.getBoolValue();
+}
+
+uint64_t SubtrActorPlugin::profileLogEvery() {
+  auto logEveryCvar = cvarManager->getCvar("subtr_actor_profile_log_every");
+  return static_cast<uint64_t>(
+      std::max(1, static_cast<bool>(logEveryCvar) ? logEveryCvar.getIntValue() : 120));
+}
+
+void SubtrActorPlugin::recordProfileTiming(
+    double samplingMs,
+    double processingMs,
+    double drainMs) {
+  profileSampleCount += 1;
+  profileSamplingMs += samplingMs;
+  profileProcessingMs += processingMs;
+  profileDrainMs += drainMs;
+
+  const uint64_t logEvery = profileLogEvery();
+  if (profileSampleCount < logEvery) {
+    return;
+  }
+
+  const double divisor = static_cast<double>(profileSampleCount);
+  cvarManager->log(std::format(
+      "subtr-actor: live profile over {} samples: sample={:.3f}ms process={:.3f}ms "
+      "drain={:.3f}ms total={:.3f}ms",
+      profileSampleCount,
+      profileSamplingMs / divisor,
+      profileProcessingMs / divisor,
+      profileDrainMs / divisor,
+      (profileSamplingMs + profileProcessingMs + profileDrainMs) / divisor));
+  resetProfileTiming();
+}
+
+void SubtrActorPlugin::resetProfileTiming() {
+  profileSampleCount = 0;
+  profileSamplingMs = 0.0;
+  profileProcessingMs = 0.0;
+  profileDrainMs = 0.0;
+}
+
 void SubtrActorPlugin::tick(std::string) {
   if (!loaded || !engine) {
     return;
   }
 
-  auto enabledCvar = cvarManager->getCvar("subtr_actor_enabled");
-  const bool processingEnabled = static_cast<bool>(enabledCvar) && enabledCvar.getBoolValue();
-  if (!processingEnabled) {
+  if (!liveProcessingEnabled()) {
     if (wasInGame && engineReset) {
       finishAndDrainPendingEvents("live processing disabled");
       engineReset(engine);
@@ -1314,16 +1420,22 @@ void SubtrActorPlugin::tick(std::string) {
   }
   wasInGame = true;
 
-  inputTickNumber += 1;
-  auto sampleEveryCvar = cvarManager->getCvar("subtr_actor_sample_every_ticks");
-  const uint64_t sampleEvery =
-      std::max(1, static_cast<bool>(sampleEveryCvar) ? sampleEveryCvar.getIntValue() : 1);
-  if (sampleEvery > 1 && (inputTickNumber % sampleEvery) != 0) {
-    return;
+  ServerWrapper server = gameWrapper->GetGameEventAsServer();
+  if (!server.IsNull()) {
+    const float now = server.GetSecondsElapsed();
+    if (lastProcessedGameTime && now >= *lastProcessedGameTime &&
+        now - *lastProcessedGameTime < sampleIntervalSeconds()) {
+      return;
+    }
+    lastProcessedGameTime = now;
   }
 
+  inputTickNumber += 1;
+  const auto sampleStarted = std::chrono::steady_clock::now();
   SaLiveFrame frame = sampleFrame();
+  const auto processStarted = std::chrono::steady_clock::now();
   const int32_t processResult = processFrame(engine, &frame);
+  const auto drainStarted = std::chrono::steady_clock::now();
   if (processResult != 0) {
     cvarManager->log(
         std::format("subtr-actor: live frame processing failed: {}", processResult));
@@ -1333,6 +1445,19 @@ void SubtrActorPlugin::tick(std::string) {
   commitPendingFrameEvents();
   clearPendingFrameEvents();
   drainPendingEvents();
+  const auto drainFinished = std::chrono::steady_clock::now();
+
+  if (profileTimingEnabled()) {
+    const double samplingMs =
+        std::chrono::duration<double, std::milli>(processStarted - sampleStarted).count();
+    const double processingMs =
+        std::chrono::duration<double, std::milli>(drainStarted - processStarted).count();
+    const double drainMs =
+        std::chrono::duration<double, std::milli>(drainFinished - drainStarted).count();
+    recordProfileTiming(samplingMs, processingMs, drainMs);
+  } else {
+    resetProfileTiming();
+  }
 }
 
 SaLiveFrame SubtrActorPlugin::sampleFrame() {
@@ -1529,6 +1654,8 @@ void SubtrActorPlugin::resetLiveState() {
   frameNumber = 0;
   inputTickNumber = 0;
   lastTime = 0.0f;
+  lastProcessedGameTime.reset();
+  resetProfileTiming();
   sampledPlayers.clear();
   sampledPlayerNames.clear();
   clearPendingFrameEvents();

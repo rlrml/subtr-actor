@@ -3,6 +3,7 @@
 #include <chrono>
 #include <deque>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -122,6 +123,12 @@ private:
   uint64_t frameNumber = 0;
   uint64_t inputTickNumber = 0;
   float lastTime = 0.0f;
+  std::optional<float> lastProcessedGameTime;
+  uint64_t profileSampleCount = 0;
+  double profileSamplingMs = 0.0;
+  double profileProcessingMs = 0.0;
+  double profileDrainMs = 0.0;
+  std::shared_ptr<bool> liveTickCancelled = std::make_shared<bool>(false);
   bool loaded = false;
   bool wasInGame = false;
   std::vector<SaPlayerFrame> sampledPlayers;
@@ -154,6 +161,13 @@ private:
   bool loadRustLibrary();
   void unloadRustLibrary();
   void tick(std::string eventName);
+  void scheduleLiveTick(float delaySeconds = 0.25f);
+  bool liveProcessingEnabled();
+  float sampleIntervalSeconds();
+  bool profileTimingEnabled();
+  uint64_t profileLogEvery();
+  void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
+  void resetProfileTiming();
   void render(CanvasWrapper canvas);
   std::string readJsonBuffer(JsonLen len, WriteJson write);
   std::string readNamedJsonBuffer(
