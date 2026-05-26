@@ -196,6 +196,7 @@ export function updateAttachedCamera(options: {
   cameraDistanceScale: number;
   customCameraSettings: CameraSettings | null;
   frameIndex: number;
+  attachedPlayerUnavailable?: boolean;
   ballPosition: THREE.Vector3 | null;
   desiredCameraPosition: THREE.Vector3;
   desiredLookTarget: THREE.Vector3;
@@ -209,6 +210,7 @@ export function updateAttachedCamera(options: {
     customCameraSettings,
     desiredCameraPosition,
     desiredLookTarget,
+    attachedPlayerUnavailable = false,
     fieldScale,
     frameIndex,
     replay,
@@ -241,7 +243,12 @@ export function updateAttachedCamera(options: {
   const attachedPlayer = replay.players.find((player) => player.id === attachedPlayerId);
   const frame = attachedPlayer?.frames[frameIndex];
 
-  if (!attachedPlayer || !frame?.position || frame.isPresent === false) {
+  if (
+    !attachedPlayer ||
+    attachedPlayerUnavailable ||
+    !frame?.position ||
+    frame.isPresent === false
+  ) {
     controls.enabled = true;
     return;
   }

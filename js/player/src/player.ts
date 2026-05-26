@@ -44,6 +44,7 @@ import type {
   ReplayPlayerSnapshot,
   ReplayPlayerState,
   ReplayPlayerStatePatch,
+  ReplayTimelineEvent,
   Vec3,
 } from "./types";
 
@@ -680,6 +681,7 @@ export class ReplayPlayer extends EventTarget {
         nextFrame?.position ?? null,
         frameWindow.alpha,
       );
+      const activeDemoEvent = this.getActiveDemoEvent(player.id, this.currentTime);
       if (!interpolatedPosition) {
         mesh.visible = false;
         if (boostTrail) {
@@ -688,9 +690,33 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        if (demoIndicator) {
-          demoIndicator.group.visible = false;
+        this.updateDemoIndicator(player.id, demoIndicator ?? null, null, activeDemoEvent);
+        renderPlayers.push({
+          track: player,
+          mesh,
+          boostTrail: boostTrail ?? null,
+          frame,
+          nextFrame,
+          interpolatedPosition: renderPosition,
+          boostFraction,
+        });
+        continue;
+      }
+
+      if (activeDemoEvent) {
+        mesh.visible = false;
+        if (boostTrail) {
+          boostTrail.visible = false;
         }
+        if (boostMeter) {
+          boostMeter.group.visible = false;
+        }
+        this.updateDemoIndicator(
+          player.id,
+          demoIndicator ?? null,
+          interpolatedPosition,
+          activeDemoEvent,
+        );
         renderPlayers.push({
           track: player,
           mesh,
@@ -804,6 +830,9 @@ export class ReplayPlayer extends EventTarget {
       cameraDistanceScale: this.cameraDistanceScale,
       customCameraSettings: this.customCameraSettings,
       frameIndex,
+      attachedPlayerUnavailable:
+        this.attachedPlayerId !== null &&
+        this.getActiveDemoEvent(this.attachedPlayerId, this.currentTime) !== null,
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
@@ -1031,7 +1060,7 @@ export class ReplayPlayer extends EventTarget {
   private getActiveDemoEvent(
     victimPlayerId: string,
     currentTime: number,
-  ): ReplayModel["timelineEvents"][number] | null {
+  ): ReplayTimelineEvent | null {
     for (let index = this.replay.timelineEvents.length - 1; index >= 0; index -= 1) {
       const event = this.replay.timelineEvents[index]!;
       const age = currentTime - event.time;
@@ -1052,12 +1081,12 @@ export class ReplayPlayer extends EventTarget {
     playerId: string,
     indicator: DemoIndicator | null,
     fallbackPosition: Vec3 | null,
+    demoEvent: ReplayTimelineEvent | null = this.getActiveDemoEvent(playerId, this.currentTime),
   ): void {
     if (!indicator) {
       return;
     }
 
-    const demoEvent = this.getActiveDemoEvent(playerId, this.currentTime);
     const position = demoEvent?.location ?? fallbackPosition;
     if (!demoEvent || !position) {
       indicator.group.visible = false;

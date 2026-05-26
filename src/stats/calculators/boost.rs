@@ -1,5 +1,7 @@
 use super::*;
 
+const DEMO_RESPAWN_WINDOW_SECONDS: f32 = 3.2;
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BoostStats {
@@ -330,9 +332,16 @@ pub struct BoostCalculator {
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
-    pending_demo_respawns: HashSet<PlayerId>,
+    pending_demo_respawns: HashMap<PlayerId, PendingDemoRespawn>,
+    demo_reset_boost_amounts: HashMap<PlayerId, f32>,
     previous_boost_levels_live: Option<bool>,
     active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PendingDemoRespawn {
+    demo_time: f32,
+    pre_demo_boost_amount: Option<f32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1349,7 +1358,13 @@ impl BoostCalculator {
             self.kickoff_respawn_awarded.clear();
         }
         for demo in &events.demo_events {
-            self.pending_demo_respawns.insert(demo.victim.clone());
+            let pre_demo_boost_amount = self.previous_boost_amounts.get(&demo.victim).copied();
+            self.pending_demo_respawns
+                .entry(demo.victim.clone())
+                .or_insert(PendingDemoRespawn {
+                    demo_time: demo.time,
+                    pre_demo_boost_amount,
+                });
         }
 
         let mut current_boost_amounts = Vec::new();
@@ -1382,8 +1397,22 @@ impl BoostCalculator {
             } else {
                 previous_boost_amount
             };
-            let demo_respawn_supported = self.pending_demo_respawns.contains(&player.player_id)
-                && player.rigid_body.is_some();
+            let pending_demo_respawn = self.pending_demo_respawns.get(&player.player_id);
+            let demo_respawn_ready = pending_demo_respawn.is_some_and(|pending| {
+                player.rigid_body.is_some()
+                    && frame.time - pending.demo_time >= DEMO_RESPAWN_WINDOW_SECONDS
+            });
+            let demo_respawn_pending = pending_demo_respawn.is_some() && !demo_respawn_ready;
+            let demo_respawn_supported = demo_respawn_ready;
+
+            if demo_respawn_pending {
+                if let Some(pending) = self.pending_demo_respawns.get_mut(&player.player_id) {
+                    pending.pre_demo_boost_amount =
+                        pending.pre_demo_boost_amount.or(previous_sample_boost_amount);
+                }
+                continue;
+            }
+
             if let Some(previous_sample_boost_amount) = previous_sample_boost_amount {
                 let reasons = Self::classify_boost_increase_reasons(
                     previous_sample_boost_amount,
@@ -1512,6 +1541,16 @@ impl BoostCalculator {
                     .insert(player.player_id.clone());
             }
             if demo_respawn_supported {
+                if let Some(pending) = self.pending_demo_respawns.get(&player.player_id) {
+                    let demo_reset_amount = pending
+                        .pre_demo_boost_amount
+                        .unwrap_or(previous_boost_amount)
+                        .max(0.0);
+                    *self
+                        .demo_reset_boost_amounts
+                        .entry(player.player_id.clone())
+                        .or_default() += demo_reset_amount;
+                }
                 respawn_amount += BOOST_KICKOFF_START_AMOUNT;
                 self.pending_demo_respawns.remove(&player.player_id);
             }
@@ -1752,6 +1791,9 @@ impl BoostCalculator {
         let mut team_zero_used = self.team_zero_stats.amount_used;
         let mut team_one_used = self.team_one_stats.amount_used;
         for player in &players.players {
+            if self.pending_demo_respawns.contains_key(&player.player_id) {
+                continue;
+            }
             let Some(boost_amount) = player.boost_amount else {
                 continue;
             };
@@ -1766,7 +1808,13 @@ impl BoostCalculator {
                 .entry(player.player_id.clone())
                 .or_default();
             let previous_amount_used = stats.amount_used;
-            let amount_used_raw = (stats.amount_obtained() - boost_amount).max(0.0);
+            let demo_reset_boost_amount = self
+                .demo_reset_boost_amounts
+                .get(&player.player_id)
+                .copied()
+                .unwrap_or(0.0);
+            let amount_used_raw =
+                (stats.amount_obtained() - demo_reset_boost_amount - boost_amount).max(0.0);
             let amount_used = amount_used_raw.max(stats.amount_used);
             if track_boost_levels {
                 let split_amount = stats.amount_used_by_vertical_band();
