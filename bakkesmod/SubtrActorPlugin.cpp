@@ -74,13 +74,28 @@ bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
          }) != params.end();
 }
 
-bool isRequiredEventHistoryField(std::string_view fieldName) {
-  return std::find_if(
-             REQUIRED_EVENT_HISTORY_FIELDS.begin(),
-             REQUIRED_EVENT_HISTORY_FIELDS.end(),
-             [fieldName](const char *candidate) {
-               return std::string_view(candidate) == fieldName;
-             }) != REQUIRED_EVENT_HISTORY_FIELDS.end();
+std::vector<std::string> defaultEventHistoryFields() {
+  std::vector<std::string> fields;
+  fields.reserve(FRAME_EVENTS_STATE_EVENT_FIELDS.size());
+  for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
+    fields.emplace_back(fieldName);
+  }
+  return fields;
+}
+
+std::vector<std::string> defaultRequiredEventHistoryFields() {
+  std::vector<std::string> fields;
+  fields.reserve(REQUIRED_EVENT_HISTORY_FIELDS.size());
+  for (const char *fieldName : REQUIRED_EVENT_HISTORY_FIELDS) {
+    fields.emplace_back(fieldName);
+  }
+  return fields;
+}
+
+bool containsString(const std::vector<std::string> &values, std::string_view value) {
+  return std::find_if(values.begin(), values.end(), [value](const std::string &candidate) {
+           return candidate == value;
+         }) != values.end();
 }
 
 void skipJsonWhitespace(const std::string &json, size_t &offset) {
@@ -2425,6 +2440,42 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     }
     outputNames.assign(VERIFY_GRAPH_OUTPUTS.begin(), VERIFY_GRAPH_OUTPUTS.end());
   }
+  std::vector<std::string> eventHistoryFieldNames =
+      parseJsonStringArrayProperty(graphInfoJson, "event_history_field_names");
+  if (eventHistoryFieldNames.empty()) {
+    if (!graphInfoJson.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not read event_history field names from graph_info");
+    }
+    eventHistoryFieldNames = defaultEventHistoryFields();
+  }
+  std::vector<std::string> requiredEventHistoryFieldNames =
+      parseJsonStringArrayProperty(graphInfoJson, "required_event_history_field_names");
+  if (requiredEventHistoryFieldNames.empty()) {
+    if (!graphInfoJson.empty()) {
+      ok = false;
+      cvarManager->log(
+          "subtr-actor: graph verification could not read required event_history field names from graph_info");
+    }
+    requiredEventHistoryFieldNames = defaultRequiredEventHistoryFields();
+  }
+  bool requiredEventHistoryFieldNotDeclared = false;
+  for (const std::string &fieldName : requiredEventHistoryFieldNames) {
+    if (!containsString(eventHistoryFieldNames, fieldName)) {
+      ok = false;
+      requiredEventHistoryFieldNotDeclared = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification required event_history field '{}' is not declared",
+          fieldName));
+    }
+  }
+  if (!requiredEventHistoryFieldNotDeclared) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares {} event_history fields and {} required cumulative event fields",
+        eventHistoryFieldNames.size(),
+        requiredEventHistoryFieldNames.size()));
+  }
 
   std::string analysisNodesJson;
   std::string eventHistoryJson;
@@ -2637,7 +2688,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
   } else {
     std::sort(frameEventKeys.begin(), frameEventKeys.end());
     bool missingEventField = false;
-    for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
+    for (const std::string &fieldName : eventHistoryFieldNames) {
       if (!std::binary_search(frameEventKeys.begin(), frameEventKeys.end(), fieldName)) {
         ok = false;
         missingEventField = true;
@@ -2662,7 +2713,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     if (!missingEventField) {
       cvarManager->log(std::format(
           "subtr-actor: frame_events_state exposes {} live event fields",
-          FRAME_EVENTS_STATE_EVENT_FIELDS.size()));
+          eventHistoryFieldNames.size()));
     }
   }
 
@@ -2675,11 +2726,11 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     std::sort(eventHistoryKeys.begin(), eventHistoryKeys.end());
     bool missingEventHistoryField = false;
     bool missingRequiredEventHistory = false;
-    for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
+    for (const std::string &fieldName : eventHistoryFieldNames) {
       if (!std::binary_search(eventHistoryKeys.begin(), eventHistoryKeys.end(), fieldName)) {
         ok = false;
         missingEventHistoryField = true;
-        if (requireEventHistory && isRequiredEventHistoryField(fieldName)) {
+        if (requireEventHistory && containsString(requiredEventHistoryFieldNames, fieldName)) {
           missingRequiredEventHistory = true;
         }
         cvarManager->log(std::format(
@@ -2690,7 +2741,7 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
       const auto eventCount = parseJsonArrayPropertyElementCount(eventHistoryJson, fieldName);
       if (!eventCount) {
         ok = false;
-        if (requireEventHistory && isRequiredEventHistoryField(fieldName)) {
+        if (requireEventHistory && containsString(requiredEventHistoryFieldNames, fieldName)) {
           missingRequiredEventHistory = true;
         }
         cvarManager->log(std::format(
@@ -2702,7 +2753,8 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
           "subtr-actor: event_history event field '{}' has {} cumulative entries",
           fieldName,
           *eventCount));
-      if (requireEventHistory && isRequiredEventHistoryField(fieldName) && *eventCount == 0) {
+      if (requireEventHistory && containsString(requiredEventHistoryFieldNames, fieldName) &&
+          *eventCount == 0) {
         ok = false;
         missingRequiredEventHistory = true;
         cvarManager->log(std::format(
@@ -2713,9 +2765,10 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     if (!missingEventHistoryField) {
       cvarManager->log(std::format(
           "subtr-actor: event_history exposes {} cumulative live event fields",
-          FRAME_EVENTS_STATE_EVENT_FIELDS.size()));
+          eventHistoryFieldNames.size()));
     }
-    if (requireEventHistory && !missingRequiredEventHistory && !missingEventHistoryField) {
+    if (requireEventHistory && !requiredEventHistoryFieldNotDeclared &&
+        !missingRequiredEventHistory && !missingEventHistoryField) {
       cvarManager->log(
           "subtr-actor: event_history required cumulative event fields are nonzero");
     }

@@ -360,6 +360,23 @@ const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
     "event_history",
     "graph_info",
 ];
+const LIVE_EVENT_HISTORY_FIELD_NAMES: &[&str] = &[
+    "active_demos",
+    "demo_events",
+    "boost_pad_events",
+    "touch_events",
+    "dodge_refreshed_events",
+    "player_stat_events",
+    "goal_events",
+];
+const REQUIRED_EVENT_HISTORY_FIELD_NAMES: &[&str] = &[
+    "demo_events",
+    "boost_pad_events",
+    "touch_events",
+    "dodge_refreshed_events",
+    "player_stat_events",
+    "goal_events",
+];
 
 impl Default for SaEngine {
     fn default() -> Self {
@@ -404,6 +421,8 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
         "callable_analysis_node_names": callable_analysis_node_names,
         "builtin_stats_module_names": builtin_stats_module_names(),
         "graph_output_names": LIVE_GRAPH_OUTPUT_NAMES,
+        "event_history_field_names": LIVE_EVENT_HISTORY_FIELD_NAMES,
+        "required_event_history_field_names": REQUIRED_EVENT_HISTORY_FIELD_NAMES,
         "node_names": node_names,
         "dag": dag,
     }))
@@ -5757,6 +5776,40 @@ mod tests {
                 "graph info should expose graph output {output_name}"
             );
         }
+        let event_history_fields = value["event_history_field_names"]
+            .as_array()
+            .expect("event history field names should be an array");
+        assert_eq!(
+            event_history_fields.len(),
+            LIVE_EVENT_HISTORY_FIELD_NAMES.len()
+        );
+        for field_name in LIVE_EVENT_HISTORY_FIELD_NAMES {
+            assert!(
+                event_history_fields.iter().any(|name| name == field_name),
+                "graph info should expose event_history field {field_name}"
+            );
+        }
+        let required_event_history_fields = value["required_event_history_field_names"]
+            .as_array()
+            .expect("required event history field names should be an array");
+        assert_eq!(
+            required_event_history_fields.len(),
+            REQUIRED_EVENT_HISTORY_FIELD_NAMES.len()
+        );
+        for field_name in REQUIRED_EVENT_HISTORY_FIELD_NAMES {
+            assert!(
+                required_event_history_fields
+                    .iter()
+                    .any(|name| name == field_name),
+                "graph info should expose required event_history field {field_name}"
+            );
+        }
+        assert!(
+            !required_event_history_fields
+                .iter()
+                .any(|name| name == "active_demos"),
+            "active_demos is current state and should not be required as cumulative history"
+        );
         let node_names = value["node_names"]
             .as_array()
             .expect("node names should be an array");
@@ -6756,10 +6809,7 @@ mod tests {
             "bulk analysis_nodes output should include the callable frame_events_state payload"
         );
         let event_history = live_graph_output_json_value(engine, "event_history");
-        assert_eq!(
-            event_history["touch_events"].as_array().unwrap().len(),
-            1
-        );
+        assert_eq!(event_history["touch_events"].as_array().unwrap().len(), 1);
         assert_eq!(
             event_history["dodge_refreshed_events"]
                 .as_array()
@@ -6768,16 +6818,10 @@ mod tests {
             1
         );
         assert_eq!(
-            event_history["boost_pad_events"]
-                .as_array()
-                .unwrap()
-                .len(),
+            event_history["boost_pad_events"].as_array().unwrap().len(),
             1
         );
-        assert_eq!(
-            event_history["goal_events"].as_array().unwrap().len(),
-            1
-        );
+        assert_eq!(event_history["goal_events"].as_array().unwrap().len(), 1);
         assert_eq!(
             event_history["player_stat_events"]
                 .as_array()
@@ -6785,14 +6829,8 @@ mod tests {
                 .len(),
             1
         );
-        assert_eq!(
-            event_history["demo_events"].as_array().unwrap().len(),
-            1
-        );
-        assert_eq!(
-            event_history["active_demos"].as_array().unwrap().len(),
-            1
-        );
+        assert_eq!(event_history["demo_events"].as_array().unwrap().len(), 1);
+        assert_eq!(event_history["active_demos"].as_array().unwrap().len(), 1);
         let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
         assert!(json_len > 0);
         let mut event_json_bytes = vec![0; json_len];
@@ -8506,10 +8544,7 @@ mod tests {
             live_stats_json_value(engine)
         );
         let event_history = live_graph_output_json_value(engine, "event_history");
-        assert_eq!(
-            event_history["touch_events"].as_array().unwrap().len(),
-            1
-        );
+        assert_eq!(event_history["touch_events"].as_array().unwrap().len(), 1);
         assert_eq!(
             event_history["touch_events"][0]["frame"],
             serde_json::json!(1)

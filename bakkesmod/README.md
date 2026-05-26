@@ -60,7 +60,8 @@ events, dodge-refresh transitions, and control state:
 - cumulative raw live event-family history through the `event_history` named
   graph output, using `subtr_actor_bakkesmod_graph_output_json_len` and
   `subtr_actor_bakkesmod_write_graph_output_json`
-- the resolved graph DAG, callable node registry, builtin node registry, and stats module registry through
+- the resolved graph DAG, callable node registry, builtin node registry, stats
+  module registry, and Rust-declared live event-history field registry through
   `subtr_actor_bakkesmod_graph_info_json_len` and
   `subtr_actor_bakkesmod_write_graph_info_json`
 
@@ -153,6 +154,10 @@ acceptance check for live graph callability and event-generation parity.
    `graph-info.json` should list `analysis_nodes` and `event_history` in
    `graph_output_names`, and `callable_analysis_node_names` should match the names verified by
    `subtr_actor_verify_graph`.
+   It should also list `event_history_field_names` and
+   `required_event_history_field_names`; the verifier uses those Rust-declared
+   registries when checking `frame_events_state` and cumulative `event_history`
+   fields.
    `graph-analysis-nodes.json` should contain keys for every node reported by
    `callable_analysis_node_names`.
    `graph-event-history.json` should contain cumulative raw live event-family

@@ -79,6 +79,10 @@ jobs:
           Assert-Contains $pluginText "Function TAGame.GameEvent_Soccar_TA.EventGoalScored" "BakkesMod goal scored event hook"
           Assert-Contains $pluginText "Function TAGame.Car_TA.Demolish" "BakkesMod demolition event hook"
           Assert-Contains $pluginText "verified {} graph outputs by name" "BakkesMod graph output registry verification"
+          Assert-Contains $pluginText "graph_info declares {} event_history fields and {} required cumulative event fields" "BakkesMod Rust-declared event history registry verification"
+          Assert-Contains $pluginText "could not read event_history field names from graph_info" "BakkesMod event history registry diagnostics"
+          Assert-Contains $pluginText "could not read required event_history field names from graph_info" "BakkesMod required event history registry diagnostics"
+          Assert-Contains $pluginText "required event_history field '{}' is not declared" "BakkesMod required event history declaration diagnostics"
           Assert-Contains $pluginText "matches fixed ABI" "BakkesMod named/fixed graph output verification"
           Assert-Contains $pluginText "differs from named output" "BakkesMod named/fixed graph output mismatch diagnostics"
           Assert-Contains $pluginText "verified {} builtin stats modules by name" "BakkesMod stats module registry verification"
@@ -123,6 +127,8 @@ jobs:
           Assert-Contains $rustText "builtin_analysis_node_names" "builtin analysis-node registry"
           Assert-Contains $rustText "analysis_nodes" "analysis_nodes graph output"
           Assert-Contains $rustText "event_history" "event_history graph output"
+          Assert-Contains $rustText "event_history_field_names" "event_history graph info field registry"
+          Assert-Contains $rustText "required_event_history_field_names" "event_history graph info required field registry"
           Assert-Contains $rustText "stats_timeline_events" "stats timeline analysis node"
 
       - name: Upload plugin artifacts
