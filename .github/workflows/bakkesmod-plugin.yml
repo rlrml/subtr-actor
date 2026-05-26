@@ -31,9 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate graph dump helper
+      - name: Validate BakkesMod helper scripts
         run: |
-          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py
+          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py bakkesmod/verify-rust-dll-exports.py
           python bakkesmod/verify-plugin-source.py
 
       - name: Install Rust
@@ -70,6 +70,7 @@ jobs:
           if ((Get-FileHash $rustDll).Hash -ne (Get-FileHash $installRustDll).Hash) {
             throw "Install layout Rust DLL differs from primary Rust DLL"
           }
+          python bakkesmod/verify-rust-dll-exports.py $rustDll $installRustDll
 
           function Read-ArtifactText([string]$Path) {
             $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $Path))
