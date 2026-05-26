@@ -903,6 +903,75 @@ std::string mechanicLabel(SaMechanicKind kind) {
   }
 }
 
+std::string normalizeEventFilterToken(std::string_view token) {
+  std::string normalized;
+  normalized.reserve(token.size());
+  bool previousSeparator = false;
+  for (const char ch : token) {
+    const unsigned char value = static_cast<unsigned char>(ch);
+    if (std::isalnum(value) != 0) {
+      normalized.push_back(static_cast<char>(std::tolower(value)));
+      previousSeparator = false;
+      continue;
+    }
+    if ((ch == '_' || ch == '-' || std::isspace(value) != 0) && !previousSeparator &&
+        !normalized.empty()) {
+      normalized.push_back('_');
+      previousSeparator = true;
+    }
+  }
+  if (!normalized.empty() && normalized.back() == '_') {
+    normalized.pop_back();
+  }
+  return normalized;
+}
+
+std::string mechanicToken(SaMechanicKind kind) {
+  return normalizeEventFilterToken(mechanicLabel(kind));
+}
+
+bool eventFilterAllows(
+    std::string_view rawFilter,
+    std::string_view category,
+    std::string_view type) {
+  const std::string normalizedCategory = normalizeEventFilterToken(category);
+  const std::string normalizedType = normalizeEventFilterToken(type);
+  std::string token;
+  bool sawToken = false;
+
+  auto flushToken = [&]() {
+    if (token.empty()) {
+      return false;
+    }
+    sawToken = true;
+    const bool allowed = token == "all" || token == normalizedCategory ||
+                         token == normalizedType ||
+                         token == std::format("{}_{}", normalizedCategory, normalizedType);
+    token.clear();
+    return allowed;
+  };
+
+  for (const char ch : rawFilter) {
+    const unsigned char value = static_cast<unsigned char>(ch);
+    if (ch == ',' || ch == ';' || ch == '|' || std::isspace(value) != 0) {
+      if (flushToken()) {
+        return true;
+      }
+      continue;
+    }
+    if (std::isalnum(value) != 0) {
+      token.push_back(static_cast<char>(std::tolower(value)));
+    } else if ((ch == '_' || ch == '-') && !token.empty() && token.back() != '_') {
+      token.push_back('_');
+    }
+  }
+
+  if (flushToken()) {
+    return true;
+  }
+  return !sawToken;
+}
+
 std::string teamEventLabel(const SaTeamEvent &event) {
   switch (event.kind) {
   case SaTeamEventKindRush:
@@ -1071,6 +1140,84 @@ void SubtrActorPlugin::onLoad() {
       true,
       1);
   cvarManager->registerCvar(
+      "subtr_actor_overlay_x",
+      "64",
+      "Subtr-actor overlay panel X position.",
+      true,
+      true,
+      0,
+      true,
+      10000);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_y",
+      "240",
+      "Subtr-actor overlay panel Y position.",
+      true,
+      true,
+      0,
+      true,
+      10000);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_scale",
+      "1",
+      "Subtr-actor overlay text scale.",
+      true,
+      true,
+      0.5,
+      true,
+      3);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_message_seconds",
+      "3",
+      "Seconds to keep subtr-actor event messages visible.",
+      true,
+      true,
+      0.5,
+      true,
+      30);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_max_messages",
+      "8",
+      "Maximum subtr-actor event messages to keep on screen.",
+      true,
+      true,
+      1,
+      true,
+      30);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_mechanics_enabled",
+      "1",
+      "Show individual mechanic events in the subtr-actor overlay.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_team_events_enabled",
+      "1",
+      "Show team-level events in the subtr-actor overlay.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_goal_context_enabled",
+      "1",
+      "Show goal-context events in the subtr-actor overlay.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_event_types",
+      "all",
+      "Comma-separated overlay filter: all, mechanics, team, goal_context, or mechanic "
+      "tokens like speed_flip,wavedash,half_flip.",
+      true);
+  cvarManager->registerCvar(
       "subtr_actor_sample_interval_ms",
       "8",
       "Minimum elapsed game time between live frame samples.",
@@ -1155,6 +1302,18 @@ void SubtrActorPlugin::onLoad() {
       "Feeds a synthetic live frame with every required event family, then runs "
       "strict graph verification against a temporary Rust engine. Pass 'dump' "
       "to also write synthetic graph JSON snapshots.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_overlay_options",
+      [this](std::vector<std::string>) {
+        cvarManager->log(
+            "subtr-actor overlay filters: all, mechanics, team, goal_context, speed_flip, "
+            "half_flip, wavedash, ball_carry, air_dribble, ceiling_shot, wall_aerial, "
+            "wall_aerial_shot, center, flip_reset, double_tap, flick, musty_flick, "
+            "one_timer, pass, half_volley, whiff, bump, backboard, boost_pickup, demo, "
+            "shot, save, assist, goal");
+      },
+      "Logs supported values for subtr_actor_overlay_event_types.",
       PERMISSION_ALL);
   hookGameEvents();
 
@@ -1427,6 +1586,31 @@ float SubtrActorPlugin::sampleIntervalSeconds() {
                  1.0f,
                  1000.0f);
   return intervalMs / 1000.0f;
+}
+
+int SubtrActorPlugin::overlayX() {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_x");
+  return std::clamp(static_cast<bool>(cvar) ? cvar.getIntValue() : 64, 0, 10000);
+}
+
+int SubtrActorPlugin::overlayY() {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_y");
+  return std::clamp(static_cast<bool>(cvar) ? cvar.getIntValue() : 240, 0, 10000);
+}
+
+float SubtrActorPlugin::overlayScale() {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_scale");
+  return std::clamp(static_cast<bool>(cvar) ? cvar.getFloatValue() : 1.0f, 0.5f, 3.0f);
+}
+
+float SubtrActorPlugin::overlayMessageSeconds() {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_message_seconds");
+  return std::clamp(static_cast<bool>(cvar) ? cvar.getFloatValue() : 3.0f, 0.5f, 30.0f);
+}
+
+int SubtrActorPlugin::overlayMaxMessages() {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_max_messages");
+  return std::clamp(static_cast<bool>(cvar) ? cvar.getIntValue() : 8, 1, 30);
 }
 
 bool SubtrActorPlugin::profileTimingEnabled() {
@@ -1794,6 +1978,10 @@ void SubtrActorPlugin::populatePlayerFromPri(
   sampledPlayerNames.push_back(pri.GetPlayerName().ToString());
   player.player_name = sampledPlayerNames.back().c_str();
   player.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
+  if (!sampledPlayerNames.back().empty()) {
+    playerNamesByIndex[playerIndex] = sampledPlayerNames.back();
+  }
+  playerTeamsByIndex[playerIndex] = player.is_team_0;
   player.has_match_stats = 1;
   player.match_goals = pri.GetMatchGoals();
   player.match_assists = pri.GetMatchAssists();
@@ -1819,6 +2007,8 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
     playerIndex = player.player_index;
   } else {
     nextPlayerIndex = std::max(nextPlayerIndex, playerIndex + 1);
+    playerNamesByIndex.try_emplace(playerIndex, std::format("Player {}", playerIndex + 1));
+    playerTeamsByIndex.try_emplace(playerIndex, player.is_team_0);
   }
   carPlayerIndices[car.memory_address] = playerIndex;
   recordDodgeRefreshFromJumpState(car, playerIndex, player.is_team_0);
@@ -1858,6 +2048,8 @@ void SubtrActorPlugin::resetLiveState() {
   priPlayerIndices.clear();
   uniqueIdPlayerIndices.clear();
   stablePriPlayerIndices.clear();
+  playerNamesByIndex.clear();
+  playerTeamsByIndex.clear();
   lastPlayerStats.clear();
   suppressedPlayerStatDeltas.clear();
   lastDoubleJumped.clear();
@@ -3657,46 +3849,130 @@ void SubtrActorPlugin::drainPendingEvents() {
   } while (count == 16);
 }
 
+bool SubtrActorPlugin::overlayCategoryEnabled(std::string_view category) {
+  const std::string normalizedCategory = normalizeEventFilterToken(category);
+  if (normalizedCategory == "mechanics") {
+    auto cvar = cvarManager->getCvar("subtr_actor_overlay_mechanics_enabled");
+    if (static_cast<bool>(cvar) && !cvar.getBoolValue()) {
+      return false;
+    }
+  } else if (normalizedCategory == "team") {
+    auto cvar = cvarManager->getCvar("subtr_actor_overlay_team_events_enabled");
+    if (static_cast<bool>(cvar) && !cvar.getBoolValue()) {
+      return false;
+    }
+  } else if (normalizedCategory == "goal_context") {
+    auto cvar = cvarManager->getCvar("subtr_actor_overlay_goal_context_enabled");
+    if (static_cast<bool>(cvar) && !cvar.getBoolValue()) {
+      return false;
+    }
+  }
+
+  auto filterCvar = cvarManager->getCvar("subtr_actor_overlay_event_types");
+  const std::string filter =
+      static_cast<bool>(filterCvar) ? filterCvar.getStringValue() : "all";
+  return eventFilterAllows(filter, normalizedCategory, normalizedCategory);
+}
+
+bool SubtrActorPlugin::overlayMechanicEnabled(SaMechanicKind kind) {
+  auto cvar = cvarManager->getCvar("subtr_actor_overlay_mechanics_enabled");
+  if (static_cast<bool>(cvar) && !cvar.getBoolValue()) {
+    return false;
+  }
+  auto filterCvar = cvarManager->getCvar("subtr_actor_overlay_event_types");
+  const std::string filter =
+      static_cast<bool>(filterCvar) ? filterCvar.getStringValue() : "all";
+  return eventFilterAllows(filter, "mechanics", mechanicToken(kind));
+}
+
+std::string SubtrActorPlugin::teamLabel(uint8_t isTeam0) const {
+  return isTeam0 != 0 ? "Blue" : "Orange";
+}
+
+std::string SubtrActorPlugin::playerLabel(uint32_t playerIndex, uint8_t isTeam0) const {
+  const auto name = playerNamesByIndex.find(playerIndex);
+  if (name != playerNamesByIndex.end() && !name->second.empty()) {
+    return name->second;
+  }
+  const auto team = playerTeamsByIndex.find(playerIndex);
+  const uint8_t labelTeam = team == playerTeamsByIndex.end() ? isTeam0 : team->second;
+  return std::format("{} #{}", teamLabel(labelTeam), playerIndex + 1);
+}
+
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
+  if (!overlayMechanicEnabled(event.kind)) {
+    return;
+  }
+
   const bool isBlue = event.is_team_0 != 0;
-  const std::string label = event.confidence < 0.999f
-                                ? std::format(
-                                      "{} ({:.0f}%)",
-                                      mechanicLabel(event.kind),
-                                      event.confidence * 100.0f)
-                                : mechanicLabel(event.kind);
+  const std::string action = event.confidence < 0.999f
+                                 ? std::format(
+                                       "{} ({:.0f}%)",
+                                       mechanicLabel(event.kind),
+                                       event.confidence * 100.0f)
+                                 : mechanicLabel(event.kind);
+  const std::string label =
+      std::format("{}: {}", playerLabel(event.player_index, event.is_team_0), action);
   OverlayMessage message{
       label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
-      std::chrono::steady_clock::now() + std::chrono::seconds(2),
+      std::chrono::steady_clock::now() +
+          std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+              std::chrono::duration<float>(overlayMessageSeconds())),
   };
   messages.push_back(message);
+  while (messages.size() > static_cast<size_t>(overlayMaxMessages())) {
+    messages.pop_front();
+  }
 }
 
 void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
+  if (!overlayCategoryEnabled("team")) {
+    return;
+  }
+
   const bool isBlue = event.is_team_0 != 0;
-  const std::string label = event.confidence < 0.999f
-                                ? std::format(
-                                      "{} ({:.0f}%)",
-                                      teamEventLabel(event),
-                                      event.confidence * 100.0f)
-                                : teamEventLabel(event);
+  const std::string action = event.confidence < 0.999f
+                                 ? std::format(
+                                       "{} ({:.0f}%)",
+                                       teamEventLabel(event),
+                                       event.confidence * 100.0f)
+                                 : teamEventLabel(event);
+  const std::string label = std::format("{}: {}", teamLabel(event.is_team_0), action);
   OverlayMessage message{
       label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
-      std::chrono::steady_clock::now() + std::chrono::seconds(2),
+      std::chrono::steady_clock::now() +
+          std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+              std::chrono::duration<float>(overlayMessageSeconds())),
   };
   messages.push_back(message);
+  while (messages.size() > static_cast<size_t>(overlayMaxMessages())) {
+    messages.pop_front();
+  }
 }
 
 void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &event) {
+  if (!overlayCategoryEnabled("goal_context")) {
+    return;
+  }
+
   const bool isBlue = event.scoring_team_is_team_0 != 0;
+  const std::string actor =
+      event.has_scorer != 0
+          ? playerLabel(event.scorer_index, event.scoring_team_is_team_0)
+          : teamLabel(event.scoring_team_is_team_0);
   OverlayMessage message{
-      goalContextLabel(event),
+      std::format("{}: {}", actor, goalContextLabel(event)),
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
-      std::chrono::steady_clock::now() + std::chrono::seconds(2),
+      std::chrono::steady_clock::now() +
+          std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+              std::chrono::duration<float>(overlayMessageSeconds())),
   };
   messages.push_back(message);
+  while (messages.size() > static_cast<size_t>(overlayMaxMessages())) {
+    messages.pop_front();
+  }
 }
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {
@@ -3706,6 +3982,20 @@ void SubtrActorPlugin::render(CanvasWrapper canvas) {
   auto statusOverlayEnabledCvar = cvarManager->getCvar("subtr_actor_status_overlay_enabled");
   const bool statusOverlayEnabled = !static_cast<bool>(statusOverlayEnabledCvar) ||
                                     statusOverlayEnabledCvar.getBoolValue();
+  const float scale = overlayScale();
+  const int lineHeight = static_cast<int>(std::round(24.0f * scale));
+  const int messageLineHeight =
+      static_cast<int>(std::round(static_cast<float>(lineHeight) * 1.25f));
+  const Vector2 panelPosition{overlayX(), overlayY()};
+
+  if (overlayEnabled) {
+    const auto now = std::chrono::steady_clock::now();
+    while (!messages.empty() && messages.front().expires_at <= now) {
+      messages.pop_front();
+    }
+  }
+
+  std::optional<std::pair<std::string, LinearColor>> statusLine;
 
   if (statusOverlayEnabled) {
     const bool processingEnabled = liveProcessingEnabled();
@@ -3724,27 +4014,58 @@ void SubtrActorPlugin::render(CanvasWrapper canvas) {
                                  frameNumber,
                                  intervalMs)
                            : "subtr-actor ON | waiting for game";
-    canvas.SetPosition(Vector2{64, 240});
-    canvas.SetColor((processingEnabled || replayAnnotationActive)
-                        ? LinearColor{80, 255, 150, 255}
-                        : LinearColor{180, 180, 180, 255});
-    canvas.DrawString(status, 1.0f, 1.0f, true);
+    statusLine = std::pair{
+        status,
+        (processingEnabled || replayAnnotationActive) ? LinearColor{80, 255, 150, 255}
+                                                      : LinearColor{180, 180, 180, 255}};
+  }
+
+  if (!statusLine && (!overlayEnabled || messages.empty())) {
+    return;
+  }
+
+  float panelWidth = 0.0f;
+  int panelHeight = 0;
+  if (statusLine) {
+    panelWidth =
+        std::max(panelWidth, canvas.GetStringSize(statusLine->first, scale, scale).X);
+    panelHeight += lineHeight;
+  }
+  if (overlayEnabled) {
+    for (const OverlayMessage &message : messages) {
+      panelWidth = std::max(
+          panelWidth,
+          canvas.GetStringSize(message.text, scale * 1.25f, scale * 1.25f).X);
+      panelHeight += messageLineHeight;
+    }
+  }
+
+  constexpr float panelPaddingX = 12.0f;
+  constexpr float panelPaddingY = 10.0f;
+  canvas.SetPosition(Vector2F{
+      static_cast<float>(panelPosition.X) - panelPaddingX,
+      static_cast<float>(panelPosition.Y) - panelPaddingY});
+  canvas.SetColor(LinearColor{8, 12, 16, 180});
+  canvas.FillBox(Vector2F{
+      panelWidth + panelPaddingX * 2.0f,
+      static_cast<float>(panelHeight) + panelPaddingY * 2.0f});
+
+  Vector2 position = panelPosition;
+  if (statusLine) {
+    canvas.SetPosition(position);
+    canvas.SetColor(statusLine->second);
+    canvas.DrawString(statusLine->first, scale, scale, true);
+    position.Y += lineHeight;
   }
 
   if (!overlayEnabled) {
     return;
   }
 
-  const auto now = std::chrono::steady_clock::now();
-  while (!messages.empty() && messages.front().expires_at <= now) {
-    messages.pop_front();
-  }
-
-  Vector2 position{64, 280};
   for (const OverlayMessage &message : messages) {
     canvas.SetPosition(position);
     canvas.SetColor(message.color);
-    canvas.DrawString(message.text, 1.4f, 1.4f, true);
-    position.Y += 34;
+    canvas.DrawString(message.text, scale * 1.25f, scale * 1.25f, true);
+    position.Y += messageLineHeight;
   }
 }

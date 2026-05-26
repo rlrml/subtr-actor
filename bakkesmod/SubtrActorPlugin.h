@@ -155,6 +155,8 @@ private:
   std::unordered_map<uintptr_t, uint32_t> priPlayerIndices;
   std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
+  std::unordered_map<uint32_t, std::string> playerNamesByIndex;
+  std::unordered_map<uint32_t, uint8_t> playerTeamsByIndex;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> suppressedPlayerStatDeltas;
   std::unordered_map<uint32_t, bool> lastDoubleJumped;
@@ -180,6 +182,11 @@ private:
   bool liveProcessingEnabled();
   bool replayAnnotationsEnabled();
   float sampleIntervalSeconds();
+  int overlayX();
+  int overlayY();
+  float overlayScale();
+  float overlayMessageSeconds();
+  int overlayMaxMessages();
   bool profileTimingEnabled();
   uint64_t profileLogEvery();
   void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
@@ -204,6 +211,10 @@ private:
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);
+  bool overlayCategoryEnabled(std::string_view category);
+  bool overlayMechanicEnabled(SaMechanicKind kind);
+  std::string playerLabel(uint32_t playerIndex, uint8_t isTeam0) const;
+  std::string teamLabel(uint8_t isTeam0) const;
   bool finishAndDrainPendingEvents(std::string_view context);
   void drainPendingEvents();
   SaLiveFrame sampleFrame();
