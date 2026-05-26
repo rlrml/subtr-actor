@@ -3946,10 +3946,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   }
 
   const now = performance.now();
-  if (
-    state.playing &&
-    now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS
-  ) {
+  if (state.playing && now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS) {
     return;
   }
   lastPlayingSnapshotUiUpdateAt = now;

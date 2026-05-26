@@ -194,6 +194,58 @@ fn bump_detector_requires_clear_victim_impulse() {
 }
 
 #[test]
+fn bump_detector_requires_initiator_slowdown() {
+    let mut calculator = BumpCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(0.0, 0.0, 17.0),
+                    glam::Vec3::new(1200.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(260.0, 0.0, 17.0),
+                    glam::Vec3::ZERO,
+                ),
+            ]),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(1, 0.1),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(120.0, 0.0, 17.0),
+                    glam::Vec3::new(1200.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(300.0, 0.0, 17.0),
+                    glam::Vec3::new(700.0, 0.0, 0.0),
+                ),
+            ]),
+            &FrameEventsState::default(),
+            true,
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().is_empty());
+}
+
+#[test]
 fn bump_detector_suppresses_active_fifty_fifty_pair() {
     let mut calculator = BumpCalculator::new();
     let initiator_id = boxcars::RemoteId::Steam(1);
