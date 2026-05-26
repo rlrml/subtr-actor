@@ -14,6 +14,7 @@ import {
   buildGoalTagTimelineEvents,
   buildHalfFlipTimelineEvents,
   buildHalfVolleyTimelineEvents,
+  buildMechanicPlaylistEvents,
   buildMechanicTimelineEvents,
   buildMustyFlickTimelineEvents,
   buildOneTimerTimelineEvents,
@@ -28,8 +29,6 @@ import {
   buildWhiffTimelineEvents,
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
-  getMechanicTimelineEventModuleIds,
-  getMechanicTimelineModuleIds,
   getReplayTimelineEventKinds,
 } from "./timelineMarkers.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
@@ -66,7 +65,7 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
   );
 });
 
-test("buildMechanicTimelineEvents maps endpoint mechanics to markers at the end frame", () => {
+test("buildMechanicTimelineEvents skips span mechanics", () => {
   const replay = {
     frames: Array.from({ length: 4 }, (_, time) => ({ time })),
     players: [
@@ -93,23 +92,24 @@ test("buildMechanicTimelineEvents maps endpoint mechanics to markers at the end 
         },
         properties: [],
       },
+      {
+        id: "flick:1:3:0",
+        kind: "flick",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 3,
+          start_time: 1,
+          end_time: 3,
+        },
+        properties: [],
+      },
     ],
   });
 
-  assert.deepEqual(buildMechanicTimelineEvents(statsTimeline, replay, ["double_tap"]), [
-    {
-      id: "double_tap:1:3:0",
-      time: 3,
-      frame: 3,
-      kind: "double_tap",
-      label: "Blue double tap",
-      shortLabel: "DT",
-      playerId: "Steam:blue-id",
-      playerName: "Blue",
-      isTeamZero: true,
-      color: "#3b82f6",
-    },
-  ]);
+  assert.deepEqual(buildMechanicTimelineEvents(statsTimeline, replay, ["double_tap", "flick"]), []);
 });
 
 test("buildMechanicTimelineEvents maps flip reset mechanics to moment markers", () => {
@@ -156,7 +156,7 @@ test("buildMechanicTimelineEvents maps flip reset mechanics to moment markers", 
   ]);
 });
 
-test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
+test("buildMechanicTimelineEvents skips all span mechanics regardless kind", () => {
   const replay = {
     frames: Array.from({ length: 4 }, (_, time) => ({ time })),
     players: [
@@ -220,27 +220,23 @@ test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
       "ball_carry",
       "double_tap",
     ]).map((event) => event.id),
-    ["double_tap:1:3:0"],
+    [],
   );
 });
 
-test("mechanic module id helpers separate event mechanics from all mechanic-backed modules", () => {
+test("buildMechanicPlaylistEvents includes span mechanics at their end time", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
   const statsTimeline = createLegacyStatsTimeline({
     mechanic_events: [
-      {
-        id: "ball_carry:1:3:0",
-        kind: "ball_carry",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 1,
-          end_frame: 3,
-          start_time: 1,
-          end_time: 3,
-        },
-        properties: [],
-      },
       {
         id: "double_tap:1:3:0",
         kind: "double_tap",
@@ -255,154 +251,23 @@ test("mechanic module id helpers separate event mechanics from all mechanic-back
         },
         properties: [],
       },
-      {
-        id: "wall_aerial:2:5:0",
-        kind: "wall_aerial",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 2,
-          end_frame: 5,
-          start_time: 2,
-          end_time: 5,
-        },
-        properties: [],
-      },
-      {
-        id: "center:3:6:0",
-        kind: "center",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 3,
-          end_frame: 6,
-          start_time: 3,
-          end_time: 6,
-        },
-        properties: [],
-      },
-      {
-        id: "flip_reset:4:0",
-        kind: "flip_reset",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "moment",
-          frame: 4,
-          time: 4,
-        },
-        properties: [],
-      },
-      {
-        id: "half_volley:5:0",
-        kind: "half_volley",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "moment",
-          frame: 5,
-          time: 5,
-        },
-        properties: [],
-      },
-      {
-        id: "pass:2:5:0",
-        kind: "pass",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 2,
-          end_frame: 5,
-          start_time: 2,
-          end_time: 5,
-        },
-        properties: [],
-      },
-      {
-        id: "wavedash:4:0",
-        kind: "wavedash",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "moment",
-          frame: 4,
-          time: 4,
-        },
-        properties: [],
-      },
     ],
   });
 
-  assert.deepEqual(
-    [...getMechanicTimelineEventModuleIds(statsTimeline)],
-    ["center", "double-tap", "flip-reset", "half-volley", "pass", "wall-aerial"],
-  );
-  assert.deepEqual(
-    [...getMechanicTimelineModuleIds(statsTimeline)],
-    ["ball-carry", "center", "double-tap", "flip-reset", "half-volley", "pass", "wall-aerial"],
-  );
-});
-
-test("countEnabledTimelineEvents ignores module markers owned by mechanic events", () => {
-  const replay = {
-    timelineEvents: [],
-    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
-    players: [
-      {
-        id: "Steam:blue-id",
-        name: "Blue",
-      },
-    ],
-  } as ReplayModel;
-
-  const statsTimeline = createLegacyStatsTimeline({
-    mechanic_events: [
-      {
-        id: "wall_aerial:2:5:0",
-        kind: "wall_aerial",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 2,
-          end_frame: 5,
-          start_time: 2,
-          end_time: 5,
-        },
-        properties: [],
-      },
-    ],
-    wall_aerial_events: [
-      {
-        time: 5,
-        frame: 5,
-        player: { Steam: "blue-id" },
-        is_team_0: true,
-        wall: "side",
-        wall_contact_time: 2,
-        wall_contact_frame: 2,
-        takeoff_time: 3,
-        takeoff_frame: 3,
-        time_since_takeoff: 2,
-        wall_contact_position: [4096, -300, 220],
-        takeoff_position: [4070, -330, 300],
-        player_position: [3600, -500, 820],
-        ball_position: [3700, -520, 900],
-        setup_start_time: 1,
-        setup_start_frame: 1,
-        setup_duration: 1,
-        ball_speed: 1400,
-        ball_speed_change: 260,
-        goal_alignment: 0.69,
-        confidence: 0.74,
-      },
-    ],
-  });
-
-  assert.equal(countEnabledTimelineEvents(["wall-aerial"], replay, statsTimeline), 0);
+  assert.deepEqual(buildMechanicPlaylistEvents(statsTimeline, replay, ["double_tap"]), [
+    {
+      id: "double_tap:1:3:0:playlist",
+      time: 3,
+      frame: 3,
+      kind: "double_tap",
+      label: "Blue double tap",
+      shortLabel: "DT",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
 });
 
 test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () => {
@@ -1432,6 +1297,64 @@ test("buildWhiffTimelineEvents labels beaten-to-ball events separately", () => {
   ]);
 });
 
+test("countEnabledTimelineEvents ignores mechanic-backed module ids", () => {
+  const replay = {
+    timelineEvents: [{ kind: "goal", time: 10 }],
+    frames: Array.from({ length: 3 }, (_, time) => ({ time })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+  } as ReplayModel;
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "flick:1:2:0",
+        kind: "flick",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 1,
+          end_frame: 2,
+          start_time: 1,
+          end_time: 2,
+        },
+        properties: [],
+      },
+    ],
+    frames: [
+      {
+        frame_number: 2,
+        time: 2,
+        dt: 0.1,
+        team_zero: {},
+        team_one: {},
+        players: [
+          {
+            player_id: { Steam: "blue-id" },
+            name: "Blue",
+            is_team_0: true,
+            flick: {
+              count: 1,
+              high_confidence_count: 1,
+              is_last_flick: true,
+              last_flick_time: 2,
+              last_flick_frame: 2,
+              time_since_last_flick: 0,
+              frames_since_last_flick: 0,
+              last_confidence: 0.8,
+              best_confidence: 0.8,
+              cumulative_confidence: 0.8,
+              cumulative_setup_duration: 1,
+              cumulative_ball_speed_change: 400,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(countEnabledTimelineEvents(["flick"], replay, statsTimeline), 1);
+});
+
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [
@@ -1919,7 +1842,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         "wall-aerial-shot",
         "center",
         "double-tap",
-        "goal-tags",
         "one-timer",
         "pass",
         "touch",
@@ -1936,6 +1858,6 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       replay,
       statsTimeline,
     ),
-    22,
+    21,
   );
 });

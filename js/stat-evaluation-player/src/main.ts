@@ -16,6 +16,7 @@ import type {
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayTimelineEvent,
+  ReplayTimelineRange,
   ReplayPlayerState,
   ReplayPlayerTrack,
   PlaylistManifestPage,
@@ -43,14 +44,11 @@ import type {
 import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import {
-  countEnabledTimelineEvents,
+  buildMechanicPlaylistEvents,
   buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
   formatMechanicKind,
-  buildGoalTagTimelineEvents,
   getMechanicKinds,
-  getMechanicTimelineModuleIds,
-  getNonMechanicTimelineEventModuleIds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
@@ -141,7 +139,7 @@ const MODULES = createStatModules(
 );
 
 let activeModules: StatModule[] = [];
-let activeTimelineEventModuleIds = new Set<string>();
+let activeTimelineEventSourceIds = new Set<string>();
 let activeTimelineRangeModuleIds = new Set<string>();
 let activeMechanicTimelineKinds = new Set<string>();
 let activeRenderEffectModuleIds = new Set<string>();
@@ -157,7 +155,6 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
 ]);
 const TOUCH_MODULE_ID = "touch";
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
-const MECHANIC_RANGE_SOURCE_ID = "mechanics:ranges";
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -174,6 +171,21 @@ interface EventWindowSourceDefinition {
   id: string;
   label: string;
   buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
+}
+
+interface EventTimelineSource {
+  id: string;
+  playlistId: string;
+  timelineKey: string;
+  timelineId: string;
+  group: string;
+  label: string;
+  count: number;
+  active: boolean;
+  buildTimelineEvents(): ReplayTimelineEvent[];
+  buildPlaylistEvents(): ReplayTimelineEvent[];
+  buildTimelineRanges?(): ReplayTimelineRange[];
+  setActive(enabled: boolean): void;
 }
 
 interface EventPlaylistSource {
@@ -210,15 +222,7 @@ const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
   },
 ];
 
-const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
-  {
-    id: "goal-tags",
-    label: "Goal Tags",
-    buildEvents(ctx) {
-      return buildGoalTagTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-  },
-];
+const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [];
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -454,19 +458,19 @@ let mechanicsReviewBoundaryGuard = false;
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
-    ...activeTimelineEventModuleIds,
+    ...activeTimelineEventSourceIds,
     ...activeTimelineRangeModuleIds,
     ...activeRenderEffectModuleIds,
   ]);
 }
 
-function getActiveTimelineEventModuleIds(): Set<string> {
-  return getNonMechanicTimelineEventModuleIds(activeTimelineEventModuleIds, statsTimeline);
+function getActiveTimelineEventSourceIds(): Set<string> {
+  return new Set(activeTimelineEventSourceIds);
 }
 
 function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
   return kind === "events"
-    ? activeTimelineEventModuleIds
+    ? activeTimelineEventSourceIds
     : kind === "ranges"
       ? activeTimelineRangeModuleIds
       : activeRenderEffectModuleIds;
@@ -494,8 +498,8 @@ function setupActiveModules(): void {
   const ctx = getModuleContext();
   if (!ctx) return;
 
-  const activeModuleIds = getActiveModuleIds();
-  activeModules = MODULES.filter((mod) => activeModuleIds.has(mod.id));
+  const activeSourceIds = getActiveModuleIds();
+  activeModules = MODULES.filter((mod) => activeSourceIds.has(mod.id));
   boostPickupFilters.setup(ctx);
 
   for (const mod of activeModules) {
@@ -518,7 +522,7 @@ function setupActiveModules(): void {
 function migrateMechanicBackedTimelineEventSelections(): void {
   for (const kind of getMechanicKinds(statsTimeline)) {
     const moduleId = mechanicKindToModuleId(kind);
-    if (activeTimelineEventModuleIds.delete(moduleId)) {
+    if (activeTimelineEventSourceIds.delete(moduleId)) {
       activeMechanicTimelineKinds.add(kind);
     }
   }
@@ -605,54 +609,19 @@ function syncTimelineEvents(): void {
   if (!timelineOverlay || !ctx) {
     return;
   }
-  const activeEventModuleIds = getActiveTimelineEventModuleIds();
 
-  for (const mod of activeModules) {
-    if (!activeEventModuleIds.has(mod.id)) {
+  for (const source of getEventTimelineSources(ctx)) {
+    if (!source.active) {
       continue;
     }
-    const events = mod.getTimelineEvents?.(ctx);
-    if (!events || events.length === 0) {
-      continue;
-    }
+    const events = source.buildTimelineEvents();
+    if (events.length === 0) continue;
 
     timelineSourceRemovers.set(
-      mod.id,
+      source.timelineKey,
       timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
-        id: `module:${mod.id}`,
-        label: mod.label,
-      }),
-    );
-  }
-
-  for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
-    if (!activeTimelineEventModuleIds.has(source.id)) {
-      continue;
-    }
-    const events = source.buildEvents(ctx);
-    if (events.length === 0) {
-      continue;
-    }
-
-    timelineSourceRemovers.set(
-      `events:${source.id}`,
-      timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
-        id: `events:${source.id}`,
+        id: source.timelineId,
         label: source.label,
-      }),
-    );
-  }
-
-  for (const kind of activeMechanicTimelineKinds) {
-    const mechanicEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    if (mechanicEvents.length === 0) {
-      continue;
-    }
-    timelineSourceRemovers.set(
-      `mechanics:events:${kind}`,
-      timelineOverlay.addEventSource(withTimelineEventSeekTimes(mechanicEvents), {
-        id: `mechanics:${kind}`,
-        label: formatMechanicKind(kind),
       }),
     );
   }
@@ -679,43 +648,36 @@ function syncTimelineRanges(): void {
     );
   }
 
-  const mechanicRanges = buildMechanicTimelineRanges(
-    ctx.statsTimeline,
-    ctx.replay,
-    activeMechanicTimelineKinds,
-  );
-  if (mechanicRanges.length > 0) {
-    timelineRangeSourceRemovers.set(
-      MECHANIC_RANGE_SOURCE_ID,
-      timelineOverlay.addRangeSource(mechanicRanges),
-    );
+  for (const source of getEventTimelineSources(ctx)) {
+    if (!source.active || !source.buildTimelineRanges) {
+      continue;
+    }
+    const ranges = source.buildTimelineRanges();
+    if (ranges.length === 0) continue;
+    timelineRangeSourceRemovers.set(source.timelineKey, timelineOverlay.addRangeSource(ranges));
   }
 
   timelineOverlay.refreshRanges();
 }
 
 function renderTimelineEventCount(): void {
-  if (!replayPlayer || !statsTimeline) {
+  const ctx = getModuleContext();
+  if (!ctx) {
     eventsReadout.textContent = "--";
     return;
   }
 
-  const mechanicEventCount = buildMechanicTimelineEvents(
-    statsTimeline,
-    replayPlayer.replay,
-    activeMechanicTimelineKinds,
-  ).length;
-  const mechanicRangeCount = buildMechanicTimelineRanges(
-    statsTimeline,
-    replayPlayer.replay,
-    activeMechanicTimelineKinds,
-  ).length;
+  eventsReadout.textContent = `${countVisibleTimelineSources(ctx)}`;
+}
 
-  eventsReadout.textContent = `${
-    countEnabledTimelineEvents(activeTimelineEventModuleIds, replayPlayer.replay, statsTimeline) +
-    mechanicEventCount +
-    mechanicRangeCount
-  }`;
+function countVisibleTimelineSources(ctx: StatModuleContext): number {
+  const goalCount = ctx.replay.timelineEvents.filter((event) => event.kind === "goal").length;
+  return (
+    goalCount +
+    getEventTimelineSources(ctx)
+      .filter((source) => source.active)
+      .reduce((count, source) => count + source.count, 0)
+  );
 }
 
 function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
@@ -866,7 +828,7 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
     playback: getPlaybackConfigSnapshot(),
     camera: getCameraConfigSnapshot(),
     overlays: {
-      timelineEvents: [...activeTimelineEventModuleIds],
+      timelineEvents: [...activeTimelineEventSourceIds],
       timelineRanges: [...activeTimelineRangeModuleIds],
       mechanics: [...activeMechanicTimelineKinds],
       renderEffects: [...activeRenderEffectModuleIds],
@@ -948,7 +910,7 @@ function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
-  activeTimelineEventModuleIds = new Set(config.overlays.timelineEvents);
+  activeTimelineEventSourceIds = new Set(config.overlays.timelineEvents);
   activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
   activeMechanicTimelineKinds = new Set(config.overlays.mechanics);
   migrateMechanicBackedTimelineEventSelections();
@@ -1166,7 +1128,6 @@ function renderModuleSummary(): void {
 
   const timelineToggles: HTMLButtonElement[] = [];
   const inGameVisualizationToggles: HTMLButtonElement[] = [];
-  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
 
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -1174,7 +1135,7 @@ function renderModuleSummary(): void {
       continue;
     }
 
-    if (mod.getTimelineEvents && !mechanicModuleIds.has(mod.id)) {
+    if (mod.getTimelineEvents) {
       timelineToggles.push(
         renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
       );
@@ -1235,35 +1196,9 @@ function renderEventTimelineControls(): void {
   mechanicsTimelineWindowBody.replaceChildren();
 
   const ctx = getModuleContext();
-  const kinds = getMechanicKinds(statsTimeline);
-  const mechanicCounts = new Map<string, number>();
-  for (const event of statsTimeline?.events.mechanics ?? []) {
-    mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
-  }
-  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
+  const sources = getEventTimelineSources(ctx);
 
-  const moduleEventSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
-  ).map((mod) => ({
-    id: mod.id,
-    label: mod.label,
-    count: ctx ? (mod.getTimelineEvents?.(ctx).length ?? 0) : 0,
-  }));
-  const replayEventSources = REPLAY_EVENT_SOURCE_DEFINITIONS.map((source) => ({
-    id: source.id,
-    label: source.label,
-    count: ctx ? source.buildEvents(ctx).length : 0,
-  }));
-  const extraEventSources = EXTRA_EVENT_SOURCE_DEFINITIONS.map((source) => ({
-    id: source.id,
-    label: source.label,
-    count: ctx ? source.buildEvents(ctx).length : 0,
-  }));
-  const eventSourceIds = [...replayEventSources, ...moduleEventSources, ...extraEventSources]
-    .filter((source) => source.count > 0)
-    .map((source) => source.id);
-
-  if (eventSourceIds.length === 0 && kinds.length === 0) {
+  if (sources.length === 0) {
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
     empty.textContent = "No events loaded.";
@@ -1278,10 +1213,9 @@ function renderEventTimelineControls(): void {
   allButton.type = "button";
   allButton.className = "module-summary-item";
   allButton.addEventListener("click", () => {
-    for (const id of eventSourceIds) {
-      activeTimelineEventModuleIds.add(id);
+    for (const source of sources) {
+      source.setActive(true);
     }
-    activeMechanicTimelineKinds = new Set(kinds);
     setupActiveModules();
     syncTimelineEvents();
     syncTimelineRanges();
@@ -1294,15 +1228,16 @@ function renderEventTimelineControls(): void {
   const allName = document.createElement("span");
   allName.textContent = "All events";
   const allCount = document.createElement("strong");
-  allCount.textContent = `${eventSourceIds.length + kinds.length}`;
+  allCount.textContent = `${sources.length}`;
   allButton.append(allName, allCount);
 
   const noneButton = document.createElement("button");
   noneButton.type = "button";
   noneButton.className = "module-summary-item";
   noneButton.addEventListener("click", () => {
-    activeTimelineEventModuleIds.clear();
-    activeMechanicTimelineKinds.clear();
+    for (const source of sources) {
+      source.setActive(false);
+    }
     setupActiveModules();
     syncTimelineEvents();
     syncTimelineRanges();
@@ -1321,54 +1256,8 @@ function renderEventTimelineControls(): void {
   actions.append(allButton, noneButton);
   mechanicsTimelineWindowBody.append(actions);
 
-  const replayList = renderEventSourceList("Replay", replayEventSources);
-  if (replayList) {
-    mechanicsTimelineWindowBody.append(replayList);
-  }
-
-  const moduleList = renderEventSourceList("Stats", [...moduleEventSources, ...extraEventSources]);
-  if (moduleList) {
-    mechanicsTimelineWindowBody.append(moduleList);
-  }
-
-  if (kinds.length > 0) {
-    const mechanicsHeading = document.createElement("h3");
-    mechanicsHeading.className = "module-settings-eyebrow";
-    mechanicsHeading.textContent = "Mechanics";
-    mechanicsTimelineWindowBody.append(mechanicsHeading);
-
-    const list = document.createElement("div");
-    list.className = "module-list mechanics-list";
-    for (const kind of kinds) {
-      const active = activeMechanicTimelineKinds.has(kind);
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "module-summary-item";
-      item.dataset.active = active ? "true" : "false";
-      item.setAttribute("aria-pressed", active ? "true" : "false");
-      item.addEventListener("click", () => {
-        if (activeMechanicTimelineKinds.has(kind)) {
-          activeMechanicTimelineKinds.delete(kind);
-        } else {
-          activeMechanicTimelineKinds.add(kind);
-        }
-        syncTimelineEvents();
-        syncTimelineRanges();
-        renderEventTimelineControls();
-        renderTimelineEventCount();
-        scheduleConfigUrlUpdate();
-      });
-
-      const name = document.createElement("span");
-      name.textContent = formatMechanicKind(kind);
-
-      const state = document.createElement("strong");
-      state.textContent = `${active ? "On" : "Off"} ${mechanicCounts.get(kind) ?? 0}`;
-
-      item.append(name, state);
-      list.append(item);
-    }
-
+  const list = renderEventSourceList(sources);
+  if (list) {
     mechanicsTimelineWindowBody.append(list);
   }
 }
@@ -1377,32 +1266,152 @@ function renderMechanicsTimelineControls(): void {
   renderEventTimelineControls();
 }
 
-function renderEventSourceList(
-  label: string,
-  sources: Array<{ id: string; label: string; count: number }>,
-): HTMLElement | null {
-  const availableSources = sources.filter((source) => source.count > 0);
-  if (availableSources.length === 0) {
+function getEventTimelineSources(ctx: StatModuleContext | null): EventTimelineSource[] {
+  if (!ctx) {
+    return [];
+  }
+
+  const sources: EventTimelineSource[] = [];
+  for (const source of REPLAY_EVENT_SOURCE_DEFINITIONS) {
+    const events = source.buildEvents(ctx);
+    const count = events.length;
+    if (count === 0) {
+      continue;
+    }
+    sources.push({
+      id: source.id,
+      playlistId: `replay:${source.id}`,
+      timelineKey: `events:${source.id}`,
+      timelineId: `events:${source.id}`,
+      group: "Replay",
+      label: source.label,
+      count,
+      active: activeTimelineEventSourceIds.has(source.id),
+      buildTimelineEvents() {
+        return events;
+      },
+      buildPlaylistEvents() {
+        return events;
+      },
+      setActive(enabled) {
+        toggleCapability(source.id, "events", enabled);
+      },
+    });
+  }
+
+  for (const mod of MODULES.filter((module) => module.getTimelineEvents)) {
+    const events = mod.getTimelineEvents?.(ctx) ?? [];
+    const count = events.length;
+    if (count === 0) {
+      continue;
+    }
+    sources.push({
+      id: mod.id,
+      playlistId: `module:${mod.id}`,
+      timelineKey: `module:${mod.id}`,
+      timelineId: `module:${mod.id}`,
+      group: "Stats",
+      label: mod.label,
+      count,
+      active: activeTimelineEventSourceIds.has(mod.id),
+      buildTimelineEvents() {
+        return events;
+      },
+      buildPlaylistEvents() {
+        return events;
+      },
+      setActive(enabled) {
+        toggleCapability(mod.id, "events", enabled);
+      },
+    });
+  }
+
+  for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
+    const events = source.buildEvents(ctx);
+    const count = events.length;
+    if (count === 0) {
+      continue;
+    }
+    sources.push({
+      id: source.id,
+      playlistId: `extra:${source.id}`,
+      timelineKey: `extra:${source.id}`,
+      timelineId: `extra:${source.id}`,
+      group: "Stats",
+      label: source.label,
+      count,
+      active: activeTimelineEventSourceIds.has(source.id),
+      buildTimelineEvents() {
+        return events;
+      },
+      buildPlaylistEvents() {
+        return events;
+      },
+      setActive(enabled) {
+        toggleCapability(source.id, "events", enabled);
+      },
+    });
+  }
+
+  for (const kind of getMechanicKinds(ctx.statsTimeline)) {
+    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
+    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
+    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
+    const count = timelineEvents.length + timelineRanges.length;
+    if (count === 0) {
+      continue;
+    }
+    sources.push({
+      id: `mechanic:${kind}`,
+      playlistId: `mechanic:${kind}`,
+      timelineKey: `mechanic:${kind}`,
+      timelineId: `mechanic:${kind}`,
+      group: "Mechanics",
+      label: formatMechanicKind(kind),
+      count,
+      active: activeMechanicTimelineKinds.has(kind),
+      buildTimelineEvents() {
+        return timelineEvents;
+      },
+      buildPlaylistEvents() {
+        return playlistEvents;
+      },
+      buildTimelineRanges() {
+        return timelineRanges;
+      },
+      setActive(enabled) {
+        if (enabled) {
+          activeMechanicTimelineKinds.add(kind);
+        } else {
+          activeMechanicTimelineKinds.delete(kind);
+        }
+        scheduleConfigUrlUpdate();
+      },
+    });
+  }
+
+  return sources.sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function renderEventSourceList(sources: EventTimelineSource[]): HTMLElement | null {
+  if (sources.length === 0) {
     return null;
   }
 
-  const fragment = document.createElement("section");
-  const heading = document.createElement("h3");
-  heading.className = "module-settings-eyebrow";
-  heading.textContent = label;
-
   const list = document.createElement("div");
-  list.className = "module-list mechanics-list";
+  list.className = "module-list mechanics-list mechanics-event-list";
+  list.style.setProperty("--event-source-columns", `${getEventSourceColumnCount(sources.length)}`);
 
-  for (const source of availableSources) {
-    const active = activeTimelineEventModuleIds.has(source.id);
+  for (const source of sources) {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "module-summary-item";
-    item.dataset.active = active ? "true" : "false";
-    item.setAttribute("aria-pressed", active ? "true" : "false");
+    item.dataset.active = source.active ? "true" : "false";
+    item.setAttribute("aria-pressed", source.active ? "true" : "false");
     item.addEventListener("click", () => {
-      toggleCapability(source.id, "events", !activeTimelineEventModuleIds.has(source.id));
+      source.setActive(!source.active);
+      syncTimelineEvents();
+      syncTimelineRanges();
       renderEventTimelineControls();
       renderTimelineEventCount();
     });
@@ -1411,14 +1420,29 @@ function renderEventSourceList(
     name.textContent = source.label;
 
     const state = document.createElement("strong");
-    state.textContent = `${active ? "On" : "Off"} ${source.count}`;
+    state.textContent = `${source.active ? "On" : "Off"} ${source.count}`;
 
     item.append(name, state);
     list.append(item);
   }
 
-  fragment.append(heading, list);
-  return fragment;
+  return list;
+}
+
+function getEventSourceColumnCount(sourceCount: number): number {
+  if (window.innerWidth < 640) {
+    return 1;
+  }
+  if (window.innerWidth < 900) {
+    return sourceCount >= 7 ? 2 : 1;
+  }
+  if (sourceCount >= 13) {
+    return 3;
+  }
+  if (sourceCount >= 7) {
+    return 2;
+  }
+  return 1;
 }
 
 function getEventPlaylistReplaySources(ctx: StatModuleContext): EventPlaylistSource[] {
@@ -1429,12 +1453,6 @@ function getEventPlaylistReplaySources(ctx: StatModuleContext): EventPlaylistSou
       label: "Goals",
       events: ctx.replay.timelineEvents.filter((event) => event.kind === "goal"),
     },
-    ...REPLAY_EVENT_SOURCE_DEFINITIONS.map((source) => ({
-      id: `replay:${source.id}`,
-      group: "Replay",
-      label: source.label,
-      events: source.buildEvents(ctx),
-    })),
   ];
 
   return replaySources.filter((source) => source.events.length > 0);
@@ -1446,41 +1464,16 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
     return [];
   }
 
-  const visibleMechanicKinds = getMechanicKinds(ctx.statsTimeline);
-  const mechanicModuleIds = getMechanicTimelineModuleIds(ctx.statsTimeline);
-  const moduleSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
-  )
-    .map((mod) => ({
-      id: `module:${mod.id}`,
-      group: "Stats",
-      label: mod.label,
-      events: mod.getTimelineEvents?.(ctx) ?? [],
+  const eventSources = getEventTimelineSources(ctx)
+    .map((source) => ({
+      id: source.playlistId,
+      group: source.group,
+      label: source.label,
+      events: source.buildPlaylistEvents(),
     }))
     .filter((source) => source.events.length > 0);
 
-  const extraSources = EXTRA_EVENT_SOURCE_DEFINITIONS.map((source) => ({
-    id: `extra:${source.id}`,
-    group: "Stats",
-    label: source.label,
-    events: source.buildEvents(ctx),
-  })).filter((source) => source.events.length > 0);
-
-  const mechanicSources = visibleMechanicKinds
-    .map((kind) => ({
-      id: `mechanic:${kind}`,
-      group: "Mechanics",
-      label: formatMechanicKind(kind),
-      events: buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]),
-    }))
-    .filter((source) => source.events.length > 0);
-
-  return [
-    ...getEventPlaylistReplaySources(ctx),
-    ...moduleSources,
-    ...extraSources,
-    ...mechanicSources,
-  ];
+  return [...getEventPlaylistReplaySources(ctx), ...eventSources];
 }
 
 function getEventPlaylistSelectedSourceIds(sources: EventPlaylistSource[]): Set<string> {
@@ -4092,7 +4085,7 @@ async function loadReplayBundleForDisplay(
       replayEventsLabel: "Replay",
       replayEvents: (context) =>
         withTimelineEventSeekTimes(
-          filterReplayTimelineEvents(context.replay, activeTimelineEventModuleIds),
+          filterReplayTimelineEvents(context.replay, activeTimelineEventSourceIds),
         ),
     });
     const recorder = createCanvasRecorderPlugin({
@@ -4353,7 +4346,7 @@ export function mountStatEvaluationPlayer(
     activeModules = [];
     replayLoadModal?.destroy();
     replayLoadModal = null;
-    activeTimelineEventModuleIds = new Set<string>();
+    activeTimelineEventSourceIds = new Set<string>();
     activeTimelineRangeModuleIds = new Set<string>();
     activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();

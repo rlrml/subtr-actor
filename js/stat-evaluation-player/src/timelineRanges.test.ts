@@ -52,7 +52,7 @@ function positioningEvent(
   };
 }
 
-test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", () => {
+test("buildMechanicTimelineRanges emits ranges for visible span mechanics", () => {
   const replay = {
     frames: Array.from({ length: 6 }, (_, time) => ({ time })),
     players: [
@@ -120,6 +120,32 @@ test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", (
         },
         properties: [],
       },
+      {
+        id: "flick:3:5:0",
+        kind: "flick",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 3,
+          end_frame: 5,
+          start_time: 3,
+          end_time: 5,
+        },
+        properties: [],
+      },
+      {
+        id: "flip_reset:4:0",
+        kind: "flip_reset",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "moment",
+          frame: 4,
+          time: 4,
+        },
+        properties: [],
+      },
     ],
   });
 
@@ -129,8 +155,16 @@ test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", (
       "wall_aerial_shot",
       "pass",
       "ball_carry",
+      "flick",
+      "flip_reset",
     ]).map((range) => range.id),
-    ["ball_carry:1:5:0"],
+    [
+      "ball_carry:1:5:0",
+      "wall_aerial:1:3:0",
+      "pass:2:4:0",
+      "wall_aerial_shot:2:4:0",
+      "flick:3:5:0",
+    ],
   );
 });
 

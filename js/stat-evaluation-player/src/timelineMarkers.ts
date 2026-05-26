@@ -25,7 +25,6 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   wavedash: "WD",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
-const RANGE_ONLY_MECHANIC_KINDS = new Set(["air_dribble", "ball_carry"]);
 function getReplayPlayerName(replay: ReplayModel, playerId: string): string {
   return replay.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
@@ -73,34 +72,8 @@ export function isVisibleMechanicKind(kind: string): boolean {
   return !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
-export function isRangeOnlyMechanicKind(kind: string): boolean {
-  return RANGE_ONLY_MECHANIC_KINDS.has(kind);
-}
-
-export function getMechanicTimelineEventKinds(statsTimeline: StatsTimeline | null): string[] {
-  return getMechanicKinds(statsTimeline).filter((kind) => !isRangeOnlyMechanicKind(kind));
-}
-
 export function mechanicKindToModuleId(kind: string): string {
   return kind.replaceAll("_", "-");
-}
-
-export function getMechanicTimelineModuleIds(statsTimeline: StatsTimeline | null): Set<string> {
-  return new Set(getMechanicKinds(statsTimeline).map(mechanicKindToModuleId));
-}
-
-export function getMechanicTimelineEventModuleIds(
-  statsTimeline: StatsTimeline | null,
-): Set<string> {
-  return new Set(getMechanicTimelineEventKinds(statsTimeline).map(mechanicKindToModuleId));
-}
-
-export function getNonMechanicTimelineEventModuleIds(
-  moduleIds: Iterable<string>,
-  statsTimeline: StatsTimeline | null,
-): Set<string> {
-  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
-  return new Set([...moduleIds].filter((moduleId) => !mechanicModuleIds.has(moduleId)));
 }
 
 export function buildMechanicTimelineEvents(
@@ -115,7 +88,44 @@ export function buildMechanicTimelineEvents(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.kind) &&
-        !isRangeOnlyMechanicKind(event.kind) &&
+        event.timing.type === "moment" &&
+        (!enabled || enabled.has(event.kind)),
+    )
+    .map((event) => {
+      const playerId = playerIdToString(event.player_id);
+      const playerName = playerNames.get(playerId) ?? playerId;
+      const mechanicLabel = formatMechanicKind(event.kind);
+      if (event.timing.type !== "moment") {
+        throw new Error("unreachable non-moment mechanic event");
+      }
+
+      return {
+        id: event.id,
+        time: getReplayFrameTime(replay, event.timing.frame, event.timing.time),
+        frame: event.timing.frame,
+        kind: event.kind,
+        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
+        shortLabel: mechanicShortLabel(event.kind),
+        playerId,
+        playerName,
+        isTeamZero: event.is_team_0,
+        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
+}
+
+export function buildMechanicPlaylistEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+  enabledKinds?: Iterable<string>,
+): ReplayTimelineEvent[] {
+  const enabled = enabledKinds ? new Set(enabledKinds) : null;
+  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
+
+  return (statsTimeline.events.mechanics ?? [])
+    .filter(
+      (event) =>
+        isVisibleMechanicKind(event.kind) &&
         (!enabled || enabled.has(event.kind)),
     )
     .map((event) => {
@@ -132,8 +142,9 @@ export function buildMechanicTimelineEvents(
               frame: event.timing.end_frame,
               time: event.timing.end_time,
             };
+
       return {
-        id: event.id,
+        id: `${event.id}:playlist`,
         time: getReplayFrameTime(replay, timing.frame, timing.time),
         frame: timing.frame,
         kind: event.kind,
@@ -148,9 +159,9 @@ export function buildMechanicTimelineEvents(
 }
 
 export function getReplayTimelineEventKinds(
-  activeModuleIds: Iterable<string>,
+  activeSourceIds: Iterable<string>,
 ): ReplayTimelineEventKind[] {
-  const active = new Set(activeModuleIds);
+  const active = new Set(activeSourceIds);
   const allowedKinds = new Set<ReplayTimelineEventKind>(["goal"]);
 
   if (active.has("core")) {
@@ -168,9 +179,9 @@ export function getReplayTimelineEventKinds(
 
 export function filterReplayTimelineEvents(
   replay: ReplayModel,
-  activeModuleIds: Iterable<string>,
+  activeSourceIds: Iterable<string>,
 ): ReplayTimelineEvent[] {
-  const allowedKinds = new Set(getReplayTimelineEventKinds(activeModuleIds));
+  const allowedKinds = new Set(getReplayTimelineEventKinds(activeSourceIds));
   return replay.timelineEvents.filter((event) => allowedKinds.has(event.kind));
 }
 
@@ -793,19 +804,18 @@ export function buildWhiffTimelineEvents(
 }
 
 export function countEnabledTimelineEvents(
-  activeModuleIds: Iterable<string>,
+  activeSourceIds: Iterable<string>,
   replay: ReplayModel,
   statsTimeline: StatsTimeline,
 ): number {
-  const active = getNonMechanicTimelineEventModuleIds(activeModuleIds, statsTimeline);
+  const mechanicModuleIds = new Set(getMechanicKinds(statsTimeline).map(mechanicKindToModuleId));
+  const active = new Set(
+    [...activeSourceIds].filter((sourceId) => !mechanicModuleIds.has(sourceId)),
+  );
   let count = filterReplayTimelineEvents(replay, active).length;
 
   if (active.has("fifty-fifty")) {
     count += buildFiftyFiftyTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("goal-tags")) {
-    count += buildGoalTagTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("musty-flick")) {
