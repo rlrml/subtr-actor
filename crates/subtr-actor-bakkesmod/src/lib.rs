@@ -11,6 +11,7 @@ use subtr_actor::{
     builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
     builtin_stats_module_names, default_stats_timeline_config,
+    geometry::apply_velocities_to_rigid_body,
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
@@ -712,17 +713,28 @@ impl ProcessorView for SaLiveProcessorView<'_> {
 
     fn get_velocity_applied_ball_rigid_body(
         &self,
-        _target_time: f32,
+        target_time: f32,
     ) -> SubtrActorResult<RigidBody> {
-        self.get_normalized_ball_rigid_body()
+        let rigid_body = self.get_normalized_ball_rigid_body()?;
+        Ok(apply_velocities_to_rigid_body(
+            &rigid_body,
+            target_time - self.frame.time,
+        ))
     }
 
     fn get_interpolated_ball_rigid_body(
         &self,
-        _target_time: f32,
-        _close_enough_to_frame_time: f32,
+        target_time: f32,
+        close_enough_to_frame_time: f32,
     ) -> SubtrActorResult<RigidBody> {
-        self.get_normalized_ball_rigid_body()
+        let rigid_body = self.get_normalized_ball_rigid_body()?;
+        if (target_time - self.frame.time).abs() <= close_enough_to_frame_time.abs() {
+            return Ok(rigid_body);
+        }
+        Ok(apply_velocities_to_rigid_body(
+            &rigid_body,
+            target_time - self.frame.time,
+        ))
     }
 
     fn get_normalized_player_rigid_body(
@@ -742,18 +754,29 @@ impl ProcessorView for SaLiveProcessorView<'_> {
     fn get_velocity_applied_player_rigid_body(
         &self,
         player_id: &PlayerId,
-        _target_time: f32,
+        target_time: f32,
     ) -> SubtrActorResult<RigidBody> {
-        self.get_normalized_player_rigid_body(player_id)
+        let rigid_body = self.get_normalized_player_rigid_body(player_id)?;
+        Ok(apply_velocities_to_rigid_body(
+            &rigid_body,
+            target_time - self.frame.time,
+        ))
     }
 
     fn get_interpolated_player_rigid_body(
         &self,
         player_id: &PlayerId,
-        _target_time: f32,
-        _close_enough_to_frame_time: f32,
+        target_time: f32,
+        close_enough_to_frame_time: f32,
     ) -> SubtrActorResult<RigidBody> {
-        self.get_normalized_player_rigid_body(player_id)
+        let rigid_body = self.get_normalized_player_rigid_body(player_id)?;
+        if (target_time - self.frame.time).abs() <= close_enough_to_frame_time.abs() {
+            return Ok(rigid_body);
+        }
+        Ok(apply_velocities_to_rigid_body(
+            &rigid_body,
+            target_time - self.frame.time,
+        ))
     }
 
     fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
@@ -7344,6 +7367,11 @@ mod tests {
         players[0].double_jump_active = 1;
         players[0].dodge_active = 1;
         players[0].powerslide_active = 1;
+        players[0].rigid_body.linear_velocity = SaVec3 {
+            x: 0.0,
+            y: 400.0,
+            z: 0.0,
+        };
         players[1].player_name = orange_name.as_ptr();
 
         let mut frame = live_frame(
@@ -7489,7 +7517,28 @@ mod tests {
             300.0
         );
         assert_eq!(
+            view.get_velocity_applied_ball_rigid_body(frame.time + 0.5)
+                .unwrap()
+                .location
+                .x,
+            160.0
+        );
+        assert_eq!(
             view.get_interpolated_ball_rigid_body(frame.time, 0.0)
+                .unwrap()
+                .location
+                .x,
+            10.0
+        );
+        assert_eq!(
+            view.get_interpolated_ball_rigid_body(frame.time + 0.5, 0.0)
+                .unwrap()
+                .location
+                .x,
+            160.0
+        );
+        assert_eq!(
+            view.get_interpolated_ball_rigid_body(frame.time + 0.5, 0.5)
                 .unwrap()
                 .location
                 .x,
@@ -7510,7 +7559,28 @@ mod tests {
             92.75
         );
         assert_eq!(
+            view.get_velocity_applied_player_rigid_body(&blue_id, frame.time + 0.5)
+                .unwrap()
+                .location
+                .y,
+            220.0
+        );
+        assert_eq!(
             view.get_interpolated_player_rigid_body(&blue_id, frame.time, 0.0)
+                .unwrap()
+                .location
+                .y,
+            20.0
+        );
+        assert_eq!(
+            view.get_interpolated_player_rigid_body(&blue_id, frame.time + 0.5, 0.0)
+                .unwrap()
+                .location
+                .y,
+            220.0
+        );
+        assert_eq!(
+            view.get_interpolated_player_rigid_body(&blue_id, frame.time + 0.5, 0.5)
                 .unwrap()
                 .location
                 .y,
