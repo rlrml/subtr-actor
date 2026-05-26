@@ -104,6 +104,39 @@ DERIVED_EVENT_FIELDS = {
     ),
 }
 
+REQUIRED_PLUGIN_ABI_EXPORTS = (
+    ("subtr_actor_bakkesmod_engine_create", "engineCreate"),
+    ("subtr_actor_bakkesmod_engine_destroy", "engineDestroy"),
+    ("subtr_actor_bakkesmod_engine_reset", "engineReset"),
+    ("subtr_actor_bakkesmod_finish", "engineFinish"),
+    ("subtr_actor_bakkesmod_process_frame", "processFrame"),
+    ("subtr_actor_bakkesmod_events_json_len", "eventsJsonLen"),
+    ("subtr_actor_bakkesmod_write_events_json", "writeEventsJson"),
+    ("subtr_actor_bakkesmod_frame_json_len", "frameJsonLen"),
+    ("subtr_actor_bakkesmod_write_frame_json", "writeFrameJson"),
+    ("subtr_actor_bakkesmod_timeline_json_len", "timelineJsonLen"),
+    ("subtr_actor_bakkesmod_write_timeline_json", "writeTimelineJson"),
+    ("subtr_actor_bakkesmod_stats_json_len", "statsJsonLen"),
+    ("subtr_actor_bakkesmod_write_stats_json", "writeStatsJson"),
+    ("subtr_actor_bakkesmod_stats_module_json_len", "statsModuleJsonLen"),
+    ("subtr_actor_bakkesmod_write_stats_module_json", "writeStatsModuleJson"),
+    ("subtr_actor_bakkesmod_stats_module_frame_json_len", "statsModuleFrameJsonLen"),
+    ("subtr_actor_bakkesmod_write_stats_module_frame_json", "writeStatsModuleFrameJson"),
+    ("subtr_actor_bakkesmod_stats_module_config_json_len", "statsModuleConfigJsonLen"),
+    ("subtr_actor_bakkesmod_write_stats_module_config_json", "writeStatsModuleConfigJson"),
+    ("subtr_actor_bakkesmod_graph_output_json_len", "graphOutputJsonLen"),
+    ("subtr_actor_bakkesmod_write_graph_output_json", "writeGraphOutputJson"),
+    ("subtr_actor_bakkesmod_analysis_node_json_len", "analysisNodeJsonLen"),
+    ("subtr_actor_bakkesmod_write_analysis_node_json", "writeAnalysisNodeJson"),
+    ("subtr_actor_bakkesmod_analysis_node_names_json_len", "analysisNodeNamesJsonLen"),
+    ("subtr_actor_bakkesmod_write_analysis_node_names_json", "writeAnalysisNodeNamesJson"),
+    ("subtr_actor_bakkesmod_graph_info_json_len", "graphInfoJsonLen"),
+    ("subtr_actor_bakkesmod_write_graph_info_json", "writeGraphInfoJson"),
+    ("subtr_actor_bakkesmod_drain_events", "drainEvents"),
+    ("subtr_actor_bakkesmod_drain_team_events", "drainTeamEvents"),
+    ("subtr_actor_bakkesmod_drain_goal_context_events", "drainGoalContextEvents"),
+)
+
 
 def quoted_strings(value: str) -> list[str]:
     return re.findall(r'"([^"]+)"', value)
@@ -166,6 +199,48 @@ def main() -> int:
     missing_coverage = sorted(required_event_fields - covered_event_fields)
     if missing_coverage:
         errors.append(f"required event fields missing C++ producer contract: {missing_coverage}")
+
+    loaded_exports = set(
+        re.findall(r'GetProcAddress\(rustLibrary,\s*"([^"]+)"\)', plugin_source)
+    )
+    expected_exports = {symbol for symbol, _ in REQUIRED_PLUGIN_ABI_EXPORTS}
+    missing_loaded_exports = sorted(expected_exports - loaded_exports)
+    unexpected_loaded_exports = sorted(loaded_exports - expected_exports)
+    if missing_loaded_exports:
+        errors.append(f"required Rust ABI exports not loaded by C++ plugin: {missing_loaded_exports}")
+    if unexpected_loaded_exports:
+        errors.append(f"C++ plugin loads unexpected Rust ABI exports: {unexpected_loaded_exports}")
+    for symbol, pointer_name in REQUIRED_PLUGIN_ABI_EXPORTS:
+        require_contains(
+            abi_header,
+            f"{symbol}(",
+            f"{symbol} checked-in ABI declaration",
+            errors,
+        )
+        require_contains(
+            plugin_header,
+            f"{pointer_name} = nullptr",
+            f"{symbol} function pointer member",
+            errors,
+        )
+        require_contains(
+            plugin_source,
+            f'"{symbol}"',
+            f"{symbol} GetProcAddress load",
+            errors,
+        )
+        require_contains(
+            plugin_source,
+            f"!{pointer_name}",
+            f"{symbol} load failure guard",
+            errors,
+        )
+        require_contains(
+            plugin_source,
+            f"{pointer_name} = nullptr",
+            f"{symbol} unload reset",
+            errors,
+        )
 
     for family in EVENT_FAMILIES:
         require_contains(
