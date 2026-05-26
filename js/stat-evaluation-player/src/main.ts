@@ -85,6 +85,7 @@ import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
+const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
 let replayPlayer: ReplayPlayer | null = null;
@@ -94,6 +95,7 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: Map<number, StatsFrame> | null = null;
 let unsubscribe: (() => void) | null = null;
 let removeRenderHook: (() => void) | null = null;
+let lastPlayingSnapshotUiUpdateAt = 0;
 
 const timelineSourceRemovers = new Map<string, () => void>();
 const timelineRangeSourceRemovers = new Map<string, () => void>();
@@ -1904,7 +1906,16 @@ function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): str
     return path;
   }
   if (path.startsWith("/")) {
-    return isLikelyLocalFilePath(path) ? `/@fs${path}` : path;
+    if (isLikelyLocalFilePath(path)) {
+      return `/@fs${path}`;
+    }
+    if (sourceUrl) {
+      const base = new URL(sourceUrl, window.location.href);
+      if (base.origin !== window.location.origin) {
+        return new URL(path, base.origin).href;
+      }
+    }
+    return path;
   }
   return sourceUrl ? new URL(path, sourceUrl).href : path;
 }
@@ -3934,6 +3945,15 @@ function renderSnapshot(state: ReplayPlayerState): void {
   if (enforceMechanicsReviewClipBoundary(state)) {
     return;
   }
+
+  const now = performance.now();
+  if (
+    state.playing &&
+    now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS
+  ) {
+    return;
+  }
+  lastPlayingSnapshotUiUpdateAt = now;
 
   timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
   frameReadout.textContent = `${state.frameIndex}`;
