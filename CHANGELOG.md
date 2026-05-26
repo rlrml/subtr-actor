@@ -4,6 +4,13 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.8.11 - 2026-05-26
+
+- Improve wall-to-air setup detection for air-based mechanics.
+- Refresh dependency locks for the current Rust and JavaScript dependency set.
+- Format the timeline marker test so the player package CI style check passes.
+- Refresh Rust, Python, and JavaScript release metadata to `0.8.11`.
+
 ## v0.8.10 - 2026-05-25
 
 - Suppress bump stats around contested fifty-fifties to reduce false positive
