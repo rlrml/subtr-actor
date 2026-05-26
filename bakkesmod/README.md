@@ -119,8 +119,10 @@ acceptance check for live graph callability and event-generation parity.
    `analysis_nodes` contains exactly the callable analysis nodes, and that
    `frame_events_state` exposes every live event family field.
 3. Exercise live events that should be visible to the graph: touch the ball,
-   pick up a boost pad, score a goal, and trigger a demolition when possible.
-   Overlay labels should appear for drainable graph events.
+   trigger a dodge refresh or flip reset setup when possible, pick up a boost
+   pad, generate shot/save/assist match-stat deltas, score a goal, and trigger
+   a demolition when possible. Overlay labels should appear for drainable graph
+   events.
    If the console logs `subtr-actor: live frame processing failed`, the plugin
    preserves queued BakkesMod events and retries them on the next sampled frame.
 4. Dump the complete live graph surface:
@@ -146,6 +148,11 @@ acceptance check for live graph callability and event-generation parity.
    ```
 
    Each command should write a nonempty JSON file in `data\subtr-actor`.
+   After the live event exercise above, `graph-node-frame_events_state.json`
+   should expose the event-family arrays checked by `subtr_actor_verify_graph`
+   (`touch_events`, `dodge_refreshed_events`, `boost_pad_events`,
+   `player_stat_events`, `goal_events`, `demo_events`, and `active_demos`), and
+   the arrays corresponding to exercised events should contain entries.
 
 ## Linux/Nix support
 
