@@ -179,6 +179,7 @@ private:
   void resetLiveState();
   void clearPendingFrameEvents();
   void attachPendingFrameEvents(SaLiveFrame &frame);
+  SaEventTiming currentEventTiming();
   void recordTouch(CarWrapper car);
   void recordDodgeRefreshFromJumpState(CarWrapper car, uint32_t playerIndex, uint8_t isTeam0);
   void recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind);

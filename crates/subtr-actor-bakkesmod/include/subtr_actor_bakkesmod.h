@@ -53,7 +53,14 @@ typedef struct SaPlayerFrame {
   int32_t match_score;
 } SaPlayerFrame;
 
+typedef struct SaEventTiming {
+  uint64_t frame_number;
+  float time;
+  uint8_t has_timing;
+} SaEventTiming;
+
 typedef struct SaTouchEvent {
+  SaEventTiming timing;
   uint32_t player_index;
   uint8_t has_player;
   uint8_t is_team_0;
@@ -62,6 +69,7 @@ typedef struct SaTouchEvent {
 } SaTouchEvent;
 
 typedef struct SaDodgeRefreshedEvent {
+  SaEventTiming timing;
   uint32_t player_index;
   uint8_t is_team_0;
   int32_t counter_value;
@@ -73,6 +81,7 @@ typedef enum SaBoostPadEventKind {
 } SaBoostPadEventKind;
 
 typedef struct SaBoostPadEvent {
+  SaEventTiming timing;
   uint32_t pad_id;
   SaBoostPadEventKind kind;
   uint8_t sequence;
@@ -81,6 +90,7 @@ typedef struct SaBoostPadEvent {
 } SaBoostPadEvent;
 
 typedef struct SaGoalEvent {
+  SaEventTiming timing;
   uint8_t scoring_team_is_team_0;
   uint32_t player_index;
   uint8_t has_player;
@@ -97,6 +107,7 @@ typedef enum SaPlayerStatEventKind {
 } SaPlayerStatEventKind;
 
 typedef struct SaPlayerStatEvent {
+  SaEventTiming timing;
   uint32_t player_index;
   uint8_t is_team_0;
   SaPlayerStatEventKind kind;
@@ -107,6 +118,7 @@ typedef struct SaPlayerStatEvent {
 } SaPlayerStatEvent;
 
 typedef struct SaDemolishEvent {
+  SaEventTiming timing;
   uint32_t attacker_index;
   uint32_t victim_index;
   SaVec3 attacker_velocity;

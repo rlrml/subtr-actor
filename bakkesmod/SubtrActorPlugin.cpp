@@ -167,6 +167,13 @@ std::vector<std::string> parseJsonStringArrayProperty(
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
 static_assert(sizeof(SaPlayerStatEventKind) == 4);
+
+static_assert(std::is_standard_layout_v<SaEventTiming>);
+static_assert(sizeof(SaEventTiming) == 16);
+static_assert(alignof(SaEventTiming) == 8);
+static_assert(offsetof(SaEventTiming, frame_number) == 0);
+static_assert(offsetof(SaEventTiming, time) == 8);
+static_assert(offsetof(SaEventTiming, has_timing) == 12);
 static_assert(sizeof(SaMechanicKind) == 4);
 static_assert(sizeof(SaTeamEventKind) == 4);
 static_assert(sizeof(SaGoalBuildupKind) == 4);
@@ -220,61 +227,67 @@ static_assert(offsetof(SaPlayerFrame, match_shots) == 104);
 static_assert(offsetof(SaPlayerFrame, match_score) == 108);
 
 static_assert(std::is_standard_layout_v<SaTouchEvent>);
-static_assert(sizeof(SaTouchEvent) == 16);
-static_assert(alignof(SaTouchEvent) == 4);
-static_assert(offsetof(SaTouchEvent, player_index) == 0);
-static_assert(offsetof(SaTouchEvent, has_player) == 4);
-static_assert(offsetof(SaTouchEvent, is_team_0) == 5);
-static_assert(offsetof(SaTouchEvent, closest_approach_distance) == 8);
-static_assert(offsetof(SaTouchEvent, has_closest_approach_distance) == 12);
+static_assert(sizeof(SaTouchEvent) == 32);
+static_assert(alignof(SaTouchEvent) == 8);
+static_assert(offsetof(SaTouchEvent, timing) == 0);
+static_assert(offsetof(SaTouchEvent, player_index) == 16);
+static_assert(offsetof(SaTouchEvent, has_player) == 20);
+static_assert(offsetof(SaTouchEvent, is_team_0) == 21);
+static_assert(offsetof(SaTouchEvent, closest_approach_distance) == 24);
+static_assert(offsetof(SaTouchEvent, has_closest_approach_distance) == 28);
 
 static_assert(std::is_standard_layout_v<SaDodgeRefreshedEvent>);
-static_assert(sizeof(SaDodgeRefreshedEvent) == 12);
-static_assert(alignof(SaDodgeRefreshedEvent) == 4);
-static_assert(offsetof(SaDodgeRefreshedEvent, player_index) == 0);
-static_assert(offsetof(SaDodgeRefreshedEvent, is_team_0) == 4);
-static_assert(offsetof(SaDodgeRefreshedEvent, counter_value) == 8);
+static_assert(sizeof(SaDodgeRefreshedEvent) == 32);
+static_assert(alignof(SaDodgeRefreshedEvent) == 8);
+static_assert(offsetof(SaDodgeRefreshedEvent, timing) == 0);
+static_assert(offsetof(SaDodgeRefreshedEvent, player_index) == 16);
+static_assert(offsetof(SaDodgeRefreshedEvent, is_team_0) == 20);
+static_assert(offsetof(SaDodgeRefreshedEvent, counter_value) == 24);
 
 static_assert(std::is_standard_layout_v<SaBoostPadEvent>);
-static_assert(sizeof(SaBoostPadEvent) == 20);
-static_assert(alignof(SaBoostPadEvent) == 4);
-static_assert(offsetof(SaBoostPadEvent, pad_id) == 0);
-static_assert(offsetof(SaBoostPadEvent, kind) == 4);
-static_assert(offsetof(SaBoostPadEvent, sequence) == 8);
-static_assert(offsetof(SaBoostPadEvent, player_index) == 12);
-static_assert(offsetof(SaBoostPadEvent, has_player) == 16);
+static_assert(sizeof(SaBoostPadEvent) == 40);
+static_assert(alignof(SaBoostPadEvent) == 8);
+static_assert(offsetof(SaBoostPadEvent, timing) == 0);
+static_assert(offsetof(SaBoostPadEvent, pad_id) == 16);
+static_assert(offsetof(SaBoostPadEvent, kind) == 20);
+static_assert(offsetof(SaBoostPadEvent, sequence) == 24);
+static_assert(offsetof(SaBoostPadEvent, player_index) == 28);
+static_assert(offsetof(SaBoostPadEvent, has_player) == 32);
 
 static_assert(std::is_standard_layout_v<SaGoalEvent>);
-static_assert(sizeof(SaGoalEvent) == 28);
-static_assert(alignof(SaGoalEvent) == 4);
-static_assert(offsetof(SaGoalEvent, scoring_team_is_team_0) == 0);
-static_assert(offsetof(SaGoalEvent, player_index) == 4);
-static_assert(offsetof(SaGoalEvent, has_player) == 8);
-static_assert(offsetof(SaGoalEvent, team_zero_score) == 12);
-static_assert(offsetof(SaGoalEvent, has_team_zero_score) == 16);
-static_assert(offsetof(SaGoalEvent, team_one_score) == 20);
-static_assert(offsetof(SaGoalEvent, has_team_one_score) == 24);
+static_assert(sizeof(SaGoalEvent) == 48);
+static_assert(alignof(SaGoalEvent) == 8);
+static_assert(offsetof(SaGoalEvent, timing) == 0);
+static_assert(offsetof(SaGoalEvent, scoring_team_is_team_0) == 16);
+static_assert(offsetof(SaGoalEvent, player_index) == 20);
+static_assert(offsetof(SaGoalEvent, has_player) == 24);
+static_assert(offsetof(SaGoalEvent, team_zero_score) == 28);
+static_assert(offsetof(SaGoalEvent, has_team_zero_score) == 32);
+static_assert(offsetof(SaGoalEvent, team_one_score) == 36);
+static_assert(offsetof(SaGoalEvent, has_team_one_score) == 40);
 
 static_assert(std::is_standard_layout_v<SaPlayerStatEvent>);
-static_assert(sizeof(SaPlayerStatEvent) == 132);
-static_assert(alignof(SaPlayerStatEvent) == 4);
-static_assert(offsetof(SaPlayerStatEvent, player_index) == 0);
-static_assert(offsetof(SaPlayerStatEvent, is_team_0) == 4);
-static_assert(offsetof(SaPlayerStatEvent, kind) == 8);
-static_assert(offsetof(SaPlayerStatEvent, has_shot_ball) == 12);
-static_assert(offsetof(SaPlayerStatEvent, shot_ball) == 16);
-static_assert(offsetof(SaPlayerStatEvent, has_shot_player) == 72);
-static_assert(offsetof(SaPlayerStatEvent, shot_player) == 76);
+static_assert(sizeof(SaPlayerStatEvent) == 152);
+static_assert(alignof(SaPlayerStatEvent) == 8);
+static_assert(offsetof(SaPlayerStatEvent, timing) == 0);
+static_assert(offsetof(SaPlayerStatEvent, player_index) == 16);
+static_assert(offsetof(SaPlayerStatEvent, is_team_0) == 20);
+static_assert(offsetof(SaPlayerStatEvent, kind) == 24);
+static_assert(offsetof(SaPlayerStatEvent, has_shot_ball) == 28);
+static_assert(offsetof(SaPlayerStatEvent, shot_ball) == 32);
+static_assert(offsetof(SaPlayerStatEvent, has_shot_player) == 88);
+static_assert(offsetof(SaPlayerStatEvent, shot_player) == 92);
 
 static_assert(std::is_standard_layout_v<SaDemolishEvent>);
-static_assert(sizeof(SaDemolishEvent) == 48);
-static_assert(alignof(SaDemolishEvent) == 4);
-static_assert(offsetof(SaDemolishEvent, attacker_index) == 0);
-static_assert(offsetof(SaDemolishEvent, victim_index) == 4);
-static_assert(offsetof(SaDemolishEvent, attacker_velocity) == 8);
-static_assert(offsetof(SaDemolishEvent, victim_velocity) == 20);
-static_assert(offsetof(SaDemolishEvent, victim_location) == 32);
-static_assert(offsetof(SaDemolishEvent, active_duration_seconds) == 44);
+static_assert(sizeof(SaDemolishEvent) == 64);
+static_assert(alignof(SaDemolishEvent) == 8);
+static_assert(offsetof(SaDemolishEvent, timing) == 0);
+static_assert(offsetof(SaDemolishEvent, attacker_index) == 16);
+static_assert(offsetof(SaDemolishEvent, victim_index) == 20);
+static_assert(offsetof(SaDemolishEvent, attacker_velocity) == 24);
+static_assert(offsetof(SaDemolishEvent, victim_velocity) == 36);
+static_assert(offsetof(SaDemolishEvent, victim_location) == 48);
+static_assert(offsetof(SaDemolishEvent, active_duration_seconds) == 60);
 
 static_assert(std::is_standard_layout_v<SaLiveFrame>);
 static_assert(sizeof(SaLiveFrame) == 232);
@@ -1143,12 +1156,22 @@ void SubtrActorPlugin::attachPendingFrameEvents(SaLiveFrame &frame) {
   frame.demolish_count = pendingDemolishes.size();
 }
 
+SaEventTiming SubtrActorPlugin::currentEventTiming() {
+  SaEventTiming timing{};
+  timing.frame_number = frameNumber;
+  ServerWrapper server = gameWrapper->GetGameEventAsServer();
+  timing.time = server.IsNull() ? lastTime : server.GetSecondsElapsed();
+  timing.has_timing = 1;
+  return timing;
+}
+
 void SubtrActorPlugin::recordTouch(CarWrapper car) {
   if (car.IsNull()) {
     return;
   }
 
   SaTouchEvent event{};
+  event.timing = currentEventTiming();
   if (auto playerIndex = playerIndexForCar(car)) {
     event.player_index = *playerIndex;
     event.has_player = 1;
@@ -1200,6 +1223,7 @@ void SubtrActorPlugin::recordDodgeRefreshFromJumpState(
   }
 
   SaDodgeRefreshedEvent event{};
+  event.timing = currentEventTiming();
   event.player_index = playerIndex;
   event.is_team_0 = isTeam0;
   event.counter_value = ++dodgeRefreshCounters[playerIndex];
@@ -1212,6 +1236,7 @@ void SubtrActorPlugin::recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventK
   }
 
   SaBoostPadEvent event{};
+  event.timing = currentEventTiming();
   event.pad_id = boostPadId(pickup);
   event.kind = kind;
   if (kind == SaBoostPadEventKindPickedUp) {
@@ -1230,6 +1255,7 @@ void SubtrActorPlugin::recordGoal(
     int scoreIndex,
     int assistIndex) {
   SaGoalEvent event{};
+  event.timing = currentEventTiming();
   if (!goal.IsNull()) {
     event.scoring_team_is_team_0 = goal.GetTeamNum() == 0 ? 0 : 1;
   } else if (!server.IsNull()) {
@@ -1264,6 +1290,7 @@ void SubtrActorPlugin::recordDemolish(CarWrapper victim, ActorWrapper demolisher
   }
 
   SaDemolishEvent event{};
+  event.timing = currentEventTiming();
   event.attacker_index = *attackerIndex;
   event.victim_index = *victimIndex;
   event.attacker_velocity = toSaVec3(attacker.GetVelocity());
@@ -1307,6 +1334,7 @@ void SubtrActorPlugin::recordPlayerStatDeltas(
     const int count = consumeSuppressed(next - previous, field);
     for (int i = 0; i < count; i += 1) {
       SaPlayerStatEvent event{};
+      event.timing = currentEventTiming();
       event.player_index = playerIndex;
       event.is_team_0 = isTeam0;
       event.kind = kind;
@@ -1357,6 +1385,7 @@ void SubtrActorPlugin::recordExplicitPlayerStat(PriWrapper pri, SaPlayerStatEven
   }
 
   SaPlayerStatEvent event{};
+  event.timing = currentEventTiming();
   event.player_index = *playerIndex;
   event.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
   event.kind = kind;

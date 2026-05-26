@@ -93,7 +93,16 @@ pub struct SaPlayerFrame {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
+pub struct SaEventTiming {
+    pub frame_number: u64,
+    pub time: f32,
+    pub has_timing: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SaTouchEvent {
+    pub timing: SaEventTiming,
     pub player_index: u32,
     pub has_player: u8,
     pub is_team_0: u8,
@@ -104,6 +113,7 @@ pub struct SaTouchEvent {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SaDodgeRefreshedEvent {
+    pub timing: SaEventTiming,
     pub player_index: u32,
     pub is_team_0: u8,
     pub counter_value: i32,
@@ -119,6 +129,7 @@ pub enum SaBoostPadEventKind {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct SaBoostPadEvent {
+    pub timing: SaEventTiming,
     pub pad_id: u32,
     pub kind: SaBoostPadEventKind,
     pub sequence: u8,
@@ -129,6 +140,7 @@ pub struct SaBoostPadEvent {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SaGoalEvent {
+    pub timing: SaEventTiming,
     pub scoring_team_is_team_0: u8,
     pub player_index: u32,
     pub has_player: u8,
@@ -149,6 +161,7 @@ pub enum SaPlayerStatEventKind {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct SaPlayerStatEvent {
+    pub timing: SaEventTiming,
     pub player_index: u32,
     pub is_team_0: u8,
     pub kind: SaPlayerStatEventKind,
@@ -161,6 +174,7 @@ pub struct SaPlayerStatEvent {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SaDemolishEvent {
+    pub timing: SaEventTiming,
     pub attacker_index: u32,
     pub victim_index: u32,
     pub attacker_velocity: SaVec3,
@@ -1078,16 +1092,27 @@ fn explicit_live_play_state(frame: &SaLiveFrame) -> Option<LivePlayState> {
     })
 }
 
+fn event_frame_and_time(frame: &FrameInfo, timing: SaEventTiming) -> (usize, f32) {
+    if timing.has_timing != 0 {
+        (timing.frame_number as usize, timing.time)
+    } else {
+        (frame.frame_number, frame.time)
+    }
+}
+
 fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
     events
         .iter()
-        .map(|event| TouchEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            team_is_team_0: event.is_team_0 != 0,
-            player: (event.has_player != 0).then_some(player_id(event.player_index)),
-            closest_approach_distance: (event.has_closest_approach_distance != 0)
-                .then_some(event.closest_approach_distance),
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            TouchEvent {
+                time,
+                frame: frame_number,
+                team_is_team_0: event.is_team_0 != 0,
+                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                closest_approach_distance: (event.has_closest_approach_distance != 0)
+                    .then_some(event.closest_approach_distance),
+            }
         })
         .collect()
 }
@@ -1098,12 +1123,15 @@ fn explicit_dodge_refreshed_events(
 ) -> Vec<DodgeRefreshedEvent> {
     events
         .iter()
-        .map(|event| DodgeRefreshedEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            player: player_id(event.player_index),
-            is_team_0: event.is_team_0 != 0,
-            counter_value: event.counter_value,
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            DodgeRefreshedEvent {
+                time,
+                frame: frame_number,
+                player: player_id(event.player_index),
+                is_team_0: event.is_team_0 != 0,
+                counter_value: event.counter_value,
+            }
         })
         .collect()
 }
@@ -1111,17 +1139,20 @@ fn explicit_dodge_refreshed_events(
 fn explicit_boost_pad_events(frame: &FrameInfo, events: &[SaBoostPadEvent]) -> Vec<BoostPadEvent> {
     events
         .iter()
-        .map(|event| BoostPadEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            pad_id: event.pad_id.to_string(),
-            player: (event.has_player != 0).then_some(player_id(event.player_index)),
-            kind: match event.kind {
-                SaBoostPadEventKind::PickedUp => BoostPadEventKind::PickedUp {
-                    sequence: event.sequence,
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            BoostPadEvent {
+                time,
+                frame: frame_number,
+                pad_id: event.pad_id.to_string(),
+                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                kind: match event.kind {
+                    SaBoostPadEventKind::PickedUp => BoostPadEventKind::PickedUp {
+                        sequence: event.sequence,
+                    },
+                    SaBoostPadEventKind::Available => BoostPadEventKind::Available,
                 },
-                SaBoostPadEventKind::Available => BoostPadEventKind::Available,
-            },
+            }
         })
         .collect()
 }
@@ -1129,13 +1160,16 @@ fn explicit_boost_pad_events(frame: &FrameInfo, events: &[SaBoostPadEvent]) -> V
 fn explicit_goal_events(frame: &FrameInfo, events: &[SaGoalEvent]) -> Vec<GoalEvent> {
     events
         .iter()
-        .map(|event| GoalEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
-            player: (event.has_player != 0).then_some(player_id(event.player_index)),
-            team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
-            team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            GoalEvent {
+                time,
+                frame: frame_number,
+                scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
+                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
+                team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
+            }
         })
         .collect()
 }
@@ -1146,17 +1180,20 @@ fn explicit_player_stat_events(
 ) -> Vec<PlayerStatEvent> {
     events
         .iter()
-        .map(|event| PlayerStatEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            player: player_id(event.player_index),
-            is_team_0: event.is_team_0 != 0,
-            kind: match event.kind {
-                SaPlayerStatEventKind::Shot => PlayerStatEventKind::Shot,
-                SaPlayerStatEventKind::Save => PlayerStatEventKind::Save,
-                SaPlayerStatEventKind::Assist => PlayerStatEventKind::Assist,
-            },
-            shot: shot_event_metadata(event),
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            PlayerStatEvent {
+                time,
+                frame: frame_number,
+                player: player_id(event.player_index),
+                is_team_0: event.is_team_0 != 0,
+                kind: match event.kind {
+                    SaPlayerStatEventKind::Shot => PlayerStatEventKind::Shot,
+                    SaPlayerStatEventKind::Save => PlayerStatEventKind::Save,
+                    SaPlayerStatEventKind::Assist => PlayerStatEventKind::Assist,
+                },
+                shot: shot_event_metadata(event),
+            }
         })
         .collect()
 }
@@ -1178,15 +1215,18 @@ fn shot_event_metadata(event: &SaPlayerStatEvent) -> Option<ShotEventMetadata> {
 fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Vec<DemolishInfo> {
     events
         .iter()
-        .map(|event| DemolishInfo {
-            time: frame.time,
-            seconds_remaining: frame.seconds_remaining.unwrap_or_default(),
-            frame: frame.frame_number,
-            attacker: player_id(event.attacker_index),
-            victim: player_id(event.victim_index),
-            attacker_velocity: vec3(event.attacker_velocity),
-            victim_velocity: vec3(event.victim_velocity),
-            victim_location: vec3(event.victim_location),
+        .map(|event| {
+            let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            DemolishInfo {
+                time,
+                seconds_remaining: frame.seconds_remaining.unwrap_or_default(),
+                frame: frame_number,
+                attacker: player_id(event.attacker_index),
+                victim: player_id(event.victim_index),
+                attacker_velocity: vec3(event.attacker_velocity),
+                victim_velocity: vec3(event.victim_velocity),
+                victim_location: vec3(event.victim_location),
+            }
         })
         .collect()
 }
@@ -1265,9 +1305,13 @@ fn infer_dodge_refreshed_events(
 }
 
 impl SaLiveEventGenerator {
-    fn sync_active_demos(&mut self, time: f32, events: &[SaDemolishEvent]) -> Vec<DemoEventSample> {
+    fn sync_active_demos(
+        &mut self,
+        frame: &FrameInfo,
+        events: &[SaDemolishEvent],
+    ) -> Vec<DemoEventSample> {
         self.active_demos
-            .retain(|demo| demo.expires_at + f32::EPSILON >= time);
+            .retain(|demo| demo.expires_at + f32::EPSILON >= frame.time);
 
         for event in events {
             let sample = DemoEventSample {
@@ -1281,7 +1325,11 @@ impl SaLiveEventGenerator {
             } else {
                 0.0
             };
-            let expires_at = time + active_duration_seconds;
+            let (_, event_time) = event_frame_and_time(frame, event.timing);
+            let expires_at = event_time + active_duration_seconds;
+            if expires_at + f32::EPSILON < frame.time {
+                continue;
+            }
             if let Some(active_demo) = self.active_demos.iter_mut().find(|active_demo| {
                 active_demo.sample.attacker == sample.attacker
                     && active_demo.sample.victim == sample.victim
@@ -1308,7 +1356,7 @@ impl SaLiveEventGenerator {
         explicit_events: &SaFrameEventSlices<'_>,
     ) -> (FrameEventsState, LivePlayState) {
         let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
-        let active_demos = self.sync_active_demos(frame.time, explicit_events.demolishes);
+        let active_demos = self.sync_active_demos(frame, explicit_events.demolishes);
         let boost_pad_events = explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
         let player_stat_events =
             explicit_player_stat_events(frame, explicit_events.player_stat_events);
@@ -3329,6 +3377,7 @@ mod tests {
             "SaQuat",
             "SaRigidBody",
             "SaPlayerFrame",
+            "SaEventTiming",
             "SaTouchEvent",
             "SaDodgeRefreshedEvent",
             "SaBoostPadEvent",
@@ -3400,8 +3449,17 @@ mod tests {
                 ],
             ),
             (
+                "SaEventTiming",
+                vec![
+                    ("uint64_t", "frame_number"),
+                    ("float", "time"),
+                    ("uint8_t", "has_timing"),
+                ],
+            ),
+            (
                 "SaTouchEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint32_t", "player_index"),
                     ("uint8_t", "has_player"),
                     ("uint8_t", "is_team_0"),
@@ -3412,6 +3470,7 @@ mod tests {
             (
                 "SaDodgeRefreshedEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint32_t", "player_index"),
                     ("uint8_t", "is_team_0"),
                     ("int32_t", "counter_value"),
@@ -3420,6 +3479,7 @@ mod tests {
             (
                 "SaBoostPadEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint32_t", "pad_id"),
                     ("SaBoostPadEventKind", "kind"),
                     ("uint8_t", "sequence"),
@@ -3430,6 +3490,7 @@ mod tests {
             (
                 "SaGoalEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint8_t", "scoring_team_is_team_0"),
                     ("uint32_t", "player_index"),
                     ("uint8_t", "has_player"),
@@ -3442,6 +3503,7 @@ mod tests {
             (
                 "SaPlayerStatEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint32_t", "player_index"),
                     ("uint8_t", "is_team_0"),
                     ("SaPlayerStatEventKind", "kind"),
@@ -3454,6 +3516,7 @@ mod tests {
             (
                 "SaDemolishEvent",
                 vec![
+                    ("SaEventTiming", "timing"),
                     ("uint32_t", "attacker_index"),
                     ("uint32_t", "victim_index"),
                     ("SaVec3", "attacker_velocity"),
@@ -3640,50 +3703,61 @@ mod tests {
         assert_offset!(SaPlayerFrame, match_shots, 104);
         assert_offset!(SaPlayerFrame, match_score, 108);
 
-        assert_layout!(SaTouchEvent, size = 16, align = 4);
-        assert_offset!(SaTouchEvent, player_index, 0);
-        assert_offset!(SaTouchEvent, has_player, 4);
-        assert_offset!(SaTouchEvent, is_team_0, 5);
-        assert_offset!(SaTouchEvent, closest_approach_distance, 8);
-        assert_offset!(SaTouchEvent, has_closest_approach_distance, 12);
+        assert_layout!(SaEventTiming, size = 16, align = 8);
+        assert_offset!(SaEventTiming, frame_number, 0);
+        assert_offset!(SaEventTiming, time, 8);
+        assert_offset!(SaEventTiming, has_timing, 12);
 
-        assert_layout!(SaDodgeRefreshedEvent, size = 12, align = 4);
-        assert_offset!(SaDodgeRefreshedEvent, player_index, 0);
-        assert_offset!(SaDodgeRefreshedEvent, is_team_0, 4);
-        assert_offset!(SaDodgeRefreshedEvent, counter_value, 8);
+        assert_layout!(SaTouchEvent, size = 32, align = 8);
+        assert_offset!(SaTouchEvent, timing, 0);
+        assert_offset!(SaTouchEvent, player_index, 16);
+        assert_offset!(SaTouchEvent, has_player, 20);
+        assert_offset!(SaTouchEvent, is_team_0, 21);
+        assert_offset!(SaTouchEvent, closest_approach_distance, 24);
+        assert_offset!(SaTouchEvent, has_closest_approach_distance, 28);
 
-        assert_layout!(SaBoostPadEvent, size = 20, align = 4);
-        assert_offset!(SaBoostPadEvent, pad_id, 0);
-        assert_offset!(SaBoostPadEvent, kind, 4);
-        assert_offset!(SaBoostPadEvent, sequence, 8);
-        assert_offset!(SaBoostPadEvent, player_index, 12);
-        assert_offset!(SaBoostPadEvent, has_player, 16);
+        assert_layout!(SaDodgeRefreshedEvent, size = 32, align = 8);
+        assert_offset!(SaDodgeRefreshedEvent, timing, 0);
+        assert_offset!(SaDodgeRefreshedEvent, player_index, 16);
+        assert_offset!(SaDodgeRefreshedEvent, is_team_0, 20);
+        assert_offset!(SaDodgeRefreshedEvent, counter_value, 24);
 
-        assert_layout!(SaGoalEvent, size = 28, align = 4);
-        assert_offset!(SaGoalEvent, scoring_team_is_team_0, 0);
-        assert_offset!(SaGoalEvent, player_index, 4);
-        assert_offset!(SaGoalEvent, has_player, 8);
-        assert_offset!(SaGoalEvent, team_zero_score, 12);
-        assert_offset!(SaGoalEvent, has_team_zero_score, 16);
-        assert_offset!(SaGoalEvent, team_one_score, 20);
-        assert_offset!(SaGoalEvent, has_team_one_score, 24);
+        assert_layout!(SaBoostPadEvent, size = 40, align = 8);
+        assert_offset!(SaBoostPadEvent, timing, 0);
+        assert_offset!(SaBoostPadEvent, pad_id, 16);
+        assert_offset!(SaBoostPadEvent, kind, 20);
+        assert_offset!(SaBoostPadEvent, sequence, 24);
+        assert_offset!(SaBoostPadEvent, player_index, 28);
+        assert_offset!(SaBoostPadEvent, has_player, 32);
 
-        assert_layout!(SaPlayerStatEvent, size = 132, align = 4);
-        assert_offset!(SaPlayerStatEvent, player_index, 0);
-        assert_offset!(SaPlayerStatEvent, is_team_0, 4);
-        assert_offset!(SaPlayerStatEvent, kind, 8);
-        assert_offset!(SaPlayerStatEvent, has_shot_ball, 12);
-        assert_offset!(SaPlayerStatEvent, shot_ball, 16);
-        assert_offset!(SaPlayerStatEvent, has_shot_player, 72);
-        assert_offset!(SaPlayerStatEvent, shot_player, 76);
+        assert_layout!(SaGoalEvent, size = 48, align = 8);
+        assert_offset!(SaGoalEvent, timing, 0);
+        assert_offset!(SaGoalEvent, scoring_team_is_team_0, 16);
+        assert_offset!(SaGoalEvent, player_index, 20);
+        assert_offset!(SaGoalEvent, has_player, 24);
+        assert_offset!(SaGoalEvent, team_zero_score, 28);
+        assert_offset!(SaGoalEvent, has_team_zero_score, 32);
+        assert_offset!(SaGoalEvent, team_one_score, 36);
+        assert_offset!(SaGoalEvent, has_team_one_score, 40);
 
-        assert_layout!(SaDemolishEvent, size = 48, align = 4);
-        assert_offset!(SaDemolishEvent, attacker_index, 0);
-        assert_offset!(SaDemolishEvent, victim_index, 4);
-        assert_offset!(SaDemolishEvent, attacker_velocity, 8);
-        assert_offset!(SaDemolishEvent, victim_velocity, 20);
-        assert_offset!(SaDemolishEvent, victim_location, 32);
-        assert_offset!(SaDemolishEvent, active_duration_seconds, 44);
+        assert_layout!(SaPlayerStatEvent, size = 152, align = 8);
+        assert_offset!(SaPlayerStatEvent, timing, 0);
+        assert_offset!(SaPlayerStatEvent, player_index, 16);
+        assert_offset!(SaPlayerStatEvent, is_team_0, 20);
+        assert_offset!(SaPlayerStatEvent, kind, 24);
+        assert_offset!(SaPlayerStatEvent, has_shot_ball, 28);
+        assert_offset!(SaPlayerStatEvent, shot_ball, 32);
+        assert_offset!(SaPlayerStatEvent, has_shot_player, 88);
+        assert_offset!(SaPlayerStatEvent, shot_player, 92);
+
+        assert_layout!(SaDemolishEvent, size = 64, align = 8);
+        assert_offset!(SaDemolishEvent, timing, 0);
+        assert_offset!(SaDemolishEvent, attacker_index, 16);
+        assert_offset!(SaDemolishEvent, victim_index, 20);
+        assert_offset!(SaDemolishEvent, attacker_velocity, 24);
+        assert_offset!(SaDemolishEvent, victim_velocity, 36);
+        assert_offset!(SaDemolishEvent, victim_location, 48);
+        assert_offset!(SaDemolishEvent, active_duration_seconds, 60);
 
         assert_layout!(SaLiveFrame, size = 232, align = 8);
         assert_offset!(SaLiveFrame, frame_number, 0);
@@ -4802,6 +4876,7 @@ mod tests {
             },
         )];
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -5062,6 +5137,7 @@ mod tests {
             frame.has_live_play = 1;
             if frame_number == 1 {
                 let touches = [SaTouchEvent {
+                    timing: SaEventTiming::default(),
                     player_index: 0,
                     has_player: 1,
                     is_team_0: 1,
@@ -5807,6 +5883,7 @@ mod tests {
             z: 180.0,
         })];
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -5814,6 +5891,7 @@ mod tests {
             has_closest_approach_distance: 1,
         }];
         let dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             is_team_0: 1,
             counter_value: 7,
@@ -5867,6 +5945,7 @@ mod tests {
             z: 180.0,
         })];
         let dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             is_team_0: 1,
             counter_value: 7,
@@ -5939,6 +6018,7 @@ mod tests {
             ),
         ];
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -5946,11 +6026,13 @@ mod tests {
             has_closest_approach_distance: 1,
         }];
         let dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             is_team_0: 1,
             counter_value: 3,
         }];
         let boost_pad_events = [SaBoostPadEvent {
+            timing: SaEventTiming::default(),
             pad_id: 34,
             kind: SaBoostPadEventKind::PickedUp,
             sequence: 2,
@@ -5958,6 +6040,7 @@ mod tests {
             has_player: 1,
         }];
         let goals = [SaGoalEvent {
+            timing: SaEventTiming::default(),
             scoring_team_is_team_0: 1,
             player_index: 0,
             has_player: 1,
@@ -5967,6 +6050,7 @@ mod tests {
             has_team_one_score: 1,
         }];
         let player_stat_events = [SaPlayerStatEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             is_team_0: 1,
             kind: SaPlayerStatEventKind::Shot,
@@ -5998,6 +6082,7 @@ mod tests {
             ),
         }];
         let demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
             attacker_index: 0,
             victim_index: 1,
             attacker_velocity: SaVec3 {
@@ -6294,7 +6379,7 @@ mod tests {
     }
 
     #[test]
-    fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
+    fn process_frame_preserves_explicit_live_event_timing_for_graph_input() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let players = [
             player_at_index(
@@ -6303,7 +6388,7 @@ mod tests {
                 SaVec3 {
                     x: 0.0,
                     y: 0.0,
-                    z: 92.75,
+                    z: 180.0,
                 },
             ),
             player_at_index(
@@ -6316,14 +6401,35 @@ mod tests {
                 },
             ),
         ];
+        let timing = SaEventTiming {
+            frame_number: 4,
+            time: 0.4,
+            has_timing: 1,
+        };
         let touches = [SaTouchEvent {
+            timing,
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
             closest_approach_distance: 12.0,
             has_closest_approach_distance: 1,
         }];
+        let dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing,
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 3,
+        }];
+        let boost_pad_events = [SaBoostPadEvent {
+            timing,
+            pad_id: 34,
+            kind: SaBoostPadEventKind::PickedUp,
+            sequence: 2,
+            player_index: 0,
+            has_player: 1,
+        }];
         let goals = [SaGoalEvent {
+            timing,
             scoring_team_is_team_0: 1,
             player_index: 0,
             has_player: 1,
@@ -6333,6 +6439,7 @@ mod tests {
             has_team_one_score: 1,
         }];
         let player_stat_events = [SaPlayerStatEvent {
+            timing,
             player_index: 0,
             is_team_0: 1,
             kind: SaPlayerStatEventKind::Shot,
@@ -6364,6 +6471,159 @@ mod tests {
             ),
         }];
         let demolishes = [SaDemolishEvent {
+            timing,
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+            active_duration_seconds: 0.25,
+        }];
+        let mut frame = live_frame(
+            9,
+            rigid_body(
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 180.0,
+                },
+                SaVec3::default(),
+            ),
+            &players,
+        );
+        frame.touches = touches.as_ptr();
+        frame.touch_count = touches.len();
+        frame.dodge_refreshes = dodge_refreshes.as_ptr();
+        frame.dodge_refresh_count = dodge_refreshes.len();
+        frame.boost_pad_events = boost_pad_events.as_ptr();
+        frame.boost_pad_event_count = boost_pad_events.len();
+        frame.goals = goals.as_ptr();
+        frame.goal_count = goals.len();
+        frame.player_stat_events = player_stat_events.as_ptr();
+        frame.player_stat_event_count = player_stat_events.len();
+        frame.demolishes = demolishes.as_ptr();
+        frame.demolish_count = demolishes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.touch_events[0].frame, 4);
+        assert_eq!(frame_events.touch_events[0].time, 0.4);
+        assert!(
+            frame_events
+                .dodge_refreshed_events
+                .iter()
+                .any(|event| event.frame == 4 && event.time == 0.4),
+            "explicit dodge refresh timing should survive alongside any same-frame inferred event"
+        );
+        assert_eq!(frame_events.boost_pad_events[0].frame, 4);
+        assert_eq!(frame_events.boost_pad_events[0].time, 0.4);
+        assert_eq!(frame_events.goal_events[0].frame, 4);
+        assert_eq!(frame_events.goal_events[0].time, 0.4);
+        assert_eq!(frame_events.player_stat_events[0].frame, 4);
+        assert_eq!(frame_events.player_stat_events[0].time, 0.4);
+        assert_eq!(frame_events.demo_events[0].frame, 4);
+        assert_eq!(frame_events.demo_events[0].time, 0.4);
+
+        let frame_events_node = live_analysis_node_json_value(engine, "frame_events_state");
+        assert_eq!(frame_events_node["touch_events"][0]["frame"], 4);
+        assert_eq!(frame_events_node["boost_pad_events"][0]["frame"], 4);
+        assert_eq!(frame_events_node["goal_events"][0]["frame"], 4);
+        assert_eq!(frame_events_node["player_stat_events"][0]["frame"], 4);
+        assert_eq!(frame_events_node["demo_events"][0]["frame"], 4);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            has_player: 1,
+            is_team_0: 1,
+            closest_approach_distance: 12.0,
+            has_closest_approach_distance: 1,
+        }];
+        let goals = [SaGoalEvent {
+            timing: SaEventTiming::default(),
+            scoring_team_is_team_0: 1,
+            player_index: 0,
+            has_player: 1,
+            team_zero_score: 1,
+            has_team_zero_score: 1,
+            team_one_score: 0,
+            has_team_one_score: 1,
+        }];
+        let player_stat_events = [SaPlayerStatEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            kind: SaPlayerStatEventKind::Shot,
+            has_shot_ball: 1,
+            shot_ball: rigid_body(
+                SaVec3 {
+                    x: 300.0,
+                    y: 100.0,
+                    z: 120.0,
+                },
+                SaVec3 {
+                    x: 1000.0,
+                    y: 500.0,
+                    z: 100.0,
+                },
+            ),
+            has_shot_player: 1,
+            shot_player: rigid_body(
+                SaVec3 {
+                    x: 240.0,
+                    y: 90.0,
+                    z: 92.75,
+                },
+                SaVec3 {
+                    x: 800.0,
+                    y: 300.0,
+                    z: 0.0,
+                },
+            ),
+        }];
+        let demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
             attacker_index: 0,
             victim_index: 1,
             attacker_velocity: SaVec3 {
@@ -6438,6 +6698,7 @@ mod tests {
             ),
         ];
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -6445,6 +6706,7 @@ mod tests {
             has_closest_approach_distance: 1,
         }];
         let goals = [SaGoalEvent {
+            timing: SaEventTiming::default(),
             scoring_team_is_team_0: 1,
             player_index: 0,
             has_player: 1,
@@ -6454,6 +6716,7 @@ mod tests {
             has_team_one_score: 1,
         }];
         let player_stat_events = [SaPlayerStatEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             is_team_0: 1,
             kind: SaPlayerStatEventKind::Shot,
@@ -6485,6 +6748,7 @@ mod tests {
             ),
         }];
         let demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
             attacker_index: 0,
             victim_index: 1,
             attacker_velocity: SaVec3 {
@@ -6589,6 +6853,7 @@ mod tests {
         );
         let player_stat_events = [
             SaPlayerStatEvent {
+                timing: SaEventTiming::default(),
                 player_index: 0,
                 is_team_0: 1,
                 kind: SaPlayerStatEventKind::Shot,
@@ -6598,6 +6863,7 @@ mod tests {
                 shot_player,
             },
             SaPlayerStatEvent {
+                timing: SaEventTiming::default(),
                 player_index: 1,
                 is_team_0: 0,
                 kind: SaPlayerStatEventKind::Save,
@@ -6607,6 +6873,7 @@ mod tests {
                 shot_player: SaRigidBody::default(),
             },
             SaPlayerStatEvent {
+                timing: SaEventTiming::default(),
                 player_index: 0,
                 is_team_0: 1,
                 kind: SaPlayerStatEventKind::Assist,
@@ -6676,6 +6943,7 @@ mod tests {
     fn live_abi_finish_is_idempotent_for_exported_graph_views_and_drains() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -6800,6 +7068,7 @@ mod tests {
     fn live_abi_timeline_json_matches_direct_full_graph_across_finish() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -6858,6 +7127,7 @@ mod tests {
     fn live_abi_stats_json_matches_direct_full_graph_across_finish() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -6916,6 +7186,7 @@ mod tests {
     fn live_abi_exposes_every_builtin_stats_module_by_name() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -7004,6 +7275,7 @@ mod tests {
     fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -7114,6 +7386,7 @@ mod tests {
     fn live_abi_exposes_named_graph_outputs() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -7223,6 +7496,7 @@ mod tests {
     fn live_abi_exposes_every_builtin_analysis_node_by_name() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -7367,6 +7641,7 @@ mod tests {
     fn live_abi_frame_json_matches_direct_full_graph_across_finish() {
         let engine = subtr_actor_bakkesmod_engine_create();
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
@@ -7927,6 +8202,7 @@ mod tests {
         let demo_events = explicit_demolish_events(
             &frame_info,
             &[SaDemolishEvent {
+                timing: SaEventTiming::default(),
                 attacker_index: 2,
                 victim_index: 5,
                 attacker_velocity: SaVec3 {
@@ -8005,6 +8281,7 @@ mod tests {
         let demo_events = explicit_demolish_events(
             &frame_info,
             &[SaDemolishEvent {
+                timing: SaEventTiming::default(),
                 attacker_index: 0,
                 victim_index: 1,
                 attacker_velocity: SaVec3 {
@@ -8087,6 +8364,7 @@ mod tests {
         let demo_events = explicit_demolish_events(
             &frame_info,
             &[SaDemolishEvent {
+                timing: SaEventTiming::default(),
                 attacker_index: 0,
                 victim_index: 1,
                 attacker_velocity: SaVec3 {
@@ -8172,6 +8450,7 @@ mod tests {
             ),
         ];
         let demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
             attacker_index: 0,
             victim_index: 1,
             attacker_velocity: SaVec3 {
@@ -8256,6 +8535,7 @@ mod tests {
             },
         )];
         let touches = [SaTouchEvent {
+            timing: SaEventTiming::default(),
             player_index: 0,
             has_player: 1,
             is_team_0: 1,
