@@ -53,7 +53,9 @@ function assignRushTeamStats(target: RushTeamStats, source: RushTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyRushEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyRushEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createRushEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

@@ -7,11 +7,7 @@ import type {
   ReplayTimelineRange,
 } from "subtr-actor-player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrameLookup,
-  StatsTimeline,
-} from "../statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrameLookup, StatsTimeline } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
 
 export interface StatModuleContext {

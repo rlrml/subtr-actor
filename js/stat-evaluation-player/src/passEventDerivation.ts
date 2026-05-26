@@ -99,10 +99,7 @@ function applyCompletedPassEvent(
   stats.frames_since_last_completed_pass = Math.max(0, frameNumber - event.frame);
 }
 
-function assignPassPlayerStats(
-  target: PassPlayerStats,
-  source: PassPlayerStats | undefined,
-): void {
+function assignPassPlayerStats(target: PassPlayerStats, source: PassPlayerStats | undefined): void {
   Object.assign(target, source ?? defaultPassPlayerStats());
 }
 
@@ -110,7 +107,9 @@ function assignPassTeamStats(target: PassTeamStats, source: PassTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyPassEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyPassEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createPassEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

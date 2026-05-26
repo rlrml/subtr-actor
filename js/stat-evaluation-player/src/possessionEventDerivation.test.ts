@@ -65,14 +65,18 @@ test("possession event derivation populates compacted team stats", () => {
   const blueDefensive = derived.frames[3]!.team_zero.possession.labeled_time?.entries.find(
     (entry) =>
       entry.labels.some((label) => label.key === "possession_state" && label.value === "own") &&
-      entry.labels.some((label) => label.key === "field_third" && label.value === "defensive_third"),
+      entry.labels.some(
+        (label) => label.key === "field_third" && label.value === "defensive_third",
+      ),
   );
   assertClose(blueDefensive?.value, 0.1);
 
   const orangeDefensive = derived.frames[3]!.team_one.possession.labeled_time?.entries.find(
     (entry) =>
       entry.labels.some((label) => label.key === "possession_state" && label.value === "own") &&
-      entry.labels.some((label) => label.key === "field_third" && label.value === "defensive_third"),
+      entry.labels.some(
+        (label) => label.key === "field_third" && label.value === "defensive_third",
+      ),
   );
   assertClose(orangeDefensive?.value, 0.3);
 });

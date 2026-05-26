@@ -388,7 +388,8 @@ export function createEventDerivedStatsFrameLookup(
       stage: "deriving-stats",
       processedFrames: materializedUntilIndex + 1,
       totalFrames: scaffoldFrames.length,
-      progress: scaffoldFrames.length === 0 ? 1 : (materializedUntilIndex + 1) / scaffoldFrames.length,
+      progress:
+        scaffoldFrames.length === 0 ? 1 : (materializedUntilIndex + 1) / scaffoldFrames.length,
     });
     nextMaterializationChunkSize = Math.min(
       maxMaterializationChunkSize,
@@ -409,7 +410,9 @@ export function createEventDerivedStatsFrameLookup(
   };
 }
 
-function clonePlayerId(playerId: (StatsFrame | StatsFrameScaffold)["players"][number]["player_id"]) {
+function clonePlayerId(
+  playerId: (StatsFrame | StatsFrameScaffold)["players"][number]["player_id"],
+) {
   if (!playerId || typeof playerId !== "object") {
     return playerId;
   }
@@ -430,26 +433,20 @@ function cloneStatsFrameScaffold(
   };
 }
 
-function hydrateStatsTimelineFrameScaffolding(
-  timeline: StatsTimeline,
-): MaterializedStatsTimeline {
+function hydrateStatsTimelineFrameScaffolding(timeline: StatsTimeline): MaterializedStatsTimeline {
   return {
     ...timeline,
     frames: timeline.frames.map((frame) => hydrateStatsFrameScaffolding(frame)),
   };
 }
 
-function hydrateStatsFrameScaffolding(
-  frame: StatsFrame | StatsFrameScaffold,
-): StatsFrame {
+function hydrateStatsFrameScaffolding(frame: StatsFrame | StatsFrameScaffold): StatsFrame {
   const hydratedFrame = {
     ...frame,
     team_zero: createTeamStatsSnapshot(
       (frame.team_zero ?? {}) as DeepPartial<typeof frame.team_zero>,
     ),
-    team_one: createTeamStatsSnapshot(
-      (frame.team_one ?? {}) as DeepPartial<typeof frame.team_one>,
-    ),
+    team_one: createTeamStatsSnapshot((frame.team_one ?? {}) as DeepPartial<typeof frame.team_one>),
     players: frame.players.map((player) =>
       createPlayerStatsSnapshot(player as DeepPartial<typeof player>),
     ),

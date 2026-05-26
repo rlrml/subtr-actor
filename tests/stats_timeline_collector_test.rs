@@ -210,6 +210,20 @@ fn normalize_boost_for_live_play_comparison(boost: &mut BoostStats) {
     boost.amount_collected_inactive = 0.0;
     boost.big_pads_collected_inactive = 0;
     boost.small_pads_collected_inactive = 0;
+    boost
+        .labeled_amounts
+        .entries
+        .retain(|entry| !has_inactive_boost_activity_label(&entry.labels));
+    boost
+        .labeled_counts
+        .entries
+        .retain(|entry| !has_inactive_boost_activity_label(&entry.labels));
+}
+
+fn has_inactive_boost_activity_label(labels: &[StatLabel]) -> bool {
+    labels
+        .iter()
+        .any(|label| label.key == "activity" && label.value == "inactive")
 }
 
 fn complete_movement_breakdowns_for_comparison(movement: &MovementStats) -> MovementStats {

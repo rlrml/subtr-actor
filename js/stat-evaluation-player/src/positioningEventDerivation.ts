@@ -104,7 +104,9 @@ function assignPositioningStats(
   Object.assign(target, source ?? defaultPositioningStats());
 }
 
-export function applyPositioningEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyPositioningEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createPositioningEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -114,7 +116,9 @@ export function applyPositioningEventDerivedStats(timeline: MaterializedStatsTim
   return timeline;
 }
 
-export function createPositioningEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+export function createPositioningEventDerivedStatsAccumulator(
+  timeline: MaterializedStatsTimeline,
+): {
   applyFrame(frame: StatsFrame): void;
 } {
   const events = sortPositioningEvents(timeline.events.positioning ?? []);

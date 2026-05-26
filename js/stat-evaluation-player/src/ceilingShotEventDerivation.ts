@@ -87,10 +87,7 @@ function incrementLabels(stats: CeilingShotStatsWithLabels, labels: StatLabel[])
   }
 }
 
-function countWithLabel(
-  stats: CeilingShotStatsWithLabels,
-  value: "standard" | "high",
-): number {
+function countWithLabel(stats: CeilingShotStatsWithLabels, value: "standard" | "high"): number {
   return (
     stats.labeled_event_counts?.entries
       .filter((entry) =>
@@ -168,7 +165,9 @@ function assignCeilingShotStats(
   }
 }
 
-export function applyCeilingShotEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyCeilingShotEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createCeilingShotEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -178,7 +177,9 @@ export function applyCeilingShotEventDerivedStats(timeline: MaterializedStatsTim
   return timeline;
 }
 
-export function createCeilingShotEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+export function createCeilingShotEventDerivedStatsAccumulator(
+  timeline: MaterializedStatsTimeline,
+): {
   applyFrame(frame: StatsFrame): void;
 } {
   const events = sortCeilingShotEvents(timeline.events.ceiling_shot ?? []);
@@ -213,10 +214,7 @@ export function createCeilingShotEventDerivedStatsAccumulator(timeline: Material
       }
 
       for (const player of frame.players) {
-        assignCeilingShotStats(
-          player.ceiling_shot,
-          players.get(remoteIdKey(player.player_id)),
-        );
+        assignCeilingShotStats(player.ceiling_shot, players.get(remoteIdKey(player.player_id)));
       }
     },
   };

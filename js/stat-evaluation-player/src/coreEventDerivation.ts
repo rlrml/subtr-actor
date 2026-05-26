@@ -81,10 +81,7 @@ function sortCoreEvents<T extends { time: number; frame: number }>(events: reado
     .map(({ event }) => event);
 }
 
-function assignCorePlayerStats(
-  target: CorePlayerStats,
-  source: CorePlayerStats | undefined,
-): void {
+function assignCorePlayerStats(target: CorePlayerStats, source: CorePlayerStats | undefined): void {
   Object.assign(target, source ?? defaultCorePlayerStats());
 }
 
@@ -92,9 +89,10 @@ function assignCoreTeamStats(target: CoreTeamStats, source: CoreTeamStats): void
   Object.assign(target, source);
 }
 
-function applyOptionalPositionDelta<
-  T extends { x: number; y: number; z: number },
->(current: T | null, delta: T | null): T | null {
+function applyOptionalPositionDelta<T extends { x: number; y: number; z: number }>(
+  current: T | null,
+  delta: T | null,
+): T | null {
   return delta == null ? current : { ...delta };
 }
 
@@ -187,7 +185,9 @@ function applyCorePlayerDelta(stats: CorePlayerStats, delta: CorePlayerStats): v
   );
 }
 
-export function applyCoreEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyCoreEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createCoreEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -206,8 +206,8 @@ export function createCoreEventDerivedStatsAccumulator(timeline: MaterializedSta
   let playerEventIndex = 0;
   let teamEventIndex = 0;
   const players = new Map<string, CorePlayerStats>();
-  let teamZero = defaultCoreTeamStats();
-  let teamOne = defaultCoreTeamStats();
+  const teamZero = defaultCoreTeamStats();
+  const teamOne = defaultCoreTeamStats();
 
   return {
     applyFrame(frame: StatsFrame): void {

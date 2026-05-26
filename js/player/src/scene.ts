@@ -29,6 +29,7 @@ const OPAQUE_WALL_OPACITY = 1;
 const OUTSIDE_WALL_OPACITY = 0.32;
 const BALL_TEXTURE_SIZE = 1024;
 const KEYBOARD_PAN_SPEED = 16;
+const MAX_RENDERER_PIXEL_RATIO = 1.5;
 
 function createWallMaterial(color: number): THREE.MeshBasicMaterial {
   const material = new THREE.MeshBasicMaterial({
@@ -831,8 +832,11 @@ export function createReplayScene(
   camera.position.set(0, -9000 * fieldScale, 5000 * fieldScale);
   camera.lookAt(0, 0, 0);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    powerPreference: "high-performance",
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_RENDERER_PIXEL_RATIO));
   renderer.domElement.style.display = "block";
   renderer.domElement.style.width = "100%";
   renderer.domElement.style.height = "100%";

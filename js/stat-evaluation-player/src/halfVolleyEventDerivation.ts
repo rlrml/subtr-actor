@@ -100,14 +100,13 @@ function assignHalfVolleyPlayerStats(
   Object.assign(target, source ?? defaultHalfVolleyPlayerStats());
 }
 
-function assignHalfVolleyTeamStats(
-  target: HalfVolleyTeamStats,
-  source: HalfVolleyTeamStats,
-): void {
+function assignHalfVolleyTeamStats(target: HalfVolleyTeamStats, source: HalfVolleyTeamStats): void {
   Object.assign(target, source);
 }
 
-export function applyHalfVolleyEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyHalfVolleyEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createHalfVolleyEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -179,10 +178,7 @@ export function createHalfVolleyEventDerivedStatsAccumulator(timeline: Materiali
       assignHalfVolleyTeamStats(frame.team_zero.half_volley, teamZero);
       assignHalfVolleyTeamStats(frame.team_one.half_volley, teamOne);
       for (const player of frame.players) {
-        assignHalfVolleyPlayerStats(
-          player.half_volley,
-          players.get(remoteIdKey(player.player_id)),
-        );
+        assignHalfVolleyPlayerStats(player.half_volley, players.get(remoteIdKey(player.player_id)));
       }
     },
   };

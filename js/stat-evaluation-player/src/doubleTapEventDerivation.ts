@@ -79,7 +79,9 @@ function assignDoubleTapTeamStats(target: DoubleTapTeamStats, count: number): vo
   target.count = count;
 }
 
-export function applyDoubleTapEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyDoubleTapEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createDoubleTapEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

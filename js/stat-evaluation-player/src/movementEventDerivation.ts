@@ -78,7 +78,9 @@ function sortMovementEvents(events: readonly MovementEvent[]): MovementEvent[] {
 
 function sortLabels(labels: StatLabel[]): StatLabel[] {
   return labels.sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
 }
 
@@ -158,7 +160,9 @@ function assignMovementStats(target: MovementStats, source: MovementStats | unde
   }
 }
 
-export function applyMovementEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyMovementEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createMovementEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

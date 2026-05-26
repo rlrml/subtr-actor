@@ -70,6 +70,16 @@ const CONFIG: StatsPlayerConfig = {
       },
     },
     {
+      id: "replay-loading",
+      placement: {
+        x: 1240,
+        y: 64,
+        viewport: { width: 1920, height: 1080 },
+        zIndex: 34,
+        visible: true,
+      },
+    },
+    {
       id: "scoreboard",
       placement: {
         x: 820,

@@ -29,6 +29,7 @@ import {
   countEnabledTimelineEvents,
   filterReplayTimelineEvents,
   getMechanicTimelineEventModuleIds,
+  getMechanicTimelineModuleIds,
   getReplayTimelineEventKinds,
 } from "./timelineMarkers.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
@@ -111,6 +112,50 @@ test("buildMechanicTimelineEvents maps endpoint mechanics to markers at the end 
   ]);
 });
 
+test("buildMechanicTimelineEvents maps flip reset mechanics to moment markers", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, time) => ({ time })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        name: "Blue",
+      },
+    ],
+  } as ReplayModel;
+
+  const statsTimeline = createLegacyStatsTimeline({
+    mechanic_events: [
+      {
+        id: "flip_reset:2:0",
+        kind: "flip_reset",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "moment",
+          frame: 2,
+          time: 2,
+        },
+        properties: [],
+      },
+    ],
+  });
+
+  assert.deepEqual(buildMechanicTimelineEvents(statsTimeline, replay, ["flip_reset"]), [
+    {
+      id: "flip_reset:2:0",
+      time: 2,
+      frame: 2,
+      kind: "flip_reset",
+      label: "Blue flip reset",
+      shortLabel: "FR",
+      playerId: "Steam:blue-id",
+      playerName: "Blue",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
 test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
   const replay = {
     frames: Array.from({ length: 4 }, (_, time) => ({ time })),
@@ -179,7 +224,7 @@ test("buildMechanicTimelineEvents skips range-only carry mechanics", () => {
   );
 });
 
-test("getMechanicTimelineEventModuleIds only includes generic mechanic-owned module markers", () => {
+test("mechanic module id helpers separate event mechanics from all mechanic-backed modules", () => {
   const statsTimeline = createLegacyStatsTimeline({
     mechanic_events: [
       {
@@ -239,6 +284,44 @@ test("getMechanicTimelineEventModuleIds only includes generic mechanic-owned mod
         properties: [],
       },
       {
+        id: "flip_reset:4:0",
+        kind: "flip_reset",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "moment",
+          frame: 4,
+          time: 4,
+        },
+        properties: [],
+      },
+      {
+        id: "half_volley:5:0",
+        kind: "half_volley",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "moment",
+          frame: 5,
+          time: 5,
+        },
+        properties: [],
+      },
+      {
+        id: "pass:2:5:0",
+        kind: "pass",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 2,
+          end_frame: 5,
+          start_time: 2,
+          end_time: 5,
+        },
+        properties: [],
+      },
+      {
         id: "wavedash:4:0",
         kind: "wavedash",
         player_id: { Steam: "blue-id" },
@@ -255,7 +338,11 @@ test("getMechanicTimelineEventModuleIds only includes generic mechanic-owned mod
 
   assert.deepEqual(
     [...getMechanicTimelineEventModuleIds(statsTimeline)],
-    ["center", "double-tap", "wall-aerial"],
+    ["center", "double-tap", "flip-reset", "half-volley", "pass", "wall-aerial"],
+  );
+  assert.deepEqual(
+    [...getMechanicTimelineModuleIds(statsTimeline)],
+    ["ball-carry", "center", "double-tap", "flip-reset", "half-volley", "pass", "wall-aerial"],
   );
 });
 

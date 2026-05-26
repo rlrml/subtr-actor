@@ -154,10 +154,7 @@ function applyFlickEvent(
   stats.last_confidence = event.confidence;
   stats.best_confidence = Math.max(stats.best_confidence, event.confidence);
   stats.cumulative_confidence = addF32(stats.cumulative_confidence, event.confidence);
-  stats.cumulative_setup_duration = addF32(
-    stats.cumulative_setup_duration,
-    event.setup_duration,
-  );
+  stats.cumulative_setup_duration = addF32(stats.cumulative_setup_duration, event.setup_duration);
   stats.cumulative_ball_speed_change = addF32(
     stats.cumulative_ball_speed_change,
     event.ball_speed_change,
@@ -175,7 +172,9 @@ function assignFlickStats(target: FlickStats, source: FlickStatsWithLabels | und
   }
 }
 
-export function applyFlickEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyFlickEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createFlickEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

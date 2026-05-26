@@ -56,7 +56,9 @@ function emptyLabeledTouchCounts(): TouchStats["labeled_touch_counts"] {
           })),
         ),
       ),
-    ).sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels))),
+    ).sort((left, right) =>
+      JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+    ),
   };
 }
 
@@ -95,9 +97,9 @@ function createTouchAccumulator(): TouchAccumulator {
   };
 }
 
-function sortBySample<T extends { time: number; frame: number; sample_time?: number; sample_frame?: number }>(
-  events: readonly T[],
-): T[] {
+function sortBySample<
+  T extends { time: number; frame: number; sample_time?: number; sample_frame?: number },
+>(events: readonly T[]): T[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
@@ -139,7 +141,9 @@ function sortByFrame<T extends { time: number; frame: number }>(events: readonly
 
 function incrementLabeledTouchCount(stats: TouchStats, labels: StatLabel[]): void {
   labels.sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
   const entries = stats.labeled_touch_counts?.entries ?? [];
   stats.labeled_touch_counts = { entries };
@@ -154,11 +158,15 @@ function incrementLabeledTouchCount(stats: TouchStats, labels: StatLabel[]): voi
     entry.count += 1;
   } else {
     entries.push({ labels, count: 1 });
-    entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+    entries.sort((left, right) =>
+      JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+    );
   }
 }
 
-function cloneLabeledTouchCounts(source: NonNullable<TouchStats["labeled_touch_counts"]>): NonNullable<TouchStats["labeled_touch_counts"]> {
+function cloneLabeledTouchCounts(
+  source: NonNullable<TouchStats["labeled_touch_counts"]>,
+): NonNullable<TouchStats["labeled_touch_counts"]> {
   return {
     entries: source.entries.map((entry) => ({
       labels: entry.labels.map((label) => ({ ...label })),
@@ -233,7 +241,9 @@ function assignTouchStats(target: TouchStats, source: TouchAccumulator | undefin
   });
 }
 
-export function applyTouchEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyTouchEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createTouchEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -268,7 +278,10 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
             stats.time_since_last_touch = Math.max(0, subF32(frame.time, stats.last_touch_time));
           }
           if (stats.last_touch_frame != null) {
-            stats.frames_since_last_touch = Math.max(0, frame.frame_number - stats.last_touch_frame);
+            stats.frames_since_last_touch = Math.max(
+              0,
+              frame.frame_number - stats.last_touch_frame,
+            );
           }
         }
 

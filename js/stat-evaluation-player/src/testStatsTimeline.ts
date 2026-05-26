@@ -218,8 +218,7 @@ export function createLegacyStatsTimeline(
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
       positioning: overrides.positioning_events ?? overrides.events?.positioning ?? [],
-      rotation_player:
-        overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
+      rotation_player: overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
       rotation_team: overrides.rotation_team_events ?? overrides.events?.rotation_team ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
       boost_ledger: overrides.boost_ledger ?? overrides.events?.boost_ledger ?? [],

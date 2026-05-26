@@ -82,7 +82,10 @@ function labelsSortKey(labels: readonly StatLabel[]): string {
   return labels.map(labelSortKey).join("\u0001");
 }
 
-function incrementLabels(stats: { labeled_event_counts?: LabeledCounts }, labels: StatLabel[]): void {
+function incrementLabels(
+  stats: { labeled_event_counts?: LabeledCounts },
+  labels: StatLabel[],
+): void {
   labels.sort((left, right) => labelSortKey(left).localeCompare(labelSortKey(right)));
   const labeledCounts = (stats.labeled_event_counts ??= { entries: [] });
   const existing = labeledCounts.entries.find(
@@ -186,7 +189,9 @@ function assignAirDribbleStats(
   }
 }
 
-export function applyBallCarryEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyBallCarryEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createBallCarryEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

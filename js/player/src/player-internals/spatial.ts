@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { ReplayScene } from "../scene";
 import type {
   CameraSettings,
+  Quaternion,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayModel,
@@ -49,6 +50,24 @@ export function interpolatePosition(
     y: THREE.MathUtils.lerp(current.y, next.y, alpha),
     z: THREE.MathUtils.lerp(current.z, next.z, alpha),
   };
+}
+
+export function interpolateQuaternion(
+  current: Quaternion | null,
+  next: Quaternion | null,
+  alpha: number,
+): THREE.Quaternion | null {
+  const source = current ?? next;
+  if (!source) {
+    return null;
+  }
+
+  const result = new THREE.Quaternion(source.x, source.y, source.z, source.w);
+  if (!next || alpha <= 0 || current === null) {
+    return result;
+  }
+
+  return result.slerp(new THREE.Quaternion(next.x, next.y, next.z, next.w), alpha);
 }
 
 export function rootPosition(position: Vec3): THREE.Vector3 {

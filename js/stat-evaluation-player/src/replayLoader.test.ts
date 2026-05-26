@@ -103,7 +103,10 @@ test("getReplayLoadCompletion maps replay loading stages to monotonic overall pr
     0.94,
   );
   assertApproximatelyEqual(getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }), 0.96);
-  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "deriving-stats", progress: 0.5 }), 0.98);
+  assertApproximatelyEqual(
+    getReplayLoadCompletion({ stage: "deriving-stats", progress: 0.5 }),
+    0.98,
+  );
   assertApproximatelyEqual(getReplayLoadCompletion({ stage: "deriving-stats", progress: 1 }), 1);
 });
 

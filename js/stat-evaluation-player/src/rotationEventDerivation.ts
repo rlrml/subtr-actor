@@ -64,10 +64,7 @@ function sortRotationEvents<T extends { time: number; frame: number }>(events: r
     .map(({ event }) => event);
 }
 
-function applyRotationPlayerEvent(
-  state: RotationPlayerState,
-  event: RotationPlayerEvent,
-): void {
+function applyRotationPlayerEvent(state: RotationPlayerState, event: RotationPlayerEvent): void {
   state.active = event.active;
   const stats = state.stats;
   stats.became_first_man_count += event.became_first_man_count;
@@ -129,7 +126,9 @@ function assignRotationTeamStats(target: RotationTeamStats, source: RotationTeam
   Object.assign(target, source);
 }
 
-export function applyRotationEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyRotationEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createRotationEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

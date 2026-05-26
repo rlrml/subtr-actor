@@ -44,9 +44,7 @@ function defaultWallAerialShotStats(): WallAerialShotStats {
   };
 }
 
-function sortWallAerialShotEvents(
-  events: readonly WallAerialShotEvent[],
-): WallAerialShotEvent[] {
+function sortWallAerialShotEvents(events: readonly WallAerialShotEvent[]): WallAerialShotEvent[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
@@ -113,7 +111,9 @@ function assignWallAerialShotStats(
   Object.assign(target, source ?? defaultWallAerialShotStats());
 }
 
-export function applyWallAerialShotEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyWallAerialShotEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createWallAerialShotEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -123,7 +123,9 @@ export function applyWallAerialShotEventDerivedStats(timeline: MaterializedStats
   return timeline;
 }
 
-export function createWallAerialShotEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+export function createWallAerialShotEventDerivedStatsAccumulator(
+  timeline: MaterializedStatsTimeline,
+): {
   applyFrame(frame: StatsFrame): void;
 } {
   const events = sortWallAerialShotEvents(timeline.events.wall_aerial_shot ?? []);

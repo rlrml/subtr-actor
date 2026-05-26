@@ -40,10 +40,7 @@ function sortDemoTimelineEvents(events: readonly TimelineEvent[]): TimelineEvent
     .map(({ event }) => event);
 }
 
-function assignDemoPlayerStats(
-  target: DemoPlayerStats,
-  source: DemoPlayerStats | undefined,
-): void {
+function assignDemoPlayerStats(target: DemoPlayerStats, source: DemoPlayerStats | undefined): void {
   Object.assign(target, source ?? defaultDemoPlayerStats());
 }
 
@@ -51,7 +48,9 @@ function assignDemoTeamStats(target: DemoTeamStats, source: DemoTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyDemoEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyDemoEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createDemoEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

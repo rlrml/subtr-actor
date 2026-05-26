@@ -19,9 +19,7 @@ export type ReplayReviewMode = "report" | "viewer";
 export interface ReplayReviewDataProvider {
   readonly replayName?: string;
   readonly replayUrl?: URL | null;
-  getStatsTimeline?(
-    onProgress?: (progress: ReplayLoadProgress) => void,
-  ): Promise<StatsTimeline>;
+  getStatsTimeline?(onProgress?: (progress: ReplayLoadProgress) => void): Promise<StatsTimeline>;
   getReplayBundle?(onProgress?: (progress: ReplayLoadProgress) => void): Promise<ReplayLoadBundle>;
 }
 
@@ -245,7 +243,8 @@ export function mountReplayReview(
       }),
     );
     const loadedBundle = await bundle;
-    const loadedStatsTimeline = loadedBundle?.statsTimeline ?? (statsTimeline ? await statsTimeline : null);
+    const loadedStatsTimeline =
+      loadedBundle?.statsTimeline ?? (statsTimeline ? await statsTimeline : null);
     if (!loadedStatsTimeline) {
       renderEmpty();
       setStatus("No replay loaded");

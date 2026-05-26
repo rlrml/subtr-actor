@@ -46,14 +46,13 @@ function frameCountsTowardPowerslide(frame: StatsFrame): boolean {
   );
 }
 
-function assignPowerslideStats(
-  target: PowerslideStats,
-  source: PowerslideStats | undefined,
-): void {
+function assignPowerslideStats(target: PowerslideStats, source: PowerslideStats | undefined): void {
   Object.assign(target, source ?? defaultPowerslideStats());
 }
 
-export function applyPowerslideEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyPowerslideEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createPowerslideEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

@@ -1,7 +1,11 @@
 import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
 import type { BoostStateEvent } from "./generated/BoostStateEvent.ts";
 import type { BoostStats } from "./generated/BoostStats.ts";
-import type { PlayerStatsSnapshot, StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import type {
+  PlayerStatsSnapshot,
+  StatsFrame,
+  MaterializedStatsTimeline,
+} from "./statsTimeline.ts";
 
 const FLOAT_TOLERANCE = 0.001;
 const BOOST_MAX_AMOUNT = 255;
@@ -158,7 +162,9 @@ function labelValue(event: BoostLedgerEvent, key: string): string | null {
 
 function sortedLabels(labels: BoostLedgerEvent["labels"]): NonNullable<BoostLedgerEvent["labels"]> {
   return [...(labels ?? [])].sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
 }
 
@@ -183,7 +189,9 @@ function addLabeledAmount(stats: EventDerivedBoostStats, event: BoostLedgerEvent
     return true;
   }
   entries.push({ labels: cloneLabels(event.labels), value: amount });
-  entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+  entries.sort((left, right) =>
+    JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+  );
   return true;
 }
 
@@ -203,7 +211,9 @@ function addLabeledCount(
     return true;
   }
   entries.push({ labels: cloneLabels(event.labels), count });
-  entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+  entries.sort((left, right) =>
+    JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+  );
   return true;
 }
 
@@ -250,15 +260,7 @@ function addContinuousBoostSample(
   stats.boost_integral = addF32(stats.boost_integral, mulF32(averageBoostAmount, sampleDt));
   stats.time_zero_boost = addF32(
     stats.time_zero_boost,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        0,
-        BOOST_ZERO_BAND_RAW,
-      ),
-    ),
+    mulF32(sampleDt, intervalFractionInBoostRange(previous, current, 0, BOOST_ZERO_BAND_RAW)),
   );
   stats.time_hundred_boost = addF32(
     stats.time_hundred_boost,
@@ -274,15 +276,7 @@ function addContinuousBoostSample(
   );
   stats.time_boost_0_25 = addF32(
     stats.time_boost_0_25,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        0,
-        boostPercentToAmount(25),
-      ),
-    ),
+    mulF32(sampleDt, intervalFractionInBoostRange(previous, current, 0, boostPercentToAmount(25))),
   );
   stats.time_boost_25_50 = addF32(
     stats.time_boost_25_50,
@@ -582,7 +576,9 @@ function sortedBoostStateEvents(timeline: MaterializedStatsTimeline): BoostState
   });
 }
 
-export function applyBoostLedgerDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyBoostLedgerDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createBoostLedgerDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -738,10 +734,24 @@ export function findBoostLedgerDerivationMismatches(
       }
     }
 
-    compareLedgerDerivedBoostStats(mismatches, frame, "team_zero", frame.team_zero.boost, teamZero.stats);
-    compareLedgerDerivedBoostStats(mismatches, frame, "team_one", frame.team_one.boost, teamOne.stats);
+    compareLedgerDerivedBoostStats(
+      mismatches,
+      frame,
+      "team_zero",
+      frame.team_zero.boost,
+      teamZero.stats,
+    );
+    compareLedgerDerivedBoostStats(
+      mismatches,
+      frame,
+      "team_one",
+      frame.team_one.boost,
+      teamOne.stats,
+    );
     for (const player of frame.players) {
-      const expected = players.get(remoteIdKey(player.player_id as Record<string, unknown>))?.stats ?? createLedgerBoostStats();
+      const expected =
+        players.get(remoteIdKey(player.player_id as Record<string, unknown>))?.stats ??
+        createLedgerBoostStats();
       compareLedgerDerivedBoostStats(mismatches, frame, "player", player.boost, expected, player);
     }
   }

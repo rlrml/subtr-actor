@@ -184,9 +184,9 @@ test("event-derived stats frame lookup applies converted modules incrementally",
     "half-volley",
   ]);
   assert.deepEqual(
-    STATS_TIMELINE_EVENT_DERIVED_APPLIERS.filter(
-      (applier) => !applier.createFrameAccumulator,
-    ).map((applier) => applier.id),
+    STATS_TIMELINE_EVENT_DERIVED_APPLIERS.filter((applier) => !applier.createFrameAccumulator).map(
+      (applier) => applier.id,
+    ),
     [],
   );
 

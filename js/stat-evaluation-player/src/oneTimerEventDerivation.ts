@@ -53,7 +53,9 @@ function advanceOneTimerFrame(
   stats.time_since_last_one_timer =
     stats.last_one_timer_time == null ? null : Math.max(0, frameTime - stats.last_one_timer_time);
   stats.frames_since_last_one_timer =
-    stats.last_one_timer_frame == null ? null : Math.max(0, frameNumber - stats.last_one_timer_frame);
+    stats.last_one_timer_frame == null
+      ? null
+      : Math.max(0, frameNumber - stats.last_one_timer_frame);
 }
 
 function applyOneTimerEvent(
@@ -83,7 +85,9 @@ function assignOneTimerTeamStats(target: OneTimerTeamStats, source: OneTimerTeam
   Object.assign(target, source);
 }
 
-export function applyOneTimerEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyOneTimerEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createOneTimerEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

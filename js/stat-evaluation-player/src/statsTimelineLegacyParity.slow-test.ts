@@ -9,8 +9,9 @@ const LEGACY_PARITY_TIMEOUT_MS_PER_FIXTURE = Number(
   process.env.SUBTR_ACTOR_LEGACY_STATS_PARITY_TIMEOUT_MS ?? 300_000,
 );
 const WIDE_REPLAY_FORMAT_PARITY = process.env.SUBTR_ACTOR_WIDE_LEGACY_STATS_PARITY === "1";
-const EXPLICIT_PARITY_FIXTURES = process.env.SUBTR_ACTOR_LEGACY_STATS_PARITY_FIXTURES
-  ?.split(/[,\s]+/)
+const EXPLICIT_PARITY_FIXTURES = process.env.SUBTR_ACTOR_LEGACY_STATS_PARITY_FIXTURES?.split(
+  /[,\s]+/,
+)
   .map((fixture) => fixture.trim())
   .filter(Boolean);
 
@@ -95,8 +96,7 @@ test(
     ? "event-derived stats timeline frames match legacy full timelines across replay-format fixtures"
     : "event-derived stats timeline frames match the legacy serialized full timeline",
   {
-    timeout:
-      LEGACY_PARITY_TIMEOUT_MS_PER_FIXTURE * (WIDE_REPLAY_FORMAT_PARITY ? 20 : 1) + 10_000,
+    timeout: LEGACY_PARITY_TIMEOUT_MS_PER_FIXTURE * (WIDE_REPLAY_FORMAT_PARITY ? 20 : 1) + 10_000,
   },
   async () => {
     const fixtures =

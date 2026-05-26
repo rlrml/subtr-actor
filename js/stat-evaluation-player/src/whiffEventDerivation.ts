@@ -60,7 +60,12 @@ function advanceWhiffFrame(stats: WhiffAccumulator, frameNumber: number, frameTi
     stats.last_whiff_frame == null ? null : Math.max(0, frameNumber - stats.last_whiff_frame);
 }
 
-function applyWhiffEvent(stats: WhiffAccumulator, event: WhiffEvent, frameNumber: number, frameTime: number): void {
+function applyWhiffEvent(
+  stats: WhiffAccumulator,
+  event: WhiffEvent,
+  frameNumber: number,
+  frameTime: number,
+): void {
   if ((event.kind ?? "whiff") === "beaten_to_ball") {
     stats.beaten_to_ball_count += 1;
     return;
@@ -92,7 +97,9 @@ function assignWhiffStats(target: WhiffStats, source: WhiffAccumulator | undefin
   Object.assign(target, source ?? defaultWhiffStats());
 }
 
-export function applyWhiffEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyWhiffEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createWhiffEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -119,7 +126,10 @@ export function createWhiffEventDerivedStatsAccumulator(timeline: MaterializedSt
           advanceWhiffFrame(stats, frame.frame_number, frame.time);
         }
 
-        while (eventIndex < events.length && events[eventIndex]!.resolved_frame <= frame.frame_number) {
+        while (
+          eventIndex < events.length &&
+          events[eventIndex]!.resolved_frame <= frame.frame_number
+        ) {
           const event = events[eventIndex] as WhiffEvent;
           const playerKey = remoteIdKey(event.player);
           const stats = players.get(playerKey) ?? defaultWhiffStats();

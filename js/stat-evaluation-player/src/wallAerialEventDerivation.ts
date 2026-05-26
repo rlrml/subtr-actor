@@ -113,14 +113,13 @@ function applyWallAerialEvent(
   );
 }
 
-function assignWallAerialStats(
-  target: WallAerialStats,
-  source: WallAerialStats | undefined,
-): void {
+function assignWallAerialStats(target: WallAerialStats, source: WallAerialStats | undefined): void {
   Object.assign(target, source ?? defaultWallAerialStats());
 }
 
-export function applyWallAerialEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyWallAerialEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createWallAerialEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

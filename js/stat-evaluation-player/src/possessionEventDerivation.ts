@@ -63,7 +63,9 @@ function sortPossessionEvents(events: readonly PossessionEvent[]): PossessionEve
 
 function sortLabels(labels: StatLabel[]): StatLabel[] {
   return labels.sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
 }
 
@@ -127,7 +129,11 @@ function applyPossessionEvent(state: PossessionState, event: PossessionEvent): v
   state.fieldThird = event.field_third ?? null;
 }
 
-function accumulatePossessionFrame(raw: RawPossessionStats, state: PossessionState, frame: StatsFrame): void {
+function accumulatePossessionFrame(
+  raw: RawPossessionStats,
+  state: PossessionState,
+  frame: StatsFrame,
+): void {
   if (!state.active) {
     return;
   }
@@ -156,7 +162,9 @@ function assignPossessionStats(
   Object.assign(target, source ?? defaultPossessionTeamStats());
 }
 
-export function applyPossessionEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyPossessionEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createPossessionEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

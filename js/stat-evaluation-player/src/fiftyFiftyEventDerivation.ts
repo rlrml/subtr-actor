@@ -226,7 +226,9 @@ function assignFiftyFiftyTeamStats(target: FiftyFiftyTeamStats, source: FiftyFif
   Object.assign(target, source);
 }
 
-export function applyFiftyFiftyEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyFiftyFiftyEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createFiftyFiftyEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
@@ -248,7 +250,10 @@ export function createFiftyFiftyEventDerivedStatsAccumulator(timeline: Materiali
 
   return {
     applyFrame(frame: StatsFrame): void {
-      while (eventIndex < events.length && events[eventIndex]!.resolve_frame <= frame.frame_number) {
+      while (
+        eventIndex < events.length &&
+        events[eventIndex]!.resolve_frame <= frame.frame_number
+      ) {
         const event = events[eventIndex] as FiftyFiftyEvent;
         applyFiftyFiftyTeamEvent(teamZero, true, event);
         applyFiftyFiftyTeamEvent(teamOne, false, event);
@@ -270,10 +275,7 @@ export function createFiftyFiftyEventDerivedStatsAccumulator(timeline: Materiali
       assignFiftyFiftyTeamStats(frame.team_zero.fifty_fifty, teamZero);
       assignFiftyFiftyTeamStats(frame.team_one.fifty_fifty, teamOne);
       for (const player of frame.players) {
-        assignFiftyFiftyPlayerStats(
-          player.fifty_fifty,
-          players.get(remoteIdKey(player.player_id)),
-        );
+        assignFiftyFiftyPlayerStats(player.fifty_fifty, players.get(remoteIdKey(player.player_id)));
       }
     },
   };

@@ -76,10 +76,7 @@ function recordBumpTeamStats(stats: BumpTeamStats, event: BumpEvent): void {
   }
 }
 
-function assignBumpPlayerStats(
-  target: BumpPlayerStats,
-  source: BumpPlayerStats | undefined,
-): void {
+function assignBumpPlayerStats(target: BumpPlayerStats, source: BumpPlayerStats | undefined): void {
   Object.assign(target, source ?? defaultBumpPlayerStats());
 }
 
@@ -87,7 +84,9 @@ function assignBumpTeamStats(target: BumpTeamStats, source: BumpTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyBumpEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyBumpEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createBumpEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

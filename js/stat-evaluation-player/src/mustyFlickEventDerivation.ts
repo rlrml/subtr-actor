@@ -169,7 +169,9 @@ function assignMustyFlickStats(
   }
 }
 
-export function applyMustyFlickEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyMustyFlickEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createMustyFlickEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

@@ -101,7 +101,9 @@ function confidenceBandLabel(confidence: number, highConfidenceThreshold: number
 
 function incrementLabeledCount(counts: LabeledCounts, labels: StatLabel[]): void {
   const sortedLabels = labels.sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
   const entry = counts.entries.find(
     (candidate) =>
@@ -116,7 +118,9 @@ function incrementLabeledCount(counts: LabeledCounts, labels: StatLabel[]): void
     return;
   }
   counts.entries.push({ labels: sortedLabels, count: 1 });
-  counts.entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+  counts.entries.sort((left, right) =>
+    JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+  );
 }
 
 function cloneLabeledCounts(counts: LabeledCounts): LabeledCounts {
@@ -139,10 +143,9 @@ function applyQualityMechanicEvent(
   if (event.confidence >= highConfidenceThreshold) {
     accumulator.highConfidenceCount += 1;
   }
-  incrementLabeledCount(
-    accumulator.labeledCounts,
-    [confidenceBandLabel(event.confidence, highConfidenceThreshold)],
-  );
+  incrementLabeledCount(accumulator.labeledCounts, [
+    confidenceBandLabel(event.confidence, highConfidenceThreshold),
+  ]);
   accumulator.lastTime = event.time;
   accumulator.lastFrame = event.frame;
   accumulator.lastResolvedTime = resolvedTime;
@@ -308,7 +311,9 @@ function frameAdvancesSpeedFlipStats(frame: StatsFrame): boolean {
   return frame.is_live_play || frame.ball_has_been_hit === false;
 }
 
-export function applyMechanicEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyMechanicEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createMechanicEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

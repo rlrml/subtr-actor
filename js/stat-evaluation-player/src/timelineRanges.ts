@@ -1,10 +1,10 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsTimeline,
-} from "./statsTimeline.ts";
-import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
+import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
+import {
+  formatMechanicKind,
+  isRangeOnlyMechanicKind,
+  isVisibleMechanicKind,
+} from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -106,6 +106,7 @@ export function buildMechanicTimelineRanges(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.kind) &&
+        isRangeOnlyMechanicKind(event.kind) &&
         event.timing.type === "span" &&
         (!enabled || enabled.has(event.kind)),
     )
@@ -790,8 +791,10 @@ function buildTimeInZoneTimelineRangesFromEvents(
     while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
       const event = events[eventIndex] as PositioningEvent;
       const playerId = playerIdToString(event.player as Record<string, unknown>);
-      const entry =
-        eventsByPlayer.get(playerId) ?? { event, zoneDeltas: new Map<string, number>() };
+      const entry = eventsByPlayer.get(playerId) ?? {
+        event,
+        zoneDeltas: new Map<string, number>(),
+      };
       entry.event = event;
       for (const spec of PLAYER_ZONE_SPECS) {
         entry.zoneDeltas.set(

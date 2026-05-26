@@ -121,10 +121,7 @@ const PLAYER_IDENTITY_FIELDS = new Set(["is_team_0", "name", "player_id"]);
 
 function isEmptyRecord(value: unknown): boolean {
   return (
-    !!value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.keys(value).length === 0
+    !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0
   );
 }
 
@@ -163,12 +160,16 @@ export function createStatsFrameLookup(
   onProgress?: (progress: ReplayLoadProgress) => void,
   options?: { materializationChunkSize?: number; maxMaterializationChunkSize?: number },
 ): StatsFrameLookup {
-  const compactFrameCount = statsTimeline.frames.filter((frame) => isCompactStatsFrame(frame)).length;
+  const compactFrameCount = statsTimeline.frames.filter((frame) =>
+    isCompactStatsFrame(frame),
+  ).length;
   if (compactFrameCount === statsTimeline.frames.length) {
     return createEventDerivedStatsFrameLookup(statsTimeline, onProgress, options);
   }
   if (compactFrameCount > 0) {
-    throw new Error("stats timeline frames must be either all compact scaffolds or all materialized snapshots");
+    throw new Error(
+      "stats timeline frames must be either all compact scaffolds or all materialized snapshots",
+    );
   }
   return createMaterializedStatsFrameLookup(statsTimeline as MaterializedStatsTimeline);
 }

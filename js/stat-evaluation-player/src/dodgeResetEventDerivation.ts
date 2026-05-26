@@ -42,14 +42,13 @@ function applyDodgeResetEvent(stats: DodgeResetStats, event: DodgeResetEvent): v
   }
 }
 
-function assignDodgeResetStats(
-  target: DodgeResetStats,
-  source: DodgeResetStats | undefined,
-): void {
+function assignDodgeResetStats(target: DodgeResetStats, source: DodgeResetStats | undefined): void {
   Object.assign(target, source ?? defaultDodgeResetStats());
 }
 
-export function applyDodgeResetEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyDodgeResetEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createDodgeResetEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

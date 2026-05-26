@@ -50,7 +50,9 @@ function advanceBackboardFrame(
   stats.time_since_last_backboard =
     stats.last_backboard_time == null ? null : Math.max(0, frameTime - stats.last_backboard_time);
   stats.frames_since_last_backboard =
-    stats.last_backboard_frame == null ? null : Math.max(0, frameNumber - stats.last_backboard_frame);
+    stats.last_backboard_frame == null
+      ? null
+      : Math.max(0, frameNumber - stats.last_backboard_frame);
 }
 
 function applyBackboardEvent(
@@ -77,7 +79,9 @@ function assignBackboardTeamStats(target: BackboardTeamStats, count: number): vo
   target.count = count;
 }
 
-export function applyBackboardEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyBackboardEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createBackboardEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {

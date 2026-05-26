@@ -1,9 +1,5 @@
 import type { ReplayModel } from "subtr-actor-player";
-import {
-  createStatsFrameLookup,
-  type StatsFrameLookup,
-  type StatsTimeline,
-} from "./statsTimeline";
+import { createStatsFrameLookup, type StatsFrameLookup, type StatsTimeline } from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
 export {
   formatReplayLoadProgress,
@@ -64,10 +60,7 @@ async function parseStatsTimelineParts(
   const config = parseJsonBuffer<StatsTimeline["config"]>(decoder, parts.configBuffer);
   onProgress?.({ stage: "decoding-stats", progress: 0.05 });
   await waitForNextPaint();
-  const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(
-    decoder,
-    parts.replayMetaBuffer,
-  );
+  const replayMeta = parseJsonBuffer<StatsTimeline["replay_meta"]>(decoder, parts.replayMetaBuffer);
   onProgress?.({ stage: "decoding-stats", progress: 0.1 });
   await waitForNextPaint();
   const events = parseJsonBuffer<StatsTimeline["events"]>(decoder, parts.eventsBuffer);
@@ -78,9 +71,7 @@ async function parseStatsTimelineParts(
   const totalChunks = parts.frameChunkBuffers.length;
   for (let index = 0; index < totalChunks; index += 1) {
     const buffer = parts.frameChunkBuffers[index]!;
-    frames.push(
-      ...parseJsonBuffer<Array<StatsTimeline["frames"][number]>>(decoder, buffer),
-    );
+    frames.push(...parseJsonBuffer<Array<StatsTimeline["frames"][number]>>(decoder, buffer));
     onProgress?.({
       stage: "decoding-stats",
       processedChunks: index + 1,

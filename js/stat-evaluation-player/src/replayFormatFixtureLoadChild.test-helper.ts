@@ -193,7 +193,9 @@ function assertHydratedStatsTimelineMatchesLegacy(
   );
   const mismatch = findFirstMismatch(legacyTimeline.frames, frames, "$.frames");
   if (mismatch) {
-    throw new Error(`event-derived stats timeline did not match legacy serialized frames: ${mismatch}`);
+    throw new Error(
+      `event-derived stats timeline did not match legacy serialized frames: ${mismatch}`,
+    );
   }
 }
 
@@ -242,7 +244,9 @@ async function main(): Promise<void> {
   const statsTimelineStartedAt = process.hrtime.bigint();
   logProgress(`${fixture}: loading compact stats timeline`);
   const statsTimelineParts = get_stats_timeline_json_parts(bytes, 32 * 1024 * 1024);
-  logProgress(`${fixture}: compact stats timeline loaded in ${elapsedMs(statsTimelineStartedAt)}ms`);
+  logProgress(
+    `${fixture}: compact stats timeline loaded in ${elapsedMs(statsTimelineStartedAt)}ms`,
+  );
 
   const rawStatsFrames = parseRawStatsTimelineFrames(decoder, statsTimelineParts);
   const rawStatsFrameWithPlayer = rawStatsFrames.find((frame) => {

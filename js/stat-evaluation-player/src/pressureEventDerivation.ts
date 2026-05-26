@@ -62,7 +62,9 @@ function sortPressureEvents(events: readonly PressureEvent[]): PressureEvent[] {
 
 function sortLabels(labels: StatLabel[]): StatLabel[] {
   return labels.sort((left, right) =>
-    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+    left.key === right.key
+      ? left.value.localeCompare(right.value)
+      : left.key.localeCompare(right.key),
   );
 }
 
@@ -119,7 +121,11 @@ function applyPressureEvent(state: PressureState, event: PressureEvent): void {
   state.fieldHalf = event.field_half;
 }
 
-function accumulatePressureFrame(raw: RawPressureStats, state: PressureState, frame: StatsFrame): void {
+function accumulatePressureFrame(
+  raw: RawPressureStats,
+  state: PressureState,
+  frame: StatsFrame,
+): void {
   if (!state.active) {
     return;
   }
@@ -143,7 +149,9 @@ function assignPressureStats(
   Object.assign(target, source ?? defaultPressureTeamStats());
 }
 
-export function applyPressureEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+export function applyPressureEventDerivedStats(
+  timeline: MaterializedStatsTimeline,
+): MaterializedStatsTimeline {
   const accumulator = createPressureEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
