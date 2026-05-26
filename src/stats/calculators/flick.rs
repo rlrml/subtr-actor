@@ -22,6 +22,8 @@ const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
 pub struct FlickEvent {
     pub time: f32,
     pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
@@ -485,6 +487,8 @@ impl FlickCalculator {
         Some(FlickEvent {
             time: touch_event.time,
             frame: touch_event.frame,
+            sample_time: touch_event.time,
+            sample_frame: touch_event.frame,
             player: player.player_id.clone(),
             is_team_0: player.is_team_0,
             dodge_time: dodge_start.time,
@@ -504,7 +508,9 @@ impl FlickCalculator {
         })
     }
 
-    fn apply_event(&mut self, frame: &FrameInfo, event: FlickEvent) {
+    fn apply_event(&mut self, frame: &FrameInfo, mut event: FlickEvent) {
+        event.sample_time = frame.time;
+        event.sample_frame = frame.frame_number;
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.record_event(&event);
         stats.is_last_flick = true;

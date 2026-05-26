@@ -7,7 +7,7 @@ import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 const playerId = { Steam: "rotation-player" } as Record<string, unknown>;
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("rotation event derivation populates compacted player and team stats", () => {
@@ -19,15 +19,7 @@ test("rotation event derivation populates compacted player and team stats", () =
           frame: 10,
           player: playerId,
           is_team_0: true,
-          active_game_time: 0.1,
-          tracked_time: 0.1,
-          time_first_man: 0.1,
-          time_second_man: 0,
-          time_third_man: 0,
-          time_ambiguous_role: 0,
-          time_behind_play: 0,
-          time_level_with_play: 0.04,
-          time_ahead_of_play: 0.06,
+          active: true,
           became_first_man_count: 1,
           lost_first_man_count: 0,
           current_role_state: "first_man",
@@ -38,15 +30,7 @@ test("rotation event derivation populates compacted player and team stats", () =
           frame: 11,
           player: playerId,
           is_team_0: true,
-          active_game_time: 0.2,
-          tracked_time: 0.2,
-          time_first_man: 0,
-          time_second_man: 0.2,
-          time_third_man: 0,
-          time_ambiguous_role: 0,
-          time_behind_play: 0.2,
-          time_level_with_play: 0,
-          time_ahead_of_play: 0,
+          active: true,
           became_first_man_count: 0,
           lost_first_man_count: 1,
           current_role_state: "second_man",
@@ -72,11 +56,13 @@ test("rotation event derivation populates compacted player and team stats", () =
       createStatsFrame({
         frame_number: 10,
         time: 1,
+        dt: 0.1,
         players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
       }),
       createStatsFrame({
         frame_number: 11,
         time: 1.1,
+        dt: 0.2,
         players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
       }),
     ],

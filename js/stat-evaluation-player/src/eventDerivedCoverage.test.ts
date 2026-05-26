@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { STATS_TIMELINE_EVENT_DERIVED_APPLIERS } from "./replayLoader.ts";
+import { STATS_TIMELINE_EVENT_DERIVED_APPLIERS } from "./statsTimelineDerivation.ts";
 import { createPlayerStatsSnapshot, createTeamStatsSnapshot } from "./testStatsTimeline.ts";
 
 const PLAYER_IDENTITY_FIELDS = new Set(["player_id", "name", "is_team_0"]);
@@ -10,7 +10,7 @@ function sorted(values: Iterable<string>): string[] {
   return [...values].sort((left, right) => left.localeCompare(right));
 }
 
-test("loader event-derived appliers cover the transferred player and team stats shape", () => {
+test("event-derived appliers cover the transferred player and team stats shape", () => {
   const playerModules = Object.keys(createPlayerStatsSnapshot()).filter(
     (module) => !PLAYER_IDENTITY_FIELDS.has(module),
   );

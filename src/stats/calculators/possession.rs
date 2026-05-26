@@ -10,6 +10,12 @@ enum PossessionStateLabel {
     Neutral,
 }
 
+impl Default for PossessionStateLabel {
+    fn default() -> Self {
+        Self::Neutral
+    }
+}
+
 impl PossessionStateLabel {
     fn as_label_value(self) -> &'static str {
         match self {
@@ -140,7 +146,7 @@ pub struct PossessionTeamStats {
 pub struct PossessionEvent {
     pub time: f32,
     pub frame: usize,
-    pub dt: f32,
+    pub active: bool,
     pub possession_state: String,
     pub field_third: Option<String>,
 }
@@ -339,6 +345,14 @@ pub struct PossessionCalculator {
     stats: PossessionStats,
     tracker: PossessionTracker,
     events: Vec<PossessionEvent>,
+    last_emitted_event_state: Option<PossessionEventState>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PossessionEventState {
+    active: bool,
+    possession_state: PossessionStateLabel,
+    field_third: Option<FieldThirdLabel>,
 }
 
 impl PossessionCalculator {
@@ -374,6 +388,31 @@ impl PossessionCalculator {
         }
     }
 
+    fn emit_event_if_changed(
+        &mut self,
+        frame: &FrameInfo,
+        active: bool,
+        possession_state: PossessionStateLabel,
+        field_third: Option<FieldThirdLabel>,
+    ) {
+        let event_state = PossessionEventState {
+            active,
+            possession_state,
+            field_third,
+        };
+        if self.last_emitted_event_state == Some(event_state) {
+            return;
+        }
+        self.events.push(PossessionEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            active,
+            possession_state: possession_state.as_label_value().to_owned(),
+            field_third: field_third.map(|label| label.as_label_value().to_owned()),
+        });
+        self.last_emitted_event_state = Some(event_state);
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -381,36 +420,25 @@ impl PossessionCalculator {
         possession_state: &PossessionState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        if live_play_state.is_live_play {
-            self.stats.tracked_time += frame.dt;
-            let field_third = ball.sample().map(FieldThirdLabel::from_ball);
-            let state = if let Some(possession_team_is_team_0) =
-                possession_state.active_team_before_sample
-            {
-                let state = if possession_team_is_team_0 {
+        if !live_play_state.is_live_play {
+            self.emit_event_if_changed(frame, false, PossessionStateLabel::Neutral, None);
+            return Ok(());
+        }
+
+        self.stats.tracked_time += frame.dt;
+        let field_third = ball.sample().map(FieldThirdLabel::from_ball);
+        let state =
+            if let Some(possession_team_is_team_0) = possession_state.active_team_before_sample {
+                if possession_team_is_team_0 {
                     PossessionStateLabel::TeamZero
                 } else {
                     PossessionStateLabel::TeamOne
-                };
-                Self::apply_possession_time(&mut self.stats, state, field_third, frame.dt);
-                state
+                }
             } else {
-                Self::apply_possession_time(
-                    &mut self.stats,
-                    PossessionStateLabel::Neutral,
-                    field_third,
-                    frame.dt,
-                );
                 PossessionStateLabel::Neutral
             };
-            self.events.push(PossessionEvent {
-                time: frame.time,
-                frame: frame.frame_number,
-                dt: frame.dt,
-                possession_state: state.as_label_value().to_owned(),
-                field_third: field_third.map(|label| label.as_label_value().to_owned()),
-            });
-        }
+        Self::apply_possession_time(&mut self.stats, state, field_third, frame.dt);
+        self.emit_event_if_changed(frame, true, state, field_third);
         Ok(())
     }
 }

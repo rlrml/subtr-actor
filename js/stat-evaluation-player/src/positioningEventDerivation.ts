@@ -1,6 +1,37 @@
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import type { PositioningStats } from "./generated/PositioningStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+
+const FLOAT_POSITIONING_FIELDS = [
+  "active_game_time",
+  "tracked_time",
+  "sum_distance_to_teammates",
+  "sum_distance_to_ball",
+  "sum_distance_to_ball_has_possession",
+  "time_has_possession",
+  "sum_distance_to_ball_no_possession",
+  "time_no_possession",
+  "time_demolished",
+  "time_no_teammates",
+  "time_most_back",
+  "time_most_forward",
+  "time_mid_role",
+  "time_other_role",
+  "time_defensive_third",
+  "time_neutral_third",
+  "time_offensive_third",
+  "time_defensive_half",
+  "time_offensive_half",
+  "time_closest_to_ball",
+  "time_farthest_from_ball",
+  "time_behind_ball",
+  "time_level_with_ball",
+  "time_in_front_of_ball",
+] as const;
+
+function addF32(left: number, right: number): number {
+  return Math.fround(Math.fround(left) + Math.fround(right));
+}
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -59,30 +90,9 @@ function sortPositioningEvents(events: readonly PositioningEvent[]): Positioning
 }
 
 function applyPositioningEvent(stats: PositioningStats, event: PositioningEvent): void {
-  stats.active_game_time += event.active_game_time;
-  stats.tracked_time += event.tracked_time;
-  stats.sum_distance_to_teammates += event.sum_distance_to_teammates;
-  stats.sum_distance_to_ball += event.sum_distance_to_ball;
-  stats.sum_distance_to_ball_has_possession += event.sum_distance_to_ball_has_possession;
-  stats.time_has_possession += event.time_has_possession;
-  stats.sum_distance_to_ball_no_possession += event.sum_distance_to_ball_no_possession;
-  stats.time_no_possession += event.time_no_possession;
-  stats.time_demolished += event.time_demolished;
-  stats.time_no_teammates += event.time_no_teammates;
-  stats.time_most_back += event.time_most_back;
-  stats.time_most_forward += event.time_most_forward;
-  stats.time_mid_role += event.time_mid_role;
-  stats.time_other_role += event.time_other_role;
-  stats.time_defensive_third += event.time_defensive_third;
-  stats.time_neutral_third += event.time_neutral_third;
-  stats.time_offensive_third += event.time_offensive_third;
-  stats.time_defensive_half += event.time_defensive_half;
-  stats.time_offensive_half += event.time_offensive_half;
-  stats.time_closest_to_ball += event.time_closest_to_ball;
-  stats.time_farthest_from_ball += event.time_farthest_from_ball;
-  stats.time_behind_ball += event.time_behind_ball;
-  stats.time_level_with_ball += event.time_level_with_ball;
-  stats.time_in_front_of_ball += event.time_in_front_of_ball;
+  for (const field of FLOAT_POSITIONING_FIELDS) {
+    stats[field] = addF32(stats[field], event[field]);
+  }
   stats.times_caught_ahead_of_play_on_conceded_goals +=
     event.times_caught_ahead_of_play_on_conceded_goals;
 }
@@ -94,26 +104,38 @@ function assignPositioningStats(
   Object.assign(target, source ?? defaultPositioningStats());
 }
 
-export function applyPositioningEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyPositioningEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createPositioningEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createPositioningEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortPositioningEvents(timeline.events.positioning ?? []);
 
   let eventIndex = 0;
   const players = new Map<string, PositioningStats>();
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as PositioningEvent;
-      const playerKey = remoteIdKey(event.player);
-      const playerStats = players.get(playerKey) ?? defaultPositioningStats();
-      players.set(playerKey, playerStats);
-      applyPositioningEvent(playerStats, event);
-      eventIndex += 1;
-    }
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        const event = events[eventIndex] as PositioningEvent;
+        const playerKey = remoteIdKey(event.player);
+        const playerStats = players.get(playerKey) ?? defaultPositioningStats();
+        players.set(playerKey, playerStats);
+        applyPositioningEvent(playerStats, event);
+        eventIndex += 1;
+      }
 
-    for (const player of frame.players) {
-      assignPositioningStats(player.positioning, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      for (const player of frame.players) {
+        assignPositioningStats(player.positioning, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }

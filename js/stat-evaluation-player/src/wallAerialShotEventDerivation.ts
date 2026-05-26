@@ -1,8 +1,20 @@
 import type { WallAerialShotEvent } from "./generated/WallAerialShotEvent.ts";
 import type { WallAerialShotStats } from "./generated/WallAerialShotStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const WALL_AERIAL_HIGH_CONFIDENCE = 0.78;
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
+}
+
+function subF32(left: number, right: number): number {
+  return f32(f32(left) - f32(right));
+}
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -59,7 +71,7 @@ function advanceWallAerialShotStats(
   stats.time_since_last_wall_aerial_shot =
     stats.last_wall_aerial_shot_time == null
       ? null
-      : Math.max(0, frameTime - stats.last_wall_aerial_shot_time);
+      : Math.max(0, subF32(frameTime, stats.last_wall_aerial_shot_time));
   stats.frames_since_last_wall_aerial_shot =
     stats.last_wall_aerial_shot_frame == null
       ? null
@@ -79,13 +91,19 @@ function applyWallAerialShotEvent(
   stats.is_last_wall_aerial_shot = true;
   stats.last_wall_aerial_shot_time = event.time;
   stats.last_wall_aerial_shot_frame = event.frame;
-  stats.time_since_last_wall_aerial_shot = Math.max(0, frameTime - event.time);
+  stats.time_since_last_wall_aerial_shot = Math.max(0, subF32(frameTime, event.time));
   stats.frames_since_last_wall_aerial_shot = Math.max(0, frameNumber - event.frame);
   stats.last_confidence = event.confidence;
   stats.best_confidence = Math.max(stats.best_confidence, event.confidence);
-  stats.cumulative_confidence += event.confidence;
-  stats.cumulative_takeoff_to_shot_time += event.time_since_takeoff;
-  stats.cumulative_shot_height += event.player_position[2] ?? 0;
+  stats.cumulative_confidence = addF32(stats.cumulative_confidence, event.confidence);
+  stats.cumulative_takeoff_to_shot_time = addF32(
+    stats.cumulative_takeoff_to_shot_time,
+    event.time_since_takeoff,
+  );
+  stats.cumulative_shot_height = addF32(
+    stats.cumulative_shot_height,
+    event.player_position[2] ?? 0,
+  );
 }
 
 function assignWallAerialShotStats(
@@ -95,58 +113,70 @@ function assignWallAerialShotStats(
   Object.assign(target, source ?? defaultWallAerialShotStats());
 }
 
-export function applyWallAerialShotEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyWallAerialShotEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createWallAerialShotEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createWallAerialShotEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortWallAerialShotEvents(timeline.events.wall_aerial_shot ?? []);
 
   let eventIndex = 0;
   let lastWallAerialShotPlayer: string | null = null;
   const players = new Map<string, WallAerialShotStats>();
 
-  for (const frame of timeline.frames) {
-    for (const [playerKey, stats] of players) {
-      advanceWallAerialShotStats(
-        stats,
-        frame.frame_number,
-        frame.time,
-        frame.is_live_play && playerKey === lastWallAerialShotPlayer,
-      );
-    }
-
-    if (!frame.is_live_play) {
-      lastWallAerialShotPlayer = null;
-    } else {
-      let processedEvent = false;
-      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        const event = events[eventIndex] as WallAerialShotEvent;
-        const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultWallAerialShotStats();
-        players.set(playerKey, stats);
-        applyWallAerialShotEvent(stats, event, frame.frame_number, frame.time);
-        lastWallAerialShotPlayer = playerKey;
-        processedEvent = true;
-        eventIndex += 1;
+  return {
+    applyFrame(frame: StatsFrame): void {
+      for (const [playerKey, stats] of players) {
+        advanceWallAerialShotStats(
+          stats,
+          frame.frame_number,
+          frame.time,
+          frame.is_live_play && playerKey === lastWallAerialShotPlayer,
+        );
       }
 
-      if (processedEvent) {
-        for (const stats of players.values()) {
-          stats.is_last_wall_aerial_shot = false;
+      if (!frame.is_live_play) {
+        lastWallAerialShotPlayer = null;
+      } else {
+        let processedEvent = false;
+        while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+          const event = events[eventIndex] as WallAerialShotEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultWallAerialShotStats();
+          players.set(playerKey, stats);
+          applyWallAerialShotEvent(stats, event, frame.frame_number, frame.time);
+          lastWallAerialShotPlayer = playerKey;
+          processedEvent = true;
+          eventIndex += 1;
+        }
+
+        if (processedEvent) {
+          for (const stats of players.values()) {
+            stats.is_last_wall_aerial_shot = false;
+          }
+        }
+        if (lastWallAerialShotPlayer != null) {
+          const stats = players.get(lastWallAerialShotPlayer);
+          if (stats) {
+            stats.is_last_wall_aerial_shot = true;
+          }
         }
       }
-      if (lastWallAerialShotPlayer != null) {
-        const stats = players.get(lastWallAerialShotPlayer);
-        if (stats) {
-          stats.is_last_wall_aerial_shot = true;
-        }
+
+      for (const player of frame.players) {
+        assignWallAerialShotStats(
+          player.wall_aerial_shot,
+          players.get(remoteIdKey(player.player_id)),
+        );
       }
-    }
-
-    for (const player of frame.players) {
-      assignWallAerialShotStats(
-        player.wall_aerial_shot,
-        players.get(remoteIdKey(player.player_id)),
-      );
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

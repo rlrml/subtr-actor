@@ -15,6 +15,8 @@ test("pass event derivation can populate compacted player and team stats", () =>
         {
           time: 2,
           frame: 20,
+          sample_time: 2.2,
+          sample_frame: 22,
           passer,
           receiver,
           is_team_0: true,
@@ -28,6 +30,8 @@ test("pass event derivation can populate compacted player and team stats", () =>
         {
           time: 3,
           frame: 30,
+          sample_time: 3,
+          sample_frame: 30,
           passer: orangePasser,
           receiver,
           is_team_0: false,
@@ -38,6 +42,11 @@ test("pass event derivation can populate compacted player and team stats", () =>
           ball_advance_distance: 800,
           pass_kind: "backboard",
         },
+      ],
+      pass_last_completed: [
+        { time: 2.2, frame: 22, player: passer },
+        { time: 2.4, frame: 24, player: null },
+        { time: 3, frame: 30, player: orangePasser },
       ],
     },
     frames: [
@@ -52,9 +61,19 @@ test("pass event derivation can populate compacted player and team stats", () =>
         ],
       }),
       createStatsFrame({
+        frame_number: 22,
+        time: 2.2,
+        is_live_play: true,
+        players: [
+          { player_id: passer, is_team_0: true },
+          { player_id: receiver, is_team_0: true },
+          { player_id: orangePasser, is_team_0: false },
+        ],
+      }),
+      createStatsFrame({
         frame_number: 25,
         time: 2.5,
-        is_live_play: false,
+        is_live_play: true,
         players: [
           { player_id: passer, is_team_0: true },
           { player_id: receiver, is_team_0: true },
@@ -90,19 +109,20 @@ test("pass event derivation can populate compacted player and team stats", () =>
 
   applyPassEventDerivedStats(timeline);
 
-  assert.equal(timeline.frames[0]?.team_zero.pass.completed_pass_count, 1);
-  assert.equal(timeline.frames[0]?.team_zero.pass.total_pass_distance, 900);
-  assert.equal(timeline.frames[0]?.players[0]?.pass.completed_pass_count, 1);
-  assert.equal(timeline.frames[0]?.players[0]?.pass.is_last_completed_pass, true);
-  assert.equal(timeline.frames[0]?.players[1]?.pass.received_pass_count, 1);
+  assert.equal(timeline.frames[0]?.team_zero.pass.completed_pass_count, 0);
+  assert.equal(timeline.frames[1]?.team_zero.pass.completed_pass_count, 1);
+  assert.equal(timeline.frames[1]?.team_zero.pass.total_pass_distance, 900);
+  assert.equal(timeline.frames[1]?.players[0]?.pass.completed_pass_count, 1);
+  assert.equal(timeline.frames[1]?.players[0]?.pass.is_last_completed_pass, true);
+  assert.equal(timeline.frames[1]?.players[1]?.pass.received_pass_count, 1);
 
-  assert.equal(timeline.frames[1]?.players[0]?.pass.is_last_completed_pass, false);
-  assert.equal(timeline.frames[1]?.players[0]?.pass.frames_since_last_completed_pass, 5);
-
-  assert.equal(timeline.frames[2]?.team_one.pass.completed_pass_count, 1);
-  assert.equal(timeline.frames[2]?.team_one.pass.longest_pass_distance, 1100);
   assert.equal(timeline.frames[2]?.players[0]?.pass.is_last_completed_pass, false);
-  assert.equal(timeline.frames[2]?.players[1]?.pass.received_pass_count, 2);
-  assert.equal(timeline.frames[2]?.players[2]?.pass.is_last_completed_pass, true);
-  assert.equal(timeline.frames[2]?.players[2]?.pass.frames_since_last_completed_pass, 0);
+  assert.equal(timeline.frames[2]?.players[0]?.pass.frames_since_last_completed_pass, 5);
+
+  assert.equal(timeline.frames[3]?.team_one.pass.completed_pass_count, 1);
+  assert.equal(timeline.frames[3]?.team_one.pass.longest_pass_distance, 1100);
+  assert.equal(timeline.frames[3]?.players[0]?.pass.is_last_completed_pass, false);
+  assert.equal(timeline.frames[3]?.players[1]?.pass.received_pass_count, 2);
+  assert.equal(timeline.frames[3]?.players[2]?.pass.is_last_completed_pass, true);
+  assert.equal(timeline.frames[3]?.players[2]?.pass.frames_since_last_completed_pass, 0);
 });

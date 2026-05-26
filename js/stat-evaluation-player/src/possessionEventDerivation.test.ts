@@ -5,7 +5,7 @@ import { applyPossessionEventDerivedStats } from "./possessionEventDerivation.ts
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("possession event derivation populates compacted team stats", () => {
@@ -15,21 +15,21 @@ test("possession event derivation populates compacted team stats", () => {
         {
           time: 1,
           frame: 10,
-          dt: 0.1,
+          active: true,
           possession_state: "team_zero",
           field_third: "team_zero_third",
         },
         {
           time: 1.1,
           frame: 11,
-          dt: 0.2,
+          active: true,
           possession_state: "neutral",
           field_third: "neutral_third",
         },
         {
           time: 1.2,
           frame: 12,
-          dt: 0.3,
+          active: true,
           possession_state: "team_one",
           field_third: "team_one_third",
         },
@@ -37,9 +37,9 @@ test("possession event derivation populates compacted team stats", () => {
     },
     frames: [
       createStatsFrame({ frame_number: 9, time: 0.9 }),
-      createStatsFrame({ frame_number: 10, time: 1 }),
-      createStatsFrame({ frame_number: 11, time: 1.1 }),
-      createStatsFrame({ frame_number: 12, time: 1.2 }),
+      createStatsFrame({ frame_number: 10, time: 1, dt: 0.1 }),
+      createStatsFrame({ frame_number: 11, time: 1.1, dt: 0.2 }),
+      createStatsFrame({ frame_number: 12, time: 1.2, dt: 0.3 }),
     ],
   });
 

@@ -36,9 +36,12 @@
 //! - [`StatsCollector`] accumulates graph-backed replay statistics as a
 //!   module-keyed dynamic payload suitable for builtin module selection and
 //!   JSON export.
-//! - [`StatsTimelineCollector`] accumulates graph-backed replay statistics
-//!   frame by frame and returns typed snapshots ([`ReplayStatsTimeline`]) for
-//!   the builtin analysis modules.
+//! - [`StatsTimelineEventCollector`] accumulates graph-backed replay statistics
+//!   as event streams plus lightweight frame scaffolding. This is the preferred
+//!   timeline export when callers do not need to serialize full per-frame
+//!   partial sums.
+//! - [`StatsTimelineCollector`] preserves the legacy full snapshot timeline
+//!   form ([`ReplayStatsTimeline`]) for parity checks and compatibility.
 //!
 //! ## Stats and exports
 //!
@@ -94,11 +97,11 @@
 //! println!("shape: {:?}", features.raw_dim());
 //! ```
 //!
-//! ### Export typed stats timeline snapshots
+//! ### Export compact event-backed stats timeline
 //!
 //! ```no_run
 //! use boxcars::ParserBuilder;
-//! use subtr_actor::StatsTimelineCollector;
+//! use subtr_actor::StatsTimelineEventCollector;
 //!
 //! let bytes = std::fs::read("replay.replay").unwrap();
 //! let replay = ParserBuilder::new(&bytes)
@@ -107,7 +110,9 @@
 //!     .parse()
 //!     .unwrap();
 //!
-//! let timeline = StatsTimelineCollector::new().get_replay_data(&replay).unwrap();
+//! let timeline = StatsTimelineEventCollector::new()
+//!     .get_replay_stats_timeline_scaffold(&replay)
+//!     .unwrap();
 //!
 //! println!("timeline frames: {}", timeline.frames.len());
 //! println!("rush events: {}", timeline.events.rush.len());

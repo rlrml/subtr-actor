@@ -25,50 +25,56 @@ test("replay loading exposes each user-visible work phase", () => {
       {
         stage: "validating",
         index: 1,
-        total: 8,
+        total: 9,
         label: "Parse replay",
       },
       {
         stage: "processing",
         index: 2,
-        total: 8,
+        total: 9,
         label: "Process replay frames",
       },
       {
         stage: "building-stats",
         index: 3,
-        total: 8,
-        label: "Build stats snapshots",
+        total: 9,
+        label: "Build stats events",
       },
       {
         stage: "serializing-replay",
         index: 4,
-        total: 8,
+        total: 9,
         label: "Serialize replay data",
       },
       {
         stage: "serializing-stats",
         index: 5,
-        total: 8,
+        total: 9,
         label: "Serialize stats timeline",
       },
       {
         stage: "normalizing",
         index: 6,
-        total: 8,
+        total: 9,
         label: "Normalize replay model",
       },
       {
         stage: "decoding-replay",
         index: 7,
-        total: 8,
+        total: 9,
         label: "Decode replay data",
       },
       {
         stage: "decoding-stats",
         index: 8,
-        total: 8,
+        total: 9,
         label: "Decode stats chunks",
+      },
+      {
+        stage: "deriving-stats",
+        index: 9,
+        total: 9,
+        label: "Derive stats snapshots",
       },
     ],
   );
@@ -96,7 +102,9 @@ test("getReplayLoadCompletion maps replay loading stages to monotonic overall pr
     getReplayLoadCompletion({ stage: "decoding-replay", progress: 1 }),
     0.94,
   );
-  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }), 0.99);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "decoding-stats", progress: 1 }), 0.96);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "deriving-stats", progress: 0.5 }), 0.98);
+  assertApproximatelyEqual(getReplayLoadCompletion({ stage: "deriving-stats", progress: 1 }), 1);
 });
 
 test("getReplayLoadCompletion clamps processing progress into the expected range", () => {
@@ -108,19 +116,19 @@ test("legacy stats timeline progress maps to the newer concrete phases", () => {
   assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.25 }), {
     stage: "building-stats",
     index: 3,
-    total: 8,
-    label: "Build stats snapshots",
+    total: 9,
+    label: "Build stats events",
   });
   assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.42 }), {
     stage: "serializing-replay",
     index: 4,
-    total: 8,
+    total: 9,
     label: "Serialize replay data",
   });
   assert.deepEqual(getReplayLoadPhase({ stage: "stats-timeline", progress: 0.75 }), {
     stage: "serializing-stats",
     index: 5,
-    total: 8,
+    total: 9,
     label: "Serialize stats timeline",
   });
 });
@@ -189,6 +197,12 @@ test("getReplayLoadPhaseStates marks prior detailed phases complete", () => {
         completion: 0.5,
         indeterminate: false,
       },
+      {
+        stage: "deriving-stats",
+        state: "pending",
+        completion: 0,
+        indeterminate: false,
+      },
     ],
   );
 });
@@ -207,6 +221,8 @@ test("phase states stay monotonic through the worker and main thread load sequen
     { stage: "decoding-replay", progress: 1 },
     { stage: "decoding-stats", progress: 0 },
     { stage: "decoding-stats", progress: 1 },
+    { stage: "deriving-stats", progress: 0 },
+    { stage: "deriving-stats", progress: 1 },
   ] as const;
   const previousCompletionByStage = new Map<string, number>();
 
@@ -240,7 +256,7 @@ test("formatReplayLoadProgress reports detailed stats and decode work", () => {
       totalFrames: 10,
       progress: 0.3,
     }),
-    "Building stats snapshots... 30% (3/10)",
+    "Building stats events... 30% (3/10)",
   );
   assert.equal(
     formatReplayLoadProgress({ stage: "stats-timeline", progress: 0.42 }),
@@ -254,6 +270,10 @@ test("formatReplayLoadProgress reports detailed stats and decode work", () => {
       progress: 0.5,
     }),
     "Decoding stats chunks... 50% (2/4)",
+  );
+  assert.equal(
+    formatReplayLoadProgress({ stage: "deriving-stats", progress: 0.25 }),
+    "Deriving stats snapshots... 25%",
   );
   assert.equal(
     formatReplayLoadProgress({ stage: "normalizing", progress: 1 }),

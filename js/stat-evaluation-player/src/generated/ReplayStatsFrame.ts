@@ -3,4 +3,4 @@ import type { GameplayPhase } from "./GameplayPhase.ts";
 import type { PlayerStatsSnapshot } from "./PlayerStatsSnapshot.ts";
 import type { TeamStatsSnapshot } from "./TeamStatsSnapshot.ts";
 
-export type ReplayStatsFrame = { frame_number: number, time: number, dt: number, seconds_remaining: number | null, game_state: number | null, gameplay_phase: GameplayPhase, is_live_play: boolean, team_zero: TeamStatsSnapshot, team_one: TeamStatsSnapshot, players: Array<PlayerStatsSnapshot>, };
+export type ReplayStatsFrame = { frame_number: number, time: number, dt: number, seconds_remaining: number | null, game_state: number | null, ball_has_been_hit: boolean | null, kickoff_countdown_time: number | null, gameplay_phase: GameplayPhase, is_live_play: boolean, team_zero: TeamStatsSnapshot, team_one: TeamStatsSnapshot, players: Array<PlayerStatsSnapshot>, };

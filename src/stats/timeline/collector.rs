@@ -8,11 +8,18 @@ use crate::stats::analysis_graph::{
 use crate::*;
 use std::collections::BTreeMap;
 
-pub fn build_timeline_graph() -> AnalysisGraph {
+pub fn build_legacy_timeline_graph() -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
     graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
     graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
     graph
+}
+
+#[deprecated(
+    note = "use build_legacy_timeline_graph for full partial-sum snapshots, or build_timeline_event_graph for compact event-backed timelines"
+)]
+pub fn build_timeline_graph() -> AnalysisGraph {
+    build_legacy_timeline_graph()
 }
 
 pub fn build_timeline_event_graph() -> AnalysisGraph {
@@ -84,8 +91,13 @@ impl Default for StatsTimelineCollector {
 }
 
 impl StatsTimelineCollector {
+    /// Create the legacy full-snapshot timeline collector.
+    ///
+    /// This evaluates and stores cumulative team/player stat modules for every
+    /// captured frame. Prefer [`StatsTimelineEventCollector`] for compact
+    /// event-backed transfer.
     pub fn new() -> Self {
-        let graph = build_timeline_graph();
+        let graph = build_legacy_timeline_graph();
         Self {
             graph,
             replay_meta: None,
@@ -111,7 +123,7 @@ impl StatsTimelineCollector {
             })
     }
 
-    pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+    pub fn into_legacy_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         let replay_meta = self
             .replay_meta
             .clone()
@@ -134,22 +146,46 @@ impl StatsTimelineCollector {
         })
     }
 
+    #[deprecated(
+        note = "use into_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.into_legacy_replay_stats_timeline()
+    }
+
     pub fn with_frame_resolution(mut self, resolution: StatsFrameResolution) -> Self {
         self.frame_persistence = StatsFramePersistenceController::new(resolution);
         self
     }
 
-    pub fn get_replay_data(
+    pub fn get_legacy_replay_stats_timeline(
         mut self,
         replay: &boxcars::Replay,
     ) -> SubtrActorResult<ReplayStatsTimeline> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
-        self.into_replay_stats_timeline()
+        self.into_legacy_replay_stats_timeline()
     }
 
+    #[deprecated(
+        note = "use get_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn get_replay_data(
+        self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.get_legacy_replay_stats_timeline(replay)
+    }
+
+    #[deprecated(
+        note = "use into_legacy_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
     pub fn into_timeline(self) -> ReplayStatsTimeline {
-        self.into_replay_stats_timeline()
+        self.into_legacy_timeline()
+    }
+
+    pub fn into_legacy_timeline(self) -> ReplayStatsTimeline {
+        self.into_legacy_replay_stats_timeline()
             .expect("analysis-node timeline collector should build typed stats frames")
     }
 }
@@ -225,6 +261,8 @@ impl StatsTimelineEventCollector {
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: gameplay.game_state,
+            ball_has_been_hit: gameplay.ball_has_been_hit,
+            kickoff_countdown_time: gameplay.kickoff_countdown_time,
             gameplay_phase: live_play_state.gameplay_phase,
             is_live_play: live_play_state.is_live_play,
             team_zero: BTreeMap::new(),
@@ -260,13 +298,23 @@ impl StatsTimelineEventCollector {
         })
     }
 
-    pub fn get_replay_data(
+    pub fn get_replay_stats_timeline_scaffold(
         mut self,
         replay: &boxcars::Replay,
     ) -> SubtrActorResult<ReplayStatsTimelineScaffold> {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
         self.into_replay_stats_timeline_scaffold()
+    }
+
+    #[deprecated(
+        note = "use get_replay_stats_timeline_scaffold for compact event-backed timelines"
+    )]
+    pub fn get_replay_data(
+        self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<ReplayStatsTimelineScaffold> {
+        self.get_replay_stats_timeline_scaffold(replay)
     }
 }
 

@@ -110,6 +110,8 @@ struct CoreStatsExport<'a> {
     player_stats: Vec<PlayerStatsEntry<'a, CorePlayerStats>>,
     timeline: &'a [TimelineEvent],
     goal_context: &'a [GoalContextEvent],
+    player_events: &'a [CorePlayerStatsEvent],
+    team_events: &'a [CoreTeamStatsEvent],
 }
 
 #[derive(Serialize)]
@@ -432,6 +434,8 @@ pub(crate) fn builtin_module_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
                 timeline: calculator.timeline(),
                 goal_context: calculator.goal_context_events(),
+                player_events: calculator.core_player_events(),
+                team_events: calculator.core_team_events(),
             })
         }
         "backboard" => {
@@ -591,23 +595,27 @@ pub(crate) fn builtin_module_json(
         }
         "possession" => {
             let calculator = graph_state::<PossessionCalculator>(graph, module_name)?;
-            serialize_to_json_value(&StatsExport {
+            serialize_to_json_value(&StatsWithEventsExport {
                 stats: calculator.stats(),
+                events: calculator.events(),
             })
         }
         "pressure" => {
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
-            serialize_to_json_value(&StatsExport {
+            serialize_to_json_value(&StatsWithEventsExport {
                 stats: calculator.stats(),
+                events: calculator.events(),
             })
         }
         "rotation" => {
             let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
-            serialize_to_json_value(&TeamPlayerStatsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
-            })
+            serialize_to_json_value(&serde_json::json!({
+                "team_zero": calculator.team_zero_stats(),
+                "team_one": calculator.team_one_stats(),
+                "player_stats": player_stats_entries(calculator.player_stats()),
+                "player_events": calculator.player_events(),
+                "team_events": calculator.team_events(),
+            }))
         }
         "rush" => {
             let calculator = graph_state::<RushCalculator>(graph, module_name)?;
@@ -618,9 +626,12 @@ pub(crate) fn builtin_module_json(
         }
         "touch" => {
             let calculator = graph_state::<TouchCalculator>(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
-            })
+            serialize_to_json_value(&serde_json::json!({
+                "player_stats": player_stats_entries(calculator.player_stats()),
+                "events": calculator.events(),
+                "ball_movement_events": calculator.ball_movement_events(),
+                "last_touch_events": calculator.last_touch_events(),
+            }))
         }
         "whiff" => {
             let calculator = graph_state::<WhiffCalculator>(graph, module_name)?;
@@ -683,12 +694,14 @@ pub(crate) fn builtin_module_json(
         }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
-            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
-                events: calculator.pickup_comparison_events(),
-            })
+            serialize_to_json_value(&serde_json::json!({
+                "team_zero": calculator.team_zero_stats(),
+                "team_one": calculator.team_one_stats(),
+                "player_stats": player_stats_entries(calculator.player_stats()),
+                "events": calculator.pickup_comparison_events(),
+                "ledger_events": calculator.ledger_events(),
+                "state_events": calculator.state_events(),
+            }))
         }
         "bump" => {
             let calculator = graph_state::<BumpCalculator>(graph, module_name)?;
@@ -701,24 +714,27 @@ pub(crate) fn builtin_module_json(
         }
         "movement" => {
             let calculator = graph_state::<MovementCalculator>(graph, module_name)?;
-            serialize_to_json_value(&TeamPlayerStatsExport {
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
                 team_zero: calculator.team_zero_stats(),
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
             })
         }
         "positioning" => {
             let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
             })
         }
         "powerslide" => {
             let calculator = graph_state::<PowerslideCalculator>(graph, module_name)?;
-            serialize_to_json_value(&TeamPlayerStatsExport {
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
                 team_zero: calculator.team_zero_stats(),
                 team_one: calculator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
+                events: calculator.events(),
             })
         }
         "demo" => {

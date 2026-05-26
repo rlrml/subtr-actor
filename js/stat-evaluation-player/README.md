@@ -42,7 +42,10 @@ import {
 ```
 
 - `mountStatsReport(root, { initialData })` renders the static report-style
-  stats pages from an existing `StatsTimeline`.
+  stats pages from an existing compact or materialized `StatsTimeline`. Compact
+  timelines carry event streams plus scaffold frames; use
+  `createStatsFrameLookup(statsTimeline)` when code needs per-frame partial
+  sums.
 - `mountReplayReview(root, { provider })` renders the shared review shell with
   full-page Stats and Viewer modes backed by one data provider.
 - `createReplayReviewDataProviderFromLocation()` creates the GitHub Pages-style

@@ -1,6 +1,6 @@
 import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DodgeResetStats } from "./generated/DodgeResetStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -49,26 +49,38 @@ function assignDodgeResetStats(
   Object.assign(target, source ?? defaultDodgeResetStats());
 }
 
-export function applyDodgeResetEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyDodgeResetEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createDodgeResetEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createDodgeResetEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortDodgeResetEvents(timeline.events.dodge_reset ?? []);
 
   let eventIndex = 0;
   const players = new Map<string, DodgeResetStats>();
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as DodgeResetEvent;
-      const playerKey = remoteIdKey(event.player);
-      const stats = players.get(playerKey) ?? defaultDodgeResetStats();
-      players.set(playerKey, stats);
-      applyDodgeResetEvent(stats, event);
-      eventIndex += 1;
-    }
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        const event = events[eventIndex] as DodgeResetEvent;
+        const playerKey = remoteIdKey(event.player);
+        const stats = players.get(playerKey) ?? defaultDodgeResetStats();
+        players.set(playerKey, stats);
+        applyDodgeResetEvent(stats, event);
+        eventIndex += 1;
+      }
 
-    for (const player of frame.players) {
-      assignDodgeResetStats(player.dodge_reset, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      for (const player of frame.players) {
+        assignDodgeResetStats(player.dodge_reset, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }

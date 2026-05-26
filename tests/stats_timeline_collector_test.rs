@@ -4,6 +4,7 @@ use subtr_actor::*;
 
 const TEST_BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const TEST_BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
+const REPLAY_FORMAT_EVOLUTION_DOC: &str = include_str!("../docs/replay-format-evolution.md");
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
@@ -12,6 +13,55 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .must_parse_network_data()
         .parse()
         .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
+}
+
+fn replay_format_fixture_paths() -> Vec<String> {
+    let fixture_filter = std::env::var("SUBTR_ACTOR_REPLAY_FORMAT_FIXTURE").ok();
+    REPLAY_FORMAT_EVOLUTION_DOC
+        .lines()
+        .filter_map(|line| {
+            let start = line.find("| `")? + 3;
+            let rest = &line[start..];
+            let end = rest.find("` |")?;
+            let fixture = &rest[..end];
+            fixture
+                .ends_with(".replay")
+                .then(|| format!("assets/{fixture}"))
+        })
+        .filter(|path| {
+            fixture_filter
+                .as_ref()
+                .map(|filter| path.contains(filter))
+                .unwrap_or(true)
+        })
+        .collect()
+}
+
+fn asset_replay_fixture_paths() -> Vec<String> {
+    let fixture_filter = std::env::var("SUBTR_ACTOR_REPLAY_FIXTURE").ok();
+    let mut replay_paths = std::fs::read_dir("assets")
+        .expect("expected checked-in replay asset directory")
+        .filter_map(|entry| {
+            let entry = entry.expect("expected replay asset directory entry");
+            let path = entry.path();
+            (path
+                .extension()
+                .is_some_and(|extension| extension == "replay"))
+            .then(|| {
+                path.to_str()
+                    .expect("expected replay fixture path to be valid UTF-8")
+                    .to_owned()
+            })
+        })
+        .filter(|path| {
+            fixture_filter
+                .as_ref()
+                .map(|filter| path.contains(filter))
+                .unwrap_or(true)
+        })
+        .collect::<Vec<_>>();
+    replay_paths.sort();
+    replay_paths
 }
 
 fn frame_total_goals(frame: &ReplayStatsFrame) -> i32 {
@@ -1056,7 +1106,8 @@ fn assert_speed_flip_events_reconstruct_serialized_partial_sums(
     let mut last_speed_flip_player: Option<PlayerId> = None;
 
     for frame in &timeline.frames {
-        if frame.gameplay_phase.counts_toward_player_motion() {
+        let speed_flip_stats_advance = frame.is_live_play || frame.ball_has_been_hit == Some(false);
+        if speed_flip_stats_advance {
             while speed_flip_event_index < timeline.events.speed_flip.len()
                 && timeline.events.speed_flip[speed_flip_event_index].resolved_frame
                     <= frame.frame_number
@@ -1782,12 +1833,20 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
 ) {
     let mut events = timeline.events.pass.clone();
     events.sort_by(|left, right| {
+        left.sample_frame
+            .cmp(&right.sample_frame)
+            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
+    });
+    let mut last_completed_events = timeline.events.pass_last_completed.clone();
+    last_completed_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
+    let has_last_completed_events = !last_completed_events.is_empty();
 
     let mut event_index = 0;
+    let mut last_completed_event_index = 0;
     let mut players: HashMap<PlayerId, DerivedPassPlayerStats> = HashMap::new();
     let mut team_zero = PassTeamStats::default();
     let mut team_one = PassTeamStats::default();
@@ -1805,7 +1864,9 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
             last_completed_pass_player = None;
         } else {
             let mut processed_event = false;
-            while event_index < events.len() && events[event_index].frame <= frame.frame_number {
+            while event_index < events.len()
+                && events[event_index].sample_frame <= frame.frame_number
+            {
                 let event = &events[event_index];
                 players
                     .entry(event.passer.clone())
@@ -1833,12 +1894,35 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
                 processed_event = true;
             }
 
-            if processed_event {
+            if !has_last_completed_events && processed_event {
                 for stats in players.values_mut() {
                     stats.stats.is_last_completed_pass = false;
                 }
             }
 
+            if !has_last_completed_events {
+                if let Some(player_id) = last_completed_pass_player.as_ref() {
+                    if let Some(stats) = players.get_mut(player_id) {
+                        stats.stats.is_last_completed_pass = true;
+                    }
+                }
+            }
+        }
+
+        let mut processed_last_completed_event = false;
+        while last_completed_event_index < last_completed_events.len()
+            && last_completed_events[last_completed_event_index].frame <= frame.frame_number
+        {
+            last_completed_pass_player = last_completed_events[last_completed_event_index]
+                .player
+                .clone();
+            last_completed_event_index += 1;
+            processed_last_completed_event = true;
+        }
+        if processed_last_completed_event {
+            for stats in players.values_mut() {
+                stats.stats.is_last_completed_pass = false;
+            }
             if let Some(player_id) = last_completed_pass_player.as_ref() {
                 if let Some(stats) = players.get_mut(player_id) {
                     stats.stats.is_last_completed_pass = true;
@@ -1873,6 +1957,11 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
         event_index,
         events.len(),
         "{replay_path} unprocessed pass events"
+    );
+    assert_eq!(
+        last_completed_event_index,
+        last_completed_events.len(),
+        "{replay_path} unprocessed pass-last-completed events"
     );
 }
 
@@ -2335,7 +2424,11 @@ fn assert_ball_carry_events_reconstruct_serialized_partial_sums(
     );
 }
 
-fn apply_wall_aerial_event(stats: &mut WallAerialStats, event: &WallAerialEvent) {
+fn apply_wall_aerial_event(
+    stats: &mut WallAerialStats,
+    event: &WallAerialEvent,
+    frame: &ReplayStatsFrame,
+) {
     const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
     stats.count += 1;
@@ -2345,8 +2438,8 @@ fn apply_wall_aerial_event(stats: &mut WallAerialStats, event: &WallAerialEvent)
     stats.is_last_wall_aerial = true;
     stats.last_wall_aerial_time = Some(event.time);
     stats.last_wall_aerial_frame = Some(event.frame);
-    stats.time_since_last_wall_aerial = Some(0.0);
-    stats.frames_since_last_wall_aerial = Some(0);
+    stats.time_since_last_wall_aerial = Some((frame.time - event.time).max(0.0));
+    stats.frames_since_last_wall_aerial = Some(frame.frame_number.saturating_sub(event.frame));
     stats.last_confidence = Some(event.confidence);
     stats.best_confidence = stats.best_confidence.max(event.confidence);
     stats.cumulative_confidence += event.confidence;
@@ -2463,8 +2556,10 @@ fn assert_wall_aerial_events_reconstruct_serialized_partial_sums(
 ) {
     let mut events = timeline.events.wall_aerial.clone();
     events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
+        left.sample_frame
+            .cmp(&right.sample_frame)
+            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
+            .then_with(|| left.frame.cmp(&right.frame))
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
@@ -2483,10 +2578,12 @@ fn assert_wall_aerial_events_reconstruct_serialized_partial_sums(
 
         if frame.is_live_play {
             let mut processed_event = false;
-            while event_index < events.len() && events[event_index].frame <= frame.frame_number {
+            while event_index < events.len()
+                && events[event_index].sample_frame <= frame.frame_number
+            {
                 let event = &events[event_index];
                 let stats = players.entry(event.player.clone()).or_default();
-                apply_wall_aerial_event(stats, event);
+                apply_wall_aerial_event(stats, event, frame);
                 last_wall_aerial_player = Some(event.player.clone());
                 processed_event = true;
                 event_index += 1;
@@ -2865,8 +2962,10 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
 ) {
     let mut events = timeline.events.flick.clone();
     events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
+        left.sample_frame
+            .cmp(&right.sample_frame)
+            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
+            .then_with(|| left.frame.cmp(&right.frame))
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
@@ -2880,12 +2979,20 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
                 advance_flick_stats(stats, frame, last_flick_player.as_ref() == Some(player_id));
             }
 
-            while event_index < events.len() && events[event_index].frame <= frame.frame_number {
+            while event_index < events.len()
+                && events[event_index].sample_frame <= frame.frame_number
+            {
                 let event = &events[event_index];
                 let stats = players.entry(event.player.clone()).or_default();
                 apply_flick_event(stats, event);
                 last_flick_player = Some(event.player.clone());
                 event_index += 1;
+            }
+
+            if let Some(player_id) = last_flick_player.as_ref() {
+                if let Some(stats) = players.get_mut(player_id) {
+                    stats.is_last_flick = true;
+                }
             }
         } else {
             last_flick_player = None;
@@ -2895,8 +3002,8 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
             let expected = players.get(&player.player_id).cloned().unwrap_or_default();
             assert_eq!(
                 player.flick, expected,
-                "{replay_path} player {} flick frame {}",
-                player.name, frame.frame_number,
+                "{replay_path} player {} flick frame {} live={} phase={:?}",
+                player.name, frame.frame_number, frame.is_live_play, frame.gameplay_phase,
             );
         }
     }
@@ -2952,9 +3059,9 @@ fn assert_musty_flick_events_reconstruct_serialized_partial_sums(
 ) {
     let mut events = timeline.events.musty_flick.clone();
     events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
+        left.sample_frame
+            .cmp(&right.sample_frame)
+            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
     });
 
     let mut event_index = 0;
@@ -2971,12 +3078,28 @@ fn assert_musty_flick_events_reconstruct_serialized_partial_sums(
                 );
             }
 
-            while event_index < events.len() && events[event_index].frame <= frame.frame_number {
+            let mut processed_event = false;
+            while event_index < events.len()
+                && events[event_index].sample_frame <= frame.frame_number
+            {
                 let event = &events[event_index];
                 let stats = players.entry(event.player.clone()).or_default();
                 apply_musty_flick_event(stats, event);
                 last_musty_player = Some(event.player.clone());
                 event_index += 1;
+                processed_event = true;
+            }
+
+            if processed_event {
+                for stats in players.values_mut() {
+                    stats.is_last_musty = false;
+                }
+            }
+
+            if let Some(player_id) = last_musty_player.as_ref() {
+                if let Some(stats) = players.get_mut(player_id) {
+                    stats.is_last_musty = true;
+                }
             }
         } else {
             last_musty_player = None;
@@ -3465,7 +3588,10 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
             && player_events[player_event_index].frame <= frame.frame_number
         {
             let event = &player_events[player_event_index];
-            players.insert(event.player.clone(), event.stats.clone());
+            apply_core_player_delta(
+                players.entry(event.player.clone()).or_default(),
+                &event.delta,
+            );
             player_event_index += 1;
         }
 
@@ -3474,9 +3600,9 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
         {
             let event = &team_events[team_event_index];
             if event.is_team_0 {
-                team_zero = event.stats.clone();
+                apply_core_team_delta(&mut team_zero, &event.delta);
             } else {
-                team_one = event.stats.clone();
+                apply_core_team_delta(&mut team_one, &event.delta);
             }
             team_event_index += 1;
         }
@@ -3514,6 +3640,171 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
     );
 }
 
+fn apply_goal_after_kickoff_delta(
+    stats: &mut GoalAfterKickoffStats,
+    delta: &GoalAfterKickoffStats,
+) {
+    if delta.goal_times().is_empty() {
+        stats.kickoff_goal_count += delta.kickoff_goal_count;
+        stats.short_goal_count += delta.short_goal_count;
+        stats.medium_goal_count += delta.medium_goal_count;
+        stats.long_goal_count += delta.long_goal_count;
+    } else {
+        for time in delta.goal_times() {
+            stats.record_goal(*time);
+        }
+    }
+}
+
+fn apply_goal_buildup_delta(stats: &mut GoalBuildupStats, delta: &GoalBuildupStats) {
+    stats.counter_attack_goal_count += delta.counter_attack_goal_count;
+    stats.sustained_pressure_goal_count += delta.sustained_pressure_goal_count;
+    stats.other_buildup_goal_count += delta.other_buildup_goal_count;
+}
+
+fn apply_goal_ball_air_time_delta(stats: &mut GoalBallAirTimeStats, delta: &GoalBallAirTimeStats) {
+    if delta.goal_ball_air_times().is_empty() {
+        stats.goal_ball_air_time_sample_count += delta.goal_ball_air_time_sample_count;
+        stats.cumulative_goal_ball_air_time += delta.cumulative_goal_ball_air_time;
+        if delta.last_goal_ball_air_time.is_some() {
+            stats.last_goal_ball_air_time = delta.last_goal_ball_air_time;
+        }
+    } else {
+        let previous_last_goal_ball_air_time = stats.last_goal_ball_air_time;
+        for time in delta.goal_ball_air_times() {
+            stats.record_goal(*time);
+        }
+        stats.last_goal_ball_air_time = delta
+            .last_goal_ball_air_time
+            .or(previous_last_goal_ball_air_time);
+    }
+}
+
+fn apply_core_team_delta(stats: &mut CoreTeamStats, delta: &CoreTeamStats) {
+    stats.score += delta.score;
+    stats.goals += delta.goals;
+    stats.assists += delta.assists;
+    stats.saves += delta.saves;
+    stats.shots += delta.shots;
+    apply_goal_after_kickoff_delta(
+        &mut stats.scoring_context.goal_after_kickoff,
+        &delta.scoring_context.goal_after_kickoff,
+    );
+    apply_goal_buildup_delta(
+        &mut stats.scoring_context.goal_buildup,
+        &delta.scoring_context.goal_buildup,
+    );
+    apply_goal_ball_air_time_delta(
+        &mut stats.scoring_context.goal_ball_air_time,
+        &delta.scoring_context.goal_ball_air_time,
+    );
+}
+
+fn apply_core_player_delta(stats: &mut CorePlayerStats, delta: &CorePlayerStats) {
+    stats.score += delta.score;
+    stats.goals += delta.goals;
+    stats.assists += delta.assists;
+    stats.saves += delta.saves;
+    stats.shots += delta.shots;
+    stats.scoring_context.goals_conceded_while_last_defender +=
+        delta.scoring_context.goals_conceded_while_last_defender;
+    stats.scoring_context.goals_for_while_most_back +=
+        delta.scoring_context.goals_for_while_most_back;
+    stats.scoring_context.goals_against_while_most_back +=
+        delta.scoring_context.goals_against_while_most_back;
+    stats.scoring_context.goal_against_boost_sample_count +=
+        delta.scoring_context.goal_against_boost_sample_count;
+    stats.scoring_context.cumulative_boost_on_goals_against +=
+        delta.scoring_context.cumulative_boost_on_goals_against;
+    if delta.scoring_context.last_boost_on_goal_against.is_some() {
+        stats.scoring_context.last_boost_on_goal_against =
+            delta.scoring_context.last_boost_on_goal_against;
+    }
+    stats.scoring_context.goal_against_boost_leadup_sample_count +=
+        delta.scoring_context.goal_against_boost_leadup_sample_count;
+    stats
+        .scoring_context
+        .cumulative_average_boost_in_goal_against_leadup += delta
+        .scoring_context
+        .cumulative_average_boost_in_goal_against_leadup;
+    stats
+        .scoring_context
+        .cumulative_min_boost_in_goal_against_leadup += delta
+        .scoring_context
+        .cumulative_min_boost_in_goal_against_leadup;
+    if delta
+        .scoring_context
+        .last_average_boost_in_goal_against_leadup
+        .is_some()
+    {
+        stats
+            .scoring_context
+            .last_average_boost_in_goal_against_leadup = delta
+            .scoring_context
+            .last_average_boost_in_goal_against_leadup;
+    }
+    if delta
+        .scoring_context
+        .last_min_boost_in_goal_against_leadup
+        .is_some()
+    {
+        stats.scoring_context.last_min_boost_in_goal_against_leadup =
+            delta.scoring_context.last_min_boost_in_goal_against_leadup;
+    }
+    stats.scoring_context.goal_against_position_sample_count +=
+        delta.scoring_context.goal_against_position_sample_count;
+    stats.scoring_context.cumulative_goal_against_position_x +=
+        delta.scoring_context.cumulative_goal_against_position_x;
+    stats.scoring_context.cumulative_goal_against_position_y +=
+        delta.scoring_context.cumulative_goal_against_position_y;
+    stats.scoring_context.cumulative_goal_against_position_z +=
+        delta.scoring_context.cumulative_goal_against_position_z;
+    if delta.scoring_context.last_goal_against_position.is_some() {
+        stats.scoring_context.last_goal_against_position =
+            delta.scoring_context.last_goal_against_position;
+    }
+    stats
+        .scoring_context
+        .scoring_goal_last_touch_position_sample_count += delta
+        .scoring_context
+        .scoring_goal_last_touch_position_sample_count;
+    stats
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_x += delta
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_x;
+    stats
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_y += delta
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_y;
+    stats
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_z += delta
+        .scoring_context
+        .cumulative_scoring_goal_last_touch_position_z;
+    if delta
+        .scoring_context
+        .last_scoring_goal_last_touch_position
+        .is_some()
+    {
+        stats.scoring_context.last_scoring_goal_last_touch_position =
+            delta.scoring_context.last_scoring_goal_last_touch_position;
+    }
+    apply_goal_after_kickoff_delta(
+        &mut stats.scoring_context.goal_after_kickoff,
+        &delta.scoring_context.goal_after_kickoff,
+    );
+    apply_goal_buildup_delta(
+        &mut stats.scoring_context.goal_buildup,
+        &delta.scoring_context.goal_buildup,
+    );
+    apply_goal_ball_air_time_delta(
+        &mut stats.scoring_context.goal_ball_air_time,
+        &delta.scoring_context.goal_ball_air_time,
+    );
+}
+
 fn possession_label_for_derivation(key: &'static str, value: &str) -> StatLabel {
     match (key, value) {
         ("possession_state", "team_zero") => StatLabel::new("possession_state", "team_zero"),
@@ -3526,26 +3817,50 @@ fn possession_label_for_derivation(key: &'static str, value: &str) -> StatLabel 
     }
 }
 
-fn apply_possession_event_for_derivation(stats: &mut PossessionStats, event: &PossessionEvent) {
-    stats.tracked_time += event.dt;
-    match event.possession_state.as_str() {
-        "team_zero" => stats.team_zero_time += event.dt,
-        "team_one" => stats.team_one_time += event.dt,
-        "neutral" => stats.neutral_time += event.dt,
+#[derive(Debug, Clone, Default)]
+struct PossessionDerivationState {
+    active: bool,
+    possession_state: String,
+    field_third: Option<String>,
+}
+
+fn apply_possession_event_for_derivation(
+    state: &mut PossessionDerivationState,
+    event: &PossessionEvent,
+) {
+    state.active = event.active;
+    state.possession_state = event.possession_state.clone();
+    state.field_third = event.field_third.clone();
+}
+
+fn accumulate_possession_frame_for_derivation(
+    stats: &mut PossessionStats,
+    state: &PossessionDerivationState,
+    frame: &ReplayStatsFrame,
+) {
+    if !state.active {
+        return;
+    }
+
+    stats.tracked_time += frame.dt;
+    match state.possession_state.as_str() {
+        "team_zero" => stats.team_zero_time += frame.dt,
+        "team_one" => stats.team_one_time += frame.dt,
+        "neutral" => stats.neutral_time += frame.dt,
         value => panic!("unexpected possession state {value}"),
     }
 
-    let state_label = possession_label_for_derivation("possession_state", &event.possession_state);
-    if let Some(field_third) = event.field_third.as_deref() {
+    let state_label = possession_label_for_derivation("possession_state", &state.possession_state);
+    if let Some(field_third) = state.field_third.as_deref() {
         stats.labeled_time.add(
             [
                 state_label,
                 possession_label_for_derivation("field_third", field_third),
             ],
-            event.dt,
+            frame.dt,
         );
     } else {
-        stats.labeled_time.add([state_label], event.dt);
+        stats.labeled_time.add([state_label], frame.dt);
     }
 }
 
@@ -3629,13 +3944,19 @@ fn assert_possession_events_reconstruct_serialized_partial_sums(
 
     let mut event_index = 0;
     let mut stats = PossessionStats::default();
+    let mut state = PossessionDerivationState {
+        active: false,
+        possession_state: "neutral".to_owned(),
+        field_third: None,
+    };
 
     for frame in &timeline.frames {
         while event_index < events.len() && events[event_index].frame <= frame.frame_number {
-            apply_possession_event_for_derivation(&mut stats, &events[event_index]);
+            apply_possession_event_for_derivation(&mut state, &events[event_index]);
             event_index += 1;
         }
 
+        accumulate_possession_frame_for_derivation(&mut stats, &state, frame);
         assert_possession_team_stats_close(
             replay_path,
             "team_zero.possession",
@@ -3668,17 +3989,45 @@ fn pressure_label_for_derivation(value: &str) -> StatLabel {
     }
 }
 
-fn apply_pressure_event_for_derivation(stats: &mut PressureStats, event: &PressureEvent) {
-    stats.tracked_time += event.dt;
-    match event.field_half.as_str() {
-        "team_zero_side" => stats.team_zero_side_time += event.dt,
-        "team_one_side" => stats.team_one_side_time += event.dt,
-        "neutral" => stats.neutral_time += event.dt,
+#[derive(Debug, Clone)]
+struct PressureDerivationState {
+    active: bool,
+    field_half: String,
+}
+
+impl Default for PressureDerivationState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            field_half: "neutral".to_owned(),
+        }
+    }
+}
+
+fn apply_pressure_event_for_derivation(state: &mut PressureDerivationState, event: &PressureEvent) {
+    state.active = event.active;
+    state.field_half = event.field_half.clone();
+}
+
+fn accumulate_pressure_frame_for_derivation(
+    stats: &mut PressureStats,
+    state: &PressureDerivationState,
+    frame: &ReplayStatsFrame,
+) {
+    if !state.active {
+        return;
+    }
+
+    stats.tracked_time += frame.dt;
+    match state.field_half.as_str() {
+        "team_zero_side" => stats.team_zero_side_time += frame.dt,
+        "team_one_side" => stats.team_one_side_time += frame.dt,
+        "neutral" => stats.neutral_time += frame.dt,
         value => panic!("unexpected pressure field half {value}"),
     }
     stats
         .labeled_time
-        .add([pressure_label_for_derivation(&event.field_half)], event.dt);
+        .add([pressure_label_for_derivation(&state.field_half)], frame.dt);
 }
 
 fn assert_pressure_team_stats_close(
@@ -3734,13 +4083,15 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
 
     let mut event_index = 0;
     let mut stats = PressureStats::default();
+    let mut state = PressureDerivationState::default();
 
     for frame in &timeline.frames {
         while event_index < events.len() && events[event_index].frame <= frame.frame_number {
-            apply_pressure_event_for_derivation(&mut stats, &events[event_index]);
+            apply_pressure_event_for_derivation(&mut state, &events[event_index]);
             event_index += 1;
         }
 
+        accumulate_pressure_frame_for_derivation(&mut stats, &state, frame);
         assert_pressure_team_stats_close(
             replay_path,
             "team_zero.pressure",
@@ -4061,23 +4412,50 @@ fn assert_positioning_events_reconstruct_serialized_partial_sums(
     );
 }
 
+#[derive(Debug, Clone, Default)]
+struct RotationPlayerDerivationState {
+    active: bool,
+    stats: RotationPlayerStats,
+}
+
 fn apply_rotation_player_event_for_derivation(
-    stats: &mut RotationPlayerStats,
+    state: &mut RotationPlayerDerivationState,
     event: &RotationPlayerEvent,
 ) {
-    stats.active_game_time += event.active_game_time;
-    stats.tracked_time += event.tracked_time;
-    stats.time_first_man += event.time_first_man;
-    stats.time_second_man += event.time_second_man;
-    stats.time_third_man += event.time_third_man;
-    stats.time_ambiguous_role += event.time_ambiguous_role;
-    stats.time_behind_play += event.time_behind_play;
-    stats.time_level_with_play += event.time_level_with_play;
-    stats.time_ahead_of_play += event.time_ahead_of_play;
+    state.active = event.active;
+    let stats = &mut state.stats;
     stats.became_first_man_count += event.became_first_man_count;
     stats.lost_first_man_count += event.lost_first_man_count;
     stats.current_role_state = event.current_role_state;
     stats.current_depth_state = event.current_depth_state;
+}
+
+fn accumulate_rotation_player_frame_for_derivation(
+    state: &mut RotationPlayerDerivationState,
+    frame: &ReplayStatsFrame,
+) {
+    if !state.active {
+        return;
+    }
+
+    let stats = &mut state.stats;
+    stats.active_game_time += frame.dt;
+    stats.tracked_time += frame.dt;
+
+    match stats.current_role_state {
+        RoleState::FirstMan => stats.time_first_man += frame.dt,
+        RoleState::SecondMan => stats.time_second_man += frame.dt,
+        RoleState::ThirdMan => stats.time_third_man += frame.dt,
+        RoleState::Ambiguous => stats.time_ambiguous_role += frame.dt,
+        RoleState::Unknown => {}
+    }
+
+    match stats.current_depth_state {
+        PlayDepthState::BehindPlay => stats.time_behind_play += frame.dt,
+        PlayDepthState::LevelWithPlay => stats.time_level_with_play += frame.dt,
+        PlayDepthState::AheadOfPlay => stats.time_ahead_of_play += frame.dt,
+        PlayDepthState::Unknown => {}
+    }
 }
 
 fn apply_rotation_team_event_for_derivation(
@@ -4170,7 +4548,7 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
 
     let mut player_event_index = 0;
     let mut team_event_index = 0;
-    let mut players: HashMap<PlayerId, RotationPlayerStats> = HashMap::new();
+    let mut players: HashMap<PlayerId, RotationPlayerDerivationState> = HashMap::new();
     let mut team_zero = RotationTeamStats::default();
     let mut team_one = RotationTeamStats::default();
 
@@ -4217,7 +4595,13 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
         );
 
         for player in &frame.players {
-            let expected = players.get(&player.player_id).cloned().unwrap_or_default();
+            if let Some(state) = players.get_mut(&player.player_id) {
+                accumulate_rotation_player_frame_for_derivation(state, frame);
+            }
+            let expected = players
+                .get(&player.player_id)
+                .map(|state| state.stats.clone())
+                .unwrap_or_default();
             assert_rotation_player_stats_close(
                 replay_path,
                 &format!("player {} rotation", player.name),
@@ -4727,8 +5111,10 @@ fn assert_half_volley_events_reconstruct_serialized_partial_sums(
 ) {
     let mut events = timeline.events.half_volley.clone();
     events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
+        left.sample_frame
+            .cmp(&right.sample_frame)
+            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
+            .then_with(|| left.frame.cmp(&right.frame))
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
@@ -4750,7 +5136,9 @@ fn assert_half_volley_events_reconstruct_serialized_partial_sums(
             last_half_volley_player = None;
         } else {
             let mut processed_event = false;
-            while event_index < events.len() && events[event_index].frame <= frame.frame_number {
+            while event_index < events.len()
+                && events[event_index].sample_frame <= frame.frame_number
+            {
                 let event = &events[event_index];
                 players
                     .entry(event.player.clone())
@@ -4890,6 +5278,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             fifty_fifty: Vec::new(),
             one_timer: Vec::new(),
             pass: Vec::new(),
+            pass_last_completed: Vec::new(),
             ball_carry: Vec::new(),
             goal_tags: Vec::new(),
             rush: Vec::new(),
@@ -4914,6 +5303,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 dt: 0.0,
                 seconds_remaining: None,
                 game_state: None,
+                ball_has_been_hit: None,
+                kickoff_countdown_time: None,
                 gameplay_phase: GameplayPhase::ActivePlay,
                 is_live_play: true,
                 team_zero: default_team_stats_snapshot(),
@@ -4926,6 +5317,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 dt: 0.1,
                 seconds_remaining: None,
                 game_state: None,
+                ball_has_been_hit: None,
+                kickoff_countdown_time: None,
                 gameplay_phase: GameplayPhase::ActivePlay,
                 is_live_play: true,
                 team_zero: default_team_stats_snapshot(),
@@ -4938,6 +5331,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 dt: 0.1,
                 seconds_remaining: None,
                 game_state: None,
+                ball_has_been_hit: None,
+                kickoff_countdown_time: None,
                 gameplay_phase: GameplayPhase::ActivePlay,
                 is_live_play: true,
                 team_zero: default_team_stats_snapshot(),
@@ -4962,7 +5357,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
     let final_frame = timeline.frames.last().expect("Expected at least one frame");
 
@@ -5290,21 +5685,10 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     assert_eq!(timeline.events.double_tap, double_tap.events());
 }
 
-#[test]
-fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
-    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
-    let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
-        .expect("Expected stats timeline data");
-    assert!(
-        !timeline.events.boost_ledger.is_empty(),
-        "expected boost ledger events to be emitted"
-    );
-    assert!(
-        !timeline.events.boost_state.is_empty(),
-        "expected boost state events to be emitted"
-    );
-
+fn assert_boost_ledger_reconstructs_serialized_boost_partial_sums(
+    replay_path: &str,
+    timeline: &ReplayStatsTimeline,
+) {
     let mut ledger_events = timeline.events.boost_ledger.clone();
     ledger_events.sort_by(|left, right| {
         left.frame
@@ -5372,12 +5756,12 @@ fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
         }
 
         assert_boost_ledger_derived_stats_match(
-            &format!("team_zero frame {}", frame.frame_number),
+            &format!("{replay_path} team_zero frame {}", frame.frame_number),
             &frame.team_zero.boost,
             &team_zero.stats,
         );
         assert_boost_ledger_derived_stats_match(
-            &format!("team_one frame {}", frame.frame_number),
+            &format!("{replay_path} team_one frame {}", frame.frame_number),
             &frame.team_one.boost,
             &team_one.stats,
         );
@@ -5385,7 +5769,10 @@ fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
             let expected = players.get(&player.player_id).map(|stats| &stats.stats);
             let default_stats = BoostStats::default();
             assert_boost_ledger_derived_stats_match(
-                &format!("player {} frame {}", player.name, frame.frame_number),
+                &format!(
+                    "{replay_path} player {} frame {}",
+                    player.name, frame.frame_number
+                ),
                 &player.boost,
                 expected.unwrap_or(&default_stats),
             );
@@ -5394,13 +5781,31 @@ fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
     assert_eq!(
         ledger_event_index,
         ledger_events.len(),
-        "unprocessed boost ledger events"
+        "{replay_path} unprocessed boost ledger events"
     );
     assert_eq!(
         state_event_index,
         state_events.len(),
-        "unprocessed boost state events"
+        "{replay_path} unprocessed boost state events"
     );
+}
+
+#[test]
+fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
+    let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
+    let replay = parse_replay(replay_path);
+    let timeline = StatsTimelineCollector::new()
+        .get_legacy_replay_stats_timeline(&replay)
+        .expect("Expected stats timeline data");
+    assert!(
+        !timeline.events.boost_ledger.is_empty(),
+        "expected boost ledger events to be emitted"
+    );
+    assert!(
+        !timeline.events.boost_state.is_empty(),
+        "expected boost state events to be emitted"
+    );
+    assert_boost_ledger_reconstructs_serialized_boost_partial_sums(replay_path, &timeline);
 }
 
 #[test]
@@ -5415,7 +5820,7 @@ fn test_mechanic_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
 
         if timeline.events.half_flip.is_empty() && timeline.events.wavedash.is_empty() {
@@ -5446,7 +5851,7 @@ fn test_speed_flip_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5468,7 +5873,7 @@ fn test_whiff_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.whiff.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5486,7 +5891,7 @@ fn test_backboard_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5501,7 +5906,7 @@ fn test_double_tap_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5524,7 +5929,7 @@ fn test_one_timer_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.one_timer.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5550,7 +5955,7 @@ fn test_pass_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.pass.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5568,7 +5973,7 @@ fn test_rush_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5592,7 +5997,7 @@ fn test_bump_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.bump.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5610,7 +6015,7 @@ fn test_demo_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5628,7 +6033,7 @@ fn test_fifty_fifty_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5652,7 +6057,7 @@ fn test_half_volley_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.half_volley.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5676,7 +6081,7 @@ fn test_ball_carry_events_reconstruct_serialized_partial_sums() {
     for replay_path in replay_paths {
         let replay = parse_replay(replay_path);
         let timeline = StatsTimelineCollector::new()
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
         if !timeline.events.ball_carry.is_empty() {
             found_timeline = Some((replay_path, timeline));
@@ -5694,7 +6099,7 @@ fn test_wall_aerial_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/air-dribble-goal-mouth-2026-05-24.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5709,7 +6114,7 @@ fn test_wall_aerial_shot_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/air-dribble-goal-mouth-2026-05-24.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5724,7 +6129,7 @@ fn test_flick_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5739,7 +6144,7 @@ fn test_musty_flick_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5754,7 +6159,7 @@ fn test_dodge_reset_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5777,7 +6182,7 @@ fn test_powerslide_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5792,7 +6197,7 @@ fn test_touch_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5811,7 +6216,7 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5830,7 +6235,7 @@ fn test_possession_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5845,7 +6250,7 @@ fn test_pressure_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5860,7 +6265,7 @@ fn test_movement_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5875,7 +6280,7 @@ fn test_positioning_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5890,7 +6295,7 @@ fn test_rotation_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -5898,6 +6303,83 @@ fn test_rotation_events_reconstruct_serialized_partial_sums() {
         "expected rotation fixture to contain rotation player events"
     );
     assert_rotation_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
+}
+
+fn assert_converted_events_reconstruct_serialized_partial_sums(
+    replay_path: &str,
+    timeline: &ReplayStatsTimeline,
+) {
+    assert_boost_ledger_reconstructs_serialized_boost_partial_sums(replay_path, timeline);
+    assert_core_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_possession_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_pressure_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_movement_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_positioning_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_rotation_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_quality_mechanic_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_speed_flip_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_whiff_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_backboard_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_double_tap_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_demo_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_fifty_fifty_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_bump_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_rush_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_pass_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_one_timer_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_ball_carry_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_wall_aerial_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_wall_aerial_shot_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_flick_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_ceiling_shot_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_musty_flick_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_dodge_reset_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_powerslide_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_touch_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_half_volley_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+}
+
+fn assert_replay_paths_reconstruct_serialized_partial_sums(replay_paths: Vec<String>) {
+    for replay_path in replay_paths {
+        eprintln!("checking {replay_path}");
+        let replay = parse_replay(&replay_path);
+        let timeline = StatsTimelineCollector::new()
+            .get_legacy_replay_stats_timeline(&replay)
+            .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
+        assert_converted_events_reconstruct_serialized_partial_sums(&replay_path, &timeline);
+    }
+}
+
+#[test]
+#[ignore = "wide replay-format parity is slow; run explicitly when changing compact timeline derivation"]
+fn replay_format_fixture_events_reconstruct_serialized_partial_sums() {
+    let replay_paths = replay_format_fixture_paths();
+    assert!(
+        !replay_paths.is_empty(),
+        "expected replay-format docs to list checked-in fixtures"
+    );
+    assert!(
+        std::env::var("SUBTR_ACTOR_REPLAY_FORMAT_FIXTURE").is_ok() || replay_paths.len() >= 10,
+        "expected replay-format docs to list checked-in fixtures"
+    );
+
+    assert_replay_paths_reconstruct_serialized_partial_sums(replay_paths);
+}
+
+#[test]
+#[ignore = "all replay asset event parity is slow; run explicitly before removing transferred partial sums"]
+fn all_asset_fixture_events_reconstruct_serialized_partial_sums() {
+    let replay_paths = asset_replay_fixture_paths();
+    assert!(
+        !replay_paths.is_empty(),
+        "expected checked-in replay asset fixtures"
+    );
+    assert!(
+        std::env::var("SUBTR_ACTOR_REPLAY_FIXTURE").is_ok() || replay_paths.len() >= 20,
+        "expected broad replay fixture coverage"
+    );
+
+    assert_replay_paths_reconstruct_serialized_partial_sums(replay_paths);
 }
 
 #[test]
@@ -5992,6 +6474,8 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
             dt: 0.5,
             seconds_remaining: None,
             game_state: None,
+            ball_has_been_hit: None,
+            kickoff_countdown_time: None,
             gameplay_phase: if is_live_play {
                 GameplayPhase::ActivePlay
             } else {
@@ -6041,7 +6525,7 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
 fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     assert!(
@@ -6088,7 +6572,7 @@ fn test_stats_timeline_value_serializes_for_rlcs_replay() {
         .expect("Expected captured stats data");
 
     captured
-        .into_stats_timeline_value()
+        .into_legacy_stats_timeline_value()
         .expect("Expected stats timeline value");
 }
 
@@ -6099,7 +6583,7 @@ fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
         .get_replay_data(&replay)
         .expect("Expected replay data");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     let first_goal = replay_data
@@ -6174,7 +6658,7 @@ fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
 fn test_stats_timeline_old_replay_with_substitutions_discovers_late_players() {
     let replay = parse_replay("assets/old-ballchasing-midfield-car.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
     let final_frame = timeline.frames.last().expect("Expected timeline frames");
     let names = player_names(final_frame);
@@ -6201,7 +6685,7 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     dump_final_boost_stats(&timeline);
@@ -6286,7 +6770,7 @@ fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     let pre_reset_frame = timeline
@@ -6332,7 +6816,7 @@ fn test_stats_timeline_first_kickoff_credits_both_players() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
 
     let baseline_frame = timeline

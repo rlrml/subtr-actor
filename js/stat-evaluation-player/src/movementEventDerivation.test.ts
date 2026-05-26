@@ -8,7 +8,7 @@ const bluePlayer = { Steam: "blue-movement" } as Record<string, unknown>;
 const orangePlayer = { Steam: "orange-movement" } as Record<string, unknown>;
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("movement event derivation populates compacted player and team stats", () => {

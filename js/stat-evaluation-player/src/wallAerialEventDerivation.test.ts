@@ -14,6 +14,8 @@ test("wall-aerial event derivation can populate compacted player stats", () => {
         {
           time: 2,
           frame: 20,
+          sample_time: 2,
+          sample_frame: 20,
           player: bluePlayer,
           is_team_0: true,
           wall: "side",
@@ -37,6 +39,8 @@ test("wall-aerial event derivation can populate compacted player stats", () => {
         {
           time: 3,
           frame: 30,
+          sample_time: 3,
+          sample_frame: 30,
           player: orangePlayer,
           is_team_0: false,
           wall: "back",

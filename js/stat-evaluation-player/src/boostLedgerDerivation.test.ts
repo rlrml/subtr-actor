@@ -6,7 +6,7 @@ import {
   findBoostLedgerDerivationMismatches,
 } from "./boostLedgerDerivation.ts";
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const playerId = { Steam: "ledger-player" } as Record<string, unknown>;
 const compactedBoostFields = [
@@ -26,7 +26,7 @@ function assertClose(actual: number | undefined, expected: number): void {
   assert.ok(actual != null && Math.abs(actual - expected) < 0.000001);
 }
 
-function ledgerTimeline(): StatsTimeline {
+function ledgerTimeline(): MaterializedStatsTimeline {
   return createStatsTimeline({
     events: {
       boost_state: [

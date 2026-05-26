@@ -18,7 +18,7 @@ function frameWithBlue(frameNumber: number, time: number, isLivePlay = true) {
 }
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("touch event derivation uses sample frame for accumulation and touch frame for last-touch fields", () => {
@@ -91,7 +91,14 @@ test("touch event derivation uses sample frame for accumulation and touch frame 
   assert.equal(touchFrame.cumulative_ball_speed_change, 950);
   assert.equal(touchFrame.total_ball_travel_distance, 100);
   assert.equal(touchFrame.total_ball_advance_distance, 60);
-  assert.equal(touchFrame.labeled_touch_counts?.entries[0]?.count, 1);
+  const labeledTouch = touchFrame.labeled_touch_counts?.entries.find(
+    (entry) =>
+      entry.labels.some((label) => label.key === "kind" && label.value === "hard_hit") &&
+      entry.labels.some((label) => label.key === "height_band" && label.value === "high_air") &&
+      entry.labels.some((label) => label.key === "surface" && label.value === "wall") &&
+      entry.labels.some((label) => label.key === "dodge_state" && label.value === "dodge"),
+  );
+  assert.equal(labeledTouch?.count, 1);
 
   assert.equal(derived.frames[3]!.players[0]!.touch.is_last_touch, true);
   assert.equal(derived.frames[4]!.players[0]!.touch.is_last_touch, false);

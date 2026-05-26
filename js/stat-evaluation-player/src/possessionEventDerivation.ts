@@ -2,7 +2,7 @@ import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PossessionTeamStats } from "./generated/PossessionTeamStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 interface RawPossessionStats {
   tracked_time: number;
@@ -10,6 +10,20 @@ interface RawPossessionStats {
   team_one_time: number;
   neutral_time: number;
   labeled_time: LabeledFloatSums;
+}
+
+interface PossessionState {
+  active: boolean;
+  possessionState: string;
+  fieldThird: string | null;
+}
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
 }
 
 function defaultRawPossessionStats(): RawPossessionStats {
@@ -64,9 +78,9 @@ function addLabeledTime(sums: LabeledFloatSums, labels: StatLabel[], value: numb
       ),
   );
   if (entry) {
-    entry.value += value;
+    entry.value = addF32(entry.value, value);
   } else {
-    sums.entries.push({ labels: sortedLabels, value });
+    sums.entries.push({ labels: sortedLabels, value: f32(value) });
     sums.entries.sort((left, right) =>
       JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
     );
@@ -107,21 +121,32 @@ function possessionTeamStats(raw: RawPossessionStats, isTeamZero: boolean): Poss
   };
 }
 
-function applyPossessionEvent(raw: RawPossessionStats, event: PossessionEvent): void {
-  raw.tracked_time += event.dt;
-  if (event.possession_state === "team_zero") {
-    raw.team_zero_time += event.dt;
-  } else if (event.possession_state === "team_one") {
-    raw.team_one_time += event.dt;
-  } else {
-    raw.neutral_time += event.dt;
+function applyPossessionEvent(state: PossessionState, event: PossessionEvent): void {
+  state.active = event.active;
+  state.possessionState = event.possession_state;
+  state.fieldThird = event.field_third ?? null;
+}
+
+function accumulatePossessionFrame(raw: RawPossessionStats, state: PossessionState, frame: StatsFrame): void {
+  if (!state.active) {
+    return;
   }
 
-  const labels: StatLabel[] = [{ key: "possession_state", value: event.possession_state }];
-  if (event.field_third != null) {
-    labels.push({ key: "field_third", value: event.field_third });
+  const dt = f32(frame.dt);
+  raw.tracked_time = addF32(raw.tracked_time, dt);
+  if (state.possessionState === "team_zero") {
+    raw.team_zero_time = addF32(raw.team_zero_time, dt);
+  } else if (state.possessionState === "team_one") {
+    raw.team_one_time = addF32(raw.team_one_time, dt);
+  } else {
+    raw.neutral_time = addF32(raw.neutral_time, dt);
   }
-  addLabeledTime(raw.labeled_time, labels, event.dt);
+
+  const labels: StatLabel[] = [{ key: "possession_state", value: state.possessionState }];
+  if (state.fieldThird != null) {
+    labels.push({ key: "field_third", value: state.fieldThird });
+  }
+  addLabeledTime(raw.labeled_time, labels, dt);
 }
 
 function assignPossessionStats(
@@ -131,21 +156,39 @@ function assignPossessionStats(
   Object.assign(target, source ?? defaultPossessionTeamStats());
 }
 
-export function applyPossessionEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyPossessionEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createPossessionEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createPossessionEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortPossessionEvents(timeline.events.possession ?? []);
 
   let eventIndex = 0;
   const raw = defaultRawPossessionStats();
+  const state: PossessionState = {
+    active: false,
+    possessionState: "neutral",
+    fieldThird: null,
+  };
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      applyPossessionEvent(raw, events[eventIndex] as PossessionEvent);
-      eventIndex += 1;
-    }
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        applyPossessionEvent(state, events[eventIndex] as PossessionEvent);
+        eventIndex += 1;
+      }
 
-    assignPossessionStats(frame.team_zero.possession, possessionTeamStats(raw, true));
-    assignPossessionStats(frame.team_one.possession, possessionTeamStats(raw, false));
-  }
-
-  return timeline;
+      accumulatePossessionFrame(raw, state, frame);
+      assignPossessionStats(frame.team_zero.possession, possessionTeamStats(raw, true));
+      assignPossessionStats(frame.team_one.possession, possessionTeamStats(raw, false));
+    },
+  };
 }

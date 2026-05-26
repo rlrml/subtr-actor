@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 const STATS_TIMELINE_FIXTURE: &str =
     "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
 
+const REPLAY_FORMAT_EVOLUTION_DOC: &str = include_str!("../../../docs/replay-format-evolution.md");
+
 fn parse_replay(path: &str) -> boxcars::Replay {
     let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
     boxcars::ParserBuilder::new(&data[..])
@@ -11,6 +13,48 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .must_parse_network_data()
         .parse()
         .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
+}
+
+fn replay_format_fixture_paths() -> Vec<String> {
+    REPLAY_FORMAT_EVOLUTION_DOC
+        .lines()
+        .filter_map(|line| {
+            let start = line.find("| `")? + 3;
+            let rest = &line[start..];
+            let end = rest.find("` |")?;
+            let fixture = &rest[..end];
+            fixture
+                .ends_with(".replay")
+                .then(|| format!("assets/{fixture}"))
+        })
+        .collect()
+}
+
+fn asset_replay_fixture_paths() -> Vec<String> {
+    let fixture_filter = std::env::var("SUBTR_ACTOR_REPLAY_FIXTURE").ok();
+    let mut replay_paths = std::fs::read_dir("assets")
+        .expect("expected checked-in replay asset directory")
+        .filter_map(|entry| {
+            let entry = entry.expect("expected replay asset directory entry");
+            let path = entry.path();
+            (path
+                .extension()
+                .is_some_and(|extension| extension == "replay"))
+            .then(|| {
+                path.to_str()
+                    .expect("expected replay fixture path to be valid UTF-8")
+                    .to_owned()
+            })
+        })
+        .filter(|path| {
+            fixture_filter
+                .as_ref()
+                .map(|filter| path.contains(filter))
+                .unwrap_or(true)
+        })
+        .collect::<Vec<_>>();
+    replay_paths.sort();
+    replay_paths
 }
 
 fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, usize)> {
@@ -38,6 +82,7 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("fifty_fifty", events.fifty_fifty.len()),
         ("one_timer", events.one_timer.len()),
         ("pass", events.pass.len()),
+        ("pass_last_completed", events.pass_last_completed.len()),
         ("ball_carry", events.ball_carry.len()),
         ("goal_tags", events.goal_tags.len()),
         ("rush", events.rush.len()),
@@ -77,6 +122,7 @@ fn canonical_event_sets(events: &ReplayStatsTimelineEvents) -> BTreeMap<String, 
 }
 
 fn assert_canonical_event_sets_match(
+    context: &str,
     left: &ReplayStatsTimelineEvents,
     right: &ReplayStatsTimelineEvents,
 ) {
@@ -97,10 +143,18 @@ fn assert_canonical_event_sets_match(
             .iter()
             .zip(right_entries)
             .position(|(left, right)| left != right);
+        let mismatch_detail = first_mismatch
+            .map(|index| {
+                format!(
+                    ", left={}, right={}",
+                    left_entries[index], right_entries[index]
+                )
+            })
+            .unwrap_or_default();
         panic!(
-            "event set {name} differs: left_count={}, right_count={}, first_mismatch={first_mismatch:?}",
+            "{context} event set {name} differs: left_count={}, right_count={}, first_mismatch={first_mismatch:?}{mismatch_detail}",
             left_entries.len(),
-            right_entries.len()
+            right_entries.len(),
         );
     }
 }
@@ -120,51 +174,104 @@ fn event_timeline_graph_does_not_build_full_stats_frame_snapshots() {
     );
 }
 
-#[test]
-fn event_timeline_scaffold_matches_full_timeline_without_stat_snapshots() {
-    let replay = parse_replay(STATS_TIMELINE_FIXTURE);
-    let full_timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
-        .expect("full stats timeline should collect");
-    let scaffold_timeline = StatsTimelineEventCollector::new()
-        .get_replay_data(&replay)
-        .expect("event stats timeline scaffold should collect");
+fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(replay_path: &str) {
+    let replay = parse_replay(replay_path);
+    let mut processor = ReplayProcessor::new(&replay).expect("replay processor should initialize");
+    let mut full_collector = StatsTimelineCollector::new();
+    let mut scaffold_collector = StatsTimelineEventCollector::new();
+    processor
+        .process_all(&mut [&mut full_collector, &mut scaffold_collector])
+        .expect("full and event stats timelines should collect from the same processor");
+    let full_timeline = full_collector
+        .into_legacy_replay_stats_timeline()
+        .expect("full stats timeline should assemble");
+    let scaffold_timeline = scaffold_collector
+        .into_replay_stats_timeline_scaffold()
+        .expect("event stats timeline scaffold should assemble");
 
     assert_eq!(scaffold_timeline.config, full_timeline.config);
     assert_eq!(scaffold_timeline.replay_meta, full_timeline.replay_meta);
     assert_eq!(
         event_set_counts(&scaffold_timeline.events),
-        event_set_counts(&full_timeline.events)
+        event_set_counts(&full_timeline.events),
+        "{replay_path} event set counts should match"
     );
-    assert_canonical_event_sets_match(&scaffold_timeline.events, &full_timeline.events);
-    assert_eq!(scaffold_timeline.frames.len(), full_timeline.frames.len());
+    assert_canonical_event_sets_match(
+        replay_path,
+        &scaffold_timeline.events,
+        &full_timeline.events,
+    );
+    assert_eq!(
+        scaffold_timeline.frames.len(),
+        full_timeline.frames.len(),
+        "{replay_path} frame count should match"
+    );
 
     for (scaffold_frame, full_frame) in scaffold_timeline.frames.iter().zip(&full_timeline.frames) {
-        assert_eq!(scaffold_frame.frame_number, full_frame.frame_number);
-        assert_eq!(scaffold_frame.time, full_frame.time);
-        assert_eq!(scaffold_frame.dt, full_frame.dt);
         assert_eq!(
-            scaffold_frame.seconds_remaining,
-            full_frame.seconds_remaining
+            scaffold_frame.frame_number, full_frame.frame_number,
+            "{replay_path} scaffold frame number should match"
         );
-        assert_eq!(scaffold_frame.game_state, full_frame.game_state);
-        assert_eq!(scaffold_frame.gameplay_phase, full_frame.gameplay_phase);
-        assert_eq!(scaffold_frame.is_live_play, full_frame.is_live_play);
+        assert_eq!(
+            scaffold_frame.time, full_frame.time,
+            "{replay_path} scaffold frame time should match"
+        );
+        assert_eq!(
+            scaffold_frame.dt, full_frame.dt,
+            "{replay_path} scaffold frame dt should match"
+        );
+        assert_eq!(
+            scaffold_frame.seconds_remaining, full_frame.seconds_remaining,
+            "{replay_path} scaffold seconds_remaining should match"
+        );
+        assert_eq!(
+            scaffold_frame.game_state, full_frame.game_state,
+            "{replay_path} scaffold game_state should match"
+        );
+        assert_eq!(
+            scaffold_frame.ball_has_been_hit, full_frame.ball_has_been_hit,
+            "{replay_path} scaffold ball_has_been_hit should match"
+        );
+        assert_eq!(
+            scaffold_frame.kickoff_countdown_time, full_frame.kickoff_countdown_time,
+            "{replay_path} scaffold kickoff_countdown_time should match"
+        );
+        assert_eq!(
+            scaffold_frame.gameplay_phase, full_frame.gameplay_phase,
+            "{replay_path} scaffold gameplay_phase should match"
+        );
+        assert_eq!(
+            scaffold_frame.is_live_play, full_frame.is_live_play,
+            "{replay_path} scaffold live-play flag should match"
+        );
 
         assert!(
             scaffold_frame.team_zero.is_empty(),
-            "event scaffold should not carry team-zero stat modules"
+            "{replay_path} event scaffold should not carry team-zero stat modules"
         );
         assert!(
             scaffold_frame.team_one.is_empty(),
-            "event scaffold should not carry team-one stat modules"
+            "{replay_path} event scaffold should not carry team-one stat modules"
         );
-        assert_eq!(scaffold_frame.players.len(), full_frame.players.len());
+        assert_eq!(
+            scaffold_frame.players.len(),
+            full_frame.players.len(),
+            "{replay_path} scaffold player count should match"
+        );
         for (scaffold_player, full_player) in scaffold_frame.players.iter().zip(&full_frame.players)
         {
-            assert_eq!(scaffold_player.player_id, full_player.player_id);
-            assert_eq!(scaffold_player.name, full_player.name);
-            assert_eq!(scaffold_player.is_team_0, full_player.is_team_0);
+            assert_eq!(
+                scaffold_player.player_id, full_player.player_id,
+                "{replay_path} scaffold player id should match"
+            );
+            assert_eq!(
+                scaffold_player.name, full_player.name,
+                "{replay_path} scaffold player name should match"
+            );
+            assert_eq!(
+                scaffold_player.is_team_0, full_player.is_team_0,
+                "{replay_path} scaffold player team should match"
+            );
         }
     }
 
@@ -195,6 +302,46 @@ fn event_timeline_scaffold_matches_full_timeline_without_stat_snapshots() {
         .expect("scaffold player should serialize as an object");
     assert_eq!(
         player.keys().cloned().collect::<Vec<_>>(),
-        ["is_team_0", "name", "player_id"]
+        ["is_team_0", "name", "player_id"],
+        "{replay_path} scaffold player should serialize identity fields only"
     );
+}
+
+#[test]
+fn event_timeline_scaffold_matches_full_timeline_without_stat_snapshots() {
+    assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(
+        STATS_TIMELINE_FIXTURE,
+    );
+}
+
+#[test]
+#[ignore = "wide replay-format parity is slow; run explicitly when changing compact timeline transfer"]
+fn replay_format_fixture_event_timeline_scaffolds_match_full_timelines() {
+    let fixture_paths = replay_format_fixture_paths();
+    assert!(
+        fixture_paths.len() >= 10,
+        "expected replay-format docs to list checked-in fixtures"
+    );
+    for replay_path in fixture_paths {
+        println!("checking {replay_path}");
+        assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(&replay_path);
+    }
+}
+
+#[test]
+#[ignore = "all replay asset scaffold parity is slow; run explicitly before removing transferred partial sums"]
+fn all_asset_fixture_event_timeline_scaffolds_match_full_timelines_without_stat_snapshots() {
+    let fixture_paths = asset_replay_fixture_paths();
+    assert!(
+        !fixture_paths.is_empty(),
+        "expected checked-in replay asset fixtures"
+    );
+    assert!(
+        std::env::var("SUBTR_ACTOR_REPLAY_FIXTURE").is_ok() || fixture_paths.len() >= 20,
+        "expected broad replay fixture coverage"
+    );
+    for replay_path in fixture_paths {
+        println!("checking {replay_path}");
+        assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(&replay_path);
+    }
 }

@@ -9,7 +9,7 @@ const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
 fn tags_colonelpanic8_third_goal_as_double_tap() {
     let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("failed to collect stats timeline for double tap replay");
 
     assert!(

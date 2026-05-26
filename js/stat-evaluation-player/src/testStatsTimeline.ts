@@ -2,7 +2,7 @@ import type {
   PlayerStatsSnapshot,
   StatsEvents,
   StatsFrame,
-  StatsTimeline,
+  MaterializedStatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
 import {
@@ -39,6 +39,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       fifty_fifty: [],
       one_timer: [],
       pass: [],
+      pass_last_completed: [],
       ball_carry: [],
       goal_tags: [],
       rush: [],
@@ -86,6 +87,8 @@ export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFram
       dt: 0,
       seconds_remaining: null,
       game_state: null,
+      ball_has_been_hit: null,
+      kickoff_countdown_time: null,
       gameplay_phase: "unknown",
       is_live_play: true,
       team_zero: createTeamStatsSnapshot(),
@@ -103,8 +106,10 @@ export function createStatsFrame(overrides?: DeepPartial<StatsFrame>): StatsFram
   return merged;
 }
 
-export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): StatsTimeline {
-  const merged = merge<StatsTimeline>(
+export function createStatsTimeline(
+  overrides?: DeepPartial<MaterializedStatsTimeline>,
+): MaterializedStatsTimeline {
+  const merged = merge<MaterializedStatsTimeline>(
     {
       config: {
         most_back_forward_threshold_y: 0,
@@ -151,7 +156,7 @@ export function createStatsTimeline(overrides?: DeepPartial<StatsTimeline>): Sta
 }
 
 export function createLegacyStatsTimeline(
-  overrides: DeepPartial<StatsTimeline> & {
+  overrides: DeepPartial<MaterializedStatsTimeline> & {
     timeline_events?: StatsEvents["timeline"];
     backboard_events?: StatsEvents["backboard"];
     ceiling_shot_events?: StatsEvents["ceiling_shot"];
@@ -183,7 +188,7 @@ export function createLegacyStatsTimeline(
     boost_state?: StatsEvents["boost_state"];
     bump_events?: StatsEvents["bump"];
   } = {},
-): StatsTimeline {
+): MaterializedStatsTimeline {
   return createStatsTimeline({
     ...overrides,
     events: {

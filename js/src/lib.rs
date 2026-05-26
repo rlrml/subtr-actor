@@ -529,13 +529,13 @@ pub fn get_replay_bundle_json_parts_with_progress(
     Ok(result.into())
 }
 
-/// Get cumulative stats snapshots for each replay sample.
+/// Get compact event-backed stats frames for each replay sample.
 #[wasm_bindgen]
 pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
@@ -546,8 +546,20 @@ pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
 pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+
+    serde_json::to_vec(&stats_timeline)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn get_legacy_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let replay = parse_replay_from_data(data)?;
+
     let stats_timeline = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     serde_json::to_vec(&stats_timeline)
@@ -562,7 +574,7 @@ pub fn get_stats_timeline_json_parts(
     let replay = parse_replay_from_data(data)?;
 
     let stats_timeline = StatsTimelineEventCollector::new()
-        .get_replay_data(&replay)
+        .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
     stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes, None)

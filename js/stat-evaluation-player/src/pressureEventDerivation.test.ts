@@ -5,23 +5,23 @@ import { applyPressureEventDerivedStats } from "./pressureEventDerivation.ts";
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("pressure event derivation populates compacted team stats", () => {
   const timeline = createStatsTimeline({
     events: {
       pressure: [
-        { time: 1, frame: 10, dt: 0.1, field_half: "team_zero_side" },
-        { time: 1.1, frame: 11, dt: 0.2, field_half: "neutral" },
-        { time: 1.2, frame: 12, dt: 0.3, field_half: "team_one_side" },
+        { time: 1, frame: 10, active: true, field_half: "team_zero_side" },
+        { time: 1.1, frame: 11, active: true, field_half: "neutral" },
+        { time: 1.2, frame: 12, active: true, field_half: "team_one_side" },
       ],
     },
     frames: [
       createStatsFrame({ frame_number: 9, time: 0.9 }),
-      createStatsFrame({ frame_number: 10, time: 1 }),
-      createStatsFrame({ frame_number: 11, time: 1.1 }),
-      createStatsFrame({ frame_number: 12, time: 1.2 }),
+      createStatsFrame({ frame_number: 10, time: 1, dt: 0.1 }),
+      createStatsFrame({ frame_number: 11, time: 1.1, dt: 0.2 }),
+      createStatsFrame({ frame_number: 12, time: 1.2, dt: 0.3 }),
     ],
   });
 

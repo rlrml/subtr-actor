@@ -14,6 +14,8 @@ test("half-volley event derivation can populate compacted player and team stats"
         {
           time: 2,
           frame: 20,
+          sample_time: 2,
+          sample_frame: 20,
           player: bluePlayer,
           is_team_0: true,
           bounce_time: 1.8,
@@ -25,6 +27,8 @@ test("half-volley event derivation can populate compacted player and team stats"
         {
           time: 3,
           frame: 30,
+          sample_time: 3,
+          sample_frame: 30,
           player: orangePlayer,
           is_team_0: false,
           bounce_time: 2.9,

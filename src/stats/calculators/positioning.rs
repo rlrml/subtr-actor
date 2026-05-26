@@ -699,10 +699,13 @@ impl PositioningCalculator {
             }
         }
 
-        let frame_events: Vec<_> = event_deltas
+        let mut frame_events: Vec<_> = event_deltas
             .into_values()
             .filter(PositioningEvent::has_delta)
             .collect();
+        frame_events.sort_by(|left, right| {
+            format!("{:?}", left.player).cmp(&format!("{:?}", right.player))
+        });
         self.events.extend(frame_events);
 
         self.previous_ball_position = Some(ball_position);

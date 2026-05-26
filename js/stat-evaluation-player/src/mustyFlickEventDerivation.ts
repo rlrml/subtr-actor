@@ -2,13 +2,25 @@ import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { MustyFlickStats } from "./generated/MustyFlickStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const MUSTY_HIGH_CONFIDENCE = 0.8;
 
 type MustyFlickStatsWithLabels = MustyFlickStats & {
   labeled_event_counts?: LabeledCounts;
 };
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
+}
+
+function subF32(left: number, right: number): number {
+  return f32(f32(left) - f32(right));
+}
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -41,11 +53,15 @@ function sortMustyFlickEvents(events: readonly MustyFlickEvent[]): MustyFlickEve
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
-      if (left.event.frame !== right.event.frame) {
-        return left.event.frame - right.event.frame;
+      const leftSampleFrame = left.event.sample_frame ?? left.event.frame;
+      const rightSampleFrame = right.event.sample_frame ?? right.event.frame;
+      if (leftSampleFrame !== rightSampleFrame) {
+        return leftSampleFrame - rightSampleFrame;
       }
-      if (left.event.time !== right.event.time) {
-        return left.event.time - right.event.time;
+      const leftSampleTime = left.event.sample_time ?? left.event.time;
+      const rightSampleTime = right.event.sample_time ?? right.event.time;
+      if (leftSampleTime !== rightSampleTime) {
+        return leftSampleTime - rightSampleTime;
       }
       return left.index - right.index;
     })
@@ -88,6 +104,15 @@ function totalLabeledCount(stats: MustyFlickStatsWithLabels): number {
   return stats.labeled_event_counts?.entries.reduce((total, entry) => total + entry.count, 0) ?? 0;
 }
 
+function cloneLabeledCounts(counts: LabeledCounts): LabeledCounts {
+  return {
+    entries: counts.entries.map((entry) => ({
+      labels: entry.labels.map((label) => ({ ...label })),
+      count: entry.count,
+    })),
+  };
+}
+
 function advanceMustyFlickStats(
   stats: MustyFlickStatsWithLabels,
   frameNumber: number,
@@ -96,7 +121,7 @@ function advanceMustyFlickStats(
 ): void {
   stats.is_last_musty = isLastMustyPlayer;
   stats.time_since_last_musty =
-    stats.last_musty_time == null ? null : Math.max(0, frameTime - stats.last_musty_time);
+    stats.last_musty_time == null ? null : Math.max(0, subF32(frameTime, stats.last_musty_time));
   stats.frames_since_last_musty =
     stats.last_musty_frame == null ? null : Math.max(0, frameNumber - stats.last_musty_frame);
 }
@@ -123,11 +148,11 @@ function applyMustyFlickEvent(
   stats.is_last_musty = true;
   stats.last_musty_time = event.time;
   stats.last_musty_frame = event.frame;
-  stats.time_since_last_musty = Math.max(0, frameTime - event.time);
+  stats.time_since_last_musty = Math.max(0, subF32(frameTime, event.time));
   stats.frames_since_last_musty = Math.max(0, frameNumber - event.frame);
   stats.last_confidence = event.confidence;
   stats.best_confidence = Math.max(stats.best_confidence, event.confidence);
-  stats.cumulative_confidence += event.confidence;
+  stats.cumulative_confidence = addF32(stats.cumulative_confidence, event.confidence);
 }
 
 function assignMustyFlickStats(
@@ -135,46 +160,79 @@ function assignMustyFlickStats(
   source: MustyFlickStatsWithLabels | undefined,
 ): void {
   Object.assign(target, source ?? defaultMustyFlickStats());
-  if (!source?.labeled_event_counts) {
+  if (source?.labeled_event_counts) {
+    (target as MustyFlickStatsWithLabels).labeled_event_counts = cloneLabeledCounts(
+      source.labeled_event_counts,
+    );
+  } else {
     delete (target as MustyFlickStatsWithLabels).labeled_event_counts;
   }
 }
 
-export function applyMustyFlickEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyMustyFlickEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createMustyFlickEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createMustyFlickEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortMustyFlickEvents(timeline.events.musty_flick ?? []);
 
   let eventIndex = 0;
   let lastMustyPlayer: string | null = null;
   const players = new Map<string, MustyFlickStatsWithLabels>();
 
-  for (const frame of timeline.frames) {
-    if (frame.is_live_play) {
-      for (const [playerKey, stats] of players) {
-        advanceMustyFlickStats(
-          stats,
-          frame.frame_number,
-          frame.time,
-          lastMustyPlayer === playerKey,
-        );
+  return {
+    applyFrame(frame: StatsFrame): void {
+      if (frame.is_live_play) {
+        for (const [playerKey, stats] of players) {
+          advanceMustyFlickStats(
+            stats,
+            frame.frame_number,
+            frame.time,
+            lastMustyPlayer === playerKey,
+          );
+        }
+
+        let processedEvent = false;
+        while (
+          eventIndex < events.length &&
+          (events[eventIndex]!.sample_frame ?? events[eventIndex]!.frame) <= frame.frame_number
+        ) {
+          const event = events[eventIndex] as MustyFlickEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultMustyFlickStats();
+          players.set(playerKey, stats);
+          applyMustyFlickEvent(stats, event, frame.frame_number, frame.time);
+          lastMustyPlayer = playerKey;
+          eventIndex += 1;
+          processedEvent = true;
+        }
+
+        if (processedEvent) {
+          for (const stats of players.values()) {
+            stats.is_last_musty = false;
+          }
+        }
+        if (lastMustyPlayer != null) {
+          const stats = players.get(lastMustyPlayer);
+          if (stats) {
+            stats.is_last_musty = true;
+          }
+        }
+      } else {
+        lastMustyPlayer = null;
       }
 
-      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        const event = events[eventIndex] as MustyFlickEvent;
-        const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultMustyFlickStats();
-        players.set(playerKey, stats);
-        applyMustyFlickEvent(stats, event, frame.frame_number, frame.time);
-        lastMustyPlayer = playerKey;
-        eventIndex += 1;
+      for (const player of frame.players) {
+        assignMustyFlickStats(player.musty_flick, players.get(remoteIdKey(player.player_id)));
       }
-    } else {
-      lastMustyPlayer = null;
-    }
-
-    for (const player of frame.players) {
-      assignMustyFlickStats(player.musty_flick, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

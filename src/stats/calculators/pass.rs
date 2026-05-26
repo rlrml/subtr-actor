@@ -18,6 +18,8 @@ pub enum PassKind {
 pub struct PassEvent {
     pub time: f32,
     pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub passer: PlayerId,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
@@ -29,6 +31,15 @@ pub struct PassEvent {
     pub ball_travel_distance: f32,
     pub ball_advance_distance: f32,
     pub pass_kind: PassKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PassLastCompletedEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    pub player: Option<PlayerId>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -107,8 +118,10 @@ pub struct PassCalculator {
     team_zero_stats: PassTeamStats,
     team_one_stats: PassTeamStats,
     events: Vec<PassEvent>,
+    last_completed_events: Vec<PassLastCompletedEvent>,
     last_touch: Option<PendingPassTouch>,
     current_last_completed_pass_player: Option<PlayerId>,
+    emitted_last_completed_pass_player: Option<PlayerId>,
 }
 
 impl PassCalculator {
@@ -130,6 +143,10 @@ impl PassCalculator {
 
     pub fn events(&self) -> &[PassEvent] {
         &self.events
+    }
+
+    pub fn last_completed_events(&self) -> &[PassLastCompletedEvent] {
+        &self.last_completed_events
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -176,6 +193,8 @@ impl PassCalculator {
         Some(PassEvent {
             time: touch.time,
             frame: touch.frame,
+            sample_time: touch.time,
+            sample_frame: touch.frame,
             passer: previous.player.clone(),
             receiver: receiver.clone(),
             is_team_0: touch.team_is_team_0,
@@ -255,7 +274,9 @@ impl PassCalculator {
         }
     }
 
-    fn record_pass(&mut self, frame: &FrameInfo, event: PassEvent) {
+    fn record_pass(&mut self, frame: &FrameInfo, mut event: PassEvent) {
+        event.sample_time = frame.time;
+        event.sample_frame = frame.frame_number;
         let passer_stats = self.player_stats.entry(event.passer.clone()).or_default();
         passer_stats.completed_pass_count += 1;
         passer_stats.total_pass_distance += event.ball_travel_distance;
@@ -290,6 +311,18 @@ impl PassCalculator {
         self.events.push(event);
     }
 
+    fn emit_last_completed_event(&mut self, frame: &FrameInfo, player: Option<PlayerId>) {
+        if self.emitted_last_completed_pass_player == player {
+            return;
+        }
+        self.emitted_last_completed_pass_player = player.clone();
+        self.last_completed_events.push(PassLastCompletedEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            player,
+        });
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -303,10 +336,12 @@ impl PassCalculator {
         if !live_play {
             self.last_touch = None;
             self.current_last_completed_pass_player = None;
+            self.emit_last_completed_event(frame, None);
             return Ok(());
         }
 
         let Some(ball_position) = ball.position() else {
+            self.emit_last_completed_event(frame, None);
             return Ok(());
         };
 
@@ -337,6 +372,7 @@ impl PassCalculator {
                 stats.is_last_completed_pass = true;
             }
         }
+        self.emit_last_completed_event(frame, self.current_last_completed_pass_player.clone());
 
         Ok(())
     }

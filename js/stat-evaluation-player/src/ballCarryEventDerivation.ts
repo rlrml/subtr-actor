@@ -4,7 +4,7 @@ import type { BallCarryEvent } from "./generated/BallCarryEvent.ts";
 import type { BallCarryStats } from "./generated/BallCarryStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 type BallCarryStatsWithLabels = BallCarryStats & {
   labeled_event_counts?: LabeledCounts;
@@ -112,6 +112,15 @@ function totalLabeledCount(stats: { labeled_event_counts?: LabeledCounts }): num
   return stats.labeled_event_counts?.entries.reduce((total, entry) => total + entry.count, 0) ?? 0;
 }
 
+function cloneLabeledCounts(counts: LabeledCounts): LabeledCounts {
+  return {
+    entries: counts.entries.map((entry) => ({
+      labels: entry.labels.map((label) => ({ ...label })),
+      count: entry.count,
+    })),
+  };
+}
+
 function applyBallCarryEvent(stats: BallCarryStatsWithLabels, event: BallCarryEvent): void {
   incrementLabels(stats, [{ key: "kind", value: "carry" }]);
   stats.carry_count = totalLabeledCount(stats);
@@ -154,7 +163,11 @@ function assignBallCarryStats(
   source: BallCarryStatsWithLabels | undefined,
 ): void {
   Object.assign(target, source ?? defaultBallCarryStats());
-  if (!source?.labeled_event_counts) {
+  if (source?.labeled_event_counts) {
+    (target as BallCarryStatsWithLabels).labeled_event_counts = cloneLabeledCounts(
+      source.labeled_event_counts,
+    );
+  } else {
     delete (target as BallCarryStatsWithLabels).labeled_event_counts;
   }
 }
@@ -164,12 +177,28 @@ function assignAirDribbleStats(
   source: AirDribbleStatsWithLabels | undefined,
 ): void {
   Object.assign(target, source ?? defaultAirDribbleStats());
-  if (!source?.labeled_event_counts) {
+  if (source?.labeled_event_counts) {
+    (target as AirDribbleStatsWithLabels).labeled_event_counts = cloneLabeledCounts(
+      source.labeled_event_counts,
+    );
+  } else {
     delete (target as AirDribbleStatsWithLabels).labeled_event_counts;
   }
 }
 
-export function applyBallCarryEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyBallCarryEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createBallCarryEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createBallCarryEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortBallCarryEvents(timeline.events.ball_carry ?? []);
 
   let eventIndex = 0;
@@ -180,34 +209,34 @@ export function applyBallCarryEventDerivedStats(timeline: StatsTimeline): StatsT
   const teamZeroAirDribble = defaultAirDribbleStats();
   const teamOneAirDribble = defaultAirDribbleStats();
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.end_frame < frame.frame_number) {
-      const event = events[eventIndex] as BallCarryEvent;
-      const playerKey = remoteIdKey(event.player_id);
-      if (event.kind === "carry") {
-        const playerStats = ballCarryPlayers.get(playerKey) ?? defaultBallCarryStats();
-        ballCarryPlayers.set(playerKey, playerStats);
-        applyBallCarryEvent(playerStats, event);
-        applyBallCarryEvent(event.is_team_0 ? teamZeroBallCarry : teamOneBallCarry, event);
-      } else {
-        const playerStats = airDribblePlayers.get(playerKey) ?? defaultAirDribbleStats();
-        airDribblePlayers.set(playerKey, playerStats);
-        applyAirDribbleEvent(playerStats, event);
-        applyAirDribbleEvent(event.is_team_0 ? teamZeroAirDribble : teamOneAirDribble, event);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.end_frame < frame.frame_number) {
+        const event = events[eventIndex] as BallCarryEvent;
+        const playerKey = remoteIdKey(event.player_id);
+        if (event.kind === "carry") {
+          const playerStats = ballCarryPlayers.get(playerKey) ?? defaultBallCarryStats();
+          ballCarryPlayers.set(playerKey, playerStats);
+          applyBallCarryEvent(playerStats, event);
+          applyBallCarryEvent(event.is_team_0 ? teamZeroBallCarry : teamOneBallCarry, event);
+        } else {
+          const playerStats = airDribblePlayers.get(playerKey) ?? defaultAirDribbleStats();
+          airDribblePlayers.set(playerKey, playerStats);
+          applyAirDribbleEvent(playerStats, event);
+          applyAirDribbleEvent(event.is_team_0 ? teamZeroAirDribble : teamOneAirDribble, event);
+        }
+        eventIndex += 1;
       }
-      eventIndex += 1;
-    }
 
-    assignBallCarryStats(frame.team_zero.ball_carry, teamZeroBallCarry);
-    assignBallCarryStats(frame.team_one.ball_carry, teamOneBallCarry);
-    assignAirDribbleStats(frame.team_zero.air_dribble, teamZeroAirDribble);
-    assignAirDribbleStats(frame.team_one.air_dribble, teamOneAirDribble);
-    for (const player of frame.players) {
-      const playerKey = remoteIdKey(player.player_id);
-      assignBallCarryStats(player.ball_carry, ballCarryPlayers.get(playerKey));
-      assignAirDribbleStats(player.air_dribble, airDribblePlayers.get(playerKey));
-    }
-  }
-
-  return timeline;
+      assignBallCarryStats(frame.team_zero.ball_carry, teamZeroBallCarry);
+      assignBallCarryStats(frame.team_one.ball_carry, teamOneBallCarry);
+      assignAirDribbleStats(frame.team_zero.air_dribble, teamZeroAirDribble);
+      assignAirDribbleStats(frame.team_one.air_dribble, teamOneAirDribble);
+      for (const player of frame.players) {
+        const playerKey = remoteIdKey(player.player_id);
+        assignBallCarryStats(player.ball_carry, ballCarryPlayers.get(playerKey));
+        assignAirDribbleStats(player.air_dribble, airDribblePlayers.get(playerKey));
+      }
+    },
+  };
 }

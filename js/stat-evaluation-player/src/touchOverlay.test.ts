@@ -58,6 +58,23 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
   } as ReplayModel;
 
   const statsTimeline = createLegacyStatsTimeline({
+    events: {
+      touch: [
+        {
+          time: 1.25,
+          frame: 1,
+          sample_time: 1.25,
+          sample_frame: 1,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "control",
+          height_band: "ground",
+          surface: "ground",
+          dodge_state: "no_dodge",
+          ball_speed_change: 0,
+        },
+      ],
+    },
     frames: [
       {
         frame_number: 0,
@@ -130,6 +147,43 @@ test("buildTouchMarkers assigns credited ball movement to the active touch marke
   } as ReplayModel;
 
   const statsTimeline = createLegacyStatsTimeline({
+    events: {
+      touch: [
+        {
+          time: 0,
+          frame: 0,
+          sample_time: 0,
+          sample_frame: 0,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "control",
+          height_band: "ground",
+          surface: "ground",
+          dodge_state: "no_dodge",
+          ball_speed_change: 0,
+        },
+      ],
+      touch_ball_movement: [
+        {
+          time: 1,
+          frame: 1,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          travel_distance: 100,
+          advance_distance: 100,
+          retreat_distance: 0,
+        },
+        {
+          time: 2,
+          frame: 2,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          travel_distance: 80,
+          advance_distance: 70,
+          retreat_distance: 0,
+        },
+      ],
+    },
     frames: [
       {
         frame_number: 0,
@@ -213,6 +267,23 @@ test("buildTouchMarkers uses normalized replay frame time instead of raw stats t
   } as ReplayModel;
 
   const statsTimeline = createLegacyStatsTimeline({
+    events: {
+      touch: [
+        {
+          time: 4.75,
+          frame: 1,
+          sample_time: 4.75,
+          sample_frame: 1,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "control",
+          height_band: "ground",
+          surface: "ground",
+          dodge_state: "no_dodge",
+          ball_speed_change: 0,
+        },
+      ],
+    },
     frames: [
       {
         frame_number: 1,

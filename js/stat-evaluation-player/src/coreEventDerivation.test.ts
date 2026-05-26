@@ -15,7 +15,7 @@ test("core event derivation populates compacted player and team stats", () => {
           frame: 10,
           player: bluePlayer,
           is_team_0: true,
-          stats: {
+          delta: {
             score: 110,
             goals: 1,
             assists: 0,
@@ -60,7 +60,7 @@ test("core event derivation populates compacted player and team stats", () => {
           time: 1,
           frame: 10,
           is_team_0: true,
-          stats: {
+          delta: {
             score: 110,
             goals: 1,
             assists: 0,

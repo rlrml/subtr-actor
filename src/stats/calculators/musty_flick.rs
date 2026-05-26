@@ -21,6 +21,8 @@ const MUSTY_HIGH_CONFIDENCE: f32 = 0.80;
 pub struct MustyFlickEvent {
     pub time: f32,
     pub frame: usize,
+    pub sample_time: f32,
+    pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
@@ -292,6 +294,8 @@ impl MustyFlickCalculator {
         Some(MustyFlickEvent {
             time: touch_event.time,
             frame: touch_event.frame,
+            sample_time: touch_event.time,
+            sample_frame: touch_event.frame,
             player: player.player_id.clone(),
             is_team_0: player.is_team_0,
             aerial: player_position.z >= MUSTY_AERIAL_HEIGHT,
@@ -331,11 +335,13 @@ impl MustyFlickCalculator {
             let Some(dodge_start) = self.recent_dodge_starts.get(player_id).copied() else {
                 continue;
             };
-            let Some(event) =
+            let Some(mut event) =
                 self.musty_candidate(ball, player, touch_event, dodge_start, ball_speed_change)
             else {
                 continue;
             };
+            event.sample_time = frame.time;
+            event.sample_frame = frame.frame_number;
 
             let stats = self.player_stats.entry(player_id.clone()).or_default();
             stats.record_event(&event, event.aerial);

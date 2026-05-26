@@ -78,7 +78,7 @@ fn assert_finite_json(value: &Value, path: &str) {
 fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("failed to collect stats timeline for post-EAC standard replay");
 
     assert!(
@@ -115,7 +115,7 @@ fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
 fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("failed to collect stats timeline for post-EAC standard replay");
 
     let third_goal = timeline
@@ -355,7 +355,7 @@ fn post_eac_replays_emit_stats_outputs() {
 
         let timeline = StatsTimelineCollector::new()
             .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
-            .get_replay_data(&replay)
+            .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|error| {
                 panic!(
                     "failed to collect typed stats timeline for {}: {error:?}",
@@ -405,7 +405,7 @@ fn post_eac_replays_emit_stats_outputs() {
                     fixture.path
                 )
             })
-            .into_stats_timeline_value()
+            .into_legacy_stats_timeline_value()
             .unwrap_or_else(|error| {
                 panic!(
                     "failed to convert dynamic stats frames for {}: {error:?}",

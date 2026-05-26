@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 use subtr_actor::{
     CoreTeamStats, MechanicEvent, MechanicEventPropertyValue, MechanicTiming, ReplayStatsFrame,
-    ReplayStatsTimeline, TeamStatsSnapshot,
+    ReplayStatsTimeline, ReplayStatsTimelineEvents, TeamStatsSnapshot,
 };
 
 pub fn parse_replay(path: &str) -> boxcars::Replay {
@@ -112,11 +112,247 @@ pub fn mechanic_event_unsigned_property(event: &MechanicEvent, key: &str) -> Opt
 pub fn assert_replay_stats_timeline_eq(left: &ReplayStatsTimeline, right: &ReplayStatsTimeline) {
     if let Some(diff) = compare_field("config", &left.config, &right.config)
         .or_else(|| compare_field("replay_meta", &left.replay_meta, &right.replay_meta))
-        .or_else(|| compare_field("events", &left.events, &right.events))
+        .or_else(|| compare_timeline_events("events", &left.events, &right.events))
         .or_else(|| compare_replay_frame_slice("frames", &left.frames, &right.frames))
     {
         panic!("replay stats timelines differ at {diff}");
     }
+}
+
+fn compare_timeline_events(
+    label: &str,
+    left: &ReplayStatsTimelineEvents,
+    right: &ReplayStatsTimelineEvents,
+) -> Option<String> {
+    compare_serialized_slice(
+        &format!("{label}.timeline"),
+        &left.timeline,
+        &right.timeline,
+    )
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.core_player"),
+            &left.core_player,
+            &right.core_player,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.core_team"),
+            &left.core_team,
+            &right.core_team,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.possession"),
+            &left.possession,
+            &right.possession,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.pressure"),
+            &left.pressure,
+            &right.pressure,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.movement"),
+            &left.movement,
+            &right.movement,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning"),
+            &left.positioning,
+            &right.positioning,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.rotation_player"),
+            &left.rotation_player,
+            &right.rotation_player,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.rotation_team"),
+            &left.rotation_team,
+            &right.rotation_team,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.mechanics"),
+            &left.mechanics,
+            &right.mechanics,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.goal_context"),
+            &left.goal_context,
+            &right.goal_context,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.backboard"),
+            &left.backboard,
+            &right.backboard,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.ceiling_shot"),
+            &left.ceiling_shot,
+            &right.ceiling_shot,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.wall_aerial"),
+            &left.wall_aerial,
+            &right.wall_aerial,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.wall_aerial_shot"),
+            &left.wall_aerial_shot,
+            &right.wall_aerial_shot,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.center"), &left.center, &right.center))
+    .or_else(|| compare_serialized_slice(&format!("{label}.flick"), &left.flick, &right.flick))
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.musty_flick"),
+            &left.musty_flick,
+            &right.musty_flick,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.dodge_reset"),
+            &left.dodge_reset,
+            &right.dodge_reset,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.double_tap"),
+            &left.double_tap,
+            &right.double_tap,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.fifty_fifty"),
+            &left.fifty_fifty,
+            &right.fifty_fifty,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.one_timer"),
+            &left.one_timer,
+            &right.one_timer,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.pass"), &left.pass, &right.pass))
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.ball_carry"),
+            &left.ball_carry,
+            &right.ball_carry,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.goal_tags"),
+            &left.goal_tags,
+            &right.goal_tags,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.rush"), &left.rush, &right.rush))
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.speed_flip"),
+            &left.speed_flip,
+            &right.speed_flip,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.half_flip"),
+            &left.half_flip,
+            &right.half_flip,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.half_volley"),
+            &left.half_volley,
+            &right.half_volley,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.wavedash"),
+            &left.wavedash,
+            &right.wavedash,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.whiff"), &left.whiff, &right.whiff))
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.powerslide"),
+            &left.powerslide,
+            &right.powerslide,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.touch"), &left.touch, &right.touch))
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.touch_ball_movement"),
+            &left.touch_ball_movement,
+            &right.touch_ball_movement,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.touch_last_touch"),
+            &left.touch_last_touch,
+            &right.touch_last_touch,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.boost_pickups"),
+            &left.boost_pickups,
+            &right.boost_pickups,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.boost_ledger"),
+            &left.boost_ledger,
+            &right.boost_ledger,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.boost_state"),
+            &left.boost_state,
+            &right.boost_state,
+        )
+    })
+    .or_else(|| compare_serialized_slice(&format!("{label}.bump"), &left.bump, &right.bump))
 }
 
 fn compare_field<T: PartialEq + Serialize>(label: &str, left: &T, right: &T) -> Option<String> {
@@ -139,6 +375,14 @@ fn compare_slice<T: PartialEq + Serialize>(label: &str, left: &[T], right: &[T])
         .map(|(index, (left_item, right_item))| {
             serialized_diff_path(&format!("{label}[{index}]"), left_item, right_item)
         })
+}
+
+fn compare_serialized_slice<T: Serialize>(label: &str, left: &[T], right: &[T]) -> Option<String> {
+    let left_value = serde_json::to_value(left).expect("left side should serialize for debugging");
+    let right_value =
+        serde_json::to_value(right).expect("right side should serialize for debugging");
+    (left_value != right_value)
+        .then(|| first_json_diff(label.to_owned(), &left_value, &right_value))
 }
 
 fn compare_replay_frame_slice(
@@ -186,6 +430,20 @@ fn compare_replay_frame(
             &format!("{label}.game_state"),
             &left.game_state,
             &right.game_state,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.ball_has_been_hit"),
+            &left.ball_has_been_hit,
+            &right.ball_has_been_hit,
+        )
+    })
+    .or_else(|| {
+        compare_field(
+            &format!("{label}.kickoff_countdown_time"),
+            &left.kickoff_countdown_time,
+            &right.kickoff_countdown_time,
         )
     })
     .or_else(|| {

@@ -36,6 +36,7 @@
     "test": "node ../scripts/ensure-wasm-package.mjs && tsx --tsconfig tsconfig.test.json --test src/*.test.ts",
     "test:ci": "node ../scripts/ensure-wasm-package.mjs && env SUBTR_ACTOR_REPLAY_FIXTURE_MODE=smoke tsx --tsconfig tsconfig.test.json --test src/*.test.ts",
     "test:fixtures": "node ../scripts/ensure-wasm-package.mjs && env SUBTR_ACTOR_REPLAY_FIXTURE_MODE=full SUBTR_ACTOR_REPLAY_FIXTURE_CONCURRENCY=2 tsx --tsconfig tsconfig.test.json --test src/replayFormatFixtures.test.ts",
+    "test:legacy-stats-parity": "node ../scripts/ensure-wasm-package.mjs && tsx --tsconfig tsconfig.test.json --test src/statsTimelineLegacyParity.slow-test.ts",
     "bench:load": "node ./scripts/benchmark-replay-load.mjs",
     "build:types": "tsc --project tsconfig.build.json",
     "build": "../scripts/with-clean-npm-env.sh node --run=build:bindings && ../scripts/with-clean-npm-env.sh node --run=build:player && ../scripts/with-clean-npm-env.sh node --run=check && vite build && ../scripts/with-clean-npm-env.sh node --run=build:types",

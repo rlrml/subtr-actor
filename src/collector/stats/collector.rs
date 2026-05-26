@@ -64,6 +64,9 @@ impl BuiltinModuleSelection {
     }
 
     fn graph(&self) -> SubtrActorResult<AnalysisGraph> {
+        if self.module_names == builtin_stats_module_names() {
+            return Ok(build_legacy_timeline_graph());
+        }
         graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
     }
 
@@ -147,6 +150,8 @@ impl BuiltinModuleSelection {
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: gameplay.game_state,
+            ball_has_been_hit: gameplay.ball_has_been_hit,
+            kickoff_countdown_time: gameplay.kickoff_countdown_time,
             gameplay_phase: live_play_state.gameplay_phase,
             is_live_play: live_play_state.is_live_play,
             modules: self.frame_modules_json(graph, replay_meta)?,
@@ -306,30 +311,74 @@ impl StatsCollector<StatsSnapshotFrame, IdentityFrameTransform> {
         self.capture_frames().get_captured_data(replay)
     }
 
-    pub fn get_stats_timeline_value(self, replay: &boxcars::Replay) -> SubtrActorResult<Value> {
-        serialize_to_json_value(&self.get_replay_stats_timeline(replay)?)
+    /// Collect the legacy full per-frame stats timeline as JSON.
+    ///
+    /// This serializes cumulative team/player partial sums on every captured
+    /// frame. Prefer `StatsTimelineEventCollector` for compact event-backed
+    /// timeline transfer.
+    pub fn get_legacy_stats_timeline_value(
+        self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<Value> {
+        serialize_to_json_value(&self.get_legacy_replay_stats_timeline(replay)?)
     }
 
-    pub fn get_replay_stats_timeline(
+    /// Collect the legacy full per-frame stats timeline.
+    ///
+    /// This preserves the pre-event-transfer snapshot shape for compatibility
+    /// and parity checks.
+    pub fn get_legacy_replay_stats_timeline(
         self,
         replay: &boxcars::Replay,
     ) -> SubtrActorResult<ReplayStatsTimeline> {
         self.with_frame_transform(ReplayStatsFrameTransform)
             .capture_frames()
             .get_captured_data(replay)?
-            .into_replay_stats_timeline()
+            .into_legacy_replay_stats_timeline()
+    }
+
+    #[deprecated(
+        note = "use get_legacy_stats_timeline_value for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn get_stats_timeline_value(self, replay: &boxcars::Replay) -> SubtrActorResult<Value> {
+        self.get_legacy_stats_timeline_value(replay)
+    }
+
+    #[deprecated(
+        note = "use get_legacy_stats_timeline_value for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn get_replay_stats_timeline(
+        self,
+        replay: &boxcars::Replay,
+    ) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.get_legacy_replay_stats_timeline(replay)
     }
 
     pub fn into_snapshot_data(self) -> SubtrActorResult<StatsSnapshotData> {
         self.into_captured_data()
     }
 
-    pub fn into_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.into_snapshot_data()?.to_stats_timeline_value()
+    pub fn into_legacy_stats_timeline_value(self) -> SubtrActorResult<Value> {
+        self.into_snapshot_data()?.to_legacy_stats_timeline_value()
     }
 
+    pub fn into_legacy_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.into_snapshot_data()?
+            .into_legacy_replay_stats_timeline()
+    }
+
+    #[deprecated(
+        note = "use into_legacy_stats_timeline_value for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_stats_timeline_value(self) -> SubtrActorResult<Value> {
+        self.into_legacy_stats_timeline_value()
+    }
+
+    #[deprecated(
+        note = "use into_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
     pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
-        self.into_snapshot_data()?.into_stats_timeline()
+        self.into_legacy_replay_stats_timeline()
     }
 }
 

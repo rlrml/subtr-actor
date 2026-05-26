@@ -1,12 +1,13 @@
 import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
 import type { BoostStateEvent } from "./generated/BoostStateEvent.ts";
 import type { BoostStats } from "./generated/BoostStats.ts";
-import type { PlayerStatsSnapshot, StatsTimeline } from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const FLOAT_TOLERANCE = 0.001;
 const BOOST_MAX_AMOUNT = 255;
 const BOOST_ZERO_BAND_RAW = 1;
 const BOOST_FULL_BAND_MIN_RAW = BOOST_MAX_AMOUNT - 1;
+const F32_EPSILON = 1.1920928955078125e-7;
 
 const CONTINUOUS_BOOST_FIELDS = [
   "tracked_time",
@@ -45,7 +46,8 @@ const LEDGER_BOOST_FIELDS = [
 const EVENT_DERIVED_BOOST_FIELDS = [...CONTINUOUS_BOOST_FIELDS, ...LEDGER_BOOST_FIELDS] as const;
 
 type EventDerivedBoostField = (typeof EVENT_DERIVED_BOOST_FIELDS)[number];
-type EventDerivedBoostStats = Pick<BoostStats, EventDerivedBoostField>;
+type EventDerivedBoostStats = Pick<BoostStats, EventDerivedBoostField> &
+  Pick<BoostStats, "labeled_amounts" | "labeled_counts">;
 type BoostLedgerMismatchScope = "team_zero" | "team_one" | "player";
 
 export interface BoostLedgerDerivationMismatch {
@@ -65,6 +67,32 @@ interface LedgerAccumulator {
   currentBoostBefore: number | null;
   currentBoostFrame: number | null;
   previousBoostAmount: number | null;
+  labeledAmountsVersion: number;
+  labeledAmountsSnapshot: EventDerivedBoostStats["labeled_amounts"];
+  labeledAmountsSnapshotVersion: number;
+  labeledCountsVersion: number;
+  labeledCountsSnapshot: EventDerivedBoostStats["labeled_counts"];
+  labeledCountsSnapshotVersion: number;
+}
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
+}
+
+function subF32(left: number, right: number): number {
+  return f32(f32(left) - f32(right));
+}
+
+function mulF32(left: number, right: number): number {
+  return f32(f32(left) * f32(right));
+}
+
+function divF32(left: number, right: number): number {
+  return f32(f32(left) / f32(right));
 }
 
 function createLedgerBoostStats(): EventDerivedBoostStats {
@@ -100,6 +128,8 @@ function createLedgerBoostStats(): EventDerivedBoostStats {
   };
 }
 
+const EMPTY_LEDGER_BOOST_STATS = createLedgerBoostStats();
+
 function createLedgerAccumulator(): LedgerAccumulator {
   return {
     stats: createLedgerBoostStats(),
@@ -108,6 +138,12 @@ function createLedgerAccumulator(): LedgerAccumulator {
     currentBoostBefore: null,
     currentBoostFrame: null,
     previousBoostAmount: null,
+    labeledAmountsVersion: 0,
+    labeledAmountsSnapshot: undefined,
+    labeledAmountsSnapshotVersion: -1,
+    labeledCountsVersion: 0,
+    labeledCountsSnapshot: undefined,
+    labeledCountsSnapshotVersion: -1,
   };
 }
 
@@ -120,8 +156,59 @@ function labelValue(event: BoostLedgerEvent, key: string): string | null {
   return event.labels?.find((label) => label.key === key)?.value ?? null;
 }
 
+function sortedLabels(labels: BoostLedgerEvent["labels"]): NonNullable<BoostLedgerEvent["labels"]> {
+  return [...(labels ?? [])].sort((left, right) =>
+    left.key === right.key ? left.value.localeCompare(right.value) : left.key.localeCompare(right.key),
+  );
+}
+
+function labelSetKey(labels: BoostLedgerEvent["labels"]): string {
+  return JSON.stringify(sortedLabels(labels));
+}
+
+function cloneLabels(labels: BoostLedgerEvent["labels"]): NonNullable<BoostLedgerEvent["labels"]> {
+  return sortedLabels(labels).map((label) => ({ ...label }));
+}
+
+function addLabeledAmount(stats: EventDerivedBoostStats, event: BoostLedgerEvent): boolean {
+  const amount = f32(event.amount);
+  if (amount <= 0) {
+    return false;
+  }
+  const entries = (stats.labeled_amounts ??= { entries: [] }).entries;
+  const key = labelSetKey(event.labels);
+  const existing = entries.find((entry) => labelSetKey(entry.labels) === key);
+  if (existing) {
+    existing.value = addF32(existing.value, amount);
+    return true;
+  }
+  entries.push({ labels: cloneLabels(event.labels), value: amount });
+  entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+  return true;
+}
+
+function addLabeledCount(
+  stats: EventDerivedBoostStats,
+  event: BoostLedgerEvent,
+  count: number,
+): boolean {
+  if (count <= 0) {
+    return false;
+  }
+  const entries = (stats.labeled_counts ??= { entries: [] }).entries;
+  const key = labelSetKey(event.labels);
+  const existing = entries.find((entry) => labelSetKey(entry.labels) === key);
+  if (existing) {
+    existing.count += count;
+    return true;
+  }
+  entries.push({ labels: cloneLabels(event.labels), count });
+  entries.sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)));
+  return true;
+}
+
 function boostPercentToAmount(boostPercent: number): number {
-  return (boostPercent * BOOST_MAX_AMOUNT) / 100;
+  return divF32(mulF32(boostPercent, BOOST_MAX_AMOUNT), 100);
 }
 
 function intervalFractionInBoostRange(
@@ -130,20 +217,21 @@ function intervalFractionInBoostRange(
   minBoost: number,
   maxBoost: number,
 ): number {
-  if (Math.abs(endBoost - startBoost) <= Number.EPSILON) {
+  const boostDelta = subF32(endBoost, startBoost);
+  if (Math.abs(boostDelta) <= F32_EPSILON) {
     return startBoost >= minBoost && startBoost < maxBoost ? 1 : 0;
   }
 
-  const tAtMin = (minBoost - startBoost) / (endBoost - startBoost);
-  const tAtMax = (maxBoost - startBoost) / (endBoost - startBoost);
+  const tAtMin = divF32(subF32(minBoost, startBoost), boostDelta);
+  const tAtMax = divF32(subF32(maxBoost, startBoost), boostDelta);
   const intervalStart = Math.max(Math.min(tAtMin, tAtMax), 0);
   const intervalEnd = Math.min(Math.max(tAtMin, tAtMax), 1);
-  return Math.max(intervalEnd - intervalStart, 0);
+  return Math.max(subF32(intervalEnd, intervalStart), 0);
 }
 
 function applyBoostStateEvent(accumulator: LedgerAccumulator, event: BoostStateEvent): void {
-  accumulator.currentBoostAmount = event.boost_amount;
-  accumulator.currentBoostBefore = event.boost_before;
+  accumulator.currentBoostAmount = f32(event.boost_amount);
+  accumulator.currentBoostBefore = event.boost_before == null ? null : f32(event.boost_before);
   accumulator.currentBoostFrame = event.frame;
 }
 
@@ -153,58 +241,85 @@ function addContinuousBoostSample(
   boostAmount: number,
   dt: number,
 ): void {
-  const averageBoostAmount = (previousBoostAmount + boostAmount) * 0.5;
+  const previous = f32(previousBoostAmount);
+  const current = f32(boostAmount);
+  const sampleDt = f32(dt);
+  const averageBoostAmount = mulF32(addF32(previous, current), 0.5);
 
-  stats.tracked_time += dt;
-  stats.boost_integral += averageBoostAmount * dt;
-  stats.time_zero_boost +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      0,
-      BOOST_ZERO_BAND_RAW,
-    );
-  stats.time_hundred_boost +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      BOOST_FULL_BAND_MIN_RAW,
-      BOOST_MAX_AMOUNT + 1,
-    );
-  stats.time_boost_0_25 +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      0,
-      boostPercentToAmount(25),
-    );
-  stats.time_boost_25_50 +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      boostPercentToAmount(25),
-      boostPercentToAmount(50),
-    );
-  stats.time_boost_50_75 +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      boostPercentToAmount(50),
-      boostPercentToAmount(75),
-    );
-  stats.time_boost_75_100 +=
-    dt *
-    intervalFractionInBoostRange(
-      previousBoostAmount,
-      boostAmount,
-      boostPercentToAmount(75),
-      BOOST_MAX_AMOUNT + 1,
-    );
+  stats.tracked_time = addF32(stats.tracked_time, sampleDt);
+  stats.boost_integral = addF32(stats.boost_integral, mulF32(averageBoostAmount, sampleDt));
+  stats.time_zero_boost = addF32(
+    stats.time_zero_boost,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        0,
+        BOOST_ZERO_BAND_RAW,
+      ),
+    ),
+  );
+  stats.time_hundred_boost = addF32(
+    stats.time_hundred_boost,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        BOOST_FULL_BAND_MIN_RAW,
+        BOOST_MAX_AMOUNT + 1,
+      ),
+    ),
+  );
+  stats.time_boost_0_25 = addF32(
+    stats.time_boost_0_25,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        0,
+        boostPercentToAmount(25),
+      ),
+    ),
+  );
+  stats.time_boost_25_50 = addF32(
+    stats.time_boost_25_50,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(25),
+        boostPercentToAmount(50),
+      ),
+    ),
+  );
+  stats.time_boost_50_75 = addF32(
+    stats.time_boost_50_75,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(50),
+        boostPercentToAmount(75),
+      ),
+    ),
+  );
+  stats.time_boost_75_100 = addF32(
+    stats.time_boost_75_100,
+    mulF32(
+      sampleDt,
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(75),
+        BOOST_MAX_AMOUNT + 1,
+      ),
+    ),
+  );
 }
 
 function applyContinuousBoostSample(
@@ -226,6 +341,10 @@ function applyContinuousBoostSample(
 }
 
 function countPickupOnce(accumulator: LedgerAccumulator, event: BoostLedgerEvent): void {
+  if (event.count <= 0) {
+    return;
+  }
+
   const padSize = labelValue(event, "pad_size");
   if (padSize !== "big" && padSize !== "small") {
     return;
@@ -256,7 +375,17 @@ function countPickupOnce(accumulator: LedgerAccumulator, event: BoostLedgerEvent
 }
 
 function applyLedgerEvent(accumulator: LedgerAccumulator, event: BoostLedgerEvent): void {
-  const amount = Number.isFinite(event.amount) ? event.amount : 0;
+  const amount = f32(Number.isFinite(event.amount) ? event.amount : 0);
+  if (event.transaction !== "used") {
+    if (addLabeledAmount(accumulator.stats, event)) {
+      accumulator.labeledAmountsVersion += 1;
+    }
+  }
+  if (event.transaction === "collected") {
+    if (addLabeledCount(accumulator.stats, event, Math.max(event.count, 1))) {
+      accumulator.labeledCountsVersion += 1;
+    }
+  }
   const padSize = labelValue(event, "pad_size");
   const activity = labelValue(event, "activity") ?? "active";
   const fieldHalf = labelValue(event, "field_half");
@@ -265,63 +394,142 @@ function applyLedgerEvent(accumulator: LedgerAccumulator, event: BoostLedgerEven
     case "collected":
       countPickupOnce(accumulator, event);
       if (activity === "inactive") {
-        accumulator.stats.amount_collected_inactive += amount;
+        accumulator.stats.amount_collected_inactive = addF32(
+          accumulator.stats.amount_collected_inactive,
+          amount,
+        );
         break;
       }
-      accumulator.stats.amount_collected += amount;
+      accumulator.stats.amount_collected = addF32(accumulator.stats.amount_collected, amount);
       if (padSize === "big") {
-        accumulator.stats.amount_collected_big += amount;
+        accumulator.stats.amount_collected_big = addF32(
+          accumulator.stats.amount_collected_big,
+          amount,
+        );
       } else if (padSize === "small") {
-        accumulator.stats.amount_collected_small += amount;
+        accumulator.stats.amount_collected_small = addF32(
+          accumulator.stats.amount_collected_small,
+          amount,
+        );
       }
       break;
 
     case "stolen":
-      accumulator.stats.amount_stolen += amount;
+      accumulator.stats.amount_stolen = addF32(accumulator.stats.amount_stolen, amount);
       if (padSize === "big") {
         accumulator.stats.big_pads_stolen += 1;
-        accumulator.stats.amount_stolen_big += amount;
+        accumulator.stats.amount_stolen_big = addF32(accumulator.stats.amount_stolen_big, amount);
       } else if (padSize === "small") {
         accumulator.stats.small_pads_stolen += 1;
-        accumulator.stats.amount_stolen_small += amount;
+        accumulator.stats.amount_stolen_small = addF32(
+          accumulator.stats.amount_stolen_small,
+          amount,
+        );
       }
       break;
 
     case "overfill":
-      accumulator.stats.overfill_total += amount;
+      accumulator.stats.overfill_total = addF32(accumulator.stats.overfill_total, amount);
       if (fieldHalf === "opponent") {
-        accumulator.stats.overfill_from_stolen += amount;
+        accumulator.stats.overfill_from_stolen = addF32(
+          accumulator.stats.overfill_from_stolen,
+          amount,
+        );
       }
       countPickupOnce(accumulator, event);
       break;
 
     case "respawn":
-      accumulator.stats.amount_respawned += amount;
+      accumulator.stats.amount_respawned = addF32(accumulator.stats.amount_respawned, amount);
       break;
 
     case "used":
-      accumulator.stats.amount_used += amount;
+      accumulator.stats.amount_used = addF32(accumulator.stats.amount_used, amount);
+      break;
+
+    case "used_allocation":
       if (labelValue(event, "vertical_state") === "grounded") {
-        accumulator.stats.amount_used_while_grounded += amount;
+        accumulator.stats.amount_used_while_grounded = addF32(
+          accumulator.stats.amount_used_while_grounded,
+          amount,
+        );
       } else if (labelValue(event, "vertical_state") === "aerial") {
-        accumulator.stats.amount_used_while_airborne += amount;
+        accumulator.stats.amount_used_while_airborne = addF32(
+          accumulator.stats.amount_used_while_airborne,
+          amount,
+        );
       }
       if (labelValue(event, "supersonic") === "true") {
-        accumulator.stats.amount_used_while_supersonic += amount;
+        accumulator.stats.amount_used_while_supersonic = addF32(
+          accumulator.stats.amount_used_while_supersonic,
+          amount,
+        );
       }
       break;
   }
 }
 
-function copyLedgerDerivedBoostStats(target: BoostStats, source: EventDerivedBoostStats): void {
+function getLabeledAmountsSnapshot(
+  accumulator: LedgerAccumulator,
+): EventDerivedBoostStats["labeled_amounts"] {
+  if (accumulator.labeledAmountsSnapshotVersion !== accumulator.labeledAmountsVersion) {
+    accumulator.labeledAmountsSnapshot =
+      accumulator.stats.labeled_amounts && accumulator.stats.labeled_amounts.entries.length > 0
+        ? {
+            entries: accumulator.stats.labeled_amounts.entries.map((entry) => ({
+              labels: entry.labels.map((label) => ({ ...label })),
+              value: entry.value,
+            })),
+          }
+        : undefined;
+    accumulator.labeledAmountsSnapshotVersion = accumulator.labeledAmountsVersion;
+  }
+  return accumulator.labeledAmountsSnapshot;
+}
+
+function getLabeledCountsSnapshot(
+  accumulator: LedgerAccumulator,
+): EventDerivedBoostStats["labeled_counts"] {
+  if (accumulator.labeledCountsSnapshotVersion !== accumulator.labeledCountsVersion) {
+    accumulator.labeledCountsSnapshot =
+      accumulator.stats.labeled_counts && accumulator.stats.labeled_counts.entries.length > 0
+        ? {
+            entries: accumulator.stats.labeled_counts.entries.map((entry) => ({
+              labels: entry.labels.map((label) => ({ ...label })),
+              count: entry.count,
+            })),
+          }
+        : undefined;
+    accumulator.labeledCountsSnapshotVersion = accumulator.labeledCountsVersion;
+  }
+  return accumulator.labeledCountsSnapshot;
+}
+
+function copyLedgerDerivedBoostStats(
+  target: BoostStats,
+  accumulator: LedgerAccumulator | undefined,
+): void {
+  const source = accumulator?.stats ?? EMPTY_LEDGER_BOOST_STATS;
   for (const field of EVENT_DERIVED_BOOST_FIELDS) {
     target[field] = source[field];
+  }
+  const labeledAmounts = accumulator ? getLabeledAmountsSnapshot(accumulator) : undefined;
+  if (labeledAmounts) {
+    target.labeled_amounts = labeledAmounts;
+  } else {
+    delete target.labeled_amounts;
+  }
+  const labeledCounts = accumulator ? getLabeledCountsSnapshot(accumulator) : undefined;
+  if (labeledCounts) {
+    target.labeled_counts = labeledCounts;
+  } else {
+    delete target.labeled_counts;
   }
 }
 
 function compareLedgerDerivedBoostStats(
   mismatches: BoostLedgerDerivationMismatch[],
-  frame: StatsTimeline["frames"][number],
+  frame: MaterializedStatsTimeline["frames"][number],
   scope: BoostLedgerMismatchScope,
   actual: BoostStats,
   expected: EventDerivedBoostStats,
@@ -346,7 +554,7 @@ function compareLedgerDerivedBoostStats(
   }
 }
 
-function sortedBoostLedgerEvents(timeline: StatsTimeline): BoostLedgerEvent[] {
+function sortedBoostLedgerEvents(timeline: MaterializedStatsTimeline): BoostLedgerEvent[] {
   return [...(timeline.events.boost_ledger ?? [])].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
@@ -360,7 +568,7 @@ function sortedBoostLedgerEvents(timeline: StatsTimeline): BoostLedgerEvent[] {
   });
 }
 
-function sortedBoostStateEvents(timeline: StatsTimeline): BoostStateEvent[] {
+function sortedBoostStateEvents(timeline: MaterializedStatsTimeline): BoostStateEvent[] {
   return [...(timeline.events.boost_state ?? [])].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
@@ -374,7 +582,19 @@ function sortedBoostStateEvents(timeline: StatsTimeline): BoostStateEvent[] {
   });
 }
 
-export function applyBoostLedgerDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyBoostLedgerDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createBoostLedgerDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createBoostLedgerDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const ledgerEvents = sortedBoostLedgerEvents(timeline);
   const stateEvents = sortedBoostStateEvents(timeline);
   let ledgerEventIndex = 0;
@@ -383,79 +603,75 @@ export function applyBoostLedgerDerivedStats(timeline: StatsTimeline): StatsTime
   const teamZero = createLedgerAccumulator();
   const teamOne = createLedgerAccumulator();
 
-  for (const frame of timeline.frames) {
-    const stateEventPlayersThisFrame: Array<{ key: string; isTeamZero: boolean }> = [];
-    while (
-      stateEventIndex < stateEvents.length &&
-      stateEvents[stateEventIndex]!.frame <= frame.frame_number
-    ) {
-      const event = stateEvents[stateEventIndex]!;
-      const playerKey = remoteIdKey(event.player_id as Record<string, unknown>);
-      let player = players.get(playerKey);
-      if (!player) {
-        player = createLedgerAccumulator();
-        players.set(playerKey, player);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      const stateEventPlayersThisFrame: Array<{ key: string; isTeamZero: boolean }> = [];
+      while (
+        stateEventIndex < stateEvents.length &&
+        stateEvents[stateEventIndex]!.frame <= frame.frame_number
+      ) {
+        const event = stateEvents[stateEventIndex]!;
+        const playerKey = remoteIdKey(event.player_id as Record<string, unknown>);
+        let player = players.get(playerKey);
+        if (!player) {
+          player = createLedgerAccumulator();
+          players.set(playerKey, player);
+        }
+        applyBoostStateEvent(player, event);
+        if (event.frame === frame.frame_number) {
+          stateEventPlayersThisFrame.push({ key: playerKey, isTeamZero: event.is_team_0 });
+        }
+        stateEventIndex += 1;
       }
-      applyBoostStateEvent(player, event);
-      if (event.frame === frame.frame_number) {
-        stateEventPlayersThisFrame.push({ key: playerKey, isTeamZero: event.is_team_0 });
-      }
-      stateEventIndex += 1;
-    }
 
-    while (
-      ledgerEventIndex < ledgerEvents.length &&
-      ledgerEvents[ledgerEventIndex]!.frame <= frame.frame_number
-    ) {
-      const event = ledgerEvents[ledgerEventIndex]!;
-      const playerKey = remoteIdKey(event.player_id as Record<string, unknown>);
-      let player = players.get(playerKey);
-      if (!player) {
-        player = createLedgerAccumulator();
-        players.set(playerKey, player);
+      while (
+        ledgerEventIndex < ledgerEvents.length &&
+        ledgerEvents[ledgerEventIndex]!.frame <= frame.frame_number
+      ) {
+        const event = ledgerEvents[ledgerEventIndex]!;
+        const playerKey = remoteIdKey(event.player_id as Record<string, unknown>);
+        let player = players.get(playerKey);
+        if (!player) {
+          player = createLedgerAccumulator();
+          players.set(playerKey, player);
+        }
+        applyLedgerEvent(player, event);
+        applyLedgerEvent(event.is_team_0 ? teamZero : teamOne, event);
+        ledgerEventIndex += 1;
       }
-      applyLedgerEvent(player, event);
-      applyLedgerEvent(event.is_team_0 ? teamZero : teamOne, event);
-      ledgerEventIndex += 1;
-    }
 
-    for (const player of stateEventPlayersThisFrame) {
-      const playerStats = players.get(player.key);
-      if (!playerStats) {
-        continue;
-      }
-      const continuousSample = applyContinuousBoostSample(
-        playerStats,
-        frame.dt,
-        frame.frame_number,
-      );
-      if (continuousSample) {
-        addContinuousBoostSample(
-          player.isTeamZero ? teamZero.stats : teamOne.stats,
-          continuousSample[0],
-          continuousSample[1],
+      for (const player of stateEventPlayersThisFrame) {
+        const playerStats = players.get(player.key);
+        if (!playerStats) {
+          continue;
+        }
+        const continuousSample = applyContinuousBoostSample(
+          playerStats,
           frame.dt,
+          frame.frame_number,
         );
+        if (continuousSample) {
+          addContinuousBoostSample(
+            player.isTeamZero ? teamZero.stats : teamOne.stats,
+            continuousSample[0],
+            continuousSample[1],
+            frame.dt,
+          );
+        }
       }
-    }
 
-    copyLedgerDerivedBoostStats(frame.team_zero.boost, teamZero.stats);
-    copyLedgerDerivedBoostStats(frame.team_one.boost, teamOne.stats);
-    for (const player of frame.players) {
-      const playerStats = players.get(remoteIdKey(player.player_id as Record<string, unknown>));
-      if (playerStats) {
-        copyLedgerDerivedBoostStats(player.boost, playerStats.stats);
-      } else {
-        copyLedgerDerivedBoostStats(player.boost, createLedgerBoostStats());
+      copyLedgerDerivedBoostStats(frame.team_zero.boost, teamZero);
+      copyLedgerDerivedBoostStats(frame.team_one.boost, teamOne);
+      for (const player of frame.players) {
+        const playerStats = players.get(remoteIdKey(player.player_id as Record<string, unknown>));
+        copyLedgerDerivedBoostStats(player.boost, playerStats);
       }
-    }
-  }
-
-  return timeline;
+    },
+  };
 }
 
 export function findBoostLedgerDerivationMismatches(
-  timeline: StatsTimeline,
+  timeline: MaterializedStatsTimeline,
 ): BoostLedgerDerivationMismatch[] {
   const ledgerEvents = sortedBoostLedgerEvents(timeline);
   const stateEvents = sortedBoostStateEvents(timeline);

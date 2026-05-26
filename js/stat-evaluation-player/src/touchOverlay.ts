@@ -45,13 +45,6 @@ interface TouchMarkerView {
   label: HTMLDivElement;
 }
 
-interface PlayerTouchSnapshot {
-  touchCount: number;
-  totalBallTravelDistance: number;
-  totalBallAdvanceDistance: number;
-  totalBallRetreatDistance: number;
-}
-
 export function getLastTouchPlayer(statsFrame: StatsFrame): PlayerStatsSnapshot | null {
   return statsFrame.players.find((player) => player.touch?.is_last_touch) ?? null;
 }
@@ -60,15 +53,6 @@ export function playerIdToString(playerId: Record<string, unknown>): string {
   const [kind, value] = Object.entries(playerId)[0] ?? ["Unknown", "unknown"];
   const normalizedValue = typeof value === "string" ? value : JSON.stringify(value);
   return `${kind}:${normalizedValue}`;
-}
-
-function touchSnapshot(player: PlayerStatsSnapshot): PlayerTouchSnapshot {
-  return {
-    touchCount: player.touch?.touch_count ?? 0,
-    totalBallTravelDistance: player.touch?.total_ball_travel_distance ?? 0,
-    totalBallAdvanceDistance: player.touch?.total_ball_advance_distance ?? 0,
-    totalBallRetreatDistance: player.touch?.total_ball_retreat_distance ?? 0,
-  };
 }
 
 function positiveDelta(current: number, previous: number): number {
@@ -95,99 +79,89 @@ export function buildTouchMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): TouchMarker[] {
-  const previousSnapshots = new Map<string, PlayerTouchSnapshot>();
   const activeMarkerByPlayer = new Map<string, number>();
   const markers: TouchMarker[] = [];
+  const events = [
+    ...(statsTimeline.events?.touch ?? []).map((event, index) => ({
+      kind: "touch" as const,
+      frame: event.frame,
+      time: event.time,
+      index,
+      event,
+    })),
+    ...(statsTimeline.events?.touch_ball_movement ?? []).map((event, index) => ({
+      kind: "movement" as const,
+      frame: event.frame,
+      time: event.time,
+      index,
+      event,
+    })),
+  ].sort((left, right) => {
+    if (left.frame !== right.frame) {
+      return left.frame - right.frame;
+    }
+    if (left.time !== right.time) {
+      return left.time - right.time;
+    }
+    if (left.kind !== right.kind) {
+      return left.kind === "touch" ? -1 : 1;
+    }
+    return left.index - right.index;
+  });
 
-  for (const statsFrame of statsTimeline.frames) {
-    const frameBallPosition = replay.ballFrames[statsFrame.frame_number]?.position;
-
-    for (const player of statsFrame.players) {
-      const playerId = playerIdToString(player.player_id);
-      const snapshot = touchSnapshot(player);
-      const previousSnapshot = previousSnapshots.get(playerId) ?? {
-        touchCount: 0,
+  for (const item of events) {
+    if (item.kind === "touch") {
+      const event = item.event;
+      const playerId = playerIdToString(event.player);
+      const ballPosition = replay.ballFrames[event.frame]?.position;
+      if (!ballPosition) {
+        continue;
+      }
+      const markerIndex = markers.length;
+      markers.push({
+        id: `touch-stat:${event.frame}:${playerId}:${markerIndex + 1}`,
+        time: replay.frames[event.frame]?.time ?? event.time,
+        frame: event.frame,
+        isTeamZero: event.is_team_0,
+        playerId,
+        playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
+        position: {
+          x: ballPosition.x,
+          y: ballPosition.y,
+          z: ballPosition.z,
+        },
+        endPosition: {
+          x: ballPosition.x,
+          y: ballPosition.y,
+          z: ballPosition.z,
+        },
         totalBallTravelDistance: 0,
         totalBallAdvanceDistance: 0,
         totalBallRetreatDistance: 0,
-      };
-
-      const activeMarkerIndex = activeMarkerByPlayer.get(playerId);
-      const travelDelta = positiveDelta(
-        snapshot.totalBallTravelDistance,
-        previousSnapshot.totalBallTravelDistance,
-      );
-      const advanceDelta = positiveDelta(
-        snapshot.totalBallAdvanceDistance,
-        previousSnapshot.totalBallAdvanceDistance,
-      );
-      const retreatDelta = positiveDelta(
-        snapshot.totalBallRetreatDistance,
-        previousSnapshot.totalBallRetreatDistance,
-      );
-      if (
-        activeMarkerIndex !== undefined &&
-        frameBallPosition &&
-        (travelDelta > TOUCH_CREDIT_EPSILON ||
-          advanceDelta > TOUCH_CREDIT_EPSILON ||
-          retreatDelta > TOUCH_CREDIT_EPSILON)
-      ) {
-        const activeMarker = markers[activeMarkerIndex];
-        if (activeMarker) {
-          activeMarker.totalBallTravelDistance += travelDelta;
-          activeMarker.totalBallAdvanceDistance += advanceDelta;
-          activeMarker.totalBallRetreatDistance += retreatDelta;
-          activeMarker.endPosition = {
-            x: frameBallPosition.x,
-            y: frameBallPosition.y,
-            z: frameBallPosition.z,
-          };
-        }
-      }
-
-      const delta = Math.max(0, snapshot.touchCount - previousSnapshot.touchCount);
-      if (delta === 0) {
-        previousSnapshots.set(playerId, snapshot);
-        continue;
-      }
-
-      const touchFrame = player.touch?.last_touch_frame ?? statsFrame.frame_number;
-      const touchTime =
-        replay.frames[touchFrame]?.time ?? player.touch?.last_touch_time ?? statsFrame.time;
-      const ballPosition = replay.ballFrames[touchFrame]?.position;
-      if (!ballPosition) {
-        previousSnapshots.set(playerId, snapshot);
-        continue;
-      }
-
-      for (let offset = 0; offset < delta; offset += 1) {
-        const markerIndex = markers.length;
-        markers.push({
-          id: `touch-stat:${touchFrame}:${playerId}:${snapshot.touchCount - delta + offset + 1}`,
-          time: touchTime,
-          frame: touchFrame,
-          isTeamZero: player.is_team_0,
-          playerId,
-          playerName: player.name,
-          position: {
-            x: ballPosition.x,
-            y: ballPosition.y,
-            z: ballPosition.z,
-          },
-          endPosition: {
-            x: ballPosition.x,
-            y: ballPosition.y,
-            z: ballPosition.z,
-          },
-          totalBallTravelDistance: 0,
-          totalBallAdvanceDistance: 0,
-          totalBallRetreatDistance: 0,
-        });
-        activeMarkerByPlayer.set(playerId, markerIndex);
-      }
-
-      previousSnapshots.set(playerId, snapshot);
+      });
+      activeMarkerByPlayer.set(playerId, markerIndex);
+      continue;
     }
+
+    const event = item.event;
+    const playerId = playerIdToString(event.player);
+    const activeMarkerIndex = activeMarkerByPlayer.get(playerId);
+    const frameBallPosition = replay.ballFrames[event.frame]?.position;
+    if (activeMarkerIndex === undefined || !frameBallPosition) {
+      continue;
+    }
+    const activeMarker = markers[activeMarkerIndex];
+    if (!activeMarker) {
+      continue;
+    }
+    activeMarker.totalBallTravelDistance += positiveDelta(event.travel_distance, 0);
+    activeMarker.totalBallAdvanceDistance += positiveDelta(event.advance_distance, 0);
+    activeMarker.totalBallRetreatDistance += positiveDelta(event.retreat_distance, 0);
+    activeMarker.endPosition = {
+      x: frameBallPosition.x,
+      y: frameBallPosition.y,
+      z: frameBallPosition.z,
+    };
   }
 
   return markers;

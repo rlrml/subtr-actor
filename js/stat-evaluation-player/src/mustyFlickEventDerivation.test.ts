@@ -7,6 +7,10 @@ import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 const bluePlayer = { Steam: "blue-musty" } as Record<string, unknown>;
 const orangePlayer = { Steam: "orange-musty" } as Record<string, unknown>;
 
+function assertClose(actual: number | undefined, expected: number): void {
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
+}
+
 test("musty-flick event derivation can populate compacted player stats", () => {
   const timeline = createStatsTimeline({
     events: {
@@ -14,6 +18,8 @@ test("musty-flick event derivation can populate compacted player stats", () => {
         {
           time: 2,
           frame: 20,
+          sample_time: 2,
+          sample_frame: 20,
           player: bluePlayer,
           is_team_0: true,
           aerial: true,
@@ -31,6 +37,8 @@ test("musty-flick event derivation can populate compacted player stats", () => {
         {
           time: 3,
           frame: 30,
+          sample_time: 3,
+          sample_frame: 30,
           player: orangePlayer,
           is_team_0: false,
           aerial: false,
@@ -92,7 +100,7 @@ test("musty-flick event derivation can populate compacted player stats", () => {
   assert.equal(timeline.frames[0]?.players[0]?.musty_flick.aerial_count, 1);
   assert.equal(timeline.frames[0]?.players[0]?.musty_flick.high_confidence_count, 1);
   assert.equal(timeline.frames[0]?.players[0]?.musty_flick.is_last_musty, true);
-  assert.equal(timeline.frames[0]?.players[0]?.musty_flick.cumulative_confidence, 0.85);
+  assertClose(timeline.frames[0]?.players[0]?.musty_flick.cumulative_confidence, 0.85);
   assert.equal(
     (timeline.frames[0]?.players[0]?.musty_flick as { labeled_event_counts?: unknown })
       .labeled_event_counts != null,
@@ -109,5 +117,5 @@ test("musty-flick event derivation can populate compacted player stats", () => {
   assert.equal(timeline.frames[2]?.players[1]?.musty_flick.aerial_count, 0);
   assert.equal(timeline.frames[2]?.players[1]?.musty_flick.high_confidence_count, 0);
   assert.equal(timeline.frames[2]?.players[1]?.musty_flick.is_last_musty, true);
-  assert.equal(timeline.frames[2]?.players[1]?.musty_flick.cumulative_confidence, 0.7);
+  assertClose(timeline.frames[2]?.players[1]?.musty_flick.cumulative_confidence, 0.7);
 });

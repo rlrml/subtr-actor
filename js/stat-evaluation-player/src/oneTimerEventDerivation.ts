@@ -1,7 +1,7 @@
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { OneTimerPlayerStats } from "./generated/OneTimerPlayerStats.ts";
 import type { OneTimerTeamStats } from "./generated/OneTimerTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -83,7 +83,19 @@ function assignOneTimerTeamStats(target: OneTimerTeamStats, source: OneTimerTeam
   Object.assign(target, source);
 }
 
-export function applyOneTimerEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyOneTimerEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createOneTimerEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createOneTimerEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortOneTimerEvents(timeline.events.one_timer ?? []);
 
   let eventIndex = 0;
@@ -92,56 +104,56 @@ export function applyOneTimerEventDerivedStats(timeline: StatsTimeline): StatsTi
   const teamZero: OneTimerTeamStats = { count: 0, total_ball_speed: 0, fastest_ball_speed: 0 };
   const teamOne: OneTimerTeamStats = { count: 0, total_ball_speed: 0, fastest_ball_speed: 0 };
 
-  for (const frame of timeline.frames) {
-    for (const [playerKey, stats] of players) {
-      advanceOneTimerFrame(
-        stats,
-        frame.frame_number,
-        frame.time,
-        frame.is_live_play && playerKey === lastOneTimerPlayer,
-      );
-    }
-
-    if (!frame.is_live_play) {
-      lastOneTimerPlayer = null;
-    } else {
-      let processedEvent = false;
-      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        const event = events[eventIndex] as OneTimerEvent;
-        const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultOneTimerPlayerStats();
-        players.set(playerKey, stats);
-        applyOneTimerEvent(stats, event, frame.frame_number, frame.time);
-
-        const teamStats = event.is_team_0 ? teamZero : teamOne;
-        teamStats.count += 1;
-        teamStats.total_ball_speed += event.ball_speed;
-        teamStats.fastest_ball_speed = Math.max(teamStats.fastest_ball_speed, event.ball_speed);
-
-        lastOneTimerPlayer = playerKey;
-        processedEvent = true;
-        eventIndex += 1;
+  return {
+    applyFrame(frame: StatsFrame): void {
+      for (const [playerKey, stats] of players) {
+        advanceOneTimerFrame(
+          stats,
+          frame.frame_number,
+          frame.time,
+          frame.is_live_play && playerKey === lastOneTimerPlayer,
+        );
       }
 
-      if (processedEvent) {
-        for (const stats of players.values()) {
-          stats.is_last_one_timer = false;
+      if (!frame.is_live_play) {
+        lastOneTimerPlayer = null;
+      } else {
+        let processedEvent = false;
+        while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+          const event = events[eventIndex] as OneTimerEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultOneTimerPlayerStats();
+          players.set(playerKey, stats);
+          applyOneTimerEvent(stats, event, frame.frame_number, frame.time);
+
+          const teamStats = event.is_team_0 ? teamZero : teamOne;
+          teamStats.count += 1;
+          teamStats.total_ball_speed += event.ball_speed;
+          teamStats.fastest_ball_speed = Math.max(teamStats.fastest_ball_speed, event.ball_speed);
+
+          lastOneTimerPlayer = playerKey;
+          processedEvent = true;
+          eventIndex += 1;
+        }
+
+        if (processedEvent) {
+          for (const stats of players.values()) {
+            stats.is_last_one_timer = false;
+          }
+        }
+        if (lastOneTimerPlayer != null) {
+          const stats = players.get(lastOneTimerPlayer);
+          if (stats) {
+            stats.is_last_one_timer = true;
+          }
         }
       }
-      if (lastOneTimerPlayer != null) {
-        const stats = players.get(lastOneTimerPlayer);
-        if (stats) {
-          stats.is_last_one_timer = true;
-        }
+
+      assignOneTimerTeamStats(frame.team_zero.one_timer, teamZero);
+      assignOneTimerTeamStats(frame.team_one.one_timer, teamOne);
+      for (const player of frame.players) {
+        assignOneTimerPlayerStats(player.one_timer, players.get(remoteIdKey(player.player_id)));
       }
-    }
-
-    assignOneTimerTeamStats(frame.team_zero.one_timer, teamZero);
-    assignOneTimerTeamStats(frame.team_one.one_timer, teamOne);
-    for (const player of frame.players) {
-      assignOneTimerPlayerStats(player.one_timer, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

@@ -1,10 +1,17 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "subtr-actor-player";
-import type { PlayerStatsSnapshot, StatsTimeline } from "./statsTimeline.ts";
+import type {
+  PlayerStatsSnapshot,
+  StatsFrame,
+  StatsTimeline,
+} from "./statsTimeline.ts";
 import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
+import type { PossessionEvent } from "./generated/PossessionEvent.ts";
+import type { PositioningEvent } from "./generated/PositioningEvent.ts";
+import type { PressureEvent } from "./generated/PressureEvent.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
@@ -201,10 +208,97 @@ function createPressureRange(
   };
 }
 
+function sortTimelineEvents<T extends { frame: number; time: number }>(events: readonly T[]): T[] {
+  return events
+    .map((event, index) => ({ event, index }))
+    .sort((left, right) => {
+      if (left.event.frame !== right.event.frame) {
+        return left.event.frame - right.event.frame;
+      }
+      if (left.event.time !== right.event.time) {
+        return left.event.time - right.event.time;
+      }
+      return left.index - right.index;
+    })
+    .map(({ event }) => event);
+}
+
+function buildPossessionTimelineRangesFromEvents(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(timeline.events?.possession ?? []);
+  const ranges: ReplayTimelineRange[] = [];
+  let eventIndex = 0;
+  let active = false;
+  let possessionState = "neutral";
+
+  let previousFrame: StatsTimeline["frames"][number] | null = null;
+  for (const frame of timeline.frames) {
+    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+      const event = events[eventIndex] as PossessionEvent;
+      active = event.active;
+      possessionState = event.possession_state;
+      eventIndex += 1;
+    }
+
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      previousFrame = frame;
+      continue;
+    }
+
+    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
+    let nextRange: ReplayTimelineRange | null = null;
+    if (active && possessionState === "team_zero") {
+      nextRange = {
+        id: `possession:team_zero:${startTime.toFixed(3)}`,
+        startTime,
+        endTime,
+        lane: "possession",
+        laneLabel: "Possession",
+        label: "Blue possession",
+        color: "rgba(59, 130, 246, 0.88)",
+        isTeamZero: true,
+      };
+    } else if (active && possessionState === "team_one") {
+      nextRange = {
+        id: `possession:team_one:${startTime.toFixed(3)}`,
+        startTime,
+        endTime,
+        lane: "possession",
+        laneLabel: "Possession",
+        label: "Orange possession",
+        color: "rgba(245, 158, 11, 0.88)",
+        isTeamZero: false,
+      };
+    } else if (active && possessionState === "neutral") {
+      nextRange = {
+        id: `possession:neutral:${startTime.toFixed(3)}`,
+        startTime,
+        endTime,
+        lane: "possession",
+        laneLabel: "Possession",
+        label: "Neutral possession",
+        color: "rgba(209, 217, 224, 0.7)",
+        isTeamZero: null,
+      };
+    }
+
+    mergeRange(ranges, nextRange);
+    previousFrame = frame;
+  }
+
+  return ranges;
+}
+
 export function buildPossessionTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
+  if ((timeline.events?.possession?.length ?? 0) > 0) {
+    return buildPossessionTimelineRangesFromEvents(timeline, replay);
+  }
+
   const ranges: ReplayTimelineRange[] = [];
 
   let previousTeamZero = 0;
@@ -218,9 +312,10 @@ export function buildPossessionTimelineRanges(
       continue;
     }
 
-    const currentTeamZero = frame.team_zero?.possession?.possession_time ?? 0;
-    const currentTeamOne = frame.team_one?.possession?.possession_time ?? 0;
-    const currentNeutral = frame.team_zero?.possession?.neutral_time ?? 0;
+    const statsFrame = frame as StatsFrame;
+    const currentTeamZero = statsFrame.team_zero?.possession?.possession_time ?? 0;
+    const currentTeamOne = statsFrame.team_one?.possession?.possession_time ?? 0;
+    const currentNeutral = statsFrame.team_zero?.possession?.neutral_time ?? 0;
 
     const deltaTeamZero = currentTeamZero - previousTeamZero;
     const deltaTeamOne = currentTeamOne - previousTeamOne;
@@ -281,10 +376,49 @@ export function buildPossessionTimelineRanges(
   return ranges;
 }
 
+function buildPressureTimelineRangesFromEvents(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(timeline.events?.pressure ?? []);
+  const ranges: ReplayTimelineRange[] = [];
+  let eventIndex = 0;
+  let active = false;
+  let fieldHalf: PressureHalfControlState = "neutral";
+
+  let previousFrame: StatsTimeline["frames"][number] | null = null;
+  for (const frame of timeline.frames) {
+    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+      const event = events[eventIndex] as PressureEvent;
+      active = event.active;
+      fieldHalf =
+        event.field_half === "team_zero_side" || event.field_half === "team_one_side"
+          ? event.field_half
+          : "neutral";
+      eventIndex += 1;
+    }
+
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      previousFrame = frame;
+      continue;
+    }
+
+    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
+    mergeRange(ranges, active ? createPressureRange(fieldHalf, startTime, endTime) : null);
+    previousFrame = frame;
+  }
+
+  return ranges;
+}
+
 export function buildPressureTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
+  if ((timeline.events?.pressure?.length ?? 0) > 0) {
+    return buildPressureTimelineRangesFromEvents(timeline, replay);
+  }
+
   const ranges: ReplayTimelineRange[] = [];
 
   let previousTeamZero = 0;
@@ -299,9 +433,10 @@ export function buildPressureTimelineRanges(
       continue;
     }
 
-    const currentTeamZero = frame.team_zero?.pressure?.defensive_half_time ?? 0;
-    const currentTeamOne = frame.team_one?.pressure?.defensive_half_time ?? 0;
-    const currentNeutral = frame.team_zero?.pressure?.neutral_time ?? 0;
+    const statsFrame = frame as StatsFrame;
+    const currentTeamZero = statsFrame.team_zero?.pressure?.defensive_half_time ?? 0;
+    const currentTeamOne = statsFrame.team_one?.pressure?.defensive_half_time ?? 0;
+    const currentNeutral = statsFrame.team_zero?.pressure?.neutral_time ?? 0;
     const deltaTeamZero = currentTeamZero - previousTeamZero;
     const deltaTeamOne = currentTeamOne - previousTeamOne;
     const deltaNeutral = currentNeutral - previousNeutral;
@@ -619,10 +754,108 @@ function extractPlayerStatValue(player: PlayerStatsSnapshot, spec: PlayerZoneSpe
   return 0;
 }
 
+function playerNameById(frame: StatsTimeline["frames"][number], playerId: string): string {
+  return (
+    frame.players.find((player) => playerIdToString(player.player_id) === playerId)?.name ??
+    playerId
+  );
+}
+
+function positioningZoneValue(event: PositioningEvent, spec: PlayerZoneSpec): number {
+  for (const fieldName of [spec.fieldName, ...(spec.aliases ?? [])]) {
+    const value = (event as unknown as Record<string, unknown>)[fieldName];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return 0;
+}
+
+function buildTimeInZoneTimelineRangesFromEvents(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(timeline.events?.positioning ?? []);
+  const ranges: ReplayTimelineRange[] = [];
+  const lastRangeByLane = new Map<string, ReplayTimelineRange>();
+  let eventIndex = 0;
+
+  let previousFrame: StatsTimeline["frames"][number] | null = null;
+  for (const frame of timeline.frames) {
+    const eventsByPlayer = new Map<
+      string,
+      { event: PositioningEvent; zoneDeltas: Map<string, number> }
+    >();
+    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+      const event = events[eventIndex] as PositioningEvent;
+      const playerId = playerIdToString(event.player as Record<string, unknown>);
+      const entry =
+        eventsByPlayer.get(playerId) ?? { event, zoneDeltas: new Map<string, number>() };
+      entry.event = event;
+      for (const spec of PLAYER_ZONE_SPECS) {
+        entry.zoneDeltas.set(
+          spec.fieldName,
+          (entry.zoneDeltas.get(spec.fieldName) ?? 0) + positioningZoneValue(event, spec),
+        );
+      }
+      eventsByPlayer.set(playerId, entry);
+      eventIndex += 1;
+    }
+
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      previousFrame = frame;
+      continue;
+    }
+
+    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
+    if (endTime - startTime <= DELTA_EPSILON) {
+      previousFrame = frame;
+      continue;
+    }
+
+    for (const [playerId, { event, zoneDeltas }] of eventsByPlayer) {
+      let winningSpec: PlayerZoneSpec | null = null;
+      let winningDelta = 0;
+
+      for (const spec of PLAYER_ZONE_SPECS) {
+        const delta = zoneDeltas.get(spec.fieldName) ?? 0;
+        if (delta > winningDelta + DELTA_EPSILON) {
+          winningDelta = delta;
+          winningSpec = spec;
+        }
+      }
+
+      if (!winningSpec) {
+        continue;
+      }
+
+      mergeRangeForLane(ranges, lastRangeByLane, {
+        id: `time-in-zone:${playerId}:${winningSpec.fieldName}:${startTime.toFixed(3)}`,
+        startTime,
+        endTime,
+        lane: `time-in-zone:${playerId}`,
+        laneLabel: playerNameById(frame, playerId),
+        label: winningSpec.label,
+        color: getPlayerZoneColor(winningSpec, event.is_team_0),
+        isTeamZero: event.is_team_0,
+      });
+    }
+
+    previousFrame = frame;
+  }
+
+  return ranges;
+}
+
 export function buildTimeInZoneTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
+  if ((timeline.events?.positioning?.length ?? 0) > 0) {
+    return buildTimeInZoneTimelineRangesFromEvents(timeline, replay);
+  }
+
   const previousValues = new Map<string, Map<string, number>>();
   const ranges: ReplayTimelineRange[] = [];
   const lastRangeByLane = new Map<string, ReplayTimelineRange>();
@@ -640,7 +873,7 @@ export function buildTimeInZoneTimelineRanges(
       continue;
     }
 
-    for (const player of frame.players) {
+    for (const player of (frame as StatsFrame).players) {
       const playerId = playerIdToString(player.player_id);
       const previous = previousValues.get(playerId) ?? new Map<string, number>();
 

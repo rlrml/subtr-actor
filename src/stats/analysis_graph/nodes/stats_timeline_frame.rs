@@ -378,6 +378,8 @@ impl AnalysisNode for StatsTimelineFrameNode {
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: gameplay.game_state,
+            ball_has_been_hit: gameplay.ball_has_been_hit,
+            kickoff_countdown_time: gameplay.kickoff_countdown_time,
             gameplay_phase: live_play_state.gameplay_phase,
             is_live_play: live_play_state.is_live_play,
             team_zero: self.team_snapshot(ctx, true)?,

@@ -383,6 +383,8 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
       {
         time: 1.2,
         frame: 1,
+        sample_time: 1.2,
+        sample_frame: 1,
         player: { Steam: "blue-id" },
         is_team_0: true,
         ceiling_contact_time: 0.9,
@@ -433,6 +435,8 @@ test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeli
       {
         time: 2.1,
         frame: 2,
+        sample_time: 2.1,
+        sample_frame: 2,
         player: { Steam: "blue-id" },
         is_team_0: true,
         wall: "side",
@@ -526,50 +530,32 @@ test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events 
 test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
-    frames: [
+  const statsTimeline = createLegacyStatsTimeline({
+    musty_flick_events: [
       {
-        frame_number: 1,
         time: 1.5,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "blue-id" },
-            name: "Blue",
-            is_team_0: true,
-            musty_flick: {
-              count: 1,
-              last_musty_frame: 1,
-              last_musty_time: 1.5,
-              is_last_musty: true,
-            },
-          },
-        ],
-      },
-      {
-        frame_number: 2,
-        time: 2.25,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "blue-id" },
-            name: "Blue",
-            is_team_0: true,
-            musty_flick: {
-              count: 1,
-              last_musty_frame: 1,
-              last_musty_time: 1.5,
-              is_last_musty: false,
-            },
-          },
-        ],
+        frame: 1,
+        sample_time: 1.5,
+        sample_frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        aerial: false,
+        dodge_time: 1.4,
+        dodge_frame: 1,
+        time_since_dodge: 0.1,
+        confidence: 0.8,
+        local_ball_position: [0, 0, 0],
+        rear_alignment: 0.9,
+        top_alignment: 0.7,
+        forward_approach_speed: 1200,
+        pitch_rate: 2,
+        ball_speed_change: 300,
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildMustyFlickTimelineEvents(statsTimeline, replay), [
     {
@@ -603,6 +589,8 @@ test("buildBackboardTimelineEvents maps serialized backboard events to timeline 
       {
         time: 1.2,
         frame: 1,
+        sample_time: 1.2,
+        sample_frame: 1,
         player: { Steam: "blue-id" },
         is_team_0: true,
       },
@@ -720,6 +708,8 @@ test("buildPassTimelineEvents maps serialized passes to timeline markers", () =>
       {
         time: 1.2,
         frame: 1,
+        sample_time: 1.2,
+        sample_frame: 1,
         passer: { Steam: "passer-id" },
         receiver: { Steam: "receiver-id" },
         is_team_0: true,
@@ -943,11 +933,27 @@ test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", 
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
     ballFrames: [{ position: { x: 0, y: 0, z: 0 } }, { position: { x: 10, y: 20, z: 30 } }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
+  const statsTimeline = createLegacyStatsTimeline({
+    events: {
+      touch: [
+        {
+          time: 1.5,
+          frame: 1,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "control",
+          height_band: "ground",
+          surface: "ground",
+          dodge_state: "no_dodge",
+          ball_speed_change: 0,
+          sample_time: 1.5,
+          sample_frame: 1,
+        },
+      ],
+    },
     frames: [
       {
         frame_number: 1,
@@ -968,7 +974,7 @@ test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", 
         ],
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildTouchTimelineEvents(statsTimeline, replay), [
     {
@@ -989,46 +995,29 @@ test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", 
 test("buildDodgeResetTimelineEvents emits non-flip-reset dodge refreshes", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
-    frames: [
+  const statsTimeline = createLegacyStatsTimeline({
+    dodge_reset_events: [
       {
-        frame_number: 1,
         time: 1.5,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "blue-id" },
-            name: "Blue",
-            is_team_0: true,
-            dodge_reset: {
-              count: 1,
-              on_ball_count: 1,
-            },
-          },
-        ],
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        counter_value: 1,
+        on_ball: true,
       },
       {
-        frame_number: 2,
         time: 2.25,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "blue-id" },
-            name: "Blue",
-            is_team_0: true,
-            dodge_reset: {
-              count: 2,
-              on_ball_count: 1,
-            },
-          },
-        ],
+        frame: 2,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        counter_value: 2,
+        on_ball: false,
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildDodgeResetTimelineEvents(statsTimeline, replay), [
     {
@@ -1049,48 +1038,31 @@ test("buildDodgeResetTimelineEvents emits non-flip-reset dodge refreshes", () =>
 test("buildBallCarryTimelineEvents maps carry completions to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
+    players: [{ id: "Steam:orange-id", name: "Orange" }],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
-    frames: [
+  const statsTimeline = createLegacyStatsTimeline({
+    ball_carry_events: [
       {
-        frame_number: 1,
-        time: 1.5,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "orange-id" },
-            name: "Orange",
-            is_team_0: false,
-            ball_carry: {
-              carry_count: 1,
-              total_carry_time: 0,
-              total_straight_line_distance: 0,
-              total_path_distance: 0,
-              longest_carry_time: 0,
-              furthest_carry_distance: 0,
-              fastest_carry_speed: 0,
-              carry_speed_sum: 0,
-              average_horizontal_gap_sum: 0,
-              average_vertical_gap_sum: 0,
-              air_dribble_count: 0,
-              total_air_dribble_time: 0,
-              total_air_dribble_straight_line_distance: 0,
-              total_air_dribble_path_distance: 0,
-              longest_air_dribble_time: 0,
-              furthest_air_dribble_distance: 0,
-              fastest_air_dribble_speed: 0,
-              air_dribble_speed_sum: 0,
-              average_air_dribble_horizontal_gap_sum: 0,
-              average_air_dribble_vertical_gap_sum: 0,
-            },
-          },
-        ],
+        player_id: { Steam: "orange-id" },
+        is_team_0: false,
+        kind: "carry",
+        start_frame: 0,
+        end_frame: 1,
+        start_time: 0,
+        end_time: 1.5,
+        duration: 1.5,
+        straight_line_distance: 0,
+        path_distance: 0,
+        average_horizontal_gap: 0,
+        average_vertical_gap: 0,
+        average_speed: 0,
+        touch_count: 1,
+        air_touch_count: 0,
+        air_dribble_origin: null,
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildBallCarryTimelineEvents(statsTimeline, replay), [
     {
@@ -1111,30 +1083,20 @@ test("buildBallCarryTimelineEvents maps carry completions to timeline markers", 
 test("buildPowerslideTimelineEvents maps powerslide presses to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
+    players: [{ id: "Steam:orange-id", name: "Orange" }],
   } as ReplayModel;
 
-  const statsTimeline = {
-    replay_meta: {},
-    timeline_events: [],
-    frames: [
+  const statsTimeline = createLegacyStatsTimeline({
+    powerslide_events: [
       {
-        frame_number: 1,
         time: 1.5,
-        dt: 1,
-        players: [
-          {
-            player_id: { Steam: "orange-id" },
-            name: "Orange",
-            is_team_0: false,
-            powerslide: {
-              total_duration: 0,
-              press_count: 1,
-            },
-          },
-        ],
+        frame: 1,
+        player: { Steam: "orange-id" },
+        is_team_0: false,
+        active: true,
       },
     ],
-  } as StatsTimeline;
+  });
 
   assert.deepEqual(buildPowerslideTimelineEvents(statsTimeline, replay), [
     {
@@ -1499,6 +1461,8 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       {
         time: 1.1,
         frame: 1,
+        sample_time: 1.1,
+        sample_frame: 1,
         player: { Steam: "blue-id" },
         is_team_0: true,
         backboard_time: 1.0,
@@ -1541,6 +1505,8 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
       {
         time: 1.1,
         frame: 1,
+        sample_time: 1.1,
+        sample_frame: 1,
         passer: { Steam: "blue-id" },
         receiver: { Steam: "orange-id" },
         is_team_0: true,
@@ -1663,7 +1629,72 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         victim_position: [10, 0, 0],
       },
     ],
+    musty_flick_events: [
+      {
+        time: 1.25,
+        frame: 1,
+        sample_time: 1.25,
+        sample_frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        aerial: false,
+        dodge_time: 1.2,
+        dodge_frame: 1,
+        time_since_dodge: 0.05,
+        confidence: 0.8,
+        local_ball_position: [0, 0, 0],
+        rear_alignment: 0.9,
+        top_alignment: 0.7,
+        forward_approach_speed: 1200,
+        pitch_rate: 2,
+        ball_speed_change: 300,
+      },
+    ],
+    ball_carry_events: [
+      {
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        kind: "carry",
+        start_frame: 0,
+        end_frame: 1,
+        start_time: 0,
+        end_time: 1.25,
+        duration: 1.25,
+        straight_line_distance: 0,
+        path_distance: 0,
+        average_horizontal_gap: 0,
+        average_vertical_gap: 0,
+        average_speed: 0,
+        touch_count: 1,
+        air_touch_count: 0,
+        air_dribble_origin: null,
+      },
+    ],
+    powerslide_events: [
+      {
+        time: 1.25,
+        frame: 1,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        active: true,
+      },
+    ],
     events: {
+      touch: [
+        {
+          time: 1.25,
+          frame: 1,
+          sample_time: 1.25,
+          sample_frame: 1,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "control",
+          height_band: "ground",
+          surface: "ground",
+          dodge_state: "no_dodge",
+          ball_speed_change: 0,
+        },
+      ],
       goal_context: [
         {
           time: 1.1,

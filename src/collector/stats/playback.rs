@@ -14,6 +14,8 @@ pub struct CapturedStatsFrame<Modules> {
     pub dt: f32,
     pub seconds_remaining: Option<i32>,
     pub game_state: Option<i32>,
+    pub ball_has_been_hit: Option<bool>,
+    pub kickoff_countdown_time: Option<i32>,
     pub gameplay_phase: GameplayPhase,
     pub is_live_play: bool,
     pub modules: Modules,
@@ -45,6 +47,8 @@ impl<Modules> CapturedStatsFrame<Modules> {
             dt: self.dt,
             seconds_remaining: self.seconds_remaining,
             game_state: self.game_state,
+            ball_has_been_hit: self.ball_has_been_hit,
+            kickoff_countdown_time: self.kickoff_countdown_time,
             gameplay_phase: self.gameplay_phase,
             is_live_play: self.is_live_play,
             modules: transform(self.modules)?,
@@ -53,11 +57,18 @@ impl<Modules> CapturedStatsFrame<Modules> {
 }
 
 impl CapturedStatsData<StatsSnapshotFrame> {
-    pub fn into_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
-        self.to_stats_timeline()
+    pub fn into_legacy_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.to_legacy_replay_stats_timeline()
     }
 
-    pub fn into_stats_timeline_with_progress<F>(
+    #[deprecated(
+        note = "use into_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.into_legacy_replay_stats_timeline()
+    }
+
+    pub fn into_legacy_replay_stats_timeline_with_progress<F>(
         self,
         frame_interval: usize,
         mut on_progress: F,
@@ -86,13 +97,34 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         self.to_replay_stats_timeline_with_frames(frames)
     }
 
-    pub fn to_stats_timeline(&self) -> SubtrActorResult<ReplayStatsTimeline> {
+    #[deprecated(
+        note = "use into_legacy_replay_stats_timeline_with_progress for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_stats_timeline_with_progress<F>(
+        self,
+        frame_interval: usize,
+        on_progress: F,
+    ) -> SubtrActorResult<ReplayStatsTimeline>
+    where
+        F: FnMut(usize, usize) -> SubtrActorResult<()>,
+    {
+        self.into_legacy_replay_stats_timeline_with_progress(frame_interval, on_progress)
+    }
+
+    pub fn to_legacy_replay_stats_timeline(&self) -> SubtrActorResult<ReplayStatsTimeline> {
         self.to_replay_stats_timeline_with_frames(
             self.frames
                 .iter()
                 .map(|frame| self.replay_stats_frame(frame))
                 .collect::<SubtrActorResult<Vec<_>>>()?,
         )
+    }
+
+    #[deprecated(
+        note = "use to_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn to_stats_timeline(&self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.to_legacy_replay_stats_timeline()
     }
 
     pub(crate) fn into_replay_stats_timeline_with_frames(
@@ -114,11 +146,18 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         })
     }
 
-    pub fn into_stats_timeline_value(self) -> SubtrActorResult<Value> {
-        self.to_stats_timeline_value()
+    pub fn into_legacy_stats_timeline_value(self) -> SubtrActorResult<Value> {
+        self.to_legacy_stats_timeline_value()
     }
 
-    pub fn to_stats_timeline_value(&self) -> SubtrActorResult<Value> {
+    #[deprecated(
+        note = "use into_legacy_stats_timeline_value for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_stats_timeline_value(self) -> SubtrActorResult<Value> {
+        self.into_legacy_stats_timeline_value()
+    }
+
+    pub fn to_legacy_stats_timeline_value(&self) -> SubtrActorResult<Value> {
         let mut timeline = Map::new();
         timeline.insert("config".to_owned(), self.timeline_config_value()?);
         timeline.insert(
@@ -136,6 +175,13 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ),
         );
         Ok(Value::Object(timeline))
+    }
+
+    #[deprecated(
+        note = "use to_legacy_stats_timeline_value for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn to_stats_timeline_value(&self) -> SubtrActorResult<Value> {
+        self.to_legacy_stats_timeline_value()
     }
 
     fn timeline_events(&self) -> Vec<Value> {
@@ -492,6 +538,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_fifty_fifty_event,
             )?,
             pass: self.module_player_events("pass", "events", parse_pass_event)?,
+            pass_last_completed: self.module_player_events(
+                "pass",
+                "last_completed_events",
+                parse_pass_last_completed_event,
+            )?,
             ball_carry: self.module_player_events(
                 "ball_carry",
                 "events",
@@ -533,8 +584,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_boost_pickup_comparison_event,
             )?,
-            boost_ledger: Vec::new(),
-            boost_state: Vec::new(),
+            boost_ledger: self.module_player_events(
+                "boost",
+                "ledger_events",
+                parse_boost_ledger_event,
+            )?,
+            boost_state: self.module_player_events(
+                "boost",
+                "state_events",
+                parse_boost_state_event,
+            )?,
             bump: self.module_player_events("bump", "events", parse_bump_event)?,
         })
     }
@@ -655,8 +714,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "boost_pickups".to_owned(),
             Value::Array(self.module_array("boost", "events")),
         );
-        events.insert("boost_ledger".to_owned(), Value::Array(Vec::new()));
-        events.insert("boost_state".to_owned(), Value::Array(Vec::new()));
+        events.insert(
+            "boost_ledger".to_owned(),
+            Value::Array(self.module_array("boost", "ledger_events")),
+        );
+        events.insert(
+            "boost_state".to_owned(),
+            Value::Array(self.module_array("boost", "state_events")),
+        );
         events.insert(
             "bump".to_owned(),
             Value::Array(self.module_array("bump", "events")),
@@ -1065,6 +1130,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             serialize_to_json_value(&frame.game_state)?,
         );
         timeline.insert(
+            "ball_has_been_hit".to_owned(),
+            serialize_to_json_value(&frame.ball_has_been_hit)?,
+        );
+        timeline.insert(
+            "kickoff_countdown_time".to_owned(),
+            serialize_to_json_value(&frame.kickoff_countdown_time)?,
+        );
+        timeline.insert(
             "gameplay_phase".to_owned(),
             serialize_to_json_value(&frame.gameplay_phase)?,
         );
@@ -1118,6 +1191,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             dt: frame.dt,
             seconds_remaining: frame.seconds_remaining,
             game_state: frame.game_state,
+            ball_has_been_hit: frame.ball_has_been_hit,
+            kickoff_countdown_time: frame.kickoff_countdown_time,
             gameplay_phase: frame.gameplay_phase,
             is_live_play: frame.is_live_play,
             team_zero: self.replay_team_stats(frame, "team_zero")?,
@@ -1800,7 +1875,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 }
 
 impl CapturedStatsData<ReplayStatsFrame> {
-    pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+    pub fn into_legacy_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
         let CapturedStatsData {
             replay_meta,
             config,
@@ -1814,6 +1889,13 @@ impl CapturedStatsData<ReplayStatsFrame> {
             frames: Vec::new(),
         }
         .into_replay_stats_timeline_with_frames(frames)
+    }
+
+    #[deprecated(
+        note = "use into_legacy_replay_stats_timeline for full partial-sum snapshots, or StatsTimelineEventCollector for compact event-backed timelines"
+    )]
+    pub fn into_replay_stats_timeline(self) -> SubtrActorResult<ReplayStatsTimeline> {
+        self.into_legacy_replay_stats_timeline()
     }
 }
 
@@ -2143,7 +2225,7 @@ fn parse_core_player_stats_event(value: &Value) -> SubtrActorResult<CorePlayerSt
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        stats: decode_core_player_stats_value(json_required_value(object, "stats")?.clone())?,
+        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
 }
 
@@ -2153,7 +2235,7 @@ fn parse_core_team_stats_event(value: &Value) -> SubtrActorResult<CoreTeamStatsE
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        stats: decode_json_value(json_required_value(object, "stats")?.clone())?,
+        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
 }
 
@@ -2162,7 +2244,7 @@ fn parse_possession_event(value: &Value) -> SubtrActorResult<PossessionEvent> {
     Ok(PossessionEvent {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
-        dt: json_required_f32(object, "dt")?,
+        active: json_required_bool(object, "active")?,
         possession_state: json_required_str(object, "possession_state")?.to_owned(),
         field_third: match object.get("field_third") {
             None | Some(Value::Null) => None,
@@ -2176,7 +2258,7 @@ fn parse_pressure_event(value: &Value) -> SubtrActorResult<PressureEvent> {
     Ok(PressureEvent {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
-        dt: json_required_f32(object, "dt")?,
+        active: json_required_bool(object, "active")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
     })
 }
@@ -2247,15 +2329,7 @@ fn parse_rotation_player_event(value: &Value) -> SubtrActorResult<RotationPlayer
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        active_game_time: json_required_f32(object, "active_game_time")?,
-        tracked_time: json_required_f32(object, "tracked_time")?,
-        time_first_man: json_required_f32(object, "time_first_man")?,
-        time_second_man: json_required_f32(object, "time_second_man")?,
-        time_third_man: json_required_f32(object, "time_third_man")?,
-        time_ambiguous_role: json_required_f32(object, "time_ambiguous_role")?,
-        time_behind_play: json_required_f32(object, "time_behind_play")?,
-        time_level_with_play: json_required_f32(object, "time_level_with_play")?,
-        time_ahead_of_play: json_required_f32(object, "time_ahead_of_play")?,
+        active: json_required_bool(object, "active")?,
         became_first_man_count: json_required_usize(object, "became_first_man_count")? as u32,
         lost_first_man_count: json_required_usize(object, "lost_first_man_count")? as u32,
         current_role_state: decode_json_value(
@@ -2341,9 +2415,13 @@ fn parse_flick_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<M
 
 fn parse_flick_event(value: &Value) -> SubtrActorResult<FlickEvent> {
     let object = json_object(value, "flick event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(FlickEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         dodge_time: json_required_f32(object, "dodge_time")?,
@@ -2382,9 +2460,13 @@ fn parse_musty_flick_mechanic_event(
 
 fn parse_musty_flick_event(value: &Value) -> SubtrActorResult<MustyFlickEvent> {
     let object = json_object(value, "musty flick event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(MustyFlickEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         aerial: json_required_bool(object, "aerial")?,
@@ -2498,9 +2580,13 @@ fn parse_ceiling_shot_event(value: &Value) -> SubtrActorResult<CeilingShotEvent>
 
 fn parse_wall_aerial_event(value: &Value) -> SubtrActorResult<WallAerialEvent> {
     let object = json_object(value, "wall aerial event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(WallAerialEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         wall: decode_json_value(json_required_value(object, "wall")?.clone())?,
@@ -2578,9 +2664,13 @@ fn parse_double_tap_event(value: &Value) -> SubtrActorResult<DoubleTapEvent> {
 
 fn parse_pass_event(value: &Value) -> SubtrActorResult<PassEvent> {
     let object = json_object(value, "pass event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(PassEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         passer: json_required_remote_id(object, "passer")?,
         receiver: json_required_remote_id(object, "receiver")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
@@ -2590,6 +2680,15 @@ fn parse_pass_event(value: &Value) -> SubtrActorResult<PassEvent> {
         ball_travel_distance: json_required_f32(object, "ball_travel_distance")?,
         ball_advance_distance: json_required_f32(object, "ball_advance_distance")?,
         pass_kind: parse_pass_kind(object.get("pass_kind"))?,
+    })
+}
+
+fn parse_pass_last_completed_event(value: &Value) -> SubtrActorResult<PassLastCompletedEvent> {
+    let object = json_object(value, "pass last completed event")?;
+    Ok(PassLastCompletedEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_optional_remote_id(object.get("player"))?,
     })
 }
 
@@ -2690,9 +2789,13 @@ fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {
 
 fn parse_half_volley_event(value: &Value) -> SubtrActorResult<HalfVolleyEvent> {
     let object = json_object(value, "half volley event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
     Ok(HalfVolleyEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
+        time,
+        frame,
+        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
+        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         bounce_time: json_required_f32(object, "bounce_time")?,
@@ -2885,6 +2988,39 @@ fn parse_boost_pickup_comparison_event(
         inferred_time: json_optional_f32(object.get("inferred_time"))?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
         boost_after: json_optional_f32(object.get("boost_after"))?,
+    })
+}
+
+fn parse_boost_ledger_event(value: &Value) -> SubtrActorResult<BoostLedgerEvent> {
+    let object = json_object(value, "boost ledger event")?;
+    Ok(BoostLedgerEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        transaction: decode_json_value(json_required_value(object, "transaction")?.clone())?,
+        amount: json_required_f32(object, "amount")?,
+        count: json_required_usize(object, "count")? as u32,
+        labels: decode_json_value(
+            object
+                .get("labels")
+                .cloned()
+                .unwrap_or_else(|| Value::Array(Vec::new())),
+        )?,
+        boost_before: json_optional_f32(object.get("boost_before"))?,
+        boost_after: json_optional_f32(object.get("boost_after"))?,
+    })
+}
+
+fn parse_boost_state_event(value: &Value) -> SubtrActorResult<BoostStateEvent> {
+    let object = json_object(value, "boost state event")?;
+    Ok(BoostStateEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        boost_amount: json_required_f32(object, "boost_amount")?,
+        boost_before: json_optional_f32(object.get("boost_before"))?,
     })
 }
 

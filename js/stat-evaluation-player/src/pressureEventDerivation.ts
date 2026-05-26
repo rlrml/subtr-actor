@@ -2,7 +2,7 @@ import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
 import type { PressureEvent } from "./generated/PressureEvent.ts";
 import type { PressureTeamStats } from "./generated/PressureTeamStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 interface RawPressureStats {
   tracked_time: number;
@@ -10,6 +10,19 @@ interface RawPressureStats {
   team_one_side_time: number;
   neutral_time: number;
   labeled_time: LabeledFloatSums;
+}
+
+interface PressureState {
+  active: boolean;
+  fieldHalf: string;
+}
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
 }
 
 function defaultRawPressureStats(): RawPressureStats {
@@ -64,9 +77,9 @@ function addLabeledTime(sums: LabeledFloatSums, labels: StatLabel[], value: numb
       ),
   );
   if (entry) {
-    entry.value += value;
+    entry.value = addF32(entry.value, value);
   } else {
-    sums.entries.push({ labels: sortedLabels, value });
+    sums.entries.push({ labels: sortedLabels, value: f32(value) });
     sums.entries.sort((left, right) =>
       JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
     );
@@ -101,16 +114,26 @@ function pressureTeamStats(raw: RawPressureStats, isTeamZero: boolean): Pressure
   };
 }
 
-function applyPressureEvent(raw: RawPressureStats, event: PressureEvent): void {
-  raw.tracked_time += event.dt;
-  if (event.field_half === "team_zero_side") {
-    raw.team_zero_side_time += event.dt;
-  } else if (event.field_half === "team_one_side") {
-    raw.team_one_side_time += event.dt;
-  } else {
-    raw.neutral_time += event.dt;
+function applyPressureEvent(state: PressureState, event: PressureEvent): void {
+  state.active = event.active;
+  state.fieldHalf = event.field_half;
+}
+
+function accumulatePressureFrame(raw: RawPressureStats, state: PressureState, frame: StatsFrame): void {
+  if (!state.active) {
+    return;
   }
-  addLabeledTime(raw.labeled_time, [{ key: "field_half", value: event.field_half }], event.dt);
+
+  const dt = f32(frame.dt);
+  raw.tracked_time = addF32(raw.tracked_time, dt);
+  if (state.fieldHalf === "team_zero_side") {
+    raw.team_zero_side_time = addF32(raw.team_zero_side_time, dt);
+  } else if (state.fieldHalf === "team_one_side") {
+    raw.team_one_side_time = addF32(raw.team_one_side_time, dt);
+  } else {
+    raw.neutral_time = addF32(raw.neutral_time, dt);
+  }
+  addLabeledTime(raw.labeled_time, [{ key: "field_half", value: state.fieldHalf }], dt);
 }
 
 function assignPressureStats(
@@ -120,21 +143,38 @@ function assignPressureStats(
   Object.assign(target, source ?? defaultPressureTeamStats());
 }
 
-export function applyPressureEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyPressureEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createPressureEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createPressureEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortPressureEvents(timeline.events.pressure ?? []);
 
   let eventIndex = 0;
   const raw = defaultRawPressureStats();
+  const state: PressureState = {
+    active: false,
+    fieldHalf: "neutral",
+  };
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      applyPressureEvent(raw, events[eventIndex] as PressureEvent);
-      eventIndex += 1;
-    }
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        applyPressureEvent(state, events[eventIndex] as PressureEvent);
+        eventIndex += 1;
+      }
 
-    assignPressureStats(frame.team_zero.pressure, pressureTeamStats(raw, true));
-    assignPressureStats(frame.team_one.pressure, pressureTeamStats(raw, false));
-  }
-
-  return timeline;
+      accumulatePressureFrame(raw, state, frame);
+      assignPressureStats(frame.team_zero.pressure, pressureTeamStats(raw, true));
+      assignPressureStats(frame.team_one.pressure, pressureTeamStats(raw, false));
+    },
+  };
 }

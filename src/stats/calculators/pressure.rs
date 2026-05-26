@@ -9,6 +9,12 @@ enum PressureHalfLabel {
     Neutral,
 }
 
+impl Default for PressureHalfLabel {
+    fn default() -> Self {
+        Self::Neutral
+    }
+}
+
 impl PressureHalfLabel {
     fn as_label_value(self) -> &'static str {
         match self {
@@ -106,7 +112,7 @@ pub struct PressureTeamStats {
 pub struct PressureEvent {
     pub time: f32,
     pub frame: usize,
-    pub dt: f32,
+    pub active: bool,
     pub field_half: String,
 }
 
@@ -150,6 +156,13 @@ pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     stats: PressureStats,
     events: Vec<PressureEvent>,
+    last_emitted_event_state: Option<PressureEventState>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PressureEventState {
+    active: bool,
+    field_half: PressureHalfLabel,
 }
 
 impl PressureCalculator {
@@ -213,6 +226,25 @@ impl PressureCalculator {
         stats.labeled_time.add([half.as_label()], dt);
     }
 
+    fn emit_event_if_changed(
+        &mut self,
+        frame: &FrameInfo,
+        active: bool,
+        field_half: PressureHalfLabel,
+    ) {
+        let event_state = PressureEventState { active, field_half };
+        if self.last_emitted_event_state == Some(event_state) {
+            return;
+        }
+        self.events.push(PressureEvent {
+            time: frame.time,
+            frame: frame.frame_number,
+            active,
+            field_half: field_half.as_label_value().to_owned(),
+        });
+        self.last_emitted_event_state = Some(event_state);
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -220,6 +252,7 @@ impl PressureCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         if !live_play_state.is_live_play {
+            self.emit_event_if_changed(frame, false, PressureHalfLabel::Neutral);
             return Ok(());
         }
         if let Some(ball) = ball.sample() {
@@ -233,12 +266,9 @@ impl PressureCalculator {
                 PressureHalfLabel::TeamOneSide
             };
             Self::apply_pressure_time(&mut self.stats, half, frame.dt);
-            self.events.push(PressureEvent {
-                time: frame.time,
-                frame: frame.frame_number,
-                dt: frame.dt,
-                field_half: half.as_label_value().to_owned(),
-            });
+            self.emit_event_if_changed(frame, true, half);
+        } else {
+            self.emit_event_if_changed(frame, false, PressureHalfLabel::Neutral);
         }
         Ok(())
     }

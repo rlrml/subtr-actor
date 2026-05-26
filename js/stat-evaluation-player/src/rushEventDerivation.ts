@@ -1,6 +1,6 @@
 import type { RushEvent } from "./generated/RushEvent.ts";
 import type { RushTeamStats } from "./generated/RushTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function defaultRushTeamStats(): RushTeamStats {
   return {
@@ -53,7 +53,19 @@ function assignRushTeamStats(target: RushTeamStats, source: RushTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyRushEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyRushEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createRushEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createRushEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortRushEvents(timeline.events.rush ?? []);
 
   let eventIndex = 0;
@@ -61,20 +73,20 @@ export function applyRushEventDerivedStats(timeline: StatsTimeline): StatsTimeli
   const teamOne = defaultRushTeamStats();
   const minRetainedSeconds = timeline.config.rush_min_possession_retained_seconds;
 
-  for (const frame of timeline.frames) {
-    while (
-      eventIndex < events.length &&
-      frame.frame_number >= events[eventIndex]!.start_frame &&
-      frame.time - events[eventIndex]!.start_time >= minRetainedSeconds
-    ) {
-      const event = events[eventIndex] as RushEvent;
-      applyRushEvent(event.is_team_0 ? teamZero : teamOne, event);
-      eventIndex += 1;
-    }
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (
+        eventIndex < events.length &&
+        frame.frame_number >= events[eventIndex]!.start_frame &&
+        frame.time - events[eventIndex]!.start_time >= minRetainedSeconds
+      ) {
+        const event = events[eventIndex] as RushEvent;
+        applyRushEvent(event.is_team_0 ? teamZero : teamOne, event);
+        eventIndex += 1;
+      }
 
-    assignRushTeamStats(frame.team_zero.rush, teamZero);
-    assignRushTeamStats(frame.team_one.rush, teamOne);
-  }
-
-  return timeline;
+      assignRushTeamStats(frame.team_zero.rush, teamZero);
+      assignRushTeamStats(frame.team_one.rush, teamOne);
+    },
+  };
 }

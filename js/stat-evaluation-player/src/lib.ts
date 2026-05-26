@@ -38,6 +38,7 @@ export * from "./rushFormatting.ts";
 export * from "./rushEventDerivation.ts";
 export * from "./speedFlipOverlay.ts";
 export * from "./statsTimeline.ts";
+export * from "./statsTimelineDerivation.ts";
 export * from "./timelineMarkers.ts";
 export * from "./timelineRanges.ts";
 export * from "./touchEventDerivation.ts";

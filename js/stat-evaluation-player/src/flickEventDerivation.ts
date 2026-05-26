@@ -2,13 +2,25 @@ import type { FlickEvent } from "./generated/FlickEvent.ts";
 import type { FlickStats } from "./generated/FlickStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const FLICK_HIGH_CONFIDENCE = 0.8;
 
 type FlickStatsWithLabels = FlickStats & {
   labeled_event_counts?: LabeledCounts;
 };
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
+}
+
+function subF32(left: number, right: number): number {
+  return f32(f32(left) - f32(right));
+}
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -42,8 +54,15 @@ function sortFlickEvents(events: readonly FlickEvent[]): FlickEvent[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
-      if (left.event.frame !== right.event.frame) {
-        return left.event.frame - right.event.frame;
+      const leftSampleFrame = left.event.sample_frame ?? left.event.frame;
+      const rightSampleFrame = right.event.sample_frame ?? right.event.frame;
+      if (leftSampleFrame !== rightSampleFrame) {
+        return leftSampleFrame - rightSampleFrame;
+      }
+      const leftSampleTime = left.event.sample_time ?? left.event.time;
+      const rightSampleTime = right.event.sample_time ?? right.event.time;
+      if (leftSampleTime !== rightSampleTime) {
+        return leftSampleTime - rightSampleTime;
       }
       if (left.event.time !== right.event.time) {
         return left.event.time - right.event.time;
@@ -91,6 +110,15 @@ function totalLabeledCount(stats: FlickStatsWithLabels): number {
   return stats.labeled_event_counts?.entries.reduce((total, entry) => total + entry.count, 0) ?? 0;
 }
 
+function cloneLabeledCounts(counts: LabeledCounts): LabeledCounts {
+  return {
+    entries: counts.entries.map((entry) => ({
+      labels: entry.labels.map((label) => ({ ...label })),
+      count: entry.count,
+    })),
+  };
+}
+
 function advanceFlickStats(
   stats: FlickStatsWithLabels,
   frameNumber: number,
@@ -99,7 +127,7 @@ function advanceFlickStats(
 ): void {
   stats.is_last_flick = isLastFlickPlayer;
   stats.time_since_last_flick =
-    stats.last_flick_time == null ? null : Math.max(0, frameTime - stats.last_flick_time);
+    stats.last_flick_time == null ? null : Math.max(0, subF32(frameTime, stats.last_flick_time));
   stats.frames_since_last_flick =
     stats.last_flick_frame == null ? null : Math.max(0, frameNumber - stats.last_flick_frame);
 }
@@ -121,52 +149,83 @@ function applyFlickEvent(
   stats.is_last_flick = true;
   stats.last_flick_time = event.time;
   stats.last_flick_frame = event.frame;
-  stats.time_since_last_flick = Math.max(0, frameTime - event.time);
+  stats.time_since_last_flick = Math.max(0, subF32(frameTime, event.time));
   stats.frames_since_last_flick = Math.max(0, frameNumber - event.frame);
   stats.last_confidence = event.confidence;
   stats.best_confidence = Math.max(stats.best_confidence, event.confidence);
-  stats.cumulative_confidence += event.confidence;
-  stats.cumulative_setup_duration += event.setup_duration;
-  stats.cumulative_ball_speed_change += event.ball_speed_change;
+  stats.cumulative_confidence = addF32(stats.cumulative_confidence, event.confidence);
+  stats.cumulative_setup_duration = addF32(
+    stats.cumulative_setup_duration,
+    event.setup_duration,
+  );
+  stats.cumulative_ball_speed_change = addF32(
+    stats.cumulative_ball_speed_change,
+    event.ball_speed_change,
+  );
 }
 
 function assignFlickStats(target: FlickStats, source: FlickStatsWithLabels | undefined): void {
   Object.assign(target, source ?? defaultFlickStats());
-  if (!source?.labeled_event_counts) {
+  if (source?.labeled_event_counts) {
+    (target as FlickStatsWithLabels).labeled_event_counts = cloneLabeledCounts(
+      source.labeled_event_counts,
+    );
+  } else {
     delete (target as FlickStatsWithLabels).labeled_event_counts;
   }
 }
 
-export function applyFlickEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyFlickEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createFlickEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createFlickEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortFlickEvents(timeline.events.flick ?? []);
 
   let eventIndex = 0;
   let lastFlickPlayer: string | null = null;
   const players = new Map<string, FlickStatsWithLabels>();
 
-  for (const frame of timeline.frames) {
-    if (frame.is_live_play) {
-      for (const [playerKey, stats] of players) {
-        advanceFlickStats(stats, frame.frame_number, frame.time, playerKey === lastFlickPlayer);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      if (frame.is_live_play) {
+        for (const [playerKey, stats] of players) {
+          advanceFlickStats(stats, frame.frame_number, frame.time, playerKey === lastFlickPlayer);
+        }
+
+        while (
+          eventIndex < events.length &&
+          (events[eventIndex]!.sample_frame ?? events[eventIndex]!.frame) <= frame.frame_number
+        ) {
+          const event = events[eventIndex] as FlickEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultFlickStats();
+          players.set(playerKey, stats);
+          applyFlickEvent(stats, event, frame.frame_number, frame.time);
+          lastFlickPlayer = playerKey;
+          eventIndex += 1;
+        }
+        if (lastFlickPlayer != null) {
+          const stats = players.get(lastFlickPlayer);
+          if (stats) {
+            stats.is_last_flick = true;
+          }
+        }
+      } else {
+        lastFlickPlayer = null;
       }
 
-      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        const event = events[eventIndex] as FlickEvent;
-        const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultFlickStats();
-        players.set(playerKey, stats);
-        applyFlickEvent(stats, event, frame.frame_number, frame.time);
-        lastFlickPlayer = playerKey;
-        eventIndex += 1;
+      for (const player of frame.players) {
+        assignFlickStats(player.flick, players.get(remoteIdKey(player.player_id)));
       }
-    } else {
-      lastFlickPlayer = null;
-    }
-
-    for (const player of frame.players) {
-      assignFlickStats(player.flick, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

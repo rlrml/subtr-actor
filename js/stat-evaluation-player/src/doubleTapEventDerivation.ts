@@ -1,7 +1,7 @@
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { DoubleTapPlayerStats } from "./generated/DoubleTapPlayerStats.ts";
 import type { DoubleTapTeamStats } from "./generated/DoubleTapTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -79,7 +79,19 @@ function assignDoubleTapTeamStats(target: DoubleTapTeamStats, count: number): vo
   target.count = count;
 }
 
-export function applyDoubleTapEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyDoubleTapEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createDoubleTapEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createDoubleTapEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortDoubleTapEvents(timeline.events.double_tap ?? []);
 
   let eventIndex = 0;
@@ -88,51 +100,51 @@ export function applyDoubleTapEventDerivedStats(timeline: StatsTimeline): StatsT
   let lastDoubleTapPlayer: string | null = null;
   const players = new Map<string, DoubleTapPlayerStats>();
 
-  for (const frame of timeline.frames) {
-    for (const [playerKey, stats] of players) {
-      advanceDoubleTapFrame(
-        stats,
-        frame.frame_number,
-        frame.time,
-        playerKey === lastDoubleTapPlayer,
-      );
-    }
-
-    let processedEvent = false;
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as DoubleTapEvent;
-      const playerKey = remoteIdKey(event.player);
-      const stats = players.get(playerKey) ?? defaultDoubleTapPlayerStats();
-      players.set(playerKey, stats);
-      applyDoubleTapEvent(stats, event, frame.frame_number, frame.time);
-      if (event.is_team_0) {
-        teamZeroCount += 1;
-      } else {
-        teamOneCount += 1;
+  return {
+    applyFrame(frame: StatsFrame): void {
+      for (const [playerKey, stats] of players) {
+        advanceDoubleTapFrame(
+          stats,
+          frame.frame_number,
+          frame.time,
+          playerKey === lastDoubleTapPlayer,
+        );
       }
-      lastDoubleTapPlayer = playerKey;
-      processedEvent = true;
-      eventIndex += 1;
-    }
 
-    if (processedEvent) {
-      for (const stats of players.values()) {
-        stats.is_last_double_tap = false;
+      let processedEvent = false;
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        const event = events[eventIndex] as DoubleTapEvent;
+        const playerKey = remoteIdKey(event.player);
+        const stats = players.get(playerKey) ?? defaultDoubleTapPlayerStats();
+        players.set(playerKey, stats);
+        applyDoubleTapEvent(stats, event, frame.frame_number, frame.time);
+        if (event.is_team_0) {
+          teamZeroCount += 1;
+        } else {
+          teamOneCount += 1;
+        }
+        lastDoubleTapPlayer = playerKey;
+        processedEvent = true;
+        eventIndex += 1;
       }
-    }
-    if (lastDoubleTapPlayer != null) {
-      const stats = players.get(lastDoubleTapPlayer);
-      if (stats) {
-        stats.is_last_double_tap = true;
+
+      if (processedEvent) {
+        for (const stats of players.values()) {
+          stats.is_last_double_tap = false;
+        }
       }
-    }
+      if (lastDoubleTapPlayer != null) {
+        const stats = players.get(lastDoubleTapPlayer);
+        if (stats) {
+          stats.is_last_double_tap = true;
+        }
+      }
 
-    assignDoubleTapTeamStats(frame.team_zero.double_tap, teamZeroCount);
-    assignDoubleTapTeamStats(frame.team_one.double_tap, teamOneCount);
-    for (const player of frame.players) {
-      assignDoubleTapPlayerStats(player.double_tap, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      assignDoubleTapTeamStats(frame.team_zero.double_tap, teamZeroCount);
+      assignDoubleTapTeamStats(frame.team_one.double_tap, teamOneCount);
+      for (const player of frame.players) {
+        assignDoubleTapPlayerStats(player.double_tap, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }

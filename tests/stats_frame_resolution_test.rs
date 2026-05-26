@@ -11,11 +11,11 @@ fn stats_collector_default_resolution_matches_every_frame() {
         common::parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
 
     let default_stats_collector = StatsCollector::new()
-        .get_replay_stats_timeline(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("default stats collector timeline should build");
     let explicit_every_frame_stats_collector = StatsCollector::new()
         .with_frame_resolution(StatsFrameResolution::EveryFrame)
-        .get_replay_stats_timeline(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("explicit every-frame stats collector timeline should build");
     common::assert_replay_stats_timeline_eq(
         &default_stats_collector,
@@ -30,15 +30,15 @@ fn stats_collector_and_timeline_collector_match_at_sampled_resolution() {
     let resolution = StatsFrameResolution::TimeStep { seconds: 0.5 };
 
     let full_timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("full stats timeline should build");
     let sampled_collector_timeline = StatsCollector::new()
         .with_frame_resolution(resolution)
-        .get_replay_stats_timeline(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("sampled stats collector timeline should build");
     let mut sampled_timeline_collector = StatsTimelineCollector::new()
         .with_frame_resolution(resolution)
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("sampled stats timeline collector should build");
     complete_sparse_player_breakdowns(&mut sampled_timeline_collector);
 

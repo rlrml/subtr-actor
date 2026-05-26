@@ -15,6 +15,11 @@ export function merge<T>(base: T, overrides: DeepPartial<T> | undefined): T {
 
   const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
   for (const [key, value] of Object.entries(overrides)) {
+    if (key === "player_id") {
+      result[key] = value;
+      continue;
+    }
+
     if (Array.isArray(value)) {
       result[key] = value;
       continue;

@@ -4,7 +4,10 @@ import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { BoostPickupTimelineRangeOptions } from "./timelineRanges.ts";
-import type { BoostPickupComparisonEvent, StatsTimeline } from "./statsTimeline.ts";
+import type {
+  BoostPickupComparisonEvent,
+  StatsTimeline,
+} from "./statsTimeline.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 type BoostPickupFilterOption<T extends string> = {

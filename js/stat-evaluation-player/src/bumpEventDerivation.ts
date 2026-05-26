@@ -1,7 +1,7 @@
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { BumpPlayerStats } from "./generated/BumpPlayerStats.ts";
 import type { BumpTeamStats } from "./generated/BumpTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -87,7 +87,19 @@ function assignBumpTeamStats(target: BumpTeamStats, source: BumpTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyBumpEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyBumpEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createBumpEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createBumpEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortBumpEvents(timeline.events.bump ?? []);
 
   let eventIndex = 0;
@@ -95,29 +107,29 @@ export function applyBumpEventDerivedStats(timeline: StatsTimeline): StatsTimeli
   const teamZero = defaultBumpTeamStats();
   const teamOne = defaultBumpTeamStats();
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as BumpEvent;
-      const initiatorKey = remoteIdKey(event.initiator);
-      const initiatorStats = players.get(initiatorKey) ?? defaultBumpPlayerStats();
-      players.set(initiatorKey, initiatorStats);
-      recordBumpInflicted(initiatorStats, event);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        const event = events[eventIndex] as BumpEvent;
+        const initiatorKey = remoteIdKey(event.initiator);
+        const initiatorStats = players.get(initiatorKey) ?? defaultBumpPlayerStats();
+        players.set(initiatorKey, initiatorStats);
+        recordBumpInflicted(initiatorStats, event);
 
-      const victimKey = remoteIdKey(event.victim);
-      const victimStats = players.get(victimKey) ?? defaultBumpPlayerStats();
-      players.set(victimKey, victimStats);
-      recordBumpTaken(victimStats, event);
+        const victimKey = remoteIdKey(event.victim);
+        const victimStats = players.get(victimKey) ?? defaultBumpPlayerStats();
+        players.set(victimKey, victimStats);
+        recordBumpTaken(victimStats, event);
 
-      recordBumpTeamStats(event.initiator_is_team_0 ? teamZero : teamOne, event);
-      eventIndex += 1;
-    }
+        recordBumpTeamStats(event.initiator_is_team_0 ? teamZero : teamOne, event);
+        eventIndex += 1;
+      }
 
-    assignBumpTeamStats(frame.team_zero.bump, teamZero);
-    assignBumpTeamStats(frame.team_one.bump, teamOne);
-    for (const player of frame.players) {
-      assignBumpPlayerStats(player.bump, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      assignBumpTeamStats(frame.team_zero.bump, teamZero);
+      assignBumpTeamStats(frame.team_one.bump, teamOne);
+      for (const player of frame.players) {
+        assignBumpPlayerStats(player.bump, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }

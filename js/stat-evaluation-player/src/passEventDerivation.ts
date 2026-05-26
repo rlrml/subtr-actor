@@ -1,7 +1,8 @@
 import type { PassEvent } from "./generated/PassEvent.ts";
+import type { PassLastCompletedEvent } from "./generated/PassLastCompletedEvent.ts";
 import type { PassPlayerStats } from "./generated/PassPlayerStats.ts";
 import type { PassTeamStats } from "./generated/PassTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -30,6 +31,27 @@ function defaultPassPlayerStats(): PassPlayerStats {
 }
 
 function sortPassEvents(events: readonly PassEvent[]): PassEvent[] {
+  return events
+    .map((event, index) => ({ event, index }))
+    .sort((left, right) => {
+      const leftSampleFrame = left.event.sample_frame ?? left.event.frame;
+      const rightSampleFrame = right.event.sample_frame ?? right.event.frame;
+      if (leftSampleFrame !== rightSampleFrame) {
+        return leftSampleFrame - rightSampleFrame;
+      }
+      const leftSampleTime = left.event.sample_time ?? left.event.time;
+      const rightSampleTime = right.event.sample_time ?? right.event.time;
+      if (leftSampleTime !== rightSampleTime) {
+        return leftSampleTime - rightSampleTime;
+      }
+      return left.index - right.index;
+    })
+    .map(({ event }) => event);
+}
+
+function sortPassLastCompletedEvents(
+  events: readonly PassLastCompletedEvent[],
+): PassLastCompletedEvent[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
@@ -88,10 +110,27 @@ function assignPassTeamStats(target: PassTeamStats, source: PassTeamStats): void
   Object.assign(target, source);
 }
 
-export function applyPassEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyPassEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createPassEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createPassEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortPassEvents(timeline.events.pass ?? []);
+  const lastCompletedEvents = sortPassLastCompletedEvents(
+    timeline.events.pass_last_completed ?? [],
+  );
+  const hasLastCompletedEvents = lastCompletedEvents.length > 0;
 
   let eventIndex = 0;
+  let lastCompletedEventIndex = 0;
   let lastCompletedPassPlayer: string | null = null;
   const players = new Map<string, PassPlayerStats>();
   const teamZero: PassTeamStats = {
@@ -107,65 +146,90 @@ export function applyPassEventDerivedStats(timeline: StatsTimeline): StatsTimeli
     longest_pass_distance: 0,
   };
 
-  for (const frame of timeline.frames) {
-    for (const [playerKey, stats] of players) {
-      advancePassFrame(
-        stats,
-        frame.frame_number,
-        frame.time,
-        frame.is_live_play && playerKey === lastCompletedPassPlayer,
-      );
-    }
-
-    if (!frame.is_live_play) {
-      lastCompletedPassPlayer = null;
-    } else {
-      let processedEvent = false;
-      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        const event = events[eventIndex] as PassEvent;
-        const passerKey = remoteIdKey(event.passer);
-        const passerStats = players.get(passerKey) ?? defaultPassPlayerStats();
-        players.set(passerKey, passerStats);
-        applyCompletedPassEvent(passerStats, event, frame.frame_number, frame.time);
-
-        const receiverKey = remoteIdKey(event.receiver);
-        const receiverStats = players.get(receiverKey) ?? defaultPassPlayerStats();
-        players.set(receiverKey, receiverStats);
-        receiverStats.received_pass_count += 1;
-
-        const teamStats = event.is_team_0 ? teamZero : teamOne;
-        teamStats.completed_pass_count += 1;
-        teamStats.total_pass_distance += event.ball_travel_distance;
-        teamStats.total_pass_advance += event.ball_advance_distance;
-        teamStats.longest_pass_distance = Math.max(
-          teamStats.longest_pass_distance,
-          event.ball_travel_distance,
+  return {
+    applyFrame(frame: StatsFrame): void {
+      for (const [playerKey, stats] of players) {
+        advancePassFrame(
+          stats,
+          frame.frame_number,
+          frame.time,
+          frame.is_live_play && playerKey === lastCompletedPassPlayer,
         );
-
-        lastCompletedPassPlayer = passerKey;
-        processedEvent = true;
-        eventIndex += 1;
       }
 
-      if (processedEvent) {
+      if (!frame.is_live_play) {
+        lastCompletedPassPlayer = null;
+      } else {
+        let processedEvent = false;
+        while (
+          eventIndex < events.length &&
+          (events[eventIndex]!.sample_frame ?? events[eventIndex]!.frame) <= frame.frame_number
+        ) {
+          const event = events[eventIndex] as PassEvent;
+          const passerKey = remoteIdKey(event.passer);
+          const passerStats = players.get(passerKey) ?? defaultPassPlayerStats();
+          players.set(passerKey, passerStats);
+          applyCompletedPassEvent(passerStats, event, frame.frame_number, frame.time);
+
+          const receiverKey = remoteIdKey(event.receiver);
+          const receiverStats = players.get(receiverKey) ?? defaultPassPlayerStats();
+          players.set(receiverKey, receiverStats);
+          receiverStats.received_pass_count += 1;
+
+          const teamStats = event.is_team_0 ? teamZero : teamOne;
+          teamStats.completed_pass_count += 1;
+          teamStats.total_pass_distance += event.ball_travel_distance;
+          teamStats.total_pass_advance += event.ball_advance_distance;
+          teamStats.longest_pass_distance = Math.max(
+            teamStats.longest_pass_distance,
+            event.ball_travel_distance,
+          );
+
+          lastCompletedPassPlayer = passerKey;
+          processedEvent = true;
+          eventIndex += 1;
+        }
+
+        if (!hasLastCompletedEvents && processedEvent) {
+          for (const stats of players.values()) {
+            stats.is_last_completed_pass = false;
+          }
+        }
+        if (!hasLastCompletedEvents && lastCompletedPassPlayer != null) {
+          const lastStats = players.get(lastCompletedPassPlayer);
+          if (lastStats) {
+            lastStats.is_last_completed_pass = true;
+          }
+        }
+      }
+
+      let processedLastCompletedEvent = false;
+      while (
+        lastCompletedEventIndex < lastCompletedEvents.length &&
+        lastCompletedEvents[lastCompletedEventIndex]!.frame <= frame.frame_number
+      ) {
+        const event = lastCompletedEvents[lastCompletedEventIndex] as PassLastCompletedEvent;
+        lastCompletedPassPlayer = event.player == null ? null : remoteIdKey(event.player);
+        lastCompletedEventIndex += 1;
+        processedLastCompletedEvent = true;
+      }
+      if (processedLastCompletedEvent) {
         for (const stats of players.values()) {
           stats.is_last_completed_pass = false;
         }
-      }
-      if (lastCompletedPassPlayer != null) {
-        const stats = players.get(lastCompletedPassPlayer);
-        if (stats) {
-          stats.is_last_completed_pass = true;
+        if (lastCompletedPassPlayer != null) {
+          const lastStats = players.get(lastCompletedPassPlayer);
+          if (lastStats) {
+            lastStats.is_last_completed_pass = true;
+          }
         }
       }
-    }
 
-    assignPassTeamStats(frame.team_zero.pass, teamZero);
-    assignPassTeamStats(frame.team_one.pass, teamOne);
-    for (const player of frame.players) {
-      assignPassPlayerStats(player.pass, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      assignPassTeamStats(frame.team_zero.pass, teamZero);
+      assignPassTeamStats(frame.team_one.pass, teamOne);
+      for (const player of frame.players) {
+        assignPassPlayerStats(player.pass, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }

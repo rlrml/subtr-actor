@@ -3,7 +3,31 @@ import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.
 import type { TouchLastTouchEvent } from "./generated/TouchLastTouchEvent.ts";
 import type { TouchStats } from "./generated/TouchStats.ts";
 import type { TouchStatsEvent } from "./generated/TouchStatsEvent.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+
+const TOUCH_KINDS = ["control", "hard_hit", "medium_hit"] as const;
+const TOUCH_HEIGHT_BANDS = ["ground", "high_air", "low_air"] as const;
+const TOUCH_SURFACES = ["air", "ground", "wall"] as const;
+const TOUCH_DODGE_STATES = ["dodge", "no_dodge"] as const;
+
+interface TouchAccumulator {
+  stats: TouchStats;
+  labeledCountsVersion: number;
+  labeledCountsSnapshot: TouchStats["labeled_touch_counts"];
+  labeledCountsSnapshotVersion: number;
+}
+
+function f32(value: number): number {
+  return Math.fround(value);
+}
+
+function addF32(left: number, right: number): number {
+  return f32(f32(left) + f32(right));
+}
+
+function subF32(left: number, right: number): number {
+  return f32(f32(left) - f32(right));
+}
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -14,6 +38,26 @@ function remoteIdKey(playerId: unknown): string {
     "unknown",
   ];
   return `${kind}:${typeof value === "string" ? value : JSON.stringify(value)}`;
+}
+
+function emptyLabeledTouchCounts(): TouchStats["labeled_touch_counts"] {
+  return {
+    entries: TOUCH_DODGE_STATES.flatMap((dodgeState) =>
+      TOUCH_HEIGHT_BANDS.flatMap((heightBand) =>
+        TOUCH_KINDS.flatMap((kind) =>
+          TOUCH_SURFACES.map((surface) => ({
+            labels: [
+              { key: "dodge_state", value: dodgeState },
+              { key: "height_band", value: heightBand },
+              { key: "kind", value: kind },
+              { key: "surface", value: surface },
+            ],
+            count: 0,
+          })),
+        ),
+      ),
+    ).sort((left, right) => JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels))),
+  };
 }
 
 function defaultTouchStats(): TouchStats {
@@ -36,7 +80,18 @@ function defaultTouchStats(): TouchStats {
     total_ball_travel_distance: 0,
     total_ball_advance_distance: 0,
     total_ball_retreat_distance: 0,
-    labeled_touch_counts: { entries: [] },
+    labeled_touch_counts: emptyLabeledTouchCounts(),
+  };
+}
+
+const DEFAULT_TOUCH_STATS = defaultTouchStats();
+
+function createTouchAccumulator(): TouchAccumulator {
+  return {
+    stats: defaultTouchStats(),
+    labeledCountsVersion: 0,
+    labeledCountsSnapshot: undefined,
+    labeledCountsSnapshotVersion: -1,
   };
 }
 
@@ -103,11 +158,21 @@ function incrementLabeledTouchCount(stats: TouchStats, labels: StatLabel[]): voi
   }
 }
 
+function cloneLabeledTouchCounts(source: NonNullable<TouchStats["labeled_touch_counts"]>): NonNullable<TouchStats["labeled_touch_counts"]> {
+  return {
+    entries: source.entries.map((entry) => ({
+      labels: entry.labels.map((label) => ({ ...label })),
+      count: entry.count,
+    })),
+  };
+}
+
 function applyTouchStatsEvent(
-  stats: TouchStats,
+  accumulator: TouchAccumulator,
   event: TouchStatsEvent,
-  frame: StatsTimeline["frames"][number],
+  frame: StatsFrame,
 ): void {
+  const stats = accumulator.stats;
   stats.touch_count += 1;
   if (event.kind === "control") {
     stats.control_touch_count += 1;
@@ -133,20 +198,54 @@ function applyTouchStatsEvent(
     { key: "surface", value: event.surface },
     { key: "dodge_state", value: event.dodge_state },
   ]);
+  accumulator.labeledCountsVersion += 1;
   stats.last_touch_time = event.time;
   stats.last_touch_frame = event.frame;
-  stats.time_since_last_touch = Math.max(0, frame.time - event.time);
+  stats.time_since_last_touch = Math.max(0, subF32(frame.time, event.time));
   stats.frames_since_last_touch = Math.max(0, frame.frame_number - event.frame);
   stats.last_ball_speed_change = event.ball_speed_change;
   stats.max_ball_speed_change = Math.max(stats.max_ball_speed_change, event.ball_speed_change);
-  stats.cumulative_ball_speed_change += event.ball_speed_change;
+  stats.cumulative_ball_speed_change = addF32(
+    stats.cumulative_ball_speed_change,
+    event.ball_speed_change,
+  );
 }
 
-function assignTouchStats(target: TouchStats, source: TouchStats | undefined): void {
-  Object.assign(target, source ?? defaultTouchStats());
+function getLabeledTouchCountsSnapshot(
+  accumulator: TouchAccumulator,
+): TouchStats["labeled_touch_counts"] {
+  if (accumulator.labeledCountsSnapshotVersion !== accumulator.labeledCountsVersion) {
+    accumulator.labeledCountsSnapshot = accumulator.stats.labeled_touch_counts
+      ? cloneLabeledTouchCounts(accumulator.stats.labeled_touch_counts)
+      : undefined;
+    accumulator.labeledCountsSnapshotVersion = accumulator.labeledCountsVersion;
+  }
+  return accumulator.labeledCountsSnapshot;
 }
 
-export function applyTouchEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+function assignTouchStats(target: TouchStats, source: TouchAccumulator | undefined): void {
+  if (!source) {
+    Object.assign(target, DEFAULT_TOUCH_STATS);
+    return;
+  }
+  Object.assign(target, source.stats, {
+    labeled_touch_counts: getLabeledTouchCountsSnapshot(source),
+  });
+}
+
+export function applyTouchEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createTouchEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const touchEvents = sortBySample(timeline.events.touch ?? []);
   const lastTouchEvents = sortBySample(timeline.events.touch_last_touch ?? []);
   const movementEvents = sortByFrame(timeline.events.touch_ball_movement ?? []);
@@ -155,71 +254,82 @@ export function applyTouchEventDerivedStats(timeline: StatsTimeline): StatsTimel
   let lastTouchEventIndex = 0;
   let movementEventIndex = 0;
   let currentLastTouchPlayerKey: string | null = null;
-  const players = new Map<string, TouchStats>();
+  const players = new Map<string, TouchAccumulator>();
 
-  for (const frame of timeline.frames) {
-    if (!frame.is_live_play) {
-      currentLastTouchPlayerKey = null;
-    } else {
-      for (const stats of players.values()) {
-        stats.is_last_touch = false;
-        if (stats.last_touch_time != null) {
-          stats.time_since_last_touch = Math.max(0, frame.time - stats.last_touch_time);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      if (!frame.is_live_play) {
+        currentLastTouchPlayerKey = null;
+      } else {
+        for (const accumulator of players.values()) {
+          const stats = accumulator.stats;
+          stats.is_last_touch = false;
+          if (stats.last_touch_time != null) {
+            stats.time_since_last_touch = Math.max(0, subF32(frame.time, stats.last_touch_time));
+          }
+          if (stats.last_touch_frame != null) {
+            stats.frames_since_last_touch = Math.max(0, frame.frame_number - stats.last_touch_frame);
+          }
         }
-        if (stats.last_touch_frame != null) {
-          stats.frames_since_last_touch = Math.max(0, frame.frame_number - stats.last_touch_frame);
+
+        while (
+          touchEventIndex < touchEvents.length &&
+          (touchEvents[touchEventIndex]!.sample_frame ?? touchEvents[touchEventIndex]!.frame) <=
+            frame.frame_number
+        ) {
+          const event = touchEvents[touchEventIndex] as TouchStatsEvent;
+          const playerKey = remoteIdKey(event.player);
+          const accumulator = players.get(playerKey) ?? createTouchAccumulator();
+          players.set(playerKey, accumulator);
+          applyTouchStatsEvent(accumulator, event, frame);
+          touchEventIndex += 1;
+        }
+
+        while (
+          lastTouchEventIndex < lastTouchEvents.length &&
+          (lastTouchEvents[lastTouchEventIndex]!.sample_frame ??
+            lastTouchEvents[lastTouchEventIndex]!.frame) <= frame.frame_number
+        ) {
+          const event = lastTouchEvents[lastTouchEventIndex] as TouchLastTouchEvent;
+          currentLastTouchPlayerKey = event.player == null ? null : remoteIdKey(event.player);
+          lastTouchEventIndex += 1;
+        }
+
+        if (currentLastTouchPlayerKey != null) {
+          const accumulator = players.get(currentLastTouchPlayerKey);
+          if (accumulator) {
+            accumulator.stats.is_last_touch = true;
+          }
         }
       }
 
       while (
-        touchEventIndex < touchEvents.length &&
-        (touchEvents[touchEventIndex]!.sample_frame ?? touchEvents[touchEventIndex]!.frame) <=
-          frame.frame_number
+        movementEventIndex < movementEvents.length &&
+        movementEvents[movementEventIndex]!.frame <= frame.frame_number
       ) {
-        const event = touchEvents[touchEventIndex] as TouchStatsEvent;
+        const event = movementEvents[movementEventIndex] as TouchBallMovementEvent;
         const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultTouchStats();
-        players.set(playerKey, stats);
-        applyTouchStatsEvent(stats, event, frame);
-        touchEventIndex += 1;
+        const accumulator = players.get(playerKey) ?? createTouchAccumulator();
+        players.set(playerKey, accumulator);
+        const stats = accumulator.stats;
+        stats.total_ball_travel_distance = addF32(
+          stats.total_ball_travel_distance,
+          event.travel_distance,
+        );
+        stats.total_ball_advance_distance = addF32(
+          stats.total_ball_advance_distance,
+          event.advance_distance,
+        );
+        stats.total_ball_retreat_distance = addF32(
+          stats.total_ball_retreat_distance,
+          event.retreat_distance,
+        );
+        movementEventIndex += 1;
       }
 
-      while (
-        lastTouchEventIndex < lastTouchEvents.length &&
-        (lastTouchEvents[lastTouchEventIndex]!.sample_frame ??
-          lastTouchEvents[lastTouchEventIndex]!.frame) <= frame.frame_number
-      ) {
-        const event = lastTouchEvents[lastTouchEventIndex] as TouchLastTouchEvent;
-        currentLastTouchPlayerKey = event.player == null ? null : remoteIdKey(event.player);
-        lastTouchEventIndex += 1;
+      for (const player of frame.players) {
+        assignTouchStats(player.touch, players.get(remoteIdKey(player.player_id)));
       }
-
-      if (currentLastTouchPlayerKey != null) {
-        const stats = players.get(currentLastTouchPlayerKey);
-        if (stats) {
-          stats.is_last_touch = true;
-        }
-      }
-    }
-
-    while (
-      movementEventIndex < movementEvents.length &&
-      movementEvents[movementEventIndex]!.frame <= frame.frame_number
-    ) {
-      const event = movementEvents[movementEventIndex] as TouchBallMovementEvent;
-      const playerKey = remoteIdKey(event.player);
-      const stats = players.get(playerKey) ?? defaultTouchStats();
-      players.set(playerKey, stats);
-      stats.total_ball_travel_distance += event.travel_distance;
-      stats.total_ball_advance_distance += event.advance_distance;
-      stats.total_ball_retreat_distance += event.retreat_distance;
-      movementEventIndex += 1;
-    }
-
-    for (const player of frame.players) {
-      assignTouchStats(player.touch, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

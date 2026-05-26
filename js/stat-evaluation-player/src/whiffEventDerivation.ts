@@ -1,6 +1,6 @@
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 import type { WhiffStats } from "./generated/WhiffStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 type WhiffAccumulator = Omit<WhiffStats, "labeled_whiff_counts">;
 
@@ -92,7 +92,19 @@ function assignWhiffStats(target: WhiffStats, source: WhiffAccumulator | undefin
   Object.assign(target, source ?? defaultWhiffStats());
 }
 
-export function applyWhiffEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyWhiffEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createWhiffEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createWhiffEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortWhiffEvents(timeline.events.whiff ?? []);
 
   let eventIndex = 0;
@@ -100,45 +112,45 @@ export function applyWhiffEventDerivedStats(timeline: StatsTimeline): StatsTimel
   const players = new Map<string, WhiffAccumulator>();
   const frozenPlayers = new Map<string, WhiffAccumulator>();
 
-  for (const frame of timeline.frames) {
-    if (frame.is_live_play) {
-      for (const stats of players.values()) {
-        advanceWhiffFrame(stats, frame.frame_number, frame.time);
-      }
-
-      while (eventIndex < events.length && events[eventIndex]!.resolved_frame <= frame.frame_number) {
-        const event = events[eventIndex] as WhiffEvent;
-        const playerKey = remoteIdKey(event.player);
-        const stats = players.get(playerKey) ?? defaultWhiffStats();
-        players.set(playerKey, stats);
-        applyWhiffEvent(stats, event, frame.frame_number, frame.time);
-        if ((event.kind ?? "whiff") === "whiff") {
-          lastWhiffPlayer = playerKey;
+  return {
+    applyFrame(frame: StatsFrame): void {
+      if (frame.is_live_play) {
+        for (const stats of players.values()) {
+          advanceWhiffFrame(stats, frame.frame_number, frame.time);
         }
-        eventIndex += 1;
-      }
 
-      if (lastWhiffPlayer != null) {
-        const stats = players.get(lastWhiffPlayer);
-        if (stats) {
-          stats.is_last_whiff = true;
+        while (eventIndex < events.length && events[eventIndex]!.resolved_frame <= frame.frame_number) {
+          const event = events[eventIndex] as WhiffEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultWhiffStats();
+          players.set(playerKey, stats);
+          applyWhiffEvent(stats, event, frame.frame_number, frame.time);
+          if ((event.kind ?? "whiff") === "whiff") {
+            lastWhiffPlayer = playerKey;
+          }
+          eventIndex += 1;
         }
-      }
 
-      for (const player of frame.players) {
-        const playerKey = remoteIdKey(player.player_id);
-        const stats = players.get(playerKey);
-        assignWhiffStats(player.whiff, stats);
-        frozenPlayers.set(playerKey, copyWhiffStats(stats ?? defaultWhiffStats()));
-      }
-    } else {
-      for (const player of frame.players) {
-        const playerKey = remoteIdKey(player.player_id);
-        assignWhiffStats(player.whiff, frozenPlayers.get(playerKey));
-      }
-      lastWhiffPlayer = null;
-    }
-  }
+        if (lastWhiffPlayer != null) {
+          const stats = players.get(lastWhiffPlayer);
+          if (stats) {
+            stats.is_last_whiff = true;
+          }
+        }
 
-  return timeline;
+        for (const player of frame.players) {
+          const playerKey = remoteIdKey(player.player_id);
+          const stats = players.get(playerKey);
+          assignWhiffStats(player.whiff, stats);
+          frozenPlayers.set(playerKey, copyWhiffStats(stats ?? defaultWhiffStats()));
+        }
+      } else {
+        for (const player of frame.players) {
+          const playerKey = remoteIdKey(player.player_id);
+          assignWhiffStats(player.whiff, frozenPlayers.get(playerKey));
+        }
+        lastWhiffPlayer = null;
+      }
+    },
+  };
 }

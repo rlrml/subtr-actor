@@ -3,7 +3,7 @@ import type { FiftyFiftyPlayerStats } from "./generated/FiftyFiftyPlayerStats.ts
 import type { FiftyFiftyTeamStats } from "./generated/FiftyFiftyTeamStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 type FiftyFiftyPlayerStatsWithLabels = FiftyFiftyPlayerStats & {
   labeled_event_counts?: LabeledCounts;
@@ -120,6 +120,15 @@ function incrementLabels(stats: FiftyFiftyPlayerStatsWithLabels, labels: StatLab
   }
 }
 
+function cloneLabeledCounts(counts: LabeledCounts): LabeledCounts {
+  return {
+    entries: counts.entries.map((entry) => ({
+      labels: entry.labels.map((label) => ({ ...label })),
+      count: entry.count,
+    })),
+  };
+}
+
 function applyFiftyFiftyTeamEvent(
   stats: FiftyFiftyTeamStats,
   teamIsTeam0: boolean,
@@ -204,7 +213,11 @@ function assignFiftyFiftyPlayerStats(
   source: FiftyFiftyPlayerStatsWithLabels | undefined,
 ): void {
   Object.assign(target, source ?? defaultFiftyFiftyPlayerStats());
-  if (!source?.labeled_event_counts) {
+  if (source?.labeled_event_counts) {
+    (target as FiftyFiftyPlayerStatsWithLabels).labeled_event_counts = cloneLabeledCounts(
+      source.labeled_event_counts,
+    );
+  } else {
     delete (target as FiftyFiftyPlayerStatsWithLabels).labeled_event_counts;
   }
 }
@@ -213,7 +226,19 @@ function assignFiftyFiftyTeamStats(target: FiftyFiftyTeamStats, source: FiftyFif
   Object.assign(target, source);
 }
 
-export function applyFiftyFiftyEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyFiftyFiftyEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createFiftyFiftyEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createFiftyFiftyEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortFiftyFiftyEvents(timeline.events.fifty_fifty ?? []);
 
   let eventIndex = 0;
@@ -221,35 +246,35 @@ export function applyFiftyFiftyEventDerivedStats(timeline: StatsTimeline): Stats
   const teamOne = defaultFiftyFiftyTeamStats();
   const players = new Map<string, FiftyFiftyPlayerStatsWithLabels>();
 
-  for (const frame of timeline.frames) {
-    while (eventIndex < events.length && events[eventIndex]!.resolve_frame <= frame.frame_number) {
-      const event = events[eventIndex] as FiftyFiftyEvent;
-      applyFiftyFiftyTeamEvent(teamZero, true, event);
-      applyFiftyFiftyTeamEvent(teamOne, false, event);
-      if (event.team_zero_player != null) {
-        const playerKey = remoteIdKey(event.team_zero_player);
-        const stats = players.get(playerKey) ?? defaultFiftyFiftyPlayerStats();
-        players.set(playerKey, stats);
-        applyFiftyFiftyPlayerEvent(stats, true, event);
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (eventIndex < events.length && events[eventIndex]!.resolve_frame <= frame.frame_number) {
+        const event = events[eventIndex] as FiftyFiftyEvent;
+        applyFiftyFiftyTeamEvent(teamZero, true, event);
+        applyFiftyFiftyTeamEvent(teamOne, false, event);
+        if (event.team_zero_player != null) {
+          const playerKey = remoteIdKey(event.team_zero_player);
+          const stats = players.get(playerKey) ?? defaultFiftyFiftyPlayerStats();
+          players.set(playerKey, stats);
+          applyFiftyFiftyPlayerEvent(stats, true, event);
+        }
+        if (event.team_one_player != null) {
+          const playerKey = remoteIdKey(event.team_one_player);
+          const stats = players.get(playerKey) ?? defaultFiftyFiftyPlayerStats();
+          players.set(playerKey, stats);
+          applyFiftyFiftyPlayerEvent(stats, false, event);
+        }
+        eventIndex += 1;
       }
-      if (event.team_one_player != null) {
-        const playerKey = remoteIdKey(event.team_one_player);
-        const stats = players.get(playerKey) ?? defaultFiftyFiftyPlayerStats();
-        players.set(playerKey, stats);
-        applyFiftyFiftyPlayerEvent(stats, false, event);
+
+      assignFiftyFiftyTeamStats(frame.team_zero.fifty_fifty, teamZero);
+      assignFiftyFiftyTeamStats(frame.team_one.fifty_fifty, teamOne);
+      for (const player of frame.players) {
+        assignFiftyFiftyPlayerStats(
+          player.fifty_fifty,
+          players.get(remoteIdKey(player.player_id)),
+        );
       }
-      eventIndex += 1;
-    }
-
-    assignFiftyFiftyTeamStats(frame.team_zero.fifty_fifty, teamZero);
-    assignFiftyFiftyTeamStats(frame.team_one.fifty_fifty, teamOne);
-    for (const player of frame.players) {
-      assignFiftyFiftyPlayerStats(
-        player.fifty_fifty,
-        players.get(remoteIdKey(player.player_id)),
-      );
-    }
-  }
-
-  return timeline;
+    },
+  };
 }

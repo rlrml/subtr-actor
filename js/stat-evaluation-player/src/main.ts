@@ -27,7 +27,7 @@ import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createStatModules, getTeamClass, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
-import { createStatsFrameLookup, getStatsFrameForReplayFrame } from "./statsTimeline.ts";
+import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import {
   applyConfigAdapterSnapshot,
   getConfigAdapterSnapshot,
@@ -36,8 +36,9 @@ import {
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
-  StatsTimeline,
+  StatsFrameLookup,
   TeamStatsSnapshot,
+  StatsTimeline,
 } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
@@ -91,7 +92,7 @@ let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
 let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
-let statsFrameLookup: Map<number, StatsFrame> | null = null;
+let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
 let removeRenderHook: (() => void) | null = null;
 
@@ -3253,7 +3254,6 @@ function renderStatsWindowEntries(statsWindow: StatsWindowState, frameIndex: num
     return;
   }
 
-  const frame = getCurrentStatsFrame(frameIndex);
   const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
   const entries = statsWindow.entries
     .map((entry) => ({ entry, definition: getStatById(entry.statId) }))
@@ -3270,6 +3270,7 @@ function renderStatsWindowEntries(statsWindow: StatsWindowState, frameIndex: num
     return;
   }
 
+  const frame = getCurrentStatsFrame(frameIndex);
   if (!frame) {
     const empty = document.createElement("p");
     empty.className = "stat-window-empty";
@@ -4032,8 +4033,8 @@ async function loadReplayBundleForDisplay(
     const loadedReplay = await bundlePromise;
     const { replay } = loadedReplay;
     statsTimeline = loadedReplay.statsTimeline;
-    statsFrameLookup = createStatsFrameLookup(statsTimeline);
-    statRegistry = createStatRegistry(statsTimeline.frames[0] ?? null);
+    statsFrameLookup = loadedReplay.statsFrameLookup;
+    statRegistry = createStatRegistry(null);
     migrateMechanicBackedTimelineEventSelections();
 
     timelineOverlay = createTimelineOverlayPlugin({

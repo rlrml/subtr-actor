@@ -7,7 +7,7 @@ import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 const playerId = { Steam: "positioning-player" } as Record<string, unknown>;
 
 function assertClose(actual: number | undefined, expected: number): void {
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
 test("positioning event derivation populates compacted player stats", () => {

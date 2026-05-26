@@ -7,6 +7,10 @@ import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 const bluePlayer = { Steam: "blue-ceiling-shot" } as Record<string, unknown>;
 const orangePlayer = { Steam: "orange-ceiling-shot" } as Record<string, unknown>;
 
+function assertClose(actual: number | undefined, expected: number): void {
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
+}
+
 test("ceiling-shot event derivation can populate compacted player stats", () => {
   const timeline = createStatsTimeline({
     events: {
@@ -93,7 +97,7 @@ test("ceiling-shot event derivation can populate compacted player stats", () => 
   assert.equal(timeline.frames[0]?.players[0]?.ceiling_shot.count, 1);
   assert.equal(timeline.frames[0]?.players[0]?.ceiling_shot.high_confidence_count, 1);
   assert.equal(timeline.frames[0]?.players[0]?.ceiling_shot.is_last_ceiling_shot, true);
-  assert.equal(timeline.frames[0]?.players[0]?.ceiling_shot.cumulative_confidence, 0.82);
+  assertClose(timeline.frames[0]?.players[0]?.ceiling_shot.cumulative_confidence, 0.82);
   assert.equal(
     (timeline.frames[0]?.players[0]?.ceiling_shot as { labeled_event_counts?: unknown })
       .labeled_event_counts != null,
@@ -109,5 +113,5 @@ test("ceiling-shot event derivation can populate compacted player stats", () => 
   assert.equal(timeline.frames[2]?.players[1]?.ceiling_shot.count, 1);
   assert.equal(timeline.frames[2]?.players[1]?.ceiling_shot.high_confidence_count, 0);
   assert.equal(timeline.frames[2]?.players[1]?.ceiling_shot.is_last_ceiling_shot, true);
-  assert.equal(timeline.frames[2]?.players[1]?.ceiling_shot.cumulative_confidence, 0.7);
+  assertClose(timeline.frames[2]?.players[1]?.ceiling_shot.cumulative_confidence, 0.7);
 });

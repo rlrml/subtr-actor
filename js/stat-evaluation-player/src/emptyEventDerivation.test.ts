@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { applyStatsTimelineEventDerivedStats } from "./replayLoader.ts";
+import { applyStatsTimelineEventDerivedStats } from "./statsTimelineDerivation.ts";
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 
 const playerId = { Steam: "empty-event-player" } as Record<string, unknown>;

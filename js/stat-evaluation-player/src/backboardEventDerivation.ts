@@ -1,7 +1,7 @@
 import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
 import type { BackboardPlayerStats } from "./generated/BackboardPlayerStats.ts";
 import type { BackboardTeamStats } from "./generated/BackboardTeamStats.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -77,7 +77,19 @@ function assignBackboardTeamStats(target: BackboardTeamStats, count: number): vo
   target.count = count;
 }
 
-export function applyBackboardEventDerivedStats(timeline: StatsTimeline): StatsTimeline {
+export function applyBackboardEventDerivedStats(timeline: MaterializedStatsTimeline): MaterializedStatsTimeline {
+  const accumulator = createBackboardEventDerivedStatsAccumulator(timeline);
+
+  for (const frame of timeline.frames) {
+    accumulator.applyFrame(frame);
+  }
+
+  return timeline;
+}
+
+export function createBackboardEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
   const events = sortBackboardEvents(timeline.events.backboard ?? []);
 
   let eventIndex = 0;
@@ -86,51 +98,51 @@ export function applyBackboardEventDerivedStats(timeline: StatsTimeline): StatsT
   let lastBackboardPlayer: string | null = null;
   const players = new Map<string, BackboardPlayerStats>();
 
-  for (const frame of timeline.frames) {
-    for (const [playerKey, stats] of players) {
-      advanceBackboardFrame(
-        stats,
-        frame.frame_number,
-        frame.time,
-        playerKey === lastBackboardPlayer,
-      );
-    }
-
-    let processedEvent = false;
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as BackboardBounceEvent;
-      const playerKey = remoteIdKey(event.player);
-      const stats = players.get(playerKey) ?? defaultBackboardPlayerStats();
-      players.set(playerKey, stats);
-      applyBackboardEvent(stats, event, frame.frame_number, frame.time);
-      if (event.is_team_0) {
-        teamZeroCount += 1;
-      } else {
-        teamOneCount += 1;
+  return {
+    applyFrame(frame: StatsFrame): void {
+      for (const [playerKey, stats] of players) {
+        advanceBackboardFrame(
+          stats,
+          frame.frame_number,
+          frame.time,
+          playerKey === lastBackboardPlayer,
+        );
       }
-      lastBackboardPlayer = playerKey;
-      processedEvent = true;
-      eventIndex += 1;
-    }
 
-    if (processedEvent) {
-      for (const stats of players.values()) {
-        stats.is_last_backboard = false;
+      let processedEvent = false;
+      while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+        const event = events[eventIndex] as BackboardBounceEvent;
+        const playerKey = remoteIdKey(event.player);
+        const stats = players.get(playerKey) ?? defaultBackboardPlayerStats();
+        players.set(playerKey, stats);
+        applyBackboardEvent(stats, event, frame.frame_number, frame.time);
+        if (event.is_team_0) {
+          teamZeroCount += 1;
+        } else {
+          teamOneCount += 1;
+        }
+        lastBackboardPlayer = playerKey;
+        processedEvent = true;
+        eventIndex += 1;
       }
-    }
-    if (lastBackboardPlayer != null) {
-      const stats = players.get(lastBackboardPlayer);
-      if (stats) {
-        stats.is_last_backboard = true;
+
+      if (processedEvent) {
+        for (const stats of players.values()) {
+          stats.is_last_backboard = false;
+        }
       }
-    }
+      if (lastBackboardPlayer != null) {
+        const stats = players.get(lastBackboardPlayer);
+        if (stats) {
+          stats.is_last_backboard = true;
+        }
+      }
 
-    assignBackboardTeamStats(frame.team_zero.backboard, teamZeroCount);
-    assignBackboardTeamStats(frame.team_one.backboard, teamOneCount);
-    for (const player of frame.players) {
-      assignBackboardPlayerStats(player.backboard, players.get(remoteIdKey(player.player_id)));
-    }
-  }
-
-  return timeline;
+      assignBackboardTeamStats(frame.team_zero.backboard, teamZeroCount);
+      assignBackboardTeamStats(frame.team_one.backboard, teamOneCount);
+      for (const player of frame.players) {
+        assignBackboardPlayerStats(player.backboard, players.get(remoteIdKey(player.player_id)));
+      }
+    },
+  };
 }
