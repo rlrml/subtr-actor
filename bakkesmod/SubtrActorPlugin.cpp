@@ -2440,6 +2440,21 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     }
     outputNames.assign(VERIFY_GRAPH_OUTPUTS.begin(), VERIFY_GRAPH_OUTPUTS.end());
   }
+  bool missingRequiredGraphOutput = false;
+  for (const char *outputName : VERIFY_GRAPH_OUTPUTS) {
+    if (!containsString(outputNames, outputName)) {
+      ok = false;
+      missingRequiredGraphOutput = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification graph_info missing required graph output '{}'",
+          outputName));
+    }
+  }
+  if (!missingRequiredGraphOutput) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares all {} required graph outputs",
+        VERIFY_GRAPH_OUTPUTS.size()));
+  }
   std::vector<std::string> eventHistoryFieldNames =
       parseJsonStringArrayProperty(graphInfoJson, "event_history_field_names");
   if (eventHistoryFieldNames.empty()) {
@@ -2450,6 +2465,21 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
     }
     eventHistoryFieldNames = defaultEventHistoryFields();
   }
+  bool missingKnownEventHistoryField = false;
+  for (const char *fieldName : FRAME_EVENTS_STATE_EVENT_FIELDS) {
+    if (!containsString(eventHistoryFieldNames, fieldName)) {
+      ok = false;
+      missingKnownEventHistoryField = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification graph_info missing required event_history field '{}'",
+          fieldName));
+    }
+  }
+  if (!missingKnownEventHistoryField) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares all {} known event_history fields",
+        FRAME_EVENTS_STATE_EVENT_FIELDS.size()));
+  }
   std::vector<std::string> requiredEventHistoryFieldNames =
       parseJsonStringArrayProperty(graphInfoJson, "required_event_history_field_names");
   if (requiredEventHistoryFieldNames.empty()) {
@@ -2459,6 +2489,21 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
           "subtr-actor: graph verification could not read required event_history field names from graph_info");
     }
     requiredEventHistoryFieldNames = defaultRequiredEventHistoryFields();
+  }
+  bool missingKnownRequiredEventHistoryField = false;
+  for (const char *fieldName : REQUIRED_EVENT_HISTORY_FIELDS) {
+    if (!containsString(requiredEventHistoryFieldNames, fieldName)) {
+      ok = false;
+      missingKnownRequiredEventHistoryField = true;
+      cvarManager->log(std::format(
+          "subtr-actor: graph verification graph_info missing strict cumulative event_history field '{}'",
+          fieldName));
+    }
+  }
+  if (!missingKnownRequiredEventHistoryField) {
+    cvarManager->log(std::format(
+        "subtr-actor: graph_info declares all {} strict cumulative event_history fields",
+        REQUIRED_EVENT_HISTORY_FIELDS.size()));
   }
   bool requiredEventHistoryFieldNotDeclared = false;
   for (const std::string &fieldName : requiredEventHistoryFieldNames) {

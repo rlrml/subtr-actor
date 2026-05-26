@@ -157,7 +157,8 @@ acceptance check for live graph callability and event-generation parity.
    It should also list `event_history_field_names` and
    `required_event_history_field_names`; the verifier uses those Rust-declared
    registries when checking `frame_events_state` and cumulative `event_history`
-   fields.
+   fields, and fails if the registries omit a graph output or live event field
+   required by the plugin ABI.
    `graph-analysis-nodes.json` should contain keys for every node reported by
    `callable_analysis_node_names`.
    `graph-event-history.json` should contain cumulative raw live event-family
