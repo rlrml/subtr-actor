@@ -56,7 +56,9 @@ typedef struct SaPlayerFrame {
 typedef struct SaEventTiming {
   uint64_t frame_number;
   float time;
+  int32_t seconds_remaining;
   uint8_t has_timing;
+  uint8_t has_seconds_remaining;
 } SaEventTiming;
 
 typedef struct SaTouchEvent {

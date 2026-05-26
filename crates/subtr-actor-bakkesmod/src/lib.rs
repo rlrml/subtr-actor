@@ -96,7 +96,9 @@ pub struct SaPlayerFrame {
 pub struct SaEventTiming {
     pub frame_number: u64,
     pub time: f32,
+    pub seconds_remaining: i32,
     pub has_timing: u8,
+    pub has_seconds_remaining: u8,
 }
 
 #[repr(C)]
@@ -1088,6 +1090,14 @@ fn event_frame_and_time(frame: &FrameInfo, timing: SaEventTiming) -> (usize, f32
     }
 }
 
+fn event_seconds_remaining(frame: &FrameInfo, timing: SaEventTiming) -> i32 {
+    if timing.has_seconds_remaining != 0 {
+        timing.seconds_remaining
+    } else {
+        frame.seconds_remaining.unwrap_or_default()
+    }
+}
+
 fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
     events
         .iter()
@@ -1207,7 +1217,7 @@ fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Ve
             let (frame_number, time) = event_frame_and_time(frame, event.timing);
             DemolishInfo {
                 time,
-                seconds_remaining: frame.seconds_remaining.unwrap_or_default(),
+                seconds_remaining: event_seconds_remaining(frame, event.timing),
                 frame: frame_number,
                 attacker: player_id(event.attacker_index),
                 victim: player_id(event.victim_index),
@@ -3441,7 +3451,9 @@ mod tests {
                 vec![
                     ("uint64_t", "frame_number"),
                     ("float", "time"),
+                    ("int32_t", "seconds_remaining"),
                     ("uint8_t", "has_timing"),
+                    ("uint8_t", "has_seconds_remaining"),
                 ],
             ),
             (
@@ -3691,61 +3703,63 @@ mod tests {
         assert_offset!(SaPlayerFrame, match_shots, 104);
         assert_offset!(SaPlayerFrame, match_score, 108);
 
-        assert_layout!(SaEventTiming, size = 16, align = 8);
+        assert_layout!(SaEventTiming, size = 24, align = 8);
         assert_offset!(SaEventTiming, frame_number, 0);
         assert_offset!(SaEventTiming, time, 8);
-        assert_offset!(SaEventTiming, has_timing, 12);
+        assert_offset!(SaEventTiming, seconds_remaining, 12);
+        assert_offset!(SaEventTiming, has_timing, 16);
+        assert_offset!(SaEventTiming, has_seconds_remaining, 17);
 
-        assert_layout!(SaTouchEvent, size = 32, align = 8);
+        assert_layout!(SaTouchEvent, size = 40, align = 8);
         assert_offset!(SaTouchEvent, timing, 0);
-        assert_offset!(SaTouchEvent, player_index, 16);
-        assert_offset!(SaTouchEvent, has_player, 20);
-        assert_offset!(SaTouchEvent, is_team_0, 21);
-        assert_offset!(SaTouchEvent, closest_approach_distance, 24);
-        assert_offset!(SaTouchEvent, has_closest_approach_distance, 28);
+        assert_offset!(SaTouchEvent, player_index, 24);
+        assert_offset!(SaTouchEvent, has_player, 28);
+        assert_offset!(SaTouchEvent, is_team_0, 29);
+        assert_offset!(SaTouchEvent, closest_approach_distance, 32);
+        assert_offset!(SaTouchEvent, has_closest_approach_distance, 36);
 
-        assert_layout!(SaDodgeRefreshedEvent, size = 32, align = 8);
+        assert_layout!(SaDodgeRefreshedEvent, size = 40, align = 8);
         assert_offset!(SaDodgeRefreshedEvent, timing, 0);
-        assert_offset!(SaDodgeRefreshedEvent, player_index, 16);
-        assert_offset!(SaDodgeRefreshedEvent, is_team_0, 20);
-        assert_offset!(SaDodgeRefreshedEvent, counter_value, 24);
+        assert_offset!(SaDodgeRefreshedEvent, player_index, 24);
+        assert_offset!(SaDodgeRefreshedEvent, is_team_0, 28);
+        assert_offset!(SaDodgeRefreshedEvent, counter_value, 32);
 
-        assert_layout!(SaBoostPadEvent, size = 40, align = 8);
+        assert_layout!(SaBoostPadEvent, size = 48, align = 8);
         assert_offset!(SaBoostPadEvent, timing, 0);
-        assert_offset!(SaBoostPadEvent, pad_id, 16);
-        assert_offset!(SaBoostPadEvent, kind, 20);
-        assert_offset!(SaBoostPadEvent, sequence, 24);
-        assert_offset!(SaBoostPadEvent, player_index, 28);
-        assert_offset!(SaBoostPadEvent, has_player, 32);
+        assert_offset!(SaBoostPadEvent, pad_id, 24);
+        assert_offset!(SaBoostPadEvent, kind, 28);
+        assert_offset!(SaBoostPadEvent, sequence, 32);
+        assert_offset!(SaBoostPadEvent, player_index, 36);
+        assert_offset!(SaBoostPadEvent, has_player, 40);
 
-        assert_layout!(SaGoalEvent, size = 48, align = 8);
+        assert_layout!(SaGoalEvent, size = 56, align = 8);
         assert_offset!(SaGoalEvent, timing, 0);
-        assert_offset!(SaGoalEvent, scoring_team_is_team_0, 16);
-        assert_offset!(SaGoalEvent, player_index, 20);
-        assert_offset!(SaGoalEvent, has_player, 24);
-        assert_offset!(SaGoalEvent, team_zero_score, 28);
-        assert_offset!(SaGoalEvent, has_team_zero_score, 32);
-        assert_offset!(SaGoalEvent, team_one_score, 36);
-        assert_offset!(SaGoalEvent, has_team_one_score, 40);
+        assert_offset!(SaGoalEvent, scoring_team_is_team_0, 24);
+        assert_offset!(SaGoalEvent, player_index, 28);
+        assert_offset!(SaGoalEvent, has_player, 32);
+        assert_offset!(SaGoalEvent, team_zero_score, 36);
+        assert_offset!(SaGoalEvent, has_team_zero_score, 40);
+        assert_offset!(SaGoalEvent, team_one_score, 44);
+        assert_offset!(SaGoalEvent, has_team_one_score, 48);
 
-        assert_layout!(SaPlayerStatEvent, size = 152, align = 8);
+        assert_layout!(SaPlayerStatEvent, size = 160, align = 8);
         assert_offset!(SaPlayerStatEvent, timing, 0);
-        assert_offset!(SaPlayerStatEvent, player_index, 16);
-        assert_offset!(SaPlayerStatEvent, is_team_0, 20);
-        assert_offset!(SaPlayerStatEvent, kind, 24);
-        assert_offset!(SaPlayerStatEvent, has_shot_ball, 28);
-        assert_offset!(SaPlayerStatEvent, shot_ball, 32);
-        assert_offset!(SaPlayerStatEvent, has_shot_player, 88);
-        assert_offset!(SaPlayerStatEvent, shot_player, 92);
+        assert_offset!(SaPlayerStatEvent, player_index, 24);
+        assert_offset!(SaPlayerStatEvent, is_team_0, 28);
+        assert_offset!(SaPlayerStatEvent, kind, 32);
+        assert_offset!(SaPlayerStatEvent, has_shot_ball, 36);
+        assert_offset!(SaPlayerStatEvent, shot_ball, 40);
+        assert_offset!(SaPlayerStatEvent, has_shot_player, 96);
+        assert_offset!(SaPlayerStatEvent, shot_player, 100);
 
-        assert_layout!(SaDemolishEvent, size = 64, align = 8);
+        assert_layout!(SaDemolishEvent, size = 72, align = 8);
         assert_offset!(SaDemolishEvent, timing, 0);
-        assert_offset!(SaDemolishEvent, attacker_index, 16);
-        assert_offset!(SaDemolishEvent, victim_index, 20);
-        assert_offset!(SaDemolishEvent, attacker_velocity, 24);
-        assert_offset!(SaDemolishEvent, victim_velocity, 36);
-        assert_offset!(SaDemolishEvent, victim_location, 48);
-        assert_offset!(SaDemolishEvent, active_duration_seconds, 60);
+        assert_offset!(SaDemolishEvent, attacker_index, 24);
+        assert_offset!(SaDemolishEvent, victim_index, 28);
+        assert_offset!(SaDemolishEvent, attacker_velocity, 32);
+        assert_offset!(SaDemolishEvent, victim_velocity, 44);
+        assert_offset!(SaDemolishEvent, victim_location, 56);
+        assert_offset!(SaDemolishEvent, active_duration_seconds, 68);
 
         assert_layout!(SaLiveFrame, size = 232, align = 8);
         assert_offset!(SaLiveFrame, frame_number, 0);
@@ -6392,7 +6406,9 @@ mod tests {
         let timing = SaEventTiming {
             frame_number: 4,
             time: 0.4,
+            seconds_remaining: 123,
             has_timing: 1,
+            has_seconds_remaining: 1,
         };
         let touches = [SaTouchEvent {
             timing,
@@ -6527,6 +6543,7 @@ mod tests {
         assert_eq!(frame_events.player_stat_events[0].time, 0.4);
         assert_eq!(frame_events.demo_events[0].frame, 4);
         assert_eq!(frame_events.demo_events[0].time, 0.4);
+        assert_eq!(frame_events.demo_events[0].seconds_remaining, 123);
         assert!(
             frame_events.active_demos.is_empty(),
             "stale queued demolish events should not become active at the retry frame"
