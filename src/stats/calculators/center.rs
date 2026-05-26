@@ -254,11 +254,39 @@ impl CenterCalculator {
         }
     }
 
+    fn player_has_disqualifying_event(
+        events: &FrameEventsState,
+        player: &PlayerId,
+        is_team_0: bool,
+    ) -> bool {
+        events.player_stat_events.iter().any(|event| {
+            event.kind == PlayerStatEventKind::Shot
+                && event.player == *player
+                && event.is_team_0 == is_team_0
+        }) || events
+            .goal_events
+            .iter()
+            .any(|event| match event.player.as_ref() {
+                Some(scorer) => scorer == player,
+                None => event.scoring_team_is_team_0 == is_team_0,
+            })
+    }
+
+    fn clear_disqualified_pending_center(&mut self, events: &FrameEventsState) {
+        let should_clear = self.pending_touch.as_ref().is_some_and(|pending| {
+            Self::player_has_disqualifying_event(events, &pending.player, pending.is_team_0)
+        });
+        if should_clear {
+            self.pending_touch = None;
+        }
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         touch_state: &TouchState,
+        frame_events: &FrameEventsState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.begin_sample(frame);
@@ -272,6 +300,7 @@ impl CenterCalculator {
             return Ok(());
         };
 
+        self.clear_disqualified_pending_center(frame_events);
         self.update_pending_center(frame, ball_position);
 
         for touch in &touch_state.touch_events {
@@ -279,6 +308,11 @@ impl CenterCalculator {
                 self.pending_touch = None;
                 continue;
             };
+
+            if Self::player_has_disqualifying_event(frame_events, &player, touch.team_is_team_0) {
+                self.pending_touch = None;
+                continue;
+            }
 
             self.pending_touch = Some(PendingCenterTouch {
                 player,

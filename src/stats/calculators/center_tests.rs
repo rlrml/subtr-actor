@@ -45,11 +45,59 @@ fn touch(
     }
 }
 
+fn shot_event(
+    frame_number: usize,
+    time: f32,
+    player: PlayerId,
+    is_team_0: bool,
+) -> PlayerStatEvent {
+    PlayerStatEvent {
+        time,
+        frame: frame_number,
+        player,
+        is_team_0,
+        kind: PlayerStatEventKind::Shot,
+        shot: None,
+    }
+}
+
+fn goal_event(
+    frame_number: usize,
+    time: f32,
+    player: Option<PlayerId>,
+    is_team_0: bool,
+) -> GoalEvent {
+    GoalEvent {
+        time,
+        frame: frame_number,
+        scoring_team_is_team_0: is_team_0,
+        player,
+        team_zero_score: None,
+        team_one_score: None,
+    }
+}
+
 fn update(
     calculator: &mut CenterCalculator,
     frame: FrameInfo,
     ball: BallFrameState,
     touch_events: Vec<TouchEvent>,
+) {
+    update_with_events(
+        calculator,
+        frame,
+        ball,
+        touch_events,
+        FrameEventsState::default(),
+    );
+}
+
+fn update_with_events(
+    calculator: &mut CenterCalculator,
+    frame: FrameInfo,
+    ball: BallFrameState,
+    touch_events: Vec<TouchEvent>,
+    frame_events: FrameEventsState,
 ) {
     calculator
         .update(
@@ -59,6 +107,7 @@ fn update(
                 touch_events,
                 ..TouchState::default()
             },
+            &frame_events,
             true,
         )
         .unwrap();
@@ -106,6 +155,110 @@ fn ignores_ball_that_stays_wide() {
         frame(20, 1.8),
         ball(glam::Vec3::new(2100.0, 3100.0, BALL_RADIUS_Z)),
         vec![],
+    );
+
+    assert!(calculator.events().is_empty());
+    assert_eq!(calculator.team_zero_stats().count, 0);
+}
+
+#[test]
+fn ignores_touch_reported_as_shot() {
+    let player = PlayerId::Steam(1);
+    let mut calculator = CenterCalculator::new();
+
+    update_with_events(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![touch(10, 1.0, Some(player.clone()), true)],
+        FrameEventsState {
+            player_stat_events: vec![shot_event(10, 1.0, player, true)],
+            ..FrameEventsState::default()
+        },
+    );
+    update(
+        &mut calculator,
+        frame(20, 1.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+    );
+
+    assert!(calculator.events().is_empty());
+    assert_eq!(calculator.team_zero_stats().count, 0);
+}
+
+#[test]
+fn pending_center_is_cancelled_by_later_shot_event() {
+    let player = PlayerId::Steam(1);
+    let mut calculator = CenterCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![touch(10, 1.0, Some(player.clone()), true)],
+    );
+    update_with_events(
+        &mut calculator,
+        frame(20, 1.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+        FrameEventsState {
+            player_stat_events: vec![shot_event(20, 1.8, player, true)],
+            ..FrameEventsState::default()
+        },
+    );
+
+    assert!(calculator.events().is_empty());
+    assert_eq!(calculator.team_zero_stats().count, 0);
+}
+
+#[test]
+fn pending_center_is_cancelled_by_goal_event() {
+    let player = PlayerId::Steam(1);
+    let mut calculator = CenterCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![touch(10, 1.0, Some(player.clone()), true)],
+    );
+    update_with_events(
+        &mut calculator,
+        frame(20, 1.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+        FrameEventsState {
+            goal_events: vec![goal_event(20, 1.8, Some(player), true)],
+            ..FrameEventsState::default()
+        },
+    );
+
+    assert!(calculator.events().is_empty());
+    assert_eq!(calculator.team_zero_stats().count, 0);
+}
+
+#[test]
+fn pending_center_is_cancelled_by_own_goal_event() {
+    let player = PlayerId::Steam(1);
+    let mut calculator = CenterCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![touch(10, 1.0, Some(player.clone()), true)],
+    );
+    update_with_events(
+        &mut calculator,
+        frame(20, 1.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+        FrameEventsState {
+            goal_events: vec![goal_event(20, 1.8, Some(player), false)],
+            ..FrameEventsState::default()
+        },
     );
 
     assert!(calculator.events().is_empty());
