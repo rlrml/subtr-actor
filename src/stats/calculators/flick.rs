@@ -1,9 +1,9 @@
 use super::*;
 
 const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
+const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
-const FLICK_MIN_SETUP_SECONDS: f32 = 0.18;
-const FLICK_MIN_SETUP_TOUCHES: u32 = 2;
+const FLICK_MIN_SETUP_SECONDS: f32 = 0.30;
 const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 450.0;
 const FLICK_HIGH_CONFIDENCE: f32 = 0.80;
 const FLICK_MIN_CONFIDENCE: f32 = 0.55;
@@ -288,7 +288,7 @@ impl FlickCalculator {
     }
 
     fn setup_qualifies(setup: &FlickSetupSummary) -> bool {
-        setup.duration >= FLICK_MIN_SETUP_SECONDS || setup.touch_count >= FLICK_MIN_SETUP_TOUCHES
+        setup.duration >= FLICK_MIN_SETUP_SECONDS
     }
 
     fn store_recent_setup(&mut self, player_id: PlayerId, setup: FlickSetupSummary) {
@@ -399,6 +399,9 @@ impl FlickCalculator {
             if !Self::setup_qualifies(&setup) {
                 continue;
             }
+            if frame.time - setup.last_time > FLICK_MAX_CONTROL_TO_DODGE_SECONDS {
+                continue;
+            }
 
             self.recent_dodge_starts.insert(
                 player.player_id.clone(),
@@ -457,8 +460,6 @@ impl FlickCalculator {
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
         let setup_duration_score =
             Self::normalize_score(setup.duration, FLICK_MIN_SETUP_SECONDS, 0.75);
-        let touch_score =
-            (setup.touch_count as f32 / FLICK_MIN_SETUP_TOUCHES as f32).clamp(0.0, 1.0);
         let horizontal_control_score =
             1.0 - (setup.average_horizontal_gap / FLICK_MAX_CONTROL_HORIZONTAL_GAP).clamp(0.0, 1.0);
         let vertical_control_score = 1.0
@@ -474,7 +475,7 @@ impl FlickCalculator {
         let vertical_score = Self::normalize_score(vertical_impulse, 100.0, 750.0);
 
         let confidence = 0.16 * timing_score
-            + 0.19 * setup_duration_score.max(touch_score)
+            + 0.19 * setup_duration_score
             + 0.12 * horizontal_control_score
             + 0.10 * vertical_control_score
             + 0.22 * impulse_score

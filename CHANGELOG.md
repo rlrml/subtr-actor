@@ -10,6 +10,9 @@ README, or refactor-only commit.
   and stats-player generated bindings.
 - Track first-man stint counts plus average and longest stint duration in
   rotation stats.
+- Require normal flicks to have sustained near/on-car setup immediately before
+  the dodge, and label flip resets only when the acquired reset is followed by a
+  dodge-assisted ball hit.
 
 ## v0.10.0 - 2026-05-26
 

@@ -701,7 +701,7 @@ impl FlipResetGoalCalculator {
     ) -> SubtrActorResult<()> {
         self.events = self.tag_goals(
             match_stats.goal_context_events(),
-            dodge_reset.on_ball_events(),
+            dodge_reset.confirmed_flip_reset_events(),
         );
         Ok(())
     }
@@ -709,7 +709,7 @@ impl FlipResetGoalCalculator {
     fn tag_goals(
         &self,
         goals: &[GoalContextEvent],
-        events: &[DodgeRefreshedEvent],
+        events: &[ConfirmedFlipResetEvent],
     ) -> Vec<GoalTagEvent> {
         tag_goals_by_point_mechanic_event(
             goals,
@@ -875,7 +875,7 @@ impl GoalMechanicPointEvent for DoubleTapEvent {
     }
 }
 
-impl GoalMechanicPointEvent for DodgeRefreshedEvent {
+impl GoalMechanicPointEvent for ConfirmedFlipResetEvent {
     fn event_time(&self) -> f32 {
         self.time
     }

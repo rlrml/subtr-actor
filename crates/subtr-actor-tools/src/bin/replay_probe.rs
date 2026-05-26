@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use clap::{Parser, ValueEnum};
-use subtr_actor::{evaluate_replay_plausibility, Collector, PlayerFrame, ReplayDataCollector};
-use subtr_actor::{ProcessorView, TimeAdvance};
+use subtr_actor::{
+    evaluate_replay_plausibility, Collector, PlayerFrame, ProcessorView, ReplayDataCollector,
+    StatsTimelineCollector, TimeAdvance,
+};
 
 const DEFAULT_REPLAY_PATH: &str =
     "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
@@ -551,15 +553,18 @@ enum ProbeCommand {
     LegacyRotation,
     Demolition,
     VectorRanges,
+    Mechanics,
 }
 
 impl ProbeCommand {
     fn default_path(self) -> &'static str {
         match self {
             Self::Demolition => DEFAULT_DEMOLITION_REPLAY_PATH,
-            Self::Metadata | Self::Plausibility | Self::LegacyRotation | Self::VectorRanges => {
-                DEFAULT_REPLAY_PATH
-            }
+            Self::Metadata
+            | Self::Plausibility
+            | Self::LegacyRotation
+            | Self::VectorRanges
+            | Self::Mechanics => DEFAULT_REPLAY_PATH,
         }
     }
 }
@@ -587,6 +592,7 @@ fn main() {
         ProbeCommand::LegacyRotation => print_legacy_rotation(&path),
         ProbeCommand::Demolition => print_demolition(&path),
         ProbeCommand::VectorRanges => print_vector_ranges(&path),
+        ProbeCommand::Mechanics => print_mechanics(&path),
     }
 }
 
@@ -639,6 +645,33 @@ fn print_plausibility(path: &str) {
     let replay_data = collect_replay_data(path);
     let report = evaluate_replay_plausibility(&replay_data);
     println!("{report:#?}");
+}
+
+fn print_mechanics(path: &str) {
+    let replay = parse_replay(path);
+    let timeline = StatsTimelineCollector::new()
+        .get_legacy_replay_stats_timeline(&replay)
+        .unwrap_or_else(|error| panic!("failed to collect stats timeline for {path}: {error:?}"));
+    for event in &timeline.events.flick {
+        println!(
+            "flick {}",
+            serde_json::to_string(event).expect("flick event should serialize")
+        );
+    }
+    for event in &timeline.events.dodge_reset {
+        println!(
+            "dodge_reset {}",
+            serde_json::to_string(event).expect("dodge-reset event should serialize")
+        );
+    }
+    for event in &timeline.events.mechanics {
+        if event.kind == "flip_reset" || event.kind == "flick" {
+            println!(
+                "mechanic {}",
+                serde_json::to_string(event).expect("mechanic event should serialize")
+            );
+        }
+    }
 }
 
 fn print_legacy_rotation(path: &str) {

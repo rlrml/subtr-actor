@@ -164,15 +164,68 @@ fn rejects_dodge_touch_without_controlled_setup() {
 }
 
 #[test]
-fn short_setup_with_multiple_control_touches_can_count() {
+fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = FlickCalculator::new();
     let live_play = live_play();
 
-    for (frame_number, time) in [(1, 0.1), (2, 0.2)] {
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
         calculator
             .update(
                 &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(frame_number == 3),
+                &touch_state(vec![TouchEvent {
+                    time,
+                    frame: frame_number,
+                    team_is_team_0: true,
+                    player: Some(player_id.clone()),
+                    closest_approach_distance: Some(0.0),
+                }]),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(vec![TouchEvent {
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                closest_approach_distance: Some(0.0),
+            }]),
+            &live_play,
+        )
+        .unwrap();
+
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.setup_touch_count, 3);
+    assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
+}
+
+#[test]
+fn rejects_tiny_multi_touch_setup() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.02), (2, 0.04)] {
+        calculator
+            .update(
+                &FrameInfo {
+                    frame_number,
+                    time,
+                    dt: 0.02,
+                    seconds_remaining: None,
+                },
                 &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
                 &players(frame_number == 2),
                 &touch_state(vec![TouchEvent {
@@ -189,14 +242,19 @@ fn short_setup_with_multiple_control_touches_can_count() {
 
     calculator
         .update(
-            &frame(3, 0.3),
+            &FrameInfo {
+                frame_number: 3,
+                time: 0.06,
+                dt: 0.02,
+                seconds_remaining: None,
+            },
             &ball(
                 glam::Vec3::new(180.0, 0.0, 160.0),
                 glam::Vec3::new(1350.0, 0.0, 520.0),
             ),
             &players(true),
             &touch_state(vec![TouchEvent {
-                time: 0.3,
+                time: 0.06,
                 frame: 3,
                 team_is_team_0: true,
                 player: Some(player_id.clone()),
@@ -206,7 +264,56 @@ fn short_setup_with_multiple_control_touches_can_count() {
         )
         .unwrap();
 
-    let event = calculator.events().first().unwrap();
-    assert_eq!(event.setup_touch_count, 2);
-    assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().get(&player_id).is_none());
+}
+
+#[test]
+fn rejects_dodge_after_ball_has_left_car() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(false),
+                &touch_state(Vec::new()),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(glam::Vec3::new(600.0, 0.0, 112.0), glam::Vec3::ZERO),
+            &players(true),
+            &touch_state(Vec::new()),
+            &live_play,
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(5, 0.5),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(vec![TouchEvent {
+                time: 0.5,
+                frame: 5,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                closest_approach_distance: Some(0.0),
+            }]),
+            &live_play,
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().get(&player_id).is_none());
 }

@@ -191,13 +191,20 @@ fn air_dribble_event(
     }
 }
 
-fn dodge_refreshed_event(time: f32, frame: usize, player: PlayerId) -> DodgeRefreshedEvent {
-    DodgeRefreshedEvent {
+fn confirmed_flip_reset_event(
+    time: f32,
+    frame: usize,
+    player: PlayerId,
+) -> ConfirmedFlipResetEvent {
+    ConfirmedFlipResetEvent {
         time,
         frame,
+        reset_time: time - 0.5,
+        reset_frame: frame.saturating_sub(5),
         player,
         is_team_0: true,
         counter_value: 1,
+        time_since_reset: 0.5,
     }
 }
 
@@ -514,8 +521,10 @@ fn air_dribble_goal_rejects_ground_carries() {
 #[test]
 fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
     let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
-    let events = FlipResetGoalCalculator::new()
-        .tag_goals(&[goal], &[dodge_refreshed_event(7.0, 70, player_id(1))]);
+    let events = FlipResetGoalCalculator::new().tag_goals(
+        &[goal],
+        &[confirmed_flip_reset_event(7.0, 70, player_id(1))],
+    );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));

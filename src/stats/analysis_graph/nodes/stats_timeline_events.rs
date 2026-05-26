@@ -440,7 +440,7 @@ fn build_mechanic_events(
         ));
     }
 
-    for (index, event) in dodge_reset.on_ball_events().iter().enumerate() {
+    for (index, event) in dodge_reset.confirmed_flip_reset_events().iter().enumerate() {
         events.push(moment_mechanic_event(
             MECHANIC_FLIP_RESET,
             index,
