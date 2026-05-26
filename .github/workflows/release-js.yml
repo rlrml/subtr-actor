@@ -18,9 +18,10 @@ jobs:
         run: python3 scripts/check_release_versions.py
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
+          rustup default stable
 
       - name: Check lockfile
         run: cargo metadata --locked --format-version 1 > /dev/null
