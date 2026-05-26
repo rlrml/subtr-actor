@@ -82,6 +82,9 @@ $PluginText = Read-ArtifactText $PluginDll
 $PluginNeedles = @(
     "subtr_actor_verify_graph",
     "subtr_actor_self_test_graph",
+    "subtr_actor_replay_annotations_enabled",
+    "subtr-actor REPLAY",
+    "loaded {} replay annotations from normal replay processor",
     "graph self-test fed every required event family",
     "graph self-test derived active_demos from demolish event",
     "graph self-test writing synthetic graph dump",
@@ -160,6 +163,8 @@ $RustNeedles = @(
     "subtr_actor_bakkesmod_write_analysis_node_json",
     "subtr_actor_bakkesmod_analysis_node_names_json_len",
     "subtr_actor_bakkesmod_write_analysis_node_names_json",
+    "subtr_actor_bakkesmod_replay_annotations_create",
+    "subtr_actor_bakkesmod_poll_replay_annotations",
     "callable_analysis_node_names",
     "builtin_analysis_node_names",
     "analysis_nodes",

@@ -135,6 +135,10 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
     ("subtr_actor_bakkesmod_drain_events", "drainEvents"),
     ("subtr_actor_bakkesmod_drain_team_events", "drainTeamEvents"),
     ("subtr_actor_bakkesmod_drain_goal_context_events", "drainGoalContextEvents"),
+    ("subtr_actor_bakkesmod_replay_annotations_create", "replayAnnotationsCreate"),
+    ("subtr_actor_bakkesmod_replay_annotations_destroy", "replayAnnotationsDestroy"),
+    ("subtr_actor_bakkesmod_replay_annotation_count", "replayAnnotationCount"),
+    ("subtr_actor_bakkesmod_poll_replay_annotations", "pollReplayAnnotations"),
 )
 
 

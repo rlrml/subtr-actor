@@ -6,7 +6,7 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 
-use boxcars::{Quaternion, RemoteId, RigidBody, Vector3f};
+use boxcars::{ParserBuilder, Quaternion, RemoteId, RigidBody, Vector3f};
 use subtr_actor::{
     boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
@@ -23,8 +23,9 @@ use subtr_actor::{
     GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
     PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
     ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    RushEvent, ShotEventMetadata, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
-    TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator, WhiffEvent,
+    RushEvent, ShotEventMetadata, StatsTimelineEventCollector, SubtrActorError,
+    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
+    TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -344,6 +345,13 @@ pub struct SaEngine {
     pending_events: Vec<SaMechanicEvent>,
     pending_team_events: Vec<SaTeamEvent>,
     pending_goal_context_events: Vec<SaGoalContextEvent>,
+}
+
+pub struct SaReplayAnnotations {
+    events: Vec<SaMechanicEvent>,
+    cursor: usize,
+    last_poll_time: f32,
+    initialized: bool,
 }
 
 const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
@@ -2168,6 +2176,288 @@ fn push_goal_context_events_from_timeline(
     }
 }
 
+fn replay_player_index_map(replay_meta: &ReplayMeta) -> HashMap<RemoteId, u32> {
+    replay_meta
+        .player_order()
+        .enumerate()
+        .map(|(index, player)| (player.remote_id.clone(), index as u32))
+        .collect()
+}
+
+fn replay_player_index(index_map: &HashMap<RemoteId, u32>, id: &RemoteId) -> u32 {
+    index_map
+        .get(id)
+        .copied()
+        .unwrap_or_else(|| player_index(id))
+}
+
+fn push_replay_annotation(
+    events: &mut Vec<SaMechanicEvent>,
+    emitted_ids: &mut HashSet<String>,
+    index_map: &HashMap<RemoteId, u32>,
+    event: PendingGraphEvent,
+) {
+    if !emitted_ids.insert(event.id) {
+        return;
+    }
+    events.push(SaMechanicEvent {
+        kind: event.kind,
+        player_index: replay_player_index(index_map, &event.player_id),
+        is_team_0: event.is_team_0 as u8,
+        frame_number: event.frame_number as u64,
+        time: event.time,
+        confidence: event.confidence,
+    });
+}
+
+fn replay_annotations_from_timeline(
+    replay_meta: &ReplayMeta,
+    timeline: &ReplayStatsTimelineEvents,
+) -> Vec<SaMechanicEvent> {
+    let index_map = replay_player_index_map(replay_meta);
+    let mut events = Vec::new();
+    let mut emitted_ids = HashSet::new();
+
+    for event in &timeline.mechanics {
+        let Some(kind) = mechanic_kind(&event.kind) else {
+            continue;
+        };
+        let (frame_number, time) = mechanic_start(event);
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: event.id.clone(),
+                kind,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                frame_number,
+                time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for (index, event) in timeline.backboard.iter().enumerate() {
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_backboard:{}:{}:{index}",
+                    event.frame,
+                    replay_player_index(&index_map, &event.player)
+                ),
+                kind: SaMechanicKind::Backboard,
+                player_id: event.player.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for (index, event) in timeline.whiff.iter().enumerate() {
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_whiff:{}:{}:{index}",
+                    event.frame,
+                    replay_player_index(&index_map, &event.player)
+                ),
+                kind: SaMechanicKind::Whiff,
+                player_id: event.player.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for (index, event) in timeline.boost_pickups.iter().enumerate() {
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_boost_pickup:{}:{}:{:?}:{:?}:{index}",
+                    event.frame,
+                    replay_player_index(&index_map, &event.player_id),
+                    event.reported_frame,
+                    event.inferred_frame
+                ),
+                kind: SaMechanicKind::BoostPickup,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for (index, event) in timeline.bump.iter().enumerate() {
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_bump:{}:{}:{}:{index}",
+                    event.frame,
+                    replay_player_index(&index_map, &event.initiator),
+                    replay_player_index(&index_map, &event.victim)
+                ),
+                kind: SaMechanicKind::Bump,
+                player_id: event.initiator.clone(),
+                is_team_0: event.initiator_is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: event.confidence,
+            },
+        );
+    }
+
+    let mut occurrence_by_key = HashMap::new();
+    for event in &timeline.timeline {
+        let (Some(player_id), Some(is_team_0)) = (&event.player_id, event.is_team_0) else {
+            continue;
+        };
+        let frame_number = event.frame.unwrap_or(0);
+        let event_key = format!(
+            "replay_timeline:{:?}:{}:{}:{}:{}",
+            event.kind,
+            event.time.to_bits(),
+            frame_number,
+            replay_player_index(&index_map, player_id),
+            is_team_0 as u8
+        );
+        let occurrence = occurrence_by_key.entry(event_key.clone()).or_insert(0);
+        let id = format!("{event_key}:{occurrence}");
+        *occurrence += 1;
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id,
+                kind: timeline_event_kind(event.kind),
+                player_id: player_id.clone(),
+                is_team_0,
+                frame_number,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for event in &timeline.core_player {
+        for (kind, count) in [
+            (SaMechanicKind::Shot, event.delta.shots),
+            (SaMechanicKind::Save, event.delta.saves),
+            (SaMechanicKind::Assist, event.delta.assists),
+        ] {
+            for index in 0..count.max(0) {
+                push_replay_annotation(
+                    &mut events,
+                    &mut emitted_ids,
+                    &index_map,
+                    PendingGraphEvent {
+                        id: format!(
+                            "replay_core_player:{:?}:{}:{}:{}",
+                            kind,
+                            event.frame,
+                            replay_player_index(&index_map, &event.player),
+                            index
+                        ),
+                        kind,
+                        player_id: event.player.clone(),
+                        is_team_0: event.is_team_0,
+                        frame_number: event.frame,
+                        time: event.time,
+                        confidence: 1.0,
+                    },
+                );
+            }
+        }
+    }
+
+    for (index, event) in timeline.fifty_fifty.iter().enumerate() {
+        let Some(winning_team_is_team_0) = event.winning_team_is_team_0 else {
+            continue;
+        };
+        let Some(player_id) = (if winning_team_is_team_0 {
+            event.team_zero_player.as_ref()
+        } else {
+            event.team_one_player.as_ref()
+        }) else {
+            continue;
+        };
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_fifty_fifty:{}:{}:{}:{index}",
+                    event.start_frame,
+                    event.resolve_frame,
+                    replay_player_index(&index_map, player_id)
+                ),
+                kind: SaMechanicKind::FiftyFifty,
+                player_id: player_id.clone(),
+                is_team_0: winning_team_is_team_0,
+                frame_number: event.resolve_frame,
+                time: event.resolve_time,
+                confidence: 1.0,
+            },
+        );
+    }
+
+    for event in &timeline.goal_tags {
+        let Some(scorer) = event.scorer.as_ref() else {
+            continue;
+        };
+        push_replay_annotation(
+            &mut events,
+            &mut emitted_ids,
+            &index_map,
+            PendingGraphEvent {
+                id: format!(
+                    "replay_goal_tag:{}:{}:{:?}:{}",
+                    event.goal_index,
+                    event.frame,
+                    event.kind,
+                    replay_player_index(&index_map, scorer)
+                ),
+                kind: goal_tag_kind(event.kind),
+                player_id: scorer.clone(),
+                is_team_0: event.scoring_team_is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: event.confidence,
+            },
+        );
+    }
+
+    events.sort_by(|left, right| {
+        left.time
+            .total_cmp(&right.time)
+            .then_with(|| left.frame_number.cmp(&right.frame_number))
+            .then_with(|| (left.kind as u32).cmp(&(right.kind as u32)))
+            .then_with(|| left.player_index.cmp(&right.player_index))
+    });
+    events
+}
+
 fn push_drainable_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -2468,6 +2758,127 @@ fn refresh_timeline_graph_state(engine: &mut SaEngine) {
 #[no_mangle]
 pub extern "C" fn subtr_actor_bakkesmod_engine_create() -> *mut SaEngine {
     Box::into_raw(Box::new(SaEngine::default()))
+}
+
+fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplayAnnotations> {
+    let path = path.to_str().map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+            "invalid replay path utf-8: {error}"
+        )))
+    })?;
+    let bytes = std::fs::read(path).map_err(|error| {
+        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+            "could not read replay file {path}: {error}"
+        )))
+    })?;
+    let replay = ParserBuilder::new(&bytes)
+        .must_parse_network_data()
+        .on_error_check_crc()
+        .parse()
+        .map_err(|error| {
+            SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
+                "could not parse replay file {path}: {error}"
+            )))
+        })?;
+    let timeline =
+        StatsTimelineEventCollector::new().get_replay_stats_timeline_scaffold(&replay)?;
+    let events = replay_annotations_from_timeline(&timeline.replay_meta, &timeline.events);
+    Ok(SaReplayAnnotations {
+        events,
+        cursor: 0,
+        last_poll_time: 0.0,
+        initialized: false,
+    })
+}
+
+/// Parses a replay file through the normal replay processor and precomputes
+/// time-indexed annotation events for replay playback overlays.
+///
+/// Returns null on failure. The returned handle must be destroyed with
+/// `subtr_actor_bakkesmod_replay_annotations_destroy`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_create(
+    replay_path: *const c_char,
+) -> *mut SaReplayAnnotations {
+    if replay_path.is_null() {
+        return ptr::null_mut();
+    }
+    let replay_path = unsafe { CStr::from_ptr(replay_path) };
+    match build_replay_annotations(replay_path) {
+        Ok(annotations) => Box::into_raw(Box::new(annotations)),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Destroys a replay annotation handle allocated by
+/// `subtr_actor_bakkesmod_replay_annotations_create`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_destroy(
+    annotations: *mut SaReplayAnnotations,
+) {
+    if !annotations.is_null() {
+        drop(unsafe { Box::from_raw(annotations) });
+    }
+}
+
+/// Returns the number of precomputed replay annotation events.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
+    annotations: *const SaReplayAnnotations,
+) -> usize {
+    unsafe { annotations.as_ref() }
+        .map(|annotations| annotations.events.len())
+        .unwrap_or(0)
+}
+
+/// Drains annotation events whose normal replay-processing timestamp has been
+/// reached by the supplied replay playback time.
+///
+/// The cursor resets automatically after seeking backwards. Events are copied
+/// into `out_events` and the return value is the number of copied events.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
+    annotations: *mut SaReplayAnnotations,
+    replay_time: f32,
+    out_events: *mut SaMechanicEvent,
+    max_events: usize,
+) -> usize {
+    let Some(annotations) = (unsafe { annotations.as_mut() }) else {
+        return 0;
+    };
+    if max_events == 0 || out_events.is_null() {
+        return 0;
+    }
+
+    const SEEK_BACK_RESET_SECONDS: f32 = 0.25;
+    const LOOKBACK_SECONDS: f32 = 0.20;
+    const LOOKAHEAD_SECONDS: f32 = 0.05;
+
+    if !annotations.initialized
+        || replay_time + SEEK_BACK_RESET_SECONDS < annotations.last_poll_time
+    {
+        let restart_time = (replay_time - LOOKBACK_SECONDS).max(0.0);
+        annotations.cursor = annotations
+            .events
+            .partition_point(|event| event.time < restart_time);
+        annotations.initialized = true;
+    }
+    annotations.last_poll_time = replay_time;
+
+    let max_time = replay_time + LOOKAHEAD_SECONDS;
+    let mut copied = 0;
+    while annotations.cursor < annotations.events.len() && copied < max_events {
+        let event = annotations.events[annotations.cursor];
+        if event.time > max_time {
+            break;
+        }
+        unsafe {
+            out_events.add(copied).write(event);
+        }
+        annotations.cursor += 1;
+        copied += 1;
+    }
+    copied
 }
 
 #[no_mangle]
@@ -3247,6 +3658,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
+    use std::ffi::CString;
     use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
@@ -3259,6 +3671,14 @@ mod tests {
             .join("subtr_actor_bakkesmod.h");
         std::fs::read_to_string(&header_path)
             .unwrap_or_else(|_| panic!("failed to read {}", header_path.display()))
+    }
+
+    fn real_replay_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay")
+            .canonicalize()
+            .expect("real replay fixture should resolve")
     }
 
     fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
@@ -3608,6 +4028,62 @@ mod tests {
             header_exported_function_names(),
             rust_exported_function_names()
         );
+    }
+
+    #[test]
+    fn replay_annotations_parse_real_replay_and_poll_by_time() {
+        let replay_path = CString::new(real_replay_path().to_string_lossy().as_bytes())
+            .expect("fixture path should not contain interior nulls");
+        let annotations =
+            unsafe { subtr_actor_bakkesmod_replay_annotations_create(replay_path.as_ptr()) };
+        assert!(!annotations.is_null());
+
+        let annotation_count =
+            unsafe { subtr_actor_bakkesmod_replay_annotation_count(annotations) };
+        assert!(annotation_count > 0);
+        let final_time = unsafe { (*annotations).events.last().expect("events").time + 1.0 };
+
+        let mut events = vec![
+            SaMechanicEvent {
+                kind: SaMechanicKind::SpeedFlip,
+                player_index: 0,
+                is_team_0: 0,
+                frame_number: 0,
+                time: 0.0,
+                confidence: 0.0,
+            };
+            annotation_count
+        ];
+        let initial_drained = unsafe {
+            subtr_actor_bakkesmod_poll_replay_annotations(
+                annotations,
+                0.0,
+                events.as_mut_ptr(),
+                events.len(),
+            )
+        };
+        let drained = initial_drained
+            + unsafe {
+                subtr_actor_bakkesmod_poll_replay_annotations(
+                    annotations,
+                    final_time,
+                    events.as_mut_ptr().add(initial_drained),
+                    events.len() - initial_drained,
+                )
+            };
+        assert_eq!(drained, annotation_count);
+        assert!(events[..drained]
+            .windows(2)
+            .all(|pair| pair[0].time <= pair[1].time));
+
+        unsafe { subtr_actor_bakkesmod_replay_annotations_destroy(annotations) };
+    }
+
+    #[test]
+    fn replay_annotations_reject_null_path() {
+        let annotations =
+            unsafe { subtr_actor_bakkesmod_replay_annotations_create(std::ptr::null()) };
+        assert!(annotations.is_null());
     }
 
     #[test]

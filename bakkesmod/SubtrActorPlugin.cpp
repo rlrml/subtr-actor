@@ -1030,6 +1030,15 @@ void SubtrActorPlugin::onLoad() {
       true,
       1);
   cvarManager->registerCvar(
+      "subtr_actor_replay_annotations_enabled",
+      "1",
+      "Draw annotations from normal replay processing while watching Rocket League replays.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
       "subtr_actor_status_overlay_enabled",
       "1",
       "Draw subtr-actor live processing status.",
@@ -1283,6 +1292,14 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_team_events"));
   drainGoalContextEvents = reinterpret_cast<DrainGoalContextEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_goal_context_events"));
+  replayAnnotationsCreate = reinterpret_cast<ReplayAnnotationsCreate>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotations_create"));
+  replayAnnotationsDestroy = reinterpret_cast<ReplayAnnotationsDestroy>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotations_destroy"));
+  replayAnnotationCount = reinterpret_cast<ReplayAnnotationCount>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_count"));
+  pollReplayAnnotations = reinterpret_cast<PollReplayAnnotations>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_poll_replay_annotations"));
 
   if (!engineCreate || !engineDestroy || !engineReset || !engineFinish || !processFrame ||
       !eventsJsonLen || !writeEventsJson || !frameJsonLen || !writeFrameJson ||
@@ -1292,7 +1309,9 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !writeStatsModuleConfigJson || !graphOutputJsonLen || !writeGraphOutputJson ||
       !analysisNodeJsonLen || !writeAnalysisNodeJson || !analysisNodeNamesJsonLen ||
       !writeAnalysisNodeNamesJson || !graphInfoJsonLen || !writeGraphInfoJson ||
-      !drainEvents || !drainTeamEvents || !drainGoalContextEvents) {
+      !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
+      !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
+      !pollReplayAnnotations) {
     unloadRustLibrary();
     return false;
   }
@@ -1302,6 +1321,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
 }
 
 void SubtrActorPlugin::unloadRustLibrary() {
+  resetReplayAnnotations();
   if (engine && engineFinish) {
     finishAndDrainPendingEvents("plugin unload");
   }
@@ -1344,6 +1364,10 @@ void SubtrActorPlugin::unloadRustLibrary() {
   drainEvents = nullptr;
   drainTeamEvents = nullptr;
   drainGoalContextEvents = nullptr;
+  replayAnnotationsCreate = nullptr;
+  replayAnnotationsDestroy = nullptr;
+  replayAnnotationCount = nullptr;
+  pollReplayAnnotations = nullptr;
 }
 
 void SubtrActorPlugin::scheduleLiveTick(float delaySeconds) {
@@ -1355,7 +1379,9 @@ void SubtrActorPlugin::scheduleLiveTick(float delaySeconds) {
         }
 
         tick("");
-        const float nextDelay = liveProcessingEnabled() ? sampleIntervalSeconds() : 0.25f;
+        const bool replayPolling = replayAnnotationsEnabled() && gameWrapper->IsInReplay();
+        const float nextDelay =
+            liveProcessingEnabled() ? sampleIntervalSeconds() : replayPolling ? 0.05f : 0.25f;
         scheduleLiveTick(nextDelay);
       },
       delaySeconds);
@@ -1364,6 +1390,11 @@ void SubtrActorPlugin::scheduleLiveTick(float delaySeconds) {
 bool SubtrActorPlugin::liveProcessingEnabled() {
   auto enabledCvar = cvarManager->getCvar("subtr_actor_enabled");
   return static_cast<bool>(enabledCvar) && enabledCvar.getBoolValue();
+}
+
+bool SubtrActorPlugin::replayAnnotationsEnabled() {
+  auto enabledCvar = cvarManager->getCvar("subtr_actor_replay_annotations_enabled");
+  return !static_cast<bool>(enabledCvar) || enabledCvar.getBoolValue();
 }
 
 float SubtrActorPlugin::sampleIntervalSeconds() {
@@ -1419,10 +1450,91 @@ void SubtrActorPlugin::resetProfileTiming() {
   profileDrainMs = 0.0;
 }
 
+void SubtrActorPlugin::resetReplayAnnotations() {
+  if (replayAnnotations && replayAnnotationsDestroy) {
+    replayAnnotationsDestroy(replayAnnotations);
+  }
+  replayAnnotations = nullptr;
+  replayAnnotationPath.clear();
+  replayAnnotationLoadFailed = false;
+}
+
+std::optional<std::string> SubtrActorPlugin::currentReplayPath(ReplayServerWrapper replayServer) {
+  if (replayServer.IsNull()) {
+    return std::nullopt;
+  }
+  ReplayWrapper replay = replayServer.GetReplay();
+  if (replay.IsNull()) {
+    return std::nullopt;
+  }
+  std::string replayPath = replay.GetFilePath().ToString();
+  if (replayPath.empty()) {
+    return std::nullopt;
+  }
+  return replayPath;
+}
+
+void SubtrActorPlugin::tickReplayAnnotations() {
+  if (!replayAnnotationsEnabled() || !replayAnnotationsCreate || !pollReplayAnnotations) {
+    resetReplayAnnotations();
+    return;
+  }
+  if (!gameWrapper->IsInReplay()) {
+    resetReplayAnnotations();
+    return;
+  }
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  if (replayServer.IsNull()) {
+    return;
+  }
+  auto replayPath = currentReplayPath(replayServer);
+  if (!replayPath) {
+    return;
+  }
+
+  if (!replayAnnotations && replayAnnotationLoadFailed && replayAnnotationPath == *replayPath) {
+    return;
+  }
+  if (replayAnnotationPath != *replayPath) {
+    resetReplayAnnotations();
+  }
+  if (!replayAnnotations) {
+    replayAnnotationPath = *replayPath;
+    replayAnnotations = replayAnnotationsCreate(replayAnnotationPath.c_str());
+    if (!replayAnnotations) {
+      if (!replayAnnotationLoadFailed) {
+        cvarManager->log(
+            std::format("subtr-actor: failed to process replay annotations for {}", *replayPath));
+      }
+      replayAnnotationLoadFailed = true;
+      return;
+    }
+    replayAnnotationLoadFailed = false;
+    const size_t annotationCount =
+        replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
+    cvarManager->log(std::format(
+        "subtr-actor: loaded {} replay annotations from normal replay processor",
+        annotationCount));
+  }
+
+  std::array<SaMechanicEvent, 64> replayEvents{};
+  const size_t eventCount = pollReplayAnnotations(
+      replayAnnotations,
+      replayServer.GetReplayTimeElapsed(),
+      replayEvents.data(),
+      replayEvents.size());
+  for (size_t i = 0; i < eventCount; i += 1) {
+    pushEventMessage(replayEvents[i]);
+  }
+}
+
 void SubtrActorPlugin::tick(std::string) {
   if (!loaded || !engine) {
     return;
   }
+
+  tickReplayAnnotations();
 
   if (!liveProcessingEnabled()) {
     if (wasInGame && engineReset) {
@@ -3545,19 +3657,25 @@ void SubtrActorPlugin::render(CanvasWrapper canvas) {
 
   if (statusOverlayEnabled) {
     const bool processingEnabled = liveProcessingEnabled();
+    const bool replayAnnotationActive = replayAnnotationsEnabled() && replayAnnotations != nullptr;
     const bool inGame = gameWrapper->IsInGame();
     const float intervalMs = sampleIntervalSeconds() * 1000.0f;
     const std::string status =
-        !processingEnabled
-            ? "subtr-actor OFF"
-            : inGame ? std::format(
-                           "subtr-actor LIVE | frames={} | interval={:.0f}ms",
-                           frameNumber,
-                           intervalMs)
-                     : "subtr-actor ON | waiting for game";
+        replayAnnotationActive
+            ? std::format(
+                  "subtr-actor REPLAY | annotations={}",
+                  replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0)
+            : !processingEnabled
+                  ? "subtr-actor OFF"
+                  : inGame ? std::format(
+                                 "subtr-actor LIVE | frames={} | interval={:.0f}ms",
+                                 frameNumber,
+                                 intervalMs)
+                           : "subtr-actor ON | waiting for game";
     canvas.SetPosition(Vector2{64, 240});
-    canvas.SetColor(processingEnabled ? LinearColor{80, 255, 150, 255}
-                                      : LinearColor{180, 180, 180, 255});
+    canvas.SetColor((processingEnabled || replayAnnotationActive)
+                        ? LinearColor{80, 255, 150, 255}
+                        : LinearColor{180, 180, 180, 255});
     canvas.DrawString(status, 1.0f, 1.0f, true);
   }
 

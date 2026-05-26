@@ -25,6 +25,8 @@
 #include "bakkesmod/wrappers/GameObject/PriWrapper.h"
 #include "bakkesmod/wrappers/GameObject/TeamWrapper.h"
 #include "bakkesmod/wrappers/GameEvent/ServerWrapper.h"
+#include "bakkesmod/wrappers/GameEvent/ReplayWrapper.h"
+#include "bakkesmod/wrappers/ReplayServerWrapper.h"
 #include "bakkesmod/wrappers/canvaswrapper.h"
 #include "subtr_actor_bakkesmod.h"
 
@@ -68,6 +70,11 @@ private:
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
   using DrainTeamEvents = size_t (*)(SaEngine *, SaTeamEvent *, size_t);
   using DrainGoalContextEvents = size_t (*)(SaEngine *, SaGoalContextEvent *, size_t);
+  using ReplayAnnotationsCreate = SaReplayAnnotations *(*)(const char *);
+  using ReplayAnnotationsDestroy = void (*)(SaReplayAnnotations *);
+  using ReplayAnnotationCount = size_t (*)(const SaReplayAnnotations *);
+  using PollReplayAnnotations =
+      size_t (*)(SaReplayAnnotations *, float, SaMechanicEvent *, size_t);
 
   struct OverlayMessage {
     std::string text;
@@ -119,6 +126,10 @@ private:
   DrainEvents drainEvents = nullptr;
   DrainTeamEvents drainTeamEvents = nullptr;
   DrainGoalContextEvents drainGoalContextEvents = nullptr;
+  ReplayAnnotationsCreate replayAnnotationsCreate = nullptr;
+  ReplayAnnotationsDestroy replayAnnotationsDestroy = nullptr;
+  ReplayAnnotationCount replayAnnotationCount = nullptr;
+  PollReplayAnnotations pollReplayAnnotations = nullptr;
 
   uint64_t frameNumber = 0;
   uint64_t inputTickNumber = 0;
@@ -158,18 +169,25 @@ private:
   uint32_t nextPlayerIndex = 0;
   uint32_t nextBoostPadId = 1;
   std::deque<OverlayMessage> messages;
+  SaReplayAnnotations *replayAnnotations = nullptr;
+  std::string replayAnnotationPath;
+  bool replayAnnotationLoadFailed = false;
 
   bool loadRustLibrary();
   void unloadRustLibrary();
   void tick(std::string eventName);
   void scheduleLiveTick(float delaySeconds = 0.25f);
   bool liveProcessingEnabled();
+  bool replayAnnotationsEnabled();
   float sampleIntervalSeconds();
   bool profileTimingEnabled();
   uint64_t profileLogEvery();
   void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
   void resetProfileTiming();
   void render(CanvasWrapper canvas);
+  void tickReplayAnnotations();
+  void resetReplayAnnotations();
+  std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
   std::string readJsonBuffer(JsonLen len, WriteJson write);
   std::string readNamedJsonBuffer(
       NamedJsonLen len,

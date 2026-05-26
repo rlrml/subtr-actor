@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 typedef struct SaEngine SaEngine;
+typedef struct SaReplayAnnotations SaReplayAnnotations;
 
 typedef struct SaVec3 {
   float x;
@@ -261,6 +262,17 @@ typedef struct SaGoalContextEvent {
 } SaGoalContextEvent;
 
 SaEngine *subtr_actor_bakkesmod_engine_create(void);
+SaReplayAnnotations *subtr_actor_bakkesmod_replay_annotations_create(
+    const char *replay_path);
+void subtr_actor_bakkesmod_replay_annotations_destroy(
+    SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_replay_annotation_count(
+    const SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_poll_replay_annotations(
+    SaReplayAnnotations *annotations,
+    float replay_time,
+    SaMechanicEvent *out_events,
+    size_t max_events);
 void subtr_actor_bakkesmod_engine_destroy(SaEngine *engine);
 void subtr_actor_bakkesmod_engine_reset(SaEngine *engine);
 int32_t subtr_actor_bakkesmod_finish(SaEngine *engine);
