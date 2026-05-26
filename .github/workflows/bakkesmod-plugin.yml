@@ -73,6 +73,8 @@ jobs:
           Assert-Contains $pluginText "subtr_actor_verify_graph" "BakkesMod graph verification command"
           Assert-Contains $pluginText "every callable analysis node" "BakkesMod graph verification scope"
           Assert-Contains $pluginText "verified {} graph outputs by name" "BakkesMod graph output registry verification"
+          Assert-Contains $pluginText "matches fixed ABI" "BakkesMod named/fixed graph output verification"
+          Assert-Contains $pluginText "differs from named output" "BakkesMod named/fixed graph output mismatch diagnostics"
           Assert-Contains $pluginText "verified {} builtin stats modules by name" "BakkesMod stats module registry verification"
           Assert-Contains $pluginText "callable analysis node registry matches graph_info" "BakkesMod callable node registry consistency"
           Assert-Contains $pluginText "resolved analysis graph nodes are callable by name" "BakkesMod resolved graph node callability verification"

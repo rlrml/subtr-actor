@@ -2362,6 +2362,30 @@ void SubtrActorPlugin::verifyGraphRuntime(std::vector<std::string> params) {
         "subtr-actor: graph output '{}' callable ({} bytes)",
         outputName,
         outputJson.size()));
+    std::string fixedOutputJson;
+    if (outputName == "events") {
+      fixedOutputJson = readJsonBuffer(eventsJsonLen, writeEventsJson);
+    } else if (outputName == "frame") {
+      fixedOutputJson = readJsonBuffer(frameJsonLen, writeFrameJson);
+    } else if (outputName == "timeline") {
+      fixedOutputJson = readJsonBuffer(timelineJsonLen, writeTimelineJson);
+    } else if (outputName == "stats") {
+      fixedOutputJson = readJsonBuffer(statsJsonLen, writeStatsJson);
+    } else if (outputName == "graph_info") {
+      fixedOutputJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
+    }
+    if (!fixedOutputJson.empty()) {
+      if (fixedOutputJson != outputJson) {
+        ok = false;
+        cvarManager->log(std::format(
+            "subtr-actor: graph verification fixed ABI output '{}' differs from named output",
+            outputName));
+      } else {
+        cvarManager->log(std::format(
+            "subtr-actor: graph output '{}' matches fixed ABI",
+            outputName));
+      }
+    }
     if (outputName == "analysis_nodes") {
       analysisNodesJson = outputJson;
     }
