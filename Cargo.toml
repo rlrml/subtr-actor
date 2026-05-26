@@ -3,7 +3,7 @@ members = [".", "crates/subtr-actor-bakkesmod", "crates/subtr-actor-tools", "js"
 resolver = "2"
 
 [workspace.package]
-version = "0.9.2"
+version = "0.10.0"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"

@@ -4,6 +4,18 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v0.10.0 - 2026-05-26
+
+- Add a BakkesMod plugin pipeline that feeds live Rocket League state through
+  the shared subtr-actor analysis graph and exposes timeline mechanics in-game.
+- Add replay-backed annotation playback for Rocket League replay viewing through
+  the normal replay processing path.
+- Add Linux-based BakkesMod DLL builds, artifact verification, and CI coverage
+  for the plugin and Rust C ABI.
+- Introduce the shared processor view surface used by both replay processing and
+  live BakkesMod samples.
+- Refresh Rust, Python, and JavaScript release metadata to `0.10.0`.
+
 ## v0.9.2 - 2026-05-26
 
 - Remove the broken Linux aarch64 cross-wheel job from Python releases so PyPI
