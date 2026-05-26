@@ -5028,15 +5028,26 @@ mod tests {
             .with_input_state_type::<String>()
             .with_node(RequiresStringInputNode { state: () });
 
-        let players = [player_at_index(
-            0,
-            true,
-            SaVec3 {
-                x: 0.0,
-                y: 0.0,
-                z: 20.0,
-            },
-        )];
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 20.0,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 200.0,
+                    y: 0.0,
+                    z: 20.0,
+                },
+            ),
+        ];
         let touches = [SaTouchEvent {
             timing: SaEventTiming::default(),
             player_index: 0,
@@ -5044,6 +5055,57 @@ mod tests {
             is_team_0: 1,
             closest_approach_distance: 0.0,
             has_closest_approach_distance: 1,
+        }];
+        let dodge_refreshes = [SaDodgeRefreshedEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            counter_value: 7,
+        }];
+        let boost_pad_events = [SaBoostPadEvent {
+            timing: SaEventTiming::default(),
+            pad_id: 34,
+            kind: SaBoostPadEventKind::PickedUp,
+            sequence: 2,
+            player_index: 0,
+            has_player: 1,
+        }];
+        let goals = [SaGoalEvent {
+            timing: SaEventTiming::default(),
+            scoring_team_is_team_0: 1,
+            player_index: 0,
+            has_player: 1,
+            team_zero_score: 1,
+            has_team_zero_score: 1,
+            team_one_score: 0,
+            has_team_one_score: 1,
+        }];
+        let player_stat_events = [SaPlayerStatEvent {
+            timing: SaEventTiming::default(),
+            player_index: 0,
+            is_team_0: 1,
+            kind: SaPlayerStatEventKind::Shot,
+            has_shot_ball: 0,
+            shot_ball: SaRigidBody::default(),
+            has_shot_player: 0,
+            shot_player: SaRigidBody::default(),
+        }];
+        let demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 200.0,
+                y: 0.0,
+                z: 20.0,
+            },
+            active_duration_seconds: 0.25,
         }];
         let mut frame = live_frame(
             1,
@@ -5059,6 +5121,16 @@ mod tests {
         );
         frame.touches = touches.as_ptr();
         frame.touch_count = touches.len();
+        frame.dodge_refreshes = dodge_refreshes.as_ptr();
+        frame.dodge_refresh_count = dodge_refreshes.len();
+        frame.boost_pad_events = boost_pad_events.as_ptr();
+        frame.boost_pad_event_count = boost_pad_events.len();
+        frame.goals = goals.as_ptr();
+        frame.goal_count = goals.len();
+        frame.player_stat_events = player_stat_events.as_ptr();
+        frame.player_stat_event_count = player_stat_events.len();
+        frame.demolishes = demolishes.as_ptr();
+        frame.demolish_count = demolishes.len();
 
         assert_eq!(
             unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
@@ -5076,7 +5148,44 @@ mod tests {
                 .is_empty(),
             "failed graph evaluation should not commit inferred dodge-refresh history"
         );
+        assert!(
+            engine_ref.live_event_history.boost_pad_events.is_empty(),
+            "failed graph evaluation should not commit boost pad history"
+        );
+        assert!(
+            engine_ref.live_event_history.player_stat_events.is_empty(),
+            "failed graph evaluation should not commit player stat history"
+        );
+        assert!(
+            engine_ref.live_event_history.goal_events.is_empty(),
+            "failed graph evaluation should not commit goal history"
+        );
+        assert!(
+            engine_ref.live_event_history.demo_events.is_empty(),
+            "failed graph evaluation should not commit demolish history"
+        );
+        assert!(
+            engine_ref
+                .live_events
+                .boost_pad_pickup_sequence_times
+                .is_empty(),
+            "failed graph evaluation should not commit boost pickup dedupe state"
+        );
+        assert!(
+            engine_ref.live_events.last_goal_event.is_none(),
+            "failed graph evaluation should not commit goal dedupe state"
+        );
+        assert!(
+            engine_ref.live_events.known_demolishes.is_empty(),
+            "failed graph evaluation should not commit demolish dedupe state"
+        );
+        assert!(
+            engine_ref.live_events.dodge_refresh_counters.is_empty(),
+            "failed graph evaluation should not commit dodge-refresh dedupe state"
+        );
         assert_eq!(engine_ref.pending_events.len(), 0);
+        assert!(engine_ref.pending_team_events.is_empty());
+        assert!(engine_ref.pending_goal_context_events.is_empty());
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
