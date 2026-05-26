@@ -938,18 +938,6 @@ impl ProcessorView for SaLiveProcessorView<'_> {
                 demolish,
             )?);
         }
-        if demos.is_empty() {
-            for demolish in &self.events.demo_events {
-                if !seen.insert((demolish.attacker.clone(), demolish.victim.clone())) {
-                    continue;
-                }
-                demos.push(live_demolish_attribute(
-                    &demolish.attacker,
-                    &demolish.victim,
-                    Some(demolish),
-                )?);
-            }
-        }
         Ok(demos)
     }
 
@@ -6539,6 +6527,10 @@ mod tests {
         assert_eq!(frame_events.player_stat_events[0].time, 0.4);
         assert_eq!(frame_events.demo_events[0].frame, 4);
         assert_eq!(frame_events.demo_events[0].time, 0.4);
+        assert!(
+            frame_events.active_demos.is_empty(),
+            "stale queued demolish events should not become active at the retry frame"
+        );
 
         let frame_events_node = live_analysis_node_json_value(engine, "frame_events_state");
         assert_eq!(frame_events_node["touch_events"][0]["frame"], 4);
@@ -8304,6 +8296,10 @@ mod tests {
             &frame,
             &players,
             FrameEventsState {
+                active_demos: vec![DemoEventSample {
+                    attacker: RemoteId::SplitScreen(0),
+                    victim: RemoteId::SplitScreen(1),
+                }],
                 demo_events,
                 ..FrameEventsState::default()
             },
@@ -8331,6 +8327,86 @@ mod tests {
             frame_events.active_demos[0].victim,
             RemoteId::SplitScreen(1)
         );
+    }
+
+    #[test]
+    fn live_processor_view_does_not_treat_inactive_demo_events_as_active() {
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let frame = live_frame(
+            7,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        let demo_events = vec![DemolishInfo {
+            frame: 4,
+            time: 0.4,
+            seconds_remaining: 299,
+            attacker: RemoteId::SplitScreen(0),
+            victim: RemoteId::SplitScreen(1),
+            attacker_velocity: Vector3f {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: Vector3f {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_location: Vector3f {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+        }];
+        let event_history = SaLiveEventHistory::default();
+        let view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState {
+                demo_events,
+                ..FrameEventsState::default()
+            },
+            &event_history,
+        );
+
+        assert!(
+            view.get_active_demos().unwrap().is_empty(),
+            "historical or expired live demo events should not be reported as active demos"
+        );
+        let input = FrameInput::timeline_with_live_play_state(
+            &view,
+            7,
+            frame.time,
+            frame.dt,
+            LivePlayState {
+                gameplay_phase: GameplayPhase::ActivePlay,
+                is_live_play: true,
+            },
+        );
+        let frame_events = input.frame_events_state();
+        assert!(frame_events.active_demos.is_empty());
+        assert_eq!(frame_events.demo_events.len(), 1);
     }
 
     #[test]
