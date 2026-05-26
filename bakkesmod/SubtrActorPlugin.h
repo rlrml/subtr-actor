@@ -15,6 +15,8 @@
 #pragma comment(lib, "pluginsdk.lib")
 
 #include "bakkesmod/plugin/bakkesmodplugin.h"
+#include "bakkesmod/plugin/PluginSettingsWindow.h"
+#include "bakkesmod/plugin/pluginwindow.h"
 #include "bakkesmod/wrappers/Engine/UnrealStringWrapper.h"
 #include "bakkesmod/wrappers/arraywrapper.h"
 #include "bakkesmod/wrappers/Engine/ActorWrapper.h"
@@ -30,10 +32,22 @@
 #include "bakkesmod/wrappers/canvaswrapper.h"
 #include "subtr_actor_bakkesmod.h"
 
-class SubtrActorPlugin : public BakkesMod::Plugin::BakkesModPlugin {
+class SubtrActorPlugin : public BakkesMod::Plugin::BakkesModPlugin,
+                         public BakkesMod::Plugin::PluginWindow,
+                         public BakkesMod::Plugin::PluginSettingsWindow {
 public:
   void onLoad() override;
   void onUnload() override;
+  void Render() override;
+  std::string GetMenuName() override;
+  std::string GetMenuTitle() override;
+  void SetImGuiContext(uintptr_t ctx) override;
+  bool ShouldBlockInput() override;
+  bool IsActiveOverlay() override;
+  void OnOpen() override;
+  void OnClose() override;
+  void RenderSettings() override;
+  std::string GetPluginName() override;
 
 private:
   using JsonLen = size_t (*)(const SaEngine *);
@@ -80,6 +94,17 @@ private:
     std::string text;
     LinearColor color;
     std::chrono::steady_clock::time_point expires_at;
+  };
+
+  struct UiEventRecord {
+    std::string category;
+    std::string type;
+    std::string actor;
+    std::string label;
+    std::string details;
+    LinearColor color;
+    uint64_t frame_number = 0;
+    float time = 0.0f;
   };
 
   struct PlayerStatSnapshot {
@@ -174,6 +199,14 @@ private:
   SaReplayAnnotations *replayAnnotations = nullptr;
   std::string replayAnnotationPath;
   bool replayAnnotationLoadFailed = false;
+  uintptr_t imguiContext = 0;
+  bool uiWindowOpen = false;
+  bool uiLauncherOpen = true;
+  bool uiScoreboardOpen = true;
+  bool uiEventsOpen = true;
+  bool uiStatusOpen = true;
+  bool uiStatsOpen = false;
+  std::deque<UiEventRecord> recentUiEvents;
 
   bool loadRustLibrary();
   void unloadRustLibrary();
@@ -192,6 +225,19 @@ private:
   void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
   void resetProfileTiming();
   void render(CanvasWrapper canvas);
+  void renderLauncherWindow();
+  void renderScoreboardWindow();
+  void renderEventsWindow();
+  void renderStatusWindow();
+  void renderStatsWindow();
+  void renderSharedSettingsControls();
+  bool uiEnabled();
+  bool cvarBool(const char *name, bool defaultValue);
+  void setCvarBool(const char *name, bool value);
+  std::string cvarString(const char *name, std::string_view defaultValue);
+  void setCvarString(const char *name, std::string_view value);
+  void appendUiEvent(UiEventRecord event);
+  bool uiEventVisible(const UiEventRecord &event);
   void tickReplayAnnotations();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);

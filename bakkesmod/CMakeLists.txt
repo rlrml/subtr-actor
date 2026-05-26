@@ -30,12 +30,40 @@ endif()
 
 message(STATUS "BakkesMod SDK: ${BAKKESMOD_SDK_DIR}")
 
+set(BAKKESMOD_IMGUI_INCLUDE_DIR "")
+set(BAKKESMOD_IMGUI_ROOT "")
+if(EXISTS "${BAKKESMOD_SDK_DIR}/imgui/imgui.h")
+  set(BAKKESMOD_IMGUI_INCLUDE_DIR "${BAKKESMOD_SDK_DIR}")
+  set(BAKKESMOD_IMGUI_ROOT "${BAKKESMOD_SDK_DIR}")
+elseif(EXISTS "${BAKKESMOD_SDK_DIR}/imgui_bm.zip")
+  set(BAKKESMOD_IMGUI_EXTRACT_DIR "${CMAKE_CURRENT_BINARY_DIR}/bakkesmod-imgui")
+  file(MAKE_DIRECTORY "${BAKKESMOD_IMGUI_EXTRACT_DIR}")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E tar xf "${BAKKESMOD_SDK_DIR}/imgui_bm.zip"
+    WORKING_DIRECTORY "${BAKKESMOD_IMGUI_EXTRACT_DIR}"
+    RESULT_VARIABLE BAKKESMOD_IMGUI_EXTRACT_RESULT
+  )
+  if(NOT BAKKESMOD_IMGUI_EXTRACT_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to extract BakkesMod ImGui headers from ${BAKKESMOD_SDK_DIR}/imgui_bm.zip")
+  endif()
+  set(BAKKESMOD_IMGUI_INCLUDE_DIR "${BAKKESMOD_IMGUI_EXTRACT_DIR}")
+  set(BAKKESMOD_IMGUI_ROOT "${BAKKESMOD_IMGUI_EXTRACT_DIR}")
+endif()
+
+if(NOT BAKKESMOD_IMGUI_INCLUDE_DIR)
+  message(FATAL_ERROR "BakkesMod ImGui headers were not found in ${BAKKESMOD_SDK_DIR}")
+endif()
+
 add_library(SubtrActorPlugin SHARED
   SubtrActorPlugin.cpp
+  "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui.cpp"
+  "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui_draw.cpp"
+  "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui_widgets.cpp"
 )
 
 target_include_directories(SubtrActorPlugin PRIVATE
   "${BAKKESMOD_SDK_DIR}/include"
+  "${BAKKESMOD_IMGUI_INCLUDE_DIR}"
   "${CMAKE_CURRENT_LIST_DIR}/../crates/subtr-actor-bakkesmod/include"
 )
 

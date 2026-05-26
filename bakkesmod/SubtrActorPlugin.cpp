@@ -10,6 +10,8 @@
 #include <format>
 #include <type_traits>
 
+#include "imgui/imgui.h"
+
 BAKKESMOD_PLUGIN(
     SubtrActorPlugin,
     "subtr-actor mechanic overlay",
@@ -112,8 +114,41 @@ constexpr uint32_t NON_STANDARD_BOOST_PAD_ID_START = 1000;
 constexpr uint64_t DODGE_REFRESH_TOUCH_FRAME_WINDOW = 2;
 constexpr int GAME_STATE_KICKOFF_COUNTDOWN = 55;
 constexpr int GAME_STATE_GOAL_SCORED_REPLAY = 86;
+constexpr size_t MAX_RECENT_UI_EVENTS = 200;
 
 int moduleAnchor = 0;
+
+struct EventFilterOption {
+  const char *value;
+  const char *label;
+};
+
+constexpr std::array<EventFilterOption, 24> EVENT_FILTER_OPTIONS{{
+    {"all", "All events"},
+    {"mechanics", "All mechanics"},
+    {"team", "Team events"},
+    {"goal_context", "Goal context"},
+    {"speed_flip", "Speed flip"},
+    {"half_flip", "Half flip"},
+    {"wavedash", "Wavedash"},
+    {"ball_carry", "Ball carry"},
+    {"air_dribble", "Air dribble"},
+    {"ceiling_shot", "Ceiling shot"},
+    {"wall_aerial", "Wall aerial"},
+    {"wall_aerial_shot", "Wall aerial shot"},
+    {"center", "Center"},
+    {"flip_reset", "Flip reset"},
+    {"double_tap", "Double tap"},
+    {"flick", "Flick"},
+    {"musty_flick", "Musty flick"},
+    {"one_timer", "One timer"},
+    {"pass", "Pass"},
+    {"half_volley", "Half volley"},
+    {"whiff", "Whiff"},
+    {"bump", "Bump"},
+    {"demo", "Demo"},
+    {"goal", "Goal"},
+}};
 
 bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
   return std::find_if(params.begin(), params.end(), [](const std::string &param) {
@@ -972,6 +1007,25 @@ bool eventFilterAllows(
   return !sawToken;
 }
 
+const char *eventFilterLabel(std::string_view value) {
+  const std::string normalized = normalizeEventFilterToken(value);
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (normalized == option.value) {
+      return option.label;
+    }
+  }
+  return value.empty() ? "All events" : "Custom filter";
+}
+
+ImVec4 toImVec4(LinearColor color) {
+  return ImVec4{
+      color.R / 255.0f,
+      color.G / 255.0f,
+      color.B / 255.0f,
+      color.A / 255.0f,
+  };
+}
+
 std::string teamEventLabel(const SaTeamEvent &event) {
   switch (event.kind) {
   case SaTeamEventKindRush:
@@ -1134,6 +1188,15 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_status_overlay_enabled",
       "1",
       "Draw subtr-actor live processing status.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_ui_enabled",
+      "1",
+      "Enable the interactive subtr-actor BakkesMod window interface.",
       true,
       true,
       0,
@@ -1327,6 +1390,39 @@ void SubtrActorPlugin::onUnload() {
   gameWrapper->UnregisterDrawables();
   unhookGameEvents();
   unloadRustLibrary();
+}
+
+void SubtrActorPlugin::SetImGuiContext(uintptr_t ctx) {
+  imguiContext = ctx;
+  ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(ctx));
+}
+
+std::string SubtrActorPlugin::GetMenuName() {
+  return "subtr-actor";
+}
+
+std::string SubtrActorPlugin::GetMenuTitle() {
+  return "subtr-actor";
+}
+
+std::string SubtrActorPlugin::GetPluginName() {
+  return "subtr-actor";
+}
+
+bool SubtrActorPlugin::ShouldBlockInput() {
+  return true;
+}
+
+bool SubtrActorPlugin::IsActiveOverlay() {
+  return false;
+}
+
+void SubtrActorPlugin::OnOpen() {
+  uiWindowOpen = true;
+}
+
+void SubtrActorPlugin::OnClose() {
+  uiWindowOpen = false;
 }
 
 void SubtrActorPlugin::hookGameEvents() {
@@ -1577,6 +1673,34 @@ bool SubtrActorPlugin::liveProcessingEnabled() {
 bool SubtrActorPlugin::replayAnnotationsEnabled() {
   auto enabledCvar = cvarManager->getCvar("subtr_actor_replay_annotations_enabled");
   return !static_cast<bool>(enabledCvar) || enabledCvar.getBoolValue();
+}
+
+bool SubtrActorPlugin::uiEnabled() {
+  return cvarBool("subtr_actor_ui_enabled", true);
+}
+
+bool SubtrActorPlugin::cvarBool(const char *name, bool defaultValue) {
+  auto cvar = cvarManager->getCvar(name);
+  return static_cast<bool>(cvar) ? cvar.getBoolValue() : defaultValue;
+}
+
+void SubtrActorPlugin::setCvarBool(const char *name, bool value) {
+  auto cvar = cvarManager->getCvar(name);
+  if (static_cast<bool>(cvar)) {
+    cvar.setValue(value ? 1 : 0);
+  }
+}
+
+std::string SubtrActorPlugin::cvarString(const char *name, std::string_view defaultValue) {
+  auto cvar = cvarManager->getCvar(name);
+  return static_cast<bool>(cvar) ? cvar.getStringValue() : std::string(defaultValue);
+}
+
+void SubtrActorPlugin::setCvarString(const char *name, std::string_view value) {
+  auto cvar = cvarManager->getCvar(name);
+  if (static_cast<bool>(cvar)) {
+    cvar.setValue(std::string(value));
+  }
 }
 
 float SubtrActorPlugin::sampleIntervalSeconds() {
@@ -2064,6 +2188,7 @@ void SubtrActorPlugin::resetLiveState() {
   nextPlayerIndex = 0;
   nextBoostPadId = 1;
   messages.clear();
+  recentUiEvents.clear();
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -3899,11 +4024,29 @@ std::string SubtrActorPlugin::playerLabel(uint32_t playerIndex, uint8_t isTeam0)
   return std::format("{} #{}", teamLabel(labelTeam), playerIndex + 1);
 }
 
-void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
-  if (!overlayMechanicEnabled(event.kind)) {
-    return;
+void SubtrActorPlugin::appendUiEvent(UiEventRecord event) {
+  recentUiEvents.push_front(std::move(event));
+  while (recentUiEvents.size() > MAX_RECENT_UI_EVENTS) {
+    recentUiEvents.pop_back();
   }
+}
 
+bool SubtrActorPlugin::uiEventVisible(const UiEventRecord &event) {
+  if (event.category == "mechanics" &&
+      !cvarBool("subtr_actor_overlay_mechanics_enabled", true)) {
+    return false;
+  }
+  if (event.category == "team" && !cvarBool("subtr_actor_overlay_team_events_enabled", true)) {
+    return false;
+  }
+  if (event.category == "goal_context" &&
+      !cvarBool("subtr_actor_overlay_goal_context_enabled", true)) {
+    return false;
+  }
+  return eventFilterAllows(cvarString("subtr_actor_overlay_event_types", "all"), event.category, event.type);
+}
+
+void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
   const bool isBlue = event.is_team_0 != 0;
   const std::string action = event.confidence < 0.999f
                                  ? std::format(
@@ -3913,6 +4056,22 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
                                  : mechanicLabel(event.kind);
   const std::string label =
       std::format("{}: {}", playerLabel(event.player_index, event.is_team_0), action);
+  appendUiEvent(UiEventRecord{
+      "mechanics",
+      mechanicToken(event.kind),
+      playerLabel(event.player_index, event.is_team_0),
+      mechanicLabel(event.kind),
+      event.confidence < 0.999f ? std::format("{:.0f}% confidence", event.confidence * 100.0f)
+                                : "high confidence",
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      event.frame_number,
+      event.time,
+  });
+
+  if (!overlayMechanicEnabled(event.kind)) {
+    return;
+  }
+
   OverlayMessage message{
       label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
@@ -3927,10 +4086,6 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
 }
 
 void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
-  if (!overlayCategoryEnabled("team")) {
-    return;
-  }
-
   const bool isBlue = event.is_team_0 != 0;
   const std::string action = event.confidence < 0.999f
                                  ? std::format(
@@ -3939,6 +4094,21 @@ void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
                                        event.confidence * 100.0f)
                                  : teamEventLabel(event);
   const std::string label = std::format("{}: {}", teamLabel(event.is_team_0), action);
+  appendUiEvent(UiEventRecord{
+      "team",
+      "rush",
+      teamLabel(event.is_team_0),
+      teamEventLabel(event),
+      std::format("{:.1f}s - {:.1f}s", event.start_time, event.end_time),
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      event.start_frame,
+      event.start_time,
+  });
+
+  if (!overlayCategoryEnabled("team")) {
+    return;
+  }
+
   OverlayMessage message{
       label,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
@@ -3953,15 +4123,26 @@ void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
 }
 
 void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &event) {
-  if (!overlayCategoryEnabled("goal_context")) {
-    return;
-  }
-
   const bool isBlue = event.scoring_team_is_team_0 != 0;
   const std::string actor =
       event.has_scorer != 0
           ? playerLabel(event.scorer_index, event.scoring_team_is_team_0)
           : teamLabel(event.scoring_team_is_team_0);
+  appendUiEvent(UiEventRecord{
+      "goal_context",
+      "goal_context",
+      actor,
+      goalContextLabel(event),
+      teamLabel(event.scoring_team_is_team_0),
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      event.frame_number,
+      event.time,
+  });
+
+  if (!overlayCategoryEnabled("goal_context")) {
+    return;
+  }
+
   OverlayMessage message{
       std::format("{}: {}", actor, goalContextLabel(event)),
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
@@ -3973,6 +4154,265 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
   while (messages.size() > static_cast<size_t>(overlayMaxMessages())) {
     messages.pop_front();
   }
+}
+
+void SubtrActorPlugin::Render() {
+  if (imguiContext != 0) {
+    ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(imguiContext));
+  }
+
+  renderLauncherWindow();
+  if (!uiEnabled()) {
+    return;
+  }
+
+  renderScoreboardWindow();
+  renderEventsWindow();
+  renderStatusWindow();
+  renderStatsWindow();
+}
+
+void SubtrActorPlugin::RenderSettings() {
+  if (imguiContext != 0) {
+    ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(imguiContext));
+  }
+  renderSharedSettingsControls();
+}
+
+void SubtrActorPlugin::renderSharedSettingsControls() {
+  auto checkboxCvar = [this](const char *label, const char *name, bool defaultValue) {
+    bool value = cvarBool(name, defaultValue);
+    if (ImGui::Checkbox(label, &value)) {
+      setCvarBool(name, value);
+    }
+  };
+
+  checkboxCvar("Interactive in-game UI", "subtr_actor_ui_enabled", true);
+  checkboxCvar("Live analysis graph", "subtr_actor_enabled", false);
+  checkboxCvar("Canvas HUD overlay", "subtr_actor_overlay_enabled", true);
+  checkboxCvar("Canvas status line", "subtr_actor_status_overlay_enabled", true);
+  checkboxCvar("Replay annotations", "subtr_actor_replay_annotations_enabled", true);
+
+  ImGui::Separator();
+  ImGui::Text("Event visibility");
+  checkboxCvar("Mechanics", "subtr_actor_overlay_mechanics_enabled", true);
+  checkboxCvar("Team events", "subtr_actor_overlay_team_events_enabled", true);
+  checkboxCvar("Goal context", "subtr_actor_overlay_goal_context_enabled", true);
+
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        setCvarString("subtr_actor_overlay_event_types", option.value);
+        currentFilter = option.value;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
+  int intervalMs = static_cast<bool>(intervalCvar) ? intervalCvar.getIntValue() : 8;
+  if (ImGui::SliderInt("Sample interval ms", &intervalMs, 1, 1000) &&
+      static_cast<bool>(intervalCvar)) {
+    intervalCvar.setValue(intervalMs);
+  }
+
+  auto maxMessagesCvar = cvarManager->getCvar("subtr_actor_overlay_max_messages");
+  int maxMessages = static_cast<bool>(maxMessagesCvar) ? maxMessagesCvar.getIntValue() : 8;
+  if (ImGui::SliderInt("HUD message count", &maxMessages, 1, 30) &&
+      static_cast<bool>(maxMessagesCvar)) {
+    maxMessagesCvar.setValue(maxMessages);
+  }
+}
+
+void SubtrActorPlugin::renderLauncherWindow() {
+  ImGui::SetNextWindowPos(ImVec2{16.0f, 68.0f}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{340.0f, 430.0f}, ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("subtr-actor", nullptr)) {
+    ImGui::End();
+    return;
+  }
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
+  ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
+  ImGui::Checkbox("Events", &uiEventsOpen);
+  ImGui::Checkbox("Status", &uiStatusOpen);
+  ImGui::Checkbox("Player stats", &uiStatsOpen);
+
+  ImGui::Separator();
+  renderSharedSettingsControls();
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderScoreboardWindow() {
+  if (!uiScoreboardOpen) {
+    return;
+  }
+  ImGui::SetNextWindowPos(ImVec2{760.0f, 18.0f}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{210.0f, 78.0f}, ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen)) {
+    ImGui::End();
+    return;
+  }
+
+  if (lastTeamScores) {
+    ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", lastTeamScores->first);
+    ImGui::SameLine();
+    ImGui::Text("Blue  :  Orange");
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4{1.0f, 0.69f, 0.31f, 1.0f}, "%d", lastTeamScores->second);
+  } else {
+    ImGui::Text("Waiting for score data");
+  }
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderEventsWindow() {
+  if (!uiEventsOpen) {
+    return;
+  }
+  ImGui::SetNextWindowPos(ImVec2{16.0f, 505.0f}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{520.0f, 360.0f}, ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Events##subtr-actor", &uiEventsOpen)) {
+    ImGui::End();
+    return;
+  }
+
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  if (ImGui::BeginCombo("Filter", eventFilterLabel(currentFilter))) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        setCvarString("subtr_actor_overlay_event_types", option.value);
+        currentFilter = option.value;
+      }
+    }
+    ImGui::EndCombo();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear")) {
+    recentUiEvents.clear();
+  }
+
+  size_t visibleCount = 0;
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (uiEventVisible(event)) {
+      visibleCount += 1;
+    }
+  }
+  ImGui::Text("%zu visible / %zu recent", visibleCount, recentUiEvents.size());
+  ImGui::Separator();
+
+  ImGui::BeginChild("event-list", ImVec2{0.0f, 0.0f}, true);
+  ImGui::Columns(4, "event-columns", true);
+  ImGui::Text("Time");
+  ImGui::NextColumn();
+  ImGui::Text("Actor");
+  ImGui::NextColumn();
+  ImGui::Text("Event");
+  ImGui::NextColumn();
+  ImGui::Text("Details");
+  ImGui::NextColumn();
+  ImGui::Separator();
+
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (!uiEventVisible(event)) {
+      continue;
+    }
+    ImGui::Text("%.2fs", event.time);
+    ImGui::NextColumn();
+    ImGui::TextColored(toImVec4(event.color), "%s", event.actor.c_str());
+    ImGui::NextColumn();
+    ImGui::TextWrapped("%s", event.label.c_str());
+    ImGui::NextColumn();
+    ImGui::TextWrapped("%s", event.details.c_str());
+    ImGui::NextColumn();
+  }
+
+  ImGui::Columns(1);
+  ImGui::EndChild();
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderStatusWindow() {
+  if (!uiStatusOpen) {
+    return;
+  }
+  ImGui::SetNextWindowPos(ImVec2{1230.0f, 68.0f}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{330.0f, 220.0f}, ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Status##subtr-actor", &uiStatusOpen)) {
+    ImGui::End();
+    return;
+  }
+
+  ImGui::Text("Mode: %s", liveProcessingEnabled() ? "live analysis" : "idle");
+  ImGui::Text("Replay annotations: %s", replayAnnotations ? "loaded" : "not loaded");
+  if (replayAnnotations && replayAnnotationCount) {
+    ImGui::Text("Replay events: %zu", replayAnnotationCount(replayAnnotations));
+  }
+  ImGui::Text("Frame: %llu", static_cast<unsigned long long>(frameNumber));
+  ImGui::Text("Sample interval: %.0fms", sampleIntervalSeconds() * 1000.0f);
+  ImGui::Text("Players sampled: %zu", sampledPlayers.size());
+  ImGui::Text("Recent events: %zu", recentUiEvents.size());
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderStatsWindow() {
+  if (!uiStatsOpen) {
+    return;
+  }
+  ImGui::SetNextWindowPos(ImVec2{1230.0f, 310.0f}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{520.0f, 300.0f}, ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Player stats##subtr-actor", &uiStatsOpen)) {
+    ImGui::End();
+    return;
+  }
+
+  if (sampledPlayers.empty()) {
+    ImGui::Text("Waiting for sampled players.");
+    ImGui::End();
+    return;
+  }
+
+  ImGui::Columns(7, "player-stats-columns", true);
+  ImGui::Text("Player");
+  ImGui::NextColumn();
+  ImGui::Text("Score");
+  ImGui::NextColumn();
+  ImGui::Text("G");
+  ImGui::NextColumn();
+  ImGui::Text("A");
+  ImGui::NextColumn();
+  ImGui::Text("Saves");
+  ImGui::NextColumn();
+  ImGui::Text("Shots");
+  ImGui::NextColumn();
+  ImGui::Text("Boost");
+  ImGui::NextColumn();
+  ImGui::Separator();
+
+  for (const SaPlayerFrame &player : sampledPlayers) {
+    const LinearColor color =
+        player.is_team_0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+    ImGui::TextColored(toImVec4(color), "%s", playerLabel(player.player_index, player.is_team_0).c_str());
+    ImGui::NextColumn();
+    ImGui::Text("%d", player.has_match_stats != 0 ? player.match_score : 0);
+    ImGui::NextColumn();
+    ImGui::Text("%d", player.has_match_stats != 0 ? player.match_goals : 0);
+    ImGui::NextColumn();
+    ImGui::Text("%d", player.has_match_stats != 0 ? player.match_assists : 0);
+    ImGui::NextColumn();
+    ImGui::Text("%d", player.has_match_stats != 0 ? player.match_saves : 0);
+    ImGui::NextColumn();
+    ImGui::Text("%d", player.has_match_stats != 0 ? player.match_shots : 0);
+    ImGui::NextColumn();
+    ImGui::Text("%.0f", player.boost_amount);
+    ImGui::NextColumn();
+  }
+
+  ImGui::Columns(1);
+  ImGui::End();
 }
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {
