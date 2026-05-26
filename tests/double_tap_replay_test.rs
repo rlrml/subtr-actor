@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsCollector, StatsTimelineCollector};
+use subtr_actor::{GoalTagKind, StatsCollector, StatsFrameResolution, StatsTimelineCollector};
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -47,6 +47,7 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
 fn dynamic_stats_timeline_value_includes_normalized_mechanics_stream() {
     let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
     let value = StatsCollector::new()
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
         .capture_frames()
         .get_captured_data(&replay)
         .expect("failed to capture stats frames for double tap replay")
