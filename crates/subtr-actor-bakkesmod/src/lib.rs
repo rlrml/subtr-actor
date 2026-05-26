@@ -414,6 +414,7 @@ struct SaLiveEventGenerator {
     live_play_tracker: subtr_actor::LivePlayTracker,
     dodge_refresh_counters: Vec<(RemoteId, i32)>,
     active_demos: Vec<SaActiveDemo>,
+    known_demolishes: Vec<(DemoEventSample, usize)>,
     boost_pad_pickup_sequence_times: HashMap<(String, u8), f32>,
     last_goal_event: Option<GoalEvent>,
 }
@@ -1138,6 +1139,7 @@ fn explicit_dodge_refreshed_events(
 
 const MIN_BOOST_PAD_RESPAWN_SECONDS: f32 = 4.0;
 const GOAL_EVENT_DEDUPE_WINDOW_SECONDS: f32 = 3.0;
+const MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 150;
 
 fn boost_pad_pickup_sequence_is_recent(
     sequence_times: &HashMap<(String, u8), f32>,
@@ -1151,6 +1153,18 @@ fn boost_pad_pickup_sequence_is_recent(
             let elapsed = event_time - *last_time;
             (0.0..MIN_BOOST_PAD_RESPAWN_SECONDS).contains(&elapsed)
         })
+}
+
+fn demolish_is_known(
+    known_demolishes: &[(DemoEventSample, usize)],
+    sample: &DemoEventSample,
+    frame_number: usize,
+) -> bool {
+    known_demolishes.iter().any(|(existing, existing_frame)| {
+        existing.attacker == sample.attacker
+            && existing.victim == sample.victim
+            && frame_number.abs_diff(*existing_frame) < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+    })
 }
 
 fn goal_event_is_duplicate(previous: &GoalEvent, candidate: &GoalEvent) -> bool {
@@ -1301,6 +1315,30 @@ fn infer_dodge_refreshed_events(
 }
 
 impl SaLiveEventGenerator {
+    fn explicit_demolish_events(
+        &mut self,
+        frame: &FrameInfo,
+        events: &[SaDemolishEvent],
+    ) -> Vec<SaDemolishEvent> {
+        let mut accepted_events = Vec::new();
+        for event in events {
+            let (frame_number, _) = event_frame_and_time(frame, event.timing);
+            self.known_demolishes.retain(|(_, known_frame)| {
+                frame_number.abs_diff(*known_frame) < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+            });
+            let sample = DemoEventSample {
+                attacker: player_id(event.attacker_index),
+                victim: player_id(event.victim_index),
+            };
+            if demolish_is_known(&self.known_demolishes, &sample, frame_number) {
+                continue;
+            }
+            self.known_demolishes.push((sample, frame_number));
+            accepted_events.push(*event);
+        }
+        accepted_events
+    }
+
     fn sync_active_demos(
         &mut self,
         frame: &FrameInfo,
@@ -1423,8 +1461,9 @@ impl SaLiveEventGenerator {
         let explicit_dodge_refreshed_events =
             explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
         let has_explicit_dodge_refreshed_events = !explicit_dodge_refreshed_events.is_empty();
-        let demo_events = explicit_demolish_events(frame, explicit_events.demolishes);
-        let active_demos = self.sync_active_demos(frame, explicit_events.demolishes);
+        let explicit_demolishes = self.explicit_demolish_events(frame, explicit_events.demolishes);
+        let demo_events = explicit_demolish_events(frame, &explicit_demolishes);
+        let active_demos = self.sync_active_demos(frame, &explicit_demolishes);
         let boost_pad_events =
             self.explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
         let player_stat_events =
@@ -6514,6 +6553,191 @@ mod tests {
             .expect("full analysis graph should expose frame events state");
         assert_eq!(frame_events.boost_pad_events.len(), 1);
         assert_eq!(frame_events.boost_pad_events[0].pad_id, "34");
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn duplicate_explicit_live_demolishes_are_suppressed_for_graph_input() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let demolishes = [
+            SaDemolishEvent {
+                timing: SaEventTiming::default(),
+                attacker_index: 0,
+                victim_index: 1,
+                attacker_velocity: SaVec3 {
+                    x: 2300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: SaVec3::default(),
+                victim_location: SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                active_duration_seconds: 3.0,
+            },
+            SaDemolishEvent {
+                timing: SaEventTiming::default(),
+                attacker_index: 0,
+                victim_index: 1,
+                attacker_velocity: SaVec3 {
+                    x: 2300.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                victim_velocity: SaVec3::default(),
+                victim_location: SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+                active_duration_seconds: 3.0,
+            },
+        ];
+        let mut frame = live_frame(
+            1,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        frame.demolishes = demolishes.as_ptr();
+        frame.demolish_count = demolishes.len();
+
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.demo_events.len(), 1);
+        assert_eq!(frame_events.active_demos.len(), 1);
+        let demo = engine_ref
+            .graph
+            .state::<DemoCalculator>()
+            .expect("full analysis graph should expose demo calculator state");
+        assert_eq!(demo.timeline().len(), 2);
+        unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+    }
+
+    #[test]
+    fn explicit_live_demolish_can_repeat_after_dedupe_window() {
+        let engine = subtr_actor_bakkesmod_engine_create();
+        let players = [
+            player_at_index(
+                0,
+                true,
+                SaVec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+            player_at_index(
+                1,
+                false,
+                SaVec3 {
+                    x: 120.0,
+                    y: 0.0,
+                    z: 92.75,
+                },
+            ),
+        ];
+        let first_demolishes = [SaDemolishEvent {
+            timing: SaEventTiming::default(),
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+            active_duration_seconds: 0.0,
+        }];
+        let mut first = live_frame(
+            1,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        first.demolishes = first_demolishes.as_ptr();
+        first.demolish_count = first_demolishes.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &first) },
+            0
+        );
+
+        let second_demolishes = [SaDemolishEvent {
+            timing: SaEventTiming {
+                frame_number: 200,
+                time: 20.0,
+                seconds_remaining: 280,
+                has_timing: 1,
+                has_seconds_remaining: 1,
+            },
+            attacker_index: 0,
+            victim_index: 1,
+            attacker_velocity: SaVec3 {
+                x: 2300.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            victim_velocity: SaVec3::default(),
+            victim_location: SaVec3 {
+                x: 120.0,
+                y: 0.0,
+                z: 92.75,
+            },
+            active_duration_seconds: 0.0,
+        }];
+        let mut second = live_frame(
+            200,
+            rigid_body(SaVec3::default(), SaVec3::default()),
+            &players,
+        );
+        second.demolishes = second_demolishes.as_ptr();
+        second.demolish_count = second_demolishes.len();
+        assert_eq!(
+            unsafe { subtr_actor_bakkesmod_process_frame(engine, &second) },
+            0
+        );
+
+        let engine_ref = unsafe { engine.as_ref().expect("engine should be valid") };
+        let frame_events = engine_ref
+            .graph
+            .state::<FrameEventsState>()
+            .expect("full analysis graph should expose frame events state");
+        assert_eq!(frame_events.demo_events.len(), 1);
+        assert_eq!(frame_events.demo_events[0].frame, 200);
+        assert_eq!(frame_events.demo_events[0].time, 20.0);
         unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
     }
 
