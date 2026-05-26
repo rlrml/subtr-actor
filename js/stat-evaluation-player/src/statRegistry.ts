@@ -14,6 +14,7 @@ export interface StatDefinition {
 }
 
 const PLAYER_METADATA_KEYS = new Set(["player_id", "name", "is_team_0"]);
+const LIVE_PLAYBACK_PREFIXES = ["is_last_", "time_since_last_", "frames_since_last_"] as const;
 
 function isLeafStatValue(value: unknown): boolean {
   return (
@@ -58,6 +59,25 @@ function formatStatValue(value: unknown): string {
   return `${value}`;
 }
 
+function isLivePlaybackStatKey(key: string, source: Record<string, unknown>): boolean {
+  if (LIVE_PLAYBACK_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+    return true;
+  }
+
+  const lastTimeMatch = key.match(/^last_(.+)_time$/);
+  const lastFrameMatch = key.match(/^last_(.+)_frame$/);
+  const statName = lastTimeMatch?.[1] ?? lastFrameMatch?.[1];
+  if (!statName) {
+    return false;
+  }
+
+  return (
+    `is_last_${statName}` in source ||
+    `time_since_last_${statName}` in source ||
+    `frames_since_last_${statName}` in source
+  );
+}
+
 function collectStatDefinitions(
   target: unknown,
   scope: StatScopeKind,
@@ -68,8 +88,12 @@ function collectStatDefinitions(
     return;
   }
 
-  for (const [key, value] of Object.entries(target)) {
+  const targetRecord = target as Record<string, unknown>;
+  for (const [key, value] of Object.entries(targetRecord)) {
     if (scope === "player" && path.length === 0 && PLAYER_METADATA_KEYS.has(key)) {
+      continue;
+    }
+    if (isLivePlaybackStatKey(key, targetRecord)) {
       continue;
     }
 

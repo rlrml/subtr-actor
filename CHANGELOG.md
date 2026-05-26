@@ -13,6 +13,7 @@ README, or refactor-only commit.
 - Require normal flicks to have sustained near/on-car setup immediately before
   the dodge, and label flip resets only when the acquired reset is followed by a
   dodge-assisted ball hit.
+- Hide live playback bookkeeping fields from the stats-player stat registry.
 
 ## v0.10.0 - 2026-05-26
 
