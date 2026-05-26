@@ -916,6 +916,7 @@ void SubtrActorPlugin::tick(std::string) {
     return;
   }
 
+  commitPendingFrameEvents();
   clearPendingFrameEvents();
   drainPendingEvents();
 }
@@ -1145,6 +1146,12 @@ void SubtrActorPlugin::clearPendingFrameEvents() {
   pendingDemolishes.clear();
 }
 
+void SubtrActorPlugin::commitPendingFrameEvents() {
+  if (!pendingGoals.empty()) {
+    lastGoalEvent = pendingGoals.back();
+  }
+}
+
 void SubtrActorPlugin::attachPendingFrameEvents(SaLiveFrame &frame) {
   frame.touches = pendingTouches.empty() ? nullptr : pendingTouches.data();
   frame.touch_count = pendingTouches.size();
@@ -1296,7 +1303,6 @@ void SubtrActorPlugin::recordGoal(
     return;
   }
   rememberTeamScores(event);
-  lastGoalEvent = event;
   pendingGoals.push_back(event);
 
   recordExplicitPlayerStat(priForScoreIndex(server, assistIndex), SaPlayerStatEventKindAssist);
@@ -1646,19 +1652,24 @@ void SubtrActorPlugin::rememberTeamScores(const SaGoalEvent &goal) {
 }
 
 bool SubtrActorPlugin::goalEventIsDuplicate(const SaGoalEvent &goal) const {
-  if (!lastGoalEvent) {
+  const SaGoalEvent *previous = nullptr;
+  if (!pendingGoals.empty()) {
+    previous = &pendingGoals.back();
+  } else if (lastGoalEvent) {
+    previous = &*lastGoalEvent;
+  }
+  if (!previous) {
     return false;
   }
 
-  const SaGoalEvent &previous = *lastGoalEvent;
   if (goal.has_team_zero_score != 0 && goal.has_team_one_score != 0 &&
-      previous.has_team_zero_score != 0 && previous.has_team_one_score != 0) {
-    return goal.team_zero_score == previous.team_zero_score &&
-           goal.team_one_score == previous.team_one_score;
+      previous->has_team_zero_score != 0 && previous->has_team_one_score != 0) {
+    return goal.team_zero_score == previous->team_zero_score &&
+           goal.team_one_score == previous->team_one_score;
   }
 
-  return goal.scoring_team_is_team_0 == previous.scoring_team_is_team_0 &&
-         std::abs(goal.timing.time - previous.timing.time) <=
+  return goal.scoring_team_is_team_0 == previous->scoring_team_is_team_0 &&
+         std::abs(goal.timing.time - previous->timing.time) <=
              GOAL_EVENT_DEDUPE_WINDOW_SECONDS;
 }
 

@@ -181,6 +181,7 @@ private:
   void unhookGameEvents();
   void resetLiveState();
   void clearPendingFrameEvents();
+  void commitPendingFrameEvents();
   void attachPendingFrameEvents(SaLiveFrame &frame);
   SaEventTiming currentEventTiming();
   void recordTouch(CarWrapper car);
