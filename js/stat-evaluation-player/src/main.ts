@@ -48,8 +48,7 @@ import {
   formatMechanicKind,
   buildGoalTagTimelineEvents,
   getMechanicKinds,
-  getMechanicTimelineEventKinds,
-  getMechanicTimelineEventModuleIds,
+  getMechanicTimelineModuleIds,
   getNonMechanicTimelineEventModuleIds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
@@ -516,7 +515,7 @@ function setupActiveModules(): void {
 }
 
 function migrateMechanicBackedTimelineEventSelections(): void {
-  for (const kind of getMechanicTimelineEventKinds(statsTimeline)) {
+  for (const kind of getMechanicKinds(statsTimeline)) {
     const moduleId = mechanicKindToModuleId(kind);
     if (activeTimelineEventModuleIds.delete(moduleId)) {
       activeMechanicTimelineKinds.add(kind);
@@ -1166,7 +1165,7 @@ function renderModuleSummary(): void {
 
   const timelineToggles: HTMLButtonElement[] = [];
   const inGameVisualizationToggles: HTMLButtonElement[] = [];
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
 
   for (const mod of MODULES) {
     const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -1174,7 +1173,7 @@ function renderModuleSummary(): void {
       continue;
     }
 
-    if (mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id)) {
+    if (mod.getTimelineEvents && !mechanicModuleIds.has(mod.id)) {
       timelineToggles.push(
         renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
       );
@@ -1240,10 +1239,10 @@ function renderEventTimelineControls(): void {
   for (const event of statsTimeline?.events.mechanics ?? []) {
     mechanicCounts.set(event.kind, (mechanicCounts.get(event.kind) ?? 0) + 1);
   }
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(statsTimeline);
 
   const moduleEventSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
   ).map((mod) => ({
     id: mod.id,
     label: mod.label,
@@ -1447,9 +1446,9 @@ function getEventPlaylistSources(): EventPlaylistSource[] {
   }
 
   const visibleMechanicKinds = getMechanicKinds(ctx.statsTimeline);
-  const mechanicEventModuleIds = getMechanicTimelineEventModuleIds(ctx.statsTimeline);
+  const mechanicModuleIds = getMechanicTimelineModuleIds(ctx.statsTimeline);
   const moduleSources = MODULES.filter(
-    (mod) => mod.getTimelineEvents && !mechanicEventModuleIds.has(mod.id),
+    (mod) => mod.getTimelineEvents && !mechanicModuleIds.has(mod.id),
   )
     .map((mod) => ({
       id: `module:${mod.id}`,

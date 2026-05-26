@@ -54,6 +54,20 @@ test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", (
         properties: [],
       },
       {
+        id: "pass:2:4:0",
+        kind: "pass",
+        player_id: { Steam: "blue-id" },
+        is_team_0: true,
+        timing: {
+          type: "span",
+          start_frame: 2,
+          end_frame: 4,
+          start_time: 2,
+          end_time: 4,
+        },
+        properties: [],
+      },
+      {
         id: "ball_carry:1:5:0",
         kind: "ball_carry",
         player_id: { Steam: "blue-id" },
@@ -74,6 +88,7 @@ test("buildMechanicTimelineRanges only emits ranges for range-only mechanics", (
     buildMechanicTimelineRanges(timeline, replay, [
       "wall_aerial",
       "wall_aerial_shot",
+      "pass",
       "ball_carry",
     ]).map((range) => range.id),
     ["ball_carry:1:5:0"],

@@ -224,7 +224,7 @@ function ensureStyles(): void {
       display: grid;
       grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
       column-gap: var(--sap-tl-gutter-gap);
-      row-gap: 0.5rem;
+      row-gap: 0;
       align-items: center;
     }
 
@@ -233,7 +233,7 @@ function ensureStyles(): void {
       display: flex;
       flex-direction: column;
       gap: 0.34rem;
-      margin-bottom: 0.58rem;
+      margin-bottom: 0;
     }
 
     .sap-tl-event-lanes {
@@ -241,7 +241,7 @@ function ensureStyles(): void {
       display: flex;
       flex-direction: column;
       gap: 0.34rem;
-      margin-bottom: 0.58rem;
+      margin-bottom: 0;
     }
 
     .sap-tl-event-lane {
@@ -257,6 +257,7 @@ function ensureStyles(): void {
       grid-column: 2;
       height: 1.05rem;
       margin: 0 calc(var(--sap-tl-thumb-size) / 2);
+      box-sizing: border-box;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.045);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
@@ -294,6 +295,7 @@ function ensureStyles(): void {
       grid-column: 2;
       height: var(--sap-tl-track-height);
       margin: 0 calc(var(--sap-tl-thumb-size) / 2);
+      box-sizing: border-box;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.06);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
@@ -399,6 +401,7 @@ function ensureStyles(): void {
       grid-column: 2;
       min-width: 0;
       min-height: var(--sap-tl-thumb-size);
+      margin-top: 0.58rem;
     }
 
     .sap-tl-main-rail {
