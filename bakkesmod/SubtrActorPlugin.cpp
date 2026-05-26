@@ -1009,6 +1009,15 @@ void SubtrActorPlugin::onLoad() {
       true,
       1);
   cvarManager->registerCvar(
+      "subtr_actor_status_overlay_enabled",
+      "1",
+      "Draw subtr-actor live processing status.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
       "subtr_actor_sample_interval_ms",
       "50",
       "Minimum elapsed game time between live frame samples.",
@@ -3506,7 +3515,31 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {
   auto overlayEnabledCvar = cvarManager->getCvar("subtr_actor_overlay_enabled");
-  if (static_cast<bool>(overlayEnabledCvar) && !overlayEnabledCvar.getBoolValue()) {
+  const bool overlayEnabled =
+      !static_cast<bool>(overlayEnabledCvar) || overlayEnabledCvar.getBoolValue();
+  auto statusOverlayEnabledCvar = cvarManager->getCvar("subtr_actor_status_overlay_enabled");
+  const bool statusOverlayEnabled = !static_cast<bool>(statusOverlayEnabledCvar) ||
+                                    statusOverlayEnabledCvar.getBoolValue();
+
+  if (statusOverlayEnabled) {
+    const bool processingEnabled = liveProcessingEnabled();
+    const bool inGame = gameWrapper->IsInGame();
+    const float intervalMs = sampleIntervalSeconds() * 1000.0f;
+    const std::string status =
+        !processingEnabled
+            ? "subtr-actor OFF"
+            : inGame ? std::format(
+                           "subtr-actor LIVE | frames={} | interval={:.0f}ms",
+                           frameNumber,
+                           intervalMs)
+                     : "subtr-actor ON | waiting for game";
+    canvas.SetPosition(Vector2{64, 240});
+    canvas.SetColor(processingEnabled ? LinearColor{80, 255, 150, 255}
+                                      : LinearColor{180, 180, 180, 255});
+    canvas.DrawString(status, 1.0f, 1.0f, true);
+  }
+
+  if (!overlayEnabled) {
     return;
   }
 
