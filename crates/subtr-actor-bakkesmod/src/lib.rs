@@ -5578,6 +5578,14 @@ mod tests {
         let callable_names = value["callable_analysis_node_names"]
             .as_array()
             .expect("callable names should be an array");
+        let callable_name_set = callable_names
+            .iter()
+            .map(|name| {
+                name.as_str()
+                    .expect("callable names should be strings")
+                    .to_owned()
+            })
+            .collect::<BTreeSet<_>>();
         assert!(callable_names.iter().any(|name| name == "core"));
         assert!(callable_names.iter().any(|name| name == "match_stats"));
         assert!(callable_names.iter().any(|name| name == "air_dribble"));
@@ -5613,6 +5621,18 @@ mod tests {
         let node_names = value["node_names"]
             .as_array()
             .expect("node names should be an array");
+        let node_name_set = node_names
+            .iter()
+            .map(|name| {
+                name.as_str()
+                    .expect("resolved graph node names should be strings")
+                    .to_owned()
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(
+            node_name_set.is_subset(&callable_name_set),
+            "every resolved graph node reported by graph_info should be callable by name"
+        );
         for builtin_name in builtin_analysis_node_names() {
             let live_name = builtin_analysis_node_aliases()
                 .iter()
@@ -8244,6 +8264,17 @@ mod tests {
                 .as_ref()
                 .expect("engine should remain valid while checking callable node names")
         });
+        let analysis_node_keys = analysis_nodes
+            .as_object()
+            .expect("analysis_nodes output should be an object")
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            analysis_node_keys,
+            callable_node_names.iter().cloned().collect::<BTreeSet<_>>(),
+            "bulk analysis_nodes output should contain exactly the callable node-name registry"
+        );
         for node_name in callable_node_names {
             assert_eq!(
                 analysis_nodes
