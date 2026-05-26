@@ -8,7 +8,7 @@ pub struct TouchState {
     pub last_touch_team_is_team_0: Option<bool>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct TouchStateCalculator {
     previous_ball_linear_velocity: Option<glam::Vec3>,
     previous_ball_angular_velocity: Option<glam::Vec3>,
@@ -193,6 +193,37 @@ impl TouchStateCalculator {
         self.recent_touch_candidates.get(player_id).cloned()
     }
 
+    fn best_candidate_for_team(&self, team_is_team_0: bool) -> Option<TouchEvent> {
+        self.recent_touch_candidates
+            .values()
+            .filter(|candidate| candidate.team_is_team_0 == team_is_team_0)
+            .min_by(|left, right| {
+                let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
+                let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
+                left_distance.total_cmp(&right_distance)
+            })
+            .cloned()
+    }
+
+    fn enrich_explicit_touch_event(&self, event: &TouchEvent) -> TouchEvent {
+        let candidate = if let Some(player_id) = event.player.as_ref() {
+            self.candidate_for_player(player_id)
+        } else {
+            self.best_candidate_for_team(event.team_is_team_0)
+        };
+        let Some(candidate) = candidate else {
+            return event.clone();
+        };
+
+        TouchEvent {
+            player: event.player.clone().or(candidate.player),
+            closest_approach_distance: event
+                .closest_approach_distance
+                .or(candidate.closest_approach_distance),
+            ..event.clone()
+        }
+    }
+
     fn contested_touch_candidates(&self, primary: &TouchEvent) -> Vec<TouchEvent> {
         const CONTESTED_TOUCH_DISTANCE_MARGIN: f32 = 80.0;
 
@@ -226,7 +257,15 @@ impl TouchStateCalculator {
         let mut touch_events = Vec::new();
         let mut confirmed_players = HashSet::new();
 
-        if self.is_touch_candidate(frame, ball) {
+        for event in &events.touch_events {
+            let event = self.enrich_explicit_touch_event(event);
+            if let Some(player_id) = event.player.clone() {
+                confirmed_players.insert(player_id);
+            }
+            touch_events.push(event);
+        }
+
+        if touch_events.is_empty() && self.is_touch_candidate(frame, ball) {
             if let Some(candidate) = self.candidate_touch_event(frame, ball, players) {
                 for contested_candidate in self.contested_touch_candidates(&candidate) {
                     if let Some(player_id) = contested_candidate.player.clone() {

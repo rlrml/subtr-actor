@@ -1,0 +1,242 @@
+#pragma once
+
+#include <chrono>
+#include <deque>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include <windows.h>
+
+#pragma comment(lib, "pluginsdk.lib")
+
+#include "bakkesmod/plugin/bakkesmodplugin.h"
+#include "bakkesmod/wrappers/Engine/UnrealStringWrapper.h"
+#include "bakkesmod/wrappers/arraywrapper.h"
+#include "bakkesmod/wrappers/Engine/ActorWrapper.h"
+#include "bakkesmod/wrappers/GameObject/BallWrapper.h"
+#include "bakkesmod/wrappers/GameObject/CarWrapper.h"
+#include "bakkesmod/wrappers/GameObject/CarComponent/BoostWrapper.h"
+#include "bakkesmod/wrappers/GameObject/GoalWrapper.h"
+#include "bakkesmod/wrappers/GameObject/PriWrapper.h"
+#include "bakkesmod/wrappers/GameObject/TeamWrapper.h"
+#include "bakkesmod/wrappers/GameEvent/ServerWrapper.h"
+#include "bakkesmod/wrappers/GameEvent/ReplayWrapper.h"
+#include "bakkesmod/wrappers/ReplayServerWrapper.h"
+#include "bakkesmod/wrappers/canvaswrapper.h"
+#include "subtr_actor_bakkesmod.h"
+
+class SubtrActorPlugin : public BakkesMod::Plugin::BakkesModPlugin {
+public:
+  void onLoad() override;
+  void onUnload() override;
+
+private:
+  using JsonLen = size_t (*)(const SaEngine *);
+  using WriteJson = size_t (*)(const SaEngine *, uint8_t *, size_t);
+  using NamedJsonLen = size_t (*)(const SaEngine *, const char *);
+  using WriteNamedJson = size_t (*)(const SaEngine *, const char *, uint8_t *, size_t);
+  using EngineCreate = SaEngine *(*)();
+  using EngineDestroy = void (*)(SaEngine *);
+  using EngineReset = void (*)(SaEngine *);
+  using EngineFinish = int32_t (*)(SaEngine *);
+  using ProcessFrame = int32_t (*)(SaEngine *, const SaLiveFrame *);
+  using EventsJsonLen = JsonLen;
+  using WriteEventsJson = WriteJson;
+  using FrameJsonLen = JsonLen;
+  using WriteFrameJson = WriteJson;
+  using TimelineJsonLen = JsonLen;
+  using WriteTimelineJson = WriteJson;
+  using StatsJsonLen = JsonLen;
+  using WriteStatsJson = WriteJson;
+  using StatsModuleJsonLen = NamedJsonLen;
+  using WriteStatsModuleJson = WriteNamedJson;
+  using StatsModuleFrameJsonLen = NamedJsonLen;
+  using WriteStatsModuleFrameJson = WriteNamedJson;
+  using StatsModuleConfigJsonLen = NamedJsonLen;
+  using WriteStatsModuleConfigJson = WriteNamedJson;
+  using GraphOutputJsonLen = NamedJsonLen;
+  using WriteGraphOutputJson = WriteNamedJson;
+  using AnalysisNodeJsonLen = NamedJsonLen;
+  using WriteAnalysisNodeJson = WriteNamedJson;
+  using AnalysisNodeNamesJsonLen = JsonLen;
+  using WriteAnalysisNodeNamesJson = WriteJson;
+  using GraphInfoJsonLen = JsonLen;
+  using WriteGraphInfoJson = WriteJson;
+  using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
+  using DrainTeamEvents = size_t (*)(SaEngine *, SaTeamEvent *, size_t);
+  using DrainGoalContextEvents = size_t (*)(SaEngine *, SaGoalContextEvent *, size_t);
+  using ReplayAnnotationsCreate = SaReplayAnnotations *(*)(const char *);
+  using ReplayAnnotationsDestroy = void (*)(SaReplayAnnotations *);
+  using ReplayAnnotationCount = size_t (*)(const SaReplayAnnotations *);
+  using PollReplayAnnotations =
+      size_t (*)(SaReplayAnnotations *, float, SaMechanicEvent *, size_t);
+
+  struct OverlayMessage {
+    std::string text;
+    LinearColor color;
+    std::chrono::steady_clock::time_point expires_at;
+  };
+
+  struct PlayerStatSnapshot {
+    int shots = 0;
+    int saves = 0;
+    int assists = 0;
+    int demolishes = 0;
+  };
+
+  struct TouchAttribution {
+    uint32_t player_index = 0;
+    uint8_t is_team_0 = 1;
+  };
+
+  HMODULE rustLibrary = nullptr;
+  SaEngine *engine = nullptr;
+  EngineCreate engineCreate = nullptr;
+  EngineDestroy engineDestroy = nullptr;
+  EngineReset engineReset = nullptr;
+  EngineFinish engineFinish = nullptr;
+  ProcessFrame processFrame = nullptr;
+  EventsJsonLen eventsJsonLen = nullptr;
+  WriteEventsJson writeEventsJson = nullptr;
+  FrameJsonLen frameJsonLen = nullptr;
+  WriteFrameJson writeFrameJson = nullptr;
+  TimelineJsonLen timelineJsonLen = nullptr;
+  WriteTimelineJson writeTimelineJson = nullptr;
+  StatsJsonLen statsJsonLen = nullptr;
+  WriteStatsJson writeStatsJson = nullptr;
+  StatsModuleJsonLen statsModuleJsonLen = nullptr;
+  WriteStatsModuleJson writeStatsModuleJson = nullptr;
+  StatsModuleFrameJsonLen statsModuleFrameJsonLen = nullptr;
+  WriteStatsModuleFrameJson writeStatsModuleFrameJson = nullptr;
+  StatsModuleConfigJsonLen statsModuleConfigJsonLen = nullptr;
+  WriteStatsModuleConfigJson writeStatsModuleConfigJson = nullptr;
+  GraphOutputJsonLen graphOutputJsonLen = nullptr;
+  WriteGraphOutputJson writeGraphOutputJson = nullptr;
+  AnalysisNodeJsonLen analysisNodeJsonLen = nullptr;
+  WriteAnalysisNodeJson writeAnalysisNodeJson = nullptr;
+  AnalysisNodeNamesJsonLen analysisNodeNamesJsonLen = nullptr;
+  WriteAnalysisNodeNamesJson writeAnalysisNodeNamesJson = nullptr;
+  GraphInfoJsonLen graphInfoJsonLen = nullptr;
+  WriteGraphInfoJson writeGraphInfoJson = nullptr;
+  DrainEvents drainEvents = nullptr;
+  DrainTeamEvents drainTeamEvents = nullptr;
+  DrainGoalContextEvents drainGoalContextEvents = nullptr;
+  ReplayAnnotationsCreate replayAnnotationsCreate = nullptr;
+  ReplayAnnotationsDestroy replayAnnotationsDestroy = nullptr;
+  ReplayAnnotationCount replayAnnotationCount = nullptr;
+  PollReplayAnnotations pollReplayAnnotations = nullptr;
+
+  uint64_t frameNumber = 0;
+  uint64_t inputTickNumber = 0;
+  float lastTime = 0.0f;
+  std::optional<float> lastProcessedGameTime;
+  uint64_t profileSampleCount = 0;
+  double profileSamplingMs = 0.0;
+  double profileProcessingMs = 0.0;
+  double profileDrainMs = 0.0;
+  std::shared_ptr<bool> liveTickCancelled = std::make_shared<bool>(false);
+  bool loaded = false;
+  bool wasInGame = false;
+  std::vector<SaPlayerFrame> sampledPlayers;
+  std::vector<std::string> sampledPlayerNames;
+  std::vector<SaTouchEvent> pendingTouches;
+  std::vector<SaDodgeRefreshedEvent> pendingDodgeRefreshes;
+  std::vector<SaBoostPadEvent> pendingBoostPadEvents;
+  std::vector<SaGoalEvent> pendingGoals;
+  std::vector<SaPlayerStatEvent> pendingPlayerStatEvents;
+  std::vector<SaDemolishEvent> pendingDemolishes;
+  std::unordered_map<uint32_t, float> lastBoostAmounts;
+  std::unordered_map<uintptr_t, uint32_t> carPlayerIndices;
+  std::unordered_map<uintptr_t, uint32_t> priPlayerIndices;
+  std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
+  std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
+  std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
+  std::unordered_map<uintptr_t, PlayerStatSnapshot> suppressedPlayerStatDeltas;
+  std::unordered_map<uint32_t, bool> lastDoubleJumped;
+  std::unordered_map<uint32_t, bool> lastCanJump;
+  std::unordered_map<uint32_t, uint64_t> lastBallTouchFrames;
+  std::unordered_map<uint32_t, int32_t> dodgeRefreshCounters;
+  std::unordered_map<uintptr_t, uint32_t> boostPadIds;
+  std::unordered_map<uintptr_t, uint8_t> boostPadSequences;
+  std::optional<std::pair<int, int>> lastTeamScores;
+  std::optional<SaGoalEvent> lastGoalEvent;
+  std::optional<TouchAttribution> lastTouch;
+  uint32_t nextPlayerIndex = 0;
+  uint32_t nextBoostPadId = 1;
+  std::deque<OverlayMessage> messages;
+  SaReplayAnnotations *replayAnnotations = nullptr;
+  std::string replayAnnotationPath;
+  bool replayAnnotationLoadFailed = false;
+
+  bool loadRustLibrary();
+  void unloadRustLibrary();
+  void tick(std::string eventName);
+  void scheduleLiveTick(float delaySeconds = 0.25f);
+  bool liveProcessingEnabled();
+  bool replayAnnotationsEnabled();
+  float sampleIntervalSeconds();
+  bool profileTimingEnabled();
+  uint64_t profileLogEvery();
+  void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
+  void resetProfileTiming();
+  void render(CanvasWrapper canvas);
+  void tickReplayAnnotations();
+  void resetReplayAnnotations();
+  std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
+  std::string readJsonBuffer(JsonLen len, WriteJson write);
+  std::string readNamedJsonBuffer(
+      NamedJsonLen len,
+      WriteNamedJson write,
+      const std::string &name);
+  void dumpGraphJson(std::vector<std::string> params);
+  void dumpStatsModuleJson(std::vector<std::string> params);
+  void dumpStatsModuleFrameJson(std::vector<std::string> params);
+  void dumpStatsModuleConfigJson(std::vector<std::string> params);
+  void dumpGraphOutputJson(std::vector<std::string> params);
+  void dumpAnalysisNodeJson(std::vector<std::string> params);
+  void verifyGraphRuntime(std::vector<std::string> params);
+  void selfTestGraphRuntime(std::vector<std::string> params);
+  void pushEventMessage(const SaMechanicEvent &event);
+  void pushTeamEventMessage(const SaTeamEvent &event);
+  void pushGoalContextEventMessage(const SaGoalContextEvent &event);
+  bool finishAndDrainPendingEvents(std::string_view context);
+  void drainPendingEvents();
+  SaLiveFrame sampleFrame();
+  void samplePlayers(ServerWrapper server, CarWrapper localCar);
+  SaRigidBody sampleRigidBody(ActorWrapper actor);
+  SaPlayerFrame samplePlayer(CarWrapper car, uint32_t playerIndex);
+  SaPlayerFrame samplePlayer(PriWrapper pri, uint32_t playerIndex);
+  void populatePlayerFromPri(SaPlayerFrame &player, PriWrapper pri, uint32_t fallbackIndex);
+  void hookGameEvents();
+  void unhookGameEvents();
+  void resetLiveState();
+  void clearPendingFrameEvents();
+  void commitPendingFrameEvents();
+  void attachPendingFrameEvents(SaLiveFrame &frame);
+  SaEventTiming currentEventTiming();
+  void recordTouch(CarWrapper car);
+  void recordDodgeRefreshFromJumpState(CarWrapper car, uint32_t playerIndex, uint8_t isTeam0);
+  void recordBoostPadEvent(ActorWrapper pickup, SaBoostPadEventKind kind);
+  void recordGoal(ServerWrapper server, GoalWrapper goal, int scoreIndex, int assistIndex);
+  void recordDemolish(CarWrapper victim, ActorWrapper demolisher);
+  void recordPlayerStatDeltas(PriWrapper pri, uint32_t playerIndex, uint8_t isTeam0);
+  void recordExplicitPlayerStat(PriWrapper pri, SaPlayerStatEventKind kind);
+  std::optional<uint32_t> playerIndexForCar(CarWrapper car);
+  std::optional<uint32_t> playerIndexForPri(PriWrapper pri);
+  PriWrapper priForScoreIndex(ServerWrapper server, int scoreIndex);
+  std::optional<uint32_t> playerIndexForScoreIndex(ServerWrapper server, int scoreIndex);
+  std::optional<uint32_t> playerIndexForNearestCar(ActorWrapper actor, float maxDistance);
+  uint32_t stablePlayerIndexForPri(PriWrapper pri, uint32_t fallbackIndex);
+  uint32_t boostPadId(ActorWrapper pickup);
+  void sampleTeamScores(ServerWrapper server, SaLiveFrame &frame);
+  void sampleTeamScores(ServerWrapper server, SaGoalEvent &goal);
+  std::optional<bool> scoringTeamFromScoreDelta(const SaGoalEvent &goal) const;
+  void rememberTeamScores(const SaLiveFrame &frame);
+  void rememberTeamScores(const SaGoalEvent &goal);
+  bool goalEventIsDuplicate(const SaGoalEvent &goal) const;
+};

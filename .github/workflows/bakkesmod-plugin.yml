@@ -1,0 +1,64 @@
+name: BakkesMod Plugin
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bakkesmod-plugin.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'bakkesmod/**'
+      - 'crates/subtr-actor-bakkesmod/**'
+      - 'src/**'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - '.github/workflows/bakkesmod-plugin.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'bakkesmod/**'
+      - 'crates/subtr-actor-bakkesmod/**'
+      - 'src/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build plugin DLLs
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate BakkesMod helper scripts
+        run: |
+          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py bakkesmod/verify-rust-dll-exports.py bakkesmod/verify-plugin-dll-exports.py bakkesmod/verify-rust-dll-runtime.py
+          python bakkesmod/verify-plugin-source.py
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build outputs
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test Rust ABI crate
+        run: cargo test -p subtr-actor-bakkesmod --verbose
+
+      - name: Build BakkesMod plugin
+        shell: pwsh
+        run: .\bakkesmod\build-windows.ps1
+
+      - name: Verify live graph surface in plugin artifacts
+        shell: pwsh
+        run: .\bakkesmod\verify-plugin-artifacts.ps1
+
+      - name: Upload plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtr-actor-bakkesmod-plugin
+          if-no-files-found: error
+          path: |
+            bakkesmod/build/Release/SubtrActorPlugin.dll
+            bakkesmod/build/Release/subtr_actor_bakkesmod.dll
+            bakkesmod/build/Release/bakkesmod-install/**

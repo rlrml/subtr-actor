@@ -2,4 +2,4 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { TimelineEventKind } from "./TimelineEventKind.ts";
 
-export type TimelineEvent = { time: number, kind: TimelineEventKind, player_id: RemoteIdTs | null, is_team_0: boolean | null, };
+export type TimelineEvent = { time: number, frame?: number | null, kind: TimelineEventKind, player_id: RemoteIdTs | null, is_team_0: boolean | null, };

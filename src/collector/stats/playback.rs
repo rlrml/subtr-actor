@@ -164,7 +164,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "replay_meta".to_owned(),
             serialize_to_json_value(&self.replay_meta)?,
         );
-        timeline.insert("events".to_owned(), self.timeline_event_sets_value());
+        timeline.insert("events".to_owned(), self.timeline_event_sets_value()?);
         timeline.insert(
             "frames".to_owned(),
             Value::Array(
@@ -600,7 +600,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         })
     }
 
-    fn timeline_event_sets_value(&self) -> Value {
+    fn timeline_event_sets_value(&self) -> SubtrActorResult<Value> {
         let mut events = Map::new();
         events.insert("timeline".to_owned(), Value::Array(self.timeline_events()));
         events.insert(
@@ -635,7 +635,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "rotation_team".to_owned(),
             Value::Array(self.module_array("rotation", "team_events")),
         );
-        events.insert("mechanics".to_owned(), Value::Array(Vec::new()));
+        events.insert(
+            "mechanics".to_owned(),
+            serialize_to_json_value(&self.mechanic_events_typed()?)?,
+        );
         events.insert(
             "backboard".to_owned(),
             Value::Array(self.module_array("backboard", "events")),
@@ -728,7 +731,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "bump".to_owned(),
             Value::Array(self.module_array("bump", "events")),
         );
-        Value::Object(events)
+        Ok(Value::Object(events))
     }
 
     fn timeline_config(&self) -> StatsTimelineConfig {
@@ -2071,6 +2074,7 @@ fn parse_timeline_event(value: &Value) -> SubtrActorResult<TimelineEvent> {
     let object = json_object(value, "timeline event")?;
     Ok(TimelineEvent {
         time: json_required_f32(object, "time")?,
+        frame: json_optional_usize(object.get("frame"))?,
         kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
         player_id: json_optional_remote_id(object.get("player_id"))?,
         is_team_0: json_optional_bool(object.get("is_team_0")),

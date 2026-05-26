@@ -45,7 +45,7 @@ pub trait Collector {
     /// progression.
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -73,18 +73,18 @@ pub trait Collector {
     ///
     /// Collectors that aggregate state across frame boundaries can override
     /// this to flush any in-progress segment once replay traversal is complete.
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         Ok(())
     }
 }
 
 impl<G> Collector for G
 where
-    G: FnMut(&ReplayProcessor, &boxcars::Frame, usize, f32) -> SubtrActorResult<TimeAdvance>,
+    G: FnMut(&dyn ProcessorView, &boxcars::Frame, usize, f32) -> SubtrActorResult<TimeAdvance>,
 {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,

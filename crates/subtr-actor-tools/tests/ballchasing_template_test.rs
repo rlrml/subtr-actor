@@ -6,7 +6,8 @@ use serde_json::Value;
 use subtr_actor::{
     boost_amount_to_percent, standard_soccar_boost_pad_layout, stats, BoostCalculator,
     BoostPadEventKind, BoostPadSize, Collector, FrameInput, LivePlayTracker, PlayerId, PlayerInfo,
-    ReplayProcessor, StatsTimelineCollector, TimeAdvance, BOOST_KICKOFF_START_AMOUNT,
+    ProcessorView, ReplayProcessor, StatsTimelineCollector, TimeAdvance,
+    BOOST_KICKOFF_START_AMOUNT,
 };
 
 macro_rules! ballchasing_fixture_test {
@@ -261,7 +262,7 @@ fn nearest_standard_pad_size(position: glam::Vec3) -> Option<BoostPadSize> {
 impl Collector for PickupSequenceReportCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -378,7 +379,7 @@ struct BoostIncreaseReportCollector {
 impl Collector for BoostIncreaseReportCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,

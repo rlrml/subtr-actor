@@ -159,6 +159,38 @@ impl BuiltinModuleSelection {
     }
 }
 
+pub fn builtin_stats_graph_snapshot_json(
+    graph: &AnalysisGraph,
+    replay_meta: Option<&ReplayMeta>,
+) -> SubtrActorResult<Value> {
+    let modules = BuiltinModuleSelection::all();
+    let frame = if let Some(replay_meta) = replay_meta {
+        if graph.state::<FrameInfo>().is_some() && graph.state::<GameplayState>().is_some() {
+            serialize_to_json_value(&modules.snapshot_frame(graph, replay_meta)?)?
+        } else {
+            Value::Null
+        }
+    } else {
+        Value::Null
+    };
+
+    let mut payload = Map::new();
+    payload.insert(
+        "module_names".to_owned(),
+        serialize_to_json_value(&modules.module_names)?,
+    );
+    payload.insert(
+        "config".to_owned(),
+        Value::Object(modules.snapshot_config_json(graph)?),
+    );
+    payload.insert(
+        "modules".to_owned(),
+        Value::Object(modules.modules_json(graph)?),
+    );
+    payload.insert("frame".to_owned(), frame);
+    Ok(Value::Object(payload))
+}
+
 pub trait FrameTransform {
     type Output;
 
@@ -257,6 +289,7 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     last_demolish_count: usize,
     last_boost_pad_event_count: usize,
     last_touch_event_count: usize,
+    last_dodge_refreshed_event_count: usize,
     last_player_stat_event_count: usize,
     last_goal_event_count: usize,
     _marker: PhantomData<T>,
@@ -400,6 +433,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count: 0,
             last_boost_pad_event_count: 0,
             last_touch_event_count: 0,
+            last_dodge_refreshed_event_count: 0,
             last_player_stat_event_count: 0,
             last_goal_event_count: 0,
             _marker: PhantomData,
@@ -425,6 +459,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
+            last_dodge_refreshed_event_count,
             last_player_stat_event_count,
             last_goal_event_count,
             ..
@@ -442,6 +477,7 @@ impl<T, F> StatsCollector<T, F> {
             last_demolish_count,
             last_boost_pad_event_count,
             last_touch_event_count,
+            last_dodge_refreshed_event_count,
             last_player_stat_event_count,
             last_goal_event_count,
             _marker: PhantomData,
@@ -543,7 +579,7 @@ impl<T, F> StatsCollector<T, F> {
         Ok(())
     }
 
-    fn refresh_replay_meta(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn refresh_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         let player_count = processor.player_count();
         if self.last_replay_meta_player_count == Some(player_count) {
             return Ok(());
@@ -563,7 +599,7 @@ where
 {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -583,6 +619,7 @@ where
                 self.last_demolish_count,
                 self.last_boost_pad_event_count,
                 self.last_touch_event_count,
+                self.last_dodge_refreshed_event_count,
                 self.last_player_stat_event_count,
                 self.last_goal_event_count,
             ),
@@ -605,17 +642,18 @@ where
 
         self.last_sample_time = Some(current_time);
         if matches!(self.sample_mode, SampleMode::Aggregate) {
-            self.last_demolish_count = processor.demolishes.len();
-            self.last_boost_pad_event_count = processor.boost_pad_events.len();
-            self.last_touch_event_count = processor.touch_events.len();
-            self.last_player_stat_event_count = processor.player_stat_events.len();
-            self.last_goal_event_count = processor.goal_events.len();
+            self.last_demolish_count = processor.demolishes().len();
+            self.last_boost_pad_event_count = processor.boost_pad_events().len();
+            self.last_touch_event_count = processor.touch_events().len();
+            self.last_dodge_refreshed_event_count = processor.dodge_refreshed_events().len();
+            self.last_player_stat_event_count = processor.player_stat_events().len();
+            self.last_goal_event_count = processor.goal_events().len();
         }
 
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
         let Some(replay_meta) = self.replay_meta.as_ref().cloned() else {
             return Ok(());

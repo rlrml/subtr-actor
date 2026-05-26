@@ -1268,6 +1268,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "subtr-actor-bakkesmod"
+version = "0.9.2"
+dependencies = [
+ "boxcars",
+ "serde_json",
+ "subtr-actor",
+]
+
+[[package]]
 name = "subtr-actor-py"
 version = "0.9.2"
 dependencies = [

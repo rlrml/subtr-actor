@@ -28,7 +28,7 @@ pub fn build_timeline_event_graph() -> AnalysisGraph {
     graph
 }
 
-fn default_stats_timeline_config() -> StatsTimelineConfig {
+pub fn default_stats_timeline_config() -> StatsTimelineConfig {
     let rotation_defaults = RotationCalculatorConfig::default();
     StatsTimelineConfig {
         most_back_forward_threshold_y: PositioningCalculatorConfig::default()
@@ -321,7 +321,7 @@ impl StatsTimelineEventCollector {
 impl Collector for StatsTimelineCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -351,7 +351,7 @@ impl Collector for StatsTimelineCollector {
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
         let Some(_) = self.replay_meta.as_ref() else {
             return Ok(());
@@ -383,7 +383,7 @@ impl Collector for StatsTimelineCollector {
 impl Collector for StatsTimelineEventCollector {
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -413,7 +413,7 @@ impl Collector for StatsTimelineEventCollector {
         Ok(TimeAdvance::NextFrame)
     }
 
-    fn finish_replay(&mut self, _processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
         let Some(_) = self.replay_meta.as_ref() else {
             return Ok(());

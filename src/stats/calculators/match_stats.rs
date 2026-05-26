@@ -498,6 +498,8 @@ pub enum TimelineEventKind {
 #[ts(export)]
 pub struct TimelineEvent {
     pub time: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame: Option<usize>,
     pub kind: TimelineEventKind,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
@@ -797,6 +799,7 @@ struct PendingGoalEvent {
     event: GoalEvent,
     time_after_kickoff: Option<f32>,
     goal_buildup: GoalBuildupKind,
+    ball_air_time_before_goal: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -872,6 +875,55 @@ impl MatchStatsCalculator {
         &self.core_team_events
     }
 
+    pub fn finish(&mut self) -> SubtrActorResult<()> {
+        let pending_goal_events = std::mem::take(&mut self.pending_goal_events);
+        for pending_goal_event in pending_goal_events {
+            let Some(scorer) = pending_goal_event.event.player.clone() else {
+                continue;
+            };
+            let scorer_last_touch =
+                self.reconcile_goal_context_scorer(&pending_goal_event.event, &scorer);
+            let scorer_stats = self.player_stats.entry(scorer.clone()).or_default();
+            scorer_stats.goals += 1;
+            if let Some(touch_position) = scorer_last_touch.and_then(|touch| touch.ball_position) {
+                scorer_stats
+                    .scoring_context
+                    .record_scoring_goal_last_touch_position(touch_position);
+            }
+            if let Some(time_after_kickoff) = pending_goal_event.time_after_kickoff {
+                scorer_stats
+                    .scoring_context
+                    .goal_after_kickoff
+                    .record_goal(time_after_kickoff);
+            }
+            scorer_stats
+                .scoring_context
+                .goal_buildup
+                .record(pending_goal_event.goal_buildup);
+            if let Some(ball_air_time_before_goal) = pending_goal_event.ball_air_time_before_goal {
+                scorer_stats
+                    .scoring_context
+                    .record_goal_ball_air_time(ball_air_time_before_goal);
+            }
+
+            self.timeline.push(TimelineEvent {
+                time: pending_goal_event.event.time,
+                frame: Some(pending_goal_event.event.frame),
+                kind: TimelineEventKind::Goal,
+                player_id: Some(scorer),
+                is_team_0: Some(pending_goal_event.event.scoring_team_is_team_0),
+            });
+        }
+
+        self.timeline.sort_by(|a, b| {
+            a.time
+                .partial_cmp(&b.time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        Ok(())
+    }
+
     pub fn team_zero_stats(&self) -> CoreTeamStats {
         self.team_stats_for_side(true)
     }
@@ -927,6 +979,7 @@ impl MatchStatsCalculator {
     fn emit_timeline_events(
         &mut self,
         time: f32,
+        frame: Option<usize>,
         kind: TimelineEventKind,
         player_id: &PlayerId,
         is_team_0: bool,
@@ -935,6 +988,7 @@ impl MatchStatsCalculator {
         for _ in 0..delta.max(0) {
             self.timeline.push(TimelineEvent {
                 time,
+                frame,
                 kind,
                 player_id: Some(player_id.clone()),
                 is_team_0: Some(is_team_0),
@@ -1222,8 +1276,6 @@ impl MatchStatsCalculator {
         goal_event: &GoalEvent,
         scoring_team_most_back_player: Option<&PlayerId>,
         defending_team_most_back_player: Option<&PlayerId>,
-        scorer_last_touch: Option<&GoalTouchContext>,
-        ball_air_time_before_goal: Option<f32>,
     ) {
         if let Some(player_id) = scoring_team_most_back_player {
             self.player_stats
@@ -1257,23 +1309,6 @@ impl MatchStatsCalculator {
                     boost_leadup,
                 );
         }
-
-        if let Some(scorer) = goal_event.player.as_ref() {
-            if let Some(touch_position) = scorer_last_touch.and_then(|touch| touch.ball_position) {
-                self.player_stats
-                    .entry(scorer.clone())
-                    .or_default()
-                    .scoring_context
-                    .record_scoring_goal_last_touch_position(touch_position);
-            }
-            if let Some(ball_air_time_before_goal) = ball_air_time_before_goal {
-                self.player_stats
-                    .entry(scorer.clone())
-                    .or_default()
-                    .scoring_context
-                    .record_goal_ball_air_time(ball_air_time_before_goal);
-            }
-        }
     }
 
     fn record_goal_context_events(
@@ -1303,8 +1338,6 @@ impl MatchStatsCalculator {
                 goal_event,
                 scoring_team_most_back_player.as_ref(),
                 defending_team_most_back_player.as_ref(),
-                scorer_last_touch.as_ref(),
-                ball_air_time_before_goal,
             );
 
             self.goal_context_events.push(GoalContextEvent {
@@ -1326,6 +1359,28 @@ impl MatchStatsCalculator {
                 ),
             });
         }
+    }
+
+    fn reconcile_goal_context_scorer(
+        &mut self,
+        goal_event: &GoalEvent,
+        scorer: &PlayerId,
+    ) -> Option<GoalTouchContext> {
+        let scorer_last_touch = self
+            .last_touch_context_by_player
+            .get(scorer)
+            .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
+            .cloned();
+        if let Some(context) = self.goal_context_events.iter_mut().rev().find(|context| {
+            context.frame == goal_event.frame
+                && context.time == goal_event.time
+                && context.scoring_team_is_team_0 == goal_event.scoring_team_is_team_0
+                && context.scorer.as_ref() != Some(scorer)
+        }) {
+            context.scorer = Some(scorer.clone());
+            context.scorer_last_touch = scorer_last_touch.clone();
+        }
+        scorer_last_touch
     }
 
     fn prune_goal_buildup_samples(&mut self, current_time: f32) {
@@ -1474,6 +1529,7 @@ impl MatchStatsCalculator {
                     .active_kickoff_touch_time
                     .map(|kickoff_touch_time| (event.time - kickoff_touch_time).max(0.0)),
                 goal_buildup: self.classify_goal_buildup(event.time, event.scoring_team_is_team_0),
+                ball_air_time_before_goal: self.ball_air_time_before_goal(event.time),
                 event,
             })
             .collect();
@@ -1488,6 +1544,7 @@ impl MatchStatsCalculator {
             };
             self.timeline.push(TimelineEvent {
                 time: event.time,
+                frame: Some(event.frame),
                 kind,
                 player_id: Some(event.player.clone()),
                 is_team_0: Some(event.is_team_0),
@@ -1542,6 +1599,7 @@ impl MatchStatsCalculator {
             if shot_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Shot,
                     &player.player_id,
                     player.is_team_0,
@@ -1551,6 +1609,7 @@ impl MatchStatsCalculator {
             if save_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Save,
                     &player.player_id,
                     player.is_team_0,
@@ -1560,6 +1619,7 @@ impl MatchStatsCalculator {
             if assist_fallback_delta > 0 {
                 self.emit_timeline_events(
                     frame.time,
+                    Some(frame.frame_number),
                     TimelineEventKind::Assist,
                     &player.player_id,
                     player.is_team_0,
@@ -1570,6 +1630,26 @@ impl MatchStatsCalculator {
                 for _ in 0..goal_delta.max(0) {
                     let pending_goal_event =
                         self.take_pending_goal_event(&player.player_id, player.is_team_0);
+                    if let Some(pending_goal_event) = pending_goal_event.as_ref() {
+                        let scorer_last_touch = self.reconcile_goal_context_scorer(
+                            &pending_goal_event.event,
+                            &player.player_id,
+                        );
+                        if let Some(touch_position) =
+                            scorer_last_touch.and_then(|touch| touch.ball_position)
+                        {
+                            current_stats
+                                .scoring_context
+                                .record_scoring_goal_last_touch_position(touch_position);
+                        }
+                        if let Some(ball_air_time_before_goal) =
+                            pending_goal_event.ball_air_time_before_goal
+                        {
+                            current_stats
+                                .scoring_context
+                                .record_goal_ball_air_time(ball_air_time_before_goal);
+                        }
+                    }
                     let goal_time = pending_goal_event
                         .as_ref()
                         .map(|event| event.event.time)
@@ -1578,6 +1658,10 @@ impl MatchStatsCalculator {
                         .as_ref()
                         .map(|event| event.goal_buildup)
                         .unwrap_or_else(|| self.classify_goal_buildup(goal_time, player.is_team_0));
+                    let goal_frame = pending_goal_event
+                        .as_ref()
+                        .map(|event| event.event.frame)
+                        .unwrap_or(frame.frame_number);
                     let time_after_kickoff = pending_goal_event
                         .and_then(|event| event.time_after_kickoff)
                         .or_else(|| {
@@ -1596,6 +1680,7 @@ impl MatchStatsCalculator {
                         .record(goal_buildup);
                     self.timeline.push(TimelineEvent {
                         time: goal_time,
+                        frame: Some(goal_frame),
                         kind: TimelineEventKind::Goal,
                         player_id: Some(player.player_id.clone()),
                         is_team_0: Some(player.is_team_0),

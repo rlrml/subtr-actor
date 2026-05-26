@@ -28,4 +28,5 @@ impl_analysis_node! {
         touch_state_dependency() => TouchState,
     ],
     call = calculator.update_parts,
+    finish = calculator.finish,
 }

@@ -21,8 +21,20 @@ impl_analysis_node! {
     state = LivePlayState,
     name = "live_play",
     dependencies = [
-        gameplay_state_dependency() => GameplayState,
-        frame_events_state_dependency() => FrameEventsState,
+        AnalysisDependency::required::<FrameInput>(),
+        gameplay_state_dependency(),
+        frame_events_state_dependency(),
     ],
-    update_state = tracker.state_parts,
+    inputs = {
+        frame_input: FrameInput,
+        gameplay: GameplayState,
+        events: FrameEventsState,
+    },
+    evaluate = |node| {
+        node.state = frame_input
+            .live_play_state()
+            .unwrap_or_else(|| node.tracker.state_parts(gameplay, events));
+        Ok(())
+    },
+    state_ref = |node| &node.state,
 }

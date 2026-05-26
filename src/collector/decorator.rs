@@ -53,7 +53,7 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
     /// [`TimeAdvance::Time`].
     fn process_frame(
         &mut self,
-        processor: &ReplayProcessor,
+        processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,
@@ -74,7 +74,7 @@ impl<'a, C: Collector> Collector for FrameRateDecorator<'a, C> {
         Ok(next_target_time)
     }
 
-    fn finish_replay(&mut self, processor: &ReplayProcessor) -> SubtrActorResult<()> {
+    fn finish_replay(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.collector.finish_replay(processor)
     }
 }

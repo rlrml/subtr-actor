@@ -8,6 +8,10 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    bakkesmod-sdk = {
+      url = "github:bakkesmodorg/BakkesModSDK/479e8f571cf554b25f4eeb64d611dec4133edcaf";
+      flake = false;
+    };
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,6 +35,7 @@
       nixpkgs,
       flake-utils,
       fenix,
+      bakkesmod-sdk,
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
@@ -45,6 +50,7 @@
         rustToolchain = fenix.packages.${system}.combine [
           fenix.packages.${system}.stable.toolchain
           fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+          fenix.packages.${system}.targets.x86_64-pc-windows-msvc.stable.rust-std
         ];
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rustToolchain;
@@ -70,6 +76,31 @@
           wheel = [ ];
         };
         projectVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+        mingw = pkgs.pkgsCross.mingwW64;
+        xwinMsvcSysroot = pkgs.stdenvNoCC.mkDerivation {
+          pname = "xwin-msvc-sysroot";
+          version = "x86_64-desktop";
+          dontUnpack = true;
+          nativeBuildInputs = [ pkgs.xwin ];
+          outputHashAlgo = "sha256";
+          outputHashMode = "recursive";
+          outputHash = "sha256-PMJqIj13w/ssarSzm0yKzqh4uUfBrOVFe+CmzZPv3xM=";
+          installPhase = ''
+            runHook preInstall
+            export HOME="$TMPDIR"
+            xwin \
+              --accept-license \
+              --cache-dir "$TMPDIR/xwin-cache" \
+              --arch x86_64 \
+              --variant desktop \
+              splat \
+              --output "$out" \
+              --use-winsysroot-style \
+              --preserve-ms-arch-notation \
+              --copy
+            runHook postInstall
+          '';
+        };
         shellPackages = [
           pythonEnv
           pkgs.uv
@@ -144,6 +175,39 @@
             runHook postInstall
           '';
         };
+        packages.xwin-msvc-sysroot = xwinMsvcSysroot;
+        packages.bakkesmod-plugin = rustPlatform.buildRustPackage {
+          pname = "subtr-actor-bakkesmod-plugin";
+          version = projectVersion;
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.llvmPackages_21.clang-unwrapped
+            pkgs.llvmPackages_21.llvm
+            pkgs.lld
+            pkgs.ninja
+            pkgs.python3
+          ];
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            export BUILD_DIR="$TMPDIR/bakkesmod-build"
+            export XWIN_SYSROOT="${xwinMsvcSysroot}"
+            export BAKKESMODSDK_DIR="${bakkesmod-sdk}"
+            export BAKKESMOD_SDK_DIR="$BAKKESMODSDK_DIR"
+            bash bakkesmod/build-linux-msvc.sh
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            mkdir -p "$out"
+            cp -r "$BUILD_DIR/Release/." "$out/"
+            runHook postInstall
+          '';
+          doCheck = false;
+          dontCargoInstall = true;
+        };
 
         devShells.default = pkgs.mkShell {
           packages = shellPackages;
@@ -156,6 +220,40 @@
             unset PYTHONPATH
             export REPO_ROOT=$(git rev-parse --show-toplevel)
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath shellPackages}:${pkgs.stdenv.cc.cc.lib.outPath}/lib:/run/opengl-driver/lib/:''${LD_LIBRARY_PATH:-}"
+          '';
+        };
+        devShells.bakkesmod = pkgs.mkShell {
+          packages = shellPackages ++ [
+            mingw.stdenv.cc
+            pkgs.cmake
+            pkgs.file
+            pkgs.llvmPackages_21.clang-unwrapped
+            pkgs.llvmPackages_21.llvm
+            pkgs.lld
+            pkgs.ninja
+            pkgs.python3
+            pkgs.wine64Packages.unstable
+            pkgs.xwin
+          ];
+
+          env = {
+            UV_PYTHON_DOWNLOADS = "never";
+            MCFGTHREAD_INCLUDE = "${mingw.windows.mcfgthreads.dev}/include";
+            MCFGTHREAD_LIB = "${mingw.windows.mcfgthreads}/lib";
+          };
+
+          shellHook = ''
+            unset PYTHONPATH
+            export REPO_ROOT=$(git rev-parse --show-toplevel)
+            export BAKKESMODSDK_DIR="''${BAKKESMODSDK_DIR:-${bakkesmod-sdk}}"
+            export BAKKESMOD_SDK_DIR="''${BAKKESMOD_SDK_DIR:-$BAKKESMODSDK_DIR}"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath shellPackages}:${pkgs.stdenv.cc.cc.lib.outPath}/lib:/run/opengl-driver/lib/:''${LD_LIBRARY_PATH:-}"
+            echo "subtr-actor BakkesMod shell"
+            echo "  Rust ABI: cargo build -p subtr-actor-bakkesmod --release"
+            echo "  SDK:      $BAKKESMODSDK_DIR"
+            echo "  Linux MSVC build: bakkesmod/build-linux-msvc.sh"
+            echo "  Wine:     wine <windows-exe> for local MSVC artifact smoke tests"
+            echo "  MinGW note: MinGW can smoke-compile headers, but final plugin linking needs MSVC ABI."
           '';
         };
       }

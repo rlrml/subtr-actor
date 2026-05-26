@@ -1,4 +1,4 @@
-use crate::{Collector, ReplayProcessor, SubtrActorResult, TimeAdvance};
+use crate::{Collector, ProcessorView, SubtrActorResult, TimeAdvance};
 use boxcars;
 
 /// A lightweight collector that invokes a callback at a configurable frame cadence.
@@ -45,7 +45,7 @@ where
 {
     fn process_frame(
         &mut self,
-        _processor: &ReplayProcessor,
+        _processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_number: usize,
         current_time: f32,

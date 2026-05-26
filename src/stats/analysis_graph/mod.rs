@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use serde::Serialize;
+
 use crate::Collector;
 use crate::{SubtrActorError, SubtrActorErrorVariant, SubtrActorResult};
 
@@ -24,19 +26,131 @@ pub use collector::AnalysisNodeCollector;
 #[allow(unused_imports)]
 pub use nodes::*;
 
+pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
+    "core",
+    "frame_info",
+    "gameplay_state",
+    "ball_frame_state",
+    "player_frame_state",
+    "frame_events_state",
+    "live_play",
+    "match_stats",
+    "backboard",
+    "backboard_bounce_state",
+    "ceiling_shot",
+    "center",
+    "continuous_ball_control",
+    "double_tap",
+    "fifty_fifty",
+    "fifty_fifty_state",
+    "possession",
+    "possession_state",
+    "pressure",
+    "rotation",
+    "rush",
+    "touch",
+    "touch_state",
+    "wall_aerial",
+    "wall_aerial_shot",
+    "whiff",
+    "wavedash",
+    "speed_flip",
+    "half_flip",
+    "half_volley",
+    "flick",
+    "aerial_goal",
+    "high_aerial_goal",
+    "long_distance_goal",
+    "own_half_goal",
+    "empty_net_goal",
+    "counter_attack_goal",
+    "flick_goal",
+    "double_tap_goal",
+    "one_timer_goal",
+    "passing_goal",
+    "air_dribble_goal",
+    "flip_reset_goal",
+    "half_volley_goal",
+    "musty_flick",
+    "one_timer",
+    "pass",
+    "dodge_reset",
+    "ball_carry",
+    "air_dribble",
+    "boost",
+    "bump",
+    "movement",
+    "positioning",
+    "powerslide",
+    "player_vertical_state",
+    "demo",
+    "settings",
+    "stats_timeline_frame",
+    "stats_timeline_events",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct BuiltinAnalysisNodeAlias {
+    pub alias: &'static str,
+    pub node_name: &'static str,
+}
+
+pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] = &[
+    BuiltinAnalysisNodeAlias {
+        alias: "core",
+        node_name: "match_stats",
+    },
+    BuiltinAnalysisNodeAlias {
+        alias: "air_dribble",
+        node_name: "ball_carry",
+    },
+];
+
+pub fn builtin_analysis_node_names() -> &'static [&'static str] {
+    BUILTIN_ANALYSIS_NODE_NAMES
+}
+
+pub fn builtin_analysis_node_aliases() -> &'static [BuiltinAnalysisNodeAlias] {
+    BUILTIN_ANALYSIS_NODE_ALIASES
+}
+
+fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
+    builtin_analysis_node_aliases()
+        .iter()
+        .find_map(|alias| (alias.alias == name).then_some(alias.node_name))
+        .or_else(|| {
+            builtin_analysis_node_names()
+                .iter()
+                .copied()
+                .find(|candidate| *candidate == name)
+        })
+}
+
 pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn AnalysisNodeDyn>> {
     match name {
         "core" => Some(nodes::match_stats::boxed_default()),
+        "frame_info" => Some(nodes::frame_info::boxed_default()),
+        "gameplay_state" => Some(nodes::gameplay_state::boxed_default()),
+        "ball_frame_state" => Some(nodes::ball_frame_state::boxed_default()),
+        "player_frame_state" => Some(nodes::player_frame_state::boxed_default()),
+        "frame_events_state" => Some(nodes::frame_events_state::boxed_default()),
+        "live_play" => Some(nodes::live_play::boxed_default()),
+        "match_stats" => Some(nodes::match_stats::boxed_default()),
         "backboard" => Some(nodes::backboard::boxed_default()),
+        "backboard_bounce_state" => Some(nodes::backboard_bounce::boxed_default()),
         "ceiling_shot" => Some(nodes::ceiling_shot::boxed_default()),
         "center" => Some(nodes::center::boxed_default()),
+        "continuous_ball_control" => Some(nodes::continuous_ball_control::boxed_default()),
         "double_tap" => Some(nodes::double_tap::boxed_default()),
         "fifty_fifty" => Some(nodes::fifty_fifty::boxed_default()),
+        "fifty_fifty_state" => Some(nodes::fifty_fifty_state::boxed_default()),
         "possession" => Some(nodes::possession::boxed_default()),
+        "possession_state" => Some(nodes::possession_state::boxed_default()),
         "pressure" => Some(nodes::pressure::boxed_default()),
         "rotation" => Some(nodes::rotation::boxed_default()),
         "rush" => Some(nodes::rush::boxed_default()),
         "touch" => Some(nodes::touch::boxed_default()),
+        "touch_state" => Some(nodes::touch_state::boxed_default()),
         "wall_aerial" => Some(nodes::wall_aerial::boxed_default()),
         "wall_aerial_shot" => Some(nodes::wall_aerial_shot::boxed_default()),
         "whiff" => Some(nodes::whiff::boxed_default()),
@@ -68,7 +182,11 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "movement" => Some(nodes::movement::boxed_default()),
         "positioning" => Some(nodes::positioning::boxed_default()),
         "powerslide" => Some(nodes::powerslide::boxed_default()),
+        "player_vertical_state" => Some(nodes::player_vertical_state::boxed_default()),
         "demo" => Some(nodes::demo::boxed_default()),
+        "settings" => Some(nodes::settings::boxed_default()),
+        "stats_timeline_frame" => Some(nodes::stats_timeline_frame::boxed_default()),
+        "stats_timeline_events" => Some(nodes::stats_timeline_events::boxed_default()),
         _ => None,
     }
 }
@@ -79,14 +197,18 @@ where
     S: AsRef<str>,
 {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
-    graph.push_boxed_node(nodes::live_play::boxed_default());
     let mut seen = HashSet::new();
     for name in names {
         let name = name.as_ref();
-        if !seen.insert(name.to_owned()) {
+        let canonical_name = canonical_builtin_analysis_node_name(name).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
+                name.to_owned(),
+            ))
+        })?;
+        if !seen.insert(canonical_name) {
             continue;
         }
-        graph.push_boxed_node(boxed_analysis_node_by_name(name).ok_or_else(|| {
+        graph.push_boxed_node(boxed_analysis_node_by_name(canonical_name).ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::UnknownStatsModuleName(
                 name.to_owned(),
             ))
@@ -122,6 +244,7 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::bump::boxed_default(),
         nodes::ceiling_shot::boxed_default(),
         nodes::center::boxed_default(),
+        nodes::continuous_ball_control::boxed_default(),
         nodes::demo::boxed_default(),
         nodes::dodge_reset::boxed_default(),
         nodes::double_tap::boxed_default(),
@@ -160,12 +283,13 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::wall_aerial::boxed_default(),
         nodes::wall_aerial_shot::boxed_default(),
         nodes::whiff::boxed_default(),
+        nodes::stats_timeline_frame::boxed_default(),
+        nodes::stats_timeline_events::boxed_default(),
     ]
 }
 
 pub fn graph_with_all_analysis_nodes() -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
-    graph.push_boxed_node(nodes::live_play::boxed_default());
     for node in all_analysis_nodes() {
         graph.push_boxed_node(node);
     }
