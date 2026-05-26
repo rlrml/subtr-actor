@@ -542,6 +542,8 @@ export function createPlayerStatsSnapshot(
         time_behind_play: 0,
         time_level_with_play: 0,
         time_ahead_of_play: 0,
+        longest_first_man_stint_time: 0,
+        first_man_stint_count: 0,
         became_first_man_count: 0,
         lost_first_man_count: 0,
         current_role_state: "unknown",

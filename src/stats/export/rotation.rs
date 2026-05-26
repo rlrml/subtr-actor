@@ -96,6 +96,24 @@ impl StatFieldProvider for RotationPlayerStats {
         ));
         visitor(ExportedStat::unsigned(
             "rotation",
+            "first_man_stints",
+            StatUnit::Count,
+            self.first_man_stint_count,
+        ));
+        visitor(ExportedStat::float(
+            "rotation",
+            "longest_first_man_stint_time",
+            StatUnit::Seconds,
+            self.longest_first_man_stint_time,
+        ));
+        visitor(ExportedStat::float(
+            "rotation",
+            "avg_first_man_stint_time",
+            StatUnit::Seconds,
+            self.average_first_man_stint_time(),
+        ));
+        visitor(ExportedStat::unsigned(
+            "rotation",
             "became_first_man",
             StatUnit::Count,
             self.became_first_man_count,

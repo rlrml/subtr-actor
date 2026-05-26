@@ -4435,6 +4435,9 @@ fn assert_positioning_events_reconstruct_serialized_partial_sums(
 #[derive(Debug, Clone, Default)]
 struct RotationPlayerDerivationState {
     active: bool,
+    first_man_stint_active: bool,
+    current_first_man_stint_time: f32,
+    non_first_man_seconds: f32,
     stats: RotationPlayerStats,
 }
 
@@ -4443,6 +4446,11 @@ fn apply_rotation_player_event_for_derivation(
     event: &RotationPlayerEvent,
 ) {
     state.active = event.active;
+    if !event.active {
+        state.first_man_stint_active = false;
+        state.current_first_man_stint_time = 0.0;
+        state.non_first_man_seconds = 0.0;
+    }
     let stats = &mut state.stats;
     stats.became_first_man_count += event.became_first_man_count;
     stats.lost_first_man_count += event.lost_first_man_count;
@@ -4453,28 +4461,69 @@ fn apply_rotation_player_event_for_derivation(
 fn accumulate_rotation_player_frame_for_derivation(
     state: &mut RotationPlayerDerivationState,
     frame: &ReplayStatsFrame,
+    first_man_stint_end_grace_seconds: f32,
 ) {
     if !state.active {
         return;
     }
 
-    let stats = &mut state.stats;
-    stats.active_game_time += frame.dt;
-    stats.tracked_time += frame.dt;
+    state.stats.active_game_time += frame.dt;
+    state.stats.tracked_time += frame.dt;
 
-    match stats.current_role_state {
-        RoleState::FirstMan => stats.time_first_man += frame.dt,
-        RoleState::SecondMan => stats.time_second_man += frame.dt,
-        RoleState::ThirdMan => stats.time_third_man += frame.dt,
-        RoleState::Ambiguous => stats.time_ambiguous_role += frame.dt,
-        RoleState::Unknown => {}
+    match state.stats.current_role_state {
+        RoleState::FirstMan => {
+            if !state.first_man_stint_active {
+                state.first_man_stint_active = true;
+                state.current_first_man_stint_time = 0.0;
+                state.stats.first_man_stint_count += 1;
+            }
+            state.current_first_man_stint_time += frame.dt;
+            state.stats.longest_first_man_stint_time = state
+                .stats
+                .longest_first_man_stint_time
+                .max(state.current_first_man_stint_time);
+            state.non_first_man_seconds = 0.0;
+            state.stats.time_first_man += frame.dt;
+        }
+        RoleState::SecondMan => {
+            update_non_first_man_stint_state(state, frame.dt, first_man_stint_end_grace_seconds);
+            state.stats.time_second_man += frame.dt;
+        }
+        RoleState::ThirdMan => {
+            update_non_first_man_stint_state(state, frame.dt, first_man_stint_end_grace_seconds);
+            state.stats.time_third_man += frame.dt;
+        }
+        RoleState::Ambiguous => {
+            update_non_first_man_stint_state(state, frame.dt, first_man_stint_end_grace_seconds);
+            state.stats.time_ambiguous_role += frame.dt;
+        }
+        RoleState::Unknown => {
+            update_non_first_man_stint_state(state, frame.dt, first_man_stint_end_grace_seconds)
+        }
     }
 
-    match stats.current_depth_state {
-        PlayDepthState::BehindPlay => stats.time_behind_play += frame.dt,
-        PlayDepthState::LevelWithPlay => stats.time_level_with_play += frame.dt,
-        PlayDepthState::AheadOfPlay => stats.time_ahead_of_play += frame.dt,
+    match state.stats.current_depth_state {
+        PlayDepthState::BehindPlay => state.stats.time_behind_play += frame.dt,
+        PlayDepthState::LevelWithPlay => state.stats.time_level_with_play += frame.dt,
+        PlayDepthState::AheadOfPlay => state.stats.time_ahead_of_play += frame.dt,
         PlayDepthState::Unknown => {}
+    }
+}
+
+fn update_non_first_man_stint_state(
+    state: &mut RotationPlayerDerivationState,
+    dt: f32,
+    first_man_stint_end_grace_seconds: f32,
+) {
+    if !state.first_man_stint_active {
+        return;
+    }
+
+    state.non_first_man_seconds += dt;
+    if state.non_first_man_seconds > first_man_stint_end_grace_seconds {
+        state.first_man_stint_active = false;
+        state.current_first_man_stint_time = 0.0;
+        state.non_first_man_seconds = 0.0;
     }
 }
 
@@ -4514,6 +4563,11 @@ fn assert_rotation_player_stats_close(
     assert_close_field!(time_behind_play);
     assert_close_field!(time_level_with_play);
     assert_close_field!(time_ahead_of_play);
+    assert_close_field!(longest_first_man_stint_time);
+    assert_eq!(
+        actual.first_man_stint_count, expected.first_man_stint_count,
+        "{replay_path} {label}.first_man_stint_count frame {frame_number}"
+    );
     assert_eq!(
         actual.became_first_man_count, expected.became_first_man_count,
         "{replay_path} {label}.became_first_man_count frame {frame_number}"
@@ -4571,6 +4625,7 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
     let mut players: HashMap<PlayerId, RotationPlayerDerivationState> = HashMap::new();
     let mut team_zero = RotationTeamStats::default();
     let mut team_one = RotationTeamStats::default();
+    let first_man_stint_end_grace_seconds = timeline.config.rotation_first_man_debounce_seconds;
 
     for frame in &timeline.frames {
         while player_event_index < player_events.len()
@@ -4616,7 +4671,11 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
 
         for player in &frame.players {
             if let Some(state) = players.get_mut(&player.player_id) {
-                accumulate_rotation_player_frame_for_derivation(state, frame);
+                accumulate_rotation_player_frame_for_derivation(
+                    state,
+                    frame,
+                    first_man_stint_end_grace_seconds,
+                );
             }
             let expected = players
                 .get(&player.player_id)

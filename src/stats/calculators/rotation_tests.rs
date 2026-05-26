@@ -221,3 +221,81 @@ fn records_role_and_depth_time() {
     assert_eq!(second_man.time_second_man, 0.1);
     assert_eq!(second_man.time_ahead_of_play, 0.1);
 }
+
+#[test]
+fn first_man_stints_survive_brief_interruptions() {
+    let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
+        first_man_debounce_seconds: 0.25,
+        first_man_ambiguity_margin: 50.0,
+        ..RotationCalculatorConfig::default()
+    });
+
+    update_team_zero(
+        &mut calculator,
+        1,
+        0.1,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        2,
+        0.2,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(120.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        3,
+        0.3,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+
+    let stats = calculator
+        .player_stats()
+        .get(&PlayerId::Steam(1))
+        .expect("player one stats");
+    assert_eq!(stats.first_man_stint_count, 1);
+    assert_eq!(stats.time_first_man, 0.2);
+    assert_eq!(stats.longest_first_man_stint_time, 0.2);
+    assert_eq!(stats.average_first_man_stint_time(), 0.2);
+
+    update_team_zero(
+        &mut calculator,
+        4,
+        0.4,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(120.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        5,
+        0.5,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(120.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        6,
+        0.6,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(120.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        7,
+        0.7,
+        glam::Vec3::new(100.0, 0.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+
+    let stats = calculator
+        .player_stats()
+        .get(&PlayerId::Steam(1))
+        .expect("player one stats");
+    assert_eq!(stats.first_man_stint_count, 2);
+    assert!((stats.time_first_man - 0.3).abs() < f32::EPSILON);
+    assert!((stats.longest_first_man_stint_time - 0.2).abs() < f32::EPSILON);
+    assert!((stats.average_first_man_stint_time() - 0.15).abs() < f32::EPSILON);
+}

@@ -6,6 +6,9 @@ import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 interface RotationPlayerState {
   active: boolean;
+  firstManStintActive: boolean;
+  currentFirstManStintTime: number;
+  nonFirstManSeconds: number;
   stats: RotationPlayerStats;
 }
 
@@ -35,6 +38,8 @@ function defaultRotationPlayerStats(): RotationPlayerStats {
     time_behind_play: 0,
     time_level_with_play: 0,
     time_ahead_of_play: 0,
+    longest_first_man_stint_time: 0,
+    first_man_stint_count: 0,
     became_first_man_count: 0,
     lost_first_man_count: 0,
     current_role_state: "unknown",
@@ -66,6 +71,11 @@ function sortRotationEvents<T extends { time: number; frame: number }>(events: r
 
 function applyRotationPlayerEvent(state: RotationPlayerState, event: RotationPlayerEvent): void {
   state.active = event.active;
+  if (!event.active) {
+    state.firstManStintActive = false;
+    state.currentFirstManStintTime = 0;
+    state.nonFirstManSeconds = 0;
+  }
   const stats = state.stats;
   stats.became_first_man_count += event.became_first_man_count;
   stats.lost_first_man_count += event.lost_first_man_count;
@@ -73,7 +83,11 @@ function applyRotationPlayerEvent(state: RotationPlayerState, event: RotationPla
   stats.current_depth_state = event.current_depth_state;
 }
 
-function accumulateActiveRotationFrame(state: RotationPlayerState, frame: StatsFrame): void {
+function accumulateActiveRotationFrame(
+  state: RotationPlayerState,
+  frame: StatsFrame,
+  firstManStintEndGraceSeconds: number,
+): void {
   if (!state.active) {
     return;
   }
@@ -84,16 +98,33 @@ function accumulateActiveRotationFrame(state: RotationPlayerState, frame: StatsF
 
   switch (stats.current_role_state) {
     case "first_man":
+      if (!state.firstManStintActive) {
+        state.firstManStintActive = true;
+        state.currentFirstManStintTime = 0;
+        stats.first_man_stint_count += 1;
+      }
+      state.currentFirstManStintTime = addF32(state.currentFirstManStintTime, frame.dt);
+      stats.longest_first_man_stint_time = Math.max(
+        stats.longest_first_man_stint_time,
+        state.currentFirstManStintTime,
+      );
+      state.nonFirstManSeconds = 0;
       stats.time_first_man = addF32(stats.time_first_man, frame.dt);
       break;
     case "second_man":
+      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
       stats.time_second_man = addF32(stats.time_second_man, frame.dt);
       break;
     case "third_man":
+      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
       stats.time_third_man = addF32(stats.time_third_man, frame.dt);
       break;
     case "ambiguous":
+      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
       stats.time_ambiguous_role = addF32(stats.time_ambiguous_role, frame.dt);
+      break;
+    default:
+      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
       break;
   }
 
@@ -107,6 +138,23 @@ function accumulateActiveRotationFrame(state: RotationPlayerState, frame: StatsF
     case "ahead_of_play":
       stats.time_ahead_of_play = addF32(stats.time_ahead_of_play, frame.dt);
       break;
+  }
+}
+
+function updateNonFirstManStintState(
+  state: RotationPlayerState,
+  frame: StatsFrame,
+  firstManStintEndGraceSeconds: number,
+): void {
+  if (!state.firstManStintActive) {
+    return;
+  }
+
+  state.nonFirstManSeconds = addF32(state.nonFirstManSeconds, frame.dt);
+  if (state.nonFirstManSeconds > firstManStintEndGraceSeconds) {
+    state.firstManStintActive = false;
+    state.currentFirstManStintTime = 0;
+    state.nonFirstManSeconds = 0;
   }
 }
 
@@ -143,6 +191,7 @@ export function createRotationEventDerivedStatsAccumulator(timeline: Materialize
 } {
   const playerEvents = sortRotationEvents(timeline.events.rotation_player ?? []);
   const teamEvents = sortRotationEvents(timeline.events.rotation_team ?? []);
+  const firstManStintEndGraceSeconds = timeline.config.rotation_first_man_debounce_seconds;
 
   let playerEventIndex = 0;
   let teamEventIndex = 0;
@@ -160,6 +209,9 @@ export function createRotationEventDerivedStatsAccumulator(timeline: Materialize
         const playerKey = remoteIdKey(event.player);
         const playerState = players.get(playerKey) ?? {
           active: false,
+          firstManStintActive: false,
+          currentFirstManStintTime: 0,
+          nonFirstManSeconds: 0,
           stats: defaultRotationPlayerStats(),
         };
         players.set(playerKey, playerState);
@@ -181,7 +233,7 @@ export function createRotationEventDerivedStatsAccumulator(timeline: Materialize
       for (const player of frame.players) {
         const playerState = players.get(remoteIdKey(player.player_id));
         if (playerState) {
-          accumulateActiveRotationFrame(playerState, frame);
+          accumulateActiveRotationFrame(playerState, frame, firstManStintEndGraceSeconds);
         }
         assignRotationPlayerStats(player.rotation, playerState?.stats);
       }

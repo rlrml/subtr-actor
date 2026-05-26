@@ -39,6 +39,8 @@ pub struct RotationPlayerStats {
     pub time_behind_play: f32,
     pub time_level_with_play: f32,
     pub time_ahead_of_play: f32,
+    pub longest_first_man_stint_time: f32,
+    pub first_man_stint_count: u32,
     pub became_first_man_count: u32,
     pub lost_first_man_count: u32,
     pub current_role_state: RoleState,
@@ -80,6 +82,14 @@ impl RotationPlayerStats {
 
     pub fn ahead_of_play_pct(&self) -> f32 {
         self.role_pct(self.time_ahead_of_play)
+    }
+
+    pub fn average_first_man_stint_time(&self) -> f32 {
+        if self.first_man_stint_count == 0 {
+            0.0
+        } else {
+            self.time_first_man / self.first_man_stint_count as f32
+        }
     }
 }
 
@@ -223,6 +233,13 @@ struct RotationPlayerEventState {
     current_depth_state: PlayDepthState,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct FirstManStintState {
+    active: bool,
+    current_first_man_time: f32,
+    non_first_man_seconds: f32,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,
@@ -234,6 +251,7 @@ pub struct RotationCalculator {
     player_events: Vec<RotationPlayerEvent>,
     team_events: Vec<RotationTeamEvent>,
     last_emitted_player_states: HashMap<PlayerId, RotationPlayerEventState>,
+    first_man_stints: HashMap<PlayerId, FirstManStintState>,
 }
 
 impl RotationCalculator {
@@ -326,6 +344,7 @@ impl RotationCalculator {
 
     fn emit_inactive_player_events(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
         for player in &players.players {
+            self.close_first_man_stint(&player.player_id);
             let stats = self
                 .player_stats
                 .entry(player.player_id.clone())
@@ -348,6 +367,46 @@ impl RotationCalculator {
     fn reset_trackers(&mut self) {
         self.team_zero_tracker.reset();
         self.team_one_tracker.reset();
+    }
+
+    fn close_first_man_stint(&mut self, player_id: &PlayerId) {
+        if let Some(state) = self.first_man_stints.get_mut(player_id) {
+            state.active = false;
+            state.current_first_man_time = 0.0;
+            state.non_first_man_seconds = 0.0;
+        }
+    }
+
+    fn update_first_man_stint(
+        &mut self,
+        player_id: &PlayerId,
+        stats: &mut RotationPlayerStats,
+        role_state: RoleState,
+        dt: f32,
+    ) {
+        let state = self.first_man_stints.entry(player_id.clone()).or_default();
+        if role_state == RoleState::FirstMan {
+            if !state.active {
+                state.active = true;
+                state.current_first_man_time = 0.0;
+                stats.first_man_stint_count += 1;
+            }
+            state.current_first_man_time += dt;
+            stats.longest_first_man_stint_time = stats
+                .longest_first_man_stint_time
+                .max(state.current_first_man_time);
+            state.non_first_man_seconds = 0.0;
+            return;
+        }
+
+        if state.active {
+            state.non_first_man_seconds += dt;
+            if state.non_first_man_seconds > self.config.first_man_debounce_seconds {
+                state.active = false;
+                state.current_first_man_time = 0.0;
+                state.non_first_man_seconds = 0.0;
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -420,6 +479,7 @@ impl RotationCalculator {
                 .iter()
                 .filter(|player| player.is_team_0 == is_team_0)
             {
+                self.close_first_man_stint(&player.player_id);
                 let (current_role_state, current_depth_state) = {
                     let stats = self
                         .player_stats
@@ -498,14 +558,15 @@ impl RotationCalculator {
                 self.config.role_depth_margin,
             );
             let (current_role_state, current_depth_state) = {
-                let stats = self
+                let mut stats = self
                     .player_stats
-                    .entry(player.player_id.clone())
-                    .or_default();
+                    .remove(&player.player_id)
+                    .unwrap_or_default();
                 stats.active_game_time += frame.dt;
                 stats.tracked_time += frame.dt;
                 stats.current_role_state = role_state;
                 stats.current_depth_state = depth_state;
+                self.update_first_man_stint(&player.player_id, &mut stats, role_state, frame.dt);
 
                 match role_state {
                     RoleState::FirstMan => {
@@ -536,7 +597,10 @@ impl RotationCalculator {
                     PlayDepthState::Unknown => {}
                 }
 
-                (stats.current_role_state, stats.current_depth_state)
+                let current_role_state = stats.current_role_state;
+                let current_depth_state = stats.current_depth_state;
+                self.player_stats.insert(player.player_id.clone(), stats);
+                (current_role_state, current_depth_state)
             };
             let became_first_man_count = became_first_man_counts
                 .remove(&player.player_id)
