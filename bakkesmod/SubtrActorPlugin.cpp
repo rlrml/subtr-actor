@@ -991,6 +991,34 @@ SaPlayerFrame syntheticPlayer(
 } // namespace
 
 void SubtrActorPlugin::onLoad() {
+  cvarManager->registerCvar(
+      "subtr_actor_enabled",
+      "0",
+      "Enable live subtr-actor frame processing and analysis graph evaluation.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_overlay_enabled",
+      "1",
+      "Draw subtr-actor mechanic overlay messages.",
+      true,
+      true,
+      0,
+      true,
+      1);
+  cvarManager->registerCvar(
+      "subtr_actor_sample_every_ticks",
+      "4",
+      "Only process one live frame every N vehicle-input ticks. Use 1 for every tick.",
+      true,
+      true,
+      1,
+      true,
+      240);
+
   loaded = loadRustLibrary();
   if (!loaded) {
     cvarManager->log("subtr-actor: failed to load subtr_actor_bakkesmod.dll");
@@ -1258,6 +1286,19 @@ void SubtrActorPlugin::tick(std::string) {
     return;
   }
 
+  auto enabledCvar = cvarManager->getCvar("subtr_actor_enabled");
+  const bool processingEnabled = static_cast<bool>(enabledCvar) && enabledCvar.getBoolValue();
+  if (!processingEnabled) {
+    if (wasInGame && engineReset) {
+      finishAndDrainPendingEvents("live processing disabled");
+      engineReset(engine);
+      resetLiveState();
+    }
+    wasInGame = false;
+    clearPendingFrameEvents();
+    return;
+  }
+
   if (!gameWrapper->IsInGame()) {
     if (wasInGame && engineReset) {
       finishAndDrainPendingEvents("game exit");
@@ -1272,6 +1313,14 @@ void SubtrActorPlugin::tick(std::string) {
     resetLiveState();
   }
   wasInGame = true;
+
+  inputTickNumber += 1;
+  auto sampleEveryCvar = cvarManager->getCvar("subtr_actor_sample_every_ticks");
+  const uint64_t sampleEvery =
+      std::max(1, static_cast<bool>(sampleEveryCvar) ? sampleEveryCvar.getIntValue() : 1);
+  if (sampleEvery > 1 && (inputTickNumber % sampleEvery) != 0) {
+    return;
+  }
 
   SaLiveFrame frame = sampleFrame();
   const int32_t processResult = processFrame(engine, &frame);
@@ -1478,6 +1527,7 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
 
 void SubtrActorPlugin::resetLiveState() {
   frameNumber = 0;
+  inputTickNumber = 0;
   lastTime = 0.0f;
   sampledPlayers.clear();
   sampledPlayerNames.clear();
@@ -3328,6 +3378,11 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
 }
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {
+  auto overlayEnabledCvar = cvarManager->getCvar("subtr_actor_overlay_enabled");
+  if (static_cast<bool>(overlayEnabledCvar) && !overlayEnabledCvar.getBoolValue()) {
+    return;
+  }
+
   const auto now = std::chrono::steady_clock::now();
   while (!messages.empty() && messages.front().expires_at <= now) {
     messages.pop_front();

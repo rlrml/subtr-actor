@@ -120,6 +120,7 @@ private:
   DrainGoalContextEvents drainGoalContextEvents = nullptr;
 
   uint64_t frameNumber = 0;
+  uint64_t inputTickNumber = 0;
   float lastTime = 0.0f;
   bool loaded = false;
   bool wasInGame = false;
