@@ -253,11 +253,10 @@ test("getMechanicTimelineEventModuleIds only includes generic mechanic-owned mod
     ],
   });
 
-  assert.deepEqual([...getMechanicTimelineEventModuleIds(statsTimeline)], [
-    "center",
-    "double-tap",
-    "wall-aerial",
-  ]);
+  assert.deepEqual(
+    [...getMechanicTimelineEventModuleIds(statsTimeline)],
+    ["center", "double-tap", "wall-aerial"],
+  );
 });
 
 test("countEnabledTimelineEvents ignores module markers owned by mechanic events", () => {
