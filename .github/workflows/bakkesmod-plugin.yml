@@ -71,6 +71,7 @@ jobs:
 
           $pluginText = Read-ArtifactText $pluginDll
           Assert-Contains $pluginText "subtr_actor_verify_graph" "BakkesMod graph verification command"
+          Assert-Contains $pluginText "require_event_history" "BakkesMod strict event-history verification mode"
           Assert-Contains $pluginText "every callable analysis node" "BakkesMod graph verification scope"
           Assert-Contains $pluginText "Function TAGame.Ball_TA.OnCarTouch" "BakkesMod ball touch event hook"
           Assert-Contains $pluginText "Function TAGame.VehiclePickup_TA.EventPickedUp" "BakkesMod boost pickup event hook"
@@ -92,6 +93,8 @@ jobs:
           Assert-Contains $pluginText "event_history event field '{}' has {} cumulative entries" "BakkesMod cumulative event count diagnostics"
           Assert-Contains $pluginText "event_history event field '{}' is not an array" "BakkesMod cumulative event array diagnostics"
           Assert-Contains $pluginText "event_history exposes {} cumulative live event fields" "BakkesMod cumulative event surface verification"
+          Assert-Contains $pluginText "required event field '{}' has no cumulative entries" "BakkesMod strict cumulative event diagnostics"
+          Assert-Contains $pluginText "required cumulative event fields are nonzero" "BakkesMod strict cumulative event success diagnostics"
           Assert-Contains $pluginText "touch_events" "BakkesMod touch event-family field verification"
           Assert-Contains $pluginText "dodge_refreshed_events" "BakkesMod dodge-refresh event-family field verification"
           Assert-Contains $pluginText "boost_pad_events" "BakkesMod boost-pad event-family field verification"

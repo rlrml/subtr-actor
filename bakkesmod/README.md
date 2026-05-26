@@ -130,6 +130,16 @@ acceptance check for live graph callability and event-generation parity.
    events.
    If the console logs `subtr-actor: live frame processing failed`, the plugin
    preserves queued BakkesMod events and retries them on the next sampled frame.
+   After exercising the available event families, run:
+
+   ```text
+   subtr_actor_verify_graph require_event_history finish
+   ```
+
+   This stricter verifier fails if cumulative `event_history` counts are still
+   zero for touch, dodge refresh, boost pad, player stat, goal, or demolition
+   event arrays. `active_demos` is current state, not cumulative history, so it
+   is intentionally not required by this mode.
 4. Dump the complete live graph surface:
 
    ```text
