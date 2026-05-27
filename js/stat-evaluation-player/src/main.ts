@@ -22,9 +22,7 @@ import type {
 } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
-import {
-  createFileReplaySource,
-} from "./replayInputSources.ts";
+import { createFileReplaySource } from "./replayInputSources.ts";
 import {
   createCameraControls,
   getCameraControlElements,
@@ -426,13 +424,6 @@ function cueTimelineEvent(event: ReplayTimelineEvent): void {
     skipKickoffsEnabled: false,
   });
   scheduleConfigUrlUpdate();
-}
-
-function withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[] {
-  return events.map((event) => ({
-    ...event,
-    seekTime: timelineEventSeekTime(event),
-  }));
 }
 
 function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
