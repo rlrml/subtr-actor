@@ -314,6 +314,18 @@ def main() -> int:
             "web stats window kind order drifted from stats evaluation player: "
             f"expected={WEB_STATS_WINDOW_KIND_IDS!r} actual={web_stats_window_kind_ids!r}"
         )
+    require_contains(
+        plugin_source,
+        'file << ",\\"playerId\\":\\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\\""',
+        "web stats window config always emits playerId",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'file << ",\\"team\\":\\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\\""',
+        "web stats window config always emits team",
+        errors,
+    )
 
     require_contains(
         plugin_source,
