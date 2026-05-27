@@ -2482,7 +2482,23 @@ void SubtrActorPlugin::loadUiConfig() {
     window.module_view = static_cast<int>(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
     window.picker_query = parseJsonStringProperty(object, "picker_query").value_or("");
-    window.entries = parseJsonStringArrayProperty(object, "entries");
+    for (const std::string &statId : parseJsonStringArrayProperty(object, "entries")) {
+      window.entries.push_back(UiStatsWindow::Entry{statId, ""});
+    }
+    for (const std::string &entryObject : parseJsonObjectArrayProperty(object, "entries")) {
+      std::string statId = parseJsonStringProperty(entryObject, "stat_id").value_or("");
+      if (statId.empty()) {
+        statId = parseJsonStringProperty(entryObject, "statId").value_or("");
+      }
+      if (statId.empty()) {
+        continue;
+      }
+      std::string targetId = parseJsonStringProperty(entryObject, "target_id").value_or("");
+      if (targetId.empty()) {
+        targetId = parseJsonStringProperty(entryObject, "targetId").value_or("");
+      }
+      window.entries.push_back(UiStatsWindow::Entry{statId, targetId});
+    }
     if (window.entries.empty() && window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
     }
@@ -2692,7 +2708,9 @@ void SubtrActorPlugin::saveUiConfig() {
       if (j != 0) {
         file << ",";
       }
-      file << "\"" << escapeJsonString(window.entries[j]) << "\"";
+      const UiStatsWindow::Entry &entry = window.entries[j];
+      file << "{\"stat_id\":\"" << escapeJsonString(entry.stat_id) << "\""
+           << ",\"target_id\":\"" << escapeJsonString(entry.target_id) << "\"}";
     }
     file << "]}";
     if (i + 1 != uiStatsWindows.size()) {
@@ -7300,32 +7318,42 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
   switch (window.kind) {
   case UiStatsWindowKind::Player:
     window.entries = {
-        "score", "goals", "assists", "saves", "shots", "boost", "recent_events"};
+        {"score", ""}, {"goals", ""}, {"assists", ""}, {"saves", ""},
+        {"shots", ""}, {"boost", ""}, {"recent_events", ""}};
     break;
   case UiStatsWindowKind::Team:
     window.entries = {
-        "players",
-        "score",
-        "goals",
-        "assists",
-        "saves",
-        "shots",
-        "average_boost",
-        "recent_events"};
+        {"players", ""},
+        {"score", ""},
+        {"goals", ""},
+        {"assists", ""},
+        {"saves", ""},
+        {"shots", ""},
+        {"average_boost", ""},
+        {"recent_events", ""}};
     break;
   case UiStatsWindowKind::AllPlayers:
     window.entries = {
-        "score", "goals", "assists", "saves", "shots", "boost", "recent_events"};
+        {"score", ""}, {"goals", ""}, {"assists", ""}, {"saves", ""},
+        {"shots", ""}, {"boost", ""}, {"recent_events", ""}};
     break;
   case UiStatsWindowKind::AllTeams:
     window.entries = {
-        "players", "score", "goals", "shots", "average_boost", "recent_events"};
+        {"players", ""},
+        {"score", ""},
+        {"goals", ""},
+        {"shots", ""},
+        {"average_boost", ""},
+        {"recent_events", ""}};
     break;
   case UiStatsWindowKind::GoalsOverview:
-    window.entries = {"goal", "shot", "save", "assist"};
+    window.entries = {{"goal", ""}, {"shot", ""}, {"save", ""}, {"assist", ""}};
     break;
   case UiStatsWindowKind::AdHoc:
-    window.entries = {"recent_events", "demo", "flip_reset"};
+    window.entries = {
+        {"score", defaultAdHocTargetId("score")},
+        {"average_boost", defaultAdHocTargetId("average_boost")},
+        {"recent_events", defaultAdHocTargetId("recent_events")}};
     break;
   case UiStatsWindowKind::StatsModule:
     window.entries.clear();
@@ -7348,8 +7376,9 @@ bool SubtrActorPlugin::statsWindowSupportsStat(
   case UiStatsWindowKind::AllTeams:
     return definition->team;
   case UiStatsWindowKind::GoalsOverview:
-  case UiStatsWindowKind::AdHoc:
     return definition->event;
+  case UiStatsWindowKind::AdHoc:
+    return definition->player || definition->team || definition->event;
   case UiStatsWindowKind::StatsModule:
     return false;
   }
@@ -7358,9 +7387,15 @@ bool SubtrActorPlugin::statsWindowSupportsStat(
 
 bool SubtrActorPlugin::statsWindowHasStat(
     const UiStatsWindow &window,
-    std::string_view statId) const {
-  return std::find(window.entries.begin(), window.entries.end(), statId) !=
-         window.entries.end();
+    std::string_view statId,
+    std::string_view targetId) const {
+  return std::find_if(
+             window.entries.begin(),
+             window.entries.end(),
+             [&](const UiStatsWindow::Entry &entry) {
+               return entry.stat_id == statId &&
+                      (targetId.empty() || entry.target_id == targetId);
+             }) != window.entries.end();
 }
 
 int SubtrActorPlugin::recentEventCountForActor(std::string_view actor) const {
@@ -7485,6 +7520,97 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
     return std::format("{}", recentEventCountForTeam(isTeam0));
   }
   return "--";
+}
+
+std::string SubtrActorPlugin::defaultAdHocTargetId(std::string_view statId) const {
+  const UiStatDefinition *definition = uiStatDefinition(statId);
+  if (!definition) {
+    return "";
+  }
+  if (definition->player) {
+    return sampledPlayers.empty() ? "" : std::to_string(sampledPlayers.front().player_index);
+  }
+  if (definition->team) {
+    return "blue";
+  }
+  return "";
+}
+
+std::string SubtrActorPlugin::adHocStatValue(
+    std::string_view statId,
+    std::string_view targetId) const {
+  const UiStatDefinition *definition = uiStatDefinition(statId);
+  if (!definition) {
+    return "--";
+  }
+  if (definition->player) {
+    uint32_t playerIndex = sampledPlayers.empty() ? 0 : sampledPlayers.front().player_index;
+    if (!targetId.empty()) {
+      try {
+        playerIndex = static_cast<uint32_t>(std::stoul(std::string{targetId}));
+      } catch (...) {
+      }
+    }
+    const SaPlayerFrame *player = sampledPlayerByIndex(playerIndex);
+    return player ? playerStatValue(*player, statId) : "--";
+  }
+  if (definition->team) {
+    return teamStatValue(targetId == "orange" ? 0 : 1, statId);
+  }
+  return std::format("{}", recentEventCountForType(statId));
+}
+
+void SubtrActorPlugin::renderAdHocTargetSelector(
+    UiStatsWindow &window,
+    UiStatsWindow::Entry &entry,
+    std::string_view statId,
+    size_t index) {
+  const UiStatDefinition *definition = uiStatDefinition(statId);
+  if (!definition || (!definition->player && !definition->team)) {
+    ImGui::TextDisabled("-");
+    return;
+  }
+
+  if (definition->player) {
+    const SaPlayerFrame *selected = nullptr;
+    if (!entry.target_id.empty()) {
+      try {
+        selected = sampledPlayerByIndex(static_cast<uint32_t>(std::stoul(entry.target_id)));
+      } catch (...) {
+      }
+    }
+    const std::string selectedLabel =
+        selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
+    if (ImGui::BeginCombo(std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
+                          selectedLabel.c_str())) {
+      for (const SaPlayerFrame &player : sampledPlayers) {
+        const std::string nextTarget = std::to_string(player.player_index);
+        const bool isSelected = entry.target_id == nextTarget;
+        if (ImGui::Selectable(playerLabel(player.player_index, player.is_team_0).c_str(),
+                              isSelected) &&
+            !statsWindowHasStat(window, statId, nextTarget)) {
+          entry.target_id = nextTarget;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    return;
+  }
+
+  const char *selectedTeam = entry.target_id == "orange" ? "Orange" : "Blue";
+  if (ImGui::BeginCombo(
+          std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
+          selectedTeam)) {
+    if (ImGui::Selectable("Blue", entry.target_id != "orange") &&
+        !statsWindowHasStat(window, statId, "blue")) {
+      entry.target_id = "blue";
+    }
+    if (ImGui::Selectable("Orange", entry.target_id == "orange") &&
+        !statsWindowHasStat(window, statId, "orange")) {
+      entry.target_id = "orange";
+    }
+    ImGui::EndCombo();
+  }
 }
 
 void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
@@ -7651,9 +7777,14 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
         std::format("Add all {} ({})##{}-{}", category, count, window.id, category);
     if (ImGui::SmallButton(label.c_str())) {
       for (const UiStatDefinitionMatch &match : matches) {
-        if (category == match.definition->category &&
-            !statsWindowHasStat(window, match.definition->id)) {
-          window.entries.emplace_back(match.definition->id);
+        if (category != match.definition->category) {
+          continue;
+        }
+        const std::string targetId =
+            window.kind == UiStatsWindowKind::AdHoc ? defaultAdHocTargetId(match.definition->id)
+                                                    : "";
+        if (!statsWindowHasStat(window, match.definition->id, targetId)) {
+          window.entries.push_back(UiStatsWindow::Entry{match.definition->id, targetId});
         }
       }
     }
@@ -7677,12 +7808,20 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     const std::string itemLabel =
         std::format("{}  [{}]##{}-{}", definition.label, definition.id, window.id, definition.id);
     if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
-      if (alreadySelected) {
+      if (window.kind == UiStatsWindowKind::AdHoc) {
+        const std::string targetId = defaultAdHocTargetId(definition.id);
+        if (!statsWindowHasStat(window, definition.id, targetId)) {
+          window.entries.push_back(UiStatsWindow::Entry{definition.id, targetId});
+        }
+      } else if (alreadySelected) {
         window.entries.erase(
-            std::remove(window.entries.begin(), window.entries.end(), definition.id),
+            std::remove_if(
+                window.entries.begin(),
+                window.entries.end(),
+                [&](const UiStatsWindow::Entry &entry) { return entry.stat_id == definition.id; }),
             window.entries.end());
       } else {
-        window.entries.emplace_back(definition.id);
+        window.entries.push_back(UiStatsWindow::Entry{definition.id, ""});
       }
     }
   }
@@ -7738,7 +7877,7 @@ void SubtrActorPlugin::renderPlayerStatsTable(
   ImGui::TextColored(toImVec4(color), "%s", label.c_str());
   ImGui::Columns(3, "player-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
-    const std::string statId = window.entries[i];
+    const std::string &statId = window.entries[i].stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
       ++i;
       continue;
@@ -7764,7 +7903,7 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
   ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
   ImGui::Columns(3, "team-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
-    const std::string statId = window.entries[i];
+    const std::string &statId = window.entries[i].stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
       ++i;
       continue;
@@ -7793,7 +7932,8 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
   ImGui::Columns(static_cast<int>(window.entries.size()) + 1, "all-player-stats-columns", true);
   ImGui::Text("Player");
   ImGui::NextColumn();
-  for (const std::string &statId : window.entries) {
+  for (const UiStatsWindow::Entry &entry : window.entries) {
+    const std::string &statId = entry.stat_id;
     ImGui::Text("%s", uiStatLabel(statId));
     ImGui::NextColumn();
   }
@@ -7806,7 +7946,8 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
                               : LinearColor{255, 175, 80, 255};
     ImGui::TextColored(toImVec4(color), "%s", label.c_str());
     ImGui::NextColumn();
-    for (const std::string &statId : window.entries) {
+    for (const UiStatsWindow::Entry &entry : window.entries) {
+      const std::string &statId = entry.stat_id;
       ImGui::Text("%s", playerStatValue(player, statId).c_str());
       ImGui::NextColumn();
     }
@@ -7818,7 +7959,8 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
   ImGui::Columns(static_cast<int>(window.entries.size()) + 1, "all-team-stats-columns", true);
   ImGui::Text("Team");
   ImGui::NextColumn();
-  for (const std::string &statId : window.entries) {
+  for (const UiStatsWindow::Entry &entry : window.entries) {
+    const std::string &statId = entry.stat_id;
     ImGui::Text("%s", uiStatLabel(statId));
     ImGui::NextColumn();
   }
@@ -7829,7 +7971,8 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
         isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
     ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
     ImGui::NextColumn();
-    for (const std::string &statId : window.entries) {
+    for (const UiStatsWindow::Entry &entry : window.entries) {
+      const std::string &statId = entry.stat_id;
       ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
       ImGui::NextColumn();
     }
@@ -7845,7 +7988,7 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
   }
   ImGui::Columns(2, "goal-overview-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
-    const std::string statId = window.entries[i];
+    const std::string &statId = window.entries[i].stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
       ++i;
       continue;
@@ -7877,16 +8020,19 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
 }
 
 void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
-  ImGui::Columns(3, "ad-hoc-stat-rows", false);
+  ImGui::Columns(4, "ad-hoc-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
-    const std::string statId = window.entries[i];
+    UiStatsWindow::Entry &entry = window.entries[i];
+    const std::string &statId = entry.stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
       ++i;
       continue;
     }
     ImGui::Text("%s", uiStatLabel(statId));
     ImGui::NextColumn();
-    ImGui::Text("%d", recentEventCountForType(statId));
+    renderAdHocTargetSelector(window, entry, statId, i);
+    ImGui::NextColumn();
+    ImGui::Text("%s", adHocStatValue(statId, entry.target_id).c_str());
     ImGui::NextColumn();
     if (ImGui::Button(std::format("Remove##{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
@@ -7900,12 +8046,14 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
   ImGui::Separator();
   ImGui::BeginChild("ad-hoc-events", ImVec2{0.0f, 0.0f}, true);
   for (const UiEventRecord &event : recentUiEvents) {
-    const bool selected =
-        std::any_of(window.entries.begin(), window.entries.end(), [&](const std::string &statId) {
-          if (statId == "recent_events") {
+    const bool selected = std::any_of(
+        window.entries.begin(),
+        window.entries.end(),
+        [&](const UiStatsWindow::Entry &entry) {
+          if (entry.stat_id == "recent_events") {
             return true;
           }
-          return eventFilterAllows(statId, event.category, event.type);
+          return eventFilterAllows(entry.stat_id, event.category, event.type);
         });
     if (!selected) {
       continue;

@@ -118,6 +118,11 @@ private:
   };
 
   struct UiStatsWindow {
+    struct Entry {
+      std::string stat_id;
+      std::string target_id;
+    };
+
     uint32_t id = 0;
     UiStatsWindowKind kind = UiStatsWindowKind::Player;
     bool open = true;
@@ -128,7 +133,7 @@ private:
     std::string module_name;
     int module_view = 0;
     std::string picker_query;
-    std::vector<std::string> entries;
+    std::vector<Entry> entries;
     bool has_placement = false;
     bool pending_apply_placement = false;
     float x = 0.0f;
@@ -399,10 +404,20 @@ private:
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
   void initializeStatsWindowEntries(UiStatsWindow &window);
   bool statsWindowSupportsStat(const UiStatsWindow &window, std::string_view statId) const;
-  bool statsWindowHasStat(const UiStatsWindow &window, std::string_view statId) const;
+  bool statsWindowHasStat(
+      const UiStatsWindow &window,
+      std::string_view statId,
+      std::string_view targetId = {}) const;
   const std::vector<std::string> &statsModuleNames();
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
+  std::string defaultAdHocTargetId(std::string_view statId) const;
+  std::string adHocStatValue(std::string_view statId, std::string_view targetId) const;
+  void renderAdHocTargetSelector(
+      UiStatsWindow &window,
+      UiStatsWindow::Entry &entry,
+      std::string_view statId,
+      size_t index);
   std::filesystem::path uiConfigPath() const;
   void loadUiConfig();
   void saveUiConfig();
