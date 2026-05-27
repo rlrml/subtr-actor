@@ -417,6 +417,24 @@ def main() -> int:
         )
     require_contains(
         plugin_source,
+        '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
+        "launcher actions expose replay loading like the web player",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '"Live analysis graph",\n            liveAnalysis,\n            "launcher-plugin-tools"',
+        "plugin-specific live analysis toggle lives under launcher plugin tools",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        '"Live analysis graph",\n          liveAnalysis,\n          "launcher-actions"',
+        "plugin-specific live analysis toggle in web-like launcher actions",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "std::optional<std::string> SubtrActorPlugin::webPlayerIdForWindowConfig(",
         "nullable web stats window playerId helper",
         errors,

@@ -7968,14 +7968,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
     tickReplayAnnotations();
     hideLauncherWindow();
   }
-  const bool liveAnalysis = liveProcessingEnabled();
-  if (renderModuleSummaryToggle(
-          "Live analysis graph",
-          liveAnalysis,
-          "launcher-actions",
-          actionButtonWidth)) {
-    setCvarBool("subtr_actor_enabled", !liveAnalysis);
-  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
@@ -7990,6 +7982,14 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     const float pluginToolButtonWidth = ImGui::GetContentRegionAvail().x;
+    const bool liveAnalysis = liveProcessingEnabled();
+    if (renderModuleSummaryToggle(
+            "Live analysis graph",
+            liveAnalysis,
+            "launcher-plugin-tools",
+            pluginToolButtonWidth)) {
+      setCvarBool("subtr_actor_enabled", !liveAnalysis);
+    }
     if (ImGui::Button("Verify graph", ImVec2{pluginToolButtonWidth, 0.0f})) {
       showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
       verifyGraphRuntime({"subtr_actor_verify_graph"});
