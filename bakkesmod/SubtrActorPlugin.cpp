@@ -2295,10 +2295,17 @@ void SubtrActorPlugin::applyUiConfigJson(
     return;
   }
 
-  auto loadPlacement = [](const std::string &parent, const char *name, UiWindowPlacement &out) {
+  auto loadPlacement = [](
+                           const std::string &parent,
+                           const char *name,
+                           UiWindowPlacement &out,
+                           bool *visible = nullptr) {
     const auto object = parseJsonObjectProperty(parent, name);
     if (!object) {
       return;
+    }
+    if (visible != nullptr) {
+      *visible = parseJsonBoolProperty(*object, "visible").value_or(*visible);
     }
     out.has_placement = parseJsonBoolProperty(*object, "has_placement").value_or(true);
     out.pending_apply_placement = out.has_placement;
@@ -2438,20 +2445,32 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonStringProperty(json, "graph_inspector_node_query").value_or("");
 
   if (const auto placements = parseJsonObjectProperty(json, "placements")) {
-    loadPlacement(*placements, "launcher", launcherPlacement);
-    loadPlacement(*placements, "scoreboard", scoreboardPlacement);
-    loadPlacement(*placements, "events", eventsPlacement);
-    loadPlacement(*placements, "status", statusPlacement);
-    loadPlacement(*placements, "camera", cameraPlacement);
-    loadPlacement(*placements, "playback_controls", playbackControlsPlacement);
-    loadPlacement(*placements, "recording", recordingPlacement);
-    loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
-    loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
-    loadPlacement(*placements, "mechanics_review", mechanicsReviewPlacement);
-    loadPlacement(*placements, "replay_loading", replayLoadingPlacement);
-    loadPlacement(*placements, "module_controls", moduleControlsPlacement);
-    loadPlacement(*placements, "touch_controls", touchControlsPlacement);
-    loadPlacement(*placements, "boost_pickup_controls", boostPickupControlsPlacement);
+    loadPlacement(*placements, "launcher", launcherPlacement, &uiLauncherOpen);
+    loadPlacement(*placements, "scoreboard", scoreboardPlacement, &uiScoreboardOpen);
+    loadPlacement(*placements, "events", eventsPlacement, &uiEventsOpen);
+    loadPlacement(*placements, "status", statusPlacement, &uiStatusOpen);
+    loadPlacement(*placements, "camera", cameraPlacement, &uiCameraOpen);
+    loadPlacement(
+        *placements,
+        "playback_controls",
+        playbackControlsPlacement,
+        &uiPlaybackControlsOpen);
+    loadPlacement(*placements, "recording", recordingPlacement, &uiRecordingOpen);
+    loadPlacement(*placements, "graph_inspector", graphInspectorPlacement, &uiGraphInspectorOpen);
+    loadPlacement(*placements, "event_playlist", eventPlaylistPlacement, &uiEventPlaylistOpen);
+    loadPlacement(
+        *placements,
+        "mechanics_review",
+        mechanicsReviewPlacement,
+        &uiMechanicsReviewOpen);
+    loadPlacement(*placements, "replay_loading", replayLoadingPlacement, &uiReplayLoadingOpen);
+    loadPlacement(*placements, "module_controls", moduleControlsPlacement, &uiModuleControlsOpen);
+    loadPlacement(*placements, "touch_controls", touchControlsPlacement, &uiTouchControlsOpen);
+    loadPlacement(
+        *placements,
+        "boost_pickup_controls",
+        boostPickupControlsPlacement,
+        &uiBoostPickupControlsOpen);
   }
 
   uiStatsWindows.clear();
@@ -2487,6 +2506,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     }
     nextUiStatsWindowId = std::max(nextUiStatsWindowId, window.id + 1);
     window.open = parseJsonBoolProperty(object, "open").value_or(true);
+    window.open = parseJsonBoolProperty(object, "visible").value_or(window.open);
     window.selected_player_index = static_cast<uint32_t>(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
     window.selected_team_is_team_0 =
@@ -2564,8 +2584,12 @@ std::string SubtrActorPlugin::uiConfigJson() const {
     }
   };
 
-  auto writePlacement = [](std::ostream &out, const UiWindowPlacement &placement) {
+  auto writePlacement = [](
+                            std::ostream &out,
+                            const UiWindowPlacement &placement,
+                            bool visible) {
     out << "{\"has_placement\":" << (placement.has_placement ? "true" : "false")
+        << ",\"visible\":" << (visible ? "true" : "false")
         << ",\"x\":" << placement.x << ",\"y\":" << placement.y
         << ",\"width\":" << placement.width << ",\"height\":" << placement.height
         << ",\"viewport_width\":" << placement.viewport_width
@@ -2662,39 +2686,40 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << escapeJsonString(graphInspectorNodeQuery) << "\",\n";
   file << "  \"placements\": {\n";
   file << "    \"launcher\": ";
-  writePlacement(file, launcherPlacement);
+  writePlacement(file, launcherPlacement, uiLauncherOpen);
   file << ",\n    \"scoreboard\": ";
-  writePlacement(file, scoreboardPlacement);
+  writePlacement(file, scoreboardPlacement, uiScoreboardOpen);
   file << ",\n    \"events\": ";
-  writePlacement(file, eventsPlacement);
+  writePlacement(file, eventsPlacement, uiEventsOpen);
   file << ",\n    \"status\": ";
-  writePlacement(file, statusPlacement);
+  writePlacement(file, statusPlacement, uiStatusOpen);
   file << ",\n    \"camera\": ";
-  writePlacement(file, cameraPlacement);
+  writePlacement(file, cameraPlacement, uiCameraOpen);
   file << ",\n    \"playback_controls\": ";
-  writePlacement(file, playbackControlsPlacement);
+  writePlacement(file, playbackControlsPlacement, uiPlaybackControlsOpen);
   file << ",\n    \"recording\": ";
-  writePlacement(file, recordingPlacement);
+  writePlacement(file, recordingPlacement, uiRecordingOpen);
   file << ",\n    \"graph_inspector\": ";
-  writePlacement(file, graphInspectorPlacement);
+  writePlacement(file, graphInspectorPlacement, uiGraphInspectorOpen);
   file << ",\n    \"event_playlist\": ";
-  writePlacement(file, eventPlaylistPlacement);
+  writePlacement(file, eventPlaylistPlacement, uiEventPlaylistOpen);
   file << ",\n    \"mechanics_review\": ";
-  writePlacement(file, mechanicsReviewPlacement);
+  writePlacement(file, mechanicsReviewPlacement, uiMechanicsReviewOpen);
   file << ",\n    \"replay_loading\": ";
-  writePlacement(file, replayLoadingPlacement);
+  writePlacement(file, replayLoadingPlacement, uiReplayLoadingOpen);
   file << ",\n    \"module_controls\": ";
-  writePlacement(file, moduleControlsPlacement);
+  writePlacement(file, moduleControlsPlacement, uiModuleControlsOpen);
   file << ",\n    \"touch_controls\": ";
-  writePlacement(file, touchControlsPlacement);
+  writePlacement(file, touchControlsPlacement, uiTouchControlsOpen);
   file << ",\n    \"boost_pickup_controls\": ";
-  writePlacement(file, boostPickupControlsPlacement);
+  writePlacement(file, boostPickupControlsPlacement, uiBoostPickupControlsOpen);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
     file << "    {\"id\":" << window.id << ",\"kind\":\"" << kindValue(window.kind)
          << "\",\"open\":" << (window.open ? "true" : "false")
+         << ",\"visible\":" << (window.open ? "true" : "false")
          << ",\"selected_player_index\":" << window.selected_player_index
          << ",\"selected_team_is_team_0\":"
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
