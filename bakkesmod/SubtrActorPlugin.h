@@ -332,6 +332,10 @@ private:
   int mechanicsReviewIndex = 0;
   float mechanicsReviewClipLeadSeconds = 2.0f;
   float mechanicsReviewClipTrailSeconds = 2.0f;
+  bool mechanicsReviewClipActive = false;
+  float mechanicsReviewClipStartSeconds = 0.0f;
+  float mechanicsReviewClipEndSeconds = 0.0f;
+  std::string mechanicsReviewStatus;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
   std::string graphInspectorNodeQuery;
@@ -484,6 +488,7 @@ private:
   std::string mechanicsReviewKey(const UiEventRecord &event) const;
   const char *mechanicsReviewDecisionLabel(const UiEventRecord &event) const;
   void tickReplayAnnotations();
+  void tickMechanicsReviewClipBoundary();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
   std::string readJsonBuffer(JsonLen len, WriteJson write);

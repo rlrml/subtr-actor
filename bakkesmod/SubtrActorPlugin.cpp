@@ -2915,6 +2915,8 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(mechanicsReviewClipTrailSeconds),
       0.0,
       10.0));
+  mechanicsReviewStatus =
+      parseJsonStringProperty(json, "mechanics_review_status").value_or(mechanicsReviewStatus);
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
   selectedAnalysisNode = parseJsonStringProperty(json, "selected_analysis_node").value_or("");
   graphInspectorNodeQuery =
@@ -3443,6 +3445,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"mechanics_review_index\": " << mechanicsReviewIndex << ",\n";
   file << "  \"mechanics_review_clip_lead_seconds\": " << mechanicsReviewClipLeadSeconds << ",\n";
   file << "  \"mechanics_review_clip_trail_seconds\": " << mechanicsReviewClipTrailSeconds << ",\n";
+  file << "  \"mechanics_review_status\": \"" << escapeJsonString(mechanicsReviewStatus)
+       << "\",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
   file << "  \"selected_analysis_node\": \"" << escapeJsonString(selectedAnalysisNode)
@@ -3810,12 +3814,58 @@ void SubtrActorPlugin::tickReplayAnnotations() {
   }
 }
 
+void SubtrActorPlugin::tickMechanicsReviewClipBoundary() {
+  if (!mechanicsReviewClipActive) {
+    return;
+  }
+  if (!gameWrapper->IsInReplay()) {
+    mechanicsReviewClipActive = false;
+    playbackPlaying = false;
+    mechanicsReviewStatus = "Clip stopped because Rocket League left replay mode";
+    return;
+  }
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  if (replayServer.IsNull()) {
+    mechanicsReviewClipActive = false;
+    playbackPlaying = false;
+    mechanicsReviewStatus = "Clip stopped because replay playback is unavailable";
+    return;
+  }
+
+  const float currentTime = replayServer.GetReplayTimeElapsed();
+  playbackCurrentTime = currentTime;
+  if (currentTime < mechanicsReviewClipStartSeconds - 0.25f) {
+    replayServer.StartPlaybackAtTime(mechanicsReviewClipStartSeconds);
+    playbackCurrentTime = mechanicsReviewClipStartSeconds;
+    playbackPlaying = true;
+    mechanicsReviewStatus = std::format(
+        "Returned to clip start at {:.2f}s",
+        mechanicsReviewClipStartSeconds);
+    return;
+  }
+  if (currentTime < mechanicsReviewClipEndSeconds - 0.025f) {
+    return;
+  }
+
+  ReplayWrapper replay = replayServer.GetReplay();
+  if (!replay.IsNull()) {
+    replay.StopPlayback();
+  }
+  playbackCurrentTime = mechanicsReviewClipEndSeconds;
+  playbackPlaying = false;
+  mechanicsReviewClipActive = false;
+  mechanicsReviewStatus =
+      std::format("Finished clip at {:.2f}s", mechanicsReviewClipEndSeconds);
+}
+
 void SubtrActorPlugin::tick(std::string) {
   if (!loaded || !engine) {
     return;
   }
 
   tickReplayAnnotations();
+  tickMechanicsReviewClipBoundary();
 
   if (!liveProcessingEnabled()) {
     if (wasInGame && engineReset) {
@@ -7047,6 +7097,16 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::Text("Mechanic: %s", current.type.c_str());
   ImGui::Text("Player: %s", current.actor.c_str());
   ImGui::Text("Clip: %.2fs to %.2fs", clipStart, clipEnd);
+  if (mechanicsReviewClipActive) {
+    ImGui::TextColored(
+        ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+        "Active clip: %.2fs to %.2fs",
+        mechanicsReviewClipStartSeconds,
+        mechanicsReviewClipEndSeconds);
+  }
+  if (!mechanicsReviewStatus.empty()) {
+    ImGui::TextWrapped("Status: %s", mechanicsReviewStatus.c_str());
+  }
   ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));
   if (!current.details.empty()) {
     ImGui::TextWrapped("Reason: %s", current.details.c_str());
@@ -7061,6 +7121,10 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     playbackPlaying = true;
     playbackSkipPostGoalTransitions = false;
     playbackSkipKickoffs = false;
+    mechanicsReviewClipActive = true;
+    mechanicsReviewClipStartSeconds = clipStart;
+    mechanicsReviewClipEndSeconds = clipEnd;
+    mechanicsReviewStatus = std::format("Playing clip {:.2f}s to {:.2f}s", clipStart, clipEnd);
     uiPlaybackControlsOpen = true;
     playbackControlsPlacement.pending_focus = true;
 
@@ -7068,11 +7132,29 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     if (!replayServer.IsNull()) {
       replayServer.StartPlaybackAtTime(clipStart);
     } else {
+      mechanicsReviewClipActive = false;
+      playbackPlaying = false;
+      mechanicsReviewStatus = "Open a Rocket League replay to seek this clip";
       cvarManager->log(
           "subtr-actor: replay clip selected; open a replay to seek in Rocket League");
     }
   }
   ImGui::SameLine();
+  if (mechanicsReviewClipActive && ImGui::Button("Stop clip")) {
+    mechanicsReviewClipActive = false;
+    playbackPlaying = false;
+    mechanicsReviewStatus = "Clip stopped";
+    ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+    if (!replayServer.IsNull()) {
+      ReplayWrapper replay = replayServer.GetReplay();
+      if (!replay.IsNull()) {
+        replay.StopPlayback();
+      }
+    }
+  }
+  if (mechanicsReviewClipActive) {
+    ImGui::SameLine();
+  }
   if (ImGui::Button("Next") &&
       mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
     mechanicsReviewIndex += 1;
