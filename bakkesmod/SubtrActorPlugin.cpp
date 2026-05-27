@@ -6734,8 +6734,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
       }
       uiLauncherOpen = false;
     }
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", *window.open ? "Shown" : "Hidden");
     ImGui::PopID();
   };
   auto renderStatsWindowCreateButton = [&](const char *label, UiStatsWindowKind kind) {
@@ -6743,14 +6741,12 @@ void SubtrActorPlugin::renderLauncherWindow() {
       createStatsWindow(kind);
       uiLauncherOpen = false;
     }
-    ImGui::SameLine();
-    ImGui::TextDisabled("New");
   };
 
   std::array<LauncherWindowToggle, 10> webLauncherWindows{{
       {"Camera", &uiCameraOpen, &cameraPlacement},
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
-      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
+      {"Playback", &uiPlaybackControlsOpen, &playbackControlsPlacement},
       {"Recording", &uiRecordingOpen, &recordingPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
@@ -8065,14 +8061,14 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
 
   applyWindowPlacement(playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f);
   if (!ImGui::Begin(
-          "Playback controls##subtr-actor",
+          "Playback##subtr-actor",
           &uiPlaybackControlsOpen,
           UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
   captureWindowPlacement(playbackControlsPlacement);
-  if (renderSingletonWindowHeader("Playback controls", uiPlaybackControlsOpen)) {
+  if (renderSingletonWindowHeader("Playback", uiPlaybackControlsOpen)) {
     ImGui::End();
     return;
   }
@@ -8552,7 +8548,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f},
       {"Status", &uiStatusOpen, &statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f},
       {"Camera", &uiCameraOpen, &cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f},
-      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f},
+      {"Playback", &uiPlaybackControlsOpen, &playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f},
       {"Recording", &uiRecordingOpen, &recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f},
       {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f},
