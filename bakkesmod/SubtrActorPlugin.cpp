@@ -9097,13 +9097,17 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
   }
   captureStatsWindowPlacement(window);
 
+  const bool scopeHeaderOnly =
+      window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team;
   if (ImGui::SmallButton(std::format("Hide##stats-window-hide-{}", window.id).c_str())) {
     window.open = false;
     ImGui::End();
     return;
   }
-  ImGui::SameLine();
-  ImGui::TextDisabled("%s", statsWindowKindLabel(window.kind));
+  if (!scopeHeaderOnly) {
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", statsWindowKindLabel(window.kind));
+  }
   ImGui::Separator();
 
   renderStatsWindowScopeSelector(window);
@@ -9127,7 +9131,6 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
       }
       ImGui::EndCombo();
     }
-    ImGui::Separator();
     return;
   }
 
@@ -9142,7 +9145,6 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
       }
       ImGui::EndCombo();
     }
-    ImGui::Separator();
     return;
   }
 
@@ -9189,6 +9191,9 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
 
   const std::string addButton = std::format("+ Add stat##{}", window.id);
+  if (window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team) {
+    ImGui::SameLine();
+  }
   if (ImGui::Button(addButton.c_str())) {
     window.picker_open = !window.picker_open;
   }
