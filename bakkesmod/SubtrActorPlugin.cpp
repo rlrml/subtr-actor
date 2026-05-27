@@ -7023,9 +7023,9 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   placement.viewport_width = displaySize.x;
   placement.viewport_height = displaySize.y;
-  if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+  if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
       ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-    placement.z_index = std::max(placement.z_index, nextUiWindowZIndex++);
+    placement.z_index = nextUiWindowZIndex++;
   }
 }
 
@@ -7131,9 +7131,9 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   window.viewport_width = displaySize.x;
   window.viewport_height = displaySize.y;
-  if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+  if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
       ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-    window.z_index = std::max(window.z_index, nextUiWindowZIndex++);
+    window.z_index = nextUiWindowZIndex++;
   }
 }
 
