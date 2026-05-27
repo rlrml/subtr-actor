@@ -27,5 +27,3 @@ pub use collector_legacy::StatsTimelineCollector;
 #[cfg(test)]
 #[path = "collector_tests.rs"]
 mod collector_tests;
-#[cfg(test)]
-use crate::*;

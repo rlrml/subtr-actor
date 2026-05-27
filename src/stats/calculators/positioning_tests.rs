@@ -1,4 +1,4 @@
-use super::*;
+use super::positioning_ball_depth::ball_depth_fractions;
 
 #[test]
 fn ball_depth_fractions_treat_near_ball_band_as_level() {

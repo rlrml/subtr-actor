@@ -38,8 +38,6 @@ mod positioning_team_roles;
 #[path = "positioning_team_sample.rs"]
 mod positioning_team_sample;
 
-#[cfg(test)]
-pub(crate) use positioning_ball_depth::ball_depth_fractions;
 pub use positioning_calculator::{PositioningCalculator, PositioningCalculatorConfig};
 pub use positioning_event::PositioningEvent;
 pub use positioning_stats_types::PositioningStats;

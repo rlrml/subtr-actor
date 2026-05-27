@@ -1,4 +1,6 @@
 use super::super::model::TeamColor;
+use super::super::model::{ComparisonTarget, StatDomain, StatKey, StatScope};
+use super::match_config::approx_abs;
 use super::*;
 
 #[test]

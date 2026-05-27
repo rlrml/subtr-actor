@@ -1,7 +1,6 @@
-use super::{
-    build_actual_comparable_stats, collect_final_replay_meta, compute_comparable_stats,
-    raw_boost_amount_as_comparable_units, ComputedComparableStats,
-};
+use super::conversion_collect::{collect_final_replay_meta, ComputedComparableStats};
+use super::conversion_stats::raw_boost_amount_as_comparable_units;
+use super::{build_actual_comparable_stats, compute_comparable_stats};
 use subtr_actor::*;
 
 fn workspace_asset_path(path: &str) -> String {

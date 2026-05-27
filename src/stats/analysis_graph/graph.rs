@@ -5,9 +5,6 @@ use std::collections::HashMap;
 
 use crate::{SubtrActorError, SubtrActorErrorVariant};
 
-#[cfg(test)]
-use crate::SubtrActorResult;
-
 #[path = "graph_build.rs"]
 mod build;
 #[path = "graph_context.rs"]

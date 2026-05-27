@@ -1,4 +1,5 @@
 use super::*;
+use crate::SubtrActorResult;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 struct BaseState(usize);
