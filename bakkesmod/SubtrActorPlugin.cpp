@@ -6599,7 +6599,9 @@ void SubtrActorPlugin::renderBoolModuleSummaryToggle(
 }
 
 void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
-  if (ImGui::TreeNode(std::format("Timeline visualizations##{}-timeline", idSuffix).c_str())) {
+  if (ImGui::TreeNodeEx(
+          std::format("Timeline visualizations##{}-timeline", idSuffix).c_str(),
+          ImGuiTreeNodeFlags_DefaultOpen)) {
     renderBoolModuleSummaryToggle("Mechanics playlist", eventPlaylistMechanicsEnabled, idSuffix);
     renderBoolModuleSummaryToggle("Team event playlist", eventPlaylistTeamEventsEnabled, idSuffix);
     renderBoolModuleSummaryToggle(
@@ -6624,7 +6626,9 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
     ImGui::TreePop();
   }
 
-  if (ImGui::TreeNode(std::format("In-game visualizations##{}-ingame", idSuffix).c_str())) {
+  if (ImGui::TreeNodeEx(
+          std::format("In-game visualizations##{}-ingame", idSuffix).c_str(),
+          ImGuiTreeNodeFlags_DefaultOpen)) {
     renderCvarModuleSummaryToggle(
         "Canvas HUD overlay",
         "subtr_actor_overlay_enabled",
