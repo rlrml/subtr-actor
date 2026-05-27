@@ -7565,6 +7565,7 @@ void SubtrActorPlugin::renderModuleSettingsControls(
 }
 
 void SubtrActorPlugin::renderLauncherToggleChrome() {
+  uiLauncherToggleHovered = false;
   if (!uiEnabled() && !uiLauncherOpen) {
     return;
   }
@@ -7597,6 +7598,7 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
   if (uiLauncherOpen) {
     ImGui::PopStyleColor(3);
   }
+  uiLauncherToggleHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
   ImGui::End();
   ImGui::PopStyleVar(2);
 }
@@ -7747,6 +7749,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     return;
   }
   captureWindowPlacement(launcherPlacement);
+  const bool launcherHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
   if (ImGui::Button("Load Replay...")) {
@@ -7826,6 +7829,12 @@ void SubtrActorPlugin::renderLauncherWindow() {
     ImGui::Separator();
     renderSharedSettingsControls();
     ImGui::TreePop();
+  }
+
+  if (uiLauncherOpen && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !launcherHovered &&
+      !uiLauncherToggleHovered) {
+    uiLauncherOpen = false;
+    scheduleUiConfigAutosave();
   }
 
   ImGui::End();

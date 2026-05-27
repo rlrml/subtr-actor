@@ -316,6 +316,7 @@ private:
   bool uiModuleControlsOpen = false;
   bool uiTouchControlsOpen = false;
   bool uiBoostPickupControlsOpen = false;
+  bool uiLauncherToggleHovered = false;
   bool eventPlaylistMechanicsEnabled = true;
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
