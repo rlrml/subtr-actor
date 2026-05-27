@@ -7709,9 +7709,13 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
 
 void SubtrActorPlugin::renderStatsWindowCreationControls(
     const char *idSuffix,
-    bool closeLauncherOnCreate) {
+    bool closeLauncherOnCreate,
+    bool includeHeading,
+    bool includeManager) {
   ImGui::PushID(idSuffix);
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+  if (includeHeading) {
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+  }
   for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
     if (!kind.web_config) {
       continue;
@@ -7723,7 +7727,7 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
       }
     }
   }
-  if (uiStatsWindows.empty()) {
+  if (!includeManager || uiStatsWindows.empty()) {
     ImGui::PopID();
     return;
   }
@@ -7780,10 +7784,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   renderWebWindowToggleControls("launcher-web-windows", true);
-  renderSingletonWindowManager();
-
-  ImGui::Separator();
-  renderStatsWindowCreationControls("launcher-stats-windows", false);
+  renderStatsWindowCreationControls("launcher-stats-windows", false, false, false);
 
   ImGui::Separator();
   renderLauncherWorkspaceControls();

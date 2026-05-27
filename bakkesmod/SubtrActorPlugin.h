@@ -443,7 +443,11 @@ private:
   void renderLauncherWindow();
   void renderLauncherWorkspaceControls();
   void renderWebWindowToggleControls(const char *idSuffix, bool closeLauncherOnToggle);
-  void renderStatsWindowCreationControls(const char *idSuffix, bool closeLauncherOnCreate);
+  void renderStatsWindowCreationControls(
+      const char *idSuffix,
+      bool closeLauncherOnCreate,
+      bool includeHeading = true,
+      bool includeManager = true);
   void renderSettingsWindowControls();
   void renderEmptyStateWindow();
   void renderFloatingWindowLayer();
