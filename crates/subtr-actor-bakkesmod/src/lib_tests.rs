@@ -61,6 +61,10 @@ mod timeline_drain_tests;
 mod live_event_fixtures;
 use live_event_fixtures::*;
 
+#[path = "live_frame_input_test_support.rs"]
+mod live_frame_input_test_support;
+use live_frame_input_test_support::*;
+
 fn live_events_json_value(engine: *const SaEngine) -> serde_json::Value {
     let json_len = unsafe { subtr_actor_bakkesmod_events_json_len(engine) };
     assert!(json_len > 0);
