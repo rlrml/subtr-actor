@@ -7568,6 +7568,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   for (const SingletonWindowControl &window : webSingletonWindowControls()) {
     renderLauncherWindowToggle(window);
   }
+  renderSingletonWindowManager();
 
   ImGui::Separator();
   renderLauncherStatsWindowControls();
@@ -7626,14 +7627,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
       uiLauncherOpen = false;
     }
-
-    ImGui::Separator();
-    for (const SingletonWindowControl &window : singletonWindowControls()) {
-      if (!window.web_config) {
-        renderLauncherWindowToggle(window);
-      }
-    }
-    renderSingletonWindowManager();
 
     ImGui::Separator();
     renderSharedSettingsControls();
