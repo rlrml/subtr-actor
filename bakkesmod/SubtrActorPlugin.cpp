@@ -609,6 +609,19 @@ std::string escapeJsonString(std::string_view value) {
   return escaped;
 }
 
+std::string clippedDisplayText(std::string value, size_t maxBytes = 24000) {
+  if (value.size() <= maxBytes) {
+    return value;
+  }
+  const size_t originalSize = value.size();
+  value.resize(maxBytes);
+  value += std::format(
+      "\n\n... truncated {} of {} bytes ...",
+      originalSize - maxBytes,
+      originalSize);
+  return value;
+}
+
 bool findJsonPropertyValueOffset(
     const std::string &json,
     const std::string &propertyName,
@@ -1977,6 +1990,8 @@ void SubtrActorPlugin::loadUiConfig() {
       window.kind = UiStatsWindowKind::GoalsOverview;
     } else if (*kind == "ad-hoc") {
       window.kind = UiStatsWindowKind::AdHoc;
+    } else if (*kind == "stats-module") {
+      window.kind = UiStatsWindowKind::StatsModule;
     } else {
       continue;
     }
@@ -1991,8 +2006,11 @@ void SubtrActorPlugin::loadUiConfig() {
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
     window.selected_team_is_team_0 =
         parseJsonBoolProperty(object, "selected_team_is_team_0").value_or(true) ? 1 : 0;
+    window.module_name = parseJsonStringProperty(object, "module_name").value_or("");
+    window.module_view = static_cast<int>(
+        std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
     window.entries = parseJsonStringArrayProperty(object, "entries");
-    if (window.entries.empty()) {
+    if (window.entries.empty() && window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
     }
     window.has_placement = parseJsonBoolProperty(object, "has_placement").value_or(false);
@@ -2038,6 +2056,8 @@ void SubtrActorPlugin::saveUiConfig() {
       return "goals-overview";
     case UiStatsWindowKind::AdHoc:
       return "ad-hoc";
+    case UiStatsWindowKind::StatsModule:
+      return "stats-module";
     default:
       return "player";
     }
@@ -2079,6 +2099,8 @@ void SubtrActorPlugin::saveUiConfig() {
          << ",\"selected_player_index\":" << window.selected_player_index
          << ",\"selected_team_is_team_0\":"
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
+         << ",\"module_name\":\"" << escapeJsonString(window.module_name) << "\""
+         << ",\"module_view\":" << window.module_view
          << ",\"has_placement\":" << (window.has_placement ? "true" : "false")
          << ",\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"width\":" << window.width << ",\"height\":" << window.height
@@ -4714,6 +4736,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   if (ImGui::Button("New ad hoc stats")) {
     createStatsWindow(UiStatsWindowKind::AdHoc);
   }
+  if (ImGui::Button("New stats module")) {
+    const std::vector<std::string> &moduleNames = statsModuleNames();
+    createStatsModuleWindow(moduleNames.empty() ? "" : moduleNames.front());
+  }
   if (ImGui::Button("Save layout")) {
     saveUiConfig();
   }
@@ -4722,6 +4748,23 @@ void SubtrActorPlugin::renderLauncherWindow() {
     loadUiConfig();
   }
   ImGui::Text("%zu stats windows open", uiStatsWindows.size());
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
+  const std::vector<std::string> &moduleNames = statsModuleNames();
+  if (moduleNames.empty()) {
+    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+  } else {
+    ImGui::BeginChild("module-summary", ImVec2{0.0f, 150.0f}, true);
+    for (const std::string &moduleName : moduleNames) {
+      if (ImGui::SmallButton(std::format("Open##module-{}", moduleName).c_str())) {
+        createStatsModuleWindow(moduleName);
+      }
+      ImGui::SameLine();
+      ImGui::Text("%s", moduleName.c_str());
+    }
+    ImGui::EndChild();
+  }
 
   ImGui::Separator();
   renderSharedSettingsControls();
@@ -4853,6 +4896,17 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
   uiStatsWindows.push_back(window);
 }
 
+void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName) {
+  UiStatsWindow window{};
+  window.id = nextUiStatsWindowId++;
+  window.kind = UiStatsWindowKind::StatsModule;
+  window.module_name = std::move(moduleName);
+  window.module_view = 0;
+  window.width = 680.0f;
+  window.height = 460.0f;
+  uiStatsWindows.push_back(std::move(window));
+}
+
 void SubtrActorPlugin::renderStatsWindows() {
   for (UiStatsWindow &window : uiStatsWindows) {
     renderStatsWindow(window);
@@ -4879,12 +4933,17 @@ const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const
     return "Goal labels";
   case UiStatsWindowKind::AdHoc:
     return "Ad hoc stats";
+  case UiStatsWindowKind::StatsModule:
+    return "Stats module";
   default:
     return "Stats";
   }
 }
 
 std::string SubtrActorPlugin::statsWindowTitle(const UiStatsWindow &window) const {
+  if (window.kind == UiStatsWindowKind::StatsModule && !window.module_name.empty()) {
+    return std::format("Stats module: {}##subtr-actor-stats-{}", window.module_name, window.id);
+  }
   return std::format("{}##subtr-actor-stats-{}", statsWindowKindLabel(window.kind), window.id);
 }
 
@@ -4929,6 +4988,9 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
   case UiStatsWindowKind::AdHoc:
     window.entries = {"recent_events", "demo", "flip_reset"};
     break;
+  case UiStatsWindowKind::StatsModule:
+    window.entries.clear();
+    break;
   }
 }
 
@@ -4949,6 +5011,8 @@ bool SubtrActorPlugin::statsWindowSupportsStat(
   case UiStatsWindowKind::GoalsOverview:
   case UiStatsWindowKind::AdHoc:
     return definition->event;
+  case UiStatsWindowKind::StatsModule:
+    return false;
   }
   return false;
 }
@@ -4983,6 +5047,26 @@ int SubtrActorPlugin::recentEventCountForType(std::string_view type) const {
         return type == "all" || type == "recent_events" || event.type == type ||
                event.category == type;
       }));
+}
+
+const std::vector<std::string> &SubtrActorPlugin::statsModuleNames() {
+  const auto now = std::chrono::steady_clock::now();
+  if (now < nextStatsModuleNamesRefresh) {
+    return cachedStatsModuleNames;
+  }
+
+  nextStatsModuleNamesRefresh = now + std::chrono::seconds(2);
+  std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
+  std::vector<std::string> names =
+      parseJsonStringArrayProperty(graphInfoJson, "builtin_stats_module_names");
+  if (names.empty()) {
+    graphInfoJson = readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "graph_info");
+    names = parseJsonStringArrayProperty(graphInfoJson, "builtin_stats_module_names");
+  }
+  if (!names.empty()) {
+    cachedStatsModuleNames = std::move(names);
+  }
+  return cachedStatsModuleNames;
 }
 
 std::string SubtrActorPlugin::playerStatValue(
@@ -5110,10 +5194,46 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
       ImGui::EndCombo();
     }
     ImGui::Separator();
+    return;
+  }
+
+  if (window.kind == UiStatsWindowKind::StatsModule) {
+    const std::vector<std::string> &moduleNames = statsModuleNames();
+    const char *selectedModule =
+        window.module_name.empty() ? "Select module" : window.module_name.c_str();
+    if (ImGui::BeginCombo("Module", selectedModule)) {
+      for (const std::string &moduleName : moduleNames) {
+        const bool selected = moduleName == window.module_name;
+        if (ImGui::Selectable(moduleName.c_str(), selected)) {
+          window.module_name = moduleName;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::Separator();
   }
 }
 
 void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
+  if (window.kind == UiStatsWindowKind::StatsModule) {
+    ImGui::RadioButton(
+        std::format("Frame##module-view-{}", window.id).c_str(),
+        &window.module_view,
+        0);
+    ImGui::SameLine();
+    ImGui::RadioButton(
+        std::format("Module##module-view-{}", window.id).c_str(),
+        &window.module_view,
+        1);
+    ImGui::SameLine();
+    ImGui::RadioButton(
+        std::format("Config##module-view-{}", window.id).c_str(),
+        &window.module_view,
+        2);
+    ImGui::Separator();
+    return;
+  }
+
   const std::string addButton = std::format("+ Add stat##{}", window.id);
   if (ImGui::Button(addButton.c_str())) {
     window.picker_open = !window.picker_open;
@@ -5160,6 +5280,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
 }
 
 void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
+  if (window.kind == UiStatsWindowKind::StatsModule) {
+    renderStatsModuleWindow(window);
+    return;
+  }
+
   if (window.entries.empty()) {
     ImGui::Text("No stats selected.");
     return;
@@ -5187,6 +5312,8 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     break;
   case UiStatsWindowKind::AdHoc:
     renderAdHocStatsWindow(window);
+    break;
+  case UiStatsWindowKind::StatsModule:
     break;
   }
 }
@@ -5376,6 +5503,68 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
     ImGui::SameLine();
     ImGui::TextWrapped("%s", event.label.c_str());
   }
+  ImGui::EndChild();
+}
+
+void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
+  if (!loaded || !engine) {
+    ImGui::TextWrapped("Start live analysis to inspect graph-backed stats modules.");
+    return;
+  }
+
+  const std::vector<std::string> &moduleNames = statsModuleNames();
+  if (window.module_name.empty() && !moduleNames.empty()) {
+    window.module_name = moduleNames.front();
+  }
+  if (window.module_name.empty()) {
+    ImGui::TextWrapped("No builtin stats modules are available yet.");
+    return;
+  }
+
+  const char *viewLabel = "frame";
+  std::string json;
+  if (window.module_view == 1) {
+    viewLabel = "module";
+    json = readNamedJsonBuffer(statsModuleJsonLen, writeStatsModuleJson, window.module_name);
+  } else if (window.module_view == 2) {
+    viewLabel = "config";
+    json = readNamedJsonBuffer(
+        statsModuleConfigJsonLen,
+        writeStatsModuleConfigJson,
+        window.module_name);
+  } else {
+    window.module_view = 0;
+    json = readNamedJsonBuffer(
+        statsModuleFrameJsonLen,
+        writeStatsModuleFrameJson,
+        window.module_name);
+  }
+
+  if (json.empty()) {
+    ImGui::TextWrapped(
+        "The '%s' %s JSON is not available from the live graph yet.",
+        window.module_name.c_str(),
+        viewLabel);
+    return;
+  }
+
+  ImGui::Text(
+      "%s %s JSON (%zu bytes)",
+      window.module_name.c_str(),
+      viewLabel,
+      json.size());
+  ImGui::SameLine();
+  if (ImGui::SmallButton(std::format("Copy##module-json-{}", window.id).c_str())) {
+    ImGui::SetClipboardText(json.c_str());
+  }
+
+  const std::string display = clippedDisplayText(std::move(json));
+  ImGui::BeginChild(
+      std::format("module-json-{}", window.id).c_str(),
+      ImVec2{0.0f, 0.0f},
+      true,
+      ImGuiWindowFlags_HorizontalScrollbar);
+  ImGui::TextUnformatted(display.c_str(), display.c_str() + display.size());
   ImGui::EndChild();
 }
 

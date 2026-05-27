@@ -114,6 +114,7 @@ private:
     AllTeams,
     GoalsOverview,
     AdHoc,
+    StatsModule,
   };
 
   struct UiStatsWindow {
@@ -123,6 +124,8 @@ private:
     bool picker_open = false;
     uint32_t selected_player_index = 0;
     uint8_t selected_team_is_team_0 = 1;
+    std::string module_name;
+    int module_view = 0;
     std::vector<std::string> entries;
     bool has_placement = false;
     bool pending_apply_placement = false;
@@ -246,6 +249,9 @@ private:
   UiWindowPlacement scoreboardPlacement;
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
+  std::vector<std::string> cachedStatsModuleNames;
+  std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
+      std::chrono::steady_clock::time_point{};
 
   bool loadRustLibrary();
   void unloadRustLibrary();
@@ -269,6 +275,7 @@ private:
   void renderEventsWindow();
   void renderStatusWindow();
   void createStatsWindow(UiStatsWindowKind kind);
+  void createStatsModuleWindow(std::string moduleName);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,
@@ -289,12 +296,14 @@ private:
   void renderAllTeamsStatsTable(UiStatsWindow &window);
   void renderGoalsOverviewStats(UiStatsWindow &window);
   void renderAdHocStatsWindow(UiStatsWindow &window);
+  void renderStatsModuleWindow(UiStatsWindow &window);
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
   void initializeStatsWindowEntries(UiStatsWindow &window);
   bool statsWindowSupportsStat(const UiStatsWindow &window, std::string_view statId) const;
   bool statsWindowHasStat(const UiStatsWindow &window, std::string_view statId) const;
+  const std::vector<std::string> &statsModuleNames();
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
   std::filesystem::path uiConfigPath() const;
