@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use subtr_actor::{Collector, ProcessorView, TimeAdvance};
 
 #[path = "replay_probe_args.rs"]
@@ -10,6 +8,8 @@ mod basic;
 mod constants;
 #[path = "replay_probe_demolition.rs"]
 mod demolition;
+#[path = "replay_probe_legacy_types.rs"]
+mod legacy_types;
 #[path = "replay_probe_math.rs"]
 mod math;
 #[path = "replay_probe_replay.rs"]
@@ -26,14 +26,14 @@ mod vector_ranges;
 use args::{parse_args, ProbeCommand};
 use basic::{print_mechanics, print_metadata, print_plausibility};
 use demolition::print_demolition;
+use legacy_types::LegacyRotationProbe;
 use math::{median, positive_fraction};
 use replay::parse_replay;
 use rotation_interpret::{
     derive_world_angular_velocity, reinterpret_euler_rotation, reinterpret_quaternion,
     rotation_alignment,
 };
-use rotation_modes::{build_euler_modes, build_modes};
-use rotation_types::{EulerMode, QuaternionMode};
+use rotation_types::QuaternionMode;
 use vector_ranges::print_vector_ranges;
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
@@ -46,67 +46,7 @@ const MIN_ROTATION_MODE_SAMPLE_COUNT: usize = 100;
 const MIN_ANGULAR_VELOCITY_SPEED: f32 = 30.0;
 const MIN_DERIVED_ORIENTATION_SPEED: f32 = 0.5;
 
-#[derive(Debug, Default)]
-struct ModeAccumulator {
-    alignments: Vec<f32>,
-    up_zs: Vec<f32>,
-}
-
-#[derive(Debug, Default)]
-struct VelocityScaleAccumulator {
-    ratios: Vec<f32>,
-}
-
-#[derive(Debug, Default)]
-struct AngularVelocityAccumulator {
-    direction_dots: Vec<f32>,
-}
-
-#[derive(Debug)]
-struct LegacyRotationProbe {
-    modes: Vec<QuaternionMode>,
-    accumulators: HashMap<QuaternionMode, ModeAccumulator>,
-    euler_modes: Vec<EulerMode>,
-    euler_accumulators: HashMap<EulerMode, ModeAccumulator>,
-    euler_angular_accumulators: HashMap<EulerMode, AngularVelocityAccumulator>,
-    velocity_accumulators: Vec<(f32, VelocityScaleAccumulator)>,
-    previous_bodies: HashMap<subtr_actor::PlayerId, (f32, boxcars::RigidBody)>,
-}
-
 impl LegacyRotationProbe {
-    fn new() -> Self {
-        let modes = build_modes();
-        let accumulators = modes
-            .iter()
-            .copied()
-            .map(|mode| (mode, ModeAccumulator::default()))
-            .collect();
-        let euler_modes = build_euler_modes();
-        let euler_accumulators = euler_modes
-            .iter()
-            .copied()
-            .map(|mode| (mode, ModeAccumulator::default()))
-            .collect();
-        let euler_angular_accumulators = euler_modes
-            .iter()
-            .copied()
-            .map(|mode| (mode, AngularVelocityAccumulator::default()))
-            .collect();
-        let velocity_accumulators = [1.0, 0.1, 0.01]
-            .into_iter()
-            .map(|scale| (scale, VelocityScaleAccumulator::default()))
-            .collect();
-        Self {
-            modes,
-            accumulators,
-            euler_modes,
-            euler_accumulators,
-            euler_angular_accumulators,
-            velocity_accumulators,
-            previous_bodies: HashMap::new(),
-        }
-    }
-
     fn sample_player(
         &mut self,
         player_id: &subtr_actor::PlayerId,
