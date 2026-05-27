@@ -2563,6 +2563,8 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  eventPlaylistStatus =
+      parseJsonStringProperty(json, "event_playlist_status").value_or(eventPlaylistStatus);
   if (const auto overlays = parseJsonObjectProperty(json, "overlays")) {
     const std::vector<std::string> timelineEvents =
         parseJsonStringArrayProperty(*overlays, "timelineEvents");
@@ -3210,6 +3212,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"event_playlist_status\": \"" << escapeJsonString(eventPlaylistStatus) << "\",\n";
   file << "  \"overlays\": {\n";
   const std::string currentEventFilter = cvarString("subtr_actor_overlay_event_types", "all");
   const std::vector<std::string> currentEventFilterTokens =
@@ -6969,18 +6972,67 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       visibleCount,
       selectedCount,
       recentUiEvents.size());
+  if (!eventPlaylistStatus.empty()) {
+    ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());
+  }
   ImGui::Separator();
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  const bool hasReplayServer = !replayServer.IsNull();
+  const float currentPlaybackTime =
+      hasReplayServer ? replayServer.GetReplayTimeElapsed() : playbackCurrentTime;
+  auto eventSeekTime = [](const UiEventRecord &event) {
+    const float leadSeconds =
+        event.category == "goal_context" || event.type == "goal" ? 4.0f : 2.0f;
+    return std::max(0.0f, event.time - leadSeconds);
+  };
+
+  std::optional<size_t> activeEventIndex;
+  float activeEventDistance = std::numeric_limits<float>::infinity();
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
+    if (!eventPlaylistSourceEnabled(event) || !uiEventVisible(event)) {
+      continue;
+    }
+    const float distance = std::abs(event.time - currentPlaybackTime);
+    if (distance < activeEventDistance) {
+      activeEventDistance = distance;
+      activeEventIndex = index;
+    }
+  }
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
   bool renderedAny = false;
-  for (const UiEventRecord &event : recentUiEvents) {
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
     if (!eventPlaylistSourceEnabled(event) || !uiEventVisible(event)) {
       continue;
     }
     renderedAny = true;
 
-    ImGui::PushID(static_cast<int>(event.frame_number));
+    ImGui::PushID(static_cast<int>(index));
     const ImVec4 color = toImVec4(event.color);
+    const bool active = activeEventIndex && *activeEventIndex == index;
+    const float seekTime = eventSeekTime(event);
+    const std::string buttonLabel =
+        std::format("{} {:.2f}s##event-playlist-cue", active ? ">" : "Cue", event.time);
+    if (ImGui::SmallButton(buttonLabel.c_str())) {
+      mechanicsReviewClipActive = false;
+      playbackCurrentTime = seekTime;
+      playbackSkipPostGoalTransitions = false;
+      playbackSkipKickoffs = false;
+      uiPlaybackControlsOpen = true;
+      playbackControlsPlacement.pending_focus = true;
+      if (hasReplayServer) {
+        replayServer.SkipToTime(seekTime);
+        eventPlaylistStatus =
+            std::format("Cued {} at {:.2f}s", event.label, seekTime);
+      } else {
+        eventPlaylistStatus =
+            std::format("Selected {} at {:.2f}s; open a replay to seek", event.label, seekTime);
+      }
+    }
+    ImGui::SameLine();
     ImGui::TextColored(color, "%.2fs", event.time);
     ImGui::SameLine();
     ImGui::TextColored(color, "%s", event.actor.c_str());
