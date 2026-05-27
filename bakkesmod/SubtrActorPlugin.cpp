@@ -1039,6 +1039,76 @@ std::string urlEncode(std::string_view value) {
   return encoded;
 }
 
+int urlHexValue(char ch) {
+  if (ch >= '0' && ch <= '9') {
+    return ch - '0';
+  }
+  if (ch >= 'A' && ch <= 'F') {
+    return ch - 'A' + 10;
+  }
+  if (ch >= 'a' && ch <= 'f') {
+    return ch - 'a' + 10;
+  }
+  return -1;
+}
+
+std::optional<std::string> urlDecode(std::string_view value) {
+  std::string decoded;
+  decoded.reserve(value.size());
+  for (size_t index = 0; index < value.size(); index += 1) {
+    const char ch = value[index];
+    if (ch == '+') {
+      decoded.push_back(' ');
+      continue;
+    }
+    if (ch != '%') {
+      decoded.push_back(ch);
+      continue;
+    }
+    if (index + 2 >= value.size()) {
+      return std::nullopt;
+    }
+    const int high = urlHexValue(value[index + 1]);
+    const int low = urlHexValue(value[index + 2]);
+    if (high < 0 || low < 0) {
+      return std::nullopt;
+    }
+    decoded.push_back(static_cast<char>((high << 4) | low));
+    index += 2;
+  }
+  return decoded;
+}
+
+std::optional<std::string> statsPlayerCfgJsonFromClipboard(std::string_view clipboardText) {
+  const size_t firstByte = clipboardText.find_first_not_of(" \t\r\n");
+  if (firstByte == std::string_view::npos) {
+    return std::nullopt;
+  }
+  if (clipboardText[firstByte] == '{') {
+    return std::string{clipboardText.substr(firstByte)};
+  }
+
+  const size_t cfgOffset = clipboardText.find("cfg=");
+  if (cfgOffset == std::string_view::npos) {
+    return std::nullopt;
+  }
+  const size_t valueStart = cfgOffset + 4;
+  size_t valueEnd = clipboardText.find_first_of("&# \t\r\n", valueStart);
+  if (valueEnd == std::string_view::npos) {
+    valueEnd = clipboardText.size();
+  }
+  std::optional<std::string> decoded =
+      urlDecode(clipboardText.substr(valueStart, valueEnd - valueStart));
+  if (!decoded) {
+    return std::nullopt;
+  }
+  const size_t decodedFirstByte = decoded->find_first_not_of(" \t\r\n");
+  if (decodedFirstByte == std::string::npos || (*decoded)[decodedFirstByte] != '{') {
+    return std::nullopt;
+  }
+  return decoded->substr(decodedFirstByte);
+}
+
 std::string clippedDisplayText(std::string value, size_t maxBytes = 24000) {
   if (value.size() <= maxBytes) {
     return value;
@@ -7414,12 +7484,16 @@ void SubtrActorPlugin::renderLauncherWindow() {
           std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
     }
     ImGui::SameLine();
-    if (ImGui::Button("Paste layout JSON")) {
+    if (ImGui::Button("Paste layout")) {
       const char *clipboardText = ImGui::GetClipboardText();
       if (clipboardText == nullptr || clipboardText[0] == '\0') {
-        cvarManager->log("subtr-actor: clipboard does not contain UI config JSON");
+        cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
+      } else if (const std::optional<std::string> configJson =
+                     statsPlayerCfgJsonFromClipboard(clipboardText)) {
+        applyUiConfigJson(*configJson, "clipboard");
       } else {
-        applyUiConfigJson(clipboardText, "clipboard");
+        cvarManager->log(
+            "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
       }
     }
 
