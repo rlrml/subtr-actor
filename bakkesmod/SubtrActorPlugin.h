@@ -129,6 +129,7 @@ private:
     bool pending_focus = false;
     bool picker_open = false;
     uint32_t selected_player_index = 0;
+    std::string selected_player_id;
     uint8_t selected_team_is_team_0 = 1;
     std::string module_name;
     int module_view = 0;
@@ -474,6 +475,8 @@ private:
       const UiStatsWindow &window,
       const UiStatsWindow::Entry &entry) const;
   std::string webPlayerIdForIndex(uint32_t playerIndex) const;
+  std::string webPlayerIdForWindow(const UiStatsWindow &window) const;
+  void resolveStatsWindowPlayerSelection(UiStatsWindow &window);
   void renderAdHocTargetSelector(
       UiStatsWindow &window,
       UiStatsWindow::Entry &entry,

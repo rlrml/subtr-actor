@@ -1899,6 +1899,29 @@ std::string SubtrActorPlugin::webPlayerIdForIndex(uint32_t playerIndex) const {
   return std::to_string(playerIndex);
 }
 
+std::string SubtrActorPlugin::webPlayerIdForWindow(const UiStatsWindow &window) const {
+  if (!window.selected_player_id.empty() &&
+      !parseUnsignedIntegerString(window.selected_player_id)) {
+    return window.selected_player_id;
+  }
+  return webPlayerIdForIndex(window.selected_player_index);
+}
+
+void SubtrActorPlugin::resolveStatsWindowPlayerSelection(UiStatsWindow &window) {
+  if (window.selected_player_id.empty()) {
+    window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
+    return;
+  }
+  if (const auto parsedPlayerIndex = parseUnsignedIntegerString(window.selected_player_id)) {
+    window.selected_player_index = *parsedPlayerIndex;
+    return;
+  }
+  if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(window.selected_player_id);
+      uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
+    window.selected_player_index = uniquePlayerIndex->second;
+  }
+}
+
 void SubtrActorPlugin::onLoad() {
   cvarManager->registerCvar(
       "subtr_actor_enabled",
@@ -3065,7 +3088,10 @@ void SubtrActorPlugin::applyUiConfigJson(
     }
     window.selected_player_index = static_cast<uint32_t>(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
+    window.selected_player_id =
+        parseJsonStringProperty(object, "selected_player_id").value_or("");
     if (const auto playerId = parseJsonStringProperty(object, "playerId")) {
+      window.selected_player_id = *playerId;
       if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*playerId)) {
         window.selected_player_index = *parsedPlayerIndex;
       } else if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(*playerId);
@@ -3541,6 +3567,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}"
          << ",\"selected_player_index\":" << window.selected_player_index
+         << ",\"selected_player_id\":\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\""
          << ",\"selected_team_is_team_0\":"
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
          << ",\"module_name\":\"" << escapeJsonString(window.module_name) << "\""
@@ -3585,7 +3612,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}"
          << ",\"playerId\":\""
-         << escapeJsonString(webPlayerIdForIndex(window.selected_player_index)) << "\""
+         << escapeJsonString(webPlayerIdForWindow(window)) << "\""
          << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange")
          << "\",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
@@ -7881,6 +7908,7 @@ void SubtrActorPlugin::renderCameraWindow() {
     if (!uiStatsWindows.empty()) {
       UiStatsWindow &window = uiStatsWindows.back();
       window.selected_player_index = targetPlayer->player_index;
+      window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
       window.selected_team_is_team_0 = targetPlayer->is_team_0;
     }
   }
@@ -8737,6 +8765,7 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   initializeStatsWindowPlacement(window);
   if (!sampledPlayers.empty()) {
     window.selected_player_index = sampledPlayers.front().player_index;
+    window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
     window.selected_team_is_team_0 = sampledPlayers.front().is_team_0;
   }
   if (initializeEntries) {
@@ -9173,6 +9202,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
 
 void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
   if (window.kind == UiStatsWindowKind::Player) {
+    resolveStatsWindowPlayerSelection(window);
     const SaPlayerFrame *selected = sampledPlayerByIndex(window.selected_player_index);
     const std::string selectedLabel =
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
@@ -9182,6 +9212,7 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
         const bool isSelected = player.player_index == window.selected_player_index;
         if (ImGui::Selectable(label.c_str(), isSelected)) {
           window.selected_player_index = player.player_index;
+          window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
         }
       }
       ImGui::EndCombo();
