@@ -5305,9 +5305,20 @@ void SubtrActorPlugin::renderLauncherWindow() {
     applyDefaultUiWorkspace();
   }
   ImGui::SameLine();
+  if (ImGui::Button("Review workspace")) {
+    applyReplayReviewUiWorkspace();
+  }
+  if (ImGui::Button("Debug workspace")) {
+    applyGraphDebugUiWorkspace();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Recording workspace")) {
+    applyRecordingUiWorkspace();
+  }
   if (ImGui::Button("Reset positions")) {
     resetWindowPlacements();
   }
+  ImGui::SameLine();
   if (ImGui::Button("Default stats windows")) {
     resetDefaultStatsWindows();
   }
@@ -7015,6 +7026,70 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   eventPlaylistAutoFollow = true;
   resetWindowPlacements();
   resetDefaultStatsWindows();
+}
+
+void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
+  uiLauncherOpen = true;
+  uiScoreboardOpen = true;
+  uiEventsOpen = true;
+  uiEventPlaylistOpen = true;
+  uiStatusOpen = false;
+  uiCameraOpen = true;
+  uiPlaybackControlsOpen = true;
+  uiRecordingOpen = false;
+  uiGraphInspectorOpen = false;
+  uiMechanicsReviewOpen = true;
+  uiReplayLoadingOpen = true;
+  uiModuleControlsOpen = false;
+  uiTouchControlsOpen = true;
+  uiBoostPickupControlsOpen = true;
+  eventPlaylistMechanicsEnabled = true;
+  eventPlaylistTeamEventsEnabled = true;
+  eventPlaylistGoalContextEnabled = true;
+  eventPlaylistAutoFollow = true;
+  resetWindowPlacements();
+  mechanicsReviewPlacement.pending_focus = true;
+  replayLoadingPlacement.pending_focus = true;
+}
+
+void SubtrActorPlugin::applyGraphDebugUiWorkspace() {
+  uiLauncherOpen = true;
+  uiScoreboardOpen = false;
+  uiEventsOpen = true;
+  uiEventPlaylistOpen = true;
+  uiStatusOpen = true;
+  uiCameraOpen = false;
+  uiPlaybackControlsOpen = true;
+  uiRecordingOpen = false;
+  uiGraphInspectorOpen = true;
+  uiMechanicsReviewOpen = false;
+  uiReplayLoadingOpen = false;
+  uiModuleControlsOpen = true;
+  uiTouchControlsOpen = false;
+  uiBoostPickupControlsOpen = false;
+  resetWindowPlacements();
+  graphInspectorPlacement.pending_focus = true;
+  moduleControlsPlacement.pending_focus = true;
+}
+
+void SubtrActorPlugin::applyRecordingUiWorkspace() {
+  uiLauncherOpen = true;
+  uiScoreboardOpen = true;
+  uiEventsOpen = false;
+  uiEventPlaylistOpen = false;
+  uiStatusOpen = true;
+  uiCameraOpen = true;
+  uiPlaybackControlsOpen = true;
+  uiRecordingOpen = true;
+  uiGraphInspectorOpen = false;
+  uiMechanicsReviewOpen = false;
+  uiReplayLoadingOpen = false;
+  uiModuleControlsOpen = false;
+  uiTouchControlsOpen = false;
+  uiBoostPickupControlsOpen = false;
+  resetWindowPlacements();
+  recordingPlacement.pending_focus = true;
+  cameraPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {

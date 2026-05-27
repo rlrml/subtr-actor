@@ -359,6 +359,9 @@ private:
   void resetWindowPlacements();
   void resetDefaultStatsWindows();
   void applyDefaultUiWorkspace();
+  void applyReplayReviewUiWorkspace();
+  void applyGraphDebugUiWorkspace();
+  void applyRecordingUiWorkspace();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   void applyWindowPlacement(
