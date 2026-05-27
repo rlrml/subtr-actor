@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ReplayModel } from "@rlrml/subtr-actor-player";
+import type { ReplayModel } from "@rlrml/player";
 import { countEnabledTimelineEvents } from "./timelineMarkers.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 

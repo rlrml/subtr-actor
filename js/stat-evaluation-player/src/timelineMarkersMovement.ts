@@ -1,4 +1,4 @@
-import type { ReplayModel, ReplayTimelineEvent } from "@rlrml/subtr-actor-player";
+import type { ReplayModel, ReplayTimelineEvent } from "@rlrml/player";
 import { playerIdToString } from "./touchOverlay.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {

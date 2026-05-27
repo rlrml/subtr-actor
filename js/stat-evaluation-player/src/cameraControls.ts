@@ -5,7 +5,7 @@ import type {
   ReplayPlayer,
   ReplayPlayerState,
   ReplayPlayerTrack,
-} from "@rlrml/subtr-actor-player";
+} from "@rlrml/player";
 import {
   formatSetting,
   getEffectiveCameraSettings as mergeEffectiveCameraSettings,

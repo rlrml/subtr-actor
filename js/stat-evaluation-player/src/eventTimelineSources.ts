@@ -1,4 +1,4 @@
-import type { ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/subtr-actor-player";
+import type { ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import {
   buildMechanicPlaylistEvents,

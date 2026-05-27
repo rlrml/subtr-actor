@@ -1,4 +1,4 @@
-import type { PlaylistManifestPage } from "@rlrml/subtr-actor-player";
+import type { PlaylistManifestPage } from "@rlrml/player";
 import { formatMechanicKind } from "./timelineMarkers.ts";
 import {
   formatReplayLoadProgress,

@@ -16,7 +16,7 @@ import type {
   ReplayPlayer,
   ReplayTimelineEvent,
   TimelineOverlayPlugin,
-} from "@rlrml/subtr-actor-player";
+} from "@rlrml/player";
 import type { EventWindowsManager } from "./eventWindows.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 

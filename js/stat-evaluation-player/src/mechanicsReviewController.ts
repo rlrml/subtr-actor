@@ -1,4 +1,4 @@
-import type { ReplayPlayer, ReplayPlayerState } from "@rlrml/subtr-actor-player";
+import type { ReplayPlayer, ReplayPlayerState } from "@rlrml/player";
 import { mustElement } from "./floatingWindows.ts";
 import {
   createMechanicsReviewReplaySource,

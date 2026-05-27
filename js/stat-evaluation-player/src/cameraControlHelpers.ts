@@ -2,7 +2,7 @@ import type {
   CameraSettings,
   ReplayPlayerState,
   ReplayPlayerTrack,
-} from "@rlrml/subtr-actor-player";
+} from "@rlrml/player";
 
 export interface CameraSettingElements {
   fov: HTMLInputElement;

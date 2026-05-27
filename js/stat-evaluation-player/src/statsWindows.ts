@@ -1,4 +1,4 @@
-import type { ReplayPlayer } from "@rlrml/subtr-actor-player";
+import type { ReplayPlayer } from "@rlrml/player";
 import type {
   StatsWindowConfig,
   StatsWindowKind,

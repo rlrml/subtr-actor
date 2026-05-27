@@ -1,4 +1,4 @@
-import type { ReplayModel } from "@rlrml/subtr-actor-player";
+import type { ReplayModel } from "@rlrml/player";
 
 export const BLUE_TIMELINE_COLOR = "#3b82f6";
 export const ORANGE_TIMELINE_COLOR = "#f59e0b";

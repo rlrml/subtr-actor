@@ -1,4 +1,4 @@
-import type { CanvasRecorderStatus } from "@rlrml/subtr-actor-player";
+import type { CanvasRecorderStatus } from "@rlrml/player";
 
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) {

@@ -2,7 +2,7 @@ import type {
   ReplayPlayer,
   ReplayPlayerState,
   ReplayTimelineEvent,
-} from "@rlrml/subtr-actor-player";
+} from "@rlrml/player";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import {
   buildEventTimelineSources,

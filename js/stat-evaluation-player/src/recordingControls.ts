@@ -1,4 +1,4 @@
-import type { CanvasRecorderPlugin, CanvasRecorderStatus } from "@rlrml/subtr-actor-player";
+import type { CanvasRecorderPlugin, CanvasRecorderStatus } from "@rlrml/player";
 import { mustElement } from "./floatingWindows.ts";
 import type { RecordingConfig } from "./playerConfig.ts";
 import {
