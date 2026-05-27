@@ -472,7 +472,11 @@ private:
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();
   void renderBoostPickupControlsWindow();
-  bool renderModuleSummaryToggle(const char *label, bool active, const char *idSuffix);
+  bool renderModuleSummaryToggle(
+      const char *label,
+      bool active,
+      const char *idSuffix,
+      float width = 230.0f);
   void renderCvarModuleSummaryToggle(
       const char *label,
       const char *name,
