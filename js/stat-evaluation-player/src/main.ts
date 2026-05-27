@@ -56,6 +56,21 @@ import {
   type ReplayInputSource,
 } from "./replayInputSources.ts";
 import {
+  formatSetting,
+  getEffectiveCameraSettings as mergeEffectiveCameraSettings,
+  populateAttachedPlayerOptions as populateAttachedPlayerSelectOptions,
+  readCustomCameraSettings as readCustomCameraControlSettings,
+  syncCustomCameraSettingControls as syncCustomCameraControlSettings,
+  type CameraSettingElements,
+} from "./cameraControlHelpers.ts";
+import {
+  downloadRecording as downloadRecordingBlob,
+  formatBytes,
+  getRecordingOptions as getRecordingControlOptions,
+  recordingFileName,
+  recordingLabel,
+} from "./recordingControlHelpers.ts";
+import {
   createMechanicsReviewReplaySource,
   formatMechanicsReviewClipDetails,
   formatMechanicsReviewEventDetails,
@@ -1742,26 +1757,6 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toFixed(1).padStart(4, "0")}`;
 }
 
-function formatSetting(value: number | undefined, suffix = "", digits = 0): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return "--";
-  }
-
-  return `${value.toFixed(digits)}${suffix}`;
-}
-
-function getFallbackCameraSettings(): Required<CameraSettings> {
-  return {
-    fov: 110,
-    height: 100,
-    pitch: -4,
-    distance: 270,
-    stiffness: 0,
-    swivelSpeed: 1,
-    transitionSpeed: 1,
-  };
-}
-
 function getAttachedPlayerCameraSettings(attachedPlayerId: string | null): CameraSettings | null {
   if (!replayPlayer || attachedPlayerId === null) {
     return null;
@@ -1774,23 +1769,33 @@ function getAttachedPlayerCameraSettings(attachedPlayerId: string | null): Camer
 }
 
 function getEffectiveCameraSettings(state: ReplayPlayerState): CameraSettings {
+  return mergeEffectiveCameraSettings(
+    state,
+    getAttachedPlayerCameraSettings(state.attachedPlayerId),
+  );
+}
+
+function getCameraSettingElements(): CameraSettingElements {
   return {
-    ...getFallbackCameraSettings(),
-    ...(getAttachedPlayerCameraSettings(state.attachedPlayerId) ?? {}),
-    ...(state.customCameraSettings ?? {}),
+    fov: customCameraFov,
+    height: customCameraHeight,
+    pitch: customCameraPitch,
+    distance: customCameraDistance,
+    stiffness: customCameraStiffness,
+    swivelSpeed: customCameraSwivelSpeed,
+    transitionSpeed: customCameraTransitionSpeed,
+    fovReadout: customCameraFovReadout,
+    heightReadout: customCameraHeightReadout,
+    pitchReadout: customCameraPitchReadout,
+    distanceReadout: customCameraDistanceReadout,
+    stiffnessReadout: customCameraStiffnessReadout,
+    swivelSpeedReadout: customCameraSwivelSpeedReadout,
+    transitionSpeedReadout: customCameraTransitionSpeedReadout,
   };
 }
 
 function readCustomCameraSettings(): CameraSettings {
-  return {
-    fov: Number(customCameraFov.value),
-    height: Number(customCameraHeight.value),
-    pitch: Number(customCameraPitch.value),
-    distance: Number(customCameraDistance.value),
-    stiffness: Number(customCameraStiffness.value),
-    swivelSpeed: Number(customCameraSwivelSpeed.value),
-    transitionSpeed: Number(customCameraTransitionSpeed.value),
-  };
+  return readCustomCameraControlSettings(getCameraSettingElements());
 }
 
 function setCameraSettingControlsEnabled(enabled: boolean): void {
@@ -1805,30 +1810,7 @@ function setCameraSettingControlsEnabled(enabled: boolean): void {
 }
 
 function syncCustomCameraSettingControls(settings: CameraSettings): void {
-  const fallback = getFallbackCameraSettings();
-  const fov = settings.fov ?? fallback.fov;
-  const height = settings.height ?? fallback.height;
-  const pitch = settings.pitch ?? fallback.pitch;
-  const distance = settings.distance ?? fallback.distance;
-  const stiffness = settings.stiffness ?? fallback.stiffness;
-  const swivelSpeed = settings.swivelSpeed ?? fallback.swivelSpeed;
-  const transitionSpeed = settings.transitionSpeed ?? fallback.transitionSpeed;
-
-  customCameraFov.value = `${fov}`;
-  customCameraHeight.value = `${height}`;
-  customCameraPitch.value = `${pitch}`;
-  customCameraDistance.value = `${distance}`;
-  customCameraStiffness.value = `${stiffness}`;
-  customCameraSwivelSpeed.value = `${swivelSpeed}`;
-  customCameraTransitionSpeed.value = `${transitionSpeed}`;
-
-  customCameraFovReadout.textContent = formatSetting(fov, "", 0);
-  customCameraHeightReadout.textContent = formatSetting(height, "", 0);
-  customCameraPitchReadout.textContent = formatSetting(pitch, "", 0);
-  customCameraDistanceReadout.textContent = formatSetting(distance, "", 0);
-  customCameraStiffnessReadout.textContent = formatSetting(stiffness, "", 2);
-  customCameraSwivelSpeedReadout.textContent = formatSetting(swivelSpeed, "", 1);
-  customCameraTransitionSpeedReadout.textContent = formatSetting(transitionSpeed, "", 2);
+  syncCustomCameraControlSettings(getCameraSettingElements(), settings);
 }
 
 function setTransportEnabled(enabled: boolean): void {
@@ -1883,59 +1865,14 @@ function syncCameraControlAvailability(state?: ReplayPlayerState): void {
 }
 
 function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
-  attachedPlayer.replaceChildren();
-  attachedPlayer.append(new Option("Free camera", ""));
-
-  for (const player of players) {
-    attachedPlayer.append(
-      new Option(`${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`, player.id),
-    );
-  }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) {
-    return "--";
-  }
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const precision = unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
-}
-
-function recordingLabel(status: CanvasRecorderStatus | null): string {
-  if (!status) {
-    return "No replay";
-  }
-  if (status.error) {
-    return status.error;
-  }
-  switch (status.state) {
-    case "idle":
-      return "Idle";
-    case "recording":
-      return "Recording";
-    case "stopping":
-      return "Stopping";
-    case "ready":
-      return "Ready";
-    case "error":
-      return "Error";
-  }
+  populateAttachedPlayerSelectOptions(attachedPlayer, players);
 }
 
 function getRecordingOptions(): { fps: number; playbackRate: number } {
-  const fps = Number(recordingFps.value);
-  const playbackRate = Number(recordingPlaybackRate.value);
-  return {
-    fps: Number.isFinite(fps) ? Math.max(1, Math.min(120, Math.trunc(fps))) : 60,
-    playbackRate: Number.isFinite(playbackRate) ? Math.max(0.1, playbackRate) : 1,
-  };
+  return getRecordingControlOptions({
+    fps: recordingFps,
+    playbackRate: recordingPlaybackRate,
+  });
 }
 
 function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
@@ -1957,22 +1894,8 @@ function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void
   recordingPlaybackRate.disabled = isRecording;
 }
 
-function recordingFileName(): string {
-  const source = loadedReplayName?.replace(/\.replay$/i, "") || "replay";
-  const safeSource = source.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `${safeSource || "replay"}-${timestamp}.webm`;
-}
-
 function downloadRecording(blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = recordingFileName();
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadRecordingBlob(blob, recordingFileName(loadedReplayName));
 }
 
 function renderCameraProfile(state?: ReplayPlayerState): void {
