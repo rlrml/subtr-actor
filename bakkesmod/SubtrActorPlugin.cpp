@@ -9461,11 +9461,6 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   if (ImGui::IsItemHovered()) {
     ImGui::SetTooltip("Add stat");
   }
-  ImGui::SameLine();
-  const std::string resetButton = std::format("Reset##{}", window.id);
-  if (ImGui::Button(resetButton.c_str())) {
-    initializeStatsWindowEntries(window);
-  }
 
   if (!window.picker_open) {
     ImGui::Separator();
