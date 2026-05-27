@@ -1,5 +1,13 @@
 use super::*;
 
+#[path = "player_vertical_state_calculator.rs"]
+mod calculator;
+#[path = "player_vertical_state_sample.rs"]
+mod sample;
+
+pub use sample::*;
+pub use self::calculator::PlayerVerticalStateCalculator;
+
 pub const PLAYER_GROUND_Z_THRESHOLD: f32 = 20.0;
 pub const PLAYER_HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 
@@ -49,21 +57,6 @@ impl PlayerVerticalBand {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlayerVerticalSample {
-    pub height: f32,
-    pub band: PlayerVerticalBand,
-}
-
-impl PlayerVerticalSample {
-    pub fn from_height(height: f32) -> Self {
-        Self {
-            height,
-            band: PlayerVerticalBand::from_height(height),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct PlayerVerticalState {
     pub players: HashMap<PlayerId, PlayerVerticalSample>,
@@ -81,30 +74,5 @@ impl PlayerVerticalState {
     pub fn is_grounded(&self, player_id: &PlayerId) -> bool {
         self.band_for_player(player_id)
             .is_some_and(PlayerVerticalBand::is_grounded)
-    }
-}
-
-#[derive(Default)]
-pub struct PlayerVerticalStateCalculator;
-
-impl PlayerVerticalStateCalculator {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn update(&mut self, players: &PlayerFrameState) -> PlayerVerticalState {
-        let players = players
-            .players
-            .iter()
-            .filter_map(|player| {
-                let height = player.position()?.z;
-                Some((
-                    player.player_id.clone(),
-                    PlayerVerticalSample::from_height(height),
-                ))
-            })
-            .collect();
-
-        PlayerVerticalState { players }
     }
 }

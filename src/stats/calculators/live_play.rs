@@ -1,47 +1,12 @@
+#[path = "live_play_phase.rs"]
+mod phase;
+#[path = "live_play_state.rs"]
+mod state;
+
+pub use phase::*;
+pub use state::*;
+
 use super::{FrameEventsState, GameplayState};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export)]
-pub enum GameplayPhase {
-    #[default]
-    Unknown,
-    KickoffCountdown,
-    KickoffWaitingForTouch,
-    ActivePlay,
-    PostGoal,
-}
-
-impl GameplayPhase {
-    pub fn is_live_play(self) -> bool {
-        matches!(self, Self::ActivePlay)
-    }
-
-    pub fn counts_toward_player_motion(self) -> bool {
-        matches!(self, Self::ActivePlay | Self::KickoffWaitingForTouch)
-    }
-
-    pub fn counts_toward_ball_position_stats(self) -> bool {
-        self.is_live_play()
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LivePlayState {
-    pub gameplay_phase: GameplayPhase,
-    pub is_live_play: bool,
-}
-
-impl LivePlayState {
-    pub fn counts_toward_player_motion(&self) -> bool {
-        self.gameplay_phase.counts_toward_player_motion()
-    }
-
-    pub fn counts_toward_ball_position_stats(&self) -> bool {
-        self.gameplay_phase.counts_toward_ball_position_stats()
-    }
-}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LivePlayTracker {

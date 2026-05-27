@@ -1,0 +1,39 @@
+use super::*;
+
+pub(super) fn add_back_pads(pads: &mut Vec<(glam::Vec3, BoostPadSize)>) {
+    push_mirror_y(
+        pads,
+        0.0,
+        BOOST_PAD_GOAL_LINE_Y,
+        BOOST_PAD_SMALL_Z,
+        BoostPadSize::Small,
+    );
+    push_mirror_xy(
+        pads,
+        BOOST_PAD_BACK_LANE_X,
+        BOOST_PAD_BACK_LANE_Y,
+        BOOST_PAD_SMALL_Z,
+        BoostPadSize::Small,
+    );
+    push_mirror_xy(
+        pads,
+        BOOST_PAD_BACK_CORNER_X,
+        BOOST_PAD_BACK_CORNER_Y,
+        BOOST_PAD_BIG_Z,
+        BoostPadSize::Big,
+    );
+    push_mirror_xy(
+        pads,
+        BOOST_PAD_BACK_MID_X,
+        BOOST_PAD_BACK_MID_Y,
+        BOOST_PAD_SMALL_Z,
+        BoostPadSize::Small,
+    );
+    push_mirror_y(
+        pads,
+        0.0,
+        BOOST_PAD_CENTER_BACK_Y,
+        BOOST_PAD_SMALL_Z,
+        BoostPadSize::Small,
+    );
+}
