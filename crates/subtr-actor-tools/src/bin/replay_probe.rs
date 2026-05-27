@@ -1,15 +1,16 @@
 use std::collections::{BTreeMap, HashMap};
 
-use clap::{Parser, ValueEnum};
 use subtr_actor::{
     evaluate_replay_plausibility, Collector, PlayerFrame, ProcessorView, ReplayDataCollector,
     StatsTimelineCollector, TimeAdvance,
 };
 
-const DEFAULT_REPLAY_PATH: &str =
-    "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
-const DEFAULT_DEMOLITION_REPLAY_PATH: &str =
-    "assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay";
+#[path = "replay_probe_args.rs"]
+mod args;
+#[path = "replay_probe_constants.rs"]
+mod constants;
+
+use args::{parse_args, ProbeCommand};
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
 const MAX_GROUNDED_HEIGHT: f32 = 60.0;
@@ -545,46 +546,8 @@ impl Collector for LegacyRotationProbe {
     }
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
-#[value(rename_all = "kebab-case")]
-enum ProbeCommand {
-    Metadata,
-    Plausibility,
-    LegacyRotation,
-    Demolition,
-    VectorRanges,
-    Mechanics,
-}
-
-impl ProbeCommand {
-    fn default_path(self) -> &'static str {
-        match self {
-            Self::Demolition => DEFAULT_DEMOLITION_REPLAY_PATH,
-            Self::Metadata
-            | Self::Plausibility
-            | Self::LegacyRotation
-            | Self::VectorRanges
-            | Self::Mechanics => DEFAULT_REPLAY_PATH,
-        }
-    }
-}
-
-#[derive(Debug, Parser)]
-#[command(about = "Probe replay metadata, plausibility, rotation, demolition, and vector ranges.")]
-struct Args {
-    /// Probe to run.
-    command: ProbeCommand,
-
-    /// Replay path. Defaults to a built-in fixture for the selected probe.
-    replay_path: Option<String>,
-}
-
 fn main() {
-    let Args {
-        command,
-        replay_path,
-    } = Args::parse();
-    let path = replay_path.unwrap_or_else(|| command.default_path().to_string());
+    let (command, path) = parse_args();
 
     match command {
         ProbeCommand::Metadata => print_metadata(&path),
