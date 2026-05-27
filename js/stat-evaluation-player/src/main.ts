@@ -11,12 +11,8 @@ import {
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
-  CameraSettings,
-  ReplayCameraViewMode,
-  ReplayFreeCameraPreset,
   ReplayTimelineEvent,
   ReplayPlayerState,
-  ReplayPlayerTrack,
   TimelineOverlayPlugin,
 } from "@rlrml/player";
 import { getAppTemplate } from "./appTemplate.ts";
@@ -60,13 +56,10 @@ import {
   type ReplayInputSource,
 } from "./replayInputSources.ts";
 import {
-  formatSetting,
-  getEffectiveCameraSettings as mergeEffectiveCameraSettings,
-  populateAttachedPlayerOptions as populateAttachedPlayerSelectOptions,
-  readCustomCameraSettings as readCustomCameraControlSettings,
-  syncCustomCameraSettingControls as syncCustomCameraControlSettings,
-  type CameraSettingElements,
-} from "./cameraControlHelpers.ts";
+  createCameraControls,
+  getCameraControlElements,
+  type CameraControls,
+} from "./cameraControls.ts";
 import {
   createRecordingControls,
   getRecordingControlElements,
@@ -96,7 +89,6 @@ import {
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
-const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
 let replayPlayer: ReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
@@ -196,30 +188,6 @@ let touchControlsWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let playbackRate!: HTMLSelectElement;
-let attachedPlayer!: HTMLSelectElement;
-let cameraViewFreeButton!: HTMLButtonElement;
-let cameraViewFollowButton!: HTMLButtonElement;
-let cameraViewOverheadButton!: HTMLButtonElement;
-let cameraViewSideButton!: HTMLButtonElement;
-let cameraDistance!: HTMLInputElement;
-let cameraDistanceReadout!: HTMLElement;
-let customCameraSettings!: HTMLInputElement;
-let cameraSettingsControls!: HTMLDivElement;
-let customCameraFov!: HTMLInputElement;
-let customCameraHeight!: HTMLInputElement;
-let customCameraPitch!: HTMLInputElement;
-let customCameraDistance!: HTMLInputElement;
-let customCameraStiffness!: HTMLInputElement;
-let customCameraSwivelSpeed!: HTMLInputElement;
-let customCameraTransitionSpeed!: HTMLInputElement;
-let customCameraFovReadout!: HTMLElement;
-let customCameraHeightReadout!: HTMLElement;
-let customCameraPitchReadout!: HTMLElement;
-let customCameraDistanceReadout!: HTMLElement;
-let customCameraStiffnessReadout!: HTMLElement;
-let customCameraSwivelSpeedReadout!: HTMLElement;
-let customCameraTransitionSpeedReadout!: HTMLElement;
-let ballCam!: HTMLInputElement;
 let moduleSummaryEl!: HTMLDivElement;
 let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
@@ -230,12 +198,6 @@ let statusReadout!: HTMLElement;
 let playersReadout!: HTMLElement;
 let framesReadout!: HTMLElement;
 let eventsReadout!: HTMLElement;
-let cameraProfileReadout!: HTMLElement;
-let cameraFovReadout!: HTMLElement;
-let cameraHeightReadout!: HTMLElement;
-let cameraPitchReadout!: HTMLElement;
-let cameraBaseDistanceReadout!: HTMLElement;
-let cameraStiffnessReadout!: HTMLElement;
 let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
@@ -243,7 +205,6 @@ let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
-let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
@@ -267,6 +228,7 @@ const floatingWindows = new FloatingWindowController(
 
 let mechanicsReviewController: MechanicsReviewController | null = null;
 let recordingControls: RecordingControls | null = null;
+let cameraControls: CameraControls | null = null;
 
 const statsWindowManager = createStatsWindowsManager({
   getDefaultFrameIndex() {
@@ -601,15 +563,7 @@ function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
 }
 
 function getCameraConfigSnapshot(): PlayerCameraConfig {
-  const state = replayPlayer?.getState();
-  return {
-    mode: state?.cameraViewMode,
-    freePreset: lastFreeCameraPreset,
-    attachedPlayerId: state?.attachedPlayerId,
-    distanceScale: state?.cameraDistanceScale,
-    ballCam: state?.ballCamEnabled,
-    customSettings: state?.customCameraSettings,
-  };
+  return cameraControls?.getConfigSnapshot() ?? {};
 }
 
 function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
@@ -747,7 +701,7 @@ function watchGoalReplay(time: number, scorerId: string | null): void {
   if (canFollowScorer) {
     replayPlayer.setAttachedPlayer(scorerId);
     replayPlayer.setCameraViewMode("follow");
-    lastFreeCameraPreset = null;
+    cameraControls?.clearFreePreset();
   }
 
   skipPostGoalTransitions.checked = false;
@@ -792,10 +746,7 @@ function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
   replayPlayer.setState(
     getReplayPlayerStatePatchFromConfig(config.playback, config.camera, config),
   );
-  lastFreeCameraPreset = config.camera.freePreset ?? null;
-  if (config.camera.mode === "free" && config.camera.freePreset) {
-    replayPlayer.setFreeCameraPreset(config.camera.freePreset);
-  }
+  cameraControls?.applyReplayConfig(config.camera);
   syncBoostPadOverlayPlugin();
   setupActiveModules();
   renderModuleSummary();
@@ -964,148 +915,12 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toFixed(1).padStart(4, "0")}`;
 }
 
-function getAttachedPlayerCameraSettings(attachedPlayerId: string | null): CameraSettings | null {
-  if (!replayPlayer || attachedPlayerId === null) {
-    return null;
-  }
-
-  return (
-    replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId)
-      ?.cameraSettings ?? null
-  );
-}
-
-function getEffectiveCameraSettings(state: ReplayPlayerState): CameraSettings {
-  return mergeEffectiveCameraSettings(
-    state,
-    getAttachedPlayerCameraSettings(state.attachedPlayerId),
-  );
-}
-
-function getCameraSettingElements(): CameraSettingElements {
-  return {
-    fov: customCameraFov,
-    height: customCameraHeight,
-    pitch: customCameraPitch,
-    distance: customCameraDistance,
-    stiffness: customCameraStiffness,
-    swivelSpeed: customCameraSwivelSpeed,
-    transitionSpeed: customCameraTransitionSpeed,
-    fovReadout: customCameraFovReadout,
-    heightReadout: customCameraHeightReadout,
-    pitchReadout: customCameraPitchReadout,
-    distanceReadout: customCameraDistanceReadout,
-    stiffnessReadout: customCameraStiffnessReadout,
-    swivelSpeedReadout: customCameraSwivelSpeedReadout,
-    transitionSpeedReadout: customCameraTransitionSpeedReadout,
-  };
-}
-
-function readCustomCameraSettings(): CameraSettings {
-  return readCustomCameraControlSettings(getCameraSettingElements());
-}
-
-function setCameraSettingControlsEnabled(enabled: boolean): void {
-  cameraSettingsControls.hidden = !customCameraSettings.checked;
-  customCameraFov.disabled = !enabled;
-  customCameraHeight.disabled = !enabled;
-  customCameraPitch.disabled = !enabled;
-  customCameraDistance.disabled = !enabled;
-  customCameraStiffness.disabled = !enabled;
-  customCameraSwivelSpeed.disabled = !enabled;
-  customCameraTransitionSpeed.disabled = !enabled;
-}
-
-function syncCustomCameraSettingControls(settings: CameraSettings): void {
-  syncCustomCameraControlSettings(getCameraSettingElements(), settings);
-}
-
 function setTransportEnabled(enabled: boolean): void {
   togglePlayback.disabled = !enabled;
   playbackRate.disabled = !enabled;
-  attachedPlayer.disabled = !enabled;
   skipPostGoalTransitions.disabled = !enabled;
   skipKickoffs.disabled = !enabled;
-  syncCameraModeButtons(enabled ? replayPlayer?.getState() : undefined);
-}
-
-function getCameraViewButton(mode: ReplayCameraViewMode): HTMLButtonElement {
-  switch (mode) {
-    case "free":
-      return cameraViewFreeButton;
-    case "follow":
-      return cameraViewFollowButton;
-  }
-}
-
-function syncCameraModeButtons(state?: ReplayPlayerState): void {
-  const activeMode = state?.cameraViewMode ?? "free";
-  const hasReplay = replayPlayer !== null && state !== undefined;
-  const canFollow = (state?.attachedPlayerId ?? null) !== null;
-
-  for (const mode of CAMERA_VIEW_MODES) {
-    const button = getCameraViewButton(mode);
-    button.disabled = !hasReplay || (mode === "follow" && !canFollow);
-    const isActive = mode === activeMode;
-    button.dataset.active = isActive ? "true" : "false";
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  }
-
-  cameraViewOverheadButton.disabled = !hasReplay;
-  cameraViewSideButton.disabled = !hasReplay;
-  cameraViewOverheadButton.dataset.active = "false";
-  cameraViewSideButton.dataset.active = "false";
-  cameraViewOverheadButton.setAttribute("aria-pressed", "false");
-  cameraViewSideButton.setAttribute("aria-pressed", "false");
-}
-
-function syncCameraControlAvailability(state?: ReplayPlayerState): void {
-  syncCameraModeButtons(state);
-  const hasAttachedCamera =
-    replayPlayer !== null &&
-    state?.cameraViewMode === "follow" &&
-    (state.attachedPlayerId ?? null) !== null;
-  cameraDistance.disabled = !hasAttachedCamera;
-  customCameraSettings.disabled = !hasAttachedCamera;
-  setCameraSettingControlsEnabled(hasAttachedCamera && state?.customCameraSettings !== null);
-  ballCam.disabled = !hasAttachedCamera;
-}
-
-function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
-  populateAttachedPlayerSelectOptions(attachedPlayer, players);
-}
-
-function renderCameraProfile(state?: ReplayPlayerState): void {
-  const attachedPlayerId = state?.attachedPlayerId ?? null;
-  if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {
-    cameraProfileReadout.textContent = "Free camera";
-    cameraFovReadout.textContent = "--";
-    cameraHeightReadout.textContent = "--";
-    cameraPitchReadout.textContent = "--";
-    cameraBaseDistanceReadout.textContent = "--";
-    cameraStiffnessReadout.textContent = "--";
-    return;
-  }
-
-  const player = replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId);
-  if (!player) {
-    cameraProfileReadout.textContent = "Unknown";
-    cameraFovReadout.textContent = "--";
-    cameraHeightReadout.textContent = "--";
-    cameraPitchReadout.textContent = "--";
-    cameraBaseDistanceReadout.textContent = "--";
-    cameraStiffnessReadout.textContent = "--";
-    return;
-  }
-
-  const cameraSettings = getEffectiveCameraSettings(state);
-  cameraProfileReadout.textContent =
-    state.customCameraSettings === null ? player.name : `${player.name} custom`;
-  cameraFovReadout.textContent = formatSetting(cameraSettings.fov, "", 0);
-  cameraHeightReadout.textContent = formatSetting(cameraSettings.height, "", 0);
-  cameraPitchReadout.textContent = formatSetting(cameraSettings.pitch, "", 0);
-  cameraBaseDistanceReadout.textContent = formatSetting(cameraSettings.distance, "", 0);
-  cameraStiffnessReadout.textContent = formatSetting(cameraSettings.stiffness, "", 2);
+  cameraControls?.setEnabled(enabled);
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
@@ -1125,19 +940,11 @@ function renderSnapshot(state: ReplayPlayerState): void {
   playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
   togglePlayback.textContent = state.playing ? "Pause" : "Play";
   playbackRate.value = `${state.speed}`;
-  cameraDistance.value = `${state.cameraDistanceScale}`;
-  cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
-  customCameraSettings.checked = state.customCameraSettings !== null;
-  cameraSettingsControls.hidden = !customCameraSettings.checked;
-  syncCustomCameraSettingControls(getEffectiveCameraSettings(state));
-  ballCam.checked = state.ballCamEnabled;
-  attachedPlayer.value = state.attachedPlayerId ?? "";
   skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = state.skipKickoffsEnabled;
   emptyState.hidden = true;
 
-  syncCameraControlAvailability(state);
-  renderCameraProfile(state);
+  cameraControls?.syncSnapshot(state);
   statsWindowManager.render(state.frameIndex, { preserveOpenPickers: true });
   renderScoreboard(state.frameIndex);
   eventWindowsManager.syncPlaylistTimeline(state);
@@ -1167,7 +974,7 @@ async function loadReplayBundleForDisplay(
   fileInput.disabled = true;
   replayLoadModal?.show(source.name, source.preparingStatus);
   setTransportEnabled(false);
-  syncCameraControlAvailability();
+  cameraControls?.syncAvailability();
   emptyState.hidden = false;
 
   if (unsubscribe) {
@@ -1251,7 +1058,7 @@ async function loadReplayBundleForDisplay(
       }
     }
 
-    populateAttachedPlayerOptions(replay.players);
+    cameraControls?.populateAttachedPlayers(replay.players);
     emptyState.hidden = true;
     statusReadout.textContent = `Loaded ${source.name}`;
     loadedReplayName = source.name;
@@ -1262,7 +1069,7 @@ async function loadReplayBundleForDisplay(
     eventWindowsManager.resetPlaylistState();
     eventWindowsManager.renderPlaylistWindow();
     setTransportEnabled(true);
-    syncCameraControlAvailability(replayPlayer.getState());
+    cameraControls?.syncAvailability(replayPlayer.getState());
     renderSnapshot(replayPlayer.getState());
     statsWindowManager.render(replayPlayer.getState().frameIndex);
     renderScoreboard(replayPlayer.getState().frameIndex);
@@ -1338,39 +1145,6 @@ export function mountStatEvaluationPlayer(
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
-  attachedPlayer = mustElement<HTMLSelectElement>(root, "#attached-player");
-  cameraViewFreeButton = mustElement<HTMLButtonElement>(root, "#camera-view-free");
-  cameraViewFollowButton = mustElement<HTMLButtonElement>(root, "#camera-view-follow");
-  cameraViewOverheadButton = mustElement<HTMLButtonElement>(root, "#camera-view-overhead");
-  cameraViewSideButton = mustElement<HTMLButtonElement>(root, "#camera-view-side");
-  cameraDistance = mustElement<HTMLInputElement>(root, "#camera-distance");
-  cameraDistanceReadout = mustElement<HTMLElement>(root, "#camera-distance-readout");
-  customCameraSettings = mustElement<HTMLInputElement>(root, "#custom-camera-settings");
-  cameraSettingsControls = mustElement<HTMLDivElement>(root, "#camera-settings-controls");
-  customCameraFov = mustElement<HTMLInputElement>(root, "#custom-camera-fov");
-  customCameraHeight = mustElement<HTMLInputElement>(root, "#custom-camera-height");
-  customCameraPitch = mustElement<HTMLInputElement>(root, "#custom-camera-pitch");
-  customCameraDistance = mustElement<HTMLInputElement>(root, "#custom-camera-distance");
-  customCameraStiffness = mustElement<HTMLInputElement>(root, "#custom-camera-stiffness");
-  customCameraSwivelSpeed = mustElement<HTMLInputElement>(root, "#custom-camera-swivel-speed");
-  customCameraTransitionSpeed = mustElement<HTMLInputElement>(
-    root,
-    "#custom-camera-transition-speed",
-  );
-  customCameraFovReadout = mustElement<HTMLElement>(root, "#custom-camera-fov-readout");
-  customCameraHeightReadout = mustElement<HTMLElement>(root, "#custom-camera-height-readout");
-  customCameraPitchReadout = mustElement<HTMLElement>(root, "#custom-camera-pitch-readout");
-  customCameraDistanceReadout = mustElement<HTMLElement>(root, "#custom-camera-distance-readout");
-  customCameraStiffnessReadout = mustElement<HTMLElement>(root, "#custom-camera-stiffness-readout");
-  customCameraSwivelSpeedReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-swivel-speed-readout",
-  );
-  customCameraTransitionSpeedReadout = mustElement<HTMLElement>(
-    root,
-    "#custom-camera-transition-speed-readout",
-  );
-  ballCam = mustElement<HTMLInputElement>(root, "#ball-cam");
   moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
   moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
@@ -1381,12 +1155,6 @@ export function mountStatEvaluationPlayer(
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
-  cameraProfileReadout = mustElement<HTMLElement>(root, "#camera-profile-readout");
-  cameraFovReadout = mustElement<HTMLElement>(root, "#camera-fov-readout");
-  cameraHeightReadout = mustElement<HTMLElement>(root, "#camera-height-readout");
-  cameraPitchReadout = mustElement<HTMLElement>(root, "#camera-pitch-readout");
-  cameraBaseDistanceReadout = mustElement<HTMLElement>(root, "#camera-base-distance-readout");
-  cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   recordingControls = createRecordingControls({
@@ -1406,6 +1174,14 @@ export function mountStatEvaluationPlayer(
     },
   });
 
+  cameraControls = createCameraControls({
+    elements: getCameraControlElements(root),
+    getReplayPlayer() {
+      return replayPlayer;
+    },
+    scheduleConfigUrlUpdate,
+  });
+
   mechanicsReviewController = createMechanicsReviewController({
     elements: getMechanicsReviewElements(root),
     getReplayPlayer() {
@@ -1417,7 +1193,7 @@ export function mountStatEvaluationPlayer(
       skipKickoffs.checked = false;
     },
     clearFreeCameraPreset() {
-      lastFreeCameraPreset = null;
+      cameraControls?.clearFreePreset();
     },
     showWindow,
     setStatusReadout(message) {
@@ -1479,9 +1255,9 @@ export function mountStatEvaluationPlayer(
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
     recordingControls = null;
+    cameraControls = null;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
-    lastFreeCameraPreset = null;
     initialUrlConfig = null;
     if (configUrlUpdateTimer !== null) {
       window.clearTimeout(configUrlUpdateTimer);
@@ -1613,107 +1389,7 @@ export function mountStatEvaluationPlayer(
   );
 
   recordingControls?.installListeners(listeners.signal);
-
-  cameraDistance.addEventListener(
-    "input",
-    () => {
-      replayPlayer?.setCameraDistanceScale(Number(cameraDistance.value));
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  customCameraSettings.addEventListener(
-    "change",
-    () => {
-      cameraSettingsControls.hidden = !customCameraSettings.checked;
-      replayPlayer?.setCustomCameraSettings(
-        customCameraSettings.checked ? readCustomCameraSettings() : null,
-      );
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  for (const input of [
-    customCameraFov,
-    customCameraHeight,
-    customCameraPitch,
-    customCameraDistance,
-    customCameraStiffness,
-    customCameraSwivelSpeed,
-    customCameraTransitionSpeed,
-  ]) {
-    input.addEventListener(
-      "input",
-      () => {
-        const settings = readCustomCameraSettings();
-        syncCustomCameraSettingControls(settings);
-        replayPlayer?.setCustomCameraSettings(settings);
-        scheduleConfigUrlUpdate();
-      },
-      { signal: listeners.signal },
-    );
-  }
-
-  attachedPlayer.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setAttachedPlayer(attachedPlayer.value || null);
-      lastFreeCameraPreset = null;
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  cameraViewFreeButton.addEventListener(
-    "click",
-    () => {
-      replayPlayer?.setCameraViewMode("free");
-      lastFreeCameraPreset = null;
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  cameraViewFollowButton.addEventListener(
-    "click",
-    () => {
-      replayPlayer?.setCameraViewMode("follow");
-      lastFreeCameraPreset = null;
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  cameraViewOverheadButton.addEventListener(
-    "click",
-    () => {
-      replayPlayer?.setFreeCameraPreset("overhead");
-      lastFreeCameraPreset = "overhead";
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  cameraViewSideButton.addEventListener(
-    "click",
-    () => {
-      replayPlayer?.setFreeCameraPreset("side");
-      lastFreeCameraPreset = "side";
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  ballCam.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setBallCamEnabled(ballCam.checked);
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
+  cameraControls?.installListeners(listeners.signal);
 
   skipPostGoalTransitions.addEventListener(
     "change",
@@ -1736,8 +1412,7 @@ export function mountStatEvaluationPlayer(
   renderModuleSummary();
   renderModuleSettings();
   renderScoreboard();
-  renderCameraProfile();
-  syncCameraModeButtons();
+  cameraControls?.syncAvailability();
   recordingControls?.sync();
   renderTimelineEventCount();
   mechanicsReviewController?.render();
