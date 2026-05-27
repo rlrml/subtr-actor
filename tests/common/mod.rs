@@ -2,11 +2,9 @@ use std::path::Path;
 
 use serde::Serialize;
 use serde_json::Value;
-use subtr_actor::{
-    CoreTeamStats, MechanicEvent, MechanicEventPropertyValue, MechanicTiming, ReplayStatsFrame,
-    ReplayStatsTimeline, ReplayStatsTimelineEvents, TeamStatsSnapshot,
-};
+use subtr_actor::*;
 
+#[allow(dead_code)]
 pub fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
     let data = std::fs::read(&replay_path)
@@ -16,6 +14,108 @@ pub fn parse_replay(path: &str) -> boxcars::Replay {
         .must_parse_network_data()
         .parse()
         .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
+}
+
+#[allow(dead_code)]
+pub fn default_team_stats_snapshot() -> TeamStatsSnapshot {
+    TeamStatsSnapshot {
+        fifty_fifty: FiftyFiftyTeamStats::default(),
+        possession: PossessionTeamStats::default(),
+        pressure: PressureTeamStats::default(),
+        territorial_pressure: TerritorialPressureTeamStats::default(),
+        rotation: RotationTeamStats::default(),
+        rush: RushTeamStats::default(),
+        core: CoreTeamStats::default(),
+        backboard: BackboardTeamStats::default(),
+        double_tap: DoubleTapTeamStats::default(),
+        one_timer: OneTimerTeamStats::default(),
+        pass: PassTeamStats::default(),
+        ball_carry: BallCarryStats::default(),
+        air_dribble: AirDribbleStats::default(),
+        boost: BoostStats::default(),
+        bump: BumpTeamStats::default(),
+        half_volley: HalfVolleyTeamStats::default(),
+        movement: MovementStats::default(),
+        powerslide: PowerslideStats::default(),
+        demo: DemoTeamStats::default(),
+    }
+}
+
+#[allow(dead_code)]
+pub fn default_player_stats_snapshot(
+    player_id: PlayerId,
+    name: impl Into<String>,
+    is_team_0: bool,
+) -> PlayerStatsSnapshot {
+    PlayerStatsSnapshot {
+        player_id,
+        name: name.into(),
+        is_team_0,
+        core: CorePlayerStats::default(),
+        backboard: BackboardPlayerStats::default(),
+        ceiling_shot: CeilingShotStats::default(),
+        wall_aerial: WallAerialStats::default(),
+        wall_aerial_shot: WallAerialShotStats::default(),
+        double_tap: DoubleTapPlayerStats::default(),
+        one_timer: OneTimerPlayerStats::default(),
+        pass: PassPlayerStats::default(),
+        fifty_fifty: FiftyFiftyPlayerStats::default(),
+        speed_flip: SpeedFlipStats::default(),
+        half_flip: HalfFlipStats::default(),
+        half_volley: HalfVolleyPlayerStats::default(),
+        wavedash: WavedashStats::default(),
+        touch: TouchStats::default(),
+        whiff: WhiffStats::default(),
+        flick: FlickStats::default(),
+        musty_flick: MustyFlickStats::default(),
+        dodge_reset: DodgeResetStats::default(),
+        ball_carry: BallCarryStats::default(),
+        air_dribble: AirDribbleStats::default(),
+        boost: BoostStats::default(),
+        bump: BumpPlayerStats::default(),
+        movement: MovementStats::default(),
+        positioning: PositioningStats::default(),
+        rotation: RotationPlayerStats::default(),
+        powerslide: PowerslideStats::default(),
+        demo: DemoPlayerStats::default(),
+    }
+}
+
+#[allow(dead_code)]
+pub fn empty_stats_timeline_config() -> StatsTimelineConfig {
+    StatsTimelineConfig {
+        most_back_forward_threshold_y: 0.0,
+        level_ball_depth_margin: 0.0,
+        pressure_neutral_zone_half_width_y: 0.0,
+        territorial_pressure_neutral_zone_half_width_y: 0.0,
+        territorial_pressure_min_establish_seconds: 0.0,
+        territorial_pressure_min_establish_third_seconds: 0.0,
+        territorial_pressure_relief_grace_seconds: 0.0,
+        territorial_pressure_confirmed_relief_grace_seconds: 0.0,
+        rotation_role_depth_margin: 0.0,
+        rotation_first_man_ambiguity_margin: 0.0,
+        rotation_first_man_debounce_seconds: 0.0,
+        rush_max_start_y: 0.0,
+        rush_attack_support_distance_y: 0.0,
+        rush_defender_distance_y: 0.0,
+        rush_min_possession_retained_seconds: 0.0,
+        aerial_goal_min_ball_z: 0.0,
+        high_aerial_goal_min_ball_z: 0.0,
+        long_distance_goal_max_attacking_y: 0.0,
+        own_half_goal_max_attacking_y: 0.0,
+        empty_net_min_defender_y_margin: 0.0,
+        empty_net_min_defender_distance: 0.0,
+        empty_net_max_touch_attacking_y: 0.0,
+        flick_goal_max_event_to_goal_seconds: 0.0,
+        double_tap_goal_max_event_to_goal_seconds: 0.0,
+        one_timer_goal_max_event_to_goal_seconds: 0.0,
+        air_dribble_goal_max_end_to_goal_seconds: 0.0,
+        flip_reset_goal_max_event_to_goal_seconds: 0.0,
+        half_volley_max_bounce_to_touch_seconds: 0.0,
+        half_volley_min_ball_speed: 0.0,
+        half_volley_goal_max_touch_to_goal_seconds: 0.0,
+        half_volley_goal_min_goal_alignment: 0.0,
+    }
 }
 
 #[allow(dead_code)]
