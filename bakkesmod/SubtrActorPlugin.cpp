@@ -2601,17 +2601,43 @@ void SubtrActorPlugin::applyUiConfigJson(
           eventFilterFromSelectedSources(selectedFilters));
     }
 
+    const std::vector<std::string> timelineRanges =
+        parseJsonStringArrayProperty(*overlays, "timelineRanges");
+    if (jsonPropertyExists(*overlays, "timelineRanges")) {
+      timelineRangeBoostEnabled = containsString(timelineRanges, "boost");
+      timelineRangePossessionEnabled = containsString(timelineRanges, "possession");
+      timelineRangePressureEnabled = containsString(timelineRanges, "pressure");
+      timelineRangeRushEnabled = containsString(timelineRanges, "rush");
+      timelineRangeAbsolutePositioningEnabled =
+          containsString(timelineRanges, "absolute-positioning");
+    }
+
     const std::vector<std::string> renderEffects =
         parseJsonStringArrayProperty(*overlays, "renderEffects");
     if (overlays->find("\"renderEffects\"") != std::string::npos) {
       const bool anyRenderEffect = !renderEffects.empty();
+      renderEffectCeilingShotEnabled = containsString(renderEffects, "ceiling-shot");
+      renderEffectFiftyFiftyEnabled = containsString(renderEffects, "fifty-fifty");
+      renderEffectPressureEnabled = containsString(renderEffects, "pressure");
+      renderEffectRelativePositioningEnabled =
+          containsString(renderEffects, "relative-positioning");
+      renderEffectAbsolutePositioningEnabled =
+          containsString(renderEffects, "absolute-positioning");
+      renderEffectSpeedFlipEnabled = containsString(renderEffects, "speed-flip");
+      renderEffectTouchEnabled = containsString(renderEffects, "touch");
       setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect);
       setCvarBool(
           "subtr_actor_overlay_mechanics_enabled",
-          containsString(renderEffects, "mechanics"));
+          containsString(renderEffects, "mechanics") ||
+              renderEffectCeilingShotEnabled ||
+              renderEffectFiftyFiftyEnabled ||
+              renderEffectRelativePositioningEnabled ||
+              renderEffectAbsolutePositioningEnabled ||
+              renderEffectSpeedFlipEnabled ||
+              renderEffectTouchEnabled);
       setCvarBool(
           "subtr_actor_overlay_team_events_enabled",
-          containsString(renderEffects, "team"));
+          containsString(renderEffects, "team") || renderEffectPressureEnabled);
       setCvarBool(
           "subtr_actor_overlay_goal_context_enabled",
           containsString(renderEffects, "goal_context"));
@@ -3183,7 +3209,14 @@ std::string SubtrActorPlugin::uiConfigJson() const {
     }
   }
   file << "],\n";
-  file << "    \"timelineRanges\": [],\n";
+  file << "    \"timelineRanges\": [";
+  wroteOverlayValue = false;
+  writeOverlayId("boost", timelineRangeBoostEnabled);
+  writeOverlayId("possession", timelineRangePossessionEnabled);
+  writeOverlayId("pressure", timelineRangePressureEnabled);
+  writeOverlayId("rush", timelineRangeRushEnabled);
+  writeOverlayId("absolute-positioning", timelineRangeAbsolutePositioningEnabled);
+  file << "],\n";
   file << "    \"mechanics\": [";
   const bool allMechanicsSelected =
       allEventSourcesSelected(currentEventFilter) ||
@@ -3214,6 +3247,17 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   writeOverlayId(
       "goal_context",
       hudOverlayEnabled && cvarBool("subtr_actor_overlay_goal_context_enabled", true));
+  writeOverlayId("ceiling-shot", hudOverlayEnabled && renderEffectCeilingShotEnabled);
+  writeOverlayId("fifty-fifty", hudOverlayEnabled && renderEffectFiftyFiftyEnabled);
+  writeOverlayId("pressure", hudOverlayEnabled && renderEffectPressureEnabled);
+  writeOverlayId(
+      "relative-positioning",
+      hudOverlayEnabled && renderEffectRelativePositioningEnabled);
+  writeOverlayId(
+      "absolute-positioning",
+      hudOverlayEnabled && renderEffectAbsolutePositioningEnabled);
+  writeOverlayId("speed-flip", hudOverlayEnabled && renderEffectSpeedFlipEnabled);
+  writeOverlayId("touch", hudOverlayEnabled && renderEffectTouchEnabled);
   file << "],\n";
   file << "    \"followedPlayerHud\": false,\n";
   file << "    \"boostPads\": "
@@ -7080,6 +7124,31 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   if (ImGui::Button("Open possession stats")) {
     createStatsModuleWindow("possession", 0);
   }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMELINE RANGES");
+  ImGui::Checkbox("Boost pickups##timeline-ranges", &timelineRangeBoostEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Possession##timeline-ranges", &timelineRangePossessionEnabled);
+  ImGui::Checkbox("Half control##timeline-ranges", &timelineRangePressureEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Rush##timeline-ranges", &timelineRangeRushEnabled);
+  ImGui::Checkbox(
+      "Position zones##timeline-ranges",
+      &timelineRangeAbsolutePositioningEnabled);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "IN-GAME EFFECTS");
+  ImGui::Checkbox("Ceiling shot labels##render-effects", &renderEffectCeilingShotEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("50/50 labels##render-effects", &renderEffectFiftyFiftyEnabled);
+  ImGui::Checkbox("Half control##render-effects", &renderEffectPressureEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Player roles##render-effects", &renderEffectRelativePositioningEnabled);
+  ImGui::Checkbox("Position zones##render-effects", &renderEffectAbsolutePositioningEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Speed flip labels##render-effects", &renderEffectSpeedFlipEnabled);
+  ImGui::Checkbox("Touch labels##render-effects", &renderEffectTouchEnabled);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
