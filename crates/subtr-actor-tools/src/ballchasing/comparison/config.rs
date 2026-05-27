@@ -7,13 +7,14 @@ mod recommended;
 #[path = "config_recommended_predicates.rs"]
 mod recommended_predicates;
 
-pub(super) use match_config::approx_abs;
 pub use match_config::MatchConfig;
 pub(crate) use matcher::StatMatcher;
 pub use recommended::recommended_match_config;
 
 #[cfg(test)]
 use super::model::{ComparisonTarget, StatDomain, StatKey, StatScope};
+#[cfg(test)]
+pub(super) use match_config::approx_abs;
 
 #[cfg(test)]
 #[path = "config_test.rs"]

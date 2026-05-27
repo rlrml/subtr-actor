@@ -8,8 +8,12 @@ mod conversion_json;
 mod conversion_stats;
 
 pub(crate) use conversion_build::{build_actual_comparable_stats, build_expected_comparable_stats};
+#[cfg(test)]
 use conversion_collect::collect_final_replay_meta;
-pub(crate) use conversion_collect::{compute_comparable_stats, ComputedComparableStats};
+pub(crate) use conversion_collect::compute_comparable_stats;
+#[cfg(test)]
+pub(crate) use conversion_collect::ComputedComparableStats;
+#[cfg(test)]
 use conversion_stats::raw_boost_amount_as_comparable_units;
 
 #[cfg(test)]
