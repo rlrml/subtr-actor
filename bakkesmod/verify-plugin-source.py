@@ -21,6 +21,7 @@ PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
+WEB_PLAYER_TEMPLATE_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/appTemplate.ts"
 
 
 @dataclass(frozen=True)
@@ -210,6 +211,18 @@ def ts_type_alias_strings(source: str, name: str) -> list[str]:
     return quoted_strings(match.group(1))
 
 
+def web_launcher_buttons(source: str, attribute: str) -> list[tuple[str, str]]:
+    return [
+        (match.group("id"), match.group("label").strip())
+        for match in re.finditer(
+            rf'<button\b(?=[^>]*\b{re.escape(attribute)}="(?P<id>[^"]+)")[^>]*>'
+            r"(?P<label>[^<]+)</button>",
+            source,
+            re.DOTALL,
+        )
+    ]
+
+
 def require_contains(source: str, needle: str, label: str, errors: list[str]) -> None:
     if needle not in source:
         errors.append(f"missing {label}: {needle}")
@@ -220,7 +233,7 @@ def reject_contains(source: str, needle: str, label: str, errors: list[str]) -> 
         errors.append(f"unexpected {label}: {needle}")
 
 
-def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
+def singleton_window_controls(source: str) -> list[tuple[str, str, bool, int]]:
     match = re.search(
         r"return\s+\{\{(.*?)\}\};\s*\}\s*\n\s*std::vector<SubtrActorPlugin::SingletonWindowControl>",
         source,
@@ -229,9 +242,9 @@ def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
     if not match:
         raise AssertionError("missing singletonWindowControls return block")
 
-    controls: list[tuple[str, bool, int]] = []
+    controls: list[tuple[str, str, bool, int]] = []
     for control in re.finditer(
-        r'\{\s*"[^"]+",\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
+        r'\{\s*"(?P<label>[^"]+)",\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
         r"(?P<web>true|false),\s*(?P<order>\d+),",
         match.group(1),
         re.DOTALL,
@@ -239,6 +252,7 @@ def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
         controls.append(
             (
                 control.group("id"),
+                control.group("label"),
                 control.group("web") == "true",
                 int(control.group("order")),
             )
@@ -248,7 +262,7 @@ def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
     return controls
 
 
-def stats_window_kind_controls(source: str) -> list[tuple[str, bool]]:
+def stats_window_kind_controls(source: str) -> list[tuple[str, str, bool]]:
     match = re.search(
         r"SubtrActorPlugin::statsWindowKindControls\(\)\s+const\s+\{\s+return\s+\{\{"
         r"(.*?)\}\};\s*\}",
@@ -258,9 +272,9 @@ def stats_window_kind_controls(source: str) -> list[tuple[str, bool]]:
     if not match:
         raise AssertionError("missing statsWindowKindControls return block")
 
-    controls: list[tuple[str, bool]] = []
+    controls: list[tuple[str, str, bool]] = []
     for control in re.finditer(
-        r'\{\s*UiStatsWindowKind::\w+,\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
+        r'\{\s*UiStatsWindowKind::\w+,\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"(?P<label>[^"]+)",\s*'
         r"(?:static_cast<[^>]+>\([^)]*\)|[^,]+),\s*"
         r"(?P<scope_selector>true|false),\s*"
         r"(?P<stat_picker>true|false),\s*"
@@ -269,7 +283,9 @@ def stats_window_kind_controls(source: str) -> list[tuple[str, bool]]:
         match.group(1),
         re.DOTALL,
     ):
-        controls.append((control.group("id"), control.group("web") == "true"))
+        controls.append(
+            (control.group("id"), control.group("label"), control.group("web") == "true")
+        )
     if not controls:
         raise AssertionError("could not parse statsWindowKindControls")
     return controls
@@ -282,6 +298,7 @@ def main() -> int:
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
     web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
+    web_player_template_source = WEB_PLAYER_TEMPLATE_SOURCE.read_text(encoding="utf-8")
     cpp_combined = plugin_header + "\n" + plugin_source
     errors: list[str] = []
 
@@ -314,27 +331,49 @@ def main() -> int:
         ts_type_alias_strings(web_player_config_source, "StatsWindowKind")
     )
 
-    web_window_ids = tuple(
-        window_id
-        for window_id, web_config, _ in sorted(
+    plugin_web_window_controls = tuple(
+        (window_id, label)
+        for window_id, label, web_config, _ in sorted(
             singleton_window_controls(plugin_source),
-            key=lambda control: (control[2], control[0]),
+            key=lambda control: (control[3], control[0]),
         )
         if web_config
     )
+    web_window_ids = tuple(window_id for window_id, _ in plugin_web_window_controls)
     if web_window_ids != web_singleton_window_ids:
         errors.append(
             "web singleton window order drifted from stats evaluation player: "
             f"expected={web_singleton_window_ids!r} actual={web_window_ids!r}"
         )
+    web_launcher_window_buttons = tuple(
+        web_launcher_buttons(web_player_template_source, "data-window-toggle")
+    )
+    if plugin_web_window_controls != web_launcher_window_buttons:
+        errors.append(
+            "web singleton launcher labels drifted from stats evaluation player: "
+            f"expected={web_launcher_window_buttons!r} actual={plugin_web_window_controls!r}"
+        )
 
+    plugin_web_stats_window_controls = tuple(
+        (kind_id, label)
+        for kind_id, label, web_config in stats_window_kind_controls(plugin_source)
+        if web_config
+    )
     plugin_web_stats_window_kind_ids = tuple(
-        kind_id for kind_id, web_config in stats_window_kind_controls(plugin_source) if web_config
+        kind_id for kind_id, _ in plugin_web_stats_window_controls
     )
     if plugin_web_stats_window_kind_ids != web_stats_window_kind_ids:
         errors.append(
             "web stats window kind order drifted from stats evaluation player: "
             f"expected={web_stats_window_kind_ids!r} actual={plugin_web_stats_window_kind_ids!r}"
+        )
+    web_launcher_stats_buttons = tuple(
+        web_launcher_buttons(web_player_template_source, "data-create-stats-window")
+    )
+    if plugin_web_stats_window_controls != web_launcher_stats_buttons:
+        errors.append(
+            "web stats launcher labels drifted from stats evaluation player: "
+            f"expected={web_launcher_stats_buttons!r} actual={plugin_web_stats_window_controls!r}"
         )
     require_contains(
         plugin_source,
