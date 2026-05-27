@@ -10,6 +10,7 @@
 #include <format>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <sstream>
 #include <type_traits>
 
@@ -241,6 +242,24 @@ bool containsString(const std::vector<std::string> &values, std::string_view val
   return std::find_if(values.begin(), values.end(), [value](const std::string &candidate) {
            return candidate == value;
          }) != values.end();
+}
+
+std::optional<uint32_t> parseUnsignedIntegerString(std::string_view value) {
+  if (value.empty() ||
+      !std::all_of(value.begin(), value.end(), [](char ch) {
+        return std::isdigit(static_cast<unsigned char>(ch)) != 0;
+      })) {
+    return std::nullopt;
+  }
+  try {
+    const unsigned long long parsed = std::stoull(std::string{value});
+    if (parsed > std::numeric_limits<uint32_t>::max()) {
+      return std::nullopt;
+    }
+    return static_cast<uint32_t>(parsed);
+  } catch (const std::exception &) {
+    return std::nullopt;
+  }
 }
 
 double recordingPlaybackRateFromIndex(int index) {
@@ -2492,9 +2511,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       }
     }
     if (const auto attachedPlayerId = parseJsonStringProperty(*camera, "attachedPlayerId")) {
-      try {
-        cameraSelectedPlayerIndex = static_cast<uint32_t>(std::stoul(*attachedPlayerId));
-      } catch (const std::exception &) {
+      if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*attachedPlayerId)) {
+        cameraSelectedPlayerIndex = *parsedPlayerIndex;
       }
     }
     cameraDistanceScale = static_cast<float>(std::clamp(
@@ -2771,6 +2789,11 @@ void SubtrActorPlugin::applyUiConfigJson(
     }
     window.selected_player_index = static_cast<uint32_t>(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
+    if (const auto playerId = parseJsonStringProperty(object, "playerId")) {
+      if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*playerId)) {
+        window.selected_player_index = *parsedPlayerIndex;
+      }
+    }
     window.selected_team_is_team_0 =
         parseJsonBoolProperty(object, "selected_team_is_team_0").value_or(true) ? 1 : 0;
     if (const auto team = parseJsonStringProperty(object, "team")) {
@@ -3177,8 +3200,15 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   }
   file << "  ],\n";
   file << "  \"statsWindows\": [\n";
+  bool wroteWebStatsWindow = false;
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
+    if (window.kind == UiStatsWindowKind::StatsModule) {
+      continue;
+    }
+    if (wroteWebStatsWindow) {
+      file << ",\n";
+    }
     file << "    {\"id\":\"stats-" << window.id << "\",\"kind\":\"" << kindValue(window.kind)
          << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
@@ -3200,9 +3230,9 @@ std::string SubtrActorPlugin::uiConfigJson() const {
       file << "}";
     }
     file << "]}";
-    if (i + 1 != uiStatsWindows.size()) {
-      file << ",";
-    }
+    wroteWebStatsWindow = true;
+  }
+  if (wroteWebStatsWindow) {
     file << "\n";
   }
   file << "  ]\n";
