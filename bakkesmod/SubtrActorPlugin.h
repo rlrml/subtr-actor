@@ -246,6 +246,7 @@ private:
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
   bool uiPlaybackControlsOpen = false;
+  bool uiRecordingOpen = false;
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
   bool uiMechanicsReviewOpen = false;
@@ -257,6 +258,14 @@ private:
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
   bool eventPlaylistAutoFollow = true;
+  int recordingFps = 60;
+  int recordingPlaybackRateIndex = 1;
+  bool recordingFinishBeforeDump = false;
+  bool recordingActive = false;
+  int recordingSnapshotCount = 0;
+  size_t recordingLastBytes = 0;
+  std::string recordingStatus = "Idle";
+  std::chrono::steady_clock::time_point recordingStartedAt = std::chrono::steady_clock::time_point{};
   int touchControlsMode = 1;
   float touchMarkerDecaySeconds = 5.0f;
   bool touchBreakdownKind = false;
@@ -286,6 +295,7 @@ private:
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
   UiWindowPlacement playbackControlsPlacement;
+  UiWindowPlacement recordingPlacement;
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
   UiWindowPlacement mechanicsReviewPlacement;
@@ -319,6 +329,7 @@ private:
   void renderEventsWindow();
   void renderStatusWindow();
   void renderPlaybackControlsWindow();
+  void renderRecordingWindow();
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
   void renderMechanicsReviewWindow();

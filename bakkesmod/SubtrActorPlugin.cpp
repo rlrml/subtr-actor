@@ -769,6 +769,18 @@ std::string clippedDisplayText(std::string value, size_t maxBytes = 24000) {
   return value;
 }
 
+std::string formatByteSize(size_t bytes) {
+  constexpr double KIB = 1024.0;
+  constexpr double MIB = KIB * 1024.0;
+  if (bytes >= static_cast<size_t>(MIB)) {
+    return std::format("{:.1f} MiB", static_cast<double>(bytes) / MIB);
+  }
+  if (bytes >= static_cast<size_t>(KIB)) {
+    return std::format("{:.1f} KiB", static_cast<double>(bytes) / KIB);
+  }
+  return std::format("{} B", bytes);
+}
+
 bool findJsonPropertyValueOffset(
     const std::string &json,
     const std::string &propertyName,
@@ -2177,6 +2189,8 @@ void SubtrActorPlugin::loadUiConfig() {
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
   uiPlaybackControlsOpen =
       parseJsonBoolProperty(json, "playback_controls_open").value_or(uiPlaybackControlsOpen);
+  uiRecordingOpen =
+      parseJsonBoolProperty(json, "recording_open").value_or(uiRecordingOpen);
   uiGraphInspectorOpen =
       parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
   uiEventPlaylistOpen =
@@ -2200,6 +2214,15 @@ void SubtrActorPlugin::loadUiConfig() {
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  recordingFps = static_cast<int>(
+      std::clamp(parseJsonNumberProperty(json, "recording_fps").value_or(60.0), 1.0, 120.0));
+  recordingPlaybackRateIndex = static_cast<int>(std::clamp(
+      parseJsonNumberProperty(json, "recording_playback_rate_index").value_or(1.0),
+      0.0,
+      3.0));
+  recordingFinishBeforeDump =
+      parseJsonBoolProperty(json, "recording_finish_before_dump")
+          .value_or(recordingFinishBeforeDump);
   touchControlsMode = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "touch_controls_mode").value_or(1.0), 0.0, 1.0));
   touchMarkerDecaySeconds = static_cast<float>(std::clamp(
@@ -2247,6 +2270,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "events", eventsPlacement);
     loadPlacement(*placements, "status", statusPlacement);
     loadPlacement(*placements, "playback_controls", playbackControlsPlacement);
+    loadPlacement(*placements, "recording", recordingPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
     loadPlacement(*placements, "mechanics_review", mechanicsReviewPlacement);
@@ -2371,6 +2395,7 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
   file << "  \"playback_controls_open\": "
        << (uiPlaybackControlsOpen ? "true" : "false") << ",\n";
+  file << "  \"recording_open\": " << (uiRecordingOpen ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_open\": " << (uiGraphInspectorOpen ? "true" : "false")
        << ",\n";
   file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
@@ -2393,6 +2418,10 @@ void SubtrActorPlugin::saveUiConfig() {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"recording_fps\": " << recordingFps << ",\n";
+  file << "  \"recording_playback_rate_index\": " << recordingPlaybackRateIndex << ",\n";
+  file << "  \"recording_finish_before_dump\": "
+       << (recordingFinishBeforeDump ? "true" : "false") << ",\n";
   file << "  \"touch_controls_mode\": " << touchControlsMode << ",\n";
   file << "  \"touch_marker_decay_seconds\": " << touchMarkerDecaySeconds << ",\n";
   file << "  \"touch_breakdown_kind\": " << (touchBreakdownKind ? "true" : "false")
@@ -2440,6 +2469,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, statusPlacement);
   file << ",\n    \"playback_controls\": ";
   writePlacement(file, playbackControlsPlacement);
+  file << ",\n    \"recording\": ";
+  writePlacement(file, recordingPlacement);
   file << ",\n    \"graph_inspector\": ";
   writePlacement(file, graphInspectorPlacement);
   file << ",\n    \"event_playlist\": ";
@@ -4956,6 +4987,7 @@ void SubtrActorPlugin::Render() {
   renderEventsWindow();
   renderStatusWindow();
   renderPlaybackControlsWindow();
+  renderRecordingWindow();
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
   renderMechanicsReviewWindow();
@@ -5102,6 +5134,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
+  ImGui::Checkbox("Recording", &uiRecordingOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
   ImGui::Checkbox("Mechanics review", &uiMechanicsReviewOpen);
   ImGui::Checkbox("Replay loading", &uiReplayLoadingOpen);
@@ -5128,6 +5161,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiEventPlaylistOpen = false;
     uiStatusOpen = false;
     uiPlaybackControlsOpen = false;
+    uiRecordingOpen = false;
     uiGraphInspectorOpen = false;
     uiMechanicsReviewOpen = false;
     uiReplayLoadingOpen = false;
@@ -5772,6 +5806,11 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     mechanicsReviewPlacement.pending_focus = true;
   }
   ImGui::SameLine();
+  if (ImGui::Button("Open recording")) {
+    uiRecordingOpen = true;
+    recordingPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
   if (ImGui::Button("Open replay loading")) {
     uiReplayLoadingOpen = true;
     replayLoadingPlacement.pending_focus = true;
@@ -6107,6 +6146,132 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderRecordingWindow() {
+  if (!uiRecordingOpen) {
+    return;
+  }
+
+  applyWindowPlacement(recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f);
+  if (!ImGui::Begin("Recording##subtr-actor", &uiRecordingOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(recordingPlacement);
+
+  const std::filesystem::path outputDirectory = gameWrapper->GetDataFolder() / "subtr-actor";
+  auto graphDumpBytes = [&]() {
+    size_t total = 0;
+    const std::array<const char *, 7> paths{{
+        "graph-events.json",
+        "graph-frame.json",
+        "graph-timeline.json",
+        "graph-stats.json",
+        "graph-analysis-nodes.json",
+        "graph-event-history.json",
+        "graph-info.json",
+    }};
+    for (const char *path : paths) {
+      std::error_code error;
+      const uintmax_t size = std::filesystem::file_size(outputDirectory / path, error);
+      if (!error) {
+        total += static_cast<size_t>(size);
+      }
+    }
+    return total;
+  };
+  auto dumpSnapshot = [&](bool finish) {
+    if (!loaded || !engine) {
+      recordingStatus = "Engine not loaded";
+      return;
+    }
+    std::vector<std::string> params{"subtr_actor_dump_graph"};
+    if (finish) {
+      params.push_back("finish");
+    }
+    dumpGraphJson(params);
+    recordingLastBytes = graphDumpBytes();
+    recordingSnapshotCount += 1;
+    recordingStatus = finish ? "Finalized graph snapshot written"
+                             : "Current graph snapshot written";
+  };
+
+  const double elapsedSeconds =
+      recordingActive
+          ? std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - recordingStartedAt)
+                .count()
+          : 0.0;
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");
+  ImGui::SliderInt("FPS", &recordingFps, 1, 120);
+  const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
+  recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
+  if (ImGui::BeginCombo("Playback rate", rates[static_cast<size_t>(recordingPlaybackRateIndex)])) {
+    for (int index = 0; index < static_cast<int>(rates.size()); index += 1) {
+      const bool selected = index == recordingPlaybackRateIndex;
+      if (ImGui::Selectable(rates[static_cast<size_t>(index)], selected)) {
+        recordingPlaybackRateIndex = index;
+      }
+    }
+    ImGui::EndCombo();
+  }
+  ImGui::Checkbox("Finalize before dump", &recordingFinishBeforeDump);
+
+  ImGui::Separator();
+  if (ImGui::Button("Start")) {
+    recordingActive = true;
+    recordingStartedAt = std::chrono::steady_clock::now();
+    recordingStatus = "Recording analysis snapshots";
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Full replay")) {
+    recordingActive = false;
+    dumpSnapshot(true);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Stop")) {
+    recordingActive = false;
+    dumpSnapshot(recordingFinishBeforeDump);
+  }
+  if (ImGui::Button("Snapshot")) {
+    dumpSnapshot(false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Log folder")) {
+    cvarManager->log(std::format(
+        "subtr-actor: recording snapshots are written to {}",
+        outputDirectory.string()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear")) {
+    recordingActive = false;
+    recordingSnapshotCount = 0;
+    recordingLastBytes = 0;
+    recordingStatus = "Idle";
+  }
+
+  ImGui::Separator();
+  ImGui::Text("Status: %s", recordingStatus.c_str());
+  ImGui::Text("Elapsed: %.1fs", elapsedSeconds);
+  ImGui::Text("Size: %s", formatByteSize(recordingLastBytes).c_str());
+  ImGui::Text("Type: JSON snapshots");
+  ImGui::Text("Snapshots: %d", recordingSnapshotCount);
+  ImGui::TextWrapped("Folder: %s", outputDirectory.string().c_str());
+
+  ImGui::Separator();
+  if (ImGui::Button("Open graph inspector")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open replay loading")) {
+    uiReplayLoadingOpen = true;
+    replayLoadingPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
 std::vector<std::string> SubtrActorPlugin::graphOutputNames() {
   std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
   std::vector<std::string> names =
@@ -6283,12 +6448,13 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 11> windows{{
+  std::array<SingletonWindowControl, 12> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
       {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
+      {"Recording", &uiRecordingOpen, &recordingPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
       {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
       {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
@@ -6384,6 +6550,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   eventPlaylistPlacement = UiWindowPlacement{};
   statusPlacement = UiWindowPlacement{};
   playbackControlsPlacement = UiWindowPlacement{};
+  recordingPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
   mechanicsReviewPlacement = UiWindowPlacement{};
   replayLoadingPlacement = UiWindowPlacement{};
@@ -6422,6 +6589,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiEventPlaylistOpen = true;
   uiStatusOpen = true;
   uiPlaybackControlsOpen = true;
+  uiRecordingOpen = false;
   uiGraphInspectorOpen = false;
   uiMechanicsReviewOpen = false;
   uiReplayLoadingOpen = false;
