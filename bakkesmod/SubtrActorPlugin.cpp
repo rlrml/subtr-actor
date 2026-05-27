@@ -7815,7 +7815,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
   renderModuleSummaryControls("launcher-module-summary");
 
   ImGui::Separator();
