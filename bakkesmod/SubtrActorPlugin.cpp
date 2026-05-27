@@ -2789,9 +2789,10 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_toggle_ui",
       [this](std::vector<std::string>) {
         uiWindowOpen = true;
-        uiLauncherOpen = !uiLauncherOpen;
         if (uiLauncherOpen) {
-          focusSingletonWindow(launcherPlacement);
+          hideLauncherWindow();
+        } else {
+          showSingletonWindow(uiLauncherOpen, launcherPlacement);
         }
       },
       "Toggles the subtr-actor in-game launcher window.",
