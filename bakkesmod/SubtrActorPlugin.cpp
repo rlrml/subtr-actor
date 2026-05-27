@@ -6853,6 +6853,7 @@ void SubtrActorPlugin::Render() {
   if (!uiEnabled()) {
     renderLauncherToggleChrome();
     renderLauncherWindow();
+    maybeAutosaveUiConfig();
     return;
   }
 
@@ -7156,6 +7157,14 @@ void SubtrActorPlugin::focusSingletonWindow(UiWindowPlacement &placement) {
 void SubtrActorPlugin::showSingletonWindow(bool &open, UiWindowPlacement &placement) {
   open = true;
   focusSingletonWindow(placement);
+}
+
+void SubtrActorPlugin::hideLauncherWindow() {
+  if (!uiLauncherOpen) {
+    return;
+  }
+  uiLauncherOpen = false;
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
@@ -7589,7 +7598,7 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
   if (ImGui::Button("Menu##subtr-actor-launcher-toggle", ImVec2{44.0f, 28.0f})) {
     uiWindowOpen = true;
     if (uiLauncherOpen) {
-      uiLauncherOpen = false;
+      hideLauncherWindow();
     } else {
       showSingletonWindow(uiLauncherOpen, launcherPlacement);
     }
@@ -7675,7 +7684,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
         showSingletonWindow(*window.open, *window.placement);
       }
       if (closeLauncherOnToggle) {
-        uiLauncherOpen = false;
+        hideLauncherWindow();
       }
     }
     if (isOpen) {
@@ -7698,7 +7707,7 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
     if (ImGui::Button(kind.create_label, ImVec2{170.0f, 0.0f})) {
       createStatsWindow(kind.kind);
       if (closeLauncherOnCreate) {
-        uiLauncherOpen = false;
+        hideLauncherWindow();
       }
     }
   }
@@ -7706,7 +7715,7 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
       ImGui::Button("New stats module", ImVec2{170.0f, 0.0f})) {
     createStatsWindow(UiStatsWindowKind::StatsModule);
     if (closeLauncherOnCreate) {
-      uiLauncherOpen = false;
+      hideLauncherWindow();
     }
   }
   if (uiStatsWindows.empty()) {
@@ -7756,7 +7765,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
     resetReplayAnnotations();
     tickReplayAnnotations();
-    uiLauncherOpen = false;
+    hideLauncherWindow();
   }
   const bool liveAnalysis = liveProcessingEnabled();
   if (renderModuleSummaryToggle("Live analysis graph", liveAnalysis, "launcher-actions")) {
@@ -7793,17 +7802,17 @@ void SubtrActorPlugin::renderLauncherWindow() {
       ImGui::PushID(moduleName.c_str());
       if (ImGui::SmallButton("Frame")) {
         createStatsModuleWindow(moduleName, 0);
-        uiLauncherOpen = false;
+        hideLauncherWindow();
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Module")) {
         createStatsModuleWindow(moduleName, 1);
-        uiLauncherOpen = false;
+        hideLauncherWindow();
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Config")) {
         createStatsModuleWindow(moduleName, 2);
-        uiLauncherOpen = false;
+        hideLauncherWindow();
       }
       ImGui::SameLine();
       ImGui::TextWrapped("%s", moduleName.c_str());
@@ -7816,14 +7825,14 @@ void SubtrActorPlugin::renderLauncherWindow() {
     if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
       showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
       verifyGraphRuntime({"subtr_actor_verify_graph"});
-      uiLauncherOpen = false;
+      hideLauncherWindow();
     }
     if (ImGui::Button("Open modules", ImVec2{170.0f, 0.0f})) {
       showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
-      uiLauncherOpen = false;
+      hideLauncherWindow();
     }
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
-      uiLauncherOpen = false;
+      hideLauncherWindow();
     }
 
     ImGui::Separator();
@@ -7833,8 +7842,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   if (uiLauncherOpen && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !launcherHovered &&
       !uiLauncherToggleHovered) {
-    uiLauncherOpen = false;
-    scheduleUiConfigAutosave();
+    hideLauncherWindow();
   }
 
   ImGui::End();
