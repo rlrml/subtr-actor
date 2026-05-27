@@ -437,9 +437,9 @@ private:
   int recentEventCountForType(std::string_view type) const;
   void renderSharedSettingsControls();
   bool uiEnabled();
-  bool cvarBool(const char *name, bool defaultValue);
+  bool cvarBool(const char *name, bool defaultValue) const;
   void setCvarBool(const char *name, bool value);
-  std::string cvarString(const char *name, std::string_view defaultValue);
+  std::string cvarString(const char *name, std::string_view defaultValue) const;
   void setCvarString(const char *name, std::string_view value);
   void appendUiEvent(UiEventRecord event);
   bool uiEventVisible(const UiEventRecord &event);

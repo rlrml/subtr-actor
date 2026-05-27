@@ -2241,7 +2241,7 @@ bool SubtrActorPlugin::uiEnabled() {
   return cvarBool("subtr_actor_ui_enabled", true);
 }
 
-bool SubtrActorPlugin::cvarBool(const char *name, bool defaultValue) {
+bool SubtrActorPlugin::cvarBool(const char *name, bool defaultValue) const {
   auto cvar = cvarManager->getCvar(name);
   return static_cast<bool>(cvar) ? cvar.getBoolValue() : defaultValue;
 }
@@ -2253,7 +2253,7 @@ void SubtrActorPlugin::setCvarBool(const char *name, bool value) {
   }
 }
 
-std::string SubtrActorPlugin::cvarString(const char *name, std::string_view defaultValue) {
+std::string SubtrActorPlugin::cvarString(const char *name, std::string_view defaultValue) const {
   auto cvar = cvarManager->getCvar(name);
   return static_cast<bool>(cvar) ? cvar.getStringValue() : std::string(defaultValue);
 }
@@ -2366,6 +2366,38 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  if (const auto overlays = parseJsonObjectProperty(json, "overlays")) {
+    const std::vector<std::string> timelineEvents =
+        parseJsonStringArrayProperty(*overlays, "timelineEvents");
+    if (overlays->find("\"timelineEvents\"") != std::string::npos) {
+      eventPlaylistMechanicsEnabled = containsString(timelineEvents, "mechanics");
+      eventPlaylistTeamEventsEnabled = containsString(timelineEvents, "team");
+      eventPlaylistGoalContextEnabled = containsString(timelineEvents, "goal_context");
+    }
+
+    const std::vector<std::string> renderEffects =
+        parseJsonStringArrayProperty(*overlays, "renderEffects");
+    if (overlays->find("\"renderEffects\"") != std::string::npos) {
+      const bool anyRenderEffect = !renderEffects.empty();
+      setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect);
+      setCvarBool(
+          "subtr_actor_overlay_mechanics_enabled",
+          containsString(renderEffects, "mechanics"));
+      setCvarBool(
+          "subtr_actor_overlay_team_events_enabled",
+          containsString(renderEffects, "team"));
+      setCvarBool(
+          "subtr_actor_overlay_goal_context_enabled",
+          containsString(renderEffects, "goal_context"));
+    }
+
+    const std::optional<bool> boostPads = parseJsonBoolProperty(*overlays, "boostPads");
+    if (boostPads) {
+      boostPickupPadBig = *boostPads;
+      boostPickupPadSmall = *boostPads;
+      boostPickupPadAmbiguous = *boostPads;
+    }
+  }
   cameraViewMode = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
   cameraFreePreset = static_cast<int>(
@@ -2722,6 +2754,44 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"overlays\": {\n";
+  file << "    \"timelineEvents\": [";
+  bool wroteOverlayValue = false;
+  auto writeOverlayId = [&](const char *id, bool enabled) {
+    if (!enabled) {
+      return;
+    }
+    if (wroteOverlayValue) {
+      file << ",";
+    }
+    file << "\"" << id << "\"";
+    wroteOverlayValue = true;
+  };
+  writeOverlayId("mechanics", eventPlaylistMechanicsEnabled);
+  writeOverlayId("team", eventPlaylistTeamEventsEnabled);
+  writeOverlayId("goal_context", eventPlaylistGoalContextEnabled);
+  file << "],\n";
+  file << "    \"timelineRanges\": [],\n";
+  file << "    \"mechanics\": [],\n";
+  file << "    \"renderEffects\": [";
+  wroteOverlayValue = false;
+  const bool hudOverlayEnabled = cvarBool("subtr_actor_overlay_enabled", true);
+  writeOverlayId(
+      "mechanics",
+      hudOverlayEnabled && cvarBool("subtr_actor_overlay_mechanics_enabled", true));
+  writeOverlayId(
+      "team",
+      hudOverlayEnabled && cvarBool("subtr_actor_overlay_team_events_enabled", true));
+  writeOverlayId(
+      "goal_context",
+      hudOverlayEnabled && cvarBool("subtr_actor_overlay_goal_context_enabled", true));
+  file << "],\n";
+  file << "    \"followedPlayerHud\": false,\n";
+  file << "    \"boostPads\": "
+       << (boostPickupPadBig || boostPickupPadSmall || boostPickupPadAmbiguous ? "true" : "false")
+       << ",\n";
+  file << "    \"boostPickupAnimation\": false\n";
+  file << "  },\n";
   file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
   file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
   file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
