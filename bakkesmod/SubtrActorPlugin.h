@@ -288,6 +288,7 @@ private:
   int cameraViewMode = 0;
   int cameraFreePreset = 0;
   uint32_t cameraSelectedPlayerIndex = 0;
+  std::string cameraSelectedPlayerId;
   float cameraDistanceScale = 1.0f;
   bool cameraCustomSettingsEnabled = false;
   bool cameraBallCamEnabled = false;
@@ -477,6 +478,8 @@ private:
   std::string webPlayerIdForIndex(uint32_t playerIndex) const;
   std::string webPlayerIdForWindow(const UiStatsWindow &window) const;
   void resolveStatsWindowPlayerSelection(UiStatsWindow &window);
+  std::string webCameraPlayerId() const;
+  void resolveCameraPlayerSelection();
   void renderAdHocTargetSelector(
       UiStatsWindow &window,
       UiStatsWindow::Entry &entry,

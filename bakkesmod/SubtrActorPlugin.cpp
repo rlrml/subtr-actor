@@ -1922,6 +1922,28 @@ void SubtrActorPlugin::resolveStatsWindowPlayerSelection(UiStatsWindow &window) 
   }
 }
 
+std::string SubtrActorPlugin::webCameraPlayerId() const {
+  if (!cameraSelectedPlayerId.empty() &&
+      !parseUnsignedIntegerString(cameraSelectedPlayerId)) {
+    return cameraSelectedPlayerId;
+  }
+  return webPlayerIdForIndex(cameraSelectedPlayerIndex);
+}
+
+void SubtrActorPlugin::resolveCameraPlayerSelection() {
+  if (cameraSelectedPlayerId.empty()) {
+    return;
+  }
+  if (const auto parsedPlayerIndex = parseUnsignedIntegerString(cameraSelectedPlayerId)) {
+    cameraSelectedPlayerIndex = *parsedPlayerIndex;
+    return;
+  }
+  if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(cameraSelectedPlayerId);
+      uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
+    cameraSelectedPlayerIndex = uniquePlayerIndex->second;
+  }
+}
+
 void SubtrActorPlugin::onLoad() {
   cvarManager->registerCvar(
       "subtr_actor_enabled",
@@ -2690,6 +2712,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
   cameraFreePreset = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(0.0), 0.0, 1.0));
+  cameraSelectedPlayerId =
+      parseJsonStringProperty(json, "camera_selected_player_id").value_or("");
   cameraSelectedPlayerIndex = static_cast<uint32_t>(
       std::max(0.0, parseJsonNumberProperty(json, "camera_selected_player_index").value_or(0.0)));
   cameraDistanceScale = static_cast<float>(std::clamp(
@@ -2757,9 +2781,16 @@ void SubtrActorPlugin::applyUiConfigJson(
         cameraViewMode = 3;
       }
     }
+    if (jsonPropertyExists(*camera, "attachedPlayerId")) {
+      cameraSelectedPlayerId.clear();
+    }
     if (const auto attachedPlayerId = parseJsonStringProperty(*camera, "attachedPlayerId")) {
+      cameraSelectedPlayerId = *attachedPlayerId;
       if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*attachedPlayerId)) {
         cameraSelectedPlayerIndex = *parsedPlayerIndex;
+      } else if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(*attachedPlayerId);
+                 uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
+        cameraSelectedPlayerIndex = uniquePlayerIndex->second;
       }
     }
     cameraDistanceScale = static_cast<float>(std::clamp(
@@ -3364,7 +3395,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   }
   file << ",\"attachedPlayerId\":";
   if (cameraViewMode == 1) {
-    file << "\"" << cameraSelectedPlayerIndex << "\"";
+    file << "\"" << escapeJsonString(webCameraPlayerId()) << "\"";
   } else {
     file << "null";
   }
@@ -3430,6 +3461,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
   file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
   file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
+  file << "  \"camera_selected_player_id\": \"" << escapeJsonString(webCameraPlayerId())
+       << "\",\n";
   file << "  \"camera_distance_scale\": " << cameraDistanceScale << ",\n";
   file << "  \"camera_custom_settings_enabled\": "
        << (cameraCustomSettingsEnabled ? "true" : "false") << ",\n";
@@ -7786,9 +7819,14 @@ void SubtrActorPlugin::renderCameraWindow() {
     return;
   }
 
+  if (cameraViewMode == 1) {
+    resolveCameraPlayerSelection();
+  }
   const SaPlayerFrame *selectedPlayer = sampledPlayerByIndex(cameraSelectedPlayerIndex);
-  if (cameraViewMode == 1 && selectedPlayer == nullptr && !sampledPlayers.empty()) {
+  if (cameraViewMode == 1 && selectedPlayer == nullptr && cameraSelectedPlayerId.empty() &&
+      !sampledPlayers.empty()) {
     cameraSelectedPlayerIndex = sampledPlayers.front().player_index;
+    cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
     selectedPlayer = sampledPlayerByIndex(cameraSelectedPlayerIndex);
   }
   const SaPlayerFrame *targetPlayer = cameraViewMode == 1 ? selectedPlayer : nullptr;
@@ -7830,6 +7868,7 @@ void SubtrActorPlugin::renderCameraWindow() {
               label.c_str(), targetPlayer != nullptr &&
                                  targetPlayer->player_index == player.player_index)) {
         cameraSelectedPlayerIndex = player.player_index;
+        cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
         cameraViewMode = 1;
       }
     }
