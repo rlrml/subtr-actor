@@ -6849,7 +6849,17 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   size_t selectedCount = 0;
   size_t visibleCount = 0;
+  size_t mechanicsSourceCount = 0;
+  size_t teamSourceCount = 0;
+  size_t goalContextSourceCount = 0;
   for (const UiEventRecord &event : recentUiEvents) {
+    if (event.category == "mechanics") {
+      mechanicsSourceCount += 1;
+    } else if (event.category == "team") {
+      teamSourceCount += 1;
+    } else if (event.category == "goal_context" || event.type == "goal") {
+      goalContextSourceCount += 1;
+    }
     if (eventPlaylistSourceEnabled(event)) {
       selectedCount += 1;
       if (uiEventVisible(event)) {
@@ -6858,27 +6868,39 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     }
   }
 
-  if (ImGui::Button("All sources")) {
+  const bool allSourcesEnabled = eventPlaylistMechanicsEnabled && eventPlaylistTeamEventsEnabled &&
+                                 eventPlaylistGoalContextEnabled;
+  const bool noSourcesEnabled = !eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
+                                !eventPlaylistGoalContextEnabled;
+  if (renderModuleSummaryToggle(
+          std::format("All events ({})", recentUiEvents.size()).c_str(),
+          allSourcesEnabled,
+          "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = true;
     eventPlaylistTeamEventsEnabled = true;
     eventPlaylistGoalContextEnabled = true;
   }
-  ImGui::SameLine();
-  if (ImGui::Button("No sources")) {
+  if (renderModuleSummaryToggle("No events", noSourcesEnabled, "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = false;
     eventPlaylistTeamEventsEnabled = false;
     eventPlaylistGoalContextEnabled = false;
   }
-  ImGui::SameLine();
   ImGui::Checkbox("Follow", &eventPlaylistAutoFollow);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "SOURCES");
-  ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
+  renderBoolModuleSummaryToggle(
+      std::format("Mechanics ({})", mechanicsSourceCount).c_str(),
+      eventPlaylistMechanicsEnabled,
+      "event-playlist-sources");
+  renderBoolModuleSummaryToggle(
+      std::format("Team ({})", teamSourceCount).c_str(),
+      eventPlaylistTeamEventsEnabled,
+      "event-playlist-sources");
+  renderBoolModuleSummaryToggle(
+      std::format("Goal context ({})", goalContextSourceCount).c_str(),
+      eventPlaylistGoalContextEnabled,
+      "event-playlist-sources");
 
   renderEventFilterCombo("Event filter");
 
