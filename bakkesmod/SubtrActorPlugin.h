@@ -467,6 +467,10 @@ private:
       const UiStatsWindow &window,
       std::string_view statId,
       std::string_view targetId = {}) const;
+  bool statsWindowTargetsEqual(
+      std::string_view statId,
+      std::string_view lhsTargetId,
+      std::string_view rhsTargetId) const;
   const std::vector<std::string> &statsModuleNames();
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
@@ -475,6 +479,7 @@ private:
   std::string webUiStatIdForWindow(
       const UiStatsWindow &window,
       const UiStatsWindow::Entry &entry) const;
+  std::optional<uint32_t> playerIndexForTargetId(std::string_view targetId) const;
   std::string webPlayerIdForIndex(uint32_t playerIndex) const;
   std::string webPlayerIdForWindow(const UiStatsWindow &window) const;
   void resolveStatsWindowPlayerSelection(UiStatsWindow &window);

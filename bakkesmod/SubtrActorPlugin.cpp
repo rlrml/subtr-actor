@@ -1891,6 +1891,18 @@ std::string SubtrActorPlugin::webUiStatIdForWindow(
   return localStatId;
 }
 
+std::optional<uint32_t> SubtrActorPlugin::playerIndexForTargetId(
+    std::string_view targetId) const {
+  if (const auto parsedPlayerIndex = parseUnsignedIntegerString(targetId)) {
+    return *parsedPlayerIndex;
+  }
+  if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(std::string{targetId});
+      uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
+    return uniquePlayerIndex->second;
+  }
+  return std::nullopt;
+}
+
 std::string SubtrActorPlugin::webPlayerIdForIndex(uint32_t playerIndex) const {
   const auto uniqueId = playerUniqueIdsByIndex.find(playerIndex);
   if (uniqueId != playerUniqueIdsByIndex.end() && !uniqueId->second.empty()) {
@@ -8983,8 +8995,25 @@ bool SubtrActorPlugin::statsWindowHasStat(
              window.entries.end(),
              [&](const UiStatsWindow::Entry &entry) {
                return normalizeUiStatId(entry.stat_id) == localStatId &&
-                      (targetId.empty() || entry.target_id == targetId);
+                      (targetId.empty() ||
+                       statsWindowTargetsEqual(localStatId, entry.target_id, targetId));
              }) != window.entries.end();
+}
+
+bool SubtrActorPlugin::statsWindowTargetsEqual(
+    std::string_view statId,
+    std::string_view lhsTargetId,
+    std::string_view rhsTargetId) const {
+  if (lhsTargetId == rhsTargetId) {
+    return true;
+  }
+  const UiStatDefinition *definition = localUiStatDefinition(normalizeUiStatId(statId));
+  if (!definition || !definition->player) {
+    return false;
+  }
+  const std::optional<uint32_t> lhsPlayerIndex = playerIndexForTargetId(lhsTargetId);
+  const std::optional<uint32_t> rhsPlayerIndex = playerIndexForTargetId(rhsTargetId);
+  return lhsPlayerIndex && rhsPlayerIndex && *lhsPlayerIndex == *rhsPlayerIndex;
 }
 
 int SubtrActorPlugin::recentEventCountForActor(std::string_view actor) const {
@@ -9120,7 +9149,7 @@ std::string SubtrActorPlugin::defaultAdHocTargetId(std::string_view statId) cons
     return "";
   }
   if (definition->player) {
-    return sampledPlayers.empty() ? "" : std::to_string(sampledPlayers.front().player_index);
+    return sampledPlayers.empty() ? "" : webPlayerIdForIndex(sampledPlayers.front().player_index);
   }
   if (definition->team) {
     return "blue";
@@ -9138,11 +9167,9 @@ std::string SubtrActorPlugin::adHocStatValue(
   }
   if (definition->player) {
     uint32_t playerIndex = sampledPlayers.empty() ? 0 : sampledPlayers.front().player_index;
-    if (!targetId.empty()) {
-      try {
-        playerIndex = static_cast<uint32_t>(std::stoul(std::string{targetId}));
-      } catch (...) {
-      }
+    if (const std::optional<uint32_t> resolvedPlayerIndex =
+            playerIndexForTargetId(targetId)) {
+      playerIndex = *resolvedPlayerIndex;
     }
     const SaPlayerFrame *player = sampledPlayerByIndex(playerIndex);
     return player ? playerStatValue(*player, localStatId) : "--";
@@ -9166,19 +9193,17 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
 
   if (definition->player) {
     const SaPlayerFrame *selected = nullptr;
-    if (!entry.target_id.empty()) {
-      try {
-        selected = sampledPlayerByIndex(static_cast<uint32_t>(std::stoul(entry.target_id)));
-      } catch (...) {
-      }
+    if (const std::optional<uint32_t> selectedPlayerIndex =
+            playerIndexForTargetId(entry.target_id)) {
+      selected = sampledPlayerByIndex(*selectedPlayerIndex);
     }
     const std::string selectedLabel =
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
     if (ImGui::BeginCombo(std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
                           selectedLabel.c_str())) {
       for (const SaPlayerFrame &player : sampledPlayers) {
-        const std::string nextTarget = std::to_string(player.player_index);
-        const bool isSelected = entry.target_id == nextTarget;
+        const std::string nextTarget = webPlayerIdForIndex(player.player_index);
+        const bool isSelected = statsWindowTargetsEqual(statId, entry.target_id, nextTarget);
         if (ImGui::Selectable(playerLabel(player.player_index, player.is_team_0).c_str(),
                               isSelected) &&
             !statsWindowHasStat(window, statId, nextTarget)) {
