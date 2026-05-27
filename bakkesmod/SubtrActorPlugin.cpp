@@ -9202,9 +9202,11 @@ void SubtrActorPlugin::resetWindowPlacements() {
 void SubtrActorPlugin::resetDefaultStatsWindows() {
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
-  createStatsWindow(UiStatsWindowKind::Player, true);
-  createStatsWindow(UiStatsWindowKind::Team, true);
-  createStatsWindow(UiStatsWindowKind::GoalsOverview, true);
+  for (const StatsWindowKindControl &window : statsWindowKindControls()) {
+    if (window.default_window) {
+      createStatsWindow(window.kind, true);
+    }
+  }
 }
 
 void SubtrActorPlugin::applyWorkspaceWindowVisibility(
@@ -9333,28 +9335,32 @@ void SubtrActorPlugin::renderStatsWindows() {
 std::array<SubtrActorPlugin::StatsWindowKindControl, 7>
 SubtrActorPlugin::statsWindowKindControls() const {
   return {{
-      {UiStatsWindowKind::Player, "player", "Player stats", "New player stats", true},
-      {UiStatsWindowKind::Team, "team", "Team stats", "New team stats", true},
+      {UiStatsWindowKind::Player, "player", "Player stats", "New player stats", true, true},
+      {UiStatsWindowKind::Team, "team", "Team stats", "New team stats", true, true},
       {UiStatsWindowKind::AllPlayers,
        "all-players",
        "All players stats",
        "New all players stats",
-       true},
+       true,
+       false},
       {UiStatsWindowKind::AllTeams,
        "all-teams",
        "All teams stats",
        "New all teams stats",
-       true},
+       true,
+       false},
       {UiStatsWindowKind::GoalsOverview,
        "goals-overview",
        "Goal labels",
        "New goal labels",
+       true,
        true},
-      {UiStatsWindowKind::AdHoc, "ad-hoc", "Ad hoc stats", "New ad hoc stats", true},
+      {UiStatsWindowKind::AdHoc, "ad-hoc", "Ad hoc stats", "New ad hoc stats", true, false},
       {UiStatsWindowKind::StatsModule,
        "stats-module",
        "Stats module",
        "New stats module",
+       false,
        false},
   }};
 }

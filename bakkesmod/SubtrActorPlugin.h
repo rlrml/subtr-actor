@@ -184,6 +184,7 @@ private:
     const char *label;
     const char *create_label;
     bool web_config;
+    bool default_window;
   };
 
   struct PlayerStatSnapshot {
