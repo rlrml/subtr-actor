@@ -7139,7 +7139,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
 
   size_t selectedCount = 0;
-  size_t visibleCount = 0;
   size_t mechanicsSourceCount = 0;
   size_t teamSourceCount = 0;
   size_t goalContextSourceCount = 0;
@@ -7151,11 +7150,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     } else if (event.category == "goal_context" || event.type == "goal") {
       goalContextSourceCount += 1;
     }
-    if (eventPlaylistSourceEnabled(event)) {
+    if (eventPlaylistSourceEnabled(event) && uiEventVisible(event)) {
       selectedCount += 1;
-      if (uiEventVisible(event)) {
-        visibleCount += 1;
-      }
     }
   }
 
@@ -7201,11 +7197,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   renderEventFilterCombo("Event filter");
 
-  ImGui::Text(
-      "%zu visible / %zu selected / %zu recent",
-      visibleCount,
-      selectedCount,
-      recentUiEvents.size());
+  ImGui::Text("%zu selected / %zu recent", selectedCount, recentUiEvents.size());
   if (!eventPlaylistStatus.empty()) {
     ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());
   }
