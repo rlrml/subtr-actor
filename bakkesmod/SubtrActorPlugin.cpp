@@ -2481,7 +2481,12 @@ void SubtrActorPlugin::applyUiConfigJson(
 
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
-  for (const std::string &object : parseJsonObjectArrayProperty(json, "stats_windows")) {
+  std::vector<std::string> statsWindowObjects =
+      parseJsonObjectArrayProperty(json, "stats_windows");
+  if (statsWindowObjects.empty()) {
+    statsWindowObjects = parseJsonObjectArrayProperty(json, "statsWindows");
+  }
+  for (const std::string &object : statsWindowObjects) {
     const auto kind = parseJsonStringProperty(object, "kind");
     if (!kind) {
       continue;
@@ -2507,6 +2512,16 @@ void SubtrActorPlugin::applyUiConfigJson(
     }
 
     window.id = static_cast<uint32_t>(parseJsonNumberProperty(object, "id").value_or(0.0));
+    if (const auto idString = parseJsonStringProperty(object, "id")) {
+      const size_t digitOffset = idString->find_first_of("0123456789");
+      if (digitOffset != std::string::npos) {
+        try {
+          window.id = static_cast<uint32_t>(std::stoul(idString->substr(digitOffset)));
+        } catch (const std::exception &) {
+          window.id = 0;
+        }
+      }
+    }
     if (window.id == 0) {
       window.id = nextUiStatsWindowId;
     }
@@ -2538,6 +2553,13 @@ void SubtrActorPlugin::applyUiConfigJson(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
     window.selected_team_is_team_0 =
         parseJsonBoolProperty(object, "selected_team_is_team_0").value_or(true) ? 1 : 0;
+    if (const auto team = parseJsonStringProperty(object, "team")) {
+      if (*team == "blue") {
+        window.selected_team_is_team_0 = 1;
+      } else if (*team == "orange") {
+        window.selected_team_is_team_0 = 0;
+      }
+    }
     window.module_name = parseJsonStringProperty(object, "module_name").value_or("");
     window.module_view = static_cast<int>(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
@@ -2773,6 +2795,35 @@ std::string SubtrActorPlugin::uiConfigJson() const {
       const UiStatsWindow::Entry &entry = window.entries[j];
       file << "{\"stat_id\":\"" << escapeJsonString(entry.stat_id) << "\""
            << ",\"target_id\":\"" << escapeJsonString(entry.target_id) << "\"}";
+    }
+    file << "]}";
+    if (i + 1 != uiStatsWindows.size()) {
+      file << ",";
+    }
+    file << "\n";
+  }
+  file << "  ],\n";
+  file << "  \"statsWindows\": [\n";
+  for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
+    const UiStatsWindow &window = uiStatsWindows[i];
+    file << "    {\"id\":\"stats-" << window.id << "\",\"kind\":\"" << kindValue(window.kind)
+         << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
+         << ",\"viewport\":{\"width\":" << window.viewport_width
+         << ",\"height\":" << window.viewport_height << "}"
+         << ",\"visible\":" << (window.open ? "true" : "false") << "}"
+         << ",\"playerId\":\"" << window.selected_player_index << "\""
+         << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange")
+         << "\",\"entries\":[";
+    for (size_t j = 0; j < window.entries.size(); j += 1) {
+      if (j != 0) {
+        file << ",";
+      }
+      const UiStatsWindow::Entry &entry = window.entries[j];
+      file << "{\"statId\":\"" << escapeJsonString(entry.stat_id) << "\"";
+      if (!entry.target_id.empty()) {
+        file << ",\"targetId\":\"" << escapeJsonString(entry.target_id) << "\"";
+      }
+      file << "}";
     }
     file << "]}";
     if (i + 1 != uiStatsWindows.size()) {
