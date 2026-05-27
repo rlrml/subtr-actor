@@ -37,7 +37,8 @@ constexpr ImGuiWindowFlags UI_CHROME_WINDOW_FLAGS =
     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
 constexpr ImGuiWindowFlags UI_LAUNCHER_MENU_WINDOW_FLAGS =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize |
+    ImGuiWindowFlags_NoSavedSettings;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
@@ -7723,9 +7724,10 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
 void SubtrActorPlugin::applyLauncherMenuPlacement() {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   const float width = 352.0f;
-  const float height = std::max(320.0f, displaySize.y > 0.0f ? displaySize.y - 120.0f : 650.0f);
+  const float maxHeight = std::max(320.0f, displaySize.y > 0.0f ? displaySize.y - 120.0f : 650.0f);
   ImGui::SetNextWindowPos(ImVec2{12.0f, 64.0f}, ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_Always);
+  ImGui::SetNextWindowSizeConstraints(ImVec2{width, 0.0f}, ImVec2{width, maxHeight});
+  ImGui::SetNextWindowSize(ImVec2{width, 0.0f}, ImGuiCond_Always);
   ImGui::SetNextWindowBgAlpha(0.92f);
   if (launcherPlacement.pending_focus) {
     ImGui::SetNextWindowFocus();
