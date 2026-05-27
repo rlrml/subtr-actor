@@ -465,6 +465,24 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "bool jsonPropertyIsNull(const std::string &json, const std::string &propertyName)",
+        "JSON null property helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'jsonPropertyIsNull(*camera, "customSettings")',
+        "camera customSettings null import uses JSON parser",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'camera->find("\\"customSettings\\":null")',
+        "camera customSettings null import uses exact substring",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'file << "null";',
         "web config can emit null values",
         errors,

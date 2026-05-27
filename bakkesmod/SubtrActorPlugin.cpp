@@ -1183,6 +1183,12 @@ bool jsonPropertyExists(const std::string &json, const std::string &propertyName
   return findJsonPropertyValueOffset(json, propertyName, offset);
 }
 
+bool jsonPropertyIsNull(const std::string &json, const std::string &propertyName) {
+  size_t offset = 0;
+  return findJsonPropertyValueOffset(json, propertyName, offset) &&
+         json.compare(offset, 4, "null") == 0;
+}
+
 std::optional<std::string> parseJsonStringProperty(
     const std::string &json,
     const std::string &propertyName) {
@@ -3483,7 +3489,7 @@ void SubtrActorPlugin::applyUiConfigJson(
               .value_or(cameraCustomTransitionSpeed),
           0.5,
           2.0));
-    } else if (camera->find("\"customSettings\":null") != std::string::npos) {
+    } else if (jsonPropertyIsNull(*camera, "customSettings")) {
       cameraCustomSettingsEnabled = false;
     }
   }
