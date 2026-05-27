@@ -7,10 +7,10 @@ use subtr_actor::playlist_generation::{
     PlaylistPlaybackOptions,
 };
 
-use super::build_items_for_source;
 use super::config::Config;
 use super::mechanics::resolve_mechanics;
 use super::source_collect::collect_sources;
+use super::source_items::build_items_for_source;
 use super::source_parse::parse_replay_file;
 
 pub(crate) fn build_manifest(config: &Config) -> anyhow::Result<PlaylistManifest> {
