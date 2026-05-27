@@ -8463,6 +8463,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
 
   if (ImGui::Button("Prev") && mechanicsReviewIndex > 0) {
     mechanicsReviewIndex -= 1;
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::Button("Replay clip")) {
@@ -8486,6 +8487,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       cvarManager->log(
           "subtr-actor: replay clip selected; open a replay to seek in Rocket League");
     }
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (mechanicsReviewClipActive && ImGui::Button("Stop clip")) {
@@ -8499,6 +8501,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
         replay.StopPlayback();
       }
     }
+    scheduleUiConfigAutosave();
   }
   if (mechanicsReviewClipActive) {
     ImGui::SameLine();
@@ -8506,6 +8509,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   if (ImGui::Button("Next") &&
       mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
     mechanicsReviewIndex += 1;
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::Button("Show playlist")) {
@@ -8551,6 +8555,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
         mechanicsReviewDecisionLabel(event));
     if (ImGui::Selectable(label.c_str(), i == static_cast<size_t>(mechanicsReviewIndex))) {
       mechanicsReviewIndex = static_cast<int>(i);
+      scheduleUiConfigAutosave();
     }
     ImGui::PopID();
   }
@@ -9823,11 +9828,17 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
     return;
   }
 
-  ImGui::RadioButton("Outputs##graph-inspector-view", &graphInspectorView, 0);
+  if (ImGui::RadioButton("Outputs##graph-inspector-view", &graphInspectorView, 0)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::RadioButton("Analysis nodes##graph-inspector-view", &graphInspectorView, 1);
+  if (ImGui::RadioButton("Analysis nodes##graph-inspector-view", &graphInspectorView, 1)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::RadioButton("Graph info##graph-inspector-view", &graphInspectorView, 2);
+  if (ImGui::RadioButton("Graph info##graph-inspector-view", &graphInspectorView, 2)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::Separator();
 
   if (graphInspectorView == 0) {
@@ -9846,6 +9857,7 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
         const bool isSelected = name == selectedGraphOutput;
         if (ImGui::Selectable(name.c_str(), isSelected)) {
           selectedGraphOutput = name;
+          scheduleUiConfigAutosave();
         }
       }
       ImGui::EndCombo();
@@ -9877,11 +9889,13 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::InputText("Search nodes", queryBuffer.data(), queryBuffer.size())) {
       graphInspectorNodeQuery = queryBuffer.data();
+      scheduleUiConfigAutosave();
     }
     if (!graphInspectorNodeQuery.empty()) {
       ImGui::SameLine();
       if (ImGui::SmallButton("Clear##graph-node-search")) {
         graphInspectorNodeQuery.clear();
+        scheduleUiConfigAutosave();
       }
     }
 
@@ -9906,6 +9920,7 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
       const bool isSelected = name == selectedAnalysisNode;
       if (ImGui::Selectable(name.c_str(), isSelected)) {
         selectedAnalysisNode = name;
+        scheduleUiConfigAutosave();
       }
     }
     if (visibleCount == 0) {
