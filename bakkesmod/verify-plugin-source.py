@@ -213,6 +213,11 @@ def require_contains(source: str, needle: str, label: str, errors: list[str]) ->
         errors.append(f"missing {label}: {needle}")
 
 
+def reject_contains(source: str, needle: str, label: str, errors: list[str]) -> None:
+    if needle in source:
+        errors.append(f"unexpected {label}: {needle}")
+
+
 def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
     match = re.search(
         r"return\s+\{\{(.*?)\}\};\s*\}\s*\n\s*std::vector<SubtrActorPlugin::SingletonWindowControl>",
@@ -348,6 +353,30 @@ def main() -> int:
         "      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |\n"
         "      ImGuiWindowFlags_NoSavedSettings;",
         "scoreboard opts out of implicit ImGui persistence",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "ImGui::SetNextWindowFocus();\n"
+        "      placement.z_index = nextUiWindowZIndex++;\n"
+        "      placement.pending_focus = false;",
+        "singleton pending-focus render path bumps z-index",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "ImGui::SetNextWindowFocus();\n"
+        "      scoreboardPlacement.z_index = nextUiWindowZIndex++;\n"
+        "      scoreboardPlacement.pending_focus = false;",
+        "scoreboard pending-focus render path bumps z-index",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "ImGui::SetNextWindowFocus();\n"
+        "    window.z_index = nextUiWindowZIndex++;\n"
+        "    window.pending_focus = false;",
+        "stats pending-focus render path bumps z-index",
         errors,
     )
 

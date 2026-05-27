@@ -7067,7 +7067,6 @@ void SubtrActorPlugin::applyWindowPlacement(
   auto applyFocus = [&]() {
     if (placement.pending_focus) {
       ImGui::SetNextWindowFocus();
-      placement.z_index = nextUiWindowZIndex++;
       placement.pending_focus = false;
     }
   };
@@ -7247,7 +7246,6 @@ void SubtrActorPlugin::applyScoreboardWindowPlacement() {
   auto applyFocus = [&]() {
     if (scoreboardPlacement.pending_focus) {
       ImGui::SetNextWindowFocus();
-      scoreboardPlacement.z_index = nextUiWindowZIndex++;
       scoreboardPlacement.pending_focus = false;
     }
   };
@@ -11279,7 +11277,6 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t /*stackIn
   applyStatsWindowPlacement(window);
   if (window.pending_focus) {
     ImGui::SetNextWindowFocus();
-    window.z_index = nextUiWindowZIndex++;
     window.pending_focus = false;
   }
   const std::string title = statsWindowTitle(window);
