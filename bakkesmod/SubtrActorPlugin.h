@@ -583,6 +583,7 @@ private:
   void loadUiConfig();
   void saveUiConfig();
   void maybeAutosaveUiConfig();
+  void renderLayoutConfigControls(const char *idSuffix);
   int recentEventCountForActor(std::string_view actor) const;
   int recentEventCountForTeam(uint8_t isTeam0) const;
   int recentEventCountForType(std::string_view type) const;

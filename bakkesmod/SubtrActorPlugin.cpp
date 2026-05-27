@@ -4260,6 +4260,44 @@ void SubtrActorPlugin::maybeAutosaveUiConfig() {
   saveUiConfig();
 }
 
+void SubtrActorPlugin::renderLayoutConfigControls(const char *idSuffix) {
+  ImGui::PushID(idSuffix);
+  if (ImGui::Button("Save layout")) {
+    saveUiConfig();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reload layout")) {
+    loadUiConfig();
+  }
+  if (ImGui::Button("Copy layout JSON")) {
+    const std::string json = uiConfigJson();
+    ImGui::SetClipboardText(json.c_str());
+    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Copy layout cfg")) {
+    const std::string json = uiConfigJson();
+    const std::optional<std::string> encodedCfg = statsPlayerCfgFromJson(json);
+    const std::string cfg = encodedCfg.value_or(std::format("#cfg={}", urlEncode(json)));
+    ImGui::SetClipboardText(cfg.c_str());
+    cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Paste layout")) {
+    const char *clipboardText = ImGui::GetClipboardText();
+    if (clipboardText == nullptr || clipboardText[0] == '\0') {
+      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
+    } else if (const std::optional<std::string> configJson =
+                   statsPlayerCfgJsonFromClipboard(clipboardText)) {
+      applyUiConfigJson(*configJson, "clipboard");
+    } else {
+      cvarManager->log(
+          "subtr-actor: clipboard does not contain UI config JSON or a stats-player cfg value");
+    }
+  }
+  ImGui::PopID();
+}
+
 float SubtrActorPlugin::sampleIntervalSeconds() {
   auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
   const float intervalMs =
@@ -6934,6 +6972,10 @@ void SubtrActorPlugin::renderSharedSettingsControls() {
       static_cast<bool>(maxMessagesCvar)) {
     maxMessagesCvar.setValue(maxMessages);
   }
+
+  ImGui::Separator();
+  ImGui::Text("Layout");
+  renderLayoutConfigControls("settings-layout");
 }
 
 bool SubtrActorPlugin::renderEventFilterCombo(const char *label) {
@@ -7535,40 +7577,7 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
       *window.open = false;
     }
   }
-  if (ImGui::Button("Save layout")) {
-    saveUiConfig();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload layout")) {
-    loadUiConfig();
-  }
-  if (ImGui::Button("Copy layout JSON")) {
-    const std::string json = uiConfigJson();
-    ImGui::SetClipboardText(json.c_str());
-    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Copy layout cfg")) {
-    const std::string json = uiConfigJson();
-    const std::optional<std::string> encodedCfg = statsPlayerCfgFromJson(json);
-    const std::string cfg =
-        encodedCfg.value_or(std::format("#cfg={}", urlEncode(json)));
-    ImGui::SetClipboardText(cfg.c_str());
-    cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Paste layout")) {
-    const char *clipboardText = ImGui::GetClipboardText();
-    if (clipboardText == nullptr || clipboardText[0] == '\0') {
-      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
-    } else if (const std::optional<std::string> configJson =
-                   statsPlayerCfgJsonFromClipboard(clipboardText)) {
-      applyUiConfigJson(*configJson, "clipboard");
-    } else {
-      cvarManager->log(
-          "subtr-actor: clipboard does not contain UI config JSON or a stats-player cfg value");
-    }
-  }
+  renderLayoutConfigControls("launcher-workspace-layout");
 }
 
 void SubtrActorPlugin::renderLauncherStatsWindowControls() {
