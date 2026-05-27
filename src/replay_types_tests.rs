@@ -1,4 +1,5 @@
 use super::*;
+use crate::glam_to_vec;
 
 fn rigid_body(position: glam::Vec3, velocity: Option<glam::Vec3>) -> boxcars::RigidBody {
     boxcars::RigidBody {

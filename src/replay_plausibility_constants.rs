@@ -1,0 +1,12 @@
+pub(super) const MAX_PAIR_DT_SECONDS: f32 = 0.2;
+pub(super) const MIN_DISPLACEMENT_SPEED: f32 = 100.0;
+pub(super) const MIN_REPORTED_SPEED: f32 = 100.0;
+pub(super) const VELOCITY_RATIO_MIN: f32 = 0.5;
+pub(super) const VELOCITY_RATIO_MAX: f32 = 2.0;
+pub(super) const MIN_VELOCITY_PAIR_COUNT: usize = 100;
+pub(super) const MAX_PLAUSIBLE_LOCATION_ABS: f32 = 10_000.0;
+pub(super) const MAX_PLAUSIBLE_LINEAR_SPEED: f32 = 10_000.0;
+pub(super) const MAX_PLAUSIBLE_QUATERNION_NORM_ERROR: f32 = 0.01;
+pub(super) const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
+pub(super) const MAX_GROUNDED_HEIGHT: f32 = 60.0;
+pub(super) const MAX_GROUNDED_VERTICAL_SPEED: f32 = 200.0;
