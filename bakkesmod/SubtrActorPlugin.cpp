@@ -11321,7 +11321,9 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
     const SaPlayerFrame *selected = sampledPlayerByIndex(window.selected_player_index);
     const std::string selectedLabel =
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
-    if (ImGui::BeginCombo("Player", selectedLabel.c_str())) {
+    if (ImGui::BeginCombo(
+            std::format("##stats-window-player-scope-{}", window.id).c_str(),
+            selectedLabel.c_str())) {
       for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
         const bool hasTeamPlayers = std::any_of(
             sampledPlayers.begin(),
@@ -11358,7 +11360,9 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
 
   if (window.kind == UiStatsWindowKind::Team) {
     const char *selectedTeam = window.selected_team_is_team_0 != 0 ? "Blue" : "Orange";
-    if (ImGui::BeginCombo("Team", selectedTeam)) {
+    if (ImGui::BeginCombo(
+            std::format("##stats-window-team-scope-{}", window.id).c_str(),
+            selectedTeam)) {
       for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
         const LinearColor color =
             isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
