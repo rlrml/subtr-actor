@@ -421,6 +421,9 @@ private:
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
   std::string defaultAdHocTargetId(std::string_view statId) const;
   std::string adHocStatValue(std::string_view statId, std::string_view targetId) const;
+  std::string webUiStatIdForWindow(
+      const UiStatsWindow &window,
+      const UiStatsWindow::Entry &entry) const;
   void renderAdHocTargetSelector(
       UiStatsWindow &window,
       UiStatsWindow::Entry &entry,

@@ -147,6 +147,11 @@ struct UiStatDefinitionMatch {
   size_t index = 0;
 };
 
+struct UiStatIdAlias {
+  const char *external_id;
+  const char *local_id;
+};
+
 constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"all", "All events"},
     {"mechanics", "All mechanics"},
@@ -220,6 +225,29 @@ constexpr std::array<UiStatDefinition, 15> UI_STAT_DEFINITIONS{{
     {"assist", "Assists detected", "Events", false, false, true},
     {"demo", "Demos detected", "Events", false, false, true},
     {"flip_reset", "Flip resets detected", "Events", false, false, true},
+}};
+
+constexpr std::array<UiStatIdAlias, 20> UI_STAT_ID_ALIASES{{
+    {"player:core.score", "score"},
+    {"player.core.score", "score"},
+    {"team:core.score", "score"},
+    {"team.core.score", "score"},
+    {"player:core.goals", "goals"},
+    {"player.core.goals", "goals"},
+    {"team:core.goals", "goals"},
+    {"team.core.goals", "goals"},
+    {"player:core.assists", "assists"},
+    {"player.core.assists", "assists"},
+    {"team:core.assists", "assists"},
+    {"team.core.assists", "assists"},
+    {"player:core.saves", "saves"},
+    {"player.core.saves", "saves"},
+    {"team:core.saves", "saves"},
+    {"team.core.saves", "saves"},
+    {"player:core.shots", "shots"},
+    {"player.core.shots", "shots"},
+    {"team:core.shots", "shots"},
+    {"team.core.shots", "shots"},
 }};
 
 bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
@@ -1560,7 +1588,7 @@ const char *eventFilterLabel(std::string_view value) {
   return value.empty() ? "All events" : "Custom filter";
 }
 
-const UiStatDefinition *uiStatDefinition(std::string_view statId) {
+const UiStatDefinition *localUiStatDefinition(std::string_view statId) {
   const auto found = std::find_if(
       UI_STAT_DEFINITIONS.begin(),
       UI_STAT_DEFINITIONS.end(),
@@ -1568,11 +1596,40 @@ const UiStatDefinition *uiStatDefinition(std::string_view statId) {
   return found == UI_STAT_DEFINITIONS.end() ? nullptr : &*found;
 }
 
+std::string normalizeUiStatId(std::string_view statId) {
+  if (localUiStatDefinition(statId)) {
+    return std::string{statId};
+  }
+  for (const UiStatIdAlias &alias : UI_STAT_ID_ALIASES) {
+    if (statId == alias.external_id) {
+      return alias.local_id;
+    }
+  }
+  return std::string{statId};
+}
+
+const UiStatDefinition *uiStatDefinition(std::string_view statId) {
+  const std::string normalized = normalizeUiStatId(statId);
+  return localUiStatDefinition(normalized);
+}
+
 const char *uiStatLabel(std::string_view statId) {
   if (const UiStatDefinition *definition = uiStatDefinition(statId)) {
     return definition->label;
   }
   return "Stat";
+}
+
+std::optional<std::string_view> coreStatsPlayerField(std::string_view localStatId) {
+  if (
+      localStatId == "score" ||
+      localStatId == "goals" ||
+      localStatId == "assists" ||
+      localStatId == "saves" ||
+      localStatId == "shots") {
+    return localStatId;
+  }
+  return std::nullopt;
 }
 
 std::string normalizeStatSearchText(std::string_view value) {
@@ -1778,6 +1835,46 @@ SaPlayerFrame syntheticPlayer(
 }
 
 } // namespace
+
+std::string SubtrActorPlugin::webUiStatIdForWindow(
+    const UiStatsWindow &window,
+    const UiStatsWindow::Entry &entry) const {
+  const std::string localStatId = normalizeUiStatId(entry.stat_id);
+  const auto coreField = coreStatsPlayerField(localStatId);
+  if (!coreField) {
+    return localStatId;
+  }
+
+  const UiStatDefinition *definition = localUiStatDefinition(localStatId);
+  if (!definition) {
+    return localStatId;
+  }
+
+  bool preferTeamScope = false;
+  switch (window.kind) {
+  case UiStatsWindowKind::Team:
+  case UiStatsWindowKind::AllTeams:
+    preferTeamScope = true;
+    break;
+  case UiStatsWindowKind::AdHoc:
+    preferTeamScope = entry.target_id == "blue" || entry.target_id == "orange";
+    break;
+  default:
+    preferTeamScope = false;
+    break;
+  }
+
+  if (preferTeamScope && definition->team) {
+    return std::format("team:core.{}", *coreField);
+  }
+  if (definition->player) {
+    return std::format("player:core.{}", *coreField);
+  }
+  if (definition->team) {
+    return std::format("team:core.{}", *coreField);
+  }
+  return localStatId;
+}
 
 void SubtrActorPlugin::onLoad() {
   cvarManager->registerCvar(
@@ -2883,7 +2980,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     window.picker_query = parseJsonStringProperty(object, "picker_query").value_or("");
     const bool hasEntriesProperty = object.find("\"entries\"") != std::string::npos;
     for (const std::string &statId : parseJsonStringArrayProperty(object, "entries")) {
-      window.entries.push_back(UiStatsWindow::Entry{statId, ""});
+      window.entries.push_back(UiStatsWindow::Entry{normalizeUiStatId(statId), ""});
     }
     for (const std::string &entryObject : parseJsonObjectArrayProperty(object, "entries")) {
       std::string statId = parseJsonStringProperty(entryObject, "stat_id").value_or("");
@@ -2893,6 +2990,7 @@ void SubtrActorPlugin::applyUiConfigJson(
       if (statId.empty()) {
         continue;
       }
+      statId = normalizeUiStatId(statId);
       std::string targetId = parseJsonStringProperty(entryObject, "target_id").value_or("");
       if (targetId.empty()) {
         targetId = parseJsonStringProperty(entryObject, "targetId").value_or("");
@@ -3326,7 +3424,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
         file << ",";
       }
       const UiStatsWindow::Entry &entry = window.entries[j];
-      file << "{\"statId\":\"" << escapeJsonString(entry.stat_id) << "\"";
+      file << "{\"statId\":\"" << escapeJsonString(webUiStatIdForWindow(window, entry)) << "\"";
       if (!entry.target_id.empty()) {
         file << ",\"targetId\":\"" << escapeJsonString(entry.target_id) << "\"";
       }
@@ -8177,7 +8275,8 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
 bool SubtrActorPlugin::statsWindowSupportsStat(
     const UiStatsWindow &window,
     std::string_view statId) const {
-  const UiStatDefinition *definition = uiStatDefinition(statId);
+  const std::string localStatId = normalizeUiStatId(statId);
+  const UiStatDefinition *definition = localUiStatDefinition(localStatId);
   if (!definition) {
     return false;
   }
@@ -8202,11 +8301,12 @@ bool SubtrActorPlugin::statsWindowHasStat(
     const UiStatsWindow &window,
     std::string_view statId,
     std::string_view targetId) const {
+  const std::string localStatId = normalizeUiStatId(statId);
   return std::find_if(
              window.entries.begin(),
              window.entries.end(),
              [&](const UiStatsWindow::Entry &entry) {
-               return entry.stat_id == statId &&
+               return normalizeUiStatId(entry.stat_id) == localStatId &&
                       (targetId.empty() || entry.target_id == targetId);
              }) != window.entries.end();
 }
@@ -8259,25 +8359,26 @@ const std::vector<std::string> &SubtrActorPlugin::statsModuleNames() {
 std::string SubtrActorPlugin::playerStatValue(
     const SaPlayerFrame &player,
     std::string_view statId) const {
-  if (statId == "score") {
+  const std::string localStatId = normalizeUiStatId(statId);
+  if (localStatId == "score") {
     return std::format("{}", player.has_match_stats != 0 ? player.match_score : 0);
   }
-  if (statId == "goals") {
+  if (localStatId == "goals") {
     return std::format("{}", player.has_match_stats != 0 ? player.match_goals : 0);
   }
-  if (statId == "assists") {
+  if (localStatId == "assists") {
     return std::format("{}", player.has_match_stats != 0 ? player.match_assists : 0);
   }
-  if (statId == "saves") {
+  if (localStatId == "saves") {
     return std::format("{}", player.has_match_stats != 0 ? player.match_saves : 0);
   }
-  if (statId == "shots") {
+  if (localStatId == "shots") {
     return std::format("{}", player.has_match_stats != 0 ? player.match_shots : 0);
   }
-  if (statId == "boost") {
+  if (localStatId == "boost") {
     return std::format("{:.0f}", player.boost_amount);
   }
-  if (statId == "recent_events") {
+  if (localStatId == "recent_events") {
     return std::format(
         "{}",
         recentEventCountForActor(playerLabel(player.player_index, player.is_team_0)));
@@ -8286,6 +8387,7 @@ std::string SubtrActorPlugin::playerStatValue(
 }
 
 std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view statId) const {
+  const std::string localStatId = normalizeUiStatId(statId);
   int players = 0;
   int score = 0;
   int goals = 0;
@@ -8308,35 +8410,36 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
     boost += player.boost_amount;
   }
 
-  if (statId == "players") {
+  if (localStatId == "players") {
     return std::format("{}", players);
   }
-  if (statId == "score") {
+  if (localStatId == "score") {
     return std::format("{}", score);
   }
-  if (statId == "goals") {
+  if (localStatId == "goals") {
     return std::format("{}", goals);
   }
-  if (statId == "assists") {
+  if (localStatId == "assists") {
     return std::format("{}", assists);
   }
-  if (statId == "saves") {
+  if (localStatId == "saves") {
     return std::format("{}", saves);
   }
-  if (statId == "shots") {
+  if (localStatId == "shots") {
     return std::format("{}", shots);
   }
-  if (statId == "average_boost") {
+  if (localStatId == "average_boost") {
     return std::format("{:.0f}", players == 0 ? 0.0f : boost / static_cast<float>(players));
   }
-  if (statId == "recent_events") {
+  if (localStatId == "recent_events") {
     return std::format("{}", recentEventCountForTeam(isTeam0));
   }
   return "--";
 }
 
 std::string SubtrActorPlugin::defaultAdHocTargetId(std::string_view statId) const {
-  const UiStatDefinition *definition = uiStatDefinition(statId);
+  const std::string localStatId = normalizeUiStatId(statId);
+  const UiStatDefinition *definition = localUiStatDefinition(localStatId);
   if (!definition) {
     return "";
   }
@@ -8352,7 +8455,8 @@ std::string SubtrActorPlugin::defaultAdHocTargetId(std::string_view statId) cons
 std::string SubtrActorPlugin::adHocStatValue(
     std::string_view statId,
     std::string_view targetId) const {
-  const UiStatDefinition *definition = uiStatDefinition(statId);
+  const std::string localStatId = normalizeUiStatId(statId);
+  const UiStatDefinition *definition = localUiStatDefinition(localStatId);
   if (!definition) {
     return "--";
   }
@@ -8365,12 +8469,12 @@ std::string SubtrActorPlugin::adHocStatValue(
       }
     }
     const SaPlayerFrame *player = sampledPlayerByIndex(playerIndex);
-    return player ? playerStatValue(*player, statId) : "--";
+    return player ? playerStatValue(*player, localStatId) : "--";
   }
   if (definition->team) {
-    return teamStatValue(targetId == "orange" ? 0 : 1, statId);
+    return teamStatValue(targetId == "orange" ? 0 : 1, localStatId);
   }
-  return std::format("{}", recentEventCountForType(statId));
+  return std::format("{}", recentEventCountForType(localStatId));
 }
 
 void SubtrActorPlugin::renderAdHocTargetSelector(
