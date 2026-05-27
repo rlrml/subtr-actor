@@ -7429,6 +7429,36 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SETTINGS");
   renderModuleSettingsControls("launcher-module-settings", true);
 
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
+  const std::vector<std::string> &moduleNames = statsModuleNames();
+  if (moduleNames.empty()) {
+    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+  } else {
+    ImGui::BeginChild("launcher-graph-stats-modules", ImVec2{0.0f, 130.0f}, true);
+    for (const std::string &moduleName : moduleNames) {
+      ImGui::PushID(moduleName.c_str());
+      if (ImGui::SmallButton("Frame")) {
+        createStatsModuleWindow(moduleName, 0);
+        uiLauncherOpen = false;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Module")) {
+        createStatsModuleWindow(moduleName, 1);
+        uiLauncherOpen = false;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Config")) {
+        createStatsModuleWindow(moduleName, 2);
+        uiLauncherOpen = false;
+      }
+      ImGui::SameLine();
+      ImGui::TextWrapped("%s", moduleName.c_str());
+      ImGui::PopID();
+    }
+    ImGui::EndChild();
+  }
+
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     const bool liveAnalysis = liveProcessingEnabled();
     if (ImGui::Button(liveAnalysis ? "Stop analysis" : "Start analysis", ImVec2{170.0f, 0.0f})) {
@@ -7519,24 +7549,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
         cvarManager->log(
             "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
       }
-    }
-
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
-    const std::vector<std::string> &moduleNames = statsModuleNames();
-    if (moduleNames.empty()) {
-      ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
-    } else {
-      ImGui::BeginChild("module-summary", ImVec2{0.0f, 150.0f}, true);
-      for (const std::string &moduleName : moduleNames) {
-        if (ImGui::SmallButton(std::format("Open##module-{}", moduleName).c_str())) {
-          createStatsModuleWindow(moduleName);
-          uiLauncherOpen = false;
-        }
-        ImGui::SameLine();
-        ImGui::Text("%s", moduleName.c_str());
-      }
-      ImGui::EndChild();
     }
 
     ImGui::Separator();
