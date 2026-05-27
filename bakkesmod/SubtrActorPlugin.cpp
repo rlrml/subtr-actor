@@ -5359,6 +5359,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     replayLoadingPlacement.pending_focus = true;
     resetReplayAnnotations();
     tickReplayAnnotations();
+    uiLauncherOpen = false;
   }
   ImGui::SameLine();
   bool liveAnalysis = liveProcessingEnabled();
@@ -5384,19 +5385,39 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
-  ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
-  ImGui::Checkbox("Events", &uiEventsOpen);
-  ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
-  ImGui::Checkbox("Status", &uiStatusOpen);
-  ImGui::Checkbox("Camera", &uiCameraOpen);
-  ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
-  ImGui::Checkbox("Recording", &uiRecordingOpen);
-  ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
-  ImGui::Checkbox("Mechanics review", &uiMechanicsReviewOpen);
-  ImGui::Checkbox("Replay loading", &uiReplayLoadingOpen);
-  ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
-  ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
-  ImGui::Checkbox("Boost pickup filters", &uiBoostPickupControlsOpen);
+  struct LauncherWindowToggle {
+    const char *label;
+    bool *open;
+    UiWindowPlacement *placement;
+  };
+  std::array<LauncherWindowToggle, 13> launcherWindows{{
+      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
+      {"Events", &uiEventsOpen, &eventsPlacement},
+      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
+      {"Status", &uiStatusOpen, &statusPlacement},
+      {"Camera", &uiCameraOpen, &cameraPlacement},
+      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
+      {"Recording", &uiRecordingOpen, &recordingPlacement},
+      {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
+      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
+      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
+      {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
+      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
+      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
+  }};
+  for (LauncherWindowToggle &window : launcherWindows) {
+    ImGui::PushID(window.label);
+    if (ImGui::Button(window.label, ImVec2{170.0f, 0.0f})) {
+      *window.open = !*window.open;
+      if (*window.open) {
+        window.placement->pending_focus = true;
+      }
+      uiLauncherOpen = false;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", *window.open ? "Shown" : "Hidden");
+    ImGui::PopID();
+  }
   renderSingletonWindowManager();
 
   ImGui::Separator();
