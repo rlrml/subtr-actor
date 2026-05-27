@@ -4,9 +4,8 @@ use subtr_actor::{
     playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
-    DoubleTapCalculator, FlickCalculator, FlipResetTracker, HalfFlipCalculator,
-    MustyFlickCalculator, OneTimerCalculator, ReplayProcessor, SpeedFlipCalculator,
-    WavedashCalculator,
+    DoubleTapCalculator, FlipResetTracker, HalfFlipCalculator, OneTimerCalculator, ReplayProcessor,
+    SpeedFlipCalculator, WavedashCalculator,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -21,6 +20,8 @@ mod candidate;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_extract_flick.rs"]
+mod extract_flick;
 #[path = "build_mechanic_review_playlist_goal_scan.rs"]
 mod goal_scan;
 #[path = "build_mechanic_review_playlist_manifest.rs"]
@@ -47,6 +48,7 @@ use candidate::{
     include_candidate, replay_duration_seconds, MechanicCandidate,
 };
 use config::{parse_args, Config};
+use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
 use goal_scan::GoalScanCollector;
 use manifest::{build_manifest, write_manifest};
 use mechanics::graph_node_names_for_mechanics;
@@ -64,60 +66,10 @@ fn extract_candidates(
     for mechanic in mechanics {
         match *mechanic {
             "flick" => {
-                let Some(calculator) = graph.state::<FlickCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "flick",
-                        mechanic_label: "Flick",
-                        detector: "builtin:flick",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: event.setup_start_time,
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; {:.1}s setup with {} touches; ball speed +{:.0}",
-                            confidence_pct(confidence),
-                            event.setup_duration,
-                            event.setup_touch_count,
-                            event.ball_speed_change
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_flick_candidates(graph, &mut candidates);
             }
             "musty_flick" => {
-                let Some(calculator) = graph.state::<MustyFlickCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "musty_flick",
-                        mechanic_label: "Musty Flick",
-                        detector: "builtin:musty_flick",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: event.dodge_time,
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; dodge-to-touch {:.2}s; pitch rate {:.1}; ball speed +{:.0}",
-                            confidence_pct(confidence),
-                            event.time_since_dodge,
-                            event.pitch_rate,
-                            event.ball_speed_change
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_musty_flick_candidates(graph, &mut candidates);
             }
             "one_timer" => {
                 let Some(calculator) = graph.state::<OneTimerCalculator>() else {
