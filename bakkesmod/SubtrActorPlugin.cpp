@@ -144,11 +144,15 @@ struct UiStatDefinitionMatch {
   size_t index = 0;
 };
 
-constexpr std::array<EventFilterOption, 24> EVENT_FILTER_OPTIONS{{
+constexpr std::array<EventFilterOption, 28> EVENT_FILTER_OPTIONS{{
     {"all", "All events"},
     {"mechanics", "All mechanics"},
     {"team", "Team events"},
     {"goal_context", "Goal context"},
+    {"touch", "Touch"},
+    {"touch_ball_movement", "Touch movement"},
+    {"dodge_reset", "Dodge refresh"},
+    {"boost_pickup", "Boost pickup"},
     {"speed_flip", "Speed flip"},
     {"half_flip", "Half flip"},
     {"wavedash", "Wavedash"},
@@ -2175,6 +2179,8 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
   uiModuleControlsOpen =
       parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
+  uiTouchControlsOpen =
+      parseJsonBoolProperty(json, "touch_controls_open").value_or(uiTouchControlsOpen);
   eventPlaylistMechanicsEnabled = parseJsonBoolProperty(json, "event_playlist_mechanics_enabled")
                                       .value_or(eventPlaylistMechanicsEnabled);
   eventPlaylistTeamEventsEnabled = parseJsonBoolProperty(json, "event_playlist_team_enabled")
@@ -2184,6 +2190,20 @@ void SubtrActorPlugin::loadUiConfig() {
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  touchControlsMode = static_cast<int>(
+      std::clamp(parseJsonNumberProperty(json, "touch_controls_mode").value_or(1.0), 0.0, 1.0));
+  touchMarkerDecaySeconds = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "touch_marker_decay_seconds").value_or(5.0),
+      1.0,
+      10.0));
+  touchBreakdownKind =
+      parseJsonBoolProperty(json, "touch_breakdown_kind").value_or(touchBreakdownKind);
+  touchBreakdownHeight =
+      parseJsonBoolProperty(json, "touch_breakdown_height").value_or(touchBreakdownHeight);
+  touchBreakdownSurface =
+      parseJsonBoolProperty(json, "touch_breakdown_surface").value_or(touchBreakdownSurface);
+  touchBreakdownDodge =
+      parseJsonBoolProperty(json, "touch_breakdown_dodge").value_or(touchBreakdownDodge);
   graphInspectorView = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
@@ -2199,6 +2219,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
     loadPlacement(*placements, "module_controls", moduleControlsPlacement);
+    loadPlacement(*placements, "touch_controls", touchControlsPlacement);
   }
 
   uiStatsWindows.clear();
@@ -2320,6 +2341,8 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"module_controls_open\": " << (uiModuleControlsOpen ? "true" : "false")
        << ",\n";
+  file << "  \"touch_controls_open\": " << (uiTouchControlsOpen ? "true" : "false")
+       << ",\n";
   file << "  \"event_playlist_mechanics_enabled\": "
        << (eventPlaylistMechanicsEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_team_enabled\": "
@@ -2328,6 +2351,16 @@ void SubtrActorPlugin::saveUiConfig() {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"touch_controls_mode\": " << touchControlsMode << ",\n";
+  file << "  \"touch_marker_decay_seconds\": " << touchMarkerDecaySeconds << ",\n";
+  file << "  \"touch_breakdown_kind\": " << (touchBreakdownKind ? "true" : "false")
+       << ",\n";
+  file << "  \"touch_breakdown_height\": " << (touchBreakdownHeight ? "true" : "false")
+       << ",\n";
+  file << "  \"touch_breakdown_surface\": " << (touchBreakdownSurface ? "true" : "false")
+       << ",\n";
+  file << "  \"touch_breakdown_dodge\": " << (touchBreakdownDodge ? "true" : "false")
+       << ",\n";
   file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
@@ -2350,6 +2383,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, eventPlaylistPlacement);
   file << ",\n    \"module_controls\": ";
   writePlacement(file, moduleControlsPlacement);
+  file << ",\n    \"touch_controls\": ";
+  writePlacement(file, touchControlsPlacement);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -4851,6 +4886,7 @@ void SubtrActorPlugin::Render() {
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
   renderModuleControlsWindow();
+  renderTouchControlsWindow();
   renderStatsWindows();
 }
 
@@ -4991,6 +5027,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
   ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
+  ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
   renderSingletonWindowManager();
 
   ImGui::Separator();
@@ -5011,6 +5048,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiEventPlaylistOpen = false;
     uiStatusOpen = false;
     uiGraphInspectorOpen = false;
+    uiTouchControlsOpen = false;
   }
   if (ImGui::Button("Save layout")) {
     saveUiConfig();
@@ -5358,6 +5396,85 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     uiEventPlaylistOpen = true;
     eventPlaylistPlacement.pending_focus = true;
   }
+  ImGui::SameLine();
+  if (ImGui::Button("Open touch controls")) {
+    uiTouchControlsOpen = true;
+    touchControlsPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderTouchControlsWindow() {
+  if (!uiTouchControlsOpen) {
+    return;
+  }
+
+  applyWindowPlacement(touchControlsPlacement, 980.0f, 160.0f, 410.0f, 380.0f);
+  if (!ImGui::Begin("Touch controls##subtr-actor", &uiTouchControlsOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(touchControlsPlacement);
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TOUCH MARKERS");
+  ImGui::SliderFloat("Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs");
+  if (ImGui::RadioButton("Markers##touch-mode", &touchControlsMode, 0)) {
+    setCvarString("subtr_actor_overlay_event_types", "touch");
+  }
+  ImGui::SameLine();
+  if (ImGui::RadioButton("Advancement##touch-mode", &touchControlsMode, 1)) {
+    setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT BREAKDOWN");
+  ImGui::Checkbox("Kind", &touchBreakdownKind);
+  ImGui::SameLine();
+  ImGui::Checkbox("Height", &touchBreakdownHeight);
+  ImGui::Checkbox("Surface", &touchBreakdownSurface);
+  ImGui::SameLine();
+  ImGui::Checkbox("Dodge", &touchBreakdownDodge);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE TOUCH STATE");
+  if (lastTouch) {
+    ImGui::Text(
+        "Last touch: %s",
+        playerLabel(lastTouch->player_index, lastTouch->is_team_0).c_str());
+  } else {
+    ImGui::Text("Last touch: --");
+  }
+  ImGui::Text("Pending touches: %zu", pendingTouches.size());
+  ImGui::Text("Pending dodge refreshes: %zu", pendingDodgeRefreshes.size());
+  ImGui::Text("Recent touch events: %d", recentEventCountForType("touch"));
+  ImGui::Text(
+      "Recent touch movement: %d",
+      recentEventCountForType("touch_ball_movement"));
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
+  if (ImGui::Button("Show touches")) {
+    setCvarString("subtr_actor_overlay_event_types", "touch");
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Show movement")) {
+    setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+  if (ImGui::Button("Open touch stats")) {
+    createStatsModuleWindow("touch", 0);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Inspect touch nodes")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorView = 1;
+    graphInspectorNodeQuery = "touch";
+    graphInspectorPlacement.pending_focus = true;
+  }
 
   ImGui::End();
 }
@@ -5561,13 +5678,14 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 6> windows{{
+  std::array<SingletonWindowControl, 7> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
       {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
+      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
   }};
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
@@ -5658,6 +5776,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   statusPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
   moduleControlsPlacement = UiWindowPlacement{};
+  touchControlsPlacement = UiWindowPlacement{};
 
   launcherPlacement.pending_focus = true;
   for (UiStatsWindow &window : uiStatsWindows) {
@@ -5691,6 +5810,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiStatusOpen = true;
   uiGraphInspectorOpen = false;
   uiModuleControlsOpen = true;
+  uiTouchControlsOpen = false;
   eventPlaylistMechanicsEnabled = true;
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;

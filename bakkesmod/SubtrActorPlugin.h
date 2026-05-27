@@ -248,10 +248,17 @@ private:
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
   bool uiModuleControlsOpen = false;
+  bool uiTouchControlsOpen = false;
   bool eventPlaylistMechanicsEnabled = true;
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
   bool eventPlaylistAutoFollow = true;
+  int touchControlsMode = 1;
+  float touchMarkerDecaySeconds = 5.0f;
+  bool touchBreakdownKind = false;
+  bool touchBreakdownHeight = false;
+  bool touchBreakdownSurface = false;
+  bool touchBreakdownDodge = false;
   int graphInspectorView = 0;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
@@ -266,6 +273,7 @@ private:
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
   UiWindowPlacement moduleControlsPlacement;
+  UiWindowPlacement touchControlsPlacement;
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
@@ -294,6 +302,7 @@ private:
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
   void renderModuleControlsWindow();
+  void renderTouchControlsWindow();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void resetWindowPlacements();
