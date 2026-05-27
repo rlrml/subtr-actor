@@ -3,8 +3,7 @@ use serde_json::json;
 use subtr_actor::{
     playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    CeilingShotCalculator, Collector, DodgeResetCalculator, FlipResetTracker, HalfFlipCalculator,
-    ReplayProcessor, SpeedFlipCalculator, WavedashCalculator,
+    CeilingShotCalculator, Collector, DodgeResetCalculator, FlipResetTracker, ReplayProcessor,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -21,6 +20,8 @@ mod config;
 mod constants;
 #[path = "build_mechanic_review_playlist_extract_flick.rs"]
 mod extract_flick;
+#[path = "build_mechanic_review_playlist_extract_movement.rs"]
+mod extract_movement;
 #[path = "build_mechanic_review_playlist_extract_touch.rs"]
 mod extract_touch;
 #[path = "build_mechanic_review_playlist_goal_scan.rs"]
@@ -50,6 +51,9 @@ use candidate::{
 };
 use config::{parse_args, Config};
 use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
+use extract_movement::{
+    push_half_flip_candidates, push_speed_flip_candidates, push_wavedash_candidates,
+};
 use extract_touch::{
     push_air_dribble_candidates, push_double_tap_candidates, push_one_timer_candidates,
 };
@@ -162,87 +166,13 @@ fn extract_candidates(
                 push_double_tap_candidates(graph, &mut candidates);
             }
             "speed_flip" => {
-                let Some(calculator) = graph.state::<SpeedFlipCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "speed_flip",
-                        mechanic_label: "Speed Flip",
-                        detector: "builtin:speed_flip",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: (event.time - 0.5).max(0.0),
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; max speed {:.0}; diagonal {:.2}; cancel {:.2}",
-                            confidence_pct(confidence),
-                            event.max_speed,
-                            event.diagonal_score,
-                            event.cancel_score
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_speed_flip_candidates(graph, &mut candidates);
             }
             "half_flip" => {
-                let Some(calculator) = graph.state::<HalfFlipCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "half_flip",
-                        mechanic_label: "Half Flip",
-                        detector: "builtin:half_flip",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: (event.time - 0.65).max(0.0),
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; backward {:.2}; reorientation {:.2}; speed delta {:+.0}",
-                            confidence_pct(confidence),
-                            event.start_backward_alignment,
-                            event.best_reorientation_alignment,
-                            event.end_speed - event.start_speed
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_half_flip_candidates(graph, &mut candidates);
             }
             "wavedash" => {
-                let Some(calculator) = graph.state::<WavedashCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "wavedash",
-                        mechanic_label: "Wavedash",
-                        detector: "builtin:wavedash",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: event.dodge_time,
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; landing {:.2}s after dodge; speed gain {:.0}",
-                            confidence_pct(confidence),
-                            event.time_since_dodge,
-                            event.horizontal_speed_gain
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_wavedash_candidates(graph, &mut candidates);
             }
             _ => {}
         }
