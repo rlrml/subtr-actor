@@ -7511,7 +7511,7 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
         {"recent_events", ""}};
     break;
   case UiStatsWindowKind::GoalsOverview:
-    window.entries = {{"goal", ""}, {"shot", ""}, {"save", ""}, {"assist", ""}};
+    window.entries.clear();
     break;
   case UiStatsWindowKind::AdHoc:
     window.entries = {
@@ -7876,6 +7876,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     return;
   }
 
+  if (window.kind == UiStatsWindowKind::GoalsOverview) {
+    ImGui::Separator();
+    return;
+  }
+
   const std::string addButton = std::format("+ Add stat##{}", window.id);
   if (ImGui::Button(addButton.c_str())) {
     window.picker_open = !window.picker_open;
@@ -8005,6 +8010,11 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     return;
   }
 
+  if (window.kind == UiStatsWindowKind::GoalsOverview) {
+    renderGoalsOverviewStats(window);
+    return;
+  }
+
   if (window.entries.empty()) {
     ImGui::Text("No stats added.");
     return;
@@ -8028,7 +8038,6 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     renderAllTeamsStatsTable(window);
     break;
   case UiStatsWindowKind::GoalsOverview:
-    renderGoalsOverviewStats(window);
     break;
   case UiStatsWindowKind::AdHoc:
     renderAdHocStatsWindow(window);
