@@ -2775,6 +2775,19 @@ void SubtrActorPlugin::applyUiConfigJson(
       recordingPlaybackRateIndex = recordingPlaybackRateIndexForValue(*playbackRate);
     }
   }
+  if (const auto playback = parseJsonObjectProperty(json, "playback")) {
+    playbackCurrentTime = static_cast<float>(std::max(
+        0.0,
+        parseJsonNumberProperty(*playback, "currentTime").value_or(playbackCurrentTime)));
+    playbackPlaying = parseJsonBoolProperty(*playback, "playing").value_or(playbackPlaying);
+    playbackRate = static_cast<float>(
+        std::clamp(parseJsonNumberProperty(*playback, "rate").value_or(playbackRate), 0.1, 4.0));
+    playbackSkipPostGoalTransitions =
+        parseJsonBoolProperty(*playback, "skipPostGoalTransitions")
+            .value_or(playbackSkipPostGoalTransitions);
+    playbackSkipKickoffs =
+        parseJsonBoolProperty(*playback, "skipKickoffs").value_or(playbackSkipKickoffs);
+  }
   touchControlsMode = static_cast<int>(
       std::clamp(
           parseJsonNumberProperty(json, "touch_controls_mode").value_or(touchControlsMode),
@@ -3266,7 +3279,19 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << ",\n";
   file << "    \"boostPickupAnimation\": false\n";
   file << "  },\n";
-  file << "  \"playback\": {},\n";
+  const bool hasReplayServerForPlayback = gameWrapper && gameWrapper->IsInReplay() &&
+                                          !gameWrapper->GetGameEventAsReplay().IsNull();
+  const float currentPlaybackTime =
+      hasReplayServerForPlayback ? gameWrapper->GetGameEventAsReplay().GetReplayTimeElapsed()
+                                 : playbackCurrentTime;
+  file << "  \"playback\": {";
+  file << "\"currentTime\":" << currentPlaybackTime
+       << ",\"playing\":" << (playbackPlaying ? "true" : "false")
+       << ",\"rate\":" << playbackRate
+       << ",\"skipPostGoalTransitions\":"
+       << (playbackSkipPostGoalTransitions ? "true" : "false")
+       << ",\"skipKickoffs\":" << (playbackSkipKickoffs ? "true" : "false")
+       << "},\n";
   file << "  \"camera\": {";
   file << "\"mode\":\"" << (cameraViewMode == 1 ? "follow" : "free") << "\"";
   file << ",\"freePreset\":";
@@ -7633,6 +7658,9 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   const bool hasReplayServer = !replayServer.IsNull();
   const char *mode = inReplay ? "replay"
                               : inGame ? "live match/freeplay" : "waiting for game";
+  if (hasReplayServer) {
+    playbackCurrentTime = replayServer.GetReplayTimeElapsed();
+  }
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYBACK");
   ImGui::Text("Mode: %s", mode);
@@ -7647,6 +7675,21 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     ImGui::Text("Last sampled: %.2fs", *lastProcessedGameTime);
   } else {
     ImGui::TextDisabled("Last sampled: --");
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");
+  ImGui::SetNextItemWidth(140.0f);
+  ImGui::InputFloat("Current time", &playbackCurrentTime, 0.25f, 2.0f, "%.2f");
+  playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
+  ImGui::SetNextItemWidth(140.0f);
+  ImGui::SliderFloat("Rate", &playbackRate, 0.1f, 4.0f, "%.2fx");
+  ImGui::Checkbox("Playing", &playbackPlaying);
+  ImGui::SameLine();
+  ImGui::Checkbox("Skip goal transitions", &playbackSkipPostGoalTransitions);
+  ImGui::Checkbox("Skip kickoffs", &playbackSkipKickoffs);
+  if (hasReplayServer && ImGui::SmallButton("Capture replay time")) {
+    playbackCurrentTime = replayServer.GetReplayTimeElapsed();
   }
 
   ImGui::Separator();

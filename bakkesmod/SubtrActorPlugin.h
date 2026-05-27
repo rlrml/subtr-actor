@@ -295,6 +295,11 @@ private:
   float cameraCustomStiffness = 0.0f;
   float cameraCustomSwivelSpeed = 1.0f;
   float cameraCustomTransitionSpeed = 1.0f;
+  float playbackCurrentTime = 0.0f;
+  bool playbackPlaying = false;
+  float playbackRate = 1.0f;
+  bool playbackSkipPostGoalTransitions = false;
+  bool playbackSkipKickoffs = false;
   int recordingFps = 60;
   int recordingPlaybackRateIndex = 1;
   bool recordingFinishBeforeDump = false;
