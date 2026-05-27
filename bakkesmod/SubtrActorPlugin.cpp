@@ -7900,16 +7900,17 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderModuleSettingsControls("launcher-module-settings", false, true);
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
-    if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
+    const float pluginToolButtonWidth = ImGui::GetContentRegionAvail().x;
+    if (ImGui::Button("Verify graph", ImVec2{pluginToolButtonWidth, 0.0f})) {
       showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
       verifyGraphRuntime({"subtr_actor_verify_graph"});
       hideLauncherWindow();
     }
-    if (ImGui::Button("Open modules", ImVec2{170.0f, 0.0f})) {
+    if (ImGui::Button("Open modules", ImVec2{pluginToolButtonWidth, 0.0f})) {
       showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
       hideLauncherWindow();
     }
-    if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
+    if (ImGui::Button("Close launcher", ImVec2{pluginToolButtonWidth, 0.0f})) {
       hideLauncherWindow();
     }
 
