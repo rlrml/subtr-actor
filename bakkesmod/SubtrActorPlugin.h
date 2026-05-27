@@ -386,6 +386,14 @@ private:
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();
   void renderBoostPickupControlsWindow();
+  bool renderModuleSummaryToggle(const char *label, bool active, const char *idSuffix);
+  void renderCvarModuleSummaryToggle(
+      const char *label,
+      const char *name,
+      bool defaultValue,
+      const char *idSuffix);
+  void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
+  void renderModuleSummaryControls(const char *idSuffix);
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void focusTopLoadedWindow();

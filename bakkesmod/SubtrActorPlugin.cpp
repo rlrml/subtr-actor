@@ -6286,6 +6286,110 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   }
 }
 
+bool SubtrActorPlugin::renderModuleSummaryToggle(
+    const char *label,
+    bool active,
+    const char *idSuffix) {
+  const std::string buttonLabel = std::format("{}##{}-{}", label, idSuffix, label);
+  if (active) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
+  }
+  const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{190.0f, 0.0f});
+  if (active) {
+    ImGui::PopStyleColor(2);
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", active ? "On" : "Off");
+  return clicked;
+}
+
+void SubtrActorPlugin::renderCvarModuleSummaryToggle(
+    const char *label,
+    const char *name,
+    bool defaultValue,
+    const char *idSuffix) {
+  const bool active = cvarBool(name, defaultValue);
+  if (renderModuleSummaryToggle(label, active, idSuffix)) {
+    setCvarBool(name, !active);
+  }
+}
+
+void SubtrActorPlugin::renderBoolModuleSummaryToggle(
+    const char *label,
+    bool &active,
+    const char *idSuffix) {
+  if (renderModuleSummaryToggle(label, active, idSuffix)) {
+    active = !active;
+  }
+}
+
+void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
+  if (ImGui::TreeNode(std::format("Timeline visualizations##{}-timeline", idSuffix).c_str())) {
+    renderBoolModuleSummaryToggle("Mechanics playlist", eventPlaylistMechanicsEnabled, idSuffix);
+    renderBoolModuleSummaryToggle("Team event playlist", eventPlaylistTeamEventsEnabled, idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Goal context playlist",
+        eventPlaylistGoalContextEnabled,
+        idSuffix);
+    renderBoolModuleSummaryToggle("Boost pickup timeline", timelineRangeBoostEnabled, idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Possession timeline",
+        timelineRangePossessionEnabled,
+        idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Half control timeline",
+        timelineRangePressureEnabled,
+        idSuffix);
+    renderBoolModuleSummaryToggle("Rush timeline", timelineRangeRushEnabled, idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Position zones timeline",
+        timelineRangeAbsolutePositioningEnabled,
+        idSuffix);
+    renderBoolModuleSummaryToggle("Playlist follow", eventPlaylistAutoFollow, idSuffix);
+    ImGui::TreePop();
+  }
+
+  if (ImGui::TreeNode(std::format("In-game visualizations##{}-ingame", idSuffix).c_str())) {
+    renderCvarModuleSummaryToggle(
+        "Canvas HUD overlay",
+        "subtr_actor_overlay_enabled",
+        true,
+        idSuffix);
+    renderCvarModuleSummaryToggle(
+        "Canvas status line",
+        "subtr_actor_status_overlay_enabled",
+        true,
+        idSuffix);
+    renderCvarModuleSummaryToggle(
+        "HUD mechanics",
+        "subtr_actor_overlay_mechanics_enabled",
+        true,
+        idSuffix);
+    renderCvarModuleSummaryToggle(
+        "HUD team events",
+        "subtr_actor_overlay_team_events_enabled",
+        true,
+        idSuffix);
+    renderCvarModuleSummaryToggle(
+        "HUD goal context",
+        "subtr_actor_overlay_goal_context_enabled",
+        true,
+        idSuffix);
+    renderBoolModuleSummaryToggle("Ceiling shot labels", renderEffectCeilingShotEnabled, idSuffix);
+    renderBoolModuleSummaryToggle("50/50 labels", renderEffectFiftyFiftyEnabled, idSuffix);
+    renderBoolModuleSummaryToggle("Half control", renderEffectPressureEnabled, idSuffix);
+    renderBoolModuleSummaryToggle("Player roles", renderEffectRelativePositioningEnabled, idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Position zones",
+        renderEffectAbsolutePositioningEnabled,
+        idSuffix);
+    renderBoolModuleSummaryToggle("Speed flip labels", renderEffectSpeedFlipEnabled, idSuffix);
+    renderBoolModuleSummaryToggle("Touch labels", renderEffectTouchEnabled, idSuffix);
+    ImGui::TreePop();
+  }
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -6327,61 +6431,9 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiLauncherOpen = false;
   }
 
-  auto renderToggleButton = [](const char *label, bool active) {
-    const std::string buttonLabel = std::format("{}##launcher-toggle-{}", label, label);
-    if (active) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
-    }
-    const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{190.0f, 0.0f});
-    if (active) {
-      ImGui::PopStyleColor(2);
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", active ? "On" : "Off");
-    return clicked;
-  };
-  auto renderCvarToggle = [&](const char *label, const char *name, bool defaultValue) {
-    const bool active = cvarBool(name, defaultValue);
-    if (renderToggleButton(label, active)) {
-      setCvarBool(name, !active);
-    }
-  };
-  auto renderBoolToggle = [&](const char *label, bool &active) {
-    if (renderToggleButton(label, active)) {
-      active = !active;
-    }
-  };
-
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
-  if (ImGui::TreeNode("Timeline visualizations##launcher-module-summary-timeline")) {
-    renderBoolToggle("Mechanics playlist", eventPlaylistMechanicsEnabled);
-    renderBoolToggle("Team event playlist", eventPlaylistTeamEventsEnabled);
-    renderBoolToggle("Goal context playlist", eventPlaylistGoalContextEnabled);
-    renderBoolToggle("Boost pickup timeline", timelineRangeBoostEnabled);
-    renderBoolToggle("Possession timeline", timelineRangePossessionEnabled);
-    renderBoolToggle("Half control timeline", timelineRangePressureEnabled);
-    renderBoolToggle("Rush timeline", timelineRangeRushEnabled);
-    renderBoolToggle("Position zones timeline", timelineRangeAbsolutePositioningEnabled);
-    renderBoolToggle("Playlist follow", eventPlaylistAutoFollow);
-    ImGui::TreePop();
-  }
-  if (ImGui::TreeNode("In-game visualizations##launcher-module-summary-ingame")) {
-    renderCvarToggle("Canvas HUD overlay", "subtr_actor_overlay_enabled", true);
-    renderCvarToggle("Canvas status line", "subtr_actor_status_overlay_enabled", true);
-    renderCvarToggle("HUD mechanics", "subtr_actor_overlay_mechanics_enabled", true);
-    renderCvarToggle("HUD team events", "subtr_actor_overlay_team_events_enabled", true);
-    renderCvarToggle("HUD goal context", "subtr_actor_overlay_goal_context_enabled", true);
-    renderBoolToggle("Ceiling shot labels", renderEffectCeilingShotEnabled);
-    renderBoolToggle("50/50 labels", renderEffectFiftyFiftyEnabled);
-    renderBoolToggle("Half control", renderEffectPressureEnabled);
-    renderBoolToggle("Player roles", renderEffectRelativePositioningEnabled);
-    renderBoolToggle("Position zones", renderEffectAbsolutePositioningEnabled);
-    renderBoolToggle("Speed flip labels", renderEffectSpeedFlipEnabled);
-    renderBoolToggle("Touch labels", renderEffectTouchEnabled);
-    ImGui::TreePop();
-  }
+  renderModuleSummaryControls("launcher-module-summary");
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
@@ -7109,15 +7161,11 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   checkboxCvar("Replay annotations", "subtr_actor_replay_annotations_enabled", true);
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "EVENT VISUALIZATIONS");
-  checkboxCvar("HUD mechanics", "subtr_actor_overlay_mechanics_enabled", true);
-  checkboxCvar("HUD team events", "subtr_actor_overlay_team_events_enabled", true);
-  checkboxCvar("HUD goal context", "subtr_actor_overlay_goal_context_enabled", true);
-  ImGui::Checkbox("Playlist mechanics", &eventPlaylistMechanicsEnabled);
-  ImGui::Checkbox("Playlist team events", &eventPlaylistTeamEventsEnabled);
-  ImGui::Checkbox("Playlist goal context", &eventPlaylistGoalContextEnabled);
-  ImGui::Checkbox("Playlist follow", &eventPlaylistAutoFollow);
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SUMMARY");
+  renderModuleSummaryControls("module-controls-summary");
 
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "EVENT FILTER");
   renderEventFilterCombo("Event filter");
 
   ImGui::Separator();
@@ -7137,31 +7185,6 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   if (ImGui::Button("Open possession stats")) {
     createStatsModuleWindow("possession", 0);
   }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMELINE RANGES");
-  ImGui::Checkbox("Boost pickups##timeline-ranges", &timelineRangeBoostEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Possession##timeline-ranges", &timelineRangePossessionEnabled);
-  ImGui::Checkbox("Half control##timeline-ranges", &timelineRangePressureEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Rush##timeline-ranges", &timelineRangeRushEnabled);
-  ImGui::Checkbox(
-      "Position zones##timeline-ranges",
-      &timelineRangeAbsolutePositioningEnabled);
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "IN-GAME EFFECTS");
-  ImGui::Checkbox("Ceiling shot labels##render-effects", &renderEffectCeilingShotEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("50/50 labels##render-effects", &renderEffectFiftyFiftyEnabled);
-  ImGui::Checkbox("Half control##render-effects", &renderEffectPressureEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Player roles##render-effects", &renderEffectRelativePositioningEnabled);
-  ImGui::Checkbox("Position zones##render-effects", &renderEffectAbsolutePositioningEnabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Speed flip labels##render-effects", &renderEffectSpeedFlipEnabled);
-  ImGui::Checkbox("Touch labels##render-effects", &renderEffectTouchEnabled);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
