@@ -6,9 +6,13 @@ import type {
   WindowPlacementConfig,
 } from "./playerConfig.ts";
 import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
-import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import { getTeamClass } from "./statModules.ts";
+import {
+  renderStatsWindowAddControl,
+  renderStatsWindowPicker,
+} from "./statsWindowPicker.ts";
 import { renderGoalLabelsOverview } from "./statsWindowGoalLabels.ts";
+import type { SelectedStatEntry, StatsWindowState } from "./statsWindowTypes.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -16,24 +20,6 @@ import type {
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
 import { playerIdToString } from "./touchOverlay.ts";
-
-interface SelectedStatEntry {
-  key: string;
-  statId: string;
-  targetId?: string;
-}
-
-interface StatsWindowState {
-  readonly id: string;
-  readonly kind: StatsWindowKind;
-  readonly entries: SelectedStatEntry[];
-  playerId: string | null;
-  team: TeamScope | null;
-  pickerOpen: boolean;
-  query: string;
-  element: HTMLElement;
-  body: HTMLElement;
-}
 
 interface StatsWindowsManagerDeps {
   getDefaultFrameIndex(): number;
@@ -309,8 +295,22 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
 
     renderStatsWindowScope(statsWindow);
     if (hasStatsWindowStatPicker(statsWindow.kind)) {
-      renderStatsWindowAddControl(statsWindow);
-      renderStatsWindowPicker(statsWindow);
+      renderStatsWindowAddControl(statsWindow, {
+        getAllowedScope: getStatsWindowAllowedScope,
+        getDefaultAdHocTargetId,
+        getStatRegistry: deps.getStatRegistry,
+        hasScopeSelector: hasStatsWindowScopeSelector,
+        renderStatsWindow,
+        scheduleConfigUrlUpdate: deps.scheduleConfigUrlUpdate,
+      });
+      renderStatsWindowPicker(statsWindow, {
+        getAllowedScope: getStatsWindowAllowedScope,
+        getDefaultAdHocTargetId,
+        getStatRegistry: deps.getStatRegistry,
+        hasScopeSelector: hasStatsWindowScopeSelector,
+        renderStatsWindow,
+        scheduleConfigUrlUpdate: deps.scheduleConfigUrlUpdate,
+      });
     }
     renderStatsWindowEntries(statsWindow, frameIndex);
 
@@ -375,158 +375,6 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
 
     row.append(select);
     statsWindow.body.append(row);
-  }
-
-  function renderStatsWindowAddControl(statsWindow: StatsWindowState): void {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "stats-window-add-button";
-    button.textContent = "+";
-    button.title = "Add stat";
-    button.setAttribute("aria-label", "Add stat");
-    button.setAttribute("aria-expanded", String(statsWindow.pickerOpen));
-    activateButton(button, () => {
-      statsWindow.pickerOpen = !statsWindow.pickerOpen;
-      renderStatsWindow(statsWindow);
-    });
-
-    if (hasStatsWindowScopeSelector(statsWindow.kind)) {
-      const scopeRow = statsWindow.body.querySelector(".stats-window-scope-row");
-      scopeRow?.append(button);
-      return;
-    }
-
-    const toolbar = document.createElement("div");
-    toolbar.className = "stats-window-toolbar";
-    toolbar.append(button);
-    statsWindow.body.append(toolbar);
-  }
-
-  function activateButton(button: HTMLButtonElement, callback: () => void): void {
-    let pointerActivated = false;
-    button.addEventListener("pointerdown", (event) => {
-      if (button.disabled) {
-        return;
-      }
-      pointerActivated = true;
-      event.preventDefault();
-      callback();
-    });
-    button.addEventListener("click", () => {
-      if (pointerActivated) {
-        pointerActivated = false;
-        return;
-      }
-      if (!button.disabled) {
-        callback();
-      }
-    });
-  }
-
-  function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
-    const picker = document.createElement("div");
-    picker.className = "stats-window-picker";
-    picker.hidden = !statsWindow.pickerOpen;
-    if (picker.hidden) {
-      statsWindow.body.append(picker);
-      return;
-    }
-
-    const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
-    const queryInput = document.createElement("input");
-    queryInput.type = "search";
-    queryInput.placeholder = "Search stats";
-    queryInput.value = statsWindow.query;
-    queryInput.dataset.statsWindowSearch = statsWindow.id;
-
-    const list = document.createElement("div");
-    list.className = "stats-window-picker-list";
-    queryInput.addEventListener("input", () => {
-      statsWindow.query = queryInput.value;
-      renderStatsWindowPickerList(statsWindow, list, allowedScope);
-    });
-
-    renderStatsWindowPickerList(statsWindow, list, allowedScope);
-
-    picker.append(queryInput, list);
-    statsWindow.body.append(picker);
-  }
-
-  function renderStatsWindowPickerList(
-    statsWindow: StatsWindowState,
-    list: HTMLElement,
-    allowedScope: StatScopeKind | null,
-  ): void {
-    list.replaceChildren();
-
-    const statRegistry = [...deps.getStatRegistry()];
-    const scopeDefinitions = allowedScope
-      ? statRegistry.filter((definition) => definition.scope === allowedScope)
-      : statRegistry;
-    const definitions = getStatDefinitionSearchMatches(scopeDefinitions, statsWindow.query);
-
-    const groupByCategory = new Map<string, StatDefinition[]>();
-    for (const definition of definitions) {
-      const group = groupByCategory.get(definition.category) ?? [];
-      group.push(definition);
-      groupByCategory.set(definition.category, group);
-    }
-
-    for (const [category, group] of groupByCategory) {
-      if (group.length < 2) continue;
-      const addGroup = document.createElement("button");
-      addGroup.type = "button";
-      addGroup.className = "stats-window-picker-item";
-      addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;
-      activateButton(addGroup, () => {
-        for (const definition of group) {
-          addStatToWindow(statsWindow, definition);
-        }
-        renderStatsWindow(statsWindow);
-        deps.scheduleConfigUrlUpdate();
-      });
-      list.append(addGroup);
-    }
-
-    for (const definition of definitions) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "stats-window-picker-item";
-      item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;
-      item.disabled =
-        statsWindow.kind !== "ad-hoc" &&
-        statsWindow.entries.some((entry) => entry.statId === definition.id);
-      activateButton(item, () => {
-        addStatToWindow(statsWindow, definition);
-        renderStatsWindow(statsWindow);
-        deps.scheduleConfigUrlUpdate();
-      });
-      list.append(item);
-    }
-
-    if (definitions.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "stat-window-empty";
-      empty.textContent = statRegistry.length === 0 ? "No stats available." : "No matching stats.";
-      list.append(empty);
-    }
-  }
-
-  function addStatToWindow(statsWindow: StatsWindowState, definition: StatDefinition): void {
-    const targetId =
-      statsWindow.kind === "ad-hoc" ? getDefaultAdHocTargetId(definition) : undefined;
-    if (
-      statsWindow.entries.some(
-        (entry) => entry.statId === definition.id && entry.targetId === targetId,
-      )
-    ) {
-      return;
-    }
-    statsWindow.entries.push({
-      key: `${statsWindow.id}:${definition.id}:${targetId ?? "scope"}`,
-      statId: definition.id,
-      targetId,
-    });
   }
 
   function getDefaultAdHocTargetId(definition: StatDefinition): string {
