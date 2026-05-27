@@ -7494,11 +7494,40 @@ void SubtrActorPlugin::renderEventSourceControls() {
     return;
   }
 
+  const std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  const bool allSelected = allEventSourcesSelected(currentFilter);
   std::vector<std::string> selected =
-      selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all"));
+      selectedEventSourceTokens(currentFilter);
   auto applySelection = [&]() {
     setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
   };
+
+  struct DisplaySource {
+    const EventFilterOption *option = nullptr;
+    size_t count = 0;
+    bool enabled = false;
+  };
+
+  std::vector<DisplaySource> displaySources;
+  displaySources.reserve(EVENT_FILTER_OPTIONS.size());
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (std::string_view{option.value} == "all") {
+      continue;
+    }
+
+    size_t count = 0;
+    for (const UiEventRecord &event : recentUiEvents) {
+      if (eventFilterAllows(option.value, event.category, event.type)) {
+        count += 1;
+      }
+    }
+
+    const bool enabled = containsString(selected, option.value);
+    if (count == 0 && (allSelected || !enabled)) {
+      continue;
+    }
+    displaySources.push_back(DisplaySource{&option, count, enabled});
+  }
 
   if (ImGui::SmallButton("All events##event-sources")) {
     selected = selectedEventSourceTokens("all");
@@ -7513,13 +7542,19 @@ void SubtrActorPlugin::renderEventSourceControls() {
   const std::string preview =
       eventFilterPreview(cvarString("subtr_actor_overlay_event_types", "all"));
   ImGui::TextDisabled("%s", preview.c_str());
+  ImGui::TextDisabled("%zu loaded sources", displaySources.size());
 
   ImGui::BeginChild("event-source-list", ImVec2{0.0f, 185.0f}, true);
+  if (displaySources.empty()) {
+    ImGui::TextDisabled("No events loaded.");
+    ImGui::EndChild();
+    ImGui::TreePop();
+    return;
+  }
+
   std::string_view currentGroup;
-  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-    if (std::string_view{option.value} == "all") {
-      continue;
-    }
+  for (const DisplaySource &source : displaySources) {
+    const EventFilterOption &option = *source.option;
     const std::string_view optionGroup{option.group};
     if (currentGroup != optionGroup) {
       if (!currentGroup.empty()) {
@@ -7529,16 +7564,9 @@ void SubtrActorPlugin::renderEventSourceControls() {
       currentGroup = optionGroup;
     }
 
-    size_t count = 0;
-    for (const UiEventRecord &event : recentUiEvents) {
-      if (eventFilterAllows(option.value, event.category, event.type)) {
-        count += 1;
-      }
-    }
-
     ImGui::PushID(option.value);
-    bool enabled = containsString(selected, option.value);
-    const std::string label = std::format("{} ({})", option.label, count);
+    bool enabled = source.enabled;
+    const std::string label = std::format("{} ({})", option.label, source.count);
     if (renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")) {
       if (enabled) {
         selected.erase(
