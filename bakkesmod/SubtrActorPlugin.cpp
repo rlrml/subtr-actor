@@ -7595,7 +7595,7 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.28f, 0.57f, 0.72f, 1.0f});
   }
 
-  if (ImGui::Button("Menu##subtr-actor-launcher-toggle", ImVec2{44.0f, 28.0f})) {
+  if (ImGui::Button("Menu##subtr-actor-launcher-toggle", ImVec2{42.0f, 42.0f})) {
     uiWindowOpen = true;
     if (uiLauncherOpen) {
       hideLauncherWindow();
@@ -7614,9 +7614,9 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
 
 void SubtrActorPlugin::applyLauncherMenuPlacement() {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
-  const float width = 340.0f;
-  const float height = std::max(320.0f, displaySize.y > 0.0f ? displaySize.y - 68.0f : 650.0f);
-  ImGui::SetNextWindowPos(ImVec2{12.0f, 50.0f}, ImGuiCond_Always);
+  const float width = 352.0f;
+  const float height = std::max(320.0f, displaySize.y > 0.0f ? displaySize.y - 120.0f : 650.0f);
+  ImGui::SetNextWindowPos(ImVec2{12.0f, 64.0f}, ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_Always);
   ImGui::SetNextWindowBgAlpha(0.92f);
   if (launcherPlacement.pending_focus) {
