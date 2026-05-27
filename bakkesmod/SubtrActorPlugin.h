@@ -392,6 +392,7 @@ private:
   void recordProfileTiming(double samplingMs, double processingMs, double drainMs);
   void resetProfileTiming();
   void render(CanvasWrapper canvas);
+  void renderLauncherToggleChrome();
   void renderLauncherWindow();
   void renderScoreboardWindow();
   void renderEventsWindow();

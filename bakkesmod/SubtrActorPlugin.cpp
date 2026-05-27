@@ -30,6 +30,10 @@ constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr float GOAL_WATCH_LEAD_SECONDS = 4.0f;
 constexpr ImGuiWindowFlags UI_FLOATING_WINDOW_FLAGS =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+constexpr ImGuiWindowFlags UI_CHROME_WINDOW_FLAGS =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
+    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
@@ -6298,6 +6302,7 @@ void SubtrActorPlugin::Render() {
     ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(imguiContext));
   }
 
+  renderLauncherToggleChrome();
   renderLauncherWindow();
   if (!uiEnabled()) {
     return;
@@ -6832,6 +6837,43 @@ void SubtrActorPlugin::renderModuleSettingsControls(
   }
 
   ImGui::PopID();
+}
+
+void SubtrActorPlugin::renderLauncherToggleChrome() {
+  if (!uiEnabled() && !uiLauncherOpen) {
+    return;
+  }
+
+  ImGui::SetNextWindowPos(ImVec2{12.0f, 12.0f}, ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.62f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{5.0f, 5.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+  if (!ImGui::Begin("subtr-actor launcher toggle##subtr-actor", nullptr, UI_CHROME_WINDOW_FLAGS)) {
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    return;
+  }
+
+  if (uiLauncherOpen) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.46f, 0.92f});
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.22f, 0.46f, 0.60f, 0.98f});
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.28f, 0.57f, 0.72f, 1.0f});
+  }
+
+  if (ImGui::Button("Menu##subtr-actor-launcher-toggle", ImVec2{44.0f, 28.0f})) {
+    uiWindowOpen = true;
+    if (uiLauncherOpen) {
+      uiLauncherOpen = false;
+    } else {
+      showSingletonWindow(uiLauncherOpen, launcherPlacement);
+    }
+  }
+
+  if (uiLauncherOpen) {
+    ImGui::PopStyleColor(3);
+  }
+  ImGui::End();
+  ImGui::PopStyleVar(2);
 }
 
 void SubtrActorPlugin::renderLauncherWindow() {
