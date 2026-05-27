@@ -164,6 +164,8 @@ private:
 
   struct SingletonWindowControl {
     const char *label;
+    const char *config_id;
+    bool web_config;
     bool *open;
     UiWindowPlacement *placement;
     float x;
@@ -520,7 +522,7 @@ private:
       std::string_view statId,
       size_t index);
   std::filesystem::path uiConfigPath() const;
-  std::string uiConfigJson() const;
+  std::string uiConfigJson();
   void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();

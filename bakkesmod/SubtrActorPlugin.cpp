@@ -3106,6 +3106,20 @@ void SubtrActorPlugin::applyUiConfigJson(
       loadPlacementObject(*placement, touchControlsPlacement, &uiTouchControlsOpen);
     }
   }
+  for (const std::string &object : parseJsonObjectArrayProperty(json, "pluginWindows")) {
+    const std::string id = parseJsonStringProperty(object, "id").value_or("");
+    const auto placement = parseJsonObjectProperty(object, "placement");
+    if (!placement) {
+      continue;
+    }
+    for (const SingletonWindowControl &window : singletonWindowControls()) {
+      if (window.web_config || id != window.config_id) {
+        continue;
+      }
+      loadPlacementObject(*placement, *window.placement, window.open);
+      break;
+    }
+  }
 
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
@@ -3258,7 +3272,7 @@ void SubtrActorPlugin::applyUiConfigJson(
   nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
 }
 
-std::string SubtrActorPlugin::uiConfigJson() const {
+std::string SubtrActorPlugin::uiConfigJson() {
   auto kindValue = [](UiStatsWindowKind kind) {
     switch (kind) {
     case UiStatsWindowKind::Player:
@@ -3619,33 +3633,33 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   writePlacement(file, boostPickupControlsPlacement, uiBoostPickupControlsOpen);
   file << "\n  },\n";
   file << "  \"singletonWindows\": [\n";
-  auto writeSingletonWindow = [&](
-                                  const char *id,
-                                  const UiWindowPlacement &placement,
-                                  bool visible,
-                                  bool last) {
-    file << "    {\"id\":\"" << id << "\",\"placement\":";
-    writePlacement(file, placement, visible);
+  auto writeWindowConfig = [&](const SingletonWindowControl &window, bool last) {
+    const bool visible = window.open != nullptr && *window.open;
+    file << "    {\"id\":\"" << window.config_id << "\",\"placement\":";
+    writePlacement(file, *window.placement, visible);
     file << "}";
     if (!last) {
       file << ",";
     }
     file << "\n";
   };
-  writeSingletonWindow("camera", cameraPlacement, uiCameraOpen, false);
-  writeSingletonWindow("scoreboard", scoreboardPlacement, uiScoreboardOpen, false);
-  writeSingletonWindow("playback", playbackControlsPlacement, uiPlaybackControlsOpen, false);
-  writeSingletonWindow("recording", recordingPlacement, uiRecordingOpen, false);
-  writeSingletonWindow("mechanics", eventsPlacement, uiEventsOpen, false);
-  writeSingletonWindow("event-playlist", eventPlaylistPlacement, uiEventPlaylistOpen, false);
-  writeSingletonWindow("mechanics-review", mechanicsReviewPlacement, uiMechanicsReviewOpen, false);
-  writeSingletonWindow("replay-loading", replayLoadingPlacement, uiReplayLoadingOpen, false);
-  writeSingletonWindow(
-      "boost-pickups",
-      boostPickupControlsPlacement,
-      uiBoostPickupControlsOpen,
-      false);
-  writeSingletonWindow("touch-controls", touchControlsPlacement, uiTouchControlsOpen, true);
+  std::vector<SingletonWindowControl> webWindows;
+  std::vector<SingletonWindowControl> pluginWindows;
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.web_config) {
+      webWindows.push_back(window);
+    } else {
+      pluginWindows.push_back(window);
+    }
+  }
+  for (size_t index = 0; index < webWindows.size(); index += 1) {
+    writeWindowConfig(webWindows[index], index + 1 == webWindows.size());
+  }
+  file << "  ],\n";
+  file << "  \"pluginWindows\": [\n";
+  for (size_t index = 0; index < pluginWindows.size(); index += 1) {
+    writeWindowConfig(pluginWindows[index], index + 1 == pluginWindows.size());
+  }
   file << "  ],\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -8941,26 +8955,48 @@ SubtrActorPlugin::singletonWindowControls() {
   const float touchControlsX = rightAnchoredUiX(410.0f);
 
   return {{
-      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement, 0.0f, 11.0f, 88.0f, 34.0f},
-      {"Events", &uiEventsOpen, &eventsPlacement, 16.0f, 256.0f, 520.0f, 360.0f},
+      {"Scoreboard",
+       "scoreboard",
+       true,
+       &uiScoreboardOpen,
+       &scoreboardPlacement,
+       0.0f,
+       11.0f,
+       88.0f,
+       34.0f},
+      {"Events", "mechanics", true, &uiEventsOpen, &eventsPlacement, 16.0f, 256.0f, 520.0f, 360.0f},
       {"Event playlist",
+       "event-playlist",
+       true,
        &uiEventPlaylistOpen,
        &eventPlaylistPlacement,
        eventPlaylistX,
        256.0f,
        430.0f,
        430.0f},
-      {"Status", &uiStatusOpen, &statusPlacement, statusX, 68.0f, 330.0f, 220.0f},
-      {"Camera", &uiCameraOpen, &cameraPlacement, 16.0f, 68.0f, 416.0f, 500.0f},
+      {"Status", "status", false, &uiStatusOpen, &statusPlacement, statusX, 68.0f, 330.0f, 220.0f},
+      {"Camera", "camera", true, &uiCameraOpen, &cameraPlacement, 16.0f, 68.0f, 416.0f, 500.0f},
       {"Playback",
+       "playback",
+       true,
        &uiPlaybackControlsOpen,
        &playbackControlsPlacement,
        playbackX,
        68.0f,
        336.0f,
        430.0f},
-      {"Recording", &uiRecordingOpen, &recordingPlacement, recordingX, 384.0f, 416.0f, 380.0f},
+      {"Recording",
+       "recording",
+       true,
+       &uiRecordingOpen,
+       &recordingPlacement,
+       recordingX,
+       384.0f,
+       416.0f,
+       380.0f},
       {"Graph inspector",
+       "graph-inspector",
+       false,
        &uiGraphInspectorOpen,
        &graphInspectorPlacement,
        360.0f,
@@ -8968,6 +9004,8 @@ SubtrActorPlugin::singletonWindowControls() {
        700.0f,
        520.0f},
       {"Mechanics review",
+       "mechanics-review",
+       true,
        &uiMechanicsReviewOpen,
        &mechanicsReviewPlacement,
        mechanicsReviewX,
@@ -8975,6 +9013,8 @@ SubtrActorPlugin::singletonWindowControls() {
        500.0f,
        560.0f},
       {"Replay loading",
+       "replay-loading",
+       true,
        &uiReplayLoadingOpen,
        &replayLoadingPlacement,
        replayLoadingX,
@@ -8982,6 +9022,8 @@ SubtrActorPlugin::singletonWindowControls() {
        520.0f,
        360.0f},
       {"Module controls",
+       "module-controls",
+       false,
        &uiModuleControlsOpen,
        &moduleControlsPlacement,
        moduleControlsX,
@@ -8989,6 +9031,8 @@ SubtrActorPlugin::singletonWindowControls() {
        430.0f,
        520.0f},
       {"Touch controls",
+       "touch-controls",
+       true,
        &uiTouchControlsOpen,
        &touchControlsPlacement,
        touchControlsX,
@@ -8996,6 +9040,8 @@ SubtrActorPlugin::singletonWindowControls() {
        410.0f,
        380.0f},
       {"Boost pickup filters",
+       "boost-pickups",
+       true,
        &uiBoostPickupControlsOpen,
        &boostPickupControlsPlacement,
        16.0f,
