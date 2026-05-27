@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
-use clap::Parser;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -20,232 +18,19 @@ use subtr_actor::{
     ReplayProcessor, SpeedFlipCalculator, SubtrActorResult, TimeAdvance, WavedashCalculator,
 };
 
-const BALLCHASING_API_BASE_URL: &str = "https://ballchasing.com/api";
-const DEFAULT_PLAYLIST: &str = "ranked-duels";
-const DEFAULT_COUNT: usize = 10;
-const DEFAULT_MIN_CONFIDENCE: f32 = 0.55;
-const DEFAULT_BEFORE_SECONDS: f32 = 10.0;
-const DEFAULT_AFTER_SECONDS: f32 = 3.5;
-const DEFAULT_GOAL_LOOKAHEAD_SECONDS: f32 = 10.0;
-const DEFAULT_GOAL_TAIL_SECONDS: f32 = 3.0;
-const DEFAULT_MIN_CLIP_SECONDS: f32 = 8.0;
-const DEFAULT_DOWNLOAD_DELAY_MS: u64 = 1100;
-const DEFAULT_MECHANICS: &[&str] = &[
-    "flick",
-    "musty_flick",
-    "one_timer",
-    "air_dribble",
-    "flip_reset",
-    "ceiling_shot",
-    "double_tap",
-];
-const ALL_MECHANICS: &[&str] = &[
-    "flick",
-    "musty_flick",
-    "one_timer",
-    "air_dribble",
-    "flip_reset",
-    "ceiling_shot",
-    "double_tap",
-    "speed_flip",
-    "half_flip",
-    "wavedash",
-];
+#[path = "build_mechanic_review_playlist_args.rs"]
+mod args;
+#[path = "build_mechanic_review_playlist_args_default.rs"]
+mod args_default;
+#[path = "build_mechanic_review_playlist_args_query.rs"]
+mod args_query;
+#[path = "build_mechanic_review_playlist_config.rs"]
+mod config;
+#[path = "build_mechanic_review_playlist_constants.rs"]
+mod constants;
 
-#[derive(Debug)]
-struct Config {
-    ids: Vec<String>,
-    replay_paths: Vec<PathBuf>,
-    ids_file: Option<PathBuf>,
-    output: Option<PathBuf>,
-    cache_dir: PathBuf,
-    count: usize,
-    playlist: String,
-    sort_by: String,
-    sort_dir: String,
-    query_params: Vec<(String, String)>,
-    min_confidence: f32,
-    before_seconds: f32,
-    after_seconds: f32,
-    goal_lookahead_seconds: f32,
-    goal_tail_seconds: f32,
-    min_clip_seconds: f32,
-    max_items: Option<usize>,
-    download_delay: Duration,
-    mechanics: Vec<String>,
-}
-
-impl Config {
-    fn from_args(args: Args) -> anyhow::Result<Self> {
-        if args.list_mechanics {
-            println!("{}", ALL_MECHANICS.join("\n"));
-            std::process::exit(0);
-        }
-
-        let mut mechanics = args.mechanic;
-        mechanics.extend(args.mechanics);
-
-        let config = Self {
-            ids: args.ids,
-            replay_paths: args.replay_paths,
-            ids_file: args.ids_file,
-            output: args.output,
-            cache_dir: args.cache_dir,
-            count: args.count,
-            playlist: args.playlist,
-            sort_by: args.sort_by,
-            sort_dir: args.sort_dir,
-            query_params: args.query_params,
-            min_confidence: args.min_confidence,
-            before_seconds: args.before_seconds,
-            after_seconds: args.after_seconds,
-            goal_lookahead_seconds: args.goal_lookahead_seconds,
-            goal_tail_seconds: args.goal_tail_seconds,
-            min_clip_seconds: args.min_clip_seconds,
-            max_items: args.max_items,
-            download_delay: Duration::from_millis(args.download_delay_ms),
-            mechanics,
-        };
-
-        config.validate()?;
-        Ok(config)
-    }
-
-    fn validate(&self) -> anyhow::Result<()> {
-        if self.count == 0 {
-            bail!("--count must be at least 1");
-        }
-        if self.before_seconds < 0.0
-            || self.after_seconds < 0.0
-            || self.goal_lookahead_seconds < 0.0
-            || self.goal_tail_seconds < 0.0
-            || self.min_clip_seconds < 0.0
-        {
-            bail!("clip padding must be non-negative");
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Parser)]
-#[command(about = "Build a mechanic-review playlist from heuristic mechanic events.")]
-struct Args {
-    /// Add one Ballchasing replay id or URL.
-    #[arg(long = "id", value_name = "ballchasing-id-or-url")]
-    ids: Vec<String>,
-
-    /// Add Ballchasing replay ids or URLs from a file, one per line.
-    #[arg(long, value_name = "path")]
-    ids_file: Option<PathBuf>,
-
-    /// Add a local .replay file.
-    #[arg(long = "replay-path", value_name = "path")]
-    replay_paths: Vec<PathBuf>,
-
-    /// Write playlist JSON to path. Defaults to stdout.
-    #[arg(short, long, value_name = "path")]
-    output: Option<PathBuf>,
-
-    /// Replay cache directory.
-    #[arg(
-        long,
-        value_name = "path",
-        default_value = ".cache/mechanic-review-replays"
-    )]
-    cache_dir: PathBuf,
-
-    /// Number of Ballchasing replays to search/download when no sources are given.
-    #[arg(long, default_value_t = DEFAULT_COUNT)]
-    count: usize,
-
-    /// Ballchasing playlist filter.
-    #[arg(long, default_value = DEFAULT_PLAYLIST)]
-    playlist: String,
-
-    /// Ballchasing sort field.
-    #[arg(long, default_value = "replay-date")]
-    sort_by: String,
-
-    /// Ballchasing sort direction.
-    #[arg(long, default_value = "desc", value_name = "asc|desc")]
-    sort_dir: String,
-
-    /// Extra Ballchasing /replays query param. Repeatable.
-    #[arg(long = "query", value_name = "key=value", value_parser = parse_query_param)]
-    query_params: Vec<(String, String)>,
-
-    /// Minimum detector confidence for scored events.
-    #[arg(long, default_value_t = DEFAULT_MIN_CONFIDENCE)]
-    min_confidence: f32,
-
-    /// Clip lead-in before setup start.
-    #[arg(long, default_value_t = DEFAULT_BEFORE_SECONDS)]
-    before_seconds: f32,
-
-    /// Clip tail after mechanic event.
-    #[arg(long, default_value_t = DEFAULT_AFTER_SECONDS)]
-    after_seconds: f32,
-
-    /// Extend clips through same-team goals this many seconds after the mechanic event.
-    #[arg(long, default_value_t = DEFAULT_GOAL_LOOKAHEAD_SECONDS)]
-    goal_lookahead_seconds: f32,
-
-    /// Clip tail after an included goal explosion.
-    #[arg(long, default_value_t = DEFAULT_GOAL_TAIL_SECONDS)]
-    goal_tail_seconds: f32,
-
-    /// Minimum emitted clip duration, extended within replay bounds.
-    #[arg(long, default_value_t = DEFAULT_MIN_CLIP_SECONDS)]
-    min_clip_seconds: f32,
-
-    /// Limit emitted candidates.
-    #[arg(long)]
-    max_items: Option<usize>,
-
-    /// Delay between uncached Ballchasing downloads.
-    #[arg(long, default_value_t = DEFAULT_DOWNLOAD_DELAY_MS)]
-    download_delay_ms: u64,
-
-    /// Include a mechanic detector. Repeatable.
-    #[arg(long = "mechanic", value_name = "name")]
-    mechanic: Vec<String>,
-
-    /// Include comma-separated mechanic detectors.
-    #[arg(long = "mechanics", value_name = "a,b,c", value_delimiter = ',')]
-    mechanics: Vec<String>,
-
-    /// Print supported mechanic detector names.
-    #[arg(long)]
-    list_mechanics: bool,
-}
-
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            ids: Vec::new(),
-            replay_paths: Vec::new(),
-            ids_file: None,
-            output: None,
-            cache_dir: PathBuf::from(".cache/mechanic-review-replays"),
-            count: DEFAULT_COUNT,
-            playlist: DEFAULT_PLAYLIST.to_owned(),
-            sort_by: "replay-date".to_owned(),
-            sort_dir: "desc".to_owned(),
-            query_params: Vec::new(),
-            min_confidence: DEFAULT_MIN_CONFIDENCE,
-            before_seconds: DEFAULT_BEFORE_SECONDS,
-            after_seconds: DEFAULT_AFTER_SECONDS,
-            goal_lookahead_seconds: DEFAULT_GOAL_LOOKAHEAD_SECONDS,
-            goal_tail_seconds: DEFAULT_GOAL_TAIL_SECONDS,
-            min_clip_seconds: DEFAULT_MIN_CLIP_SECONDS,
-            max_items: None,
-            download_delay_ms: DEFAULT_DOWNLOAD_DELAY_MS,
-            mechanic: Vec::new(),
-            mechanics: Vec::new(),
-            list_mechanics: false,
-        }
-    }
-}
+use config::{parse_args, Config};
+use constants::{ALL_MECHANICS, BALLCHASING_API_BASE_URL, DEFAULT_MECHANICS};
 
 #[derive(Debug, Clone)]
 struct ReplaySourceInput {
@@ -310,17 +95,6 @@ impl Collector for GoalScanCollector {
     ) -> SubtrActorResult<TimeAdvance> {
         Ok(TimeAdvance::NextFrame)
     }
-}
-
-fn parse_args() -> anyhow::Result<Config> {
-    Config::from_args(Args::parse())
-}
-
-fn parse_query_param(raw: &str) -> Result<(String, String), String> {
-    let (key, value) = raw
-        .split_once('=')
-        .ok_or_else(|| "--query expects key=value".to_owned())?;
-    Ok((key.to_owned(), value.to_owned()))
 }
 
 fn normalize_ballchasing_id(input: &str) -> String {
