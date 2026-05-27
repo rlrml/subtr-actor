@@ -1,15 +1,13 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{anyhow, bail, Context};
-use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
 use subtr_actor::{
     playlist_generation::{
         PlaybackBound, PlaybackBoundKind, PlaylistAdvanceMode, PlaylistEndMode, PlaylistManifest,
-        PlaylistManifestItem, PlaylistManifestReplay, PlaylistManifestReplayLocator,
-        PlaylistPlaybackOptions,
+        PlaylistManifestItem, PlaylistManifestReplay, PlaylistPlaybackOptions,
     },
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
@@ -28,38 +26,24 @@ mod args_query;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_source_api.rs"]
+mod source_api;
+#[path = "build_mechanic_review_playlist_source_ballchasing.rs"]
+mod source_ballchasing;
+#[path = "build_mechanic_review_playlist_source_collect.rs"]
+mod source_collect;
+#[path = "build_mechanic_review_playlist_source_ids.rs"]
+mod source_ids;
+#[path = "build_mechanic_review_playlist_source_parse.rs"]
+mod source_parse;
+#[path = "build_mechanic_review_playlist_source_types.rs"]
+mod source_types;
 
 use config::{parse_args, Config};
-use constants::{ALL_MECHANICS, BALLCHASING_API_BASE_URL, DEFAULT_MECHANICS};
-
-#[derive(Debug, Clone)]
-struct ReplaySourceInput {
-    source_id: String,
-    locator: PlaylistManifestReplayLocator,
-    bytes_path: PathBuf,
-    label: String,
-    meta: Value,
-}
-
-#[derive(Debug, Deserialize)]
-struct BallchasingReplayList {
-    list: Vec<BallchasingReplaySummary>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BallchasingReplaySummary {
-    id: String,
-    #[serde(default)]
-    replay_title: Option<String>,
-    #[serde(default)]
-    date: Option<String>,
-    #[serde(default)]
-    playlist_id: Option<String>,
-    #[serde(default)]
-    playlist_name: Option<String>,
-    #[serde(default)]
-    duration: Option<f32>,
-}
+use constants::{ALL_MECHANICS, DEFAULT_MECHANICS};
+use source_collect::collect_sources;
+use source_parse::parse_replay_file;
+use source_types::ReplaySourceInput;
 
 #[derive(Clone)]
 struct PlayerDisplay {
@@ -95,196 +79,6 @@ impl Collector for GoalScanCollector {
     ) -> SubtrActorResult<TimeAdvance> {
         Ok(TimeAdvance::NextFrame)
     }
-}
-
-fn normalize_ballchasing_id(input: &str) -> String {
-    input
-        .trim()
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()
-        .unwrap_or(input)
-        .split('?')
-        .next()
-        .unwrap_or(input)
-        .to_ascii_lowercase()
-}
-
-fn load_ids_file(path: &Path) -> anyhow::Result<Vec<String>> {
-    let text = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read ids file {}", path.display()))?;
-    Ok(text
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(normalize_ballchasing_id)
-        .collect())
-}
-
-fn ballchasing_api_key() -> anyhow::Result<String> {
-    std::env::var("BALLCHASING_API_KEY")
-        .context("BALLCHASING_API_KEY must be set for Ballchasing API calls")
-}
-
-fn search_ballchasing_replays(
-    client: &Client,
-    api_key: &str,
-    config: &Config,
-) -> anyhow::Result<Vec<BallchasingReplaySummary>> {
-    let mut request = client
-        .get(format!("{BALLCHASING_API_BASE_URL}/replays"))
-        .header("Authorization", api_key)
-        .query(&[
-            ("playlist", config.playlist.as_str()),
-            ("count", &config.count.to_string()),
-            ("sort-by", config.sort_by.as_str()),
-            ("sort-dir", config.sort_dir.as_str()),
-        ]);
-
-    for (key, value) in &config.query_params {
-        request = request.query(&[(key.as_str(), value.as_str())]);
-    }
-
-    let response = request
-        .send()
-        .context("failed to search Ballchasing replays")?
-        .error_for_status()
-        .context("Ballchasing replay search returned an error")?
-        .json::<BallchasingReplayList>()
-        .context("failed to decode Ballchasing replay search response")?;
-    Ok(response.list)
-}
-
-fn download_ballchasing_replay(
-    client: &Client,
-    api_key: &str,
-    replay_id: &str,
-    path: &Path,
-) -> anyhow::Result<()> {
-    let bytes = client
-        .get(format!(
-            "{BALLCHASING_API_BASE_URL}/replays/{replay_id}/file"
-        ))
-        .header("Authorization", api_key)
-        .send()
-        .with_context(|| format!("failed to download Ballchasing replay {replay_id}"))?
-        .error_for_status()
-        .with_context(|| format!("Ballchasing replay download failed for {replay_id}"))?
-        .bytes()
-        .with_context(|| format!("failed to read replay bytes for {replay_id}"))?;
-    std::fs::write(path, &bytes)
-        .with_context(|| format!("failed to write replay cache {}", path.display()))?;
-    Ok(())
-}
-
-fn collect_sources(config: &Config) -> anyhow::Result<Vec<ReplaySourceInput>> {
-    std::fs::create_dir_all(&config.cache_dir)
-        .with_context(|| format!("failed to create cache dir {}", config.cache_dir.display()))?;
-    let cache_dir = std::fs::canonicalize(&config.cache_dir).with_context(|| {
-        format!(
-            "failed to canonicalize cache dir {}",
-            config.cache_dir.display()
-        )
-    })?;
-    let client = Client::new();
-
-    let mut ids = config.ids.clone();
-    if let Some(ids_file) = &config.ids_file {
-        ids.extend(load_ids_file(ids_file)?);
-    }
-
-    let summaries = if ids.is_empty() && config.replay_paths.is_empty() {
-        let api_key = ballchasing_api_key()?;
-        search_ballchasing_replays(&client, &api_key, config)?
-    } else {
-        ids.into_iter()
-            .map(|id| BallchasingReplaySummary {
-                id: normalize_ballchasing_id(&id),
-                replay_title: None,
-                date: None,
-                playlist_id: None,
-                playlist_name: None,
-                duration: None,
-            })
-            .collect()
-    };
-
-    let mut sources = Vec::new();
-    let mut api_key = None;
-
-    for (index, summary) in summaries.into_iter().enumerate() {
-        let replay_id = normalize_ballchasing_id(&summary.id);
-        let cache_path = cache_dir.join(format!("ballchasing-{replay_id}.replay"));
-        if !cache_path.exists() {
-            let key = match &api_key {
-                Some(key) => key,
-                None => {
-                    api_key = Some(ballchasing_api_key()?);
-                    api_key.as_ref().expect("api key just set")
-                }
-            };
-            download_ballchasing_replay(&client, key, &replay_id, &cache_path)?;
-            if index + 1 < config.count {
-                std::thread::sleep(config.download_delay);
-            }
-        }
-
-        let label = summary
-            .replay_title
-            .clone()
-            .unwrap_or_else(|| format!("Ballchasing {replay_id}"));
-        sources.push(ReplaySourceInput {
-            source_id: format!("ballchasing:{replay_id}"),
-            locator: PlaylistManifestReplayLocator::ballchasing(
-                replay_id.clone(),
-                cache_path.display().to_string(),
-            ),
-            bytes_path: cache_path.clone(),
-            label,
-            meta: serde_json::to_value(summary_meta(&summary))?,
-        });
-    }
-
-    for path in &config.replay_paths {
-        let canonical = std::fs::canonicalize(path)
-            .with_context(|| format!("failed to canonicalize replay path {}", path.display()))?;
-        let label = canonical
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("local replay")
-            .to_owned();
-        sources.push(ReplaySourceInput {
-            source_id: format!("path:{}", canonical.display()),
-            locator: PlaylistManifestReplayLocator::path(canonical.display().to_string()),
-            bytes_path: canonical.clone(),
-            label,
-            meta: json!({ "source": "local" }),
-        });
-    }
-
-    Ok(sources)
-}
-
-fn summary_meta(summary: &BallchasingReplaySummary) -> Value {
-    json!({
-        "source": "ballchasing",
-        "ballchasingId": summary.id,
-        "title": summary.replay_title,
-        "date": summary.date,
-        "playlistId": summary.playlist_id,
-        "playlistName": summary.playlist_name,
-        "duration": summary.duration,
-    })
-}
-
-fn parse_replay_file(path: &Path) -> anyhow::Result<boxcars::Replay> {
-    let data =
-        std::fs::read(path).with_context(|| format!("failed to read replay {}", path.display()))?;
-    boxcars::ParserBuilder::new(&data)
-        .must_parse_network_data()
-        .always_check_crc()
-        .parse()
-        .with_context(|| format!("failed to parse replay {}", path.display()))
 }
 
 fn player_id_string(player_id: &PlayerId) -> String {
