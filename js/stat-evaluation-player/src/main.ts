@@ -11,7 +11,6 @@ import {
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
-  CanvasRecorderStatus,
   CameraSettings,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
@@ -69,12 +68,10 @@ import {
   type CameraSettingElements,
 } from "./cameraControlHelpers.ts";
 import {
-  downloadRecording as downloadRecordingBlob,
-  formatBytes,
-  getRecordingOptions as getRecordingControlOptions,
-  recordingFileName,
-  recordingLabel,
-} from "./recordingControlHelpers.ts";
+  createRecordingControls,
+  getRecordingControlElements,
+  type RecordingControls,
+} from "./recordingControls.ts";
 import {
   createMechanicsReviewController,
   getMechanicsReviewElements,
@@ -90,7 +87,6 @@ import {
   STATS_PLAYER_CONFIG_VERSION,
   type PlayerCameraConfig,
   type PlayerPlaybackConfig,
-  type RecordingConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
   type StatsPlayerConfigParamSnapshot,
@@ -243,17 +239,6 @@ let cameraStiffnessReadout!: HTMLElement;
 let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
-let recordingFps!: HTMLInputElement;
-let recordingPlaybackRate!: HTMLSelectElement;
-let recordingStart!: HTMLButtonElement;
-let recordingFullReplay!: HTMLButtonElement;
-let recordingStop!: HTMLButtonElement;
-let recordingDownload!: HTMLButtonElement;
-let recordingClear!: HTMLButtonElement;
-let recordingStatus!: HTMLElement;
-let recordingElapsed!: HTMLElement;
-let recordingSize!: HTMLElement;
-let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let boostPadOverlayEnabled = true;
@@ -281,6 +266,7 @@ const floatingWindows = new FloatingWindowController(
 );
 
 let mechanicsReviewController: MechanicsReviewController | null = null;
+let recordingControls: RecordingControls | null = null;
 
 const statsWindowManager = createStatsWindowsManager({
   getDefaultFrameIndex() {
@@ -626,13 +612,6 @@ function getCameraConfigSnapshot(): PlayerCameraConfig {
   };
 }
 
-function getRecordingConfigSnapshot(): RecordingConfig {
-  return {
-    fps: Number(recordingFps?.value),
-    playbackRate: Number(recordingPlaybackRate?.value),
-  };
-}
-
 function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
   return {
     version: STATS_PLAYER_CONFIG_VERSION,
@@ -647,7 +626,7 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
     },
-    recording: getRecordingConfigSnapshot(),
+    recording: recordingControls?.getConfigSnapshot() ?? {},
     singletonWindows: getSingletonWindowConfigs(),
     statsWindows: statsWindowManager.getConfigs(),
     moduleConfigs: getModuleConfigSnapshot(),
@@ -727,12 +706,7 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   if (config.playback.rate !== undefined) {
     playbackRate.value = `${config.playback.rate}`;
   }
-  if (config.recording.fps !== undefined) {
-    recordingFps.value = `${config.recording.fps}`;
-  }
-  if (config.recording.playbackRate !== undefined) {
-    recordingPlaybackRate.value = `${config.recording.playbackRate}`;
-  }
+  recordingControls?.applyConfig(config.recording);
   applyModuleConfigSnapshot(config.moduleConfigs);
   applyConfigToExistingWindows(config);
   statsWindowManager.replaceFromConfig(config.statsWindows);
@@ -1101,36 +1075,6 @@ function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
   populateAttachedPlayerSelectOptions(attachedPlayer, players);
 }
 
-function getRecordingOptions(): { fps: number; playbackRate: number } {
-  return getRecordingControlOptions({
-    fps: recordingFps,
-    playbackRate: recordingPlaybackRate,
-  });
-}
-
-function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
-  const hasRecorder = canvasRecorder !== null && replayPlayer !== null;
-  const state = status?.state ?? "idle";
-  const isRecording = state === "recording" || state === "stopping";
-  const hasRecording = (canvasRecorder?.getRecording() ?? null) !== null;
-
-  recordingStatus.textContent = recordingLabel(status);
-  recordingElapsed.textContent = `${(status?.elapsedSeconds ?? 0).toFixed(1)}s`;
-  recordingSize.textContent = formatBytes(status?.sizeBytes ?? 0);
-  recordingType.textContent = status?.mimeType || "WebM";
-  recordingStart.disabled = !hasRecorder || isRecording;
-  recordingFullReplay.disabled = !hasRecorder || isRecording;
-  recordingStop.disabled = !hasRecorder || !isRecording;
-  recordingDownload.disabled = !hasRecording || isRecording;
-  recordingClear.disabled = !hasRecording || isRecording;
-  recordingFps.disabled = isRecording;
-  recordingPlaybackRate.disabled = isRecording;
-}
-
-function downloadRecording(blob: Blob): void {
-  downloadRecordingBlob(blob, recordingFileName(loadedReplayName));
-}
-
 function renderCameraProfile(state?: ReplayPlayerState): void {
   const attachedPlayerId = state?.attachedPlayerId ?? null;
   if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {
@@ -1250,7 +1194,7 @@ async function loadReplayBundleForDisplay(
   eventWindowsManager.renderTimelineControls();
   eventWindowsManager.renderPlaylistWindow();
   renderModuleSettings();
-  syncRecordingWindow();
+  recordingControls?.sync();
 
   try {
     statusReadout.textContent = "Parsing replay...";
@@ -1270,7 +1214,7 @@ async function loadReplayBundleForDisplay(
         ),
     });
     const recorder = createCanvasRecorderPlugin({
-      onStatusChange: syncRecordingWindow,
+      onStatusChange: (status) => recordingControls?.sync(status),
     });
     canvasRecorder = recorder;
     const config = initialUrlConfig;
@@ -1324,14 +1268,14 @@ async function loadReplayBundleForDisplay(
     renderScoreboard(replayPlayer.getState().frameIndex);
     eventWindowsManager.syncPlaylistTimeline(replayPlayer.getState(), { forceScroll: true });
     renderModuleSettings();
-    syncRecordingWindow();
+    recordingControls?.sync();
     replayLoadModal?.hide();
   } catch (error) {
     replayLoadModal?.hide();
     replayPlayer?.destroy();
     replayPlayer = null;
     canvasRecorder = null;
-    syncRecordingWindow();
+    recordingControls?.sync();
     throw error;
   } finally {
     fileInput.disabled = false;
@@ -1445,17 +1389,22 @@ export function mountStatEvaluationPlayer(
   cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
-  recordingFps = mustElement<HTMLInputElement>(root, "#recording-fps");
-  recordingPlaybackRate = mustElement<HTMLSelectElement>(root, "#recording-playback-rate");
-  recordingStart = mustElement<HTMLButtonElement>(root, "#recording-start");
-  recordingFullReplay = mustElement<HTMLButtonElement>(root, "#recording-full-replay");
-  recordingStop = mustElement<HTMLButtonElement>(root, "#recording-stop");
-  recordingDownload = mustElement<HTMLButtonElement>(root, "#recording-download");
-  recordingClear = mustElement<HTMLButtonElement>(root, "#recording-clear");
-  recordingStatus = mustElement<HTMLElement>(root, "#recording-status");
-  recordingElapsed = mustElement<HTMLElement>(root, "#recording-elapsed");
-  recordingSize = mustElement<HTMLElement>(root, "#recording-size");
-  recordingType = mustElement<HTMLElement>(root, "#recording-type");
+  recordingControls = createRecordingControls({
+    elements: getRecordingControlElements(root),
+    getRecorder() {
+      return canvasRecorder;
+    },
+    getLoadedReplayName() {
+      return loadedReplayName;
+    },
+    hasReplayPlayer() {
+      return replayPlayer !== null;
+    },
+    scheduleConfigUrlUpdate,
+    setStatus(message) {
+      statusReadout.textContent = message;
+    },
+  });
 
   mechanicsReviewController = createMechanicsReviewController({
     elements: getMechanicsReviewElements(root),
@@ -1529,6 +1478,7 @@ export function mountStatEvaluationPlayer(
     eventWindowsManager.resetPlaylistState();
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
+    recordingControls = null;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     lastFreeCameraPreset = null;
@@ -1662,93 +1612,7 @@ export function mountStatEvaluationPlayer(
     { signal: listeners.signal },
   );
 
-  recordingStart.addEventListener(
-    "click",
-    () => {
-      if (!canvasRecorder) {
-        return;
-      }
-      try {
-        const { fps } = getRecordingOptions();
-        canvasRecorder.start({ fps });
-        syncRecordingWindow();
-      } catch (error) {
-        console.error("Failed to start recording:", error);
-        statusReadout.textContent =
-          error instanceof Error ? error.message : "Failed to start recording";
-        syncRecordingWindow(canvasRecorder.getStatus());
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingFullReplay.addEventListener(
-    "click",
-    () => {
-      if (!canvasRecorder) {
-        return;
-      }
-      const { fps, playbackRate } = getRecordingOptions();
-      void canvasRecorder
-        .recordFullReplay({
-          fps,
-          playbackRate,
-          restorePlaybackState: true,
-        })
-        .catch((error) => {
-          console.error("Failed to record replay:", error);
-          statusReadout.textContent =
-            error instanceof Error ? error.message : "Failed to record replay";
-          syncRecordingWindow(canvasRecorder?.getStatus() ?? null);
-        });
-      syncRecordingWindow();
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingStop.addEventListener(
-    "click",
-    () => {
-      void canvasRecorder?.stop().catch((error) => {
-        console.error("Failed to stop recording:", error);
-        statusReadout.textContent =
-          error instanceof Error ? error.message : "Failed to stop recording";
-      });
-      syncRecordingWindow();
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingDownload.addEventListener(
-    "click",
-    () => {
-      const blob = canvasRecorder?.getRecording();
-      if (blob) {
-        downloadRecording(blob);
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingClear.addEventListener(
-    "click",
-    () => {
-      try {
-        canvasRecorder?.clear();
-        syncRecordingWindow();
-      } catch (error) {
-        console.error("Failed to clear recording:", error);
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingFps.addEventListener("change", scheduleConfigUrlUpdate, {
-    signal: listeners.signal,
-  });
-  recordingPlaybackRate.addEventListener("change", scheduleConfigUrlUpdate, {
-    signal: listeners.signal,
-  });
+  recordingControls?.installListeners(listeners.signal);
 
   cameraDistance.addEventListener(
     "input",
@@ -1874,7 +1738,7 @@ export function mountStatEvaluationPlayer(
   renderScoreboard();
   renderCameraProfile();
   syncCameraModeButtons();
-  syncRecordingWindow();
+  recordingControls?.sync();
   renderTimelineEventCount();
   mechanicsReviewController?.render();
   eventWindowsManager.renderPlaylistWindow();
