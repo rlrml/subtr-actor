@@ -5,6 +5,7 @@
 #include <deque>
 #include <filesystem>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -404,6 +405,8 @@ private:
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
+  mutable uint64_t cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
+  mutable std::string cachedStatsJson;
   std::chrono::steady_clock::time_point nextUiConfigAutosave =
       std::chrono::steady_clock::time_point{};
   std::string lastSavedUiConfigJson;
@@ -538,6 +541,11 @@ private:
   const std::vector<std::string> &statsModuleNames();
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
+  const std::string &currentStatsJson() const;
+  std::optional<std::string> graphPlayerStatValue(
+      const SaPlayerFrame &player,
+      std::string_view statId) const;
+  std::optional<std::string> graphTeamStatValue(uint8_t isTeam0, std::string_view statId) const;
   std::string defaultAdHocTargetId(std::string_view statId) const;
   std::string adHocStatValue(std::string_view statId, std::string_view targetId) const;
   std::string webUiStatIdForWindow(
@@ -579,11 +587,11 @@ private:
   void tickMechanicsReviewClipBoundary();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
-  std::string readJsonBuffer(JsonLen len, WriteJson write);
+  std::string readJsonBuffer(JsonLen len, WriteJson write) const;
   std::string readNamedJsonBuffer(
       NamedJsonLen len,
       WriteNamedJson write,
-      const std::string &name);
+      const std::string &name) const;
   void dumpGraphJson(std::vector<std::string> params);
   void dumpStatsModuleJson(std::vector<std::string> params);
   void dumpStatsModuleFrameJson(std::vector<std::string> params);

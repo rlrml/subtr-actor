@@ -234,7 +234,7 @@ constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
     "dodge_reset",
 }};
 
-constexpr std::array<UiStatDefinition, 15> UI_STAT_DEFINITIONS{{
+constexpr auto UI_STAT_DEFINITIONS = std::to_array<UiStatDefinition>({
     {"score", "Score", "Core", true, true, false},
     {"goals", "Goals", "Core", true, true, false},
     {"assists", "Assists", "Core", true, true, false},
@@ -250,9 +250,58 @@ constexpr std::array<UiStatDefinition, 15> UI_STAT_DEFINITIONS{{
     {"assist", "Assists detected", "Events", false, false, true},
     {"demo", "Demos detected", "Events", false, false, true},
     {"flip_reset", "Flip resets detected", "Events", false, false, true},
-}};
+    {"player:touch.touch_count", "Touches", "Touch", true, false, false},
+    {"player:touch.aerial_touch_count", "Aerial touches", "Touch", true, false, false},
+    {"player:touch.wall_touch_count", "Wall touches", "Touch", true, false, false},
+    {"player:boost.amount_used", "Boost used", "Boost", true, false, false},
+    {"player:boost.amount_collected", "Boost collected", "Boost", true, false, false},
+    {"player:boost.big_pads_collected", "Big pads", "Boost", true, false, false},
+    {"player:boost.small_pads_collected", "Small pads", "Boost", true, false, false},
+    {"player:movement.total_distance", "Distance", "Movement", true, false, false},
+    {"player:movement.time_supersonic_speed", "Supersonic time", "Movement", true, false, false},
+    {"player:speed_flip.count", "Speed flips", "Mechanics", true, false, false},
+    {"player:speed_flip.high_confidence_count", "Clean speed flips", "Mechanics", true, false, false},
+    {"player:half_flip.count", "Half flips", "Mechanics", true, false, false},
+    {"player:half_flip.high_confidence_count", "Clean half flips", "Mechanics", true, false, false},
+    {"player:wavedash.count", "Wavedashes", "Mechanics", true, false, false},
+    {"player:wavedash.high_confidence_count", "Clean wavedashes", "Mechanics", true, false, false},
+    {"player:demo.demos_inflicted", "Demos inflicted", "Contact", true, false, false},
+    {"player:demo.demos_taken", "Demos taken", "Contact", true, false, false},
+    {"player:bump.bumps_inflicted", "Bumps inflicted", "Contact", true, false, false},
+    {"player:bump.bumps_taken", "Bumps taken", "Contact", true, false, false},
+    {"player:double_tap.count", "Double taps", "Mechanics", true, false, false},
+    {"player:air_dribble.count", "Air dribbles", "Mechanics", true, false, false},
+    {"player:ball_carry.carry_count", "Ball carries", "Mechanics", true, false, false},
+    {"player:pass.completed_pass_count", "Completed passes", "Team play", true, false, false},
+    {"player:pass.received_pass_count", "Received passes", "Team play", true, false, false},
+    {"player:flick.count", "Flicks", "Mechanics", true, false, false},
+    {"player:musty_flick.count", "Musty flicks", "Mechanics", true, false, false},
+    {"player:wall_aerial.count", "Wall aerials", "Mechanics", true, false, false},
+    {"player:wall_aerial_shot.count", "Wall aerial shots", "Mechanics", true, false, false},
+    {"player:ceiling_shot.count", "Ceiling shots", "Mechanics", true, false, false},
+    {"player:whiff.whiff_count", "Whiffs", "Mechanics", true, false, false},
+    {"player:powerslide.press_count", "Powerslides", "Movement", true, false, false},
+    {"player:powerslide.total_duration", "Powerslide time", "Movement", true, false, false},
+    {"team:possession.possession_time", "Possession time", "Possession", false, true, false},
+    {"team:possession.opponent_possession_time", "Opponent possession", "Possession", false, true, false},
+    {"team:pressure.offensive_half_time", "Offensive pressure", "Pressure", false, true, false},
+    {"team:pressure.defensive_half_time", "Defensive pressure", "Pressure", false, true, false},
+    {"team:boost.amount_used", "Boost used", "Boost", false, true, false},
+    {"team:boost.amount_collected", "Boost collected", "Boost", false, true, false},
+    {"team:movement.total_distance", "Distance", "Movement", false, true, false},
+    {"team:movement.time_supersonic_speed", "Supersonic time", "Movement", false, true, false},
+    {"team:demo.demos_inflicted", "Demos inflicted", "Contact", false, true, false},
+    {"team:bump.bumps_inflicted", "Bumps inflicted", "Contact", false, true, false},
+    {"team:double_tap.count", "Double taps", "Mechanics", false, true, false},
+    {"team:air_dribble.count", "Air dribbles", "Mechanics", false, true, false},
+    {"team:ball_carry.carry_count", "Ball carries", "Mechanics", false, true, false},
+    {"team:pass.completed_pass_count", "Completed passes", "Team play", false, true, false},
+    {"team:rush.count", "Rushes", "Team play", false, true, false},
+    {"team:fifty_fifty.wins", "50/50 wins", "Team play", false, true, false},
+    {"team:fifty_fifty.losses", "50/50 losses", "Team play", false, true, false},
+});
 
-constexpr std::array<UiStatIdAlias, 20> UI_STAT_ID_ALIASES{{
+constexpr auto UI_STAT_ID_ALIASES = std::to_array<UiStatIdAlias>({
     {"player:core.score", "score"},
     {"player.core.score", "score"},
     {"team:core.score", "score"},
@@ -273,7 +322,7 @@ constexpr std::array<UiStatIdAlias, 20> UI_STAT_ID_ALIASES{{
     {"player.core.shots", "shots"},
     {"team:core.shots", "shots"},
     {"team.core.shots", "shots"},
-}};
+});
 
 bool wantsRequiredEventHistory(const std::vector<std::string> &params) {
   return std::find_if(params.begin(), params.end(), [](const std::string &param) {
@@ -1051,6 +1100,122 @@ std::optional<std::string> parseJsonObjectProperty(
     return std::nullopt;
   }
   return json.substr(start, end - start);
+}
+
+std::optional<std::string> parseJsonPropertyValue(
+    const std::string &json,
+    std::string_view propertyName) {
+  size_t offset = 0;
+  if (!findJsonPropertyValueOffset(json, std::string{propertyName}, offset)) {
+    return std::nullopt;
+  }
+  const size_t start = offset;
+  size_t end = offset;
+  if (!skipJsonValue(json, end)) {
+    return std::nullopt;
+  }
+  return json.substr(start, end - start);
+}
+
+std::vector<std::string_view> dotPathSegments(std::string_view path) {
+  std::vector<std::string_view> segments;
+  size_t offset = 0;
+  while (offset < path.size()) {
+    const size_t end = path.find('.', offset);
+    segments.emplace_back(
+        path.data() + offset,
+        (end == std::string_view::npos ? path.size() : end) - offset);
+    if (end == std::string_view::npos) {
+      break;
+    }
+    offset = end + 1;
+  }
+  return segments;
+}
+
+std::optional<std::string> jsonDisplayValueAtPath(
+    const std::string &json,
+    std::string_view path) {
+  std::string current = json;
+  const std::vector<std::string_view> segments = dotPathSegments(path);
+  if (segments.empty()) {
+    return std::nullopt;
+  }
+  for (size_t index = 0; index < segments.size(); index += 1) {
+    const auto value = parseJsonPropertyValue(current, segments[index]);
+    if (!value) {
+      return std::nullopt;
+    }
+    if (index + 1 == segments.size()) {
+      return summarizeJsonValueAt(*value, 0);
+    }
+    size_t offset = 0;
+    skipJsonWhitespace(*value, offset);
+    if (offset >= value->size() || (*value)[offset] != '{') {
+      return std::nullopt;
+    }
+    current = *value;
+  }
+  return std::nullopt;
+}
+
+std::optional<double> parseJsonNumberValue(const std::string &json) {
+  size_t offset = 0;
+  skipJsonWhitespace(json, offset);
+  const size_t start = offset;
+  if (offset < json.size() && json[offset] == '-') {
+    ++offset;
+  }
+  while (offset < json.size() &&
+         std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+    ++offset;
+  }
+  if (offset < json.size() && json[offset] == '.') {
+    ++offset;
+    while (offset < json.size() &&
+           std::isdigit(static_cast<unsigned char>(json[offset])) != 0) {
+      ++offset;
+    }
+  }
+  if (offset == start) {
+    return std::nullopt;
+  }
+  try {
+    return std::stod(json.substr(start, offset - start));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+struct GraphStatId {
+  std::string_view scope;
+  std::string_view module;
+  std::string_view path;
+};
+
+std::optional<GraphStatId> parseGraphStatId(std::string_view statId) {
+  const size_t scopeEnd = statId.find(':');
+  if (scopeEnd == std::string_view::npos) {
+    return std::nullopt;
+  }
+  const size_t moduleEnd = statId.find('.', scopeEnd + 1);
+  if (moduleEnd == std::string_view::npos || moduleEnd + 1 >= statId.size()) {
+    return std::nullopt;
+  }
+  return GraphStatId{
+      statId.substr(0, scopeEnd),
+      statId.substr(scopeEnd + 1, moduleEnd - scopeEnd - 1),
+      statId.substr(moduleEnd + 1),
+  };
+}
+
+bool jsonPlayerIdMatchesIndex(const std::string &playerIdJson, uint32_t playerIndex) {
+  const auto splitScreenValue = parseJsonPropertyValue(playerIdJson, "SplitScreen");
+  if (!splitScreenValue) {
+    return false;
+  }
+  const auto parsedIndex = parseJsonNumberValue(*splitScreenValue);
+  return parsedIndex && static_cast<uint32_t>(*parsedIndex) == playerIndex;
 }
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
@@ -3987,6 +4152,8 @@ void SubtrActorPlugin::tick(std::string) {
         std::format("subtr-actor: live frame processing failed: {}", processResult));
     return;
   }
+  cachedStatsJson.clear();
+  cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
 
   commitPendingFrameEvents();
   clearPendingFrameEvents();
@@ -4236,6 +4403,8 @@ void SubtrActorPlugin::resetLiveState() {
   recentUiEvents.clear();
   mechanicsReviewDecisions.clear();
   mechanicsReviewIndex = 0;
+  cachedStatsJson.clear();
+  cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -4776,7 +4945,7 @@ bool SubtrActorPlugin::goalEventIsDuplicate(const SaGoalEvent &goal) const {
              GOAL_EVENT_DEDUPE_WINDOW_SECONDS;
 }
 
-std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {
+std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) const {
   if (!engine || !len || !write) {
     return {};
   }
@@ -4796,7 +4965,7 @@ std::string SubtrActorPlugin::readJsonBuffer(JsonLen len, WriteJson write) {
 std::string SubtrActorPlugin::readNamedJsonBuffer(
     NamedJsonLen len,
     WriteNamedJson write,
-    const std::string &name) {
+    const std::string &name) const {
   if (!engine || !len || !write) {
     return {};
   }
@@ -9528,7 +9697,10 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
   case UiStatsWindowKind::Player:
     window.entries = {
         {"score", ""}, {"goals", ""}, {"assists", ""}, {"saves", ""},
-        {"shots", ""}, {"boost", ""}, {"recent_events", ""}};
+        {"shots", ""}, {"boost", ""}, {"player:touch.touch_count", ""},
+        {"player:boost.amount_used", ""}, {"player:speed_flip.count", ""},
+        {"player:half_flip.count", ""}, {"player:wavedash.count", ""},
+        {"recent_events", ""}};
     break;
   case UiStatsWindowKind::Team:
     window.entries = {
@@ -9539,12 +9711,16 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
         {"saves", ""},
         {"shots", ""},
         {"average_boost", ""},
+        {"team:possession.possession_time", ""},
+        {"team:pressure.offensive_half_time", ""},
+        {"team:boost.amount_used", ""},
         {"recent_events", ""}};
     break;
   case UiStatsWindowKind::AllPlayers:
     window.entries = {
         {"score", ""}, {"goals", ""}, {"assists", ""}, {"saves", ""},
-        {"shots", ""}, {"boost", ""}, {"recent_events", ""}};
+        {"shots", ""}, {"boost", ""}, {"player:touch.touch_count", ""},
+        {"player:boost.amount_used", ""}, {"recent_events", ""}};
     break;
   case UiStatsWindowKind::AllTeams:
     window.entries = {
@@ -9553,6 +9729,8 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
         {"goals", ""},
         {"shots", ""},
         {"average_boost", ""},
+        {"team:possession.possession_time", ""},
+        {"team:boost.amount_used", ""},
         {"recent_events", ""}};
     break;
   case UiStatsWindowKind::GoalsOverview:
@@ -9667,6 +9845,93 @@ const std::vector<std::string> &SubtrActorPlugin::statsModuleNames() {
   return cachedStatsModuleNames;
 }
 
+const std::string &SubtrActorPlugin::currentStatsJson() const {
+  if (!loaded || !engine || !statsJsonLen || !writeStatsJson) {
+    cachedStatsJson.clear();
+    cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
+    return cachedStatsJson;
+  }
+
+  if (cachedStatsJsonFrameNumber != frameNumber) {
+    cachedStatsJson = readJsonBuffer(statsJsonLen, writeStatsJson);
+    cachedStatsJsonFrameNumber = frameNumber;
+  }
+  return cachedStatsJson;
+}
+
+std::optional<std::string> SubtrActorPlugin::graphPlayerStatValue(
+    const SaPlayerFrame &player,
+    std::string_view statId) const {
+  const auto parsed = parseGraphStatId(statId);
+  if (!parsed || parsed->scope != "player") {
+    return std::nullopt;
+  }
+
+  const std::string &statsJson = currentStatsJson();
+  if (statsJson.empty()) {
+    return std::nullopt;
+  }
+  const auto frame = parseJsonObjectProperty(statsJson, "frame");
+  if (!frame) {
+    return std::nullopt;
+  }
+  const auto modules = parseJsonObjectProperty(*frame, "modules");
+  if (!modules) {
+    return std::nullopt;
+  }
+  const auto module = parseJsonObjectProperty(*modules, std::string{parsed->module});
+  if (!module) {
+    return std::nullopt;
+  }
+
+  const std::vector<std::string> playerStats =
+      parseJsonObjectArrayProperty(*module, "player_stats");
+  for (const std::string &entry : playerStats) {
+    const auto playerId = parseJsonObjectProperty(entry, "player_id");
+    if (!playerId || !jsonPlayerIdMatchesIndex(*playerId, player.player_index)) {
+      continue;
+    }
+    const auto stats = parseJsonObjectProperty(entry, "stats");
+    if (!stats) {
+      return std::nullopt;
+    }
+    return jsonDisplayValueAtPath(*stats, parsed->path);
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> SubtrActorPlugin::graphTeamStatValue(
+    uint8_t isTeam0,
+    std::string_view statId) const {
+  const auto parsed = parseGraphStatId(statId);
+  if (!parsed || parsed->scope != "team") {
+    return std::nullopt;
+  }
+
+  const std::string &statsJson = currentStatsJson();
+  if (statsJson.empty()) {
+    return std::nullopt;
+  }
+  const auto frame = parseJsonObjectProperty(statsJson, "frame");
+  if (!frame) {
+    return std::nullopt;
+  }
+  const auto modules = parseJsonObjectProperty(*frame, "modules");
+  if (!modules) {
+    return std::nullopt;
+  }
+  const auto module = parseJsonObjectProperty(*modules, std::string{parsed->module});
+  if (!module) {
+    return std::nullopt;
+  }
+  const auto team =
+      parseJsonObjectProperty(*module, isTeam0 != 0 ? "team_zero" : "team_one");
+  if (!team) {
+    return std::nullopt;
+  }
+  return jsonDisplayValueAtPath(*team, parsed->path);
+}
+
 std::string SubtrActorPlugin::playerStatValue(
     const SaPlayerFrame &player,
     std::string_view statId) const {
@@ -9693,6 +9958,9 @@ std::string SubtrActorPlugin::playerStatValue(
     return std::format(
         "{}",
         recentEventCountForActor(playerLabel(player.player_index, player.is_team_0)));
+  }
+  if (const auto graphValue = graphPlayerStatValue(player, localStatId)) {
+    return *graphValue;
   }
   return "--";
 }
@@ -9744,6 +10012,9 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
   }
   if (localStatId == "recent_events") {
     return std::format("{}", recentEventCountForTeam(isTeam0));
+  }
+  if (const auto graphValue = graphTeamStatValue(isTeam0, localStatId)) {
+    return *graphValue;
   }
   return "--";
 }
