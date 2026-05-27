@@ -506,7 +506,7 @@ private:
   void applyStatsWindowPlacement(UiStatsWindow &window);
   void captureStatsWindowPlacement(UiStatsWindow &window);
   void renderStatsWindows();
-  void renderStatsWindow(UiStatsWindow &window);
+  void renderStatsWindow(UiStatsWindow &window, size_t stackIndex);
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
   void renderStatsWindowAddControl(UiStatsWindow &window);
   void renderStatsWindowEntries(UiStatsWindow &window);
