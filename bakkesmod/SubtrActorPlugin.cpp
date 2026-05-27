@@ -7169,12 +7169,17 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const int previousZIndex = placement.z_index;
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const ImVec2 clampedPosition =
+      mapWindowPositionToViewport(position.x, position.y, size.x, size.y, 0.0f, 0.0f);
+  if (clampedPosition.x != position.x || clampedPosition.y != position.y) {
+    ImGui::SetWindowPos(clampedPosition, ImGuiCond_Always);
+  }
   placement.has_placement = true;
-  placement.x = position.x;
-  placement.y = position.y;
+  placement.x = clampedPosition.x;
+  placement.y = clampedPosition.y;
   placement.width = size.x;
   placement.height = size.y;
-  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   placement.viewport_width = displaySize.x;
   placement.viewport_height = displaySize.y;
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
@@ -7293,12 +7298,17 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   const int previousZIndex = window.z_index;
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const ImVec2 clampedPosition =
+      mapWindowPositionToViewport(position.x, position.y, size.x, size.y, 0.0f, 0.0f);
+  if (clampedPosition.x != position.x || clampedPosition.y != position.y) {
+    ImGui::SetWindowPos(clampedPosition, ImGuiCond_Always);
+  }
   window.has_placement = true;
-  window.x = position.x;
-  window.y = position.y;
+  window.x = clampedPosition.x;
+  window.y = clampedPosition.y;
   window.width = size.x;
   window.height = size.y;
-  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   window.viewport_width = displaySize.x;
   window.viewport_height = displaySize.y;
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
