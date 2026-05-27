@@ -6828,24 +6828,27 @@ void SubtrActorPlugin::renderScoreboardWindow() {
     return;
   }
   applyWindowPlacement(scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f);
-  if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen)) {
+  constexpr ImGuiWindowFlags scoreboardFlags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+  if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen, scoreboardFlags)) {
     ImGui::End();
     return;
   }
   captureWindowPlacement(scoreboardPlacement);
-  if (renderSingletonWindowHeader("Scoreboard", uiScoreboardOpen)) {
-    ImGui::End();
-    return;
-  }
 
   if (lastTeamScores) {
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{8.0f, 0.0f});
+    ImGui::SetWindowFontScale(1.2f);
     ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", lastTeamScores->first);
     ImGui::SameLine();
-    ImGui::Text("Blue  :  Orange");
+    ImGui::TextDisabled("-");
     ImGui::SameLine();
     ImGui::TextColored(ImVec4{1.0f, 0.69f, 0.31f, 1.0f}, "%d", lastTeamScores->second);
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PopStyleVar();
   } else {
-    ImGui::Text("Waiting for score data");
+    ImGui::TextDisabled("Load a replay to show the scoreboard.");
   }
   ImGui::End();
 }
