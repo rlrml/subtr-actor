@@ -8555,18 +8555,8 @@ void SubtrActorPlugin::resetWindowPlacements() {
   boostPickupControlsPlacement = UiWindowPlacement{};
 
   launcherPlacement.pending_focus = true;
-  for (UiStatsWindow &window : uiStatsWindows) {
-    window.has_placement = false;
-    window.pending_apply_placement = false;
-    window.pending_focus = window.open;
-    window.x = 0.0f;
-    window.y = 0.0f;
-    window.width = 540.0f;
-    window.height = 330.0f;
-    if (window.kind == UiStatsWindowKind::StatsModule) {
-      window.width = 680.0f;
-      window.height = 460.0f;
-    }
+  for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
+    resetStatsWindowPlacement(uiStatsWindows[index], index);
   }
 }
 
@@ -8702,7 +8692,11 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
 }
 
 void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
-  const float offset = static_cast<float>(uiStatsWindows.size() * 18);
+  resetStatsWindowPlacement(window, uiStatsWindows.size());
+}
+
+void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex) {
+  const float offset = static_cast<float>(stackIndex * 18);
   const bool isModuleWindow = window.kind == UiStatsWindowKind::StatsModule;
   window.width = isModuleWindow ? 680.0f : 540.0f;
   window.height = isModuleWindow ? 460.0f : 330.0f;
@@ -8720,6 +8714,7 @@ void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
   window.viewport_height = displaySize.y;
   window.has_placement = true;
   window.pending_apply_placement = true;
+  window.pending_focus = window.open;
   window.z_index = nextUiWindowZIndex++;
 }
 
