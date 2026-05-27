@@ -3111,24 +3111,13 @@ void SubtrActorPlugin::applyUiConfigJson(
       continue;
     }
 
-    UiStatsWindow window{};
-    if (*kind == "player") {
-      window.kind = UiStatsWindowKind::Player;
-    } else if (*kind == "team") {
-      window.kind = UiStatsWindowKind::Team;
-    } else if (*kind == "all-players") {
-      window.kind = UiStatsWindowKind::AllPlayers;
-    } else if (*kind == "all-teams") {
-      window.kind = UiStatsWindowKind::AllTeams;
-    } else if (*kind == "goals-overview") {
-      window.kind = UiStatsWindowKind::GoalsOverview;
-    } else if (*kind == "ad-hoc") {
-      window.kind = UiStatsWindowKind::AdHoc;
-    } else if (*kind == "stats-module") {
-      window.kind = UiStatsWindowKind::StatsModule;
-    } else {
+    const std::optional<UiStatsWindowKind> parsedKind = parseStatsWindowKind(*kind);
+    if (!parsedKind) {
       continue;
     }
+
+    UiStatsWindow window{};
+    window.kind = *parsedKind;
 
     window.id = static_cast<uint32_t>(parseJsonNumberProperty(object, "id").value_or(0.0));
     if (const auto idString = parseJsonStringProperty(object, "id")) {
@@ -3250,27 +3239,6 @@ void SubtrActorPlugin::applyUiConfigJson(
 }
 
 std::string SubtrActorPlugin::uiConfigJson() {
-  auto kindValue = [](UiStatsWindowKind kind) {
-    switch (kind) {
-    case UiStatsWindowKind::Player:
-      return "player";
-    case UiStatsWindowKind::Team:
-      return "team";
-    case UiStatsWindowKind::AllPlayers:
-      return "all-players";
-    case UiStatsWindowKind::AllTeams:
-      return "all-teams";
-    case UiStatsWindowKind::GoalsOverview:
-      return "goals-overview";
-    case UiStatsWindowKind::AdHoc:
-      return "ad-hoc";
-    case UiStatsWindowKind::StatsModule:
-      return "stats-module";
-    default:
-      return "player";
-    }
-  };
-
   auto writePlacement = [](
                             std::ostream &out,
                             const UiWindowPlacement &placement,
@@ -3641,7 +3609,8 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
-    file << "    {\"id\":" << window.id << ",\"kind\":\"" << kindValue(window.kind)
+    file << "    {\"id\":" << window.id << ",\"kind\":\""
+         << statsWindowKindConfigId(window.kind)
          << "\",\"open\":" << (window.open ? "true" : "false")
          << ",\"visible\":" << (window.open ? "true" : "false")
          << ",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
@@ -3680,15 +3649,21 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  ],\n";
   file << "  \"statsWindows\": [\n";
   bool wroteWebStatsWindow = false;
+  const std::array<StatsWindowKindControl, 7> statsWindowKinds = statsWindowKindControls();
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
-    if (window.kind == UiStatsWindowKind::StatsModule) {
+    const auto kind = std::find_if(
+        statsWindowKinds.begin(),
+        statsWindowKinds.end(),
+        [&](const StatsWindowKindControl &control) { return control.kind == window.kind; });
+    if (kind == statsWindowKinds.end() || !kind->web_config) {
       continue;
     }
     if (wroteWebStatsWindow) {
       file << ",\n";
     }
-    file << "    {\"id\":\"stats-" << window.id << "\",\"kind\":\"" << kindValue(window.kind)
+    file << "    {\"id\":\"stats-" << window.id << "\",\"kind\":\""
+         << statsWindowKindConfigId(window.kind)
          << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
          << ",\"height\":" << window.viewport_height << "}"
@@ -6934,12 +6909,11 @@ void SubtrActorPlugin::renderLauncherWindow() {
       renderLauncherWindowToggle(window);
     }
   }
-  renderStatsWindowCreateButton("New player stats", UiStatsWindowKind::Player);
-  renderStatsWindowCreateButton("New team stats", UiStatsWindowKind::Team);
-  renderStatsWindowCreateButton("New all players stats", UiStatsWindowKind::AllPlayers);
-  renderStatsWindowCreateButton("New all teams stats", UiStatsWindowKind::AllTeams);
-  renderStatsWindowCreateButton("New goal labels", UiStatsWindowKind::GoalsOverview);
-  renderStatsWindowCreateButton("New ad hoc stats", UiStatsWindowKind::AdHoc);
+  for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
+    if (kind.web_config) {
+      renderStatsWindowCreateButton(kind.create_label, kind.kind);
+    }
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
@@ -9395,25 +9369,61 @@ void SubtrActorPlugin::renderStatsWindows() {
   }
 }
 
-const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const {
-  switch (kind) {
-  case UiStatsWindowKind::Player:
-    return "Player stats";
-  case UiStatsWindowKind::Team:
-    return "Team stats";
-  case UiStatsWindowKind::AllPlayers:
-    return "All players stats";
-  case UiStatsWindowKind::AllTeams:
-    return "All teams stats";
-  case UiStatsWindowKind::GoalsOverview:
-    return "Goal labels";
-  case UiStatsWindowKind::AdHoc:
-    return "Ad hoc stats";
-  case UiStatsWindowKind::StatsModule:
-    return "Stats module";
-  default:
-    return "Stats";
+std::array<SubtrActorPlugin::StatsWindowKindControl, 7>
+SubtrActorPlugin::statsWindowKindControls() const {
+  return {{
+      {UiStatsWindowKind::Player, "player", "Player stats", "New player stats", true},
+      {UiStatsWindowKind::Team, "team", "Team stats", "New team stats", true},
+      {UiStatsWindowKind::AllPlayers,
+       "all-players",
+       "All players stats",
+       "New all players stats",
+       true},
+      {UiStatsWindowKind::AllTeams,
+       "all-teams",
+       "All teams stats",
+       "New all teams stats",
+       true},
+      {UiStatsWindowKind::GoalsOverview,
+       "goals-overview",
+       "Goal labels",
+       "New goal labels",
+       true},
+      {UiStatsWindowKind::AdHoc, "ad-hoc", "Ad hoc stats", "New ad hoc stats", true},
+      {UiStatsWindowKind::StatsModule,
+       "stats-module",
+       "Stats module",
+       "New stats module",
+       false},
+  }};
+}
+
+std::optional<SubtrActorPlugin::UiStatsWindowKind>
+SubtrActorPlugin::parseStatsWindowKind(std::string_view value) const {
+  for (const StatsWindowKindControl &control : statsWindowKindControls()) {
+    if (value == control.config_id) {
+      return control.kind;
+    }
   }
+  return std::nullopt;
+}
+
+const char *SubtrActorPlugin::statsWindowKindConfigId(UiStatsWindowKind kind) const {
+  for (const StatsWindowKindControl &control : statsWindowKindControls()) {
+    if (control.kind == kind) {
+      return control.config_id;
+    }
+  }
+  return "player";
+}
+
+const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const {
+  for (const StatsWindowKindControl &control : statsWindowKindControls()) {
+    if (control.kind == kind) {
+      return control.label;
+    }
+  }
+  return "Stats";
 }
 
 std::string SubtrActorPlugin::statsWindowTitle(const UiStatsWindow &window) const {

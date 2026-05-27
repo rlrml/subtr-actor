@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <deque>
 #include <filesystem>
@@ -172,6 +173,14 @@ private:
     float y;
     float width;
     float height;
+  };
+
+  struct StatsWindowKindControl {
+    UiStatsWindowKind kind;
+    const char *config_id;
+    const char *label;
+    const char *create_label;
+    bool web_config;
   };
 
   struct PlayerStatSnapshot {
@@ -436,6 +445,7 @@ private:
   void renderModuleSummaryControls(const char *idSuffix);
   void renderModuleSettingsControls(const char *idSuffix, bool includeOpenButtons);
   std::array<SingletonWindowControl, 13> singletonWindowControls();
+  std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void focusTopLoadedWindow();
@@ -488,6 +498,8 @@ private:
   void renderJsonInspectorPayload(const char *id, const std::string &label, const std::string &json);
   std::vector<std::string> graphOutputNames();
   std::vector<std::string> analysisNodeNames();
+  std::optional<UiStatsWindowKind> parseStatsWindowKind(std::string_view value) const;
+  const char *statsWindowKindConfigId(UiStatsWindowKind kind) const;
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   std::string statsWindowDisplayLabel(const UiStatsWindow &window) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
