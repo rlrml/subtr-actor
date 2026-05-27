@@ -9672,6 +9672,14 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     }
   }
   ImGui::SameLine();
+  if (ImGui::SmallButton("Focus visible##stats-windows")) {
+    for (UiStatsWindow &window : uiStatsWindows) {
+      if (window.open) {
+        focusStatsWindow(window);
+      }
+    }
+  }
+  ImGui::SameLine();
   if (ImGui::SmallButton("Reset positions##stats-windows")) {
     for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
       resetStatsWindowPlacement(uiStatsWindows[index], index);
