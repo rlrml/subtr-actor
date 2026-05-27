@@ -7699,12 +7699,29 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       playlistSources.begin(),
       playlistSources.end(),
       [](const PlaylistSource &source) { return source.enabled; }));
-  size_t selectedCount = 0;
-  for (const UiEventRecord &event : recentUiEvents) {
+
+  std::vector<size_t> playlistEventIndexes;
+  playlistEventIndexes.reserve(recentUiEvents.size());
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
     if (eventPlaylistSourceEnabled(event) && uiEventVisible(event)) {
-      selectedCount += 1;
+      playlistEventIndexes.push_back(index);
     }
   }
+  std::sort(
+      playlistEventIndexes.begin(),
+      playlistEventIndexes.end(),
+      [&](size_t left, size_t right) {
+        const UiEventRecord &leftEvent = recentUiEvents[left];
+        const UiEventRecord &rightEvent = recentUiEvents[right];
+        if (leftEvent.time != rightEvent.time) {
+          return leftEvent.time < rightEvent.time;
+        }
+        if (leftEvent.label != rightEvent.label) {
+          return leftEvent.label < rightEvent.label;
+        }
+        return left < right;
+      });
 
   const bool allSourcesEnabled = eventPlaylistMechanicsEnabled && eventPlaylistTeamEventsEnabled &&
                                  eventPlaylistGoalContextEnabled && allEventSourcesEnabled;
@@ -7768,7 +7785,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::EndChild();
   }
 
-  ImGui::Text("%zu selected / %zu recent", selectedCount, recentUiEvents.size());
+  ImGui::Text("%zu selected / %zu recent", playlistEventIndexes.size(), recentUiEvents.size());
   if (!eventPlaylistStatus.empty()) {
     ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());
   }
@@ -7787,11 +7804,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   std::optional<size_t> activeEventIndex;
   float activeEventDistance = std::numeric_limits<float>::infinity();
-  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+  for (const size_t index : playlistEventIndexes) {
     const UiEventRecord &event = recentUiEvents[index];
-    if (!eventPlaylistSourceEnabled(event) || !uiEventVisible(event)) {
-      continue;
-    }
     const float distance = std::abs(event.time - currentPlaybackTime);
     if (distance < activeEventDistance) {
       activeEventDistance = distance;
@@ -7800,13 +7814,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
-  bool renderedAny = false;
-  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+  for (const size_t index : playlistEventIndexes) {
     const UiEventRecord &event = recentUiEvents[index];
-    if (!eventPlaylistSourceEnabled(event) || !uiEventVisible(event)) {
-      continue;
-    }
-    renderedAny = true;
 
     ImGui::PushID(static_cast<int>(index));
     const ImVec4 color = toImVec4(event.color);
@@ -7845,7 +7854,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::Separator();
     ImGui::PopID();
   }
-  if (!renderedAny) {
+  if (playlistEventIndexes.empty()) {
     ImGui::TextWrapped(
         noSourcesEnabled ? "No event types selected."
                          : "No events match the selected playlist filters.");
