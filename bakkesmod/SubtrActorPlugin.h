@@ -335,7 +335,7 @@ private:
   bool renderEffectSpeedFlipEnabled = false;
   bool renderEffectTouchEnabled = false;
   int cameraViewMode = 0;
-  int cameraFreePreset = 0;
+  int cameraFreePreset = -1;
   uint32_t cameraSelectedPlayerIndex = 0;
   std::string cameraSelectedPlayerId;
   float cameraDistanceScale = 1.0f;

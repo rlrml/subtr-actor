@@ -3369,7 +3369,7 @@ void SubtrActorPlugin::applyUiConfigJson(
   cameraViewMode = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
   cameraFreePreset = static_cast<int>(
-      std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(0.0), 0.0, 1.0));
+      std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(-1.0), -1.0, 1.0));
   cameraSelectedPlayerId =
       parseJsonStringProperty(json, "camera_selected_player_id").value_or("");
   cameraSelectedPlayerIndex = static_cast<uint32_t>(
@@ -3423,8 +3423,10 @@ void SubtrActorPlugin::applyUiConfigJson(
     const std::optional<std::string> mode = parseJsonStringProperty(*camera, "mode");
     if (mode == "follow") {
       cameraViewMode = 1;
+      cameraFreePreset = -1;
     } else if (mode == "free") {
       cameraViewMode = 0;
+      cameraFreePreset = -1;
     }
     const std::optional<std::string> freePreset =
         parseJsonStringProperty(*camera, "freePreset");
@@ -3438,6 +3440,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       if (cameraViewMode != 1) {
         cameraViewMode = 3;
       }
+    } else if (jsonPropertyIsNull(*camera, "freePreset")) {
+      cameraFreePreset = -1;
     }
     if (jsonPropertyExists(*camera, "attachedPlayerId")) {
       cameraSelectedPlayerId.clear();
@@ -9411,6 +9415,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   if (ImGui::BeginCombo("Target", selectedLabel.c_str())) {
     if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
       cameraViewMode = 0;
+      cameraFreePreset = -1;
       scheduleUiConfigAutosave();
     }
     for (const SaPlayerFrame &player : sampledPlayers) {
@@ -9424,6 +9429,7 @@ void SubtrActorPlugin::renderCameraWindow() {
         cameraSelectedPlayerIndex = player.player_index;
         cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
         cameraViewMode = 1;
+        cameraFreePreset = -1;
         scheduleUiConfigAutosave();
       }
     }
@@ -9431,10 +9437,12 @@ void SubtrActorPlugin::renderCameraWindow() {
   }
 
   if (ImGui::RadioButton("Free##camera-view", &cameraViewMode, 0)) {
+    cameraFreePreset = -1;
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::RadioButton("Follow##camera-view", &cameraViewMode, 1)) {
+    cameraFreePreset = -1;
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();

@@ -475,6 +475,30 @@ def main() -> int:
         "camera customSettings null import uses JSON parser",
         errors,
     )
+    require_contains(
+        plugin_header,
+        "int cameraFreePreset = -1;",
+        "camera free preset has nullable native state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(-1.0), -1.0, 1.0)',
+        "legacy camera free preset import preserves null state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'jsonPropertyIsNull(*camera, "freePreset")',
+        "web camera freePreset null import uses JSON parser",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'cameraFreePreset = -1;',
+        "plain camera modes clear free preset",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'camera->find("\\"customSettings\\":null")',
