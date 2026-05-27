@@ -7822,36 +7822,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SETTINGS");
   renderModuleSettingsControls("launcher-module-settings", true);
 
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
-  const std::vector<std::string> &moduleNames = statsModuleNames();
-  if (moduleNames.empty()) {
-    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
-  } else {
-    ImGui::BeginChild("launcher-graph-stats-modules", ImVec2{0.0f, 130.0f}, true);
-    for (const std::string &moduleName : moduleNames) {
-      ImGui::PushID(moduleName.c_str());
-      if (ImGui::SmallButton("Frame")) {
-        createStatsModuleWindow(moduleName, 0);
-        hideLauncherWindow();
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Module")) {
-        createStatsModuleWindow(moduleName, 1);
-        hideLauncherWindow();
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Config")) {
-        createStatsModuleWindow(moduleName, 2);
-        hideLauncherWindow();
-      }
-      ImGui::SameLine();
-      ImGui::TextWrapped("%s", moduleName.c_str());
-      ImGui::PopID();
-    }
-    ImGui::EndChild();
-  }
-
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
       showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
@@ -7864,6 +7834,36 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
       hideLauncherWindow();
+    }
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
+    const std::vector<std::string> &moduleNames = statsModuleNames();
+    if (moduleNames.empty()) {
+      ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+    } else {
+      ImGui::BeginChild("launcher-graph-stats-modules", ImVec2{0.0f, 130.0f}, true);
+      for (const std::string &moduleName : moduleNames) {
+        ImGui::PushID(moduleName.c_str());
+        if (ImGui::SmallButton("Frame")) {
+          createStatsModuleWindow(moduleName, 0);
+          hideLauncherWindow();
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Module")) {
+          createStatsModuleWindow(moduleName, 1);
+          hideLauncherWindow();
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Config")) {
+          createStatsModuleWindow(moduleName, 2);
+          hideLauncherWindow();
+        }
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", moduleName.c_str());
+        ImGui::PopID();
+      }
+      ImGui::EndChild();
     }
 
     ImGui::Separator();
