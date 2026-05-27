@@ -2181,6 +2181,8 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
   uiEventPlaylistOpen =
       parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
+  uiMechanicsReviewOpen =
+      parseJsonBoolProperty(json, "mechanics_review_open").value_or(uiMechanicsReviewOpen);
   uiModuleControlsOpen =
       parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
   uiTouchControlsOpen =
@@ -2230,6 +2232,8 @@ void SubtrActorPlugin::loadUiConfig() {
                                 .value_or(boostPickupFieldUnknown);
   graphInspectorView = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
+  mechanicsReviewIndex = static_cast<int>(
+      std::max(0.0, parseJsonNumberProperty(json, "mechanics_review_index").value_or(0.0)));
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
   selectedAnalysisNode = parseJsonStringProperty(json, "selected_analysis_node").value_or("");
   graphInspectorNodeQuery =
@@ -2243,6 +2247,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "playback_controls", playbackControlsPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
+    loadPlacement(*placements, "mechanics_review", mechanicsReviewPlacement);
     loadPlacement(*placements, "module_controls", moduleControlsPlacement);
     loadPlacement(*placements, "touch_controls", touchControlsPlacement);
     loadPlacement(*placements, "boost_pickup_controls", boostPickupControlsPlacement);
@@ -2367,6 +2372,8 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
        << ",\n";
+  file << "  \"mechanics_review_open\": " << (uiMechanicsReviewOpen ? "true" : "false")
+       << ",\n";
   file << "  \"module_controls_open\": " << (uiModuleControlsOpen ? "true" : "false")
        << ",\n";
   file << "  \"touch_controls_open\": " << (uiTouchControlsOpen ? "true" : "false")
@@ -2410,6 +2417,7 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"boost_pickup_field_unknown\": "
        << (boostPickupFieldUnknown ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
+  file << "  \"mechanics_review_index\": " << mechanicsReviewIndex << ",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
   file << "  \"selected_analysis_node\": \"" << escapeJsonString(selectedAnalysisNode)
@@ -2431,6 +2439,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, graphInspectorPlacement);
   file << ",\n    \"event_playlist\": ";
   writePlacement(file, eventPlaylistPlacement);
+  file << ",\n    \"mechanics_review\": ";
+  writePlacement(file, mechanicsReviewPlacement);
   file << ",\n    \"module_controls\": ";
   writePlacement(file, moduleControlsPlacement);
   file << ",\n    \"touch_controls\": ";
@@ -2955,6 +2965,8 @@ void SubtrActorPlugin::resetLiveState() {
   nextBoostPadId = 1;
   messages.clear();
   recentUiEvents.clear();
+  mechanicsReviewDecisions.clear();
+  mechanicsReviewIndex = 0;
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -4793,6 +4805,7 @@ std::string SubtrActorPlugin::playerLabel(uint32_t playerIndex, uint8_t isTeam0)
 void SubtrActorPlugin::appendUiEvent(UiEventRecord event) {
   recentUiEvents.push_front(std::move(event));
   while (recentUiEvents.size() > MAX_RECENT_UI_EVENTS) {
+    mechanicsReviewDecisions.erase(mechanicsReviewKey(recentUiEvents.back()));
     recentUiEvents.pop_back();
   }
 }
@@ -4938,6 +4951,7 @@ void SubtrActorPlugin::Render() {
   renderPlaybackControlsWindow();
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
+  renderMechanicsReviewWindow();
   renderModuleControlsWindow();
   renderTouchControlsWindow();
   renderBoostPickupControlsWindow();
@@ -5081,6 +5095,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
+  ImGui::Checkbox("Mechanics review", &uiMechanicsReviewOpen);
   ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
   ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
   ImGui::Checkbox("Boost pickup filters", &uiBoostPickupControlsOpen);
@@ -5105,6 +5120,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiStatusOpen = false;
     uiPlaybackControlsOpen = false;
     uiGraphInspectorOpen = false;
+    uiMechanicsReviewOpen = false;
     uiTouchControlsOpen = false;
     uiBoostPickupControlsOpen = false;
   }
@@ -5220,6 +5236,8 @@ void SubtrActorPlugin::renderEventsWindow() {
   ImGui::SameLine();
   if (ImGui::Button("Clear")) {
     recentUiEvents.clear();
+    mechanicsReviewDecisions.clear();
+    mechanicsReviewIndex = 0;
   }
 
   size_t visibleCount = 0;
@@ -5273,6 +5291,32 @@ bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) co
     return eventPlaylistGoalContextEnabled;
   }
   return true;
+}
+
+std::string SubtrActorPlugin::mechanicsReviewKey(const UiEventRecord &event) const {
+  return std::format(
+      "{}:{}:{}:{}",
+      event.category,
+      event.type,
+      event.frame_number,
+      event.actor);
+}
+
+const char *SubtrActorPlugin::mechanicsReviewDecisionLabel(const UiEventRecord &event) const {
+  const auto decision = mechanicsReviewDecisions.find(mechanicsReviewKey(event));
+  if (decision == mechanicsReviewDecisions.end()) {
+    return "unreviewed";
+  }
+  if (decision->second == 1) {
+    return "confirmed";
+  }
+  if (decision->second == 2) {
+    return "rejected";
+  }
+  if (decision->second == 3) {
+    return "uncertain";
+  }
+  return "unreviewed";
 }
 
 void SubtrActorPlugin::renderEventPlaylistWindow() {
@@ -5370,6 +5414,166 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderMechanicsReviewWindow() {
+  if (!uiMechanicsReviewOpen) {
+    return;
+  }
+
+  applyWindowPlacement(mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f);
+  if (!ImGui::Begin("Mechanics review##subtr-actor", &uiMechanicsReviewOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(mechanicsReviewPlacement);
+
+  std::vector<size_t> candidates;
+  candidates.reserve(recentUiEvents.size());
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
+    if (eventPlaylistSourceEnabled(event) && uiEventVisible(event)) {
+      candidates.push_back(index);
+    }
+  }
+  if (candidates.empty()) {
+    mechanicsReviewIndex = 0;
+  } else {
+    mechanicsReviewIndex = std::clamp(
+        mechanicsReviewIndex,
+        0,
+        static_cast<int>(candidates.size()) - 1);
+  }
+
+  int confirmedCount = 0;
+  int rejectedCount = 0;
+  int uncertainCount = 0;
+  for (const size_t index : candidates) {
+    const auto decision = mechanicsReviewDecisions.find(mechanicsReviewKey(recentUiEvents[index]));
+    if (decision == mechanicsReviewDecisions.end()) {
+      continue;
+    }
+    confirmedCount += decision->second == 1 ? 1 : 0;
+    rejectedCount += decision->second == 2 ? 1 : 0;
+    uncertainCount += decision->second == 3 ? 1 : 0;
+  }
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REVIEW QUEUE");
+  ImGui::Text(
+      "%zu candidates | %d confirmed | %d rejected | %d uncertain",
+      candidates.size(),
+      confirmedCount,
+      rejectedCount,
+      uncertainCount);
+  ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
+
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        setCvarString("subtr_actor_overlay_event_types", option.value);
+        currentFilter = option.value;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  ImGui::Separator();
+  if (candidates.empty()) {
+    ImGui::TextWrapped("No visible events match the current review filters.");
+    if (ImGui::Button("Open events")) {
+      uiEventsOpen = true;
+      eventsPlacement.pending_focus = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Open playlist")) {
+      uiEventPlaylistOpen = true;
+      eventPlaylistPlacement.pending_focus = true;
+    }
+    ImGui::End();
+    return;
+  }
+
+  UiEventRecord &current = recentUiEvents[candidates[static_cast<size_t>(mechanicsReviewIndex)]];
+  const std::string currentKey = mechanicsReviewKey(current);
+  ImGui::Text(
+      "%d / %zu",
+      mechanicsReviewIndex + 1,
+      candidates.size());
+  ImGui::TextWrapped("%s", current.label.c_str());
+  ImGui::Text("Decision: %s", mechanicsReviewDecisionLabel(current));
+  ImGui::Text("Mechanic: %s", current.type.c_str());
+  ImGui::Text("Player: %s", current.actor.c_str());
+  ImGui::Text("Clip: %.2fs to %.2fs", std::max(0.0f, current.time - 2.0f), current.time + 2.0f);
+  ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));
+  if (!current.details.empty()) {
+    ImGui::TextWrapped("Reason: %s", current.details.c_str());
+  }
+
+  if (ImGui::Button("Prev") && mechanicsReviewIndex > 0) {
+    mechanicsReviewIndex -= 1;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Next") &&
+      mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
+    mechanicsReviewIndex += 1;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Show playlist")) {
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+
+  if (ImGui::Button("Confirm")) {
+    mechanicsReviewDecisions[currentKey] = 1;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reject")) {
+    mechanicsReviewDecisions[currentKey] = 2;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Uncertain")) {
+    mechanicsReviewDecisions[currentKey] = 3;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear decision")) {
+    mechanicsReviewDecisions.erase(currentKey);
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY");
+  ImGui::Text(
+      "Replay annotations: %s",
+      replayAnnotations ? "loaded" : replayAnnotationLoadFailed ? "failed" : "idle");
+  if (!replayAnnotationPath.empty()) {
+    ImGui::TextWrapped("%s", replayAnnotationPath.c_str());
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYLIST");
+  ImGui::BeginChild("mechanics-review-list", ImVec2{0.0f, 150.0f}, true);
+  for (size_t i = 0; i < candidates.size(); i += 1) {
+    const UiEventRecord &event = recentUiEvents[candidates[i]];
+    ImGui::PushID(static_cast<int>(i));
+    const std::string label = std::format(
+        "{} {:.2f}s {} ({})",
+        i == static_cast<size_t>(mechanicsReviewIndex) ? ">" : " ",
+        event.time,
+        event.label,
+        mechanicsReviewDecisionLabel(event));
+    if (ImGui::Selectable(label.c_str(), i == static_cast<size_t>(mechanicsReviewIndex))) {
+      mechanicsReviewIndex = static_cast<int>(i);
+    }
+    ImGui::PopID();
+  }
+  ImGui::EndChild();
+
+  ImGui::End();
+}
+
 void SubtrActorPlugin::renderModuleControlsWindow() {
   if (!uiModuleControlsOpen) {
     return;
@@ -5453,6 +5657,11 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   if (ImGui::Button("Open event playlist")) {
     uiEventPlaylistOpen = true;
     eventPlaylistPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open review")) {
+    uiMechanicsReviewOpen = true;
+    mechanicsReviewPlacement.pending_focus = true;
   }
   ImGui::SameLine();
   if (ImGui::Button("Open touch controls")) {
@@ -5961,13 +6170,14 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 9> windows{{
+  std::array<SingletonWindowControl, 10> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
       {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
+      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
       {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
       {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
       {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
@@ -6061,6 +6271,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   statusPlacement = UiWindowPlacement{};
   playbackControlsPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
+  mechanicsReviewPlacement = UiWindowPlacement{};
   moduleControlsPlacement = UiWindowPlacement{};
   touchControlsPlacement = UiWindowPlacement{};
   boostPickupControlsPlacement = UiWindowPlacement{};
@@ -6097,6 +6308,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiStatusOpen = true;
   uiPlaybackControlsOpen = true;
   uiGraphInspectorOpen = false;
+  uiMechanicsReviewOpen = false;
   uiModuleControlsOpen = true;
   uiTouchControlsOpen = false;
   uiBoostPickupControlsOpen = false;

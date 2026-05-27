@@ -248,6 +248,7 @@ private:
   bool uiPlaybackControlsOpen = false;
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
+  bool uiMechanicsReviewOpen = false;
   bool uiModuleControlsOpen = false;
   bool uiTouchControlsOpen = false;
   bool uiBoostPickupControlsOpen = false;
@@ -271,11 +272,13 @@ private:
   bool boostPickupFieldOpponent = true;
   bool boostPickupFieldUnknown = true;
   int graphInspectorView = 0;
+  int mechanicsReviewIndex = 0;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
   std::string graphInspectorNodeQuery;
   uint32_t nextUiStatsWindowId = 1;
   std::deque<UiEventRecord> recentUiEvents;
+  std::unordered_map<std::string, int> mechanicsReviewDecisions;
   std::vector<UiStatsWindow> uiStatsWindows;
   UiWindowPlacement launcherPlacement;
   UiWindowPlacement scoreboardPlacement;
@@ -284,6 +287,7 @@ private:
   UiWindowPlacement playbackControlsPlacement;
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
+  UiWindowPlacement mechanicsReviewPlacement;
   UiWindowPlacement moduleControlsPlacement;
   UiWindowPlacement touchControlsPlacement;
   UiWindowPlacement boostPickupControlsPlacement;
@@ -315,6 +319,7 @@ private:
   void renderPlaybackControlsWindow();
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
+  void renderMechanicsReviewWindow();
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();
   void renderBoostPickupControlsWindow();
@@ -375,6 +380,8 @@ private:
   void appendUiEvent(UiEventRecord event);
   bool uiEventVisible(const UiEventRecord &event);
   bool eventPlaylistSourceEnabled(const UiEventRecord &event) const;
+  std::string mechanicsReviewKey(const UiEventRecord &event) const;
+  const char *mechanicsReviewDecisionLabel(const UiEventRecord &event) const;
   void tickReplayAnnotations();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
