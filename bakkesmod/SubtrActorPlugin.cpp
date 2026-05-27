@@ -7173,8 +7173,12 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       (!eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
        !eventPlaylistGoalContextEnabled) ||
       selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all")).empty();
+  const size_t activeSourceGroups = static_cast<size_t>(eventPlaylistMechanicsEnabled) +
+                                    static_cast<size_t>(eventPlaylistTeamEventsEnabled) +
+                                    static_cast<size_t>(eventPlaylistGoalContextEnabled);
+  ImGui::Text("Filters %zu / 3", activeSourceGroups);
   if (renderModuleSummaryToggle(
-          std::format("All events ({})", recentUiEvents.size()).c_str(),
+          std::format("All ({})", recentUiEvents.size()).c_str(),
           allSourcesEnabled,
           "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = true;
@@ -7182,16 +7186,16 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     eventPlaylistGoalContextEnabled = true;
     setCvarString("subtr_actor_overlay_event_types", "all");
   }
-  if (renderModuleSummaryToggle("No events", noSourcesEnabled, "event-playlist-sources")) {
+  if (renderModuleSummaryToggle("None", noSourcesEnabled, "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = false;
     eventPlaylistTeamEventsEnabled = false;
     eventPlaylistGoalContextEnabled = false;
     setCvarString("subtr_actor_overlay_event_types", "none");
   }
-  ImGui::Checkbox("Follow", &eventPlaylistAutoFollow);
+  ImGui::Checkbox("Auto-follow", &eventPlaylistAutoFollow);
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "SOURCES");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FILTERS");
   renderBoolModuleSummaryToggle(
       std::format("Mechanics ({})", mechanicsSourceCount).c_str(),
       eventPlaylistMechanicsEnabled,
@@ -7283,7 +7287,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::PopID();
   }
   if (!renderedAny) {
-    ImGui::TextWrapped("No events match the selected playlist sources.");
+    ImGui::TextWrapped(
+        noSourcesEnabled ? "No event types selected."
+                         : "No events match the selected playlist filters.");
   } else if (eventPlaylistAutoFollow) {
     ImGui::SetScrollHereY(1.0f);
   }
