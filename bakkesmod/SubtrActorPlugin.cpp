@@ -7943,9 +7943,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
     ImGui::Separator();
     renderLauncherWorkspaceControls();
-
-    ImGui::Separator();
-    renderSharedSettingsControls();
     ImGui::TreePop();
   }
 
