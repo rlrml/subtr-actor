@@ -211,6 +211,35 @@ def ts_type_alias_strings(source: str, name: str) -> list[str]:
     return quoted_strings(match.group(1))
 
 
+def ts_interface_fields(source: str, name: str) -> tuple[str, ...]:
+    match = re.search(
+        rf"export\s+interface\s+{re.escape(name)}\s*\{{(?P<body>.*?)\n\}}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"missing TypeScript interface {name}")
+    fields = []
+    for line in match.group("body").splitlines():
+        field = re.search(r"\breadonly\s+([A-Za-z0-9_]+)\??\s*:", line)
+        if field:
+            fields.append(field.group(1))
+    if not fields:
+        raise AssertionError(f"could not parse TypeScript interface {name}")
+    return tuple(fields)
+
+
+def cpp_lambda_body(source: str, name: str) -> str:
+    match = re.search(
+        rf"auto\s+{re.escape(name)}\s*=\s*\[\]\((?P<args>.*?)\)\s*\{{(?P<body>.*?)\n\s*\}};",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"missing C++ lambda {name}")
+    return match.group("body")
+
+
 def web_launcher_buttons(source: str, attribute: str) -> list[tuple[str, str]]:
     return [
         (match.group("id"), match.group("label").strip())
@@ -330,6 +359,17 @@ def main() -> int:
     web_stats_window_kind_ids = tuple(
         ts_type_alias_strings(web_player_config_source, "StatsWindowKind")
     )
+    web_window_placement_fields = ts_interface_fields(
+        web_player_config_source,
+        "WindowPlacementConfig",
+    )
+    expected_web_window_placement_fields = ("x", "y", "viewport", "zIndex", "visible")
+    if web_window_placement_fields != expected_web_window_placement_fields:
+        errors.append(
+            "stats evaluation player WindowPlacementConfig fields changed: "
+            f"expected={expected_web_window_placement_fields!r} "
+            f"actual={web_window_placement_fields!r}"
+        )
 
     plugin_web_window_controls = tuple(
         (window_id, label)
@@ -442,6 +482,37 @@ def main() -> int:
         "plugin windows keep plugin placement shape",
         errors,
     )
+    web_singleton_placement_writer = cpp_lambda_body(plugin_source, "writeStatsPlayerPlacement")
+    web_stats_placement_writer = cpp_lambda_body(
+        plugin_source,
+        "writeStatsPlayerStatsWindowPlacement",
+    )
+    for writer_name, writer_source in (
+        ("singleton web placement writer", web_singleton_placement_writer),
+        ("stats window web placement writer", web_stats_placement_writer),
+    ):
+        for field in web_window_placement_fields:
+            require_contains(
+                writer_source,
+                f'\\"{field}\\"',
+                f"{writer_name} emits WindowPlacementConfig.{field}",
+                errors,
+            )
+        for legacy_field in (
+            "has_placement",
+            '\\"viewport_width\\"',
+            '\\"viewport_height\\"',
+            "placement.width",
+            "placement.height",
+            "window.width",
+            "window.height",
+        ):
+            reject_contains(
+                writer_source,
+                legacy_field,
+                f"{writer_name} emits plugin-only placement field",
+                errors,
+            )
     require_contains(
         plugin_source,
         'std::format("##stats-window-player-scope-{}", window.id).c_str()',
