@@ -10,6 +10,8 @@ mod constants;
 mod demolition;
 #[path = "replay_probe_legacy_sample.rs"]
 mod legacy_sample;
+#[path = "replay_probe_legacy_sample_alignment.rs"]
+mod legacy_sample_alignment;
 #[path = "replay_probe_legacy_summary.rs"]
 mod legacy_summary;
 #[path = "replay_probe_legacy_summary_angular.rs"]
