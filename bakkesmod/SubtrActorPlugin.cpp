@@ -419,8 +419,8 @@ int recordingPlaybackRateIndexForValue(double value) {
 ImVec2 mapWindowPositionToViewport(
     float x,
     float y,
-    float width,
-    float height,
+    float /*width*/,
+    float /*height*/,
     float sourceViewportWidth,
     float sourceViewportHeight) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
@@ -429,12 +429,12 @@ ImVec2 mapWindowPositionToViewport(
   }
 
   constexpr float margin = 8.0f;
+  constexpr float minimumVisibleWidth = 120.0f;
+  constexpr float minimumVisibleHeight = 100.0f;
   const float scaleX = sourceViewportWidth > 0.0f ? displaySize.x / sourceViewportWidth : 1.0f;
   const float scaleY = sourceViewportHeight > 0.0f ? displaySize.y / sourceViewportHeight : 1.0f;
-  const float clampedWidth = std::max(120.0f, width);
-  const float clampedHeight = std::max(80.0f, height);
-  const float maxX = std::max(margin, displaySize.x - clampedWidth);
-  const float maxY = std::max(margin, displaySize.y - clampedHeight);
+  const float maxX = std::max(margin, displaySize.x - minimumVisibleWidth);
+  const float maxY = std::max(margin, displaySize.y - minimumVisibleHeight);
   return ImVec2{
       std::clamp(x * scaleX, margin, maxX),
       std::clamp(y * scaleY, margin, maxY),
