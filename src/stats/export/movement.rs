@@ -1,114 +1,19 @@
-use crate::*;
+use crate::{ExportedStat, MovementStats, StatFieldProvider};
+#[cfg(test)]
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
-use super::*;
+#[path = "movement_export_core.rs"]
+mod core;
+#[path = "movement_export_percent.rs"]
+mod percent;
+#[path = "movement_export_time.rs"]
+mod time;
 
 impl StatFieldProvider for MovementStats {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
-        visitor(ExportedStat::float(
-            "movement",
-            "tracked_time",
-            StatUnit::Seconds,
-            self.tracked_time,
-        ));
-        for entry in self.complete_labeled_tracked_time().entries {
-            visitor(ExportedStat::float_labeled(
-                "movement",
-                "tracked_time",
-                StatUnit::Seconds,
-                entry.labels,
-                entry.value,
-            ));
-        }
-        visitor(ExportedStat::float(
-            "movement",
-            "total_distance",
-            StatUnit::UnrealUnits,
-            self.total_distance,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "avg_speed",
-            StatUnit::UnrealUnitsPerSecond,
-            self.average_speed(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_supersonic_speed",
-            StatUnit::Seconds,
-            self.time_supersonic_speed,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_boost_speed",
-            StatUnit::Seconds,
-            self.time_boost_speed,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_slow_speed",
-            StatUnit::Seconds,
-            self.time_slow_speed,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_ground",
-            StatUnit::Seconds,
-            self.time_on_ground,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_low_air",
-            StatUnit::Seconds,
-            self.time_low_air,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "time_high_air",
-            StatUnit::Seconds,
-            self.time_high_air,
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "avg_speed_percentage",
-            StatUnit::Percent,
-            self.average_speed_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_slow_speed",
-            StatUnit::Percent,
-            self.slow_speed_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_boost_speed",
-            StatUnit::Percent,
-            self.boost_speed_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_supersonic_speed",
-            StatUnit::Percent,
-            self.supersonic_speed_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_ground",
-            StatUnit::Percent,
-            self.on_ground_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_low_air",
-            StatUnit::Percent,
-            self.low_air_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "movement",
-            "percent_high_air",
-            StatUnit::Percent,
-            self.high_air_pct(),
-        ));
+        core::visit_movement_core_fields(self, visitor);
+        time::visit_movement_time_fields(self, visitor);
+        percent::visit_movement_percent_fields(self, visitor);
     }
 }
 

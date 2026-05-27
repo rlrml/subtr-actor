@@ -1,0 +1,56 @@
+use super::*;
+
+pub(super) fn visit_team_goal_buildup(
+    stats: &CoreTeamStats,
+    visitor: &mut dyn FnMut(ExportedStat),
+) {
+    let context = &stats.scoring_context;
+    visitor(ExportedStat::unsigned(
+        "core",
+        "kickoff_goal_count",
+        StatUnit::Count,
+        context.goal_after_kickoff.kickoff_goal_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "short_goal_count",
+        StatUnit::Count,
+        context.goal_after_kickoff.short_goal_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "medium_goal_count",
+        StatUnit::Count,
+        context.goal_after_kickoff.medium_goal_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "long_goal_count",
+        StatUnit::Count,
+        context.goal_after_kickoff.long_goal_count,
+    ));
+    visitor(ExportedStat::float(
+        "core",
+        "shooting_percentage",
+        StatUnit::Percent,
+        stats.shooting_percentage(),
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "counter_attack_goal_count",
+        StatUnit::Count,
+        context.goal_buildup.counter_attack_goal_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "sustained_pressure_goal_count",
+        StatUnit::Count,
+        context.goal_buildup.sustained_pressure_goal_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "core",
+        "other_buildup_goal_count",
+        StatUnit::Count,
+        context.goal_buildup.other_buildup_goal_count,
+    ));
+}

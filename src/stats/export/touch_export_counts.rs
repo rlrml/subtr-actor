@@ -1,0 +1,55 @@
+use crate::{ExportedStat, StatUnit, TouchStats};
+
+pub(super) fn visit_touch_count_fields(stats: &TouchStats, visitor: &mut dyn FnMut(ExportedStat)) {
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "touch_count",
+        StatUnit::Count,
+        stats.touch_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "control_touch_count",
+        StatUnit::Count,
+        stats.control_touch_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "medium_hit_count",
+        StatUnit::Count,
+        stats.medium_hit_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "hard_hit_count",
+        StatUnit::Count,
+        stats.hard_hit_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "aerial_touch_count",
+        StatUnit::Count,
+        stats.aerial_touch_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "high_aerial_touch_count",
+        StatUnit::Count,
+        stats.high_aerial_touch_count,
+    ));
+    visitor(ExportedStat::unsigned(
+        "touch",
+        "wall_touch_count",
+        StatUnit::Count,
+        stats.wall_touch_count,
+    ));
+    for entry in stats.complete_labeled_touch_counts().entries {
+        visitor(ExportedStat::unsigned_labeled(
+            "touch",
+            "touch_count",
+            StatUnit::Count,
+            entry.labels,
+            entry.count,
+        ));
+    }
+}

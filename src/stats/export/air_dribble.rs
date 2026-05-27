@@ -1,125 +1,16 @@
-use crate::*;
+use crate::{AirDribbleStats, ExportedStat, StatFieldProvider};
 
-use super::*;
+#[path = "air_dribble_export_counts.rs"]
+mod counts;
+#[path = "air_dribble_export_distance.rs"]
+mod distance;
+#[path = "air_dribble_export_time.rs"]
+mod time;
 
 impl StatFieldProvider for AirDribbleStats {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
-        visitor(ExportedStat::unsigned(
-            "air_dribble",
-            "count",
-            StatUnit::Count,
-            self.count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "air_dribble",
-            "ground_to_air_count",
-            StatUnit::Count,
-            self.ground_to_air_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "air_dribble",
-            "wall_to_air_count",
-            StatUnit::Count,
-            self.wall_to_air_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "air_dribble",
-            "total_touch_count",
-            StatUnit::Count,
-            self.total_touch_count,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_touch_count",
-            StatUnit::Count,
-            self.average_touch_count(),
-        ));
-        visitor(ExportedStat::unsigned(
-            "air_dribble",
-            "max_touch_count",
-            StatUnit::Count,
-            self.max_touch_count,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "total_time",
-            StatUnit::Seconds,
-            self.total_time,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_time",
-            StatUnit::Seconds,
-            self.average_time(),
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "longest_time",
-            StatUnit::Seconds,
-            self.longest_time,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "total_straight_line_distance",
-            StatUnit::UnrealUnits,
-            self.total_straight_line_distance,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_straight_line_distance",
-            StatUnit::UnrealUnits,
-            self.average_straight_line_distance(),
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "furthest_straight_line_distance",
-            StatUnit::UnrealUnits,
-            self.furthest_distance,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "total_path_distance",
-            StatUnit::UnrealUnits,
-            self.total_path_distance,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_path_distance",
-            StatUnit::UnrealUnits,
-            self.average_path_distance(),
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_speed",
-            StatUnit::UnrealUnitsPerSecond,
-            self.average_speed(),
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "fastest_avg_speed",
-            StatUnit::UnrealUnitsPerSecond,
-            self.fastest_speed,
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_horizontal_gap",
-            StatUnit::UnrealUnits,
-            self.average_horizontal_gap(),
-        ));
-        visitor(ExportedStat::float(
-            "air_dribble",
-            "avg_vertical_gap",
-            StatUnit::UnrealUnits,
-            self.average_vertical_gap(),
-        ));
-        for entry in self.complete_labeled_event_counts().entries {
-            visitor(ExportedStat::unsigned_labeled(
-                "air_dribble",
-                "count",
-                StatUnit::Count,
-                entry.labels,
-                entry.count,
-            ));
-        }
+        counts::visit_air_dribble_count_fields(self, visitor);
+        time::visit_air_dribble_time_fields(self, visitor);
+        distance::visit_air_dribble_distance_fields(self, visitor);
     }
 }

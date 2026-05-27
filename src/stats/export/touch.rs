@@ -1,136 +1,19 @@
-use crate::*;
+use crate::{ExportedStat, StatFieldProvider, TouchStats};
+#[cfg(test)]
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
-use super::*;
+#[path = "touch_export_ball_movement.rs"]
+mod ball_movement;
+#[path = "touch_export_counts.rs"]
+mod counts;
+#[path = "touch_export_last_touch.rs"]
+mod last_touch;
 
 impl StatFieldProvider for TouchStats {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "touch_count",
-            StatUnit::Count,
-            self.touch_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "control_touch_count",
-            StatUnit::Count,
-            self.control_touch_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "medium_hit_count",
-            StatUnit::Count,
-            self.medium_hit_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "hard_hit_count",
-            StatUnit::Count,
-            self.hard_hit_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "aerial_touch_count",
-            StatUnit::Count,
-            self.aerial_touch_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "high_aerial_touch_count",
-            StatUnit::Count,
-            self.high_aerial_touch_count,
-        ));
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "wall_touch_count",
-            StatUnit::Count,
-            self.wall_touch_count,
-        ));
-        for entry in self.complete_labeled_touch_counts().entries {
-            visitor(ExportedStat::unsigned_labeled(
-                "touch",
-                "touch_count",
-                StatUnit::Count,
-                entry.labels,
-                entry.count,
-            ));
-        }
-        visitor(ExportedStat::unsigned(
-            "touch",
-            "is_last_touch",
-            StatUnit::Count,
-            u32::from(self.is_last_touch),
-        ));
-        if let Some(value) = self.last_touch_time {
-            visitor(ExportedStat::float(
-                "touch",
-                "last_touch_time",
-                StatUnit::Seconds,
-                value,
-            ));
-        }
-        if let Some(value) = self.last_touch_frame {
-            visitor(ExportedStat::unsigned(
-                "touch",
-                "last_touch_frame",
-                StatUnit::Count,
-                u32::try_from(value).unwrap_or(u32::MAX),
-            ));
-        }
-        if let Some(value) = self.time_since_last_touch {
-            visitor(ExportedStat::float(
-                "touch",
-                "time_since_last_touch",
-                StatUnit::Seconds,
-                value,
-            ));
-        }
-        if let Some(value) = self.frames_since_last_touch {
-            visitor(ExportedStat::unsigned(
-                "touch",
-                "frames_since_last_touch",
-                StatUnit::Count,
-                u32::try_from(value).unwrap_or(u32::MAX),
-            ));
-        }
-        if let Some(value) = self.last_ball_speed_change {
-            visitor(ExportedStat::float(
-                "touch",
-                "last_ball_speed_change",
-                StatUnit::UnrealUnitsPerSecond,
-                value,
-            ));
-        }
-        visitor(ExportedStat::float(
-            "touch",
-            "average_ball_speed_change",
-            StatUnit::UnrealUnitsPerSecond,
-            self.average_ball_speed_change(),
-        ));
-        visitor(ExportedStat::float(
-            "touch",
-            "max_ball_speed_change",
-            StatUnit::UnrealUnitsPerSecond,
-            self.max_ball_speed_change,
-        ));
-        visitor(ExportedStat::float(
-            "touch",
-            "total_ball_travel_distance",
-            StatUnit::UnrealUnits,
-            self.total_ball_travel_distance,
-        ));
-        visitor(ExportedStat::float(
-            "touch",
-            "total_ball_advance_distance",
-            StatUnit::UnrealUnits,
-            self.total_ball_advance_distance,
-        ));
-        visitor(ExportedStat::float(
-            "touch",
-            "total_ball_retreat_distance",
-            StatUnit::UnrealUnits,
-            self.total_ball_retreat_distance,
-        ));
+        counts::visit_touch_count_fields(self, visitor);
+        last_touch::visit_last_touch_fields(self, visitor);
+        ball_movement::visit_touch_ball_movement_fields(self, visitor);
     }
 }
 

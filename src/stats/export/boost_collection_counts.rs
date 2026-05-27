@@ -1,0 +1,54 @@
+use super::*;
+
+impl BoostStats {
+    pub(super) fn visit_collection_count_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat)) {
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_inactive_big",
+            StatUnit::Count,
+            self.big_pads_collected_inactive,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_inactive_small",
+            StatUnit::Count,
+            self.small_pads_collected_inactive,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_big",
+            StatUnit::Count,
+            self.big_pads_collected,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_stolen_big",
+            StatUnit::Count,
+            self.big_pads_stolen,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_collected_small",
+            StatUnit::Count,
+            self.small_pads_collected,
+        ));
+        visitor(ExportedStat::unsigned(
+            "boost",
+            "count_stolen_small",
+            StatUnit::Count,
+            self.small_pads_stolen,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
+            "amount_overfill",
+            StatUnit::Boost,
+            self.overfill_total,
+        ));
+        visitor(ExportedStat::float(
+            "boost",
+            "amount_overfill_stolen",
+            StatUnit::Boost,
+            self.overfill_from_stolen,
+        ));
+    }
+}
