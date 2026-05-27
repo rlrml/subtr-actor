@@ -164,6 +164,10 @@ private:
     int z_index = 0;
   };
 
+  static constexpr uint8_t UI_STAT_SCOPE_PLAYER = static_cast<uint8_t>(1u << 0);
+  static constexpr uint8_t UI_STAT_SCOPE_TEAM = static_cast<uint8_t>(1u << 1);
+  static constexpr uint8_t UI_STAT_SCOPE_EVENT = static_cast<uint8_t>(1u << 2);
+
   struct SingletonWindowControl {
     const char *label;
     const char *config_id;
@@ -183,6 +187,7 @@ private:
     const char *config_id;
     const char *label;
     const char *create_label;
+    uint8_t stat_scopes;
     bool web_config;
     bool default_window;
   };
@@ -509,6 +514,7 @@ private:
   std::optional<UiStatsWindowKind> parseStatsWindowKind(std::string_view value) const;
   const char *statsWindowKindConfigId(UiStatsWindowKind kind) const;
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
+  uint8_t statsWindowKindStatScopes(UiStatsWindowKind kind) const;
   std::string statsWindowDisplayLabel(const UiStatsWindow &window) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
