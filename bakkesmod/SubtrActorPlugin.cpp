@@ -242,6 +242,22 @@ bool containsString(const std::vector<std::string> &values, std::string_view val
          }) != values.end();
 }
 
+double recordingPlaybackRateFromIndex(int index) {
+  constexpr std::array<double, 4> rates{{0.5, 1.0, 1.5, 2.0}};
+  return rates[static_cast<size_t>(std::clamp(index, 0, static_cast<int>(rates.size()) - 1))];
+}
+
+int recordingPlaybackRateIndexForValue(double value) {
+  constexpr std::array<double, 4> rates{{0.5, 1.0, 1.5, 2.0}};
+  const auto closest = std::min_element(
+      rates.begin(),
+      rates.end(),
+      [value](double left, double right) {
+        return std::abs(left - value) < std::abs(right - value);
+      });
+  return static_cast<int>(std::distance(rates.begin(), closest));
+}
+
 ImVec2 mapWindowPositionToViewport(
     float x,
     float y,
@@ -2448,6 +2464,83 @@ void SubtrActorPlugin::applyUiConfigJson(
   recordingFinishBeforeDump =
       parseJsonBoolProperty(json, "recording_finish_before_dump")
           .value_or(recordingFinishBeforeDump);
+
+  if (const auto camera = parseJsonObjectProperty(json, "camera")) {
+    const std::optional<std::string> mode = parseJsonStringProperty(*camera, "mode");
+    if (mode == "follow") {
+      cameraViewMode = 1;
+    } else if (mode == "free") {
+      cameraViewMode = 0;
+    }
+    const std::optional<std::string> freePreset =
+        parseJsonStringProperty(*camera, "freePreset");
+    if (freePreset == "overhead") {
+      cameraFreePreset = 0;
+      if (cameraViewMode != 1) {
+        cameraViewMode = 2;
+      }
+    } else if (freePreset == "side") {
+      cameraFreePreset = 1;
+      if (cameraViewMode != 1) {
+        cameraViewMode = 3;
+      }
+    }
+    if (const auto attachedPlayerId = parseJsonStringProperty(*camera, "attachedPlayerId")) {
+      try {
+        cameraSelectedPlayerIndex = static_cast<uint32_t>(std::stoul(*attachedPlayerId));
+      } catch (const std::exception &) {
+      }
+    }
+    cameraDistanceScale = static_cast<float>(std::clamp(
+        parseJsonNumberProperty(*camera, "distanceScale").value_or(cameraDistanceScale),
+        0.75,
+        4.0));
+    cameraBallCamEnabled =
+        parseJsonBoolProperty(*camera, "ballCam").value_or(cameraBallCamEnabled);
+    if (const auto customSettings = parseJsonObjectProperty(*camera, "customSettings")) {
+      cameraCustomSettingsEnabled = true;
+      cameraCustomFov = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "fov").value_or(cameraCustomFov),
+          60.0,
+          130.0));
+      cameraCustomHeight = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "height").value_or(cameraCustomHeight),
+          40.0,
+          250.0));
+      cameraCustomPitch = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "pitch").value_or(cameraCustomPitch),
+          -30.0,
+          30.0));
+      cameraCustomDistance = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "distance").value_or(cameraCustomDistance),
+          100.0,
+          500.0));
+      cameraCustomStiffness = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "stiffness").value_or(cameraCustomStiffness),
+          0.0,
+          1.0));
+      cameraCustomSwivelSpeed = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "swivelSpeed")
+              .value_or(cameraCustomSwivelSpeed),
+          1.0,
+          10.0));
+      cameraCustomTransitionSpeed = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*customSettings, "transitionSpeed")
+              .value_or(cameraCustomTransitionSpeed),
+          0.5,
+          2.0));
+    } else if (camera->find("\"customSettings\":null") != std::string::npos) {
+      cameraCustomSettingsEnabled = false;
+    }
+  }
+  if (const auto recording = parseJsonObjectProperty(json, "recording")) {
+    recordingFps = static_cast<int>(
+        std::clamp(parseJsonNumberProperty(*recording, "fps").value_or(recordingFps), 1.0, 120.0));
+    if (const auto playbackRate = parseJsonNumberProperty(*recording, "playbackRate")) {
+      recordingPlaybackRateIndex = recordingPlaybackRateIndexForValue(*playbackRate);
+    }
+  }
+
   touchControlsMode = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "touch_controls_mode").value_or(1.0), 0.0, 1.0));
   touchMarkerDecaySeconds = static_cast<float>(std::clamp(
@@ -2792,6 +2885,39 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << ",\n";
   file << "    \"boostPickupAnimation\": false\n";
   file << "  },\n";
+  file << "  \"playback\": {},\n";
+  file << "  \"camera\": {";
+  file << "\"mode\":\"" << (cameraViewMode == 1 ? "follow" : "free") << "\"";
+  file << ",\"freePreset\":";
+  if (cameraFreePreset == 0 || cameraViewMode == 2) {
+    file << "\"overhead\"";
+  } else if (cameraFreePreset == 1 || cameraViewMode == 3) {
+    file << "\"side\"";
+  } else {
+    file << "null";
+  }
+  file << ",\"attachedPlayerId\":";
+  if (cameraViewMode == 1) {
+    file << "\"" << cameraSelectedPlayerIndex << "\"";
+  } else {
+    file << "null";
+  }
+  file << ",\"distanceScale\":" << cameraDistanceScale
+       << ",\"ballCam\":" << (cameraBallCamEnabled ? "true" : "false")
+       << ",\"customSettings\":";
+  if (cameraCustomSettingsEnabled) {
+    file << "{\"fov\":" << cameraCustomFov << ",\"height\":" << cameraCustomHeight
+         << ",\"pitch\":" << cameraCustomPitch << ",\"distance\":" << cameraCustomDistance
+         << ",\"stiffness\":" << cameraCustomStiffness
+         << ",\"swivelSpeed\":" << cameraCustomSwivelSpeed
+         << ",\"transitionSpeed\":" << cameraCustomTransitionSpeed << "}";
+  } else {
+    file << "null";
+  }
+  file << "},\n";
+  file << "  \"recording\": {\"fps\":" << recordingFps
+       << ",\"playbackRate\":" << recordingPlaybackRateFromIndex(recordingPlaybackRateIndex)
+       << "},\n";
   file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
   file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
   file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
