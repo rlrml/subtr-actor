@@ -6696,27 +6696,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
     tickReplayAnnotations();
     uiLauncherOpen = false;
   }
-  ImGui::SameLine();
-  bool liveAnalysis = liveProcessingEnabled();
-  if (ImGui::Button(liveAnalysis ? "Stop analysis" : "Start analysis")) {
-    setCvarBool("subtr_actor_enabled", !liveAnalysis);
-  }
-  if (ImGui::Button("Verify graph")) {
-    uiGraphInspectorOpen = true;
-    graphInspectorPlacement.pending_focus = true;
-    verifyGraphRuntime({"subtr_actor_verify_graph"});
-    uiLauncherOpen = false;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open modules")) {
-    uiModuleControlsOpen = true;
-    moduleControlsPlacement.pending_focus = true;
-    uiLauncherOpen = false;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Close launcher")) {
-    uiLauncherOpen = false;
-  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
@@ -6766,6 +6745,25 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreateButton("New ad hoc stats", UiStatsWindowKind::AdHoc);
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
+    const bool liveAnalysis = liveProcessingEnabled();
+    if (ImGui::Button(liveAnalysis ? "Stop analysis" : "Start analysis", ImVec2{170.0f, 0.0f})) {
+      setCvarBool("subtr_actor_enabled", !liveAnalysis);
+    }
+    if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
+      uiGraphInspectorOpen = true;
+      graphInspectorPlacement.pending_focus = true;
+      verifyGraphRuntime({"subtr_actor_verify_graph"});
+      uiLauncherOpen = false;
+    }
+    if (ImGui::Button("Open modules", ImVec2{170.0f, 0.0f})) {
+      uiModuleControlsOpen = true;
+      moduleControlsPlacement.pending_focus = true;
+      uiLauncherOpen = false;
+    }
+    if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
+      uiLauncherOpen = false;
+    }
+    ImGui::Separator();
     std::array<LauncherWindowToggle, 3> pluginToolWindows{{
         {"Status", &uiStatusOpen, &statusPlacement},
         {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
