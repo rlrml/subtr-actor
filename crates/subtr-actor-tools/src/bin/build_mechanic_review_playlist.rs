@@ -1,12 +1,7 @@
-use std::path::Path;
-
-use anyhow::{anyhow, bail, Context};
+use anyhow::anyhow;
 use serde_json::json;
 use subtr_actor::{
-    playlist_generation::{
-        PlaybackBound, PlaybackBoundKind, PlaylistAdvanceMode, PlaylistEndMode, PlaylistManifest,
-        PlaylistManifestItem, PlaylistManifestReplay, PlaylistPlaybackOptions,
-    },
+    playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
     DoubleTapCalculator, FlickCalculator, FlipResetTracker, HalfFlipCalculator,
@@ -28,6 +23,8 @@ mod config;
 mod constants;
 #[path = "build_mechanic_review_playlist_goal_scan.rs"]
 mod goal_scan;
+#[path = "build_mechanic_review_playlist_manifest.rs"]
+mod manifest;
 #[path = "build_mechanic_review_playlist_mechanics.rs"]
 mod mechanics;
 #[path = "build_mechanic_review_playlist_players.rs"]
@@ -51,10 +48,9 @@ use candidate::{
 };
 use config::{parse_args, Config};
 use goal_scan::GoalScanCollector;
-use mechanics::{graph_node_names_for_mechanics, resolve_mechanics};
+use manifest::{build_manifest, write_manifest};
+use mechanics::graph_node_names_for_mechanics;
 use players::{player_display_map, player_id_string, player_team_label};
-use source_collect::collect_sources;
-use source_parse::parse_replay_file;
 use source_types::ReplaySourceInput;
 
 fn extract_candidates(
@@ -376,7 +372,7 @@ fn extract_candidates(
     Ok(candidates)
 }
 
-fn build_items_for_source(
+pub(crate) fn build_items_for_source(
     source: &ReplaySourceInput,
     replay: &boxcars::Replay,
     config: &Config,
@@ -487,82 +483,6 @@ fn build_items_for_source(
     }
 
     Ok(items)
-}
-
-fn build_manifest(config: &Config) -> anyhow::Result<PlaylistManifest> {
-    let mechanics = resolve_mechanics(config)?;
-    let sources = collect_sources(config)?;
-    if sources.is_empty() {
-        bail!("no replay sources were selected");
-    }
-
-    let mut replays = Vec::new();
-    let mut items = Vec::new();
-    for source in &sources {
-        let replay = parse_replay_file(&source.bytes_path)?;
-        replays.push(PlaylistManifestReplay {
-            id: source.source_id.clone(),
-            label: source.label.clone(),
-            path: source.bytes_path.display().to_string(),
-            locator: source.locator.clone(),
-            meta: source.meta.clone(),
-        });
-        items.extend(build_items_for_source(source, &replay, config, &mechanics)?);
-        if let Some(max_items) = config.max_items {
-            if items.len() >= max_items {
-                items.truncate(max_items);
-                break;
-            }
-        }
-    }
-
-    let candidate_count = items.len();
-
-    Ok(PlaylistManifest {
-        version: 1,
-        kind: "mechanic-review-playlist".to_owned(),
-        label: "Mechanic review candidates".to_owned(),
-        playback: PlaylistPlaybackOptions {
-            advance_mode: PlaylistAdvanceMode::Manual,
-            end_mode: PlaylistEndMode::Stop,
-        },
-        replays,
-        items,
-        page: None,
-        meta: json!({
-            "mechanics": mechanics,
-            "sourceReplayCount": sources.len(),
-            "candidateCount": candidate_count,
-            "minConfidence": config.min_confidence,
-            "clipPadding": {
-                "beforeSeconds": config.before_seconds,
-                "afterSeconds": config.after_seconds,
-                "goalLookaheadSeconds": config.goal_lookahead_seconds,
-                "goalTailSeconds": config.goal_tail_seconds,
-                "minClipSeconds": config.min_clip_seconds,
-            },
-            "generatedBy": "build_mechanic_review_playlist",
-        }),
-    })
-}
-
-fn write_manifest(manifest: &PlaylistManifest, output: Option<&Path>) -> anyhow::Result<()> {
-    let json = serde_json::to_string_pretty(manifest)?;
-    match output {
-        Some(path) => {
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent).with_context(|| {
-                        format!("failed to create output dir {}", parent.display())
-                    })?;
-                }
-            }
-            std::fs::write(path, format!("{json}\n"))
-                .with_context(|| format!("failed to write playlist {}", path.display()))?;
-        }
-        None => println!("{json}"),
-    }
-    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
