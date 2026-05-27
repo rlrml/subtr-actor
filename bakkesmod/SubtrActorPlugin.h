@@ -247,6 +247,7 @@ private:
   bool uiStatusOpen = true;
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
+  bool uiModuleControlsOpen = false;
   bool eventPlaylistMechanicsEnabled = true;
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
@@ -264,6 +265,7 @@ private:
   UiWindowPlacement statusPlacement;
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
+  UiWindowPlacement moduleControlsPlacement;
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
@@ -291,13 +293,14 @@ private:
   void renderStatusWindow();
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
+  void renderModuleControlsWindow();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void resetWindowPlacements();
   void resetDefaultStatsWindows();
   void applyDefaultUiWorkspace();
   void createStatsWindow(UiStatsWindowKind kind);
-  void createStatsModuleWindow(std::string moduleName);
+  void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,

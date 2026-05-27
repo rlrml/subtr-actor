@@ -2173,6 +2173,8 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
   uiEventPlaylistOpen =
       parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
+  uiModuleControlsOpen =
+      parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
   eventPlaylistMechanicsEnabled = parseJsonBoolProperty(json, "event_playlist_mechanics_enabled")
                                       .value_or(eventPlaylistMechanicsEnabled);
   eventPlaylistTeamEventsEnabled = parseJsonBoolProperty(json, "event_playlist_team_enabled")
@@ -2196,6 +2198,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "status", statusPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
+    loadPlacement(*placements, "module_controls", moduleControlsPlacement);
   }
 
   uiStatsWindows.clear();
@@ -2315,6 +2318,8 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
        << ",\n";
+  file << "  \"module_controls_open\": " << (uiModuleControlsOpen ? "true" : "false")
+       << ",\n";
   file << "  \"event_playlist_mechanics_enabled\": "
        << (eventPlaylistMechanicsEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_team_enabled\": "
@@ -2343,6 +2348,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, graphInspectorPlacement);
   file << ",\n    \"event_playlist\": ";
   writePlacement(file, eventPlaylistPlacement);
+  file << ",\n    \"module_controls\": ";
+  writePlacement(file, moduleControlsPlacement);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -4843,6 +4850,7 @@ void SubtrActorPlugin::Render() {
   renderStatusWindow();
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
+  renderModuleControlsWindow();
   renderStatsWindows();
 }
 
@@ -4982,6 +4990,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
+  ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
   renderSingletonWindowManager();
 
   ImGui::Separator();
@@ -5265,6 +5274,94 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderModuleControlsWindow() {
+  if (!uiModuleControlsOpen) {
+    return;
+  }
+
+  applyWindowPlacement(moduleControlsPlacement, 980.0f, 305.0f, 430.0f, 520.0f);
+  if (!ImGui::Begin("Module controls##subtr-actor", &uiModuleControlsOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(moduleControlsPlacement);
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE PIPELINE");
+  auto checkboxCvar = [this](const char *label, const char *name, bool defaultValue) {
+    bool value = cvarBool(name, defaultValue);
+    if (ImGui::Checkbox(label, &value)) {
+      setCvarBool(name, value);
+    }
+  };
+  checkboxCvar("Live analysis graph", "subtr_actor_enabled", false);
+  checkboxCvar("Canvas HUD overlay", "subtr_actor_overlay_enabled", true);
+  checkboxCvar("Canvas status line", "subtr_actor_status_overlay_enabled", true);
+  checkboxCvar("Replay annotations", "subtr_actor_replay_annotations_enabled", true);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "EVENT VISUALIZATIONS");
+  checkboxCvar("HUD mechanics", "subtr_actor_overlay_mechanics_enabled", true);
+  checkboxCvar("HUD team events", "subtr_actor_overlay_team_events_enabled", true);
+  checkboxCvar("HUD goal context", "subtr_actor_overlay_goal_context_enabled", true);
+  ImGui::Checkbox("Playlist mechanics", &eventPlaylistMechanicsEnabled);
+  ImGui::Checkbox("Playlist team events", &eventPlaylistTeamEventsEnabled);
+  ImGui::Checkbox("Playlist goal context", &eventPlaylistGoalContextEnabled);
+  ImGui::Checkbox("Playlist follow", &eventPlaylistAutoFollow);
+
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        setCvarString("subtr_actor_overlay_event_types", option.value);
+        currentFilter = option.value;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
+  const std::vector<std::string> &moduleNames = statsModuleNames();
+  if (moduleNames.empty()) {
+    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+  } else {
+    ImGui::BeginChild("module-controls-module-list", ImVec2{0.0f, 170.0f}, true);
+    for (const std::string &moduleName : moduleNames) {
+      ImGui::PushID(moduleName.c_str());
+      if (ImGui::SmallButton("Frame")) {
+        createStatsModuleWindow(moduleName, 0);
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Module")) {
+        createStatsModuleWindow(moduleName, 1);
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Config")) {
+        createStatsModuleWindow(moduleName, 2);
+      }
+      ImGui::SameLine();
+      ImGui::TextWrapped("%s", moduleName.c_str());
+      ImGui::PopID();
+    }
+    ImGui::EndChild();
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH INSPECTION");
+  if (ImGui::Button("Open graph inspector")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open event playlist")) {
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
 void SubtrActorPlugin::renderStatusWindow() {
   if (!uiStatusOpen) {
     return;
@@ -5464,12 +5561,13 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 5> windows{{
+  std::array<SingletonWindowControl, 6> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
+      {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
   }};
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
@@ -5559,6 +5657,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   eventPlaylistPlacement = UiWindowPlacement{};
   statusPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
+  moduleControlsPlacement = UiWindowPlacement{};
 
   launcherPlacement.pending_focus = true;
   for (UiStatsWindow &window : uiStatsWindows) {
@@ -5591,6 +5690,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiEventPlaylistOpen = true;
   uiStatusOpen = true;
   uiGraphInspectorOpen = false;
+  uiModuleControlsOpen = true;
   eventPlaylistMechanicsEnabled = true;
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;
@@ -5612,13 +5712,13 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
   uiStatsWindows.push_back(window);
 }
 
-void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName) {
+void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int moduleView) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = UiStatsWindowKind::StatsModule;
   window.pending_focus = true;
   window.module_name = std::move(moduleName);
-  window.module_view = 0;
+  window.module_view = std::clamp(moduleView, 0, 2);
   window.width = 680.0f;
   window.height = 460.0f;
   uiStatsWindows.push_back(std::move(window));
