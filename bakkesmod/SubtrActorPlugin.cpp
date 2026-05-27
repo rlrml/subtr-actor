@@ -241,6 +241,23 @@ bool containsString(const std::vector<std::string> &values, std::string_view val
          }) != values.end();
 }
 
+ImVec2 clampWindowPositionToViewport(float x, float y, float width, float height) {
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  if (displaySize.x <= 0.0f || displaySize.y <= 0.0f) {
+    return ImVec2{x, y};
+  }
+
+  constexpr float margin = 8.0f;
+  const float clampedWidth = std::max(120.0f, width);
+  const float clampedHeight = std::max(80.0f, height);
+  const float maxX = std::max(margin, displaySize.x - clampedWidth);
+  const float maxY = std::max(margin, displaySize.y - clampedHeight);
+  return ImVec2{
+      std::clamp(x, margin, maxX),
+      std::clamp(y, margin, maxY),
+  };
+}
+
 void skipJsonWhitespace(const std::string &json, size_t &offset) {
   while (offset < json.size() &&
          std::isspace(static_cast<unsigned char>(json[offset])) != 0) {
@@ -5199,15 +5216,24 @@ void SubtrActorPlugin::applyWindowPlacement(
   if (placement.has_placement) {
     const ImGuiCond condition =
         placement.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
-    ImGui::SetNextWindowPos(ImVec2{placement.x, placement.y}, condition);
-    ImGui::SetNextWindowSize(
-        ImVec2{std::max(120.0f, placement.width), std::max(80.0f, placement.height)},
-        condition);
+    const ImVec2 size{
+        std::max(120.0f, placement.width),
+        std::max(80.0f, placement.height),
+    };
+    const ImVec2 position =
+        clampWindowPositionToViewport(placement.x, placement.y, size.x, size.y);
+    ImGui::SetNextWindowPos(position, condition);
+    ImGui::SetNextWindowSize(size, condition);
+    placement.x = position.x;
+    placement.y = position.y;
+    placement.width = size.x;
+    placement.height = size.y;
     placement.pending_apply_placement = false;
     applyFocus();
     return;
   }
-  ImGui::SetNextWindowPos(ImVec2{x, y}, ImGuiCond_FirstUseEver);
+  const ImVec2 defaultPosition = clampWindowPositionToViewport(x, y, width, height);
+  ImGui::SetNextWindowPos(defaultPosition, ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
   applyFocus();
 }
@@ -5226,16 +5252,27 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
   if (window.has_placement) {
     const ImGuiCond condition =
         window.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
-    ImGui::SetNextWindowPos(ImVec2{window.x, window.y}, condition);
-    ImGui::SetNextWindowSize(
-        ImVec2{std::max(180.0f, window.width), std::max(120.0f, window.height)},
-        condition);
+    const ImVec2 size{
+        std::max(180.0f, window.width),
+        std::max(120.0f, window.height),
+    };
+    const ImVec2 position = clampWindowPositionToViewport(window.x, window.y, size.x, size.y);
+    ImGui::SetNextWindowPos(position, condition);
+    ImGui::SetNextWindowSize(size, condition);
+    window.x = position.x;
+    window.y = position.y;
+    window.width = size.x;
+    window.height = size.y;
     window.pending_apply_placement = false;
     return;
   }
   const float offset = static_cast<float>((window.id - 1) * 24);
-  ImGui::SetNextWindowPos(ImVec2{96.0f + offset, 96.0f + offset}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2{540.0f, 330.0f}, ImGuiCond_FirstUseEver);
+  const float width = window.kind == UiStatsWindowKind::StatsModule ? 680.0f : 540.0f;
+  const float height = window.kind == UiStatsWindowKind::StatsModule ? 460.0f : 330.0f;
+  ImGui::SetNextWindowPos(
+      clampWindowPositionToViewport(96.0f + offset, 96.0f + offset, width, height),
+      ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
 }
 
 void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
