@@ -6771,9 +6771,9 @@ void SubtrActorPlugin::renderLauncherWindow() {
     for (LauncherWindowToggle &window : pluginToolWindows) {
       renderLauncherWindowToggle(window);
     }
+    renderSingletonWindowManager();
     ImGui::TreePop();
   }
-  renderSingletonWindowManager();
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
