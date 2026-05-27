@@ -7,65 +7,14 @@ use clap::Parser;
 use serde::Serialize;
 use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay, BoostCalculator,
-    BoostPickupActivity, BoostPickupComparison, BoostPickupComparisonEvent, BoostPickupFieldHalf,
-    BoostPickupPadType, PlayerId, ReplayProcessor,
+    BoostPickupActivity, BoostPickupComparison, BoostPickupComparisonEvent, BoostPickupPadType,
+    PlayerId, ReplayProcessor,
 };
 
-#[derive(Default, Serialize)]
-struct PickupCountBreakdown {
-    total: usize,
-    both: usize,
-    ghost: usize,
-    missed: usize,
-    big: usize,
-    small: usize,
-    ambiguous: usize,
-    active: usize,
-    inactive: usize,
-    unknown_activity: usize,
-}
+#[path = "boost_pickup_discrepancies_types.rs"]
+mod types;
 
-#[derive(Serialize)]
-struct SummaryRecord<'a> {
-    record_type: &'static str,
-    replay: &'a str,
-    emitted: &'static str,
-    all_events: PickupCountBreakdown,
-    emitted_events: PickupCountBreakdown,
-}
-
-#[derive(Serialize)]
-struct PickupRecord<'a> {
-    record_type: &'static str,
-    replay: &'a str,
-    comparison: BoostPickupComparison,
-    frame: usize,
-    time: f32,
-    player_id: &'a PlayerId,
-    player: String,
-    team: &'static str,
-    pad_type: BoostPickupPadType,
-    field_half: BoostPickupFieldHalf,
-    activity: BoostPickupActivity,
-    reported_frame: Option<usize>,
-    reported_time: Option<f32>,
-    inferred_frame: Option<usize>,
-    inferred_time: Option<f32>,
-    boost_before: Option<f32>,
-    boost_after: Option<f32>,
-}
-
-#[derive(Debug, Parser)]
-#[command(about = "Print boost-pickup discrepancy events as JSONL.")]
-struct Args {
-    /// Include all pickup comparison events, not just discrepancies.
-    #[arg(long = "all")]
-    include_all: bool,
-
-    /// Replay path or fixture name to inspect.
-    #[arg(value_name = "replay-path-or-fixture-name", num_args = 1..)]
-    replay_args: Vec<String>,
-}
+use types::{Args, PickupCountBreakdown, PickupRecord, SummaryRecord};
 
 fn parse_replay(path: &Path) -> anyhow::Result<boxcars::Replay> {
     let data =
