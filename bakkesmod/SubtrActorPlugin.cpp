@@ -10147,7 +10147,16 @@ void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t s
 }
 
 void SubtrActorPlugin::renderStatsWindows() {
+  std::vector<size_t> renderOrder;
+  renderOrder.reserve(uiStatsWindows.size());
   for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
+    renderOrder.push_back(index);
+  }
+  std::stable_sort(renderOrder.begin(), renderOrder.end(), [&](size_t left, size_t right) {
+    return uiStatsWindows[left].z_index < uiStatsWindows[right].z_index;
+  });
+
+  for (const size_t index : renderOrder) {
     UiStatsWindow &window = uiStatsWindows[index];
     if (window.open) {
       renderStatsWindow(window, index);
