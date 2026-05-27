@@ -30,7 +30,7 @@ constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr float GOAL_WATCH_LEAD_SECONDS = 4.0f;
 constexpr ImGuiWindowFlags UI_FLOATING_WINDOW_FLAGS =
-    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
 constexpr ImGuiWindowFlags UI_CHROME_WINDOW_FLAGS =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
