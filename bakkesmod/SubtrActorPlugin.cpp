@@ -7422,6 +7422,11 @@ void SubtrActorPlugin::renderLauncherStatsWindowControls() {
       uiLauncherOpen = false;
     }
   }
+  if (!statsModuleNames().empty() &&
+      ImGui::Button("New stats module", ImVec2{170.0f, 0.0f})) {
+    createStatsWindow(UiStatsWindowKind::StatsModule);
+    uiLauncherOpen = false;
+  }
   if (uiStatsWindows.empty()) {
     return;
   }
@@ -10035,6 +10040,12 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   window.kind = kind;
   initializeStatsWindowPlacement(window);
   focusStatsWindow(window);
+  if (kind == UiStatsWindowKind::StatsModule) {
+    const std::vector<std::string> &moduleNames = statsModuleNames();
+    if (!moduleNames.empty()) {
+      window.module_name = moduleNames.front();
+    }
+  }
   if (!sampledPlayers.empty()) {
     window.selected_player_index = sampledPlayers.front().player_index;
     window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
