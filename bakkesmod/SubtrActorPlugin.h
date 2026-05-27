@@ -140,6 +140,7 @@ private:
   struct UiWindowPlacement {
     bool has_placement = false;
     bool pending_apply_placement = false;
+    bool pending_focus = false;
     float x = 0.0f;
     float y = 0.0f;
     float width = 0.0f;
@@ -290,6 +291,7 @@ private:
   void renderStatusWindow();
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
+  void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName);

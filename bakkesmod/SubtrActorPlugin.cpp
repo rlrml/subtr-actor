@@ -4904,6 +4904,13 @@ void SubtrActorPlugin::applyWindowPlacement(
     float y,
     float width,
     float height) {
+  auto applyFocus = [&]() {
+    if (placement.pending_focus) {
+      ImGui::SetNextWindowFocus();
+      placement.pending_focus = false;
+    }
+  };
+
   if (placement.has_placement) {
     const ImGuiCond condition =
         placement.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
@@ -4912,10 +4919,12 @@ void SubtrActorPlugin::applyWindowPlacement(
         ImVec2{std::max(120.0f, placement.width), std::max(80.0f, placement.height)},
         condition);
     placement.pending_apply_placement = false;
+    applyFocus();
     return;
   }
   ImGui::SetNextWindowPos(ImVec2{x, y}, ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
+  applyFocus();
 }
 
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
@@ -4971,6 +4980,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
+  renderSingletonWindowManager();
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
@@ -5423,6 +5433,58 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
   }
 
   ImGui::End();
+}
+
+void SubtrActorPlugin::renderSingletonWindowManager() {
+  struct SingletonWindowControl {
+    const char *label;
+    bool *open;
+    UiWindowPlacement *placement;
+  };
+
+  std::array<SingletonWindowControl, 5> windows{{
+      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
+      {"Events", &uiEventsOpen, &eventsPlacement},
+      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
+      {"Status", &uiStatusOpen, &statusPlacement},
+      {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
+  }};
+
+  const size_t visibleCount = static_cast<size_t>(std::count_if(
+      windows.begin(),
+      windows.end(),
+      [](const SingletonWindowControl &window) { return *window.open; }));
+
+  ImGui::Text("%zu visible / %zu singleton windows", visibleCount, windows.size());
+  if (!ImGui::TreeNode("Manage windows##singleton-window-manager")) {
+    return;
+  }
+
+  ImGui::BeginChild("singleton-window-manager", ImVec2{0.0f, 118.0f}, true);
+  for (SingletonWindowControl &window : windows) {
+    ImGui::PushID(window.label);
+    if (*window.open) {
+      if (ImGui::SmallButton("Hide")) {
+        *window.open = false;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Focus")) {
+        window.placement->pending_focus = true;
+      }
+    } else {
+      if (ImGui::SmallButton("Show")) {
+        *window.open = true;
+        window.placement->pending_focus = true;
+      }
+      ImGui::SameLine();
+      ImGui::TextDisabled("Hidden");
+    }
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", window.label);
+    ImGui::PopID();
+  }
+  ImGui::EndChild();
+  ImGui::TreePop();
 }
 
 void SubtrActorPlugin::renderStatsWindowManager() {
