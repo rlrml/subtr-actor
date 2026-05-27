@@ -144,7 +144,7 @@ struct UiStatDefinitionMatch {
   size_t index = 0;
 };
 
-constexpr std::array<EventFilterOption, 28> EVENT_FILTER_OPTIONS{{
+constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"all", "All events"},
     {"mechanics", "All mechanics"},
     {"team", "Team events"},
@@ -153,6 +153,8 @@ constexpr std::array<EventFilterOption, 28> EVENT_FILTER_OPTIONS{{
     {"touch_ball_movement", "Touch movement"},
     {"dodge_reset", "Dodge refresh"},
     {"boost_pickup", "Boost pickup"},
+    {"boost_ledger", "Boost ledger"},
+    {"boost_state", "Boost state"},
     {"speed_flip", "Speed flip"},
     {"half_flip", "Half flip"},
     {"wavedash", "Wavedash"},
@@ -2181,6 +2183,8 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
   uiTouchControlsOpen =
       parseJsonBoolProperty(json, "touch_controls_open").value_or(uiTouchControlsOpen);
+  uiBoostPickupControlsOpen =
+      parseJsonBoolProperty(json, "boost_pickup_controls_open").value_or(uiBoostPickupControlsOpen);
   eventPlaylistMechanicsEnabled = parseJsonBoolProperty(json, "event_playlist_mechanics_enabled")
                                       .value_or(eventPlaylistMechanicsEnabled);
   eventPlaylistTeamEventsEnabled = parseJsonBoolProperty(json, "event_playlist_team_enabled")
@@ -2204,6 +2208,24 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "touch_breakdown_surface").value_or(touchBreakdownSurface);
   touchBreakdownDodge =
       parseJsonBoolProperty(json, "touch_breakdown_dodge").value_or(touchBreakdownDodge);
+  boostPickupPadBig =
+      parseJsonBoolProperty(json, "boost_pickup_pad_big").value_or(boostPickupPadBig);
+  boostPickupPadSmall =
+      parseJsonBoolProperty(json, "boost_pickup_pad_small").value_or(boostPickupPadSmall);
+  boostPickupPadAmbiguous =
+      parseJsonBoolProperty(json, "boost_pickup_pad_ambiguous").value_or(boostPickupPadAmbiguous);
+  boostPickupActivityActive = parseJsonBoolProperty(json, "boost_pickup_activity_active")
+                                  .value_or(boostPickupActivityActive);
+  boostPickupActivityInactive = parseJsonBoolProperty(json, "boost_pickup_activity_inactive")
+                                    .value_or(boostPickupActivityInactive);
+  boostPickupActivityUnknown = parseJsonBoolProperty(json, "boost_pickup_activity_unknown")
+                                   .value_or(boostPickupActivityUnknown);
+  boostPickupFieldOwn =
+      parseJsonBoolProperty(json, "boost_pickup_field_own").value_or(boostPickupFieldOwn);
+  boostPickupFieldOpponent = parseJsonBoolProperty(json, "boost_pickup_field_opponent")
+                                 .value_or(boostPickupFieldOpponent);
+  boostPickupFieldUnknown = parseJsonBoolProperty(json, "boost_pickup_field_unknown")
+                                .value_or(boostPickupFieldUnknown);
   graphInspectorView = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
@@ -2220,6 +2242,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
     loadPlacement(*placements, "module_controls", moduleControlsPlacement);
     loadPlacement(*placements, "touch_controls", touchControlsPlacement);
+    loadPlacement(*placements, "boost_pickup_controls", boostPickupControlsPlacement);
   }
 
   uiStatsWindows.clear();
@@ -2343,6 +2366,8 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"touch_controls_open\": " << (uiTouchControlsOpen ? "true" : "false")
        << ",\n";
+  file << "  \"boost_pickup_controls_open\": "
+       << (uiBoostPickupControlsOpen ? "true" : "false") << ",\n";
   file << "  \"event_playlist_mechanics_enabled\": "
        << (eventPlaylistMechanicsEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_team_enabled\": "
@@ -2361,6 +2386,24 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"touch_breakdown_dodge\": " << (touchBreakdownDodge ? "true" : "false")
        << ",\n";
+  file << "  \"boost_pickup_pad_big\": " << (boostPickupPadBig ? "true" : "false")
+       << ",\n";
+  file << "  \"boost_pickup_pad_small\": " << (boostPickupPadSmall ? "true" : "false")
+       << ",\n";
+  file << "  \"boost_pickup_pad_ambiguous\": "
+       << (boostPickupPadAmbiguous ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_activity_active\": "
+       << (boostPickupActivityActive ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_activity_inactive\": "
+       << (boostPickupActivityInactive ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_activity_unknown\": "
+       << (boostPickupActivityUnknown ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_field_own\": " << (boostPickupFieldOwn ? "true" : "false")
+       << ",\n";
+  file << "  \"boost_pickup_field_opponent\": "
+       << (boostPickupFieldOpponent ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_field_unknown\": "
+       << (boostPickupFieldUnknown ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
@@ -2385,6 +2428,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, moduleControlsPlacement);
   file << ",\n    \"touch_controls\": ";
   writePlacement(file, touchControlsPlacement);
+  file << ",\n    \"boost_pickup_controls\": ";
+  writePlacement(file, boostPickupControlsPlacement);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -4887,6 +4932,7 @@ void SubtrActorPlugin::Render() {
   renderEventPlaylistWindow();
   renderModuleControlsWindow();
   renderTouchControlsWindow();
+  renderBoostPickupControlsWindow();
   renderStatsWindows();
 }
 
@@ -5028,6 +5074,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
   ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
   ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
+  ImGui::Checkbox("Boost pickup filters", &uiBoostPickupControlsOpen);
   renderSingletonWindowManager();
 
   ImGui::Separator();
@@ -5049,6 +5096,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiStatusOpen = false;
     uiGraphInspectorOpen = false;
     uiTouchControlsOpen = false;
+    uiBoostPickupControlsOpen = false;
   }
   if (ImGui::Button("Save layout")) {
     saveUiConfig();
@@ -5401,6 +5449,121 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     uiTouchControlsOpen = true;
     touchControlsPlacement.pending_focus = true;
   }
+  ImGui::SameLine();
+  if (ImGui::Button("Open boost filters")) {
+    uiBoostPickupControlsOpen = true;
+    boostPickupControlsPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderBoostPickupControlsWindow() {
+  if (!uiBoostPickupControlsOpen) {
+    return;
+  }
+
+  applyWindowPlacement(boostPickupControlsPlacement, 1000.0f, 560.0f, 430.0f, 420.0f);
+  if (!ImGui::Begin("Boost pickup filters##subtr-actor", &uiBoostPickupControlsOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(boostPickupControlsPlacement);
+
+  const int activePadTypes = static_cast<int>(boostPickupPadBig) +
+                             static_cast<int>(boostPickupPadSmall) +
+                             static_cast<int>(boostPickupPadAmbiguous);
+  const int activeActivities = static_cast<int>(boostPickupActivityActive) +
+                               static_cast<int>(boostPickupActivityInactive) +
+                               static_cast<int>(boostPickupActivityUnknown);
+  const int activeFieldHalves = static_cast<int>(boostPickupFieldOwn) +
+                                static_cast<int>(boostPickupFieldOpponent) +
+                                static_cast<int>(boostPickupFieldUnknown);
+  const bool hidden =
+      activePadTypes == 0 || activeActivities == 0 || activeFieldHalves == 0;
+  const int constrainedGroups = static_cast<int>(activePadTypes < 3) +
+                                static_cast<int>(activeActivities < 3) +
+                                static_cast<int>(activeFieldHalves < 3);
+  const std::string pickupReadout =
+      hidden ? "Hidden"
+             : constrainedGroups == 0 ? "All labels"
+                                      : std::format("{} filters", constrainedGroups);
+
+  ImGui::Text("Pickup labels: %s", pickupReadout.c_str());
+  ImGui::Text("Known pads: %zu", boostPadIds.size());
+  ImGui::Text("Pending pad events: %zu", pendingBoostPadEvents.size());
+  ImGui::Text("Recent boost pickups: %d", recentEventCountForType("boost_pickup"));
+
+  ImGui::Separator();
+  if (ImGui::Button("All filters")) {
+    boostPickupPadBig = true;
+    boostPickupPadSmall = true;
+    boostPickupPadAmbiguous = true;
+    boostPickupActivityActive = true;
+    boostPickupActivityInactive = true;
+    boostPickupActivityUnknown = true;
+    boostPickupFieldOwn = true;
+    boostPickupFieldOpponent = true;
+    boostPickupFieldUnknown = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Hide pickups")) {
+    boostPickupPadBig = false;
+    boostPickupPadSmall = false;
+    boostPickupPadAmbiguous = false;
+    boostPickupActivityActive = false;
+    boostPickupActivityInactive = false;
+    boostPickupActivityUnknown = false;
+    boostPickupFieldOwn = false;
+    boostPickupFieldOpponent = false;
+    boostPickupFieldUnknown = false;
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PAD TYPE");
+  ImGui::Checkbox("Big pads", &boostPickupPadBig);
+  ImGui::SameLine();
+  ImGui::Checkbox("Small pads", &boostPickupPadSmall);
+  ImGui::Checkbox("Ambiguous pads", &boostPickupPadAmbiguous);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIVITY");
+  ImGui::Checkbox("Active play", &boostPickupActivityActive);
+  ImGui::SameLine();
+  ImGui::Checkbox("Inactive play", &boostPickupActivityInactive);
+  ImGui::Checkbox("Unknown activity", &boostPickupActivityUnknown);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FIELD HALF");
+  ImGui::Checkbox("Own half", &boostPickupFieldOwn);
+  ImGui::SameLine();
+  ImGui::Checkbox("Opponent half", &boostPickupFieldOpponent);
+  ImGui::Checkbox("Unknown half", &boostPickupFieldUnknown);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
+  if (ImGui::Button("Show boost pickups")) {
+    setCvarString("subtr_actor_overlay_event_types", "boost_pickup");
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open boost stats")) {
+    createStatsModuleWindow("boost", 0);
+  }
+  if (ImGui::Button("Inspect boost nodes")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorView = 1;
+    graphInspectorNodeQuery = "boost";
+    graphInspectorPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Boost output")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorView = 0;
+    selectedGraphOutput = "events";
+    graphInspectorPlacement.pending_focus = true;
+  }
 
   ImGui::End();
 }
@@ -5678,7 +5841,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 7> windows{{
+  std::array<SingletonWindowControl, 8> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
@@ -5686,6 +5849,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
       {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
       {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
+      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
   }};
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
@@ -5777,6 +5941,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   graphInspectorPlacement = UiWindowPlacement{};
   moduleControlsPlacement = UiWindowPlacement{};
   touchControlsPlacement = UiWindowPlacement{};
+  boostPickupControlsPlacement = UiWindowPlacement{};
 
   launcherPlacement.pending_focus = true;
   for (UiStatsWindow &window : uiStatsWindows) {
@@ -5811,6 +5976,16 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiGraphInspectorOpen = false;
   uiModuleControlsOpen = true;
   uiTouchControlsOpen = false;
+  uiBoostPickupControlsOpen = false;
+  boostPickupPadBig = true;
+  boostPickupPadSmall = true;
+  boostPickupPadAmbiguous = true;
+  boostPickupActivityActive = true;
+  boostPickupActivityInactive = true;
+  boostPickupActivityUnknown = true;
+  boostPickupFieldOwn = true;
+  boostPickupFieldOpponent = true;
+  boostPickupFieldUnknown = true;
   eventPlaylistMechanicsEnabled = true;
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;

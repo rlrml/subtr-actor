@@ -249,6 +249,7 @@ private:
   bool uiEventPlaylistOpen = false;
   bool uiModuleControlsOpen = false;
   bool uiTouchControlsOpen = false;
+  bool uiBoostPickupControlsOpen = false;
   bool eventPlaylistMechanicsEnabled = true;
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
@@ -259,6 +260,15 @@ private:
   bool touchBreakdownHeight = false;
   bool touchBreakdownSurface = false;
   bool touchBreakdownDodge = false;
+  bool boostPickupPadBig = true;
+  bool boostPickupPadSmall = true;
+  bool boostPickupPadAmbiguous = true;
+  bool boostPickupActivityActive = true;
+  bool boostPickupActivityInactive = true;
+  bool boostPickupActivityUnknown = true;
+  bool boostPickupFieldOwn = true;
+  bool boostPickupFieldOpponent = true;
+  bool boostPickupFieldUnknown = true;
   int graphInspectorView = 0;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
@@ -274,6 +284,7 @@ private:
   UiWindowPlacement eventPlaylistPlacement;
   UiWindowPlacement moduleControlsPlacement;
   UiWindowPlacement touchControlsPlacement;
+  UiWindowPlacement boostPickupControlsPlacement;
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
@@ -303,6 +314,7 @@ private:
   void renderEventPlaylistWindow();
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();
+  void renderBoostPickupControlsWindow();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void resetWindowPlacements();
