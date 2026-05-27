@@ -3687,6 +3687,10 @@ void SubtrActorPlugin::applyUiConfigJson(
           : hasWebStatsWindows ? parseJsonObjectArrayProperty(json, "statsWindows")
                                : std::vector<std::string>{};
   for (const std::string &object : statsWindowObjects) {
+    const auto idString = parseJsonStringProperty(object, "id");
+    if (statsWindowObjectsFromWeb && !idString) {
+      continue;
+    }
     const auto kind = parseJsonStringProperty(object, "kind");
     if (!kind) {
       continue;
@@ -3700,7 +3704,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     UiStatsWindow window{};
     window.kind = *parsedKind;
 
-    if (const auto idString = parseJsonStringProperty(object, "id")) {
+    if (idString) {
       window.config_id = *idString;
       const size_t digitOffset = idString->find_first_of("0123456789");
       if (digitOffset != std::string::npos) {

@@ -483,6 +483,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'const auto idString = parseJsonStringProperty(object, "id");\n    if (statsWindowObjectsFromWeb && !idString) {\n      continue;\n    }',
+        "web stats window import rejects entries without string ids",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'hasLegacyStatsWindows\n          ? parseJsonObjectArrayProperty(json, "stats_windows")',
         "stats window import prefers present legacy plugin config",
         errors,
