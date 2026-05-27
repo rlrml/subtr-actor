@@ -417,8 +417,44 @@ def main() -> int:
         )
     require_contains(
         plugin_source,
+        "std::optional<std::string> SubtrActorPlugin::webPlayerIdForWindowConfig(",
+        "nullable web stats window playerId helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::optional<std::string> SubtrActorPlugin::webCameraPlayerIdConfig() const",
+        "nullable web camera attachedPlayerId helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (const auto playerId = webPlayerIdForWindowConfig(window))",
+        "web stats window config uses nullable playerId helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (const auto playerId = webPlayerIdForIndexIfKnown(window.selected_player_index))",
+        "stats window player selection only synthesizes known player ids",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (const auto attachedPlayerId = webCameraPlayerIdConfig())",
+        "web camera config uses nullable attachedPlayerId helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'file << "null";',
+        "web config can emit null values",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
         'file << ",\\"playerId\\":\\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\\""',
-        "web stats window config always emits playerId",
+        "web stats window config always serializes playerId as string",
         errors,
     )
     require_contains(

@@ -599,9 +599,12 @@ private:
       const UiStatsWindow::Entry &entry) const;
   std::optional<uint32_t> playerIndexForTargetId(std::string_view targetId) const;
   std::string webPlayerIdForIndex(uint32_t playerIndex) const;
+  std::optional<std::string> webPlayerIdForIndexIfKnown(uint32_t playerIndex) const;
   std::string webPlayerIdForWindow(const UiStatsWindow &window) const;
+  std::optional<std::string> webPlayerIdForWindowConfig(const UiStatsWindow &window) const;
   void resolveStatsWindowPlayerSelection(UiStatsWindow &window);
   std::string webCameraPlayerId() const;
+  std::optional<std::string> webCameraPlayerIdConfig() const;
   void resolveCameraPlayerSelection();
   void renderAdHocTargetSelector(
       UiStatsWindow &window,

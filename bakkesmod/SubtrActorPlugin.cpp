@@ -2510,6 +2510,24 @@ std::string SubtrActorPlugin::webPlayerIdForIndex(uint32_t playerIndex) const {
   return std::to_string(playerIndex);
 }
 
+std::optional<std::string> SubtrActorPlugin::webPlayerIdForIndexIfKnown(
+    uint32_t playerIndex) const {
+  const auto uniqueId = playerUniqueIdsByIndex.find(playerIndex);
+  if (uniqueId != playerUniqueIdsByIndex.end() && !uniqueId->second.empty()) {
+    return uniqueId->second;
+  }
+  const auto sampledPlayer = std::find_if(
+      sampledPlayers.begin(),
+      sampledPlayers.end(),
+      [playerIndex](const SaPlayerFrame &player) {
+        return player.player_index == playerIndex;
+      });
+  if (sampledPlayer != sampledPlayers.end()) {
+    return std::to_string(playerIndex);
+  }
+  return std::nullopt;
+}
+
 std::string SubtrActorPlugin::webPlayerIdForWindow(const UiStatsWindow &window) const {
   if (!window.selected_player_id.empty() &&
       !parseUnsignedIntegerString(window.selected_player_id)) {
@@ -2518,9 +2536,19 @@ std::string SubtrActorPlugin::webPlayerIdForWindow(const UiStatsWindow &window) 
   return webPlayerIdForIndex(window.selected_player_index);
 }
 
+std::optional<std::string> SubtrActorPlugin::webPlayerIdForWindowConfig(
+    const UiStatsWindow &window) const {
+  if (!window.selected_player_id.empty()) {
+    return window.selected_player_id;
+  }
+  return webPlayerIdForIndexIfKnown(window.selected_player_index);
+}
+
 void SubtrActorPlugin::resolveStatsWindowPlayerSelection(UiStatsWindow &window) {
   if (window.selected_player_id.empty()) {
-    window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
+    if (const auto playerId = webPlayerIdForIndexIfKnown(window.selected_player_index)) {
+      window.selected_player_id = *playerId;
+    }
     return;
   }
   if (const auto parsedPlayerIndex = parseUnsignedIntegerString(window.selected_player_id)) {
@@ -2539,6 +2567,13 @@ std::string SubtrActorPlugin::webCameraPlayerId() const {
     return cameraSelectedPlayerId;
   }
   return webPlayerIdForIndex(cameraSelectedPlayerIndex);
+}
+
+std::optional<std::string> SubtrActorPlugin::webCameraPlayerIdConfig() const {
+  if (!cameraSelectedPlayerId.empty()) {
+    return cameraSelectedPlayerId;
+  }
+  return webPlayerIdForIndexIfKnown(cameraSelectedPlayerIndex);
 }
 
 void SubtrActorPlugin::resolveCameraPlayerSelection() {
@@ -3984,7 +4019,11 @@ std::string SubtrActorPlugin::uiConfigJson() {
   }
   file << ",\"attachedPlayerId\":";
   if (cameraViewMode == 1) {
-    file << "\"" << escapeJsonString(webCameraPlayerId()) << "\"";
+    if (const auto attachedPlayerId = webCameraPlayerIdConfig()) {
+      file << "\"" << escapeJsonString(*attachedPlayerId) << "\"";
+    } else {
+      file << "null";
+    }
   } else {
     file << "null";
   }
@@ -4225,7 +4264,12 @@ std::string SubtrActorPlugin::uiConfigJson() {
          << statsWindowKindConfigId(window.kind)
          << "\",\"placement\":";
     writeStatsPlayerStatsWindowPlacement(file, window);
-    file << ",\"playerId\":\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\"";
+    file << ",\"playerId\":";
+    if (const auto playerId = webPlayerIdForWindowConfig(window)) {
+      file << "\"" << escapeJsonString(*playerId) << "\"";
+    } else {
+      file << "null";
+    }
     file << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
     file << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
