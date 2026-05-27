@@ -7619,6 +7619,46 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   ImGui::Text("Annotations: %zu", annotationCount);
 
   ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY SOURCES");
+  ImGui::BeginChild("replay-loading-list", ImVec2{0.0f, 112.0f}, true);
+  if (!replayPath && rawReplayPath.empty() && replayAnnotationPath.empty()) {
+    ImGui::TextDisabled("No replay sources.");
+  } else {
+    const std::string title = replayPath ? *replayPath
+                              : !rawReplayPath.empty() ? rawReplayPath
+                                                       : replayAnnotationPath;
+    ImGui::TextWrapped("%s", title.c_str());
+    std::vector<std::string> replayMeta;
+    if (!rawReplayPath.empty()) {
+      replayMeta.push_back(std::format("raw: {}", rawReplayPath));
+    }
+    if (!replayAnnotationPath.empty() && replayAnnotationPath != title) {
+      replayMeta.push_back(std::format("processed: {}", replayAnnotationPath));
+    }
+    if (annotationCount > 0) {
+      replayMeta.push_back(std::format("{} events", annotationCount));
+    }
+    if (!replayMeta.empty()) {
+      std::string metaText;
+      for (const std::string &part : replayMeta) {
+        if (!metaText.empty()) {
+          metaText += " | ";
+        }
+        metaText += part;
+      }
+      ImGui::TextDisabled("%s", metaText.c_str());
+    }
+    ImGui::TextColored(
+        replayAnnotations ? ImVec4{0.50f, 0.86f, 0.62f, 1.0f}
+                          : replayAnnotationLoadFailed
+                              ? ImVec4{0.95f, 0.45f, 0.45f, 1.0f}
+                              : ImVec4{0.72f, 0.78f, 0.86f, 1.0f},
+        "%s",
+        status);
+  }
+  ImGui::EndChild();
+
+  ImGui::Separator();
   bool annotationsValue = annotationsEnabled;
   if (ImGui::Checkbox("Replay annotations", &annotationsValue)) {
     setCvarBool("subtr_actor_replay_annotations_enabled", annotationsValue);
