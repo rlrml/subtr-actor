@@ -5369,11 +5369,13 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiGraphInspectorOpen = true;
     graphInspectorPlacement.pending_focus = true;
     verifyGraphRuntime({"subtr_actor_verify_graph"});
+    uiLauncherOpen = false;
   }
   ImGui::SameLine();
   if (ImGui::Button("Open modules")) {
     uiModuleControlsOpen = true;
     moduleControlsPlacement.pending_focus = true;
+    uiLauncherOpen = false;
   }
   ImGui::SameLine();
   if (ImGui::Button("Close launcher")) {
@@ -5446,25 +5448,32 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
   if (ImGui::Button("New player stats")) {
     createStatsWindow(UiStatsWindowKind::Player);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New team stats")) {
     createStatsWindow(UiStatsWindowKind::Team);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New all players stats")) {
     createStatsWindow(UiStatsWindowKind::AllPlayers);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New all teams stats")) {
     createStatsWindow(UiStatsWindowKind::AllTeams);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New goal labels")) {
     createStatsWindow(UiStatsWindowKind::GoalsOverview);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New ad hoc stats")) {
     createStatsWindow(UiStatsWindowKind::AdHoc);
+    uiLauncherOpen = false;
   }
   if (ImGui::Button("New stats module")) {
     const std::vector<std::string> &moduleNames = statsModuleNames();
     createStatsModuleWindow(moduleNames.empty() ? "" : moduleNames.front());
+    uiLauncherOpen = false;
   }
   const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
       uiStatsWindows.begin(),
@@ -5486,6 +5495,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     for (const std::string &moduleName : moduleNames) {
       if (ImGui::SmallButton(std::format("Open##module-{}", moduleName).c_str())) {
         createStatsModuleWindow(moduleName);
+        uiLauncherOpen = false;
       }
       ImGui::SameLine();
       ImGui::Text("%s", moduleName.c_str());
