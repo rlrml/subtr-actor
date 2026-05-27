@@ -3536,6 +3536,14 @@ std::string SubtrActorPlugin::uiConfigJson() {
       pluginWindows.push_back(window);
     }
   }
+  std::sort(
+      webWindows.begin(),
+      webWindows.end(),
+      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
+        return left.launcher_order == right.launcher_order
+                   ? std::string_view{left.config_id} < std::string_view{right.config_id}
+                   : left.launcher_order < right.launcher_order;
+      });
   for (size_t index = 0; index < webWindows.size(); index += 1) {
     writeWindowConfig(webWindows[index], index + 1 == webWindows.size());
   }
