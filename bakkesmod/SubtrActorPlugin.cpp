@@ -7345,6 +7345,72 @@ void SubtrActorPlugin::applyLauncherMenuPlacement() {
   }
 }
 
+void SubtrActorPlugin::renderLauncherWorkspaceControls() {
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WORKSPACES");
+  if (ImGui::Button("Default workspace")) {
+    applyDefaultUiWorkspace();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Review workspace")) {
+    applyReplayReviewUiWorkspace();
+  }
+  if (ImGui::Button("Debug workspace")) {
+    applyGraphDebugUiWorkspace();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Recording workspace")) {
+    applyRecordingUiWorkspace();
+  }
+  if (ImGui::Button("Reset positions")) {
+    resetWindowPlacements();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Default stats windows")) {
+    resetDefaultStatsWindows();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Hide side windows")) {
+    for (const SingletonWindowControl &window : singletonWindowControls()) {
+      if (std::string_view{window.config_id} == "scoreboard") {
+        continue;
+      }
+      *window.open = false;
+    }
+  }
+  if (ImGui::Button("Save layout")) {
+    saveUiConfig();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reload layout")) {
+    loadUiConfig();
+  }
+  if (ImGui::Button("Copy layout JSON")) {
+    const std::string json = uiConfigJson();
+    ImGui::SetClipboardText(json.c_str());
+    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Copy layout cfg")) {
+    const std::string json = uiConfigJson();
+    const std::string cfg = std::format("#cfg={}", urlEncode(json));
+    ImGui::SetClipboardText(cfg.c_str());
+    cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Paste layout")) {
+    const char *clipboardText = ImGui::GetClipboardText();
+    if (clipboardText == nullptr || clipboardText[0] == '\0') {
+      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
+    } else if (const std::optional<std::string> configJson =
+                   statsPlayerCfgJsonFromClipboard(clipboardText)) {
+      applyUiConfigJson(*configJson, "clipboard");
+    } else {
+      cvarManager->log(
+          "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
+    }
+  }
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -7426,69 +7492,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WORKSPACES");
-  if (ImGui::Button("Default workspace")) {
-    applyDefaultUiWorkspace();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Review workspace")) {
-    applyReplayReviewUiWorkspace();
-  }
-  if (ImGui::Button("Debug workspace")) {
-    applyGraphDebugUiWorkspace();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Recording workspace")) {
-    applyRecordingUiWorkspace();
-  }
-  if (ImGui::Button("Reset positions")) {
-    resetWindowPlacements();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Default stats windows")) {
-    resetDefaultStatsWindows();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Hide side windows")) {
-    for (const SingletonWindowControl &window : singletonWindowControls()) {
-      if (std::string_view{window.config_id} == "scoreboard") {
-        continue;
-      }
-      *window.open = false;
-    }
-  }
-  if (ImGui::Button("Save layout")) {
-    saveUiConfig();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload layout")) {
-    loadUiConfig();
-  }
-  if (ImGui::Button("Copy layout JSON")) {
-    const std::string json = uiConfigJson();
-    ImGui::SetClipboardText(json.c_str());
-    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Copy layout cfg")) {
-    const std::string json = uiConfigJson();
-    const std::string cfg = std::format("#cfg={}", urlEncode(json));
-    ImGui::SetClipboardText(cfg.c_str());
-    cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Paste layout")) {
-    const char *clipboardText = ImGui::GetClipboardText();
-    if (clipboardText == nullptr || clipboardText[0] == '\0') {
-      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
-    } else if (const std::optional<std::string> configJson =
-                   statsPlayerCfgJsonFromClipboard(clipboardText)) {
-      applyUiConfigJson(*configJson, "clipboard");
-    } else {
-      cvarManager->log(
-          "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
-    }
-  }
+  renderLauncherWorkspaceControls();
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");

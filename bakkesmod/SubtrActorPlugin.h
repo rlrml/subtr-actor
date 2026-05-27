@@ -432,6 +432,7 @@ private:
   void renderLauncherToggleChrome();
   void applyLauncherMenuPlacement();
   void renderLauncherWindow();
+  void renderLauncherWorkspaceControls();
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderEventSourceControls();
