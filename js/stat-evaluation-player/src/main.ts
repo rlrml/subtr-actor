@@ -1,15 +1,10 @@
 import "./styles.css";
 import {
-  createBallchasingOverlayPlugin,
   createBoostPadOverlayPlugin,
-  createBoostPickupAnimationPlugin,
-  createCanvasRecorderPlugin,
-  createTimelineOverlayPlugin,
   timelineEventSeekTime,
   ReplayPlayer,
 } from "@rlrml/player";
 import type {
-  BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
   ReplayTimelineEvent,
   ReplayPlayerState,
@@ -39,21 +34,12 @@ import type {
 } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import {
-  filterReplayTimelineEvents,
   getMechanicKinds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
-import {
-  formatReplayLoadProgress,
-  loadReplayBundleInWorker,
-  type ReplayLoadBundle,
-} from "./replayLoader.ts";
-import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
+import type { ReplayLoadBundle } from "./replayLoader.ts";
 import {
   createFileReplaySource,
-  createRemoteReplaySource,
-  loadReplayBundleFromSource,
-  type ReplayInputSource,
 } from "./replayInputSources.ts";
 import {
   createCameraControls,
@@ -65,6 +51,10 @@ import {
   getRecordingControlElements,
   type RecordingControls,
 } from "./recordingControls.ts";
+import {
+  createReplayLoadController,
+  type ReplayLoadController,
+} from "./replayLoadController.ts";
 import { renderScoreboardWindow } from "./scoreboardWindow.ts";
 import {
   createMechanicsReviewController,
@@ -230,6 +220,7 @@ const floatingWindows = new FloatingWindowController(
 let mechanicsReviewController: MechanicsReviewController | null = null;
 let recordingControls: RecordingControls | null = null;
 let cameraControls: CameraControls | null = null;
+let replayLoadController: ReplayLoadController | null = null;
 
 const statsWindowManager = createStatsWindowsManager({
   getDefaultFrameIndex() {
@@ -915,169 +906,6 @@ function renderSnapshot(state: ReplayPlayerState): void {
   eventWindowsManager.syncPlaylistTimeline(state);
 }
 
-function includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): boolean {
-  return boostPickupFilters.includePickup(pickup);
-}
-
-async function loadReplay(source: ReplayInputSource): Promise<void> {
-  await loadReplayBundleForDisplay(
-    source,
-    Promise.resolve().then(() =>
-      loadReplayBundleFromSource(source, (progress) => {
-        statusReadout.textContent = formatReplayLoadProgress(progress);
-        replayLoadModal?.update(progress);
-      }),
-    ),
-  );
-}
-
-async function loadReplayBundleForDisplay(
-  source: ReplayInputSource,
-  bundlePromise: Promise<ReplayLoadBundle>,
-): Promise<void> {
-  statusReadout.textContent = source.preparingStatus;
-  fileInput.disabled = true;
-  replayLoadModal?.show(source.name, source.preparingStatus);
-  setTransportEnabled(false);
-  cameraControls?.syncAvailability();
-  emptyState.hidden = false;
-
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-  }
-
-  teardownActiveModules();
-  replayPlayer?.destroy();
-  replayPlayer = null;
-  canvasRecorder = null;
-  loadedReplayName = null;
-  timelineOverlay = null;
-  statsTimeline = null;
-  statsFrameLookup = null;
-  statRegistry = createStatRegistry(null);
-  clearTimelineEventSources();
-  clearTimelineRangeSources();
-  clearStandalonePlugins();
-  clearRenderCaches();
-  eventWindowsManager.resetPlaylistState();
-  renderScoreboard();
-  renderTimelineEventCount();
-  eventWindowsManager.renderTimelineControls();
-  eventWindowsManager.renderPlaylistWindow();
-  renderModuleSettings();
-  recordingControls?.sync();
-
-  try {
-    statusReadout.textContent = "Parsing replay...";
-    replayLoadModal?.show(source.name, "Parsing replay...");
-    const loadedReplay = await bundlePromise;
-    const { replay } = loadedReplay;
-    statsTimeline = loadedReplay.statsTimeline;
-    statsFrameLookup = loadedReplay.statsFrameLookup;
-    statRegistry = createStatRegistry(null);
-    migrateMechanicBackedTimelineEventSelections();
-
-    timelineOverlay = createTimelineOverlayPlugin({
-      replayEventsLabel: "Replay",
-      replayEvents: (context) =>
-        withTimelineEventSeekTimes(
-          filterReplayTimelineEvents(context.replay, activeTimelineEventSourceIds),
-        ),
-    });
-    const recorder = createCanvasRecorderPlugin({
-      onStatusChange: (status) => recordingControls?.sync(status),
-    });
-    canvasRecorder = recorder;
-    const config = initialUrlConfig;
-
-    replayPlayer = new ReplayPlayer(viewport, replay, {
-      initialPlaybackRate: config?.playback.rate,
-      initialCameraDistanceScale: config?.camera.distanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
-      initialCustomCameraSettings: config?.camera.customSettings ?? null,
-      initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
-      initialCameraViewMode: config?.camera.mode,
-      initialBallCamEnabled: config?.camera.ballCam ?? false,
-      initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
-      initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
-      initialSkipKickoffsEnabled: skipKickoffs.checked,
-      plugins: [
-        createBallchasingOverlayPlugin(),
-        createBoostPickupAnimationPlugin({
-          includePickup: includeBoostPickupAnimationPickup,
-        }),
-        recorder,
-        timelineOverlay,
-      ],
-    });
-    syncBoostPadOverlayPlugin();
-
-    setupActiveModules();
-    unsubscribe = replayPlayer.subscribe(renderSnapshot);
-    if (config) {
-      isApplyingConfig = true;
-      try {
-        applyConfigToReplayPlayer(config);
-      } finally {
-        isApplyingConfig = false;
-      }
-    }
-
-    cameraControls?.populateAttachedPlayers(replay.players);
-    emptyState.hidden = true;
-    statusReadout.textContent = `Loaded ${source.name}`;
-    loadedReplayName = source.name;
-    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-    framesReadout.textContent = `${replay.frameCount}`;
-    renderTimelineEventCount();
-    eventWindowsManager.renderTimelineControls();
-    eventWindowsManager.resetPlaylistState();
-    eventWindowsManager.renderPlaylistWindow();
-    setTransportEnabled(true);
-    cameraControls?.syncAvailability(replayPlayer.getState());
-    renderSnapshot(replayPlayer.getState());
-    statsWindowManager.render(replayPlayer.getState().frameIndex);
-    renderScoreboard(replayPlayer.getState().frameIndex);
-    eventWindowsManager.syncPlaylistTimeline(replayPlayer.getState(), { forceScroll: true });
-    renderModuleSettings();
-    recordingControls?.sync();
-    replayLoadModal?.hide();
-  } catch (error) {
-    replayLoadModal?.hide();
-    replayPlayer?.destroy();
-    replayPlayer = null;
-    canvasRecorder = null;
-    recordingControls?.sync();
-    throw error;
-  } finally {
-    fileInput.disabled = false;
-  }
-}
-
-function loadReplayFromLocation(signal: AbortSignal): void {
-  let replayRequest: ReplayFetchRequest | null;
-  try {
-    replayRequest = getReplayFetchRequestFromSearch(window.location.search, window.location.href);
-  } catch (error) {
-    console.error("Invalid replay URL:", error);
-    statusReadout.textContent = error instanceof Error ? error.message : "Invalid replay URL";
-    return;
-  }
-
-  if (!replayRequest) {
-    return;
-  }
-
-  void loadReplay(createRemoteReplaySource(replayRequest, signal)).catch((error) => {
-    if (signal.aborted) {
-      return;
-    }
-    console.error("Failed to load replay URL:", error);
-    statusReadout.textContent =
-      error instanceof Error ? error.message : "Failed to load replay URL";
-  });
-}
-
 export function mountStatEvaluationPlayer(
   root: HTMLElement,
   options: StatEvaluationPlayerMountOptions = {},
@@ -1147,12 +975,113 @@ export function mountStatEvaluationPlayer(
     scheduleConfigUrlUpdate,
   });
 
+  replayLoadController = createReplayLoadController({
+    defaultCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
+    emptyState,
+    fileInput,
+    replayLoadModal,
+    statusReadout,
+    viewport,
+    getActiveTimelineEventSourceIds() {
+      return activeTimelineEventSourceIds;
+    },
+    getInitialConfig() {
+      return initialUrlConfig;
+    },
+    getInitialSkipKickoffsEnabled() {
+      return skipKickoffs.checked;
+    },
+    getInitialSkipPostGoalTransitionsEnabled() {
+      return skipPostGoalTransitions.checked;
+    },
+    getReplayPlayer() {
+      return replayPlayer;
+    },
+    includeBoostPickupAnimationPickup(pickup) {
+      return boostPickupFilters.includePickup(pickup);
+    },
+    applyConfigToReplayPlayer,
+    clearRenderCaches,
+    clearStandalonePlugins,
+    clearTimelineEventSources,
+    clearTimelineRangeSources,
+    eventWindowsRenderPlaylistWindow() {
+      eventWindowsManager.renderPlaylistWindow();
+    },
+    eventWindowsRenderTimelineControls() {
+      eventWindowsManager.renderTimelineControls();
+    },
+    eventWindowsResetPlaylistState() {
+      eventWindowsManager.resetPlaylistState();
+    },
+    eventWindowsSyncPlaylistTimeline(state, options) {
+      eventWindowsManager.syncPlaylistTimeline(state, options);
+    },
+    migrateMechanicBackedTimelineEventSelections,
+    recordingSync(status) {
+      recordingControls?.sync(status);
+    },
+    renderModuleSettings,
+    renderScoreboard,
+    renderSnapshot,
+    renderTimelineEventCount,
+    setCanvasRecorder(recorder) {
+      canvasRecorder = recorder;
+    },
+    setIsApplyingConfig(isApplying) {
+      isApplyingConfig = isApplying;
+    },
+    setLoadedReplayName(name) {
+      loadedReplayName = name;
+    },
+    setReplayDetails(playersText, frameCount) {
+      playersReadout.textContent = playersText;
+      framesReadout.textContent = `${frameCount}`;
+    },
+    setReplayPlayer(player) {
+      replayPlayer = player;
+    },
+    setStatRegistry(registry) {
+      statRegistry = registry;
+    },
+    setStatsFrameLookup(lookup) {
+      statsFrameLookup = lookup;
+    },
+    setStatsTimeline(timeline) {
+      statsTimeline = timeline;
+    },
+    setTimelineOverlay(overlay) {
+      timelineOverlay = overlay;
+    },
+    setTransportEnabled,
+    setUnsubscribe(nextUnsubscribe) {
+      unsubscribe = nextUnsubscribe;
+    },
+    setupActiveModules,
+    statsWindowsRender(frameIndex) {
+      statsWindowManager.render(frameIndex);
+    },
+    syncBoostPadOverlayPlugin,
+    syncCameraAvailability(state) {
+      cameraControls?.syncAvailability(state);
+    },
+    teardownActiveModules,
+    unsubscribeCurrent() {
+      unsubscribe?.();
+      unsubscribe = null;
+    },
+  });
+
   mechanicsReviewController = createMechanicsReviewController({
     elements: getMechanicsReviewElements(root),
     getReplayPlayer() {
       return replayPlayer;
     },
-    loadReplayBundleForDisplay,
+    loadReplayBundleForDisplay(source, bundlePromise) {
+      return replayLoadController
+        ? replayLoadController.loadReplayBundleForDisplay(source, bundlePromise)
+        : Promise.reject(new Error("Replay loader is not initialized"));
+    },
     resetTransitionSkipControls() {
       skipPostGoalTransitions.checked = false;
       skipKickoffs.checked = false;
@@ -1221,6 +1150,7 @@ export function mountStatEvaluationPlayer(
     mechanicsReviewController = null;
     recordingControls = null;
     cameraControls = null;
+    replayLoadController = null;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     initialUrlConfig = null;
@@ -1323,7 +1253,7 @@ export function mountStatEvaluationPlayer(
 
       try {
         mechanicsReviewController?.clearCurrentReplay();
-        await loadReplay(createFileReplaySource(file));
+        await replayLoadController?.loadReplay(createFileReplaySource(file));
       } catch (error) {
         console.error("Failed to load replay:", error);
         statusReadout.textContent =
@@ -1383,7 +1313,7 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewController?.render();
   eventWindowsManager.renderPlaylistWindow();
   if (options.initialBundle) {
-    void loadReplayBundleForDisplay(
+    void replayLoadController?.loadReplayBundleForDisplay(
       {
         name: options.initialReplayName ?? "replay",
         preparingStatus: "Preparing replay...",
@@ -1401,7 +1331,7 @@ export function mountStatEvaluationPlayer(
         error instanceof Error ? error.message : "Failed to load preprocessed replay bundle";
     });
   } else if (options.loadFromLocation !== false) {
-    loadReplayFromLocation(listeners.signal);
+    replayLoadController?.loadReplayFromLocation(listeners.signal);
   }
 
   mechanicsReviewController?.loadFromLocation(listeners.signal);
