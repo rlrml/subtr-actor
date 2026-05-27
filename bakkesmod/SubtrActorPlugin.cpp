@@ -2175,6 +2175,8 @@ void SubtrActorPlugin::loadUiConfig() {
   uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
   uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
+  uiPlaybackControlsOpen =
+      parseJsonBoolProperty(json, "playback_controls_open").value_or(uiPlaybackControlsOpen);
   uiGraphInspectorOpen =
       parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
   uiEventPlaylistOpen =
@@ -2238,6 +2240,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "scoreboard", scoreboardPlacement);
     loadPlacement(*placements, "events", eventsPlacement);
     loadPlacement(*placements, "status", statusPlacement);
+    loadPlacement(*placements, "playback_controls", playbackControlsPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
     loadPlacement(*placements, "module_controls", moduleControlsPlacement);
@@ -2358,6 +2361,8 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
   file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
+  file << "  \"playback_controls_open\": "
+       << (uiPlaybackControlsOpen ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_open\": " << (uiGraphInspectorOpen ? "true" : "false")
        << ",\n";
   file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
@@ -2420,6 +2425,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, eventsPlacement);
   file << ",\n    \"status\": ";
   writePlacement(file, statusPlacement);
+  file << ",\n    \"playback_controls\": ";
+  writePlacement(file, playbackControlsPlacement);
   file << ",\n    \"graph_inspector\": ";
   writePlacement(file, graphInspectorPlacement);
   file << ",\n    \"event_playlist\": ";
@@ -4928,6 +4935,7 @@ void SubtrActorPlugin::Render() {
   renderScoreboardWindow();
   renderEventsWindow();
   renderStatusWindow();
+  renderPlaybackControlsWindow();
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
   renderModuleControlsWindow();
@@ -5071,6 +5079,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Events", &uiEventsOpen);
   ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
+  ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
   ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
   ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
@@ -5094,6 +5103,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiEventsOpen = false;
     uiEventPlaylistOpen = false;
     uiStatusOpen = false;
+    uiPlaybackControlsOpen = false;
     uiGraphInspectorOpen = false;
     uiTouchControlsOpen = false;
     uiBoostPickupControlsOpen = false;
@@ -5665,6 +5675,116 @@ void SubtrActorPlugin::renderStatusWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderPlaybackControlsWindow() {
+  if (!uiPlaybackControlsOpen) {
+    return;
+  }
+
+  applyWindowPlacement(playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f);
+  if (!ImGui::Begin("Playback controls##subtr-actor", &uiPlaybackControlsOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(playbackControlsPlacement);
+
+  const bool inReplay = gameWrapper->IsInReplay();
+  const bool inGame = gameWrapper->IsInGame();
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  const bool hasReplayServer = !replayServer.IsNull();
+  const char *mode = inReplay ? "replay"
+                              : inGame ? "live match/freeplay" : "waiting for game";
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYBACK");
+  ImGui::Text("Mode: %s", mode);
+  ImGui::Text("Live frame: %llu", static_cast<unsigned long long>(frameNumber));
+  ImGui::Text("Live time: %.2fs", lastTime);
+  if (hasReplayServer) {
+    ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
+  } else {
+    ImGui::TextDisabled("Replay time: --");
+  }
+  if (lastProcessedGameTime) {
+    ImGui::Text("Last sampled: %.2fs", *lastProcessedGameTime);
+  } else {
+    ImGui::TextDisabled("Last sampled: --");
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");
+  auto checkboxCvar = [this](const char *label, const char *name, bool defaultValue) {
+    bool value = cvarBool(name, defaultValue);
+    if (ImGui::Checkbox(label, &value)) {
+      setCvarBool(name, value);
+    }
+  };
+  checkboxCvar("Live analysis graph", "subtr_actor_enabled", false);
+  checkboxCvar("Replay annotations", "subtr_actor_replay_annotations_enabled", true);
+  checkboxCvar("Profile timing", "subtr_actor_profile_enabled", false);
+
+  auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
+  int intervalMs = static_cast<bool>(intervalCvar) ? intervalCvar.getIntValue() : 8;
+  if (ImGui::SliderInt("Sample interval ms", &intervalMs, 1, 1000) &&
+      static_cast<bool>(intervalCvar)) {
+    intervalCvar.setValue(intervalMs);
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANNOTATIONS");
+  ImGui::Text(
+      "Status: %s",
+      replayAnnotations ? "loaded" : replayAnnotationLoadFailed ? "failed" : "idle");
+  if (replayAnnotations && replayAnnotationCount) {
+    ImGui::Text("Replay events: %zu", replayAnnotationCount(replayAnnotations));
+  }
+  if (!replayAnnotationPath.empty()) {
+    ImGui::TextWrapped("Replay: %s", replayAnnotationPath.c_str());
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMING");
+  if (profileSampleCount == 0) {
+    ImGui::TextDisabled("No timing samples yet.");
+  } else {
+    const double divisor = static_cast<double>(profileSampleCount);
+    ImGui::Text("Samples: %llu", static_cast<unsigned long long>(profileSampleCount));
+    ImGui::Text(
+        "Avg total: %.3fms",
+        (profileSamplingMs + profileProcessingMs + profileDrainMs) / divisor);
+    ImGui::Text(
+        "Sample %.3f / process %.3f / drain %.3fms",
+        profileSamplingMs / divisor,
+        profileProcessingMs / divisor,
+        profileDrainMs / divisor);
+  }
+
+  ImGui::Separator();
+  if (ImGui::Button("Reset live state")) {
+    if (engine && engineReset) {
+      engineReset(engine);
+    }
+    resetLiveState();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Verify graph")) {
+    verifyGraphRuntime({"subtr_actor_verify_graph"});
+  }
+  if (ImGui::Button("Open status")) {
+    uiStatusOpen = true;
+    statusPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open playlist")) {
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+  if (ImGui::Button("Open modules")) {
+    uiModuleControlsOpen = true;
+    moduleControlsPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
 std::vector<std::string> SubtrActorPlugin::graphOutputNames() {
   std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
   std::vector<std::string> names =
@@ -5841,11 +5961,12 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 8> windows{{
+  std::array<SingletonWindowControl, 9> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
+      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
       {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
       {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
@@ -5938,6 +6059,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   eventsPlacement = UiWindowPlacement{};
   eventPlaylistPlacement = UiWindowPlacement{};
   statusPlacement = UiWindowPlacement{};
+  playbackControlsPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
   moduleControlsPlacement = UiWindowPlacement{};
   touchControlsPlacement = UiWindowPlacement{};
@@ -5973,6 +6095,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiEventsOpen = true;
   uiEventPlaylistOpen = true;
   uiStatusOpen = true;
+  uiPlaybackControlsOpen = true;
   uiGraphInspectorOpen = false;
   uiModuleControlsOpen = true;
   uiTouchControlsOpen = false;

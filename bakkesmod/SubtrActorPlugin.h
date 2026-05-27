@@ -245,6 +245,7 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
+  bool uiPlaybackControlsOpen = false;
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
   bool uiModuleControlsOpen = false;
@@ -280,6 +281,7 @@ private:
   UiWindowPlacement scoreboardPlacement;
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
+  UiWindowPlacement playbackControlsPlacement;
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
   UiWindowPlacement moduleControlsPlacement;
@@ -310,6 +312,7 @@ private:
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderStatusWindow();
+  void renderPlaybackControlsWindow();
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
   void renderModuleControlsWindow();
