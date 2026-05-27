@@ -7693,19 +7693,23 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
 
 void SubtrActorPlugin::renderWebWindowToggleControls(
     const char *idSuffix,
-    bool closeLauncherOnToggle) {
+    bool closeLauncherOnToggle,
+    bool includeState,
+    bool fullWidth) {
   ImGui::PushID(idSuffix);
   for (const SingletonWindowControl &window : webSingletonWindowControls()) {
     ImGui::PushID(window.label);
     const bool isOpen = window.open != nullptr && *window.open;
-    if (isOpen) {
+    if (includeState && isOpen) {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
     }
-    const std::string buttonLabel =
-        std::format("{}   {}", window.label, isOpen ? "Hide" : "Show");
-    if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
+    const std::string buttonLabel = includeState
+                                        ? std::format("{}   {}", window.label, isOpen ? "Hide" : "Show")
+                                        : std::string{window.label};
+    const float buttonWidth = fullWidth ? ImGui::GetContentRegionAvail().x : 210.0f;
+    if (ImGui::Button(buttonLabel.c_str(), ImVec2{buttonWidth, 0.0f})) {
       if (*window.open) {
         hideSingletonWindow(*window.open);
       } else {
@@ -7715,7 +7719,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
         hideLauncherWindow();
       }
     }
-    if (isOpen) {
+    if (includeState && isOpen) {
       ImGui::PopStyleColor(3);
     }
     ImGui::PopID();
@@ -7727,7 +7731,8 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
     const char *idSuffix,
     bool closeLauncherOnCreate,
     bool includeHeading,
-    bool includeManager) {
+    bool includeManager,
+    bool fullWidth) {
   ImGui::PushID(idSuffix);
   if (includeHeading) {
     ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
@@ -7736,7 +7741,8 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
     if (!kind.web_config) {
       continue;
     }
-    if (ImGui::Button(kind.create_label, ImVec2{170.0f, 0.0f})) {
+    const float buttonWidth = fullWidth ? ImGui::GetContentRegionAvail().x : 170.0f;
+    if (ImGui::Button(kind.create_label, ImVec2{buttonWidth, 0.0f})) {
       createStatsWindow(kind.kind);
       if (closeLauncherOnCreate) {
         hideLauncherWindow();
@@ -7799,8 +7805,8 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
-  renderWebWindowToggleControls("launcher-web-windows", true);
-  renderStatsWindowCreationControls("launcher-stats-windows", false, false, false);
+  renderWebWindowToggleControls("launcher-web-windows", true, false, true);
+  renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
 
   ImGui::Separator();
   renderLauncherWorkspaceControls();

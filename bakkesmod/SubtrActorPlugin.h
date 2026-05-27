@@ -442,12 +442,17 @@ private:
   void applyLauncherMenuPlacement();
   void renderLauncherWindow();
   void renderLauncherWorkspaceControls();
-  void renderWebWindowToggleControls(const char *idSuffix, bool closeLauncherOnToggle);
+  void renderWebWindowToggleControls(
+      const char *idSuffix,
+      bool closeLauncherOnToggle,
+      bool includeState = true,
+      bool fullWidth = false);
   void renderStatsWindowCreationControls(
       const char *idSuffix,
       bool closeLauncherOnCreate,
       bool includeHeading = true,
-      bool includeManager = true);
+      bool includeManager = true,
+      bool fullWidth = false);
   void renderSettingsWindowControls();
   void renderEmptyStateWindow();
   void renderFloatingWindowLayer();
