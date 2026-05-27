@@ -8437,6 +8437,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
 
   ImGui::BeginChild("stats-window-manager", ImVec2{0.0f, 132.0f}, true);
   std::optional<size_t> removeIndex;
+  std::optional<UiStatsWindow> duplicateWindow;
   for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
     UiStatsWindow &window = uiStatsWindows[index];
     ImGui::PushID(static_cast<int>(window.id));
@@ -8464,11 +8465,27 @@ void SubtrActorPlugin::renderStatsWindowManager() {
       removeIndex = index;
     }
     ImGui::SameLine();
+    if (ImGui::SmallButton("Duplicate")) {
+      UiStatsWindow copy = window;
+      copy.id = nextUiStatsWindowId++;
+      copy.open = true;
+      copy.pending_focus = true;
+      copy.picker_open = false;
+      copy.pending_apply_placement = true;
+      copy.x += 24.0f;
+      copy.y += 24.0f;
+      copy.z_index = nextUiWindowZIndex++;
+      duplicateWindow = std::move(copy);
+    }
+    ImGui::SameLine();
     ImGui::TextWrapped("%s", label.c_str());
     ImGui::PopID();
   }
   if (removeIndex) {
     uiStatsWindows.erase(uiStatsWindows.begin() + static_cast<std::ptrdiff_t>(*removeIndex));
+  }
+  if (duplicateWindow) {
+    uiStatsWindows.push_back(std::move(*duplicateWindow));
   }
   ImGui::EndChild();
 }
