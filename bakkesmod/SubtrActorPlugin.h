@@ -477,6 +477,7 @@ private:
       float y,
       float width,
       float height);
+  void applySingletonWindowPlacement(UiWindowPlacement &placement);
   void applyScoreboardWindowPlacement();
   void captureWindowPlacement(UiWindowPlacement &placement);
   bool renderSingletonWindowHeader(const char *label, bool &open);

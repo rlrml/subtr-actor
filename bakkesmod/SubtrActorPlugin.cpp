@@ -6447,6 +6447,21 @@ void SubtrActorPlugin::applyWindowPlacement(
   applyFocus();
 }
 
+void SubtrActorPlugin::applySingletonWindowPlacement(UiWindowPlacement &placement) {
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.placement != &placement) {
+      continue;
+    }
+    if (window.placement == &scoreboardPlacement) {
+      applyScoreboardWindowPlacement();
+      return;
+    }
+    applyWindowPlacement(placement, window.x, window.y, window.width, window.height);
+    return;
+  }
+  applyWindowPlacement(placement, 16.0f, 68.0f, 340.0f, 430.0f);
+}
+
 void SubtrActorPlugin::resetSingletonWindowPlacement(
     UiWindowPlacement &placement,
     float x,
@@ -7079,7 +7094,7 @@ void SubtrActorPlugin::renderEventsWindow() {
   if (!uiEventsOpen) {
     return;
   }
-  applyWindowPlacement(eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f);
+  applySingletonWindowPlacement(eventsPlacement);
   if (!ImGui::Begin("Events##subtr-actor", &uiEventsOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
@@ -7251,7 +7266,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     return;
   }
 
-  applyWindowPlacement(eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f);
+  applySingletonWindowPlacement(eventPlaylistPlacement);
   if (!ImGui::Begin(
           "Event playlist##subtr-actor",
           &uiEventPlaylistOpen,
@@ -7419,7 +7434,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     return;
   }
 
-  applyWindowPlacement(mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f);
+  applySingletonWindowPlacement(mechanicsReviewPlacement);
   if (!ImGui::Begin(
           "Mechanics review##subtr-actor",
           &uiMechanicsReviewOpen,
@@ -7628,7 +7643,7 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     return;
   }
 
-  applyWindowPlacement(replayLoadingPlacement, 960.0f, 68.0f, 520.0f, 360.0f);
+  applySingletonWindowPlacement(replayLoadingPlacement);
   if (!ImGui::Begin(
           "Replay loading##subtr-actor",
           &uiReplayLoadingOpen,
@@ -7800,7 +7815,7 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     return;
   }
 
-  applyWindowPlacement(moduleControlsPlacement, 980.0f, 305.0f, 430.0f, 520.0f);
+  applySingletonWindowPlacement(moduleControlsPlacement);
   if (!ImGui::Begin(
           "Module controls##subtr-actor",
           &uiModuleControlsOpen,
@@ -7907,7 +7922,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     return;
   }
 
-  applyWindowPlacement(boostPickupControlsPlacement, 1000.0f, 560.0f, 430.0f, 420.0f);
+  applySingletonWindowPlacement(boostPickupControlsPlacement);
   if (!ImGui::Begin(
           "Boost pickup filters##subtr-actor",
           &uiBoostPickupControlsOpen,
@@ -8023,7 +8038,7 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     return;
   }
 
-  applyWindowPlacement(touchControlsPlacement, 980.0f, 160.0f, 410.0f, 380.0f);
+  applySingletonWindowPlacement(touchControlsPlacement);
   if (!ImGui::Begin(
           "Touch controls##subtr-actor",
           &uiTouchControlsOpen,
@@ -8100,7 +8115,7 @@ void SubtrActorPlugin::renderStatusWindow() {
   if (!uiStatusOpen) {
     return;
   }
-  applyWindowPlacement(statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f);
+  applySingletonWindowPlacement(statusPlacement);
   if (!ImGui::Begin("Status##subtr-actor", &uiStatusOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
@@ -8140,7 +8155,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   }
   const SaPlayerFrame *targetPlayer = cameraViewMode == 1 ? selectedPlayer : nullptr;
 
-  applyWindowPlacement(cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f);
+  applySingletonWindowPlacement(cameraPlacement);
   if (!ImGui::Begin("Camera##subtr-actor", &uiCameraOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
@@ -8316,7 +8331,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     return;
   }
 
-  applyWindowPlacement(playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f);
+  applySingletonWindowPlacement(playbackControlsPlacement);
   if (!ImGui::Begin(
           "Playback##subtr-actor",
           &uiPlaybackControlsOpen,
@@ -8531,7 +8546,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
     return;
   }
 
-  applyWindowPlacement(recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f);
+  applySingletonWindowPlacement(recordingPlacement);
   if (!ImGui::Begin("Recording##subtr-actor", &uiRecordingOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
@@ -8736,7 +8751,7 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
     return;
   }
 
-  applyWindowPlacement(graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f);
+  applySingletonWindowPlacement(graphInspectorPlacement);
   if (!ImGui::Begin(
           "Graph inspector##subtr-actor",
           &uiGraphInspectorOpen,
@@ -9164,19 +9179,9 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
     topStatsWindow = nullptr;
   };
 
-  considerPlacement(uiScoreboardOpen, scoreboardPlacement);
-  considerPlacement(uiEventsOpen, eventsPlacement);
-  considerPlacement(uiStatusOpen, statusPlacement);
-  considerPlacement(uiCameraOpen, cameraPlacement);
-  considerPlacement(uiPlaybackControlsOpen, playbackControlsPlacement);
-  considerPlacement(uiRecordingOpen, recordingPlacement);
-  considerPlacement(uiGraphInspectorOpen, graphInspectorPlacement);
-  considerPlacement(uiEventPlaylistOpen, eventPlaylistPlacement);
-  considerPlacement(uiMechanicsReviewOpen, mechanicsReviewPlacement);
-  considerPlacement(uiReplayLoadingOpen, replayLoadingPlacement);
-  considerPlacement(uiModuleControlsOpen, moduleControlsPlacement);
-  considerPlacement(uiTouchControlsOpen, touchControlsPlacement);
-  considerPlacement(uiBoostPickupControlsOpen, boostPickupControlsPlacement);
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    considerPlacement(*window.open, *window.placement);
+  }
 
   for (UiStatsWindow &window : uiStatsWindows) {
     window.pending_focus = false;
