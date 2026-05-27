@@ -230,6 +230,7 @@ private:
   std::unordered_map<uintptr_t, uint32_t> carPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> priPlayerIndices;
   std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
+  std::unordered_map<uint32_t, std::string> playerUniqueIdsByIndex;
   std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
   std::unordered_map<uint32_t, std::string> playerNamesByIndex;
   std::unordered_map<uint32_t, uint8_t> playerTeamsByIndex;
@@ -472,6 +473,7 @@ private:
   std::string webUiStatIdForWindow(
       const UiStatsWindow &window,
       const UiStatsWindow::Entry &entry) const;
+  std::string webPlayerIdForIndex(uint32_t playerIndex) const;
   void renderAdHocTargetSelector(
       UiStatsWindow &window,
       UiStatsWindow::Entry &entry,

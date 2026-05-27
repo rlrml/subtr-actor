@@ -1891,6 +1891,14 @@ std::string SubtrActorPlugin::webUiStatIdForWindow(
   return localStatId;
 }
 
+std::string SubtrActorPlugin::webPlayerIdForIndex(uint32_t playerIndex) const {
+  const auto uniqueId = playerUniqueIdsByIndex.find(playerIndex);
+  if (uniqueId != playerUniqueIdsByIndex.end() && !uniqueId->second.empty()) {
+    return uniqueId->second;
+  }
+  return std::to_string(playerIndex);
+}
+
 void SubtrActorPlugin::onLoad() {
   cvarManager->registerCvar(
       "subtr_actor_enabled",
@@ -3060,6 +3068,9 @@ void SubtrActorPlugin::applyUiConfigJson(
     if (const auto playerId = parseJsonStringProperty(object, "playerId")) {
       if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*playerId)) {
         window.selected_player_index = *parsedPlayerIndex;
+      } else if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(*playerId);
+                 uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
+        window.selected_player_index = uniquePlayerIndex->second;
       }
     }
     window.selected_team_is_team_0 =
@@ -3573,7 +3584,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"height\":" << window.viewport_height << "}"
          << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}"
-         << ",\"playerId\":\"" << window.selected_player_index << "\""
+         << ",\"playerId\":\""
+         << escapeJsonString(webPlayerIdForIndex(window.selected_player_index)) << "\""
          << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange")
          << "\",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
@@ -4148,6 +4160,7 @@ void SubtrActorPlugin::resetLiveState() {
   carPlayerIndices.clear();
   priPlayerIndices.clear();
   uniqueIdPlayerIndices.clear();
+  playerUniqueIdsByIndex.clear();
   stablePriPlayerIndices.clear();
   playerNamesByIndex.clear();
   playerTeamsByIndex.clear();
@@ -4568,11 +4581,13 @@ uint32_t SubtrActorPlugin::stablePlayerIndexForPri(PriWrapper pri, uint32_t fall
   if (!uniqueId.empty()) {
     const auto existing = uniqueIdPlayerIndices.find(uniqueId);
     if (existing != uniqueIdPlayerIndices.end()) {
+      playerUniqueIdsByIndex[existing->second] = uniqueId;
       return existing->second;
     }
 
     const uint32_t playerIndex = nextPlayerIndex++;
     uniqueIdPlayerIndices[uniqueId] = playerIndex;
+    playerUniqueIdsByIndex[playerIndex] = uniqueId;
     return playerIndex;
   }
 
