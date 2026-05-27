@@ -365,6 +365,7 @@ private:
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
   void renderMechanicsReviewWindow();
+  bool renderEventFilterCombo(const char *label);
   void renderReplayLoadingWindow();
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();

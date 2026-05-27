@@ -1588,6 +1588,20 @@ const char *eventFilterLabel(std::string_view value) {
   return value.empty() ? "All events" : "Custom filter";
 }
 
+std::string eventFilterPreview(std::string_view rawFilter) {
+  const std::vector<std::string> selected = selectedEventSourceTokens(rawFilter);
+  if (allEventSourcesSelected(rawFilter)) {
+    return "All events";
+  }
+  if (selected.empty()) {
+    return "No events";
+  }
+  if (selected.size() == 1) {
+    return eventFilterLabel(selected.front());
+  }
+  return std::format("{} event types", selected.size());
+}
+
 const UiStatDefinition *localUiStatDefinition(std::string_view statId) {
   const auto found = std::find_if(
       UI_STAT_DEFINITIONS.begin(),
@@ -5987,17 +6001,7 @@ void SubtrActorPlugin::renderSharedSettingsControls() {
   checkboxCvar("Team events", "subtr_actor_overlay_team_events_enabled", true);
   checkboxCvar("Goal context", "subtr_actor_overlay_goal_context_enabled", true);
 
-  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
-  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
-    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
-      if (ImGui::Selectable(option.label, selected)) {
-        setCvarString("subtr_actor_overlay_event_types", option.value);
-        currentFilter = option.value;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  renderEventFilterCombo("Event filter");
 
   auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
   int intervalMs = static_cast<bool>(intervalCvar) ? intervalCvar.getIntValue() : 8;
@@ -6012,6 +6016,63 @@ void SubtrActorPlugin::renderSharedSettingsControls() {
       static_cast<bool>(maxMessagesCvar)) {
     maxMessagesCvar.setValue(maxMessages);
   }
+}
+
+bool SubtrActorPlugin::renderEventFilterCombo(const char *label) {
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  std::vector<std::string> selected = selectedEventSourceTokens(currentFilter);
+  std::string preview = eventFilterPreview(currentFilter);
+
+  bool changed = false;
+  auto applySelection = [&]() {
+    setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
+    currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+    selected = selectedEventSourceTokens(currentFilter);
+    preview = eventFilterPreview(currentFilter);
+    changed = true;
+  };
+
+  if (!ImGui::BeginCombo(label, preview.c_str())) {
+    return false;
+  }
+
+  if (ImGui::SmallButton("All")) {
+    selected = selectedEventSourceTokens("all");
+    applySelection();
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("None")) {
+    selected.clear();
+    applySelection();
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", preview.c_str());
+  ImGui::Separator();
+
+  ImGui::Columns(2, std::format("{}-event-filter-columns", label).c_str(), false);
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (std::string_view{option.value} == "all") {
+      continue;
+    }
+
+    ImGui::PushID(option.value);
+    bool enabled = containsString(selected, option.value);
+    if (ImGui::Checkbox(option.label, &enabled)) {
+      if (enabled && !containsString(selected, option.value)) {
+        selected.emplace_back(option.value);
+      } else if (!enabled) {
+        selected.erase(
+            std::remove(selected.begin(), selected.end(), std::string{option.value}),
+            selected.end());
+      }
+      applySelection();
+    }
+    ImGui::PopID();
+    ImGui::NextColumn();
+  }
+  ImGui::Columns(1);
+  ImGui::EndCombo();
+  return changed;
 }
 
 void SubtrActorPlugin::applyWindowPlacement(
@@ -6423,17 +6484,7 @@ void SubtrActorPlugin::renderEventsWindow() {
     return;
   }
 
-  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
-  if (ImGui::BeginCombo("Filter", eventFilterLabel(currentFilter))) {
-    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
-      if (ImGui::Selectable(option.label, selected)) {
-        setCvarString("subtr_actor_overlay_event_types", option.value);
-        currentFilter = option.value;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  renderEventFilterCombo("Filter");
   ImGui::SameLine();
   if (ImGui::Button("Clear")) {
     recentUiEvents.clear();
@@ -6505,7 +6556,9 @@ void SubtrActorPlugin::renderEventSourceControls() {
     applySelection();
   }
   ImGui::SameLine();
-  ImGui::TextDisabled("%s", eventFilterLabel(cvarString("subtr_actor_overlay_event_types", "all")));
+  const std::string preview =
+      eventFilterPreview(cvarString("subtr_actor_overlay_event_types", "all"));
+  ImGui::TextDisabled("%s", preview.c_str());
 
   ImGui::BeginChild("event-source-list", ImVec2{0.0f, 145.0f}, true);
   ImGui::Columns(2, "event-source-columns", false);
@@ -6630,17 +6683,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   ImGui::SameLine();
   ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
 
-  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
-  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
-    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
-      if (ImGui::Selectable(option.label, selected)) {
-        setCvarString("subtr_actor_overlay_event_types", option.value);
-        currentFilter = option.value;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  renderEventFilterCombo("Event filter");
 
   ImGui::Text(
       "%zu visible / %zu selected / %zu recent",
@@ -6739,17 +6782,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::SameLine();
   ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
 
-  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
-  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
-    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
-      if (ImGui::Selectable(option.label, selected)) {
-        setCvarString("subtr_actor_overlay_event_types", option.value);
-        currentFilter = option.value;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  renderEventFilterCombo("Event filter");
 
   ImGui::Separator();
   if (candidates.empty()) {
@@ -6984,17 +7017,7 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   ImGui::Checkbox("Playlist goal context", &eventPlaylistGoalContextEnabled);
   ImGui::Checkbox("Playlist follow", &eventPlaylistAutoFollow);
 
-  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
-  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
-    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
-      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
-      if (ImGui::Selectable(option.label, selected)) {
-        setCvarString("subtr_actor_overlay_event_types", option.value);
-        currentFilter = option.value;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  renderEventFilterCombo("Event filter");
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
