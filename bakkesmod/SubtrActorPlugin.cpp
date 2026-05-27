@@ -7371,13 +7371,24 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   auto renderLauncherWindowToggle = [&](const SingletonWindowControl &window) {
     ImGui::PushID(window.label);
-    if (ImGui::Button(window.label, ImVec2{170.0f, 0.0f})) {
+    const bool isOpen = window.open != nullptr && *window.open;
+    if (isOpen) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
+    }
+    const std::string buttonLabel =
+        std::format("{}   {}", window.label, isOpen ? "Hide" : "Show");
+    if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
       if (*window.open) {
         *window.open = false;
       } else {
         showSingletonWindow(*window.open, *window.placement);
       }
       uiLauncherOpen = false;
+    }
+    if (isOpen) {
+      ImGui::PopStyleColor(3);
     }
     ImGui::PopID();
   };
