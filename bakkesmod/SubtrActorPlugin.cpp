@@ -9207,40 +9207,34 @@ void SubtrActorPlugin::resetDefaultStatsWindows() {
   createStatsWindow(UiStatsWindowKind::GoalsOverview, true);
 }
 
+void SubtrActorPlugin::applyWorkspaceWindowVisibility(
+    bool launcherOpen,
+    std::initializer_list<std::string_view> openWindowIds) {
+  uiLauncherOpen = launcherOpen;
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    *window.open = std::find(openWindowIds.begin(), openWindowIds.end(), window.config_id) !=
+                   openWindowIds.end();
+  }
+}
+
 void SubtrActorPlugin::applyDefaultUiWorkspace() {
-  uiLauncherOpen = false;
-  uiScoreboardOpen = true;
-  uiEventsOpen = false;
-  uiEventPlaylistOpen = false;
-  uiStatusOpen = false;
-  uiCameraOpen = true;
-  uiPlaybackControlsOpen = false;
-  uiRecordingOpen = false;
-  uiGraphInspectorOpen = false;
-  uiMechanicsReviewOpen = false;
-  uiReplayLoadingOpen = false;
-  uiModuleControlsOpen = false;
-  uiTouchControlsOpen = false;
-  uiBoostPickupControlsOpen = false;
+  applyWorkspaceWindowVisibility(false, {"scoreboard", "camera"});
   resetWindowPlacements();
   cameraPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
-  uiLauncherOpen = true;
-  uiScoreboardOpen = true;
-  uiEventsOpen = true;
-  uiEventPlaylistOpen = true;
-  uiStatusOpen = false;
-  uiCameraOpen = true;
-  uiPlaybackControlsOpen = true;
-  uiRecordingOpen = false;
-  uiGraphInspectorOpen = false;
-  uiMechanicsReviewOpen = true;
-  uiReplayLoadingOpen = true;
-  uiModuleControlsOpen = false;
-  uiTouchControlsOpen = true;
-  uiBoostPickupControlsOpen = true;
+  applyWorkspaceWindowVisibility(
+      true,
+      {"scoreboard",
+       "mechanics",
+       "event-playlist",
+       "camera",
+       "playback",
+       "mechanics-review",
+       "replay-loading",
+       "touch-controls",
+       "boost-pickups"});
   eventPlaylistMechanicsEnabled = true;
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;
@@ -9251,40 +9245,23 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
 }
 
 void SubtrActorPlugin::applyGraphDebugUiWorkspace() {
-  uiLauncherOpen = true;
-  uiScoreboardOpen = false;
-  uiEventsOpen = true;
-  uiEventPlaylistOpen = true;
-  uiStatusOpen = true;
-  uiCameraOpen = false;
-  uiPlaybackControlsOpen = true;
-  uiRecordingOpen = false;
-  uiGraphInspectorOpen = true;
-  uiMechanicsReviewOpen = false;
-  uiReplayLoadingOpen = false;
-  uiModuleControlsOpen = true;
-  uiTouchControlsOpen = false;
-  uiBoostPickupControlsOpen = false;
+  applyWorkspaceWindowVisibility(
+      true,
+      {"mechanics",
+       "event-playlist",
+       "status",
+       "playback",
+       "graph-inspector",
+       "module-controls"});
   resetWindowPlacements();
   graphInspectorPlacement.pending_focus = true;
   moduleControlsPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::applyRecordingUiWorkspace() {
-  uiLauncherOpen = true;
-  uiScoreboardOpen = true;
-  uiEventsOpen = false;
-  uiEventPlaylistOpen = false;
-  uiStatusOpen = true;
-  uiCameraOpen = true;
-  uiPlaybackControlsOpen = true;
-  uiRecordingOpen = true;
-  uiGraphInspectorOpen = false;
-  uiMechanicsReviewOpen = false;
-  uiReplayLoadingOpen = false;
-  uiModuleControlsOpen = false;
-  uiTouchControlsOpen = false;
-  uiBoostPickupControlsOpen = false;
+  applyWorkspaceWindowVisibility(
+      true,
+      {"scoreboard", "status", "camera", "playback", "recording"});
   resetWindowPlacements();
   recordingPlacement.pending_focus = true;
   cameraPlacement.pending_focus = true;

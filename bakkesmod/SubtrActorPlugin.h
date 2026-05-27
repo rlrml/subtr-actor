@@ -4,6 +4,7 @@
 #include <chrono>
 #include <deque>
 #include <filesystem>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -453,6 +454,9 @@ private:
   void focusTopLoadedWindow();
   void resetWindowPlacements();
   void resetDefaultStatsWindows();
+  void applyWorkspaceWindowVisibility(
+      bool launcherOpen,
+      std::initializer_list<std::string_view> openWindowIds);
   void applyDefaultUiWorkspace();
   void applyReplayReviewUiWorkspace();
   void applyGraphDebugUiWorkspace();
