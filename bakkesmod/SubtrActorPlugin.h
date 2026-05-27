@@ -435,7 +435,7 @@ private:
   void renderLauncherWorkspaceControls();
   void renderLauncherStatsWindowControls();
   void renderEmptyStateWindow();
-  void renderSingletonWindows();
+  void renderFloatingWindowLayer();
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderEventSourceControls();
@@ -508,7 +508,6 @@ private:
   bool renderSingletonWindowHeader(const char *label, bool &open);
   void applyStatsWindowPlacement(UiStatsWindow &window);
   void captureStatsWindowPlacement(UiStatsWindow &window);
-  void renderStatsWindows();
   void renderStatsWindow(UiStatsWindow &window, size_t stackIndex);
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
   void renderStatsWindowAddControl(UiStatsWindow &window);

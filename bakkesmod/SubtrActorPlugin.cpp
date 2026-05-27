@@ -6718,30 +6718,62 @@ void SubtrActorPlugin::Render() {
   }
 
   renderEmptyStateWindow();
-  renderSingletonWindows();
-  renderStatsWindows();
+  renderFloatingWindowLayer();
   maybeAutosaveUiConfig();
 }
 
-void SubtrActorPlugin::renderSingletonWindows() {
-  std::vector<SingletonWindowControl> renderOrder;
+void SubtrActorPlugin::renderFloatingWindowLayer() {
+  enum class RenderEntryKind {
+    Singleton,
+    Stats,
+  };
+  struct RenderEntry {
+    RenderEntryKind kind;
+    std::string_view singleton_id;
+    size_t stats_index = 0;
+    int z_index = 0;
+    int fallback_order = 0;
+  };
+
+  std::vector<RenderEntry> renderOrder;
   for (const SingletonWindowControl &window : singletonWindowControls()) {
     if (*window.open) {
-      renderOrder.push_back(window);
+      renderOrder.push_back(RenderEntry{
+          RenderEntryKind::Singleton,
+          std::string_view{window.config_id},
+          0,
+          window.placement->z_index,
+          window.launcher_order});
+    }
+  }
+  for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
+    const UiStatsWindow &window = uiStatsWindows[index];
+    if (window.open) {
+      renderOrder.push_back(RenderEntry{
+          RenderEntryKind::Stats,
+          {},
+          index,
+          window.z_index,
+          static_cast<int>(1000 + index)});
     }
   }
   std::stable_sort(
       renderOrder.begin(),
       renderOrder.end(),
-      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
-        if (left.placement->z_index != right.placement->z_index) {
-          return left.placement->z_index < right.placement->z_index;
+      [](const RenderEntry &left, const RenderEntry &right) {
+        if (left.z_index != right.z_index) {
+          return left.z_index < right.z_index;
         }
-        return left.launcher_order < right.launcher_order;
+        return left.fallback_order < right.fallback_order;
       });
 
-  for (const SingletonWindowControl &window : renderOrder) {
-    const std::string_view id{window.config_id};
+  for (const RenderEntry &entry : renderOrder) {
+    if (entry.kind == RenderEntryKind::Stats) {
+      renderStatsWindow(uiStatsWindows[entry.stats_index], entry.stats_index);
+      continue;
+    }
+
+    const std::string_view id = entry.singleton_id;
     if (id == "scoreboard") {
       renderScoreboardWindow();
     } else if (id == "mechanics") {
@@ -10181,24 +10213,6 @@ void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t s
   window.pending_apply_placement = true;
   window.pending_focus = window.open;
   window.z_index = nextUiWindowZIndex++;
-}
-
-void SubtrActorPlugin::renderStatsWindows() {
-  std::vector<size_t> renderOrder;
-  renderOrder.reserve(uiStatsWindows.size());
-  for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
-    renderOrder.push_back(index);
-  }
-  std::stable_sort(renderOrder.begin(), renderOrder.end(), [&](size_t left, size_t right) {
-    return uiStatsWindows[left].z_index < uiStatsWindows[right].z_index;
-  });
-
-  for (const size_t index : renderOrder) {
-    UiStatsWindow &window = uiStatsWindows[index];
-    if (window.open) {
-      renderStatsWindow(window, index);
-    }
-  }
 }
 
 std::array<SubtrActorPlugin::StatsWindowKindControl, 7>
