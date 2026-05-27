@@ -7373,6 +7373,13 @@ bool SubtrActorPlugin::renderModuleSummaryToggle(
   if (active) {
     ImGui::PopStyleColor(2);
   }
+  if (width <= 0.0f) {
+    const float itemRight = ImGui::GetItemRectMax().x;
+    const float contentRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+    if (contentRight - itemRight > 112.0f) {
+      ImGui::SameLine();
+    }
+  }
   return clicked;
 }
 
@@ -7577,9 +7584,15 @@ void SubtrActorPlugin::renderModuleSummaryControls(
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMELINE VISUALIZATIONS");
   renderTimelineControls();
+  if (toggleWidth <= 0.0f) {
+    ImGui::NewLine();
+  }
   ImGui::Spacing();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "IN-GAME VISUALIZATIONS");
   renderInGameControls();
+  if (toggleWidth <= 0.0f) {
+    ImGui::NewLine();
+  }
 }
 
 void SubtrActorPlugin::renderModuleSettingsControls(
