@@ -7641,35 +7641,78 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     return;
   }
 
-  size_t selectedCount = 0;
-  size_t mechanicsSourceCount = 0;
-  size_t teamSourceCount = 0;
-  size_t goalContextSourceCount = 0;
-  for (const UiEventRecord &event : recentUiEvents) {
-    if (event.category == "mechanics") {
-      mechanicsSourceCount += 1;
-    } else if (event.category == "team") {
-      teamSourceCount += 1;
-    } else if (event.category == "goal_context" || event.type == "goal") {
-      goalContextSourceCount += 1;
+  const std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  const bool allEventSourcesEnabled = allEventSourcesSelected(currentFilter);
+  std::vector<std::string> selectedSources = selectedEventSourceTokens(currentFilter);
+
+  auto sourceHasEnabledPlaylistGroup = [&](std::string_view source) {
+    for (const UiEventRecord &event : recentUiEvents) {
+      if (eventFilterAllows(source, event.category, event.type) &&
+          eventPlaylistSourceEnabled(event)) {
+        return true;
+      }
     }
+    return false;
+  };
+  auto enableMatchingPlaylistGroups = [&](std::string_view source) {
+    for (const UiEventRecord &event : recentUiEvents) {
+      if (!eventFilterAllows(source, event.category, event.type)) {
+        continue;
+      }
+      if (event.category == "mechanics") {
+        eventPlaylistMechanicsEnabled = true;
+      } else if (event.category == "team") {
+        eventPlaylistTeamEventsEnabled = true;
+      } else if (event.category == "goal_context" || event.type == "goal") {
+        eventPlaylistGoalContextEnabled = true;
+      }
+    }
+  };
+
+  struct PlaylistSource {
+    const EventFilterOption *option = nullptr;
+    size_t count = 0;
+    bool enabled = false;
+  };
+
+  std::vector<PlaylistSource> playlistSources;
+  playlistSources.reserve(EVENT_FILTER_OPTIONS.size());
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (std::string_view{option.value} == "all") {
+      continue;
+    }
+    size_t count = 0;
+    for (const UiEventRecord &event : recentUiEvents) {
+      if (eventFilterAllows(option.value, event.category, event.type)) {
+        count += 1;
+      }
+    }
+    const bool selected = containsString(selectedSources, option.value);
+    if (count == 0 && (allEventSourcesEnabled || !selected)) {
+      continue;
+    }
+    playlistSources.push_back(
+        PlaylistSource{&option, count, selected && sourceHasEnabledPlaylistGroup(option.value)});
+  }
+
+  const size_t selectedSourceCount = static_cast<size_t>(std::count_if(
+      playlistSources.begin(),
+      playlistSources.end(),
+      [](const PlaylistSource &source) { return source.enabled; }));
+  size_t selectedCount = 0;
+  for (const UiEventRecord &event : recentUiEvents) {
     if (eventPlaylistSourceEnabled(event) && uiEventVisible(event)) {
       selectedCount += 1;
     }
   }
 
   const bool allSourcesEnabled = eventPlaylistMechanicsEnabled && eventPlaylistTeamEventsEnabled &&
-                                 eventPlaylistGoalContextEnabled &&
-                                 allEventSourcesSelected(
-                                     cvarString("subtr_actor_overlay_event_types", "all"));
+                                 eventPlaylistGoalContextEnabled && allEventSourcesEnabled;
   const bool noSourcesEnabled =
       (!eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
        !eventPlaylistGoalContextEnabled) ||
-      selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all")).empty();
-  const size_t activeSourceGroups = static_cast<size_t>(eventPlaylistMechanicsEnabled) +
-                                    static_cast<size_t>(eventPlaylistTeamEventsEnabled) +
-                                    static_cast<size_t>(eventPlaylistGoalContextEnabled);
-  ImGui::Text("Filters %zu / 3", activeSourceGroups);
+      selectedSources.empty();
+  ImGui::Text("Filters %zu / %zu", selectedSourceCount, playlistSources.size());
   if (renderModuleSummaryToggle(
           std::format("All ({})", recentUiEvents.size()).c_str(),
           allSourcesEnabled,
@@ -7689,20 +7732,41 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FILTERS");
-  renderBoolModuleSummaryToggle(
-      std::format("Mechanics ({})", mechanicsSourceCount).c_str(),
-      eventPlaylistMechanicsEnabled,
-      "event-playlist-sources");
-  renderBoolModuleSummaryToggle(
-      std::format("Team ({})", teamSourceCount).c_str(),
-      eventPlaylistTeamEventsEnabled,
-      "event-playlist-sources");
-  renderBoolModuleSummaryToggle(
-      std::format("Goal context ({})", goalContextSourceCount).c_str(),
-      eventPlaylistGoalContextEnabled,
-      "event-playlist-sources");
+  if (playlistSources.empty()) {
+    ImGui::TextDisabled("No events loaded.");
+  } else {
+    ImGui::BeginChild("event-playlist-source-list", ImVec2{0.0f, 170.0f}, true);
+    std::string_view currentGroup;
+    for (const PlaylistSource &source : playlistSources) {
+      const EventFilterOption &option = *source.option;
+      const std::string_view optionGroup{option.group};
+      if (currentGroup != optionGroup) {
+        if (!currentGroup.empty()) {
+          ImGui::Separator();
+        }
+        ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", option.group);
+        currentGroup = optionGroup;
+      }
 
-  renderEventFilterCombo("Event filter");
+      ImGui::PushID(option.value);
+      const std::string label = std::format("{} ({})", option.label, source.count);
+      if (renderModuleSummaryToggle(label.c_str(), source.enabled, "event-playlist-sources")) {
+        if (source.enabled) {
+          selectedSources.erase(
+              std::remove(selectedSources.begin(), selectedSources.end(), std::string{option.value}),
+              selectedSources.end());
+        } else {
+          appendUniqueFilterToken(selectedSources, option.value);
+          enableMatchingPlaylistGroups(option.value);
+        }
+        setCvarString(
+            "subtr_actor_overlay_event_types",
+            eventFilterFromSelectedSources(selectedSources));
+      }
+      ImGui::PopID();
+    }
+    ImGui::EndChild();
+  }
 
   ImGui::Text("%zu selected / %zu recent", selectedCount, recentUiEvents.size());
   if (!eventPlaylistStatus.empty()) {
