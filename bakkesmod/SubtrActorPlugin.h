@@ -380,6 +380,7 @@ private:
       float width,
       float height);
   void captureWindowPlacement(UiWindowPlacement &placement);
+  bool renderSingletonWindowHeader(const char *label, bool &open);
   void applyStatsWindowPlacement(UiStatsWindow &window);
   void captureStatsWindowPlacement(UiStatsWindow &window);
   void renderStatsWindows();

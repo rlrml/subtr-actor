@@ -5333,6 +5333,17 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   placement.viewport_height = displaySize.y;
 }
 
+bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open) {
+  if (ImGui::SmallButton(std::format("Hide##singleton-window-hide-{}", label).c_str())) {
+    open = false;
+    return true;
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", label);
+  ImGui::Separator();
+  return false;
+}
+
 void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
   if (window.has_placement) {
     const ImGuiCond condition =
@@ -5634,6 +5645,10 @@ void SubtrActorPlugin::renderScoreboardWindow() {
     return;
   }
   captureWindowPlacement(scoreboardPlacement);
+  if (renderSingletonWindowHeader("Scoreboard", uiScoreboardOpen)) {
+    ImGui::End();
+    return;
+  }
 
   if (lastTeamScores) {
     ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", lastTeamScores->first);
@@ -5657,6 +5672,10 @@ void SubtrActorPlugin::renderEventsWindow() {
     return;
   }
   captureWindowPlacement(eventsPlacement);
+  if (renderSingletonWindowHeader("Events", uiEventsOpen)) {
+    ImGui::End();
+    return;
+  }
 
   std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
   if (ImGui::BeginCombo("Filter", eventFilterLabel(currentFilter))) {
@@ -5827,6 +5846,10 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     return;
   }
   captureWindowPlacement(eventPlaylistPlacement);
+  if (renderSingletonWindowHeader("Event playlist", uiEventPlaylistOpen)) {
+    ImGui::End();
+    return;
+  }
 
   size_t selectedCount = 0;
   size_t visibleCount = 0;
@@ -5922,6 +5945,10 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     return;
   }
   captureWindowPlacement(mechanicsReviewPlacement);
+  if (renderSingletonWindowHeader("Mechanics review", uiMechanicsReviewOpen)) {
+    ImGui::End();
+    return;
+  }
 
   std::vector<size_t> candidates;
   candidates.reserve(recentUiEvents.size());
@@ -6082,6 +6109,10 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     return;
   }
   captureWindowPlacement(replayLoadingPlacement);
+  if (renderSingletonWindowHeader("Replay loading", uiReplayLoadingOpen)) {
+    ImGui::End();
+    return;
+  }
 
   const bool annotationsEnabled = replayAnnotationsEnabled();
   const bool inReplay = gameWrapper->IsInReplay();
@@ -6180,6 +6211,10 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     return;
   }
   captureWindowPlacement(moduleControlsPlacement);
+  if (renderSingletonWindowHeader("Module controls", uiModuleControlsOpen)) {
+    ImGui::End();
+    return;
+  }
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE PIPELINE");
   auto checkboxCvar = [this](const char *label, const char *name, bool defaultValue) {
@@ -6298,6 +6333,10 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     return;
   }
   captureWindowPlacement(boostPickupControlsPlacement);
+  if (renderSingletonWindowHeader("Boost pickup filters", uiBoostPickupControlsOpen)) {
+    ImGui::End();
+    return;
+  }
 
   const int activePadTypes = static_cast<int>(boostPickupPadBig) +
                              static_cast<int>(boostPickupPadSmall) +
@@ -6408,6 +6447,10 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     return;
   }
   captureWindowPlacement(touchControlsPlacement);
+  if (renderSingletonWindowHeader("Touch controls", uiTouchControlsOpen)) {
+    ImGui::End();
+    return;
+  }
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TOUCH MARKERS");
   ImGui::SliderFloat("Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs");
@@ -6481,6 +6524,10 @@ void SubtrActorPlugin::renderStatusWindow() {
     return;
   }
   captureWindowPlacement(statusPlacement);
+  if (renderSingletonWindowHeader("Status", uiStatusOpen)) {
+    ImGui::End();
+    return;
+  }
 
   ImGui::Text("Mode: %s", liveProcessingEnabled() ? "live analysis" : "idle");
   ImGui::Text("Replay annotations: %s", replayAnnotations ? "loaded" : "not loaded");
@@ -6512,6 +6559,10 @@ void SubtrActorPlugin::renderCameraWindow() {
     return;
   }
   captureWindowPlacement(cameraPlacement);
+  if (renderSingletonWindowHeader("Camera", uiCameraOpen)) {
+    ImGui::End();
+    return;
+  }
 
   constexpr std::array<const char *, 4> viewModes{
       "Free",
@@ -6635,6 +6686,10 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     return;
   }
   captureWindowPlacement(playbackControlsPlacement);
+  if (renderSingletonWindowHeader("Playback controls", uiPlaybackControlsOpen)) {
+    ImGui::End();
+    return;
+  }
 
   const bool inReplay = gameWrapper->IsInReplay();
   const bool inGame = gameWrapper->IsInGame();
@@ -6745,6 +6800,10 @@ void SubtrActorPlugin::renderRecordingWindow() {
     return;
   }
   captureWindowPlacement(recordingPlacement);
+  if (renderSingletonWindowHeader("Recording", uiRecordingOpen)) {
+    ImGui::End();
+    return;
+  }
 
   const std::filesystem::path outputDirectory = gameWrapper->GetDataFolder() / "subtr-actor";
   auto graphDumpBytes = [&]() {
@@ -6907,6 +6966,10 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
     return;
   }
   captureWindowPlacement(graphInspectorPlacement);
+  if (renderSingletonWindowHeader("Graph inspector", uiGraphInspectorOpen)) {
+    ImGui::End();
+    return;
+  }
 
   if (!loaded || !engine) {
     ImGui::TextWrapped("Start live analysis to inspect graph outputs and analysis nodes.");
