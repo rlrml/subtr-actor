@@ -7544,7 +7544,8 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix, bool co
 
 void SubtrActorPlugin::renderModuleSettingsControls(
     const char *idSuffix,
-    bool includeOpenButtons) {
+    bool includeOpenButtons,
+    bool webCardHeaders) {
   ImGui::PushID(idSuffix);
 
   auto settingReadout = [](std::initializer_list<std::pair<bool, const char *>> parts,
@@ -7562,15 +7563,22 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     return readout.empty() ? std::string{"Total only"} : readout;
   };
 
-  ImGui::TextDisabled("Movement breakdown");
-  ImGui::SameLine();
-  ImGui::TextColored(
-      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-      "%s",
+  auto renderSettingsHeader = [&](const char *title, const std::string &readout) {
+    if (webCardHeaders) {
+      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT DISPLAY");
+      ImGui::Text("%s", title);
+    } else {
+      ImGui::TextDisabled("%s", title);
+    }
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", readout.c_str());
+  };
+
+  renderSettingsHeader(
+      "Movement breakdown",
       settingReadout(
           {{movementBreakdownSpeed, "Speed band"}, {movementBreakdownHeight, "Height band"}},
-          " + ")
-          .c_str());
+          " + "));
   if (ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed)) {
     scheduleUiConfigAutosave();
   }
@@ -7582,15 +7590,14 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     createStatsModuleWindow("movement", 0);
   }
 
-  ImGui::TextDisabled("Possession breakdown");
-  ImGui::SameLine();
-  ImGui::TextColored(
-      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-      "%s",
+  if (webCardHeaders) {
+    ImGui::Spacing();
+  }
+  renderSettingsHeader(
+      "Possession breakdown",
       settingReadout(
           {{possessionBreakdownState, "Control"}, {possessionBreakdownThird, "Third"}},
-          " x ")
-          .c_str());
+          " x "));
   if (ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState)) {
     scheduleUiConfigAutosave();
   }
@@ -7835,7 +7842,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderModuleSummaryControls("launcher-module-summary", false);
 
   ImGui::Separator();
-  renderModuleSettingsControls("launcher-module-settings", false);
+  renderModuleSettingsControls("launcher-module-settings", false, true);
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {

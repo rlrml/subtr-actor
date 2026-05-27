@@ -488,7 +488,10 @@ private:
       const char *idSuffix);
   void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
   void renderModuleSummaryControls(const char *idSuffix, bool collapsibleGroups = true);
-  void renderModuleSettingsControls(const char *idSuffix, bool includeOpenButtons);
+  void renderModuleSettingsControls(
+      const char *idSuffix,
+      bool includeOpenButtons,
+      bool webCardHeaders = false);
   std::array<SingletonWindowControl, 13> singletonWindowControls();
   std::vector<SingletonWindowControl> webSingletonWindowControls();
   std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
