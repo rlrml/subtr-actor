@@ -14,6 +14,7 @@
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <unordered_set>
 
 #include "imgui/imgui.h"
 
@@ -160,8 +161,17 @@ struct UiStatDefinition {
   bool event;
 };
 
+struct UiStatDefinitionCandidate {
+  std::string id;
+  std::string label;
+  std::string category;
+  bool player = false;
+  bool team = false;
+  bool event = false;
+};
+
 struct UiStatDefinitionMatch {
-  const UiStatDefinition *definition = nullptr;
+  UiStatDefinitionCandidate definition;
   double score = 0.0;
   size_t index = 0;
 };
@@ -170,6 +180,8 @@ struct UiStatIdAlias {
   const char *external_id;
   const char *local_id;
 };
+
+std::string normalizeUiStatId(std::string_view statId);
 
 constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
     {"all", "All events", "All"},
@@ -910,6 +922,69 @@ void collectJsonFieldSummaries(
   }
 }
 
+void collectJsonLeafStatPaths(
+    const std::string &json,
+    std::string_view prefix,
+    std::vector<std::string> &out,
+    int maxDepth) {
+  if (maxDepth < 0) {
+    return;
+  }
+
+  size_t offset = 0;
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '{') {
+    return;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+
+  while (offset < json.size()) {
+    if (json[offset] == '}') {
+      return;
+    }
+
+    auto key = parseJsonString(json, offset);
+    if (!key) {
+      return;
+    }
+    skipJsonWhitespace(json, offset);
+    if (offset >= json.size() || json[offset] != ':') {
+      return;
+    }
+    ++offset;
+    skipJsonWhitespace(json, offset);
+
+    const std::string label =
+        prefix.empty() ? *key : std::format("{}.{}", prefix, *key);
+    const size_t valueStart = offset;
+    if (offset < json.size() && json[offset] == '{') {
+      size_t end = offset;
+      if (!skipJsonValue(json, end)) {
+        return;
+      }
+      collectJsonLeafStatPaths(json.substr(valueStart, end - valueStart), label, out, maxDepth - 1);
+      offset = end;
+    } else {
+      out.push_back(label);
+      if (!skipJsonValue(json, offset)) {
+        return;
+      }
+    }
+
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == '}') {
+      return;
+    }
+    return;
+  }
+}
+
 std::string escapeJsonString(std::string_view value) {
   std::string escaped;
   escaped.reserve(value.size() + 8);
@@ -1216,6 +1291,65 @@ bool jsonPlayerIdMatchesIndex(const std::string &playerIdJson, uint32_t playerIn
   }
   const auto parsedIndex = parseJsonNumberValue(*splitScreenValue);
   return parsedIndex && static_cast<uint32_t>(*parsedIndex) == playerIndex;
+}
+
+std::string graphStatLabel(const GraphStatId &stat) {
+  return std::format("{}.{}", stat.module, stat.path);
+}
+
+std::vector<UiStatDefinitionCandidate> graphStatDefinitionsFromStatsJson(
+    const std::string &statsJson) {
+  std::vector<UiStatDefinitionCandidate> definitions;
+  const auto frame = parseJsonObjectProperty(statsJson, "frame");
+  if (!frame) {
+    return definitions;
+  }
+  const auto modules = parseJsonObjectProperty(*frame, "modules");
+  if (!modules) {
+    return definitions;
+  }
+
+  std::unordered_set<std::string> seenIds;
+  for (const std::string &moduleName : parseJsonObjectKeys(*modules)) {
+    const auto module = parseJsonObjectProperty(*modules, moduleName);
+    if (!module) {
+      continue;
+    }
+
+    auto appendStatsObject = [&](const std::string &statsObject, const char *scope) {
+      std::vector<std::string> paths;
+      collectJsonLeafStatPaths(statsObject, "", paths, 8);
+      for (const std::string &path : paths) {
+        const std::string id = std::format("{}:{}.{}", scope, moduleName, path);
+        if (!seenIds.insert(id).second || normalizeUiStatId(id) != id) {
+          continue;
+        }
+        definitions.push_back(UiStatDefinitionCandidate{
+            id,
+            std::format("{}.{}", moduleName, path),
+            moduleName,
+            std::string_view{scope} == "player",
+            std::string_view{scope} == "team",
+            false,
+        });
+      }
+    };
+
+    const std::vector<std::string> playerStats =
+        parseJsonObjectArrayProperty(*module, "player_stats");
+    if (!playerStats.empty()) {
+      if (const auto stats = parseJsonObjectProperty(playerStats.front(), "stats")) {
+        appendStatsObject(*stats, "player");
+      }
+    }
+    if (const auto team = parseJsonObjectProperty(*module, "team_zero")) {
+      appendStatsObject(*team, "team");
+    } else if (const auto teamOne = parseJsonObjectProperty(*module, "team_one")) {
+      appendStatsObject(*teamOne, "team");
+    }
+  }
+
+  return definitions;
 }
 
 static_assert(sizeof(SaBoostPadEventKind) == 4);
@@ -1824,27 +1958,36 @@ const UiStatDefinition *uiStatDefinition(std::string_view statId) {
   return localUiStatDefinition(normalized);
 }
 
-const char *uiStatLabel(std::string_view statId) {
+std::string uiStatLabel(std::string_view statId) {
   if (const UiStatDefinition *definition = uiStatDefinition(statId)) {
     return definition->label;
   }
-  return "Stat";
+  const auto parsed = parseGraphStatId(statId);
+  return parsed ? graphStatLabel(*parsed) : "Stat";
 }
 
-const char *uiStatScopeLabel(const UiStatDefinition &definition) {
-  if (definition.player && definition.team) {
+const char *uiStatScopeLabel(bool player, bool team, bool event) {
+  if (player && team) {
     return "player/team";
   }
-  if (definition.player) {
+  if (player) {
     return "player";
   }
-  if (definition.team) {
+  if (team) {
     return "team";
   }
-  if (definition.event) {
+  if (event) {
     return "event";
   }
   return "stat";
+}
+
+const char *uiStatScopeLabel(const UiStatDefinition &definition) {
+  return uiStatScopeLabel(definition.player, definition.team, definition.event);
+}
+
+const char *uiStatScopeLabel(const UiStatDefinitionCandidate &definition) {
+  return uiStatScopeLabel(definition.player, definition.team, definition.event);
 }
 
 std::optional<std::string_view> coreStatsPlayerField(std::string_view localStatId) {
@@ -1901,7 +2044,9 @@ std::vector<std::string_view> statSearchTokens(std::string_view query) {
 }
 
 std::optional<double> statDefinitionSearchScore(
-    const UiStatDefinition &definition,
+    std::string_view category,
+    std::string_view label,
+    std::string_view id,
     std::string_view query) {
   const std::vector<std::string_view> tokens = statSearchTokens(query);
   if (tokens.empty()) {
@@ -1910,9 +2055,9 @@ std::optional<double> statDefinitionSearchScore(
 
   const std::string searchText = normalizeStatSearchText(std::format(
       "{} {} {}",
-      definition.category,
-      definition.label,
-      definition.id));
+      category,
+      label,
+      id));
   double total = 0.0;
   for (std::string_view token : tokens) {
     const size_t index = searchText.find(token);
@@ -1922,6 +2067,16 @@ std::optional<double> statDefinitionSearchScore(
     total += static_cast<double>(index);
   }
   return total + static_cast<double>(searchText.size()) / 1000.0;
+}
+
+std::optional<double> statDefinitionSearchScore(
+    const UiStatDefinitionCandidate &definition,
+    std::string_view query) {
+  return statDefinitionSearchScore(
+      definition.category,
+      definition.label,
+      definition.id,
+      query);
 }
 
 ImVec4 toImVec4(LinearColor color) {
@@ -9753,17 +9908,23 @@ bool SubtrActorPlugin::statsWindowSupportsStat(
     std::string_view statId) const {
   const std::string localStatId = normalizeUiStatId(statId);
   const UiStatDefinition *definition = localUiStatDefinition(localStatId);
-  if (!definition) {
+  uint8_t definitionScopes = 0;
+  const auto graphStat = parseGraphStatId(localStatId);
+  const bool playerScoped =
+      definition ? definition->player : (graphStat && graphStat->scope == "player");
+  const bool teamScoped =
+      definition ? definition->team : (graphStat && graphStat->scope == "team");
+  const bool eventScoped = definition ? definition->event : false;
+  if (!definition && !graphStat) {
     return false;
   }
-  uint8_t definitionScopes = 0;
-  if (definition->player) {
+  if (playerScoped) {
     definitionScopes |= UI_STAT_SCOPE_PLAYER;
   }
-  if (definition->team) {
+  if (teamScoped) {
     definitionScopes |= UI_STAT_SCOPE_TEAM;
   }
-  if (definition->event) {
+  if (eventScoped) {
     definitionScopes |= UI_STAT_SCOPE_EVENT;
   }
   return (statsWindowKindStatScopes(window.kind) & definitionScopes) != 0;
@@ -9791,8 +9952,12 @@ bool SubtrActorPlugin::statsWindowTargetsEqual(
   if (lhsTargetId == rhsTargetId) {
     return true;
   }
-  const UiStatDefinition *definition = localUiStatDefinition(normalizeUiStatId(statId));
-  if (!definition || !definition->player) {
+  const std::string localStatId = normalizeUiStatId(statId);
+  const UiStatDefinition *definition = localUiStatDefinition(localStatId);
+  const auto graphStat = parseGraphStatId(localStatId);
+  const bool playerScoped =
+      definition ? definition->player : (graphStat && graphStat->scope == "player");
+  if (!playerScoped) {
     return false;
   }
   const std::optional<uint32_t> lhsPlayerIndex = playerIndexForTargetId(lhsTargetId);
@@ -10022,13 +10187,15 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
 std::string SubtrActorPlugin::defaultAdHocTargetId(std::string_view statId) const {
   const std::string localStatId = normalizeUiStatId(statId);
   const UiStatDefinition *definition = localUiStatDefinition(localStatId);
-  if (!definition) {
-    return "";
-  }
-  if (definition->player) {
+  const auto graphStat = parseGraphStatId(localStatId);
+  const bool playerScoped =
+      definition ? definition->player : (graphStat && graphStat->scope == "player");
+  const bool teamScoped =
+      definition ? definition->team : (graphStat && graphStat->scope == "team");
+  if (playerScoped) {
     return sampledPlayers.empty() ? "" : webPlayerIdForIndex(sampledPlayers.front().player_index);
   }
-  if (definition->team) {
+  if (teamScoped) {
     return "blue";
   }
   return "";
@@ -10039,10 +10206,15 @@ std::string SubtrActorPlugin::adHocStatValue(
     std::string_view targetId) const {
   const std::string localStatId = normalizeUiStatId(statId);
   const UiStatDefinition *definition = localUiStatDefinition(localStatId);
-  if (!definition) {
+  const auto graphStat = parseGraphStatId(localStatId);
+  const bool playerScoped =
+      definition ? definition->player : (graphStat && graphStat->scope == "player");
+  const bool teamScoped =
+      definition ? definition->team : (graphStat && graphStat->scope == "team");
+  if (!definition && !graphStat) {
     return "--";
   }
-  if (definition->player) {
+  if (playerScoped) {
     uint32_t playerIndex = sampledPlayers.empty() ? 0 : sampledPlayers.front().player_index;
     if (const std::optional<uint32_t> resolvedPlayerIndex =
             playerIndexForTargetId(targetId)) {
@@ -10051,7 +10223,7 @@ std::string SubtrActorPlugin::adHocStatValue(
     const SaPlayerFrame *player = sampledPlayerByIndex(playerIndex);
     return player ? playerStatValue(*player, localStatId) : "--";
   }
-  if (definition->team) {
+  if (teamScoped) {
     return teamStatValue(targetId == "orange" ? 0 : 1, localStatId);
   }
   return std::format("{}", recentEventCountForType(localStatId));
@@ -10063,12 +10235,17 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
     std::string_view statId,
     size_t index) {
   const UiStatDefinition *definition = uiStatDefinition(statId);
-  if (!definition || (!definition->player && !definition->team)) {
+  const auto graphStat = parseGraphStatId(normalizeUiStatId(statId));
+  const bool playerScoped =
+      definition ? definition->player : (graphStat && graphStat->scope == "player");
+  const bool teamScoped =
+      definition ? definition->team : (graphStat && graphStat->scope == "team");
+  if (!playerScoped && !teamScoped) {
     ImGui::TextDisabled("-");
     return;
   }
 
-  if (definition->player) {
+  if (playerScoped) {
     const SaPlayerFrame *selected = nullptr;
     if (const std::optional<uint32_t> selectedPlayerIndex =
             playerIndexForTargetId(entry.target_id)) {
@@ -10314,9 +10491,30 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     }
   }
 
-  std::vector<UiStatDefinitionMatch> matches;
+  std::vector<UiStatDefinitionCandidate> definitions;
+  std::unordered_set<std::string> definitionIds;
   for (size_t index = 0; index < UI_STAT_DEFINITIONS.size(); index += 1) {
     const UiStatDefinition &definition = UI_STAT_DEFINITIONS[index];
+    definitions.push_back(UiStatDefinitionCandidate{
+        definition.id,
+        definition.label,
+        definition.category,
+        definition.player,
+        definition.team,
+        definition.event,
+    });
+    definitionIds.insert(definition.id);
+  }
+  for (UiStatDefinitionCandidate &definition :
+       graphStatDefinitionsFromStatsJson(currentStatsJson())) {
+    if (definitionIds.insert(definition.id).second) {
+      definitions.push_back(std::move(definition));
+    }
+  }
+
+  std::vector<UiStatDefinitionMatch> matches;
+  for (size_t index = 0; index < definitions.size(); index += 1) {
+    const UiStatDefinitionCandidate &definition = definitions[index];
     if (!statsWindowSupportsStat(window, definition.id)) {
       continue;
     }
@@ -10324,20 +10522,20 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     if (!score) {
       continue;
     }
-    matches.push_back(UiStatDefinitionMatch{&definition, *score, index});
+    matches.push_back(UiStatDefinitionMatch{definition, *score, index});
   }
   std::sort(matches.begin(), matches.end(), [](const auto &left, const auto &right) {
     return left.score == right.score ? left.index < right.index : left.score < right.score;
   });
 
-  std::vector<std::pair<std::string_view, int>> categoryCounts;
+  std::vector<std::pair<std::string, int>> categoryCounts;
   for (const UiStatDefinitionMatch &match : matches) {
     auto found = std::find_if(
         categoryCounts.begin(),
         categoryCounts.end(),
-        [&](const auto &entry) { return entry.first == match.definition->category; });
+        [&](const auto &entry) { return entry.first == match.definition.category; });
     if (found == categoryCounts.end()) {
-      categoryCounts.emplace_back(match.definition->category, 1);
+      categoryCounts.emplace_back(match.definition.category, 1);
     } else {
       found->second += 1;
     }
@@ -10351,14 +10549,14 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
         std::format("Add all {} ({})##{}-{}", category, count, window.id, category);
     if (ImGui::SmallButton(label.c_str())) {
       for (const UiStatDefinitionMatch &match : matches) {
-        if (category != match.definition->category) {
+        if (category != match.definition.category) {
           continue;
         }
         const std::string targetId =
-            window.kind == UiStatsWindowKind::AdHoc ? defaultAdHocTargetId(match.definition->id)
+            window.kind == UiStatsWindowKind::AdHoc ? defaultAdHocTargetId(match.definition.id)
                                                     : "";
-        if (!statsWindowHasStat(window, match.definition->id, targetId)) {
-          window.entries.push_back(UiStatsWindow::Entry{match.definition->id, targetId});
+        if (!statsWindowHasStat(window, match.definition.id, targetId)) {
+          window.entries.push_back(UiStatsWindow::Entry{match.definition.id, targetId});
         }
       }
     }
@@ -10372,7 +10570,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
 
   for (const UiStatDefinitionMatch &match : matches) {
-    const UiStatDefinition &definition = *match.definition;
+    const UiStatDefinitionCandidate &definition = match.definition;
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
     const std::string itemLabel = std::format(
         "{}  [{}]##{}-{}",
@@ -10381,7 +10579,10 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
         window.id,
         definition.id);
     if (alreadySelected && window.kind != UiStatsWindowKind::AdHoc) {
-      ImGui::TextDisabled("%s  [%s selected]", definition.label, uiStatScopeLabel(definition));
+      ImGui::TextDisabled(
+          "%s  [%s selected]",
+          definition.label.c_str(),
+          uiStatScopeLabel(definition));
       continue;
     }
     if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
@@ -10456,7 +10657,8 @@ void SubtrActorPlugin::renderPlayerStatsTable(
       ++i;
       continue;
     }
-    ImGui::Text("%s", uiStatLabel(statId));
+    const std::string statLabel = uiStatLabel(statId);
+    ImGui::Text("%s", statLabel.c_str());
     ImGui::NextColumn();
     ImGui::Text("%s", playerStatValue(player, statId).c_str());
     ImGui::NextColumn();
@@ -10485,7 +10687,8 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
       ++i;
       continue;
     }
-    ImGui::Text("%s", uiStatLabel(statId));
+    const std::string statLabel = uiStatLabel(statId);
+    ImGui::Text("%s", statLabel.c_str());
     ImGui::NextColumn();
     ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
     ImGui::NextColumn();
@@ -10541,7 +10744,8 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
             ++i;
             continue;
           }
-          ImGui::Text("%s", uiStatLabel(statId));
+          const std::string statLabel = uiStatLabel(statId);
+          ImGui::Text("%s", statLabel.c_str());
           ImGui::NextColumn();
           ImGui::Text("%s", playerStatValue(player, statId).c_str());
           ImGui::NextColumn();
@@ -10586,7 +10790,8 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
         ++i;
         continue;
       }
-      ImGui::Text("%s", uiStatLabel(statId));
+      const std::string statLabel = uiStatLabel(statId);
+      ImGui::Text("%s", statLabel.c_str());
       ImGui::NextColumn();
       ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
       ImGui::NextColumn();
@@ -10696,7 +10901,8 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
       ++i;
       continue;
     }
-    ImGui::Text("%s", uiStatLabel(statId));
+    const std::string statLabel = uiStatLabel(statId);
+    ImGui::Text("%s", statLabel.c_str());
     ImGui::NextColumn();
     renderAdHocTargetSelector(window, entry, statId, i);
     ImGui::NextColumn();
