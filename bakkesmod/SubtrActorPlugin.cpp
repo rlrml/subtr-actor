@@ -3813,18 +3813,28 @@ std::string SubtrActorPlugin::uiConfigJson() {
                                        std::ostream &out,
                                        const UiWindowPlacement &placement,
                                        bool visible) {
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const float viewportWidth =
+        placement.viewport_width > 0.0f ? placement.viewport_width : std::max(1.0f, displaySize.x);
+    const float viewportHeight = placement.viewport_height > 0.0f ? placement.viewport_height
+                                                                  : std::max(1.0f, displaySize.y);
     out << "{\"x\":" << placement.x << ",\"y\":" << placement.y
-        << ",\"viewport\":{\"width\":" << placement.viewport_width
-        << ",\"height\":" << placement.viewport_height << "}"
+        << ",\"viewport\":{\"width\":" << viewportWidth
+        << ",\"height\":" << viewportHeight << "}"
         << ",\"zIndex\":" << placement.z_index
         << ",\"visible\":" << (visible ? "true" : "false") << "}";
   };
   auto writeStatsPlayerStatsWindowPlacement = [](
                                                   std::ostream &out,
                                                   const UiStatsWindow &window) {
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const float viewportWidth =
+        window.viewport_width > 0.0f ? window.viewport_width : std::max(1.0f, displaySize.x);
+    const float viewportHeight =
+        window.viewport_height > 0.0f ? window.viewport_height : std::max(1.0f, displaySize.y);
     out << "{\"x\":" << window.x << ",\"y\":" << window.y
-        << ",\"viewport\":{\"width\":" << window.viewport_width
-        << ",\"height\":" << window.viewport_height << "}"
+        << ",\"viewport\":{\"width\":" << viewportWidth
+        << ",\"height\":" << viewportHeight << "}"
         << ",\"zIndex\":" << window.z_index
         << ",\"visible\":" << (window.open ? "true" : "false") << "}";
   };

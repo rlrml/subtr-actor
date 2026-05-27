@@ -357,6 +357,31 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "placement.viewport_width > 0.0f ? placement.viewport_width : std::max(1.0f, displaySize.x)",
+        "singleton web placement viewport width is positive",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "placement.viewport_height > 0.0f ? placement.viewport_height\n"
+        "                                                                  : std::max(1.0f, displaySize.y)",
+        "singleton web placement viewport height is positive",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "window.viewport_width > 0.0f ? window.viewport_width : std::max(1.0f, displaySize.x)",
+        "stats web placement viewport width is positive",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "window.viewport_height > 0.0f ? window.viewport_height : std::max(1.0f, displaySize.y)",
+        "stats web placement viewport height is positive",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "writePlacement(file, *window.placement, visible);",
         "plugin windows keep plugin placement shape",
         errors,
