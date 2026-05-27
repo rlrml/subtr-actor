@@ -44,3 +44,7 @@ pub(crate) fn flip_reset_followup_touch_candidate(
         local_ball_position: features.local_ball_position,
     })
 }
+
+#[cfg(test)]
+#[path = "flip_reset_candidates_tests.rs"]
+mod tests;

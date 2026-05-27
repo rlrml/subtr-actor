@@ -36,3 +36,7 @@ fn player_velocity(body: &boxcars::RigidBody) -> glam::Vec3 {
         z: 0.0,
     }))
 }
+
+#[cfg(test)]
+#[path = "geometry_touch_tests.rs"]
+mod tests;

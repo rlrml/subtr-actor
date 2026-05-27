@@ -43,3 +43,7 @@ where
             .find_map(|(i, item)| predicate(item).map(|res| (i, res))),
     }
 }
+
+#[cfg(test)]
+#[path = "search_tests.rs"]
+mod tests;

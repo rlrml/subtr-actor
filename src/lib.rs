@@ -16,9 +16,6 @@ pub mod stats;
 pub mod ts_bindings;
 pub mod vec_map;
 
-#[cfg(test)]
-mod shared_test;
-
 pub mod actor_state {
     //! Compatibility re-export for processor actor-state types.
     pub use crate::processor::actor_state::*;
