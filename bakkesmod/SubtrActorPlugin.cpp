@@ -5401,6 +5401,50 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiLauncherOpen = false;
   }
 
+  auto renderToggleButton = [](const char *label, bool active) {
+    const std::string buttonLabel = std::format("{}##launcher-toggle-{}", label, label);
+    if (active) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
+    }
+    const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{190.0f, 0.0f});
+    if (active) {
+      ImGui::PopStyleColor(2);
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", active ? "On" : "Off");
+    return clicked;
+  };
+  auto renderCvarToggle = [&](const char *label, const char *name, bool defaultValue) {
+    const bool active = cvarBool(name, defaultValue);
+    if (renderToggleButton(label, active)) {
+      setCvarBool(name, !active);
+    }
+  };
+  auto renderBoolToggle = [&](const char *label, bool &active) {
+    if (renderToggleButton(label, active)) {
+      active = !active;
+    }
+  };
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
+  if (ImGui::TreeNode("Timeline visualizations##launcher-module-summary-timeline")) {
+    renderBoolToggle("Mechanics playlist", eventPlaylistMechanicsEnabled);
+    renderBoolToggle("Team event playlist", eventPlaylistTeamEventsEnabled);
+    renderBoolToggle("Goal context playlist", eventPlaylistGoalContextEnabled);
+    renderBoolToggle("Playlist follow", eventPlaylistAutoFollow);
+    ImGui::TreePop();
+  }
+  if (ImGui::TreeNode("In-game visualizations##launcher-module-summary-ingame")) {
+    renderCvarToggle("Canvas HUD overlay", "subtr_actor_overlay_enabled", true);
+    renderCvarToggle("Canvas status line", "subtr_actor_status_overlay_enabled", true);
+    renderCvarToggle("HUD mechanics", "subtr_actor_overlay_mechanics_enabled", true);
+    renderCvarToggle("HUD team events", "subtr_actor_overlay_team_events_enabled", true);
+    renderCvarToggle("HUD goal context", "subtr_actor_overlay_goal_context_enabled", true);
+    ImGui::TreePop();
+  }
+
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   struct LauncherWindowToggle {
