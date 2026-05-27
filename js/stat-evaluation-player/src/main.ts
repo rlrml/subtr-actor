@@ -29,6 +29,7 @@ import {
   renderModuleSummaryView,
   type ModuleCapabilityKind,
 } from "./moduleSummaryView.ts";
+import { FloatingWindowController, mustElement } from "./floatingWindows.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import {
@@ -107,19 +108,15 @@ import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
   isStatsPlayerConfigDebugEnabled,
-  mapWindowPlacementToViewport,
   setStatsPlayerConfigOnUrl,
   STATS_PLAYER_CONFIG_VERSION,
-  type ConfigViewportSize,
   type PlayerCameraConfig,
   type PlayerPlaybackConfig,
   type RecordingConfig,
-  type SingletonWindowConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
   type StatsPlayerConfigParamSnapshot,
   type StatsWindowKind,
-  type WindowPlacementConfig,
 } from "./playerConfig.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
@@ -304,7 +301,6 @@ let recordingSize!: HTMLElement;
 let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
-let nextWindowZIndex = 30;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
@@ -324,6 +320,10 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "boost-pickups",
   "touch-controls",
 ];
+const floatingWindows = new FloatingWindowController(
+  () => appRoot ?? document,
+  scheduleConfigUrlUpdate,
+);
 
 let activeMechanicsReview: ActiveMechanicsReview | null = null;
 let mechanicsReviewBoundaryGuard = false;
@@ -347,8 +347,9 @@ const statsWindowManager = createStatsWindowsManager({
   getWindowLayer() {
     return statsWindowLayer;
   },
-  applyWindowPlacement,
-  bringWindowToFront,
+  applyWindowPlacement: (windowEl, placement) =>
+    floatingWindows.applyWindowPlacement(windowEl, placement),
+  bringWindowToFront: (windowEl) => floatingWindows.bringWindowToFront(windowEl),
   cueGoalReplay(time) {
     replayPlayer?.setState({
       currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
@@ -361,7 +362,7 @@ const statsWindowManager = createStatsWindowsManager({
     scheduleConfigUrlUpdate();
   },
   formatTime,
-  readWindowPlacement,
+  readWindowPlacement: (windowEl) => floatingWindows.readWindowPlacement(windowEl),
   scheduleConfigUrlUpdate,
   setLauncherOpen,
   watchGoalReplay,
@@ -616,74 +617,8 @@ function renderTimelineEventCount(): void {
   eventsReadout.textContent = `${eventWindowsManager.countVisibleTimelineSources(ctx)}`;
 }
 
-function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
-  const element = root.querySelector(selector);
-  if (!(element instanceof HTMLElement)) {
-    throw new Error(`Missing element for selector: ${selector}`);
-  }
-
-  return element as T;
-}
-
-function getElementWindowId(element: HTMLElement): string | null {
-  return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ?? null;
-}
-
-function getCurrentViewportSize(): ConfigViewportSize {
-  return {
-    width: Math.max(1, window.innerWidth),
-    height: Math.max(1, window.innerHeight),
-  };
-}
-
-function readWindowCoordinate(windowEl: HTMLElement, propertyName: string): number {
-  const inlineValue = windowEl.style.getPropertyValue(propertyName).trim();
-  const computedValue = getComputedStyle(windowEl).getPropertyValue(propertyName).trim();
-  const rawValue = inlineValue || computedValue;
-  const parsed = Number.parseFloat(rawValue);
-  if (Number.isFinite(parsed)) {
-    return parsed;
-  }
-
-  const rect = windowEl.getBoundingClientRect();
-  return propertyName === "--window-y" ? rect.top : rect.left;
-}
-
-function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
-  const zIndex = Number.parseInt(windowEl.style.zIndex, 10);
-  return {
-    x: readWindowCoordinate(windowEl, "--window-x"),
-    y: readWindowCoordinate(windowEl, "--window-y"),
-    viewport: getCurrentViewportSize(),
-    zIndex: Number.isFinite(zIndex) ? zIndex : undefined,
-    visible: !windowEl.hidden,
-  };
-}
-
-function applyWindowPlacement(windowEl: HTMLElement, placement: WindowPlacementConfig): void {
-  const mapped = mapWindowPlacementToViewport(placement, getCurrentViewportSize());
-  windowEl.style.setProperty("--window-x", `${mapped.x}px`);
-  windowEl.style.setProperty("--window-y", `${mapped.y}px`);
-  windowEl.hidden = !placement.visible;
-  if (placement.zIndex !== undefined) {
-    windowEl.style.zIndex = `${placement.zIndex}`;
-    nextWindowZIndex = Math.max(nextWindowZIndex, placement.zIndex + 1);
-  }
-}
-
-function getSingletonWindowConfigs(): SingletonWindowConfig[] {
-  const configs: SingletonWindowConfig[] = [];
-  const root = appRoot ?? document;
-  for (const id of SINGLETON_WINDOW_IDS) {
-    const element = root.querySelector<HTMLElement>(`[data-window-id="${id}"]`);
-    if (element) {
-      configs.push({
-        id,
-        placement: readWindowPlacement(element),
-      });
-    }
-  }
-  return configs;
+function getSingletonWindowConfigs() {
+  return floatingWindows.getSingletonWindowConfigs(SINGLETON_WINDOW_IDS);
 }
 
 function getConfigAdapters(): StatsPlayerConfigAdapter[] {
@@ -822,13 +757,7 @@ function logStatsPlayerConfigLoadDebug(
 }
 
 function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
-  const root = appRoot ?? document;
-  for (const windowConfig of config.singletonWindows) {
-    const element = root.querySelector<HTMLElement>(`[data-window-id="${windowConfig.id}"]`);
-    if (element) {
-      applyWindowPlacement(element, windowConfig.placement);
-    }
-  }
+  floatingWindows.applyWindowConfigs(config.singletonWindows);
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
@@ -950,30 +879,16 @@ function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
   statsWindowManager.render(replayPlayer.getState().frameIndex);
 }
 
-function bringWindowToFront(windowEl: HTMLElement): void {
-  windowEl.style.zIndex = `${nextWindowZIndex++}`;
-}
-
 function showWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = false;
-  bringWindowToFront(windowEl);
-  scheduleConfigUrlUpdate();
+  floatingWindows.showWindow(id);
 }
 
 function toggleWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = !windowEl.hidden;
-  if (!windowEl.hidden) {
-    bringWindowToFront(windowEl);
-  }
-  scheduleConfigUrlUpdate();
+  floatingWindows.toggleWindow(id);
 }
 
 function hideWindow(id: string): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = true;
-  scheduleConfigUrlUpdate();
+  floatingWindows.hideWindow(id);
 }
 
 function setLauncherOpen(open: boolean): void {
@@ -987,62 +902,8 @@ function openReplayFilePicker(): void {
   setLauncherOpen(false);
 }
 
-function isInteractiveDragTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    Boolean(target.closest("button, input, select, textarea, option, label, a, [data-no-drag]"))
-  );
-}
-
 function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
-  root.addEventListener(
-    "pointerdown",
-    (event) => {
-      if (!(event.target instanceof HTMLElement) || isInteractiveDragTarget(event.target)) {
-        return;
-      }
-
-      const windowEl = event.target.closest<HTMLElement>("[data-window-id]");
-      if (!windowEl || windowEl.hidden) {
-        return;
-      }
-
-      bringWindowToFront(windowEl);
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const rect = windowEl.getBoundingClientRect();
-      const pointerId = event.pointerId;
-
-      windowEl.setPointerCapture(pointerId);
-      event.preventDefault();
-
-      const onPointerMove = (moveEvent: PointerEvent) => {
-        const nextX = Math.max(
-          8,
-          Math.min(window.innerWidth - 120, rect.left + moveEvent.clientX - startX),
-        );
-        const nextY = Math.max(
-          8,
-          Math.min(window.innerHeight - 100, rect.top + moveEvent.clientY - startY),
-        );
-        windowEl.style.setProperty("--window-x", `${nextX}px`);
-        windowEl.style.setProperty("--window-y", `${nextY}px`);
-      };
-
-      const onPointerUp = () => {
-        windowEl.releasePointerCapture(pointerId);
-        windowEl.removeEventListener("pointermove", onPointerMove);
-        windowEl.removeEventListener("pointerup", onPointerUp);
-        windowEl.removeEventListener("pointercancel", onPointerUp);
-        scheduleConfigUrlUpdate();
-      };
-
-      windowEl.addEventListener("pointermove", onPointerMove);
-      windowEl.addEventListener("pointerup", onPointerUp);
-      windowEl.addEventListener("pointercancel", onPointerUp);
-    },
-    { signal },
-  );
+  floatingWindows.installDragging(root, signal);
 }
 
 function renderModuleSummary(): void {
@@ -2184,7 +2045,7 @@ export function mountStatEvaluationPlayer(
       configUrlUpdateTimer = null;
     }
     isApplyingConfig = false;
-    nextWindowZIndex = 30;
+    floatingWindows.resetZIndex();
     removeRenderHook = null;
     if (appRoot === root) {
       appRoot = null;
@@ -2251,7 +2112,7 @@ export function mountStatEvaluationPlayer(
     button.addEventListener(
       "click",
       () => {
-        const id = button.dataset.windowHide ?? getElementWindowId(button);
+        const id = button.dataset.windowHide ?? floatingWindows.getElementWindowId(button);
         if (id) {
           hideWindow(id);
         }
