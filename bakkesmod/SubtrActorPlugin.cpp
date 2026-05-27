@@ -4198,12 +4198,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
          << ",\"height\":" << window.viewport_height << "}"
          << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}";
-    file << ",\"playerId\":";
-    if (window.kind == UiStatsWindowKind::Player) {
-      file << "\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\"";
-    } else {
-      file << "null";
-    }
+    file << ",\"playerId\":\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\"";
     file << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
     file << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
