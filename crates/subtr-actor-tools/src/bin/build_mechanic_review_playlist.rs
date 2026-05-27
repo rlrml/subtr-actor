@@ -10,8 +10,8 @@ use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
     DoubleTapCalculator, FlickCalculator, FlipResetTracker, HalfFlipCalculator,
-    MustyFlickCalculator, OneTimerCalculator, ProcessorView, ReplayProcessor, SpeedFlipCalculator,
-    SubtrActorResult, TimeAdvance, WavedashCalculator,
+    MustyFlickCalculator, OneTimerCalculator, ReplayProcessor, SpeedFlipCalculator,
+    WavedashCalculator,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -26,6 +26,8 @@ mod candidate;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_goal_scan.rs"]
+mod goal_scan;
 #[path = "build_mechanic_review_playlist_mechanics.rs"]
 mod mechanics;
 #[path = "build_mechanic_review_playlist_players.rs"]
@@ -48,25 +50,12 @@ use candidate::{
     include_candidate, replay_duration_seconds, MechanicCandidate,
 };
 use config::{parse_args, Config};
+use goal_scan::GoalScanCollector;
 use mechanics::{graph_node_names_for_mechanics, resolve_mechanics};
 use players::{player_display_map, player_id_string, player_team_label};
 use source_collect::collect_sources;
 use source_parse::parse_replay_file;
 use source_types::ReplaySourceInput;
-
-struct GoalScanCollector;
-
-impl Collector for GoalScanCollector {
-    fn process_frame(
-        &mut self,
-        _processor: &dyn ProcessorView,
-        _frame: &boxcars::Frame,
-        _frame_number: usize,
-        _current_time: f32,
-    ) -> SubtrActorResult<TimeAdvance> {
-        Ok(TimeAdvance::NextFrame)
-    }
-}
 
 fn extract_candidates(
     replay: &boxcars::Replay,
