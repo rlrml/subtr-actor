@@ -129,6 +129,9 @@ To inspect the stats-player configuration loaded from a share link, add
 the exact parsed URL parameters, the selected `cfg` source, the raw `cfg` text,
 and the normalized decoded configuration. If both the query string and hash
 contain `cfg`, the hash value is used and the debug log includes a warning.
+The `cfg` value normally uses compressed base64url encoding, but URL-encoded
+raw JSON is also accepted for tooling that needs to hand off configuration
+without running the web encoder.
 
 The package also exports the stat timeline helpers and overlay utilities used by
 the viewer, so consumers can build their own derived UI around the same data.

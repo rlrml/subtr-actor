@@ -148,9 +148,13 @@ export function decodeStatsPlayerConfig(value: string): StatsPlayerConfig {
   try {
     parsed = JSON.parse(strFromU8(inflateSync(base64UrlToBytes(value))));
   } catch (error) {
-    throw new Error(
-      `Invalid stats player config: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new Error(
+        `Invalid stats player config: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   return normalizeStatsPlayerConfig(parsed);

@@ -1019,6 +1019,26 @@ std::string escapeJsonString(std::string_view value) {
   return escaped;
 }
 
+std::string urlEncode(std::string_view value) {
+  constexpr char HEX[] = "0123456789ABCDEF";
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (const unsigned char byte : value) {
+    const bool unreserved =
+        (byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
+        (byte >= '0' && byte <= '9') || byte == '-' || byte == '_' ||
+        byte == '.' || byte == '~';
+    if (unreserved) {
+      encoded.push_back(static_cast<char>(byte));
+      continue;
+    }
+    encoded.push_back('%');
+    encoded.push_back(HEX[byte >> 4]);
+    encoded.push_back(HEX[byte & 0x0F]);
+  }
+  return encoded;
+}
+
 std::string clippedDisplayText(std::string value, size_t maxBytes = 24000) {
   if (value.size() <= maxBytes) {
     return value;
@@ -7384,6 +7404,14 @@ void SubtrActorPlugin::renderLauncherWindow() {
       const std::string json = uiConfigJson();
       ImGui::SetClipboardText(json.c_str());
       cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Copy layout cfg")) {
+      const std::string json = uiConfigJson();
+      const std::string cfg = std::format("#cfg={}", urlEncode(json));
+      ImGui::SetClipboardText(cfg.c_str());
+      cvarManager->log(
+          std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
     }
     ImGui::SameLine();
     if (ImGui::Button("Paste layout JSON")) {
