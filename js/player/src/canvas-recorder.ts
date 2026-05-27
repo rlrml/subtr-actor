@@ -1,71 +1,31 @@
 import type {
-  ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerRenderContext,
   ReplayPlayerState,
 } from "./types";
+import {
+  chooseCanvasRecorderMimeType,
+  DEFAULT_CANVAS_RECORDER_FPS,
+  getRecorderErrorMessage,
+} from "./canvas-recorder-helpers";
+import type {
+  CanvasRecorderPlugin,
+  CanvasRecorderPluginOptions,
+  CanvasRecorderRangeOptions,
+  CanvasRecorderStartOptions,
+  CanvasRecorderStatus,
+  CanvasRecorderStatusListener,
+} from "./canvas-recorder-types";
 
-export type CanvasRecorderState = "idle" | "recording" | "stopping" | "ready" | "error";
-
-export interface CanvasRecorderStatus {
-  state: CanvasRecorderState;
-  elapsedSeconds: number;
-  mimeType: string;
-  sizeBytes: number;
-  error: string | null;
-}
-
-export interface CanvasRecorderStartOptions {
-  mimeType?: string;
-  fps?: number;
-  videoBitsPerSecond?: number;
-}
-
-export interface CanvasRecorderRangeOptions extends CanvasRecorderStartOptions {
-  startTime?: number;
-  endTime?: number;
-  playbackRate?: number;
-  restorePlaybackState?: boolean;
-}
-
-export type CanvasRecorderStatusListener = (status: CanvasRecorderStatus) => void;
-
-export interface CanvasRecorderPluginOptions extends CanvasRecorderStartOptions {
-  onStatusChange?: CanvasRecorderStatusListener;
-  onComplete?: (recording: Blob) => void;
-}
-
-export interface CanvasRecorderPlugin extends ReplayPlayerPlugin {
-  start(options?: CanvasRecorderStartOptions): void;
-  stop(): Promise<Blob | null>;
-  clear(): void;
-  getRecording(): Blob | null;
-  getStatus(): CanvasRecorderStatus;
-  subscribe(listener: CanvasRecorderStatusListener): () => void;
-  recordRange(options?: CanvasRecorderRangeOptions): Promise<Blob>;
-  recordFullReplay(options?: CanvasRecorderRangeOptions): Promise<Blob>;
-}
-
-const DEFAULT_FPS = 60;
-const DEFAULT_MIME_TYPES = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-
-function chooseMimeType(requested: string | undefined): string {
-  if (requested && MediaRecorder.isTypeSupported(requested)) {
-    return requested;
-  }
-
-  for (const candidate of DEFAULT_MIME_TYPES) {
-    if (MediaRecorder.isTypeSupported(candidate)) {
-      return candidate;
-    }
-  }
-
-  return "";
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export type {
+  CanvasRecorderPlugin,
+  CanvasRecorderPluginOptions,
+  CanvasRecorderRangeOptions,
+  CanvasRecorderStartOptions,
+  CanvasRecorderState,
+  CanvasRecorderStatus,
+  CanvasRecorderStatusListener,
+} from "./canvas-recorder-types";
 
 export function createCanvasRecorderPlugin(
   options: CanvasRecorderPluginOptions = {},
@@ -143,7 +103,7 @@ export function createCanvasRecorderPlugin(
   }
 
   function fail(nextError: unknown): void {
-    error = getErrorMessage(nextError);
+    error = getRecorderErrorMessage(nextError);
     recorder = null;
     rangeEndTime = null;
     autoStopOnPlaybackEnd = false;
@@ -222,8 +182,8 @@ export function createCanvasRecorderPlugin(
       sizeBytes = 0;
       elapsedSeconds = 0;
       startedAt = performance.now();
-      mimeType = chooseMimeType(startOptions.mimeType ?? options.mimeType);
-      const fps = Math.max(1, startOptions.fps ?? options.fps ?? DEFAULT_FPS);
+      mimeType = chooseCanvasRecorderMimeType(startOptions.mimeType ?? options.mimeType);
+      const fps = Math.max(1, startOptions.fps ?? options.fps ?? DEFAULT_CANVAS_RECORDER_FPS);
       const stream = canvas.captureStream(fps);
       recorder = new MediaRecorder(stream, {
         mimeType,
