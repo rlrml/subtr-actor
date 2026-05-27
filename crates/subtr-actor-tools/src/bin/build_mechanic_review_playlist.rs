@@ -3,9 +3,8 @@ use serde_json::json;
 use subtr_actor::{
     playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
-    DoubleTapCalculator, FlipResetTracker, HalfFlipCalculator, OneTimerCalculator, ReplayProcessor,
-    SpeedFlipCalculator, WavedashCalculator,
+    CeilingShotCalculator, Collector, DodgeResetCalculator, FlipResetTracker, HalfFlipCalculator,
+    ReplayProcessor, SpeedFlipCalculator, WavedashCalculator,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -22,6 +21,8 @@ mod config;
 mod constants;
 #[path = "build_mechanic_review_playlist_extract_flick.rs"]
 mod extract_flick;
+#[path = "build_mechanic_review_playlist_extract_touch.rs"]
+mod extract_touch;
 #[path = "build_mechanic_review_playlist_goal_scan.rs"]
 mod goal_scan;
 #[path = "build_mechanic_review_playlist_manifest.rs"]
@@ -49,6 +50,9 @@ use candidate::{
 };
 use config::{parse_args, Config};
 use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
+use extract_touch::{
+    push_air_dribble_candidates, push_double_tap_candidates, push_one_timer_candidates,
+};
 use goal_scan::GoalScanCollector;
 use manifest::{build_manifest, write_manifest};
 use mechanics::graph_node_names_for_mechanics;
@@ -72,61 +76,10 @@ fn extract_candidates(
                 push_musty_flick_candidates(graph, &mut candidates);
             }
             "one_timer" => {
-                let Some(calculator) = graph.state::<OneTimerCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| MechanicCandidate {
-                    mechanic: "one_timer",
-                    mechanic_label: "One Timer",
-                    detector: "builtin:one_timer",
-                    player_id: Some(player_id_string(&event.player)),
-                    is_team_0: Some(event.is_team_0),
-                    event_time: event.time,
-                    event_frame: event.frame,
-                    start_time: event.pass_start_time,
-                    end_time: event.time,
-                    confidence: None,
-                    reason: format!(
-                        "pass from {}; {:.1}s pass, {:.0}uu travel, {:.0}uu/s shot, {:.2} goal alignment",
-                        player_id_string(&event.passer),
-                        event.pass_duration,
-                        event.pass_travel_distance,
-                        event.ball_speed,
-                        event.goal_alignment
-                    ),
-                    event: event_json(event),
-                }));
+                push_one_timer_candidates(graph, &mut candidates);
             }
             "air_dribble" => {
-                let Some(calculator) = graph.state::<BallCarryCalculator>() else {
-                    continue;
-                };
-                candidates.extend(
-                    calculator
-                        .carry_events()
-                        .iter()
-                        .filter(|event| event.kind == BallCarryKind::AirDribble)
-                        .map(|event| MechanicCandidate {
-                            mechanic: "air_dribble",
-                            mechanic_label: "Air Dribble",
-                            detector: "builtin:ball_carry",
-                            player_id: Some(player_id_string(&event.player_id)),
-                            is_team_0: Some(event.is_team_0),
-                            event_time: event.end_time,
-                            event_frame: event.end_frame,
-                            start_time: event.start_time,
-                            end_time: event.end_time,
-                            confidence: None,
-                            reason: format!(
-                                "{:.1}s airborne control; {:.0}uu path; avg gap {:.0}h/{:.0}v",
-                                event.duration,
-                                event.path_distance,
-                                event.average_horizontal_gap,
-                                event.average_vertical_gap
-                            ),
-                            event: event_json(event),
-                        }),
-                );
+                push_air_dribble_candidates(graph, &mut candidates);
             }
             "flip_reset" => {
                 let tracker = FlipResetTracker::new()
@@ -206,26 +159,7 @@ fn extract_candidates(
                 }));
             }
             "double_tap" => {
-                let Some(calculator) = graph.state::<DoubleTapCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| MechanicCandidate {
-                    mechanic: "double_tap",
-                    mechanic_label: "Double Tap",
-                    detector: "builtin:double_tap",
-                    player_id: Some(player_id_string(&event.player)),
-                    is_team_0: Some(event.is_team_0),
-                    event_time: event.time,
-                    event_frame: event.frame,
-                    start_time: event.backboard_time,
-                    end_time: event.time,
-                    confidence: None,
-                    reason: format!(
-                        "same-player touch {:.2}s after backboard bounce",
-                        event.time - event.backboard_time
-                    ),
-                    event: event_json(event),
-                }));
+                push_double_tap_candidates(graph, &mut candidates);
             }
             "speed_flip" => {
                 let Some(calculator) = graph.state::<SpeedFlipCalculator>() else {
