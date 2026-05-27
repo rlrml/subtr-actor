@@ -1916,6 +1916,26 @@ void SubtrActorPlugin::onLoad() {
       },
       "Logs supported values for subtr_actor_overlay_event_types.",
       PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_open_ui",
+      [this](std::vector<std::string>) {
+        uiWindowOpen = true;
+        uiLauncherOpen = true;
+        launcherPlacement.pending_focus = true;
+      },
+      "Opens the subtr-actor in-game launcher window.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_toggle_ui",
+      [this](std::vector<std::string>) {
+        uiWindowOpen = true;
+        uiLauncherOpen = !uiLauncherOpen;
+        if (uiLauncherOpen) {
+          launcherPlacement.pending_focus = true;
+        }
+      },
+      "Toggles the subtr-actor in-game launcher window.",
+      PERMISSION_ALL);
   hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
@@ -5327,7 +5347,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     return;
   }
   applyWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f);
-  if (!ImGui::Begin("subtr-actor", nullptr)) {
+  if (!ImGui::Begin("subtr-actor", &uiLauncherOpen)) {
     ImGui::End();
     return;
   }
@@ -5354,6 +5374,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   if (ImGui::Button("Open modules")) {
     uiModuleControlsOpen = true;
     moduleControlsPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Close launcher")) {
+    uiLauncherOpen = false;
   }
 
   ImGui::Separator();
