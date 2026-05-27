@@ -409,6 +409,10 @@ private:
       const char *name,
       bool defaultValue,
       const char *idSuffix);
+  void renderEventFilterModuleSummaryToggle(
+      const char *label,
+      const char *token,
+      const char *idSuffix);
   void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
   void renderModuleSummaryControls(const char *idSuffix);
   void renderSingletonWindowManager();

@@ -6598,11 +6598,57 @@ void SubtrActorPlugin::renderBoolModuleSummaryToggle(
   }
 }
 
+void SubtrActorPlugin::renderEventFilterModuleSummaryToggle(
+    const char *label,
+    const char *token,
+    const char *idSuffix) {
+  std::vector<std::string> selected =
+      selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all"));
+  const bool active =
+      eventPlaylistMechanicsEnabled &&
+      (containsString(selected, "mechanics") || containsString(selected, token));
+  if (!renderModuleSummaryToggle(label, active, idSuffix)) {
+    return;
+  }
+
+  selected.erase(
+      std::remove(selected.begin(), selected.end(), std::string{"mechanics"}),
+      selected.end());
+  if (active) {
+    selected.erase(
+        std::remove(selected.begin(), selected.end(), std::string{token}),
+        selected.end());
+  } else {
+    appendUniqueFilterToken(selected, token);
+  }
+
+  const bool hasMechanicsSelection = std::any_of(
+      selected.begin(),
+      selected.end(),
+      [](const std::string &selectedToken) {
+        return selectedToken == "mechanics" || selectedToken == "touch" ||
+               isMechanicFilterToken(selectedToken);
+      });
+  eventPlaylistMechanicsEnabled = hasMechanicsSelection;
+  setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
+}
+
 void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
   if (ImGui::TreeNodeEx(
           std::format("Timeline visualizations##{}-timeline", idSuffix).c_str(),
           ImGuiTreeNodeFlags_DefaultOpen)) {
-    renderBoolModuleSummaryToggle("Mechanics playlist", eventPlaylistMechanicsEnabled, idSuffix);
+    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix);
+    renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix);
+    renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix);
+    renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix);
+    renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix);
+    renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix);
+    renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix);
+    renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix);
+    renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix);
+    renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix);
+    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix);
+    renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix);
     renderBoolModuleSummaryToggle("Team event playlist", eventPlaylistTeamEventsEnabled, idSuffix);
     renderBoolModuleSummaryToggle(
         "Goal context playlist",
