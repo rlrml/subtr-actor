@@ -11171,7 +11171,7 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
   }
 }
 
-void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t stackIndex) {
+void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t /*stackIndex*/) {
   applyStatsWindowPlacement(window);
   if (window.pending_focus) {
     ImGui::SetNextWindowFocus();
@@ -11193,21 +11193,14 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t stackInde
         statsWindowKindLabel(window.kind));
     ImGui::SameLine();
   }
-  const std::string resetLabel = std::format("Reset##stats-window-reset-{}", window.id);
   const std::string hideLabel = std::format("Hide##stats-window-hide-{}", window.id);
   const float buttonPadding = ImGui::GetStyle().FramePadding.x * 2.0f;
-  const float resetWidth = ImGui::CalcTextSize("Reset").x + buttonPadding;
   const float hideWidth =
       ImGui::CalcTextSize("Hide").x + buttonPadding;
-  const float controlsWidth = resetWidth + ImGui::GetStyle().ItemSpacing.x + hideWidth;
-  const float rightAlignedX = ImGui::GetWindowContentRegionMax().x - controlsWidth;
+  const float rightAlignedX = ImGui::GetWindowContentRegionMax().x - hideWidth;
   if (rightAlignedX > ImGui::GetCursorPosX()) {
     ImGui::SetCursorPosX(rightAlignedX);
   }
-  if (ImGui::SmallButton(resetLabel.c_str())) {
-    resetStatsWindowPlacement(window, stackIndex);
-  }
-  ImGui::SameLine();
   if (ImGui::SmallButton(hideLabel.c_str())) {
     window.open = false;
     scheduleUiConfigAutosave();
