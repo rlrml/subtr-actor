@@ -465,6 +465,36 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'const bool hasLegacyStatsWindows = jsonPropertyExists(json, "stats_windows");',
+        "stats window import checks legacy property presence",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const bool hasWebStatsWindows = jsonPropertyExists(json, "statsWindows");',
+        "stats window import checks web property presence",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'hasLegacyStatsWindows\n          ? parseJsonObjectArrayProperty(json, "stats_windows")',
+        "stats window import prefers present legacy plugin config",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'hasWebStatsWindows ? parseJsonObjectArrayProperty(json, "statsWindows")',
+        "stats window import falls back to present web config",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'if (statsWindowObjects.empty()) {\n    statsWindowObjects = parseJsonObjectArrayProperty(json, "statsWindows");\n  }',
+        "stats window import falls back based on parsed legacy emptiness",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "auto writeStatsPlayerPlacement = [](",
         "dedicated web placement writer",
         errors,

@@ -3675,11 +3675,13 @@ void SubtrActorPlugin::applyUiConfigJson(
 
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
-  std::vector<std::string> statsWindowObjects =
-      parseJsonObjectArrayProperty(json, "stats_windows");
-  if (statsWindowObjects.empty()) {
-    statsWindowObjects = parseJsonObjectArrayProperty(json, "statsWindows");
-  }
+  const bool hasLegacyStatsWindows = jsonPropertyExists(json, "stats_windows");
+  const bool hasWebStatsWindows = jsonPropertyExists(json, "statsWindows");
+  const std::vector<std::string> statsWindowObjects =
+      hasLegacyStatsWindows
+          ? parseJsonObjectArrayProperty(json, "stats_windows")
+          : hasWebStatsWindows ? parseJsonObjectArrayProperty(json, "statsWindows")
+                               : std::vector<std::string>{};
   for (const std::string &object : statsWindowObjects) {
     const auto kind = parseJsonStringProperty(object, "kind");
     if (!kind) {
