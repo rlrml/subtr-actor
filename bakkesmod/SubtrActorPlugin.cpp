@@ -2495,6 +2495,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     window.module_view = static_cast<int>(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
     window.picker_query = parseJsonStringProperty(object, "picker_query").value_or("");
+    const bool hasEntriesProperty = object.find("\"entries\"") != std::string::npos;
     for (const std::string &statId : parseJsonStringArrayProperty(object, "entries")) {
       window.entries.push_back(UiStatsWindow::Entry{statId, ""});
     }
@@ -2512,7 +2513,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       }
       window.entries.push_back(UiStatsWindow::Entry{statId, targetId});
     }
-    if (window.entries.empty() && window.kind != UiStatsWindowKind::StatsModule) {
+    if (!hasEntriesProperty && window.entries.empty() &&
+        window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
     }
     window.has_placement = parseJsonBoolProperty(object, "has_placement").value_or(false);
@@ -6684,7 +6686,7 @@ void SubtrActorPlugin::renderCameraWindow() {
     recordingPlacement.pending_focus = true;
   }
   if (targetPlayer != nullptr && ImGui::Button("Open player stats")) {
-    createStatsWindow(UiStatsWindowKind::Player);
+    createStatsWindow(UiStatsWindowKind::Player, true);
     if (!uiStatsWindows.empty()) {
       UiStatsWindow &window = uiStatsWindows.back();
       window.selected_player_index = targetPlayer->player_index;
@@ -7298,9 +7300,9 @@ void SubtrActorPlugin::resetWindowPlacements() {
 void SubtrActorPlugin::resetDefaultStatsWindows() {
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
-  createStatsWindow(UiStatsWindowKind::Player);
-  createStatsWindow(UiStatsWindowKind::Team);
-  createStatsWindow(UiStatsWindowKind::GoalsOverview);
+  createStatsWindow(UiStatsWindowKind::Player, true);
+  createStatsWindow(UiStatsWindowKind::Team, true);
+  createStatsWindow(UiStatsWindowKind::GoalsOverview, true);
 }
 
 void SubtrActorPlugin::applyDefaultUiWorkspace() {
@@ -7399,7 +7401,7 @@ void SubtrActorPlugin::applyRecordingUiWorkspace() {
   cameraPlacement.pending_focus = true;
 }
 
-void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
+void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initializeEntries) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = kind;
@@ -7408,7 +7410,9 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
     window.selected_player_index = sampledPlayers.front().player_index;
     window.selected_team_is_team_0 = sampledPlayers.front().is_team_0;
   }
-  initializeStatsWindowEntries(window);
+  if (initializeEntries) {
+    initializeStatsWindowEntries(window);
+  }
   uiStatsWindows.push_back(window);
 }
 
@@ -8002,7 +8006,7 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
   }
 
   if (window.entries.empty()) {
-    ImGui::Text("No stats selected.");
+    ImGui::Text("No stats added.");
     return;
   }
 

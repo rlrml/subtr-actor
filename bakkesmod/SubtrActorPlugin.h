@@ -374,7 +374,7 @@ private:
   void applyReplayReviewUiWorkspace();
   void applyGraphDebugUiWorkspace();
   void applyRecordingUiWorkspace();
-  void createStatsWindow(UiStatsWindowKind kind);
+  void createStatsWindow(UiStatsWindowKind kind, bool initializeEntries = false);
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
