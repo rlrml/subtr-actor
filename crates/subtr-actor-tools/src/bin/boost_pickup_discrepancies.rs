@@ -1,92 +1,21 @@
 use std::collections::HashMap;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use clap::Parser;
-use serde::Serialize;
 use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay, BoostCalculator,
-    BoostPickupActivity, BoostPickupComparison, BoostPickupComparisonEvent, BoostPickupPadType,
-    PlayerId, ReplayProcessor,
+    BoostPickupComparison, PlayerId, ReplayProcessor,
 };
 
+#[path = "boost_pickup_discrepancies_helpers.rs"]
+mod helpers;
 #[path = "boost_pickup_discrepancies_types.rs"]
 mod types;
 
-use types::{Args, PickupCountBreakdown, PickupRecord, SummaryRecord};
-
-fn parse_replay(path: &Path) -> anyhow::Result<boxcars::Replay> {
-    let data =
-        std::fs::read(path).with_context(|| format!("failed to read replay {}", path.display()))?;
-    boxcars::ParserBuilder::new(&data)
-        .must_parse_network_data()
-        .always_check_crc()
-        .parse()
-        .with_context(|| format!("failed to parse replay {}", path.display()))
-}
-
-fn resolve_replay_path(arg: &str) -> PathBuf {
-    let path = PathBuf::from(arg);
-    if path.exists() {
-        return path;
-    }
-
-    let fixture_replay = PathBuf::from(format!("assets/{arg}.replay"));
-    if fixture_replay.exists() {
-        return fixture_replay;
-    }
-
-    path
-}
-
-fn increment_breakdown(counts: &mut PickupCountBreakdown, event: &BoostPickupComparisonEvent) {
-    counts.total += 1;
-    match event.comparison {
-        BoostPickupComparison::Both => counts.both += 1,
-        BoostPickupComparison::Ghost => counts.ghost += 1,
-        BoostPickupComparison::Missed => counts.missed += 1,
-    }
-    match event.pad_type {
-        BoostPickupPadType::Big => counts.big += 1,
-        BoostPickupPadType::Small => counts.small += 1,
-        BoostPickupPadType::Ambiguous => counts.ambiguous += 1,
-    }
-    match event.activity {
-        BoostPickupActivity::Active => counts.active += 1,
-        BoostPickupActivity::Inactive => counts.inactive += 1,
-        BoostPickupActivity::Unknown => counts.unknown_activity += 1,
-    }
-}
-
-fn count_events<'a>(
-    events: impl IntoIterator<Item = &'a BoostPickupComparisonEvent>,
-) -> PickupCountBreakdown {
-    let mut counts = PickupCountBreakdown::default();
-    for event in events {
-        increment_breakdown(&mut counts, event);
-    }
-    counts
-}
-
-fn print_jsonl_record<T: Serialize>(record: &T) -> anyhow::Result<()> {
-    let mut stdout = io::stdout().lock();
-    let result = writeln!(stdout, "{}", serde_json::to_string(record)?);
-    match result {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => Ok(()),
-        Err(err) => Err(err.into()),
-    }
-}
-
-fn event_sort_key(event: &BoostPickupComparisonEvent) -> (usize, String, &'static str) {
-    let comparison = match event.comparison {
-        BoostPickupComparison::Both => "both",
-        BoostPickupComparison::Ghost => "ghost",
-        BoostPickupComparison::Missed => "missed",
-    };
-    (event.frame, format!("{:?}", event.player_id), comparison)
-}
+use helpers::{
+    count_events, event_sort_key, parse_replay, print_jsonl_record, resolve_replay_path,
+};
+use types::{Args, PickupRecord, SummaryRecord};
 
 fn print_pickups_jsonl(
     label: &str,
