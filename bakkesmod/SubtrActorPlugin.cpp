@@ -7715,13 +7715,6 @@ void SubtrActorPlugin::renderStatsWindowCreationControls(
       }
     }
   }
-  if (!statsModuleNames().empty() &&
-      ImGui::Button("New stats module", ImVec2{170.0f, 0.0f})) {
-    createStatsWindow(UiStatsWindowKind::StatsModule);
-    if (closeLauncherOnCreate) {
-      hideLauncherWindow();
-    }
-  }
   if (uiStatsWindows.empty()) {
     ImGui::PopID();
     return;
