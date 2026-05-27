@@ -10999,6 +10999,7 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
                                 isSelected) &&
               !statsWindowHasStat(window, statId, nextTarget)) {
             entry.target_id = nextTarget;
+            scheduleUiConfigAutosave();
           }
         }
         ImGui::Separator();
@@ -11025,6 +11026,7 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
       if (ImGui::Selectable(label, entry.target_id == targetId) &&
           !statsWindowHasStat(window, statId, targetId)) {
         entry.target_id = targetId;
+        scheduleUiConfigAutosave();
       }
       ImGui::PopStyleColor();
     }
@@ -11111,6 +11113,7 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
           if (ImGui::Selectable(label.c_str(), isSelected)) {
             window.selected_player_index = player.player_index;
             window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
+            scheduleUiConfigAutosave();
           }
         }
         ImGui::Separator();
@@ -11134,6 +11137,7 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
         ImGui::PushStyleColor(ImGuiCol_Text, toImVec4(color));
         if (ImGui::Selectable(label.c_str(), selected)) {
           window.selected_team_is_team_0 = isTeam0;
+          scheduleUiConfigAutosave();
         }
         ImGui::PopStyleColor();
       }
@@ -11151,6 +11155,7 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
         const bool selected = moduleName == window.module_name;
         if (ImGui::Selectable(moduleName.c_str(), selected)) {
           window.module_name = moduleName;
+          scheduleUiConfigAutosave();
         }
       }
       ImGui::EndCombo();
@@ -11161,20 +11166,26 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
 
 void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   if (window.kind == UiStatsWindowKind::StatsModule) {
-    ImGui::RadioButton(
-        std::format("Frame##module-view-{}", window.id).c_str(),
-        &window.module_view,
-        0);
+    if (ImGui::RadioButton(
+            std::format("Frame##module-view-{}", window.id).c_str(),
+            &window.module_view,
+            0)) {
+      scheduleUiConfigAutosave();
+    }
     ImGui::SameLine();
-    ImGui::RadioButton(
-        std::format("Module##module-view-{}", window.id).c_str(),
-        &window.module_view,
-        1);
+    if (ImGui::RadioButton(
+            std::format("Module##module-view-{}", window.id).c_str(),
+            &window.module_view,
+            1)) {
+      scheduleUiConfigAutosave();
+    }
     ImGui::SameLine();
-    ImGui::RadioButton(
-        std::format("Config##module-view-{}", window.id).c_str(),
-        &window.module_view,
-        2);
+    if (ImGui::RadioButton(
+            std::format("Config##module-view-{}", window.id).c_str(),
+            &window.module_view,
+            2)) {
+      scheduleUiConfigAutosave();
+    }
     ImGui::Separator();
     return;
   }
@@ -11214,11 +11225,13 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
           queryBuffer.data(),
           queryBuffer.size())) {
     window.picker_query = queryBuffer.data();
+    scheduleUiConfigAutosave();
   }
   if (!window.picker_query.empty()) {
     ImGui::SameLine();
     if (ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())) {
       window.picker_query.clear();
+      scheduleUiConfigAutosave();
     }
   }
 
@@ -11279,6 +11292,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     const std::string label =
         std::format("Add all {} ({})##{}-{}", category, count, window.id, category);
     if (ImGui::SmallButton(label.c_str())) {
+      bool added = false;
       for (const UiStatDefinitionMatch &match : matches) {
         if (category != match.definition.category) {
           continue;
@@ -11288,7 +11302,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
                                                     : "";
         if (!statsWindowHasStat(window, match.definition.id, targetId)) {
           window.entries.push_back(UiStatsWindow::Entry{match.definition.id, targetId});
+          added = true;
         }
+      }
+      if (added) {
+        scheduleUiConfigAutosave();
       }
     }
   }
@@ -11321,9 +11339,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
         const std::string targetId = defaultAdHocTargetId(definition.id);
         if (!statsWindowHasStat(window, definition.id, targetId)) {
           window.entries.push_back(UiStatsWindow::Entry{definition.id, targetId});
+          scheduleUiConfigAutosave();
         }
       } else {
         window.entries.push_back(UiStatsWindow::Entry{definition.id, ""});
+        scheduleUiConfigAutosave();
       }
     }
   }
@@ -11409,6 +11429,7 @@ void SubtrActorPlugin::renderPlayerStatsTable(
     ImGui::NextColumn();
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+      scheduleUiConfigAutosave();
       ImGui::Columns(1);
       return;
     }
@@ -11439,6 +11460,7 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
     ImGui::NextColumn();
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+      scheduleUiConfigAutosave();
       ImGui::Columns(1);
       return;
     }
@@ -11496,6 +11518,7 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
           ImGui::NextColumn();
           if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
             window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+            scheduleUiConfigAutosave();
             ImGui::Columns(1);
             ImGui::TreePop();
             ImGui::PopID();
@@ -11543,6 +11566,7 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
       if (ImGui::SmallButton(
               std::format("x##remove-stat-{}-{}-{}", window.id, isTeam0, i).c_str())) {
         window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+        scheduleUiConfigAutosave();
         ImGui::Columns(1);
         return;
       }
@@ -11655,6 +11679,7 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
     ImGui::NextColumn();
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+      scheduleUiConfigAutosave();
       ImGui::Columns(1);
       return;
     }
