@@ -3128,7 +3128,11 @@ bool SubtrActorPlugin::cvarBool(const char *name, bool defaultValue) const {
 void SubtrActorPlugin::setCvarBool(const char *name, bool value) {
   auto cvar = cvarManager->getCvar(name);
   if (static_cast<bool>(cvar)) {
+    const bool changed = cvar.getBoolValue() != value;
     cvar.setValue(value ? 1 : 0);
+    if (changed) {
+      scheduleUiConfigAutosave();
+    }
   }
 }
 
@@ -3140,7 +3144,11 @@ std::string SubtrActorPlugin::cvarString(const char *name, std::string_view defa
 void SubtrActorPlugin::setCvarString(const char *name, std::string_view value) {
   auto cvar = cvarManager->getCvar(name);
   if (static_cast<bool>(cvar)) {
+    const bool changed = cvar.getStringValue() != value;
     cvar.setValue(std::string(value));
+    if (changed) {
+      scheduleUiConfigAutosave();
+    }
   }
 }
 
@@ -7351,6 +7359,7 @@ void SubtrActorPlugin::renderBoolModuleSummaryToggle(
     const char *idSuffix) {
   if (renderModuleSummaryToggle(label, active, idSuffix)) {
     active = !active;
+    scheduleUiConfigAutosave();
   }
 }
 
@@ -7476,6 +7485,7 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
       boostPickupPadBig = next;
       boostPickupPadSmall = next;
       boostPickupPadAmbiguous = next;
+      scheduleUiConfigAutosave();
     }
     ImGui::TreePop();
   }
@@ -7510,9 +7520,13 @@ void SubtrActorPlugin::renderModuleSettingsControls(
           {{movementBreakdownSpeed, "Speed band"}, {movementBreakdownHeight, "Height band"}},
           " + ")
           .c_str());
-  ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed);
+  if (ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight);
+  if (ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight)) {
+    scheduleUiConfigAutosave();
+  }
   if (includeOpenButtons && ImGui::Button("Open movement stats")) {
     createStatsModuleWindow("movement", 0);
   }
@@ -7526,9 +7540,13 @@ void SubtrActorPlugin::renderModuleSettingsControls(
           {{possessionBreakdownState, "Control"}, {possessionBreakdownThird, "Third"}},
           " x ")
           .c_str());
-  ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState);
+  if (ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird);
+  if (ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird)) {
+    scheduleUiConfigAutosave();
+  }
   if (includeOpenButtons && ImGui::Button("Open possession stats")) {
     createStatsModuleWindow("possession", 0);
   }
@@ -8201,7 +8219,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     eventPlaylistGoalContextEnabled = false;
     setCvarString("subtr_actor_overlay_event_types", "none");
   }
-  ImGui::Checkbox("Auto-follow", &eventPlaylistAutoFollow);
+  if (ImGui::Checkbox("Auto-follow", &eventPlaylistAutoFollow)) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FILTERS");
@@ -8375,18 +8395,29 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       confirmedCount,
       rejectedCount,
       uncertainCount);
-  ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled);
+  if (ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled);
+  if (ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
+  if (ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled)) {
+    scheduleUiConfigAutosave();
+  }
 
   renderEventFilterCombo("Event filter");
   ImGui::SetNextItemWidth(120.0f);
-  ImGui::SliderFloat("Clip lead", &mechanicsReviewClipLeadSeconds, 0.0f, 10.0f, "%.1fs");
+  if (ImGui::SliderFloat("Clip lead", &mechanicsReviewClipLeadSeconds, 0.0f, 10.0f, "%.1fs")) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
   ImGui::SetNextItemWidth(120.0f);
-  ImGui::SliderFloat("Clip trail", &mechanicsReviewClipTrailSeconds, 0.0f, 10.0f, "%.1fs");
+  if (ImGui::SliderFloat(
+          "Clip trail", &mechanicsReviewClipTrailSeconds, 0.0f, 10.0f, "%.1fs")) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   if (candidates.empty()) {
@@ -8851,7 +8882,9 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   ImGui::Text("Recent boost pickups: %d", recentEventCountForType("boost_pickup"));
 
   ImGui::Separator();
-  ImGui::Checkbox("Boost pickup animation", &boostPickupAnimationEnabled);
+  if (ImGui::Checkbox("Boost pickup animation", &boostPickupAnimationEnabled)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::Separator();
   if (ImGui::Button("All filters")) {
     boostPickupPadBig = true;
@@ -8863,6 +8896,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     boostPickupFieldOwn = true;
     boostPickupFieldOpponent = true;
     boostPickupFieldUnknown = true;
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::Button("Hide pickups")) {
@@ -8875,28 +8909,47 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     boostPickupFieldOwn = false;
     boostPickupFieldOpponent = false;
     boostPickupFieldUnknown = false;
+    scheduleUiConfigAutosave();
   }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PAD TYPE");
-  ImGui::Checkbox("Big pads", &boostPickupPadBig);
+  if (ImGui::Checkbox("Big pads", &boostPickupPadBig)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Small pads", &boostPickupPadSmall);
-  ImGui::Checkbox("Ambiguous pads", &boostPickupPadAmbiguous);
+  if (ImGui::Checkbox("Small pads", &boostPickupPadSmall)) {
+    scheduleUiConfigAutosave();
+  }
+  if (ImGui::Checkbox("Ambiguous pads", &boostPickupPadAmbiguous)) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIVITY");
-  ImGui::Checkbox("Active play", &boostPickupActivityActive);
+  if (ImGui::Checkbox("Active play", &boostPickupActivityActive)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Inactive play", &boostPickupActivityInactive);
-  ImGui::Checkbox("Unknown activity", &boostPickupActivityUnknown);
+  if (ImGui::Checkbox("Inactive play", &boostPickupActivityInactive)) {
+    scheduleUiConfigAutosave();
+  }
+  if (ImGui::Checkbox("Unknown activity", &boostPickupActivityUnknown)) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FIELD HALF");
-  ImGui::Checkbox("Own half", &boostPickupFieldOwn);
+  if (ImGui::Checkbox("Own half", &boostPickupFieldOwn)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Opponent half", &boostPickupFieldOpponent);
-  ImGui::Checkbox("Unknown half", &boostPickupFieldUnknown);
+  if (ImGui::Checkbox("Opponent half", &boostPickupFieldOpponent)) {
+    scheduleUiConfigAutosave();
+  }
+  if (ImGui::Checkbox("Unknown half", &boostPickupFieldUnknown)) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
@@ -8967,7 +9020,10 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
       ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
       "%.1fs",
       touchMarkerDecaySeconds);
-  ImGui::SliderFloat("Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs");
+  if (ImGui::SliderFloat(
+          "Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs")) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::TextDisabled("Touch mode");
   ImGui::SameLine();
@@ -8977,10 +9033,12 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
       touchControlsMode == 1 ? "Advancement" : "Markers");
   if (ImGui::RadioButton("Markers##touch-mode", &touchControlsMode, 0)) {
     setCvarString("subtr_actor_overlay_event_types", "touch");
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::RadioButton("Advancement##touch-mode", &touchControlsMode, 1)) {
     setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
+    scheduleUiConfigAutosave();
   }
 
   ImGui::Separator();
@@ -8990,12 +9048,20 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
       ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
       "%s",
       touchBreakdownReadout().c_str());
-  ImGui::Checkbox("Kind", &touchBreakdownKind);
+  if (ImGui::Checkbox("Kind", &touchBreakdownKind)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Height", &touchBreakdownHeight);
-  ImGui::Checkbox("Surface", &touchBreakdownSurface);
+  if (ImGui::Checkbox("Height", &touchBreakdownHeight)) {
+    scheduleUiConfigAutosave();
+  }
+  if (ImGui::Checkbox("Surface", &touchBreakdownSurface)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::Checkbox("Dodge", &touchBreakdownDodge);
+  if (ImGui::Checkbox("Dodge", &touchBreakdownDodge)) {
+    scheduleUiConfigAutosave();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE TOUCH STATE");
