@@ -435,6 +435,7 @@ private:
   void renderLauncherWorkspaceControls();
   void renderLauncherStatsWindowControls();
   void renderEmptyStateWindow();
+  void renderSingletonWindows();
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderEventSourceControls();

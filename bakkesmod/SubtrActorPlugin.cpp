@@ -6718,21 +6718,58 @@ void SubtrActorPlugin::Render() {
   }
 
   renderEmptyStateWindow();
-  renderScoreboardWindow();
-  renderEventsWindow();
-  renderStatusWindow();
-  renderCameraWindow();
-  renderPlaybackControlsWindow();
-  renderRecordingWindow();
-  renderGraphInspectorWindow();
-  renderEventPlaylistWindow();
-  renderMechanicsReviewWindow();
-  renderReplayLoadingWindow();
-  renderModuleControlsWindow();
-  renderTouchControlsWindow();
-  renderBoostPickupControlsWindow();
+  renderSingletonWindows();
   renderStatsWindows();
   maybeAutosaveUiConfig();
+}
+
+void SubtrActorPlugin::renderSingletonWindows() {
+  std::vector<SingletonWindowControl> renderOrder;
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (*window.open) {
+      renderOrder.push_back(window);
+    }
+  }
+  std::stable_sort(
+      renderOrder.begin(),
+      renderOrder.end(),
+      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
+        if (left.placement->z_index != right.placement->z_index) {
+          return left.placement->z_index < right.placement->z_index;
+        }
+        return left.launcher_order < right.launcher_order;
+      });
+
+  for (const SingletonWindowControl &window : renderOrder) {
+    const std::string_view id{window.config_id};
+    if (id == "scoreboard") {
+      renderScoreboardWindow();
+    } else if (id == "mechanics") {
+      renderEventsWindow();
+    } else if (id == "event-playlist") {
+      renderEventPlaylistWindow();
+    } else if (id == "status") {
+      renderStatusWindow();
+    } else if (id == "camera") {
+      renderCameraWindow();
+    } else if (id == "playback") {
+      renderPlaybackControlsWindow();
+    } else if (id == "recording") {
+      renderRecordingWindow();
+    } else if (id == "graph-inspector") {
+      renderGraphInspectorWindow();
+    } else if (id == "mechanics-review") {
+      renderMechanicsReviewWindow();
+    } else if (id == "replay-loading") {
+      renderReplayLoadingWindow();
+    } else if (id == "module-controls") {
+      renderModuleControlsWindow();
+    } else if (id == "touch-controls") {
+      renderTouchControlsWindow();
+    } else if (id == "boost-pickups") {
+      renderBoostPickupControlsWindow();
+    }
+  }
 }
 
 void SubtrActorPlugin::RenderSettings() {
