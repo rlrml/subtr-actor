@@ -8424,6 +8424,12 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     }
   }
   ImGui::SameLine();
+  if (ImGui::SmallButton("Reset positions##stats-windows")) {
+    for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
+      resetStatsWindowPlacement(uiStatsWindows[index], index);
+    }
+  }
+  ImGui::SameLine();
   if (ImGui::SmallButton("Remove hidden##stats-windows")) {
     uiStatsWindows.erase(
         std::remove_if(
@@ -8476,6 +8482,10 @@ void SubtrActorPlugin::renderStatsWindowManager() {
       copy.y += 24.0f;
       copy.z_index = nextUiWindowZIndex++;
       duplicateWindow = std::move(copy);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reset")) {
+      resetStatsWindowPlacement(window, index);
     }
     ImGui::SameLine();
     ImGui::TextWrapped("%s", label.c_str());
