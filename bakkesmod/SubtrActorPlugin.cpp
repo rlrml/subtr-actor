@@ -8292,6 +8292,23 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");
+  const bool transportEnabled = hasReplayServer;
+  auto pushPlaybackDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+    }
+  };
+  auto popPlaybackDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PopStyleVar();
+    }
+  };
+  auto playbackButton = [&](const char *label, bool disabled) {
+    pushPlaybackDisabledStyle(disabled);
+    const bool clicked = ImGui::Button(label);
+    popPlaybackDisabledStyle(disabled);
+    return clicked && !disabled;
+  };
   auto applyPlaybackState = [&](bool shouldPlay) {
     mechanicsReviewClipActive = false;
     playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
@@ -8316,29 +8333,59 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   };
 
   ImGui::SetNextItemWidth(140.0f);
-  ImGui::InputFloat("Current time", &playbackCurrentTime, 0.25f, 2.0f, "%.2f");
+  float nextPlaybackCurrentTime = playbackCurrentTime;
+  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool currentTimeChanged =
+      ImGui::InputFloat("Current time", &nextPlaybackCurrentTime, 0.25f, 2.0f, "%.2f");
+  popPlaybackDisabledStyle(!transportEnabled);
+  if (transportEnabled && currentTimeChanged) {
+    playbackCurrentTime = nextPlaybackCurrentTime;
+  }
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
   ImGui::SetNextItemWidth(140.0f);
-  ImGui::SliderFloat("Rate", &playbackRate, 0.1f, 4.0f, "%.2fx");
-  if (ImGui::Button(playbackPlaying ? "Pause" : "Play")) {
+  float nextPlaybackRate = playbackRate;
+  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool rateChanged =
+      ImGui::SliderFloat("Rate", &nextPlaybackRate, 0.25f, 2.0f, "%.2fx");
+  popPlaybackDisabledStyle(!transportEnabled);
+  if (transportEnabled && rateChanged) {
+    playbackRate = nextPlaybackRate;
+  }
+  if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled)) {
     applyPlaybackState(!playbackPlaying);
   }
   ImGui::SameLine();
-  if (ImGui::Button("Seek")) {
+  if (playbackButton("Seek", !transportEnabled)) {
     applyPlaybackState(false);
   }
   ImGui::SameLine();
-  if (ImGui::Button("Live replay time") && hasReplayServer) {
+  if (playbackButton("Live replay time", !hasReplayServer)) {
     playbackCurrentTime = replayServer.GetReplayTimeElapsed();
     playbackStatus = std::format("Captured {:.2f}s", playbackCurrentTime);
   }
   bool nextPlaying = playbackPlaying;
-  if (ImGui::Checkbox("Playing", &nextPlaying)) {
+  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool playingChanged = ImGui::Checkbox("Playing", &nextPlaying);
+  popPlaybackDisabledStyle(!transportEnabled);
+  if (transportEnabled && playingChanged) {
     applyPlaybackState(nextPlaying);
   }
   ImGui::SameLine();
-  ImGui::Checkbox("Skip goal transitions", &playbackSkipPostGoalTransitions);
-  ImGui::Checkbox("Skip kickoffs", &playbackSkipKickoffs);
+  bool nextSkipPostGoalTransitions = playbackSkipPostGoalTransitions;
+  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool skipGoalChanged =
+      ImGui::Checkbox("Skip goal transitions", &nextSkipPostGoalTransitions);
+  popPlaybackDisabledStyle(!transportEnabled);
+  if (transportEnabled && skipGoalChanged) {
+    playbackSkipPostGoalTransitions = nextSkipPostGoalTransitions;
+  }
+  bool nextSkipKickoffs = playbackSkipKickoffs;
+  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool skipKickoffsChanged = ImGui::Checkbox("Skip kickoffs", &nextSkipKickoffs);
+  popPlaybackDisabledStyle(!transportEnabled);
+  if (transportEnabled && skipKickoffsChanged) {
+    playbackSkipKickoffs = nextSkipKickoffs;
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");
