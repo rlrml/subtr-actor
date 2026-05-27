@@ -6476,32 +6476,13 @@ void SubtrActorPlugin::renderLauncherWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
-  renderModuleSummaryControls("launcher-module-summary");
-
-  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   struct LauncherWindowToggle {
     const char *label;
     bool *open;
     UiWindowPlacement *placement;
   };
-  std::array<LauncherWindowToggle, 13> launcherWindows{{
-      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
-      {"Events", &uiEventsOpen, &eventsPlacement},
-      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
-      {"Status", &uiStatusOpen, &statusPlacement},
-      {"Camera", &uiCameraOpen, &cameraPlacement},
-      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
-      {"Recording", &uiRecordingOpen, &recordingPlacement},
-      {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
-      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
-      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
-      {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
-      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
-      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
-  }};
-  for (LauncherWindowToggle &window : launcherWindows) {
+  auto renderLauncherWindowToggle = [&](LauncherWindowToggle &window) {
     ImGui::PushID(window.label);
     if (ImGui::Button(window.label, ImVec2{170.0f, 0.0f})) {
       *window.open = !*window.open;
@@ -6513,8 +6494,54 @@ void SubtrActorPlugin::renderLauncherWindow() {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", *window.open ? "Shown" : "Hidden");
     ImGui::PopID();
+  };
+  auto renderStatsWindowCreateButton = [&](const char *label, UiStatsWindowKind kind) {
+    if (ImGui::Button(label, ImVec2{170.0f, 0.0f})) {
+      createStatsWindow(kind);
+      uiLauncherOpen = false;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("New");
+  };
+
+  std::array<LauncherWindowToggle, 10> webLauncherWindows{{
+      {"Camera", &uiCameraOpen, &cameraPlacement},
+      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
+      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
+      {"Recording", &uiRecordingOpen, &recordingPlacement},
+      {"Events", &uiEventsOpen, &eventsPlacement},
+      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
+      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
+      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
+      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
+      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
+  }};
+  for (LauncherWindowToggle &window : webLauncherWindows) {
+    renderLauncherWindowToggle(window);
+  }
+  renderStatsWindowCreateButton("New player stats", UiStatsWindowKind::Player);
+  renderStatsWindowCreateButton("New team stats", UiStatsWindowKind::Team);
+  renderStatsWindowCreateButton("New all players stats", UiStatsWindowKind::AllPlayers);
+  renderStatsWindowCreateButton("New all teams stats", UiStatsWindowKind::AllTeams);
+  renderStatsWindowCreateButton("New goal labels", UiStatsWindowKind::GoalsOverview);
+  renderStatsWindowCreateButton("New ad hoc stats", UiStatsWindowKind::AdHoc);
+
+  if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
+    std::array<LauncherWindowToggle, 3> pluginToolWindows{{
+        {"Status", &uiStatusOpen, &statusPlacement},
+        {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
+        {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
+    }};
+    for (LauncherWindowToggle &window : pluginToolWindows) {
+      renderLauncherWindowToggle(window);
+    }
+    ImGui::TreePop();
   }
   renderSingletonWindowManager();
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
+  renderModuleSummaryControls("launcher-module-summary");
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LAYOUT");
@@ -6577,35 +6604,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
-  if (ImGui::Button("New player stats")) {
-    createStatsWindow(UiStatsWindowKind::Player);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New team stats")) {
-    createStatsWindow(UiStatsWindowKind::Team);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New all players stats")) {
-    createStatsWindow(UiStatsWindowKind::AllPlayers);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New all teams stats")) {
-    createStatsWindow(UiStatsWindowKind::AllTeams);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New goal labels")) {
-    createStatsWindow(UiStatsWindowKind::GoalsOverview);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New ad hoc stats")) {
-    createStatsWindow(UiStatsWindowKind::AdHoc);
-    uiLauncherOpen = false;
-  }
-  if (ImGui::Button("New stats module")) {
-    const std::vector<std::string> &moduleNames = statsModuleNames();
-    createStatsModuleWindow(moduleNames.empty() ? "" : moduleNames.front());
-    uiLauncherOpen = false;
-  }
   const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
       uiStatsWindows.begin(),
       uiStatsWindows.end(),
