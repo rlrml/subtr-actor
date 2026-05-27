@@ -180,6 +180,30 @@ constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"goal", "Goal"},
 }};
 
+constexpr std::array<const char *, 21> MECHANIC_FILTER_TOKENS{{
+    "speed_flip",
+    "half_flip",
+    "wavedash",
+    "ball_carry",
+    "air_dribble",
+    "ceiling_shot",
+    "wall_aerial",
+    "wall_aerial_shot",
+    "center",
+    "flip_reset",
+    "double_tap",
+    "flick",
+    "musty_flick",
+    "one_timer",
+    "pass",
+    "half_volley",
+    "whiff",
+    "bump",
+    "demo",
+    "goal",
+    "dodge_reset",
+}};
+
 constexpr std::array<UiStatDefinition, 15> UI_STAT_DEFINITIONS{{
     {"score", "Score", "Core", true, true, false},
     {"goals", "Goals", "Core", true, true, false},
@@ -1390,6 +1414,27 @@ std::string normalizeEventFilterToken(std::string_view token) {
   return normalized;
 }
 
+bool isKnownEventFilterToken(std::string_view token) {
+  return std::any_of(
+      EVENT_FILTER_OPTIONS.begin(),
+      EVENT_FILTER_OPTIONS.end(),
+      [token](const EventFilterOption &option) { return std::string_view{option.value} == token; });
+}
+
+bool isMechanicFilterToken(std::string_view token) {
+  return std::any_of(
+      MECHANIC_FILTER_TOKENS.begin(),
+      MECHANIC_FILTER_TOKENS.end(),
+      [token](const char *option) { return token == std::string_view{option}; });
+}
+
+void appendUniqueFilterToken(std::vector<std::string> &tokens, std::string_view token) {
+  if (token.empty() || token == "all" || containsString(tokens, token)) {
+    return;
+  }
+  tokens.emplace_back(token);
+}
+
 std::string mechanicToken(SaMechanicKind kind) {
   return normalizeEventFilterToken(mechanicLabel(kind));
 }
@@ -2410,10 +2455,39 @@ void SubtrActorPlugin::applyUiConfigJson(
   if (const auto overlays = parseJsonObjectProperty(json, "overlays")) {
     const std::vector<std::string> timelineEvents =
         parseJsonStringArrayProperty(*overlays, "timelineEvents");
-    if (overlays->find("\"timelineEvents\"") != std::string::npos) {
+    const bool hasTimelineEvents = jsonPropertyExists(*overlays, "timelineEvents");
+    if (hasTimelineEvents) {
       eventPlaylistMechanicsEnabled = containsString(timelineEvents, "mechanics");
       eventPlaylistTeamEventsEnabled = containsString(timelineEvents, "team");
       eventPlaylistGoalContextEnabled = containsString(timelineEvents, "goal_context");
+    }
+
+    const std::vector<std::string> mechanicFilters =
+        parseJsonStringArrayProperty(*overlays, "mechanics");
+    const bool hasMechanicFilters = jsonPropertyExists(*overlays, "mechanics");
+    if (hasTimelineEvents || hasMechanicFilters) {
+      std::vector<std::string> selectedFilters;
+      for (const std::string &id : timelineEvents) {
+        const std::string token = normalizeEventFilterToken(id);
+        if (token == "mechanics" && hasMechanicFilters && !mechanicFilters.empty()) {
+          continue;
+        }
+        if (isKnownEventFilterToken(token)) {
+          appendUniqueFilterToken(selectedFilters, token);
+        }
+      }
+      for (const std::string &id : mechanicFilters) {
+        const std::string token = normalizeEventFilterToken(id);
+        if (!token.empty()) {
+          appendUniqueFilterToken(selectedFilters, token);
+        }
+      }
+      if (hasMechanicFilters && !mechanicFilters.empty()) {
+        eventPlaylistMechanicsEnabled = true;
+      }
+      setCvarString(
+          "subtr_actor_overlay_event_types",
+          eventFilterFromSelectedSources(selectedFilters));
     }
 
     const std::vector<std::string> renderEffects =
@@ -2945,6 +3019,9 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
   file << "  \"overlays\": {\n";
+  const std::string currentEventFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  const std::vector<std::string> currentEventFilterTokens =
+      selectedEventSourceTokens(currentEventFilter);
   file << "    \"timelineEvents\": [";
   bool wroteOverlayValue = false;
   auto writeOverlayId = [&](const char *id, bool enabled) {
@@ -2960,9 +3037,35 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   writeOverlayId("mechanics", eventPlaylistMechanicsEnabled);
   writeOverlayId("team", eventPlaylistTeamEventsEnabled);
   writeOverlayId("goal_context", eventPlaylistGoalContextEnabled);
+  if (!allEventSourcesSelected(currentEventFilter)) {
+    for (const std::string &token : currentEventFilterTokens) {
+      if (token == "mechanics" || token == "team" || token == "goal_context" ||
+          isMechanicFilterToken(token)) {
+        continue;
+      }
+      writeOverlayId(token.c_str(), true);
+    }
+  }
   file << "],\n";
   file << "    \"timelineRanges\": [],\n";
-  file << "    \"mechanics\": [],\n";
+  file << "    \"mechanics\": [";
+  const bool allMechanicsSelected =
+      allEventSourcesSelected(currentEventFilter) ||
+      containsString(currentEventFilterTokens, "mechanics");
+  bool wroteMechanicFilter = false;
+  if (!allMechanicsSelected) {
+    for (const std::string &token : currentEventFilterTokens) {
+      if (!isMechanicFilterToken(token)) {
+        continue;
+      }
+      if (wroteMechanicFilter) {
+        file << ",";
+      }
+      file << "\"" << escapeJsonString(token) << "\"";
+      wroteMechanicFilter = true;
+    }
+  }
+  file << "],\n";
   file << "    \"renderEffects\": [";
   wroteOverlayValue = false;
   const bool hudOverlayEnabled = cvarBool("subtr_actor_overlay_enabled", true);
