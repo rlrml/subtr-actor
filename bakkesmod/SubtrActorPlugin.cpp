@@ -7889,7 +7889,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   renderWebWindowToggleControls("launcher-web-windows", true, false, true);
-  renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
+  renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);
 
   ImGui::Separator();
   renderModuleSummaryControls("launcher-module-summary", false, 0.0f);
