@@ -2642,7 +2642,6 @@ void SubtrActorPlugin::applyUiConfigJson(
     loadPlacementObject(*object, out, visible);
   };
 
-  uiLauncherOpen = parseJsonBoolProperty(json, "launcher_open").value_or(uiLauncherOpen);
   uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
   uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
@@ -3046,7 +3045,6 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonStringProperty(json, "graph_inspector_node_query").value_or("");
 
   if (const auto placements = parseJsonObjectProperty(json, "placements")) {
-    loadPlacement(*placements, "launcher", launcherPlacement, &uiLauncherOpen);
     loadPlacement(*placements, "scoreboard", scoreboardPlacement, &uiScoreboardOpen);
     loadPlacement(*placements, "events", eventsPlacement, &uiEventsOpen);
     loadPlacement(*placements, "status", statusPlacement, &uiStatusOpen);
@@ -3309,7 +3307,6 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   std::ostringstream file;
   file << "{\n";
   file << "  \"version\": 1,\n";
-  file << "  \"launcher_open\": " << (uiLauncherOpen ? "true" : "false") << ",\n";
   file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
   file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
@@ -3587,9 +3584,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"graph_inspector_node_query\": \""
        << escapeJsonString(graphInspectorNodeQuery) << "\",\n";
   file << "  \"placements\": {\n";
-  file << "    \"launcher\": ";
-  writePlacement(file, launcherPlacement, uiLauncherOpen);
-  file << ",\n    \"scoreboard\": ";
+  file << "    \"scoreboard\": ";
   writePlacement(file, scoreboardPlacement, uiScoreboardOpen);
   file << ",\n    \"events\": ";
   writePlacement(file, eventsPlacement, uiEventsOpen);
@@ -9136,7 +9131,6 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
     topStatsWindow = nullptr;
   };
 
-  considerPlacement(uiLauncherOpen, launcherPlacement);
   considerPlacement(uiScoreboardOpen, scoreboardPlacement);
   considerPlacement(uiEventsOpen, eventsPlacement);
   considerPlacement(uiStatusOpen, statusPlacement);
