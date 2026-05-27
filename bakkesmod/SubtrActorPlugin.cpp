@@ -9479,13 +9479,33 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
     const std::string selectedLabel =
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
     if (ImGui::BeginCombo("Player", selectedLabel.c_str())) {
-      for (const SaPlayerFrame &player : sampledPlayers) {
-        const std::string label = playerLabel(player.player_index, player.is_team_0);
-        const bool isSelected = player.player_index == window.selected_player_index;
-        if (ImGui::Selectable(label.c_str(), isSelected)) {
-          window.selected_player_index = player.player_index;
-          window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
+      for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
+        const bool hasTeamPlayers = std::any_of(
+            sampledPlayers.begin(),
+            sampledPlayers.end(),
+            [isTeam0](const SaPlayerFrame &player) { return player.is_team_0 == isTeam0; });
+        if (!hasTeamPlayers) {
+          continue;
         }
+
+        const LinearColor color =
+            isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+        ImGui::TextColored(toImVec4(color), "%s team", teamLabel(isTeam0).c_str());
+        for (const SaPlayerFrame &player : sampledPlayers) {
+          if (player.is_team_0 != isTeam0) {
+            continue;
+          }
+          const std::string label = playerLabel(player.player_index, player.is_team_0);
+          const bool isSelected = player.player_index == window.selected_player_index;
+          if (ImGui::Selectable(label.c_str(), isSelected)) {
+            window.selected_player_index = player.player_index;
+            window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
+          }
+        }
+        ImGui::Separator();
+      }
+      if (sampledPlayers.empty()) {
+        ImGui::TextDisabled("Waiting for sampled players.");
       }
       ImGui::EndCombo();
     }
@@ -9495,11 +9515,16 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
   if (window.kind == UiStatsWindowKind::Team) {
     const char *selectedTeam = window.selected_team_is_team_0 != 0 ? "Blue" : "Orange";
     if (ImGui::BeginCombo("Team", selectedTeam)) {
-      if (ImGui::Selectable("Blue", window.selected_team_is_team_0 != 0)) {
-        window.selected_team_is_team_0 = 1;
-      }
-      if (ImGui::Selectable("Orange", window.selected_team_is_team_0 == 0)) {
-        window.selected_team_is_team_0 = 0;
+      for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
+        const LinearColor color =
+            isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+        const std::string label = teamLabel(isTeam0);
+        const bool selected = (window.selected_team_is_team_0 != 0) == (isTeam0 != 0);
+        ImGui::PushStyleColor(ImGuiCol_Text, toImVec4(color));
+        if (ImGui::Selectable(label.c_str(), selected)) {
+          window.selected_team_is_team_0 = isTeam0;
+        }
+        ImGui::PopStyleColor();
       }
       ImGui::EndCombo();
     }
