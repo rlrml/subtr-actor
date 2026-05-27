@@ -2319,6 +2319,12 @@ void SubtrActorPlugin::applyUiConfigJson(
         parseJsonNumberProperty(*object, "viewport_width").value_or(out.viewport_width));
     out.viewport_height = static_cast<float>(
         parseJsonNumberProperty(*object, "viewport_height").value_or(out.viewport_height));
+    if (const auto viewport = parseJsonObjectProperty(*object, "viewport")) {
+      out.viewport_width = static_cast<float>(
+          parseJsonNumberProperty(*viewport, "width").value_or(out.viewport_width));
+      out.viewport_height = static_cast<float>(
+          parseJsonNumberProperty(*viewport, "height").value_or(out.viewport_height));
+    }
   };
 
   uiLauncherOpen = parseJsonBoolProperty(json, "launcher_open").value_or(uiLauncherOpen);
@@ -2507,6 +2513,27 @@ void SubtrActorPlugin::applyUiConfigJson(
     nextUiStatsWindowId = std::max(nextUiStatsWindowId, window.id + 1);
     window.open = parseJsonBoolProperty(object, "open").value_or(true);
     window.open = parseJsonBoolProperty(object, "visible").value_or(window.open);
+    if (const auto placement = parseJsonObjectProperty(object, "placement")) {
+      window.open = parseJsonBoolProperty(*placement, "visible").value_or(window.open);
+      window.has_placement = true;
+      window.pending_apply_placement = true;
+      window.x = static_cast<float>(parseJsonNumberProperty(*placement, "x").value_or(window.x));
+      window.y = static_cast<float>(parseJsonNumberProperty(*placement, "y").value_or(window.y));
+      window.width =
+          static_cast<float>(parseJsonNumberProperty(*placement, "width").value_or(window.width));
+      window.height =
+          static_cast<float>(parseJsonNumberProperty(*placement, "height").value_or(window.height));
+      window.viewport_width = static_cast<float>(
+          parseJsonNumberProperty(*placement, "viewport_width").value_or(window.viewport_width));
+      window.viewport_height = static_cast<float>(
+          parseJsonNumberProperty(*placement, "viewport_height").value_or(window.viewport_height));
+      if (const auto viewport = parseJsonObjectProperty(*placement, "viewport")) {
+        window.viewport_width = static_cast<float>(
+            parseJsonNumberProperty(*viewport, "width").value_or(window.viewport_width));
+        window.viewport_height = static_cast<float>(
+            parseJsonNumberProperty(*viewport, "height").value_or(window.viewport_height));
+      }
+    }
     window.selected_player_index = static_cast<uint32_t>(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
     window.selected_team_is_team_0 =
@@ -2537,7 +2564,8 @@ void SubtrActorPlugin::applyUiConfigJson(
         window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
     }
-    window.has_placement = parseJsonBoolProperty(object, "has_placement").value_or(false);
+    window.has_placement =
+        parseJsonBoolProperty(object, "has_placement").value_or(window.has_placement);
     window.pending_apply_placement = window.has_placement;
     window.x = static_cast<float>(parseJsonNumberProperty(object, "x").value_or(window.x));
     window.y = static_cast<float>(parseJsonNumberProperty(object, "y").value_or(window.y));
@@ -2593,6 +2621,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
         << ",\"x\":" << placement.x << ",\"y\":" << placement.y
         << ",\"width\":" << placement.width << ",\"height\":" << placement.height
         << ",\"viewport_width\":" << placement.viewport_width
+        << ",\"viewport\":{\"width\":" << placement.viewport_width
+        << ",\"height\":" << placement.viewport_height << "}"
         << ",\"viewport_height\":" << placement.viewport_height << "}";
   };
 
@@ -2720,6 +2750,10 @@ std::string SubtrActorPlugin::uiConfigJson() const {
     file << "    {\"id\":" << window.id << ",\"kind\":\"" << kindValue(window.kind)
          << "\",\"open\":" << (window.open ? "true" : "false")
          << ",\"visible\":" << (window.open ? "true" : "false")
+         << ",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
+         << ",\"viewport\":{\"width\":" << window.viewport_width
+         << ",\"height\":" << window.viewport_height << "}"
+         << ",\"visible\":" << (window.open ? "true" : "false") << "}"
          << ",\"selected_player_index\":" << window.selected_player_index
          << ",\"selected_team_is_team_0\":"
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
