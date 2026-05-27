@@ -126,6 +126,7 @@ private:
     uint8_t selected_team_is_team_0 = 1;
     std::string module_name;
     int module_view = 0;
+    std::string picker_query;
     std::vector<std::string> entries;
     bool has_placement = false;
     bool pending_apply_placement = false;

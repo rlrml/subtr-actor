@@ -138,6 +138,12 @@ struct UiStatDefinition {
   bool event;
 };
 
+struct UiStatDefinitionMatch {
+  const UiStatDefinition *definition = nullptr;
+  double score = 0.0;
+  size_t index = 0;
+};
+
 constexpr std::array<EventFilterOption, 24> EVENT_FILTER_OPTIONS{{
     {"all", "All events"},
     {"mechanics", "All mechanics"},
@@ -1370,6 +1376,71 @@ const char *uiStatLabel(std::string_view statId) {
   return "Stat";
 }
 
+std::string normalizeStatSearchText(std::string_view value) {
+  std::string normalized;
+  normalized.reserve(value.size());
+  bool previousWasSpace = true;
+  for (const char ch : value) {
+    const unsigned char byte = static_cast<unsigned char>(ch);
+    if (std::isalnum(byte) != 0) {
+      normalized.push_back(static_cast<char>(std::tolower(byte)));
+      previousWasSpace = false;
+      continue;
+    }
+    if ((ch == '_' || ch == '/' || ch == '.' || ch == '-' || std::isspace(byte) != 0) &&
+        !previousWasSpace) {
+      normalized.push_back(' ');
+      previousWasSpace = true;
+    }
+  }
+  if (!normalized.empty() && normalized.back() == ' ') {
+    normalized.pop_back();
+  }
+  return normalized;
+}
+
+std::vector<std::string_view> statSearchTokens(std::string_view query) {
+  static thread_local std::string normalized;
+  normalized = normalizeStatSearchText(query);
+  std::vector<std::string_view> tokens;
+  size_t offset = 0;
+  while (offset < normalized.size()) {
+    const size_t end = normalized.find(' ', offset);
+    tokens.emplace_back(
+        normalized.data() + offset,
+        (end == std::string::npos ? normalized.size() : end) - offset);
+    if (end == std::string::npos) {
+      break;
+    }
+    offset = end + 1;
+  }
+  return tokens;
+}
+
+std::optional<double> statDefinitionSearchScore(
+    const UiStatDefinition &definition,
+    std::string_view query) {
+  const std::vector<std::string_view> tokens = statSearchTokens(query);
+  if (tokens.empty()) {
+    return 0.0;
+  }
+
+  const std::string searchText = normalizeStatSearchText(std::format(
+      "{} {} {}",
+      definition.category,
+      definition.label,
+      definition.id));
+  double total = 0.0;
+  for (std::string_view token : tokens) {
+    const size_t index = searchText.find(token);
+    if (index == std::string::npos) {
+      return std::nullopt;
+    }
+    total += static_cast<double>(index);
+  }
+  return total + static_cast<double>(searchText.size()) / 1000.0;
+}
+
 ImVec4 toImVec4(LinearColor color) {
   return ImVec4{
       color.R / 255.0f,
@@ -2144,6 +2215,7 @@ void SubtrActorPlugin::loadUiConfig() {
     window.module_name = parseJsonStringProperty(object, "module_name").value_or("");
     window.module_view = static_cast<int>(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
+    window.picker_query = parseJsonStringProperty(object, "picker_query").value_or("");
     window.entries = parseJsonStringArrayProperty(object, "entries");
     if (window.entries.empty() && window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
@@ -2236,6 +2308,7 @@ void SubtrActorPlugin::saveUiConfig() {
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
          << ",\"module_name\":\"" << escapeJsonString(window.module_name) << "\""
          << ",\"module_view\":" << window.module_view
+         << ",\"picker_query\":\"" << escapeJsonString(window.picker_query) << "\""
          << ",\"has_placement\":" << (window.has_placement ? "true" : "false")
          << ",\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"width\":" << window.width << ",\"height\":" << window.height
@@ -5386,20 +5459,88 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
 
   ImGui::BeginChild(
       std::format("stat-picker-{}", window.id).c_str(),
-      ImVec2{0.0f, 150.0f},
+      ImVec2{0.0f, 190.0f},
       true);
-  const char *currentCategory = nullptr;
-  for (const UiStatDefinition &definition : UI_STAT_DEFINITIONS) {
+
+  std::array<char, 128> queryBuffer{};
+  const size_t querySize = std::min(window.picker_query.size(), queryBuffer.size() - 1);
+  std::copy_n(window.picker_query.data(), querySize, queryBuffer.data());
+  ImGui::SetNextItemWidth(-1.0f);
+  if (ImGui::InputText(
+          std::format("Search stats##{}", window.id).c_str(),
+          queryBuffer.data(),
+          queryBuffer.size())) {
+    window.picker_query = queryBuffer.data();
+  }
+  if (!window.picker_query.empty()) {
+    ImGui::SameLine();
+    if (ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())) {
+      window.picker_query.clear();
+    }
+  }
+
+  std::vector<UiStatDefinitionMatch> matches;
+  for (size_t index = 0; index < UI_STAT_DEFINITIONS.size(); index += 1) {
+    const UiStatDefinition &definition = UI_STAT_DEFINITIONS[index];
     if (!statsWindowSupportsStat(window, definition.id)) {
       continue;
     }
+    const auto score = statDefinitionSearchScore(definition, window.picker_query);
+    if (!score) {
+      continue;
+    }
+    matches.push_back(UiStatDefinitionMatch{&definition, *score, index});
+  }
+  std::sort(matches.begin(), matches.end(), [](const auto &left, const auto &right) {
+    return left.score == right.score ? left.index < right.index : left.score < right.score;
+  });
+
+  std::vector<std::pair<std::string_view, int>> categoryCounts;
+  for (const UiStatDefinitionMatch &match : matches) {
+    auto found = std::find_if(
+        categoryCounts.begin(),
+        categoryCounts.end(),
+        [&](const auto &entry) { return entry.first == match.definition->category; });
+    if (found == categoryCounts.end()) {
+      categoryCounts.emplace_back(match.definition->category, 1);
+    } else {
+      found->second += 1;
+    }
+  }
+
+  for (const auto &[category, count] : categoryCounts) {
+    if (count < 2) {
+      continue;
+    }
+    const std::string label =
+        std::format("Add all {} ({})##{}-{}", category, count, window.id, category);
+    if (ImGui::SmallButton(label.c_str())) {
+      for (const UiStatDefinitionMatch &match : matches) {
+        if (category == match.definition->category &&
+            !statsWindowHasStat(window, match.definition->id)) {
+          window.entries.emplace_back(match.definition->id);
+        }
+      }
+    }
+  }
+
+  if (matches.empty()) {
+    ImGui::Text("No matching stats.");
+    ImGui::EndChild();
+    ImGui::Separator();
+    return;
+  }
+
+  const char *currentCategory = nullptr;
+  for (const UiStatDefinitionMatch &match : matches) {
+    const UiStatDefinition &definition = *match.definition;
     if (currentCategory == nullptr || std::string_view(currentCategory) != definition.category) {
       currentCategory = definition.category;
       ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", currentCategory);
     }
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
     const std::string itemLabel =
-        std::format("{}##{}-{}", definition.label, window.id, definition.id);
+        std::format("{}  [{}]##{}-{}", definition.label, definition.id, window.id, definition.id);
     if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
       if (alreadySelected) {
         window.entries.erase(
