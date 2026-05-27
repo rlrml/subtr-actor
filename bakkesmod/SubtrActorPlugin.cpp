@@ -9322,14 +9322,24 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
 
   const bool scopeHeaderOnly =
       window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team;
-  if (ImGui::SmallButton(std::format("Hide##stats-window-hide-{}", window.id).c_str())) {
+  if (!scopeHeaderOnly) {
+    ImGui::TextColored(
+        ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+        "%s",
+        statsWindowKindLabel(window.kind));
+    ImGui::SameLine();
+  }
+  const std::string hideLabel = std::format("Hide##stats-window-hide-{}", window.id);
+  const float hideWidth =
+      ImGui::CalcTextSize("Hide").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+  const float rightAlignedX = ImGui::GetWindowContentRegionMax().x - hideWidth;
+  if (rightAlignedX > ImGui::GetCursorPosX()) {
+    ImGui::SetCursorPosX(rightAlignedX);
+  }
+  if (ImGui::SmallButton(hideLabel.c_str())) {
     window.open = false;
     ImGui::End();
     return;
-  }
-  if (!scopeHeaderOnly) {
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", statsWindowKindLabel(window.kind));
   }
   ImGui::Separator();
 
