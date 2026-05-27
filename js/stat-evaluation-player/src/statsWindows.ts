@@ -8,13 +8,13 @@ import type {
 import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import { getTeamClass } from "./statModules.ts";
+import { renderGoalLabelsOverview } from "./statsWindowGoalLabels.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
   StatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 interface SelectedStatEntry {
@@ -545,7 +545,13 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
 
   function renderStatsWindowEntries(statsWindow: StatsWindowState, frameIndex: number): void {
     if (statsWindow.kind === "goals-overview") {
-      renderGoalLabelsOverview(statsWindow);
+      renderGoalLabelsOverview(statsWindow.body, {
+        getStatsTimeline: deps.getStatsTimeline,
+        getReplay: () => deps.getReplayPlayer()?.replay ?? null,
+        formatTime: deps.formatTime,
+        watchGoalReplay: deps.watchGoalReplay,
+        cueGoalReplay: deps.cueGoalReplay,
+      });
       return;
     }
 
@@ -598,106 +604,6 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
     if (statsWindow.kind === "ad-hoc") {
       renderAdHocStats(statsWindow, frame, entries);
     }
-  }
-
-  function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
-    const timeline = deps.getStatsTimeline();
-    const replay = deps.getReplayPlayer()?.replay ?? null;
-    if (!timeline || !replay) {
-      appendStatsWindowEmpty(statsWindow, "Load a replay to show goal labels.");
-      return;
-    }
-
-    const goalContexts = [...(timeline.events.goal_context ?? [])].sort(
-      (left, right) => left.time - right.time,
-    );
-    const tagsByGoalIndex = new Map<number, typeof timeline.events.goal_tags>();
-    for (const tag of timeline.events.goal_tags ?? []) {
-      const group = tagsByGoalIndex.get(tag.goal_index) ?? [];
-      group.push(tag);
-      tagsByGoalIndex.set(tag.goal_index, group);
-    }
-    for (const group of tagsByGoalIndex.values()) {
-      group.sort(
-        (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
-      );
-    }
-
-    const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
-    for (const index of tagsByGoalIndex.keys()) {
-      goalIndexes.add(index);
-    }
-    const orderedGoalIndexes = [...goalIndexes].sort((left, right) => left - right);
-    if (orderedGoalIndexes.length === 0) {
-      appendStatsWindowEmpty(statsWindow, "No goals loaded.");
-      return;
-    }
-
-    const list = document.createElement("div");
-    list.className = "goal-label-list";
-    for (const goalIndex of orderedGoalIndexes) {
-      const context = goalContexts[goalIndex] ?? null;
-      const tags = tagsByGoalIndex.get(goalIndex) ?? [];
-      const firstTag = tags[0] ?? null;
-      const time = context?.time ?? firstTag?.time ?? 0;
-      const scorer = context?.scorer ?? firstTag?.scorer ?? null;
-      const scorerId = scorer ? playerIdToString(scorer) : null;
-      const scorerName = scorer
-        ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
-        : "Unknown scorer";
-      const isTeamZero =
-        context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
-
-      const item = document.createElement("section");
-      item.className = "goal-label-item";
-      if (isTeamZero !== null) {
-        item.classList.add(getTeamClass(isTeamZero));
-      }
-
-      const header = document.createElement("header");
-      const title = document.createElement("h3");
-      title.textContent = `Goal ${goalIndex + 1}`;
-      const meta = document.createElement("span");
-      meta.textContent = `${deps.formatTime(time)} · ${scorerName}`;
-      header.append(title, meta);
-
-      const labels = document.createElement("div");
-      labels.className = "goal-label-tags";
-      if (tags.length === 0) {
-        const empty = document.createElement("span");
-        empty.className = "goal-label-tag goal-label-tag-empty";
-        empty.textContent = "Unlabeled";
-        labels.append(empty);
-      } else {
-        for (const tag of tags) {
-          const chip = document.createElement("span");
-          chip.className = "goal-label-tag";
-          chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;
-          labels.append(chip);
-        }
-      }
-
-      const actions = document.createElement("div");
-      actions.className = "goal-label-actions";
-      const watch = document.createElement("button");
-      watch.type = "button";
-      watch.className = "goal-label-watch";
-      watch.textContent = "Watch";
-      watch.addEventListener("click", () => {
-        deps.watchGoalReplay(time, scorerId);
-      });
-      const jump = document.createElement("button");
-      jump.type = "button";
-      jump.textContent = "Cue";
-      jump.addEventListener("click", () => {
-        deps.cueGoalReplay(time);
-      });
-      actions.append(watch, jump);
-
-      item.append(header, labels, actions);
-      list.append(item);
-    }
-    statsWindow.body.append(list);
   }
 
   function appendStatsWindowEmpty(statsWindow: StatsWindowState, message: string): void {
