@@ -7296,11 +7296,9 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
     window.pending_apply_placement = false;
     return;
   }
-  const float offset = static_cast<float>((window.id - 1) * 24);
   const auto [width, height] = defaultStatsWindowSize(window.kind);
-  ImGui::SetNextWindowPos(
-      mapWindowPositionToViewport(96.0f + offset, 96.0f + offset, width, height, 0.0f, 0.0f),
-      ImGuiCond_FirstUseEver);
+  const auto [x, y] = defaultStatsWindowPosition(window.id - 1);
+  ImGui::SetNextWindowPos(ImVec2{x, y}, ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
 }
 
@@ -10533,24 +10531,28 @@ std::pair<float, float> SubtrActorPlugin::defaultStatsWindowSize(UiStatsWindowKi
   return {416.0f, 330.0f};
 }
 
+std::pair<float, float> SubtrActorPlugin::defaultStatsWindowPosition(size_t stackIndex) const {
+  const float offset = static_cast<float>(stackIndex * 18);
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const float viewportWidth = displaySize.x > 0.0f ? displaySize.x : 1440.0f;
+  const float viewportHeight = displaySize.y > 0.0f ? displaySize.y : 900.0f;
+  return {
+      std::max(12.0f, std::min(viewportWidth - 360.0f, 96.0f + offset)),
+      std::max(64.0f, std::min(viewportHeight - 240.0f, 96.0f + offset)),
+  };
+}
+
 void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
   resetStatsWindowPlacement(window, uiStatsWindows.size());
 }
 
 void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex) {
-  const float offset = static_cast<float>(stackIndex * 18);
   const auto [width, height] = defaultStatsWindowSize(window.kind);
   window.width = width;
   window.height = height;
-  const ImVec2 position = mapWindowPositionToViewport(
-      96.0f + offset,
-      96.0f + offset,
-      window.width,
-      window.height,
-      0.0f,
-      0.0f);
-  window.x = position.x;
-  window.y = position.y;
+  const auto [x, y] = defaultStatsWindowPosition(stackIndex);
+  window.x = x;
+  window.y = y;
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   window.viewport_width = displaySize.x;
   window.viewport_height = displaySize.y;

@@ -494,6 +494,7 @@ private:
   void createStatsWindow(UiStatsWindowKind kind, bool initializeEntries = false);
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   std::pair<float, float> defaultStatsWindowSize(UiStatsWindowKind kind) const;
+  std::pair<float, float> defaultStatsWindowPosition(size_t stackIndex) const;
   void initializeStatsWindowPlacement(UiStatsWindow &window);
   void resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex);
   void showStatsWindow(UiStatsWindow &window);
