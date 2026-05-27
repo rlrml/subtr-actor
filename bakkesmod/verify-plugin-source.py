@@ -345,6 +345,18 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "auto writeStatsPlayerStatsWindowPlacement = [](",
+        "dedicated stats window web placement writer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "writeStatsPlayerStatsWindowPlacement(file, window);",
+        "stats windows use web placement shape",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "writePlacement(file, *window.placement, visible);",
         "plugin windows keep plugin placement shape",
         errors,

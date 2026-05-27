@@ -3819,6 +3819,15 @@ std::string SubtrActorPlugin::uiConfigJson() {
         << ",\"zIndex\":" << placement.z_index
         << ",\"visible\":" << (visible ? "true" : "false") << "}";
   };
+  auto writeStatsPlayerStatsWindowPlacement = [](
+                                                  std::ostream &out,
+                                                  const UiStatsWindow &window) {
+    out << "{\"x\":" << window.x << ",\"y\":" << window.y
+        << ",\"viewport\":{\"width\":" << window.viewport_width
+        << ",\"height\":" << window.viewport_height << "}"
+        << ",\"zIndex\":" << window.z_index
+        << ",\"visible\":" << (window.open ? "true" : "false") << "}";
+  };
   auto writeEnabledStringArray =
       [](std::ostream &out, std::initializer_list<std::pair<const char *, bool>> values) {
         out << "[";
@@ -4155,12 +4164,9 @@ std::string SubtrActorPlugin::uiConfigJson() {
          << escapeJsonString(window.config_id.empty() ? std::format("stats-{}", window.id)
                                                       : window.config_id)
          << "\""
-         << ",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
-         << ",\"viewport\":{\"width\":" << window.viewport_width
-         << ",\"height\":" << window.viewport_height << "}"
-         << ",\"zIndex\":" << window.z_index
-         << ",\"visible\":" << (window.open ? "true" : "false") << "}"
-         << ",\"selected_player_index\":" << window.selected_player_index
+         << ",\"placement\":";
+    writeStatsPlayerStatsWindowPlacement(file, window);
+    file << ",\"selected_player_index\":" << window.selected_player_index
          << ",\"selected_player_id\":\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\""
          << ",\"selected_team_is_team_0\":"
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
@@ -4207,11 +4213,8 @@ std::string SubtrActorPlugin::uiConfigJson() {
         window.config_id.empty() ? std::format("stats-{}", window.id) : window.config_id;
     file << "    {\"id\":\"" << escapeJsonString(configId) << "\",\"kind\":\""
          << statsWindowKindConfigId(window.kind)
-         << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
-         << ",\"viewport\":{\"width\":" << window.viewport_width
-         << ",\"height\":" << window.viewport_height << "}"
-         << ",\"zIndex\":" << window.z_index
-         << ",\"visible\":" << (window.open ? "true" : "false") << "}";
+         << "\",\"placement\":";
+    writeStatsPlayerStatsWindowPlacement(file, window);
     file << ",\"playerId\":\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\"";
     file << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
     file << ",\"entries\":[";
