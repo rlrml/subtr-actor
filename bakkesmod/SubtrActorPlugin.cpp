@@ -7640,6 +7640,15 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   }
   const size_t annotationCount =
       replayAnnotations && replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
+  std::vector<SaReplayPlayerInfo> annotationPlayers;
+  if (replayAnnotations && replayAnnotationPlayerCount && writeReplayAnnotationPlayers) {
+    annotationPlayers.resize(replayAnnotationPlayerCount(replayAnnotations));
+    const size_t copied = writeReplayAnnotationPlayers(
+        replayAnnotations,
+        annotationPlayers.data(),
+        annotationPlayers.size());
+    annotationPlayers.resize(copied);
+  }
   const char *status = !annotationsEnabled
                            ? "Disabled"
                            : !inReplay       ? "Waiting for replay"
@@ -7655,6 +7664,7 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
   }
   ImGui::Text("Annotations: %zu", annotationCount);
+  ImGui::Text("Players: %zu", annotationPlayers.size());
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY SOURCES");
@@ -7676,6 +7686,9 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     if (annotationCount > 0) {
       replayMeta.push_back(std::format("{} events", annotationCount));
     }
+    if (!annotationPlayers.empty()) {
+      replayMeta.push_back(std::format("{} players", annotationPlayers.size()));
+    }
     if (!replayMeta.empty()) {
       std::string metaText;
       for (const std::string &part : replayMeta) {
@@ -7695,6 +7708,23 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
         status);
   }
   ImGui::EndChild();
+
+  if (!annotationPlayers.empty()) {
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYERS");
+    ImGui::BeginChild("replay-loading-players", ImVec2{0.0f, 96.0f}, true);
+    for (const SaReplayPlayerInfo &player : annotationPlayers) {
+      const char *name = player.name == nullptr || player.name[0] == '\0' ? "--" : player.name;
+      ImGui::TextColored(
+          player.is_team_0 != 0 ? ImVec4{0.31f, 0.75f, 1.0f, 1.0f}
+                                : ImVec4{1.0f, 0.69f, 0.31f, 1.0f},
+          "%s",
+          player.is_team_0 != 0 ? "Blue" : "Orange");
+      ImGui::SameLine();
+      ImGui::Text("#%u %s", player.player_index + 1, name);
+    }
+    ImGui::EndChild();
+  }
 
   ImGui::Separator();
   bool annotationsValue = annotationsEnabled;
