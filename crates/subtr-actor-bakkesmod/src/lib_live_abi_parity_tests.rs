@@ -47,7 +47,7 @@ fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
         is_team_0: 1,
         kind: SaPlayerStatEventKind::Shot,
         has_shot_ball: 1,
-        shot_ball: rigid_body(
+        shot_ball: test_rigid_body(
             SaVec3 {
                 x: 300.0,
                 y: 100.0,
@@ -60,7 +60,7 @@ fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
             },
         ),
         has_shot_player: 1,
-        shot_player: rigid_body(
+        shot_player: test_rigid_body(
             SaVec3 {
                 x: 240.0,
                 y: 90.0,
@@ -92,7 +92,7 @@ fn live_abi_timeline_events_match_direct_full_graph_for_same_live_frame() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -172,7 +172,7 @@ fn live_abi_drained_events_match_direct_full_graph_for_same_live_frame() {
         is_team_0: 1,
         kind: SaPlayerStatEventKind::Shot,
         has_shot_ball: 1,
-        shot_ball: rigid_body(
+        shot_ball: test_rigid_body(
             SaVec3 {
                 x: 300.0,
                 y: 100.0,
@@ -185,7 +185,7 @@ fn live_abi_drained_events_match_direct_full_graph_for_same_live_frame() {
             },
         ),
         has_shot_player: 1,
-        shot_player: rigid_body(
+        shot_player: test_rigid_body(
             SaVec3 {
                 x: 240.0,
                 y: 90.0,
@@ -217,7 +217,7 @@ fn live_abi_drained_events_match_direct_full_graph_for_same_live_frame() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -278,7 +278,7 @@ fn live_abi_explicit_player_stat_event_kinds_match_direct_full_graph() {
             },
         ),
     ];
-    let shot_ball = rigid_body(
+    let shot_ball = test_rigid_body(
         SaVec3 {
             x: 300.0,
             y: 100.0,
@@ -290,7 +290,7 @@ fn live_abi_explicit_player_stat_event_kinds_match_direct_full_graph() {
             z: 100.0,
         },
     );
-    let shot_player = rigid_body(
+    let shot_player = test_rigid_body(
         SaVec3 {
             x: 240.0,
             y: 90.0,
@@ -336,7 +336,7 @@ fn live_abi_explicit_player_stat_event_kinds_match_direct_full_graph() {
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,

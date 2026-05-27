@@ -25,7 +25,7 @@ fn live_abi_exposes_named_graph_outputs() {
         let frame_number = offset as u64 + 1;
         let mut frame = live_frame(
             frame_number,
-            rigid_body(
+            test_rigid_body(
                 SaVec3 {
                     x: frame_number as f32 * 20.0,
                     y: 0.0,
@@ -157,7 +157,7 @@ fn live_abi_exposes_every_builtin_analysis_node_by_name() {
         let frame_number = offset as u64 + 1;
         let mut frame = live_frame(
             frame_number,
-            rigid_body(
+            test_rigid_body(
                 SaVec3 {
                     x: frame_number as f32 * 20.0,
                     y: 0.0,
@@ -332,7 +332,7 @@ fn live_abi_exposes_every_analysis_node_after_explicit_event_families() {
         team_one_score: 0,
         has_team_one_score: 1,
     }];
-    let shot_ball = rigid_body(
+    let shot_ball = test_rigid_body(
         SaVec3 {
             x: 300.0,
             y: 100.0,
@@ -344,7 +344,7 @@ fn live_abi_exposes_every_analysis_node_after_explicit_event_families() {
             z: 100.0,
         },
     );
-    let shot_player = rigid_body(
+    let shot_player = test_rigid_body(
         SaVec3 {
             x: 240.0,
             y: 90.0,
@@ -409,7 +409,7 @@ fn live_abi_exposes_every_analysis_node_after_explicit_event_families() {
         .map(|frame_number| {
             let mut frame = live_frame(
                 frame_number,
-                rigid_body(
+                test_rigid_body(
                     SaVec3 {
                         x: frame_number as f32 * 25.0,
                         y: 0.0,

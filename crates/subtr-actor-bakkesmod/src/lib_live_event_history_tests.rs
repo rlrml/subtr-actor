@@ -22,7 +22,7 @@ fn live_event_history_output_remains_after_frame_events_advance() {
     }];
     let mut first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -41,7 +41,7 @@ fn live_event_history_output_remains_after_frame_events_advance() {
 
     let second = live_frame(
         2,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -107,7 +107,7 @@ fn duplicate_explicit_live_boost_pickup_sequences_are_suppressed_for_graph_input
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 1024.0,
                 y: 0.0,
@@ -196,7 +196,7 @@ fn duplicate_explicit_live_demolishes_are_suppressed_for_graph_input() {
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     frame.demolishes = demolishes.as_ptr();
@@ -264,7 +264,7 @@ fn explicit_live_demolish_can_repeat_after_dedupe_window() {
     }];
     let mut first = live_frame(
         1,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     first.demolishes = first_demolishes.as_ptr();
@@ -299,7 +299,7 @@ fn explicit_live_demolish_can_repeat_after_dedupe_window() {
     }];
     let mut second = live_frame(
         200,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     second.demolishes = second_demolishes.as_ptr();
@@ -342,7 +342,7 @@ fn explicit_live_boost_pickup_sequence_can_repeat_after_respawn_window() {
     }];
     let mut first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 1024.0,
                 y: 0.0,
@@ -375,7 +375,7 @@ fn explicit_live_boost_pickup_sequence_can_repeat_after_respawn_window() {
     }];
     let mut second = live_frame(
         50,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 1024.0,
                 y: 0.0,
@@ -439,7 +439,7 @@ fn duplicate_explicit_live_goal_events_are_suppressed_for_graph_input() {
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -543,7 +543,7 @@ fn process_frame_preserves_explicit_live_event_timing_for_graph_input() {
         is_team_0: 1,
         kind: SaPlayerStatEventKind::Shot,
         has_shot_ball: 1,
-        shot_ball: rigid_body(
+        shot_ball: test_rigid_body(
             SaVec3 {
                 x: 300.0,
                 y: 100.0,
@@ -556,7 +556,7 @@ fn process_frame_preserves_explicit_live_event_timing_for_graph_input() {
             },
         ),
         has_shot_player: 1,
-        shot_player: rigid_body(
+        shot_player: test_rigid_body(
             SaVec3 {
                 x: 240.0,
                 y: 90.0,
@@ -588,7 +588,7 @@ fn process_frame_preserves_explicit_live_event_timing_for_graph_input() {
     }];
     let mut frame = live_frame(
         9,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,

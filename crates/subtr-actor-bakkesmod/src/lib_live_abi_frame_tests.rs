@@ -25,7 +25,7 @@ fn live_abi_frame_json_matches_direct_full_graph_across_finish() {
         let frame_number = offset as u64 + 1;
         let mut frame = live_frame(
             frame_number,
-            rigid_body(
+            test_rigid_body(
                 SaVec3 {
                     x: frame_number as f32 * 20.0,
                     y: 0.0,

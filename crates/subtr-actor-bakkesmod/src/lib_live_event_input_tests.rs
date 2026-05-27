@@ -10,7 +10,7 @@ fn process_frame_generates_live_touch_events_for_graph_input() {
     })];
     let first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -22,7 +22,7 @@ fn process_frame_generates_live_touch_events_for_graph_input() {
     );
     let second = live_frame(
         2,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -70,7 +70,7 @@ fn process_frame_does_not_infer_live_dodge_refreshed_events_from_touch_geometry(
     })];
     let first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -82,7 +82,7 @@ fn process_frame_does_not_infer_live_dodge_refreshed_events_from_touch_geometry(
     );
     let second = live_frame(
         2,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -139,7 +139,7 @@ fn explicit_dodge_refreshed_events_suppress_inferred_duplicates() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -201,7 +201,7 @@ fn duplicate_explicit_live_dodge_refresh_counters_are_suppressed_for_graph_input
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -263,7 +263,7 @@ fn explicit_live_dodge_refresh_counters_are_monotonic_for_graph_input() {
     ];
     let mut first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -275,7 +275,7 @@ fn explicit_live_dodge_refresh_counters_are_monotonic_for_graph_input() {
     );
     let mut second = live_frame(
         2,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -340,7 +340,7 @@ fn stale_explicit_live_dodge_refresh_suppresses_inferred_duplicate() {
     }];
     let mut first = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -352,7 +352,7 @@ fn stale_explicit_live_dodge_refresh_suppresses_inferred_duplicate() {
     );
     let mut second = live_frame(
         2,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -408,7 +408,7 @@ fn explicit_dodge_refreshed_events_feed_live_touch_state() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -511,7 +511,7 @@ fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
         is_team_0: 1,
         kind: SaPlayerStatEventKind::Shot,
         has_shot_ball: 1,
-        shot_ball: rigid_body(
+        shot_ball: test_rigid_body(
             SaVec3 {
                 x: 300.0,
                 y: 100.0,
@@ -524,7 +524,7 @@ fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
             },
         ),
         has_shot_player: 1,
-        shot_player: rigid_body(
+        shot_player: test_rigid_body(
             SaVec3 {
                 x: 240.0,
                 y: 90.0,
@@ -556,7 +556,7 @@ fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,

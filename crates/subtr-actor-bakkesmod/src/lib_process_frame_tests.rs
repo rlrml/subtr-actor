@@ -246,7 +246,7 @@ fn process_frame_does_not_commit_live_event_history_when_graph_evaluation_fails(
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,

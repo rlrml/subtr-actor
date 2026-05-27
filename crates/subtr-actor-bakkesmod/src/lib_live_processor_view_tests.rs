@@ -72,7 +72,7 @@ fn live_processor_view_satisfies_processor_surface_from_live_frame() {
 
     let mut frame = live_frame(
         11,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 10.0,
                 y: 20.0,
@@ -427,7 +427,7 @@ fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
     ];
     let frame = live_frame(
         3,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     let previous_events = sample_events(1, 0.0);
@@ -497,7 +497,7 @@ fn live_processor_view_resolves_demo_car_actor_ids() {
     ];
     let frame = live_frame(
         7,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     let frame_info = frame_info(&frame);
@@ -576,7 +576,7 @@ fn live_frame_input_can_build_active_demos_from_processor_view() {
     ];
     let frame = live_frame(
         7,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     let frame_info = frame_info(&frame);
@@ -663,7 +663,7 @@ fn live_processor_view_does_not_treat_inactive_demo_events_as_active() {
     ];
     let frame = live_frame(
         7,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     let demo_events = vec![DemolishInfo {
@@ -743,7 +743,7 @@ fn live_processor_view_frame_input_preserves_live_event_streams() {
     ];
     let frame = live_frame(
         7,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     let frame_info = frame_info(&frame);

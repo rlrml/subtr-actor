@@ -50,7 +50,7 @@ fn finish_drains_finalized_live_ball_carry_events() {
         })];
         let mut frame = live_frame(
             frame_number,
-            rigid_body(
+            test_rigid_body(
                 SaVec3 {
                     x: frame_number as f32 * 20.0,
                     y: 0.0,

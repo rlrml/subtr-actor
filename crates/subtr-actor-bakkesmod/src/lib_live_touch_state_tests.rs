@@ -43,7 +43,7 @@ fn live_demolish_events_keep_active_demo_state_until_expiration() {
 
     let mut first = live_frame(
         1,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     first.demolishes = demolishes.as_ptr();
@@ -55,7 +55,7 @@ fn live_demolish_events_keep_active_demo_state_until_expiration() {
 
     let second = live_frame(
         2,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     assert_eq!(
@@ -81,7 +81,7 @@ fn live_demolish_events_keep_active_demo_state_until_expiration() {
 
     let fourth = live_frame(
         4,
-        rigid_body(SaVec3::default(), SaVec3::default()),
+        test_rigid_body(SaVec3::default(), SaVec3::default()),
         &players,
     );
     assert_eq!(
@@ -118,7 +118,7 @@ fn explicit_live_touch_marks_kickoff_waiting_frame_as_active_play() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -180,7 +180,7 @@ fn explicit_live_touch_marks_stale_kickoff_countdown_frame_as_active_play() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -242,7 +242,7 @@ fn explicit_live_dodge_refresh_marks_kickoff_waiting_frame_as_active_play() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -307,7 +307,7 @@ fn process_frame_feeds_explicit_live_touch_events_to_touch_state() {
     }];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -374,7 +374,7 @@ fn duplicate_explicit_live_touches_are_suppressed_for_graph_input() {
     ];
     let mut frame = live_frame(
         1,
-        rigid_body(
+        test_rigid_body(
             SaVec3 {
                 x: 0.0,
                 y: 0.0,
