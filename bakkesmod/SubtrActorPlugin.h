@@ -142,6 +142,7 @@ private:
     float height = 330.0f;
     float viewport_width = 0.0f;
     float viewport_height = 0.0f;
+    int z_index = 0;
   };
 
   struct UiWindowPlacement {
@@ -154,6 +155,7 @@ private:
     float height = 0.0f;
     float viewport_width = 0.0f;
     float viewport_height = 0.0f;
+    int z_index = 0;
   };
 
   struct PlayerStatSnapshot {
@@ -310,6 +312,7 @@ private:
   std::string selectedAnalysisNode;
   std::string graphInspectorNodeQuery;
   uint32_t nextUiStatsWindowId = 1;
+  int nextUiWindowZIndex = 1;
   std::deque<UiEventRecord> recentUiEvents;
   std::unordered_map<std::string, int> mechanicsReviewDecisions;
   std::vector<UiStatsWindow> uiStatsWindows;

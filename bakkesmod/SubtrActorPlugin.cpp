@@ -2295,7 +2295,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     return;
   }
 
-  auto loadPlacementObject = [](
+  auto loadPlacementObject = [this](
                                  const std::string &object,
                                  UiWindowPlacement &out,
                                  bool *visible = nullptr) {
@@ -2319,6 +2319,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       out.viewport_height = static_cast<float>(
           parseJsonNumberProperty(*viewport, "height").value_or(out.viewport_height));
     }
+    out.z_index = static_cast<int>(parseJsonNumberProperty(object, "zIndex").value_or(out.z_index));
+    nextUiWindowZIndex = std::max(nextUiWindowZIndex, out.z_index + 1);
   };
   auto loadPlacement = [&loadPlacementObject](
                            const std::string &parent,
@@ -2581,6 +2583,8 @@ void SubtrActorPlugin::applyUiConfigJson(
         window.viewport_height = static_cast<float>(
             parseJsonNumberProperty(*viewport, "height").value_or(window.viewport_height));
       }
+      window.z_index =
+          static_cast<int>(parseJsonNumberProperty(*placement, "zIndex").value_or(window.z_index));
     }
     window.selected_player_index = static_cast<uint32_t>(
         std::max(0.0, parseJsonNumberProperty(object, "selected_player_index").value_or(0.0)));
@@ -2632,6 +2636,9 @@ void SubtrActorPlugin::applyUiConfigJson(
         parseJsonNumberProperty(object, "viewport_width").value_or(window.viewport_width));
     window.viewport_height = static_cast<float>(
         parseJsonNumberProperty(object, "viewport_height").value_or(window.viewport_height));
+    window.z_index =
+        static_cast<int>(parseJsonNumberProperty(object, "zIndex").value_or(window.z_index));
+    nextUiWindowZIndex = std::max(nextUiWindowZIndex, window.z_index + 1);
     uiStatsWindows.push_back(std::move(window));
   }
 
@@ -2678,7 +2685,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
         << ",\"viewport_width\":" << placement.viewport_width
         << ",\"viewport\":{\"width\":" << placement.viewport_width
         << ",\"height\":" << placement.viewport_height << "}"
-        << ",\"viewport_height\":" << placement.viewport_height << "}";
+        << ",\"viewport_height\":" << placement.viewport_height
+        << ",\"zIndex\":" << placement.z_index << "}";
   };
 
   std::ostringstream file;
@@ -2837,6 +2845,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
          << ",\"height\":" << window.viewport_height << "}"
+         << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}"
          << ",\"selected_player_index\":" << window.selected_player_index
          << ",\"selected_team_is_team_0\":"
@@ -2849,6 +2858,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"width\":" << window.width << ",\"height\":" << window.height
          << ",\"viewport_width\":" << window.viewport_width
          << ",\"viewport_height\":" << window.viewport_height
+         << ",\"zIndex\":" << window.z_index
          << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
       if (j != 0) {
@@ -2872,6 +2882,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
          << ",\"height\":" << window.viewport_height << "}"
+         << ",\"zIndex\":" << window.z_index
          << ",\"visible\":" << (window.open ? "true" : "false") << "}"
          << ",\"playerId\":\"" << window.selected_player_index << "\""
          << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange")
@@ -5480,6 +5491,7 @@ void SubtrActorPlugin::applyWindowPlacement(
   auto applyFocus = [&]() {
     if (placement.pending_focus) {
       ImGui::SetNextWindowFocus();
+      placement.z_index = nextUiWindowZIndex++;
       placement.pending_focus = false;
     }
   };
@@ -5525,6 +5537,10 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   placement.viewport_width = displaySize.x;
   placement.viewport_height = displaySize.y;
+  if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    placement.z_index = std::max(placement.z_index, nextUiWindowZIndex++);
+  }
 }
 
 bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open) {
@@ -5582,6 +5598,10 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   window.viewport_width = displaySize.x;
   window.viewport_height = displaySize.y;
+  if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    window.z_index = std::max(window.z_index, nextUiWindowZIndex++);
+  }
 }
 
 void SubtrActorPlugin::renderLauncherWindow() {
@@ -7438,6 +7458,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
 }
 
 void SubtrActorPlugin::resetWindowPlacements() {
+  nextUiWindowZIndex = 1;
   launcherPlacement = UiWindowPlacement{};
   scoreboardPlacement = UiWindowPlacement{};
   eventsPlacement = UiWindowPlacement{};
@@ -7619,6 +7640,7 @@ void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
   window.viewport_height = displaySize.y;
   window.has_placement = true;
   window.pending_apply_placement = true;
+  window.z_index = nextUiWindowZIndex++;
 }
 
 void SubtrActorPlugin::renderStatsWindows() {
@@ -7974,6 +7996,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
   applyStatsWindowPlacement(window);
   if (window.pending_focus) {
     ImGui::SetNextWindowFocus();
+    window.z_index = nextUiWindowZIndex++;
     window.pending_focus = false;
   }
   const std::string title = statsWindowTitle(window);
