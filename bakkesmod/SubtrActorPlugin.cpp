@@ -8387,6 +8387,17 @@ void SubtrActorPlugin::renderRecordingWindow() {
                 .count()
           : 0.0;
   const bool hasGraphSnapshot = recordingSnapshotCount > 0 || recordingLastBytes > 0;
+  const bool recordingSettingsLocked = recordingActive;
+  auto pushRecordingDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+    }
+  };
+  auto popRecordingDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PopStyleVar();
+    }
+  };
   auto recordingButton = [](const char *label, bool disabled) {
     if (disabled) {
       ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
@@ -8399,19 +8410,38 @@ void SubtrActorPlugin::renderRecordingWindow() {
   };
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");
-  ImGui::SliderInt("FPS", &recordingFps, 1, 120);
+  int nextRecordingFps = recordingFps;
+  pushRecordingDisabledStyle(recordingSettingsLocked);
+  const bool fpsChanged = ImGui::SliderInt("FPS", &nextRecordingFps, 1, 120);
+  popRecordingDisabledStyle(recordingSettingsLocked);
+  if (!recordingSettingsLocked && fpsChanged) {
+    recordingFps = nextRecordingFps;
+  }
   const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
   recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
+  int nextRecordingPlaybackRateIndex = recordingPlaybackRateIndex;
+  pushRecordingDisabledStyle(recordingSettingsLocked);
   if (ImGui::BeginCombo("Playback rate", rates[static_cast<size_t>(recordingPlaybackRateIndex)])) {
     for (int index = 0; index < static_cast<int>(rates.size()); index += 1) {
       const bool selected = index == recordingPlaybackRateIndex;
       if (ImGui::Selectable(rates[static_cast<size_t>(index)], selected)) {
-        recordingPlaybackRateIndex = index;
+        nextRecordingPlaybackRateIndex = index;
       }
     }
     ImGui::EndCombo();
   }
-  ImGui::Checkbox("Finalize before dump", &recordingFinishBeforeDump);
+  popRecordingDisabledStyle(recordingSettingsLocked);
+  if (!recordingSettingsLocked) {
+    recordingPlaybackRateIndex = nextRecordingPlaybackRateIndex;
+  }
+  bool nextFinishBeforeDump = recordingFinishBeforeDump;
+  pushRecordingDisabledStyle(recordingSettingsLocked);
+  const bool finishBeforeDumpChanged =
+      ImGui::Checkbox("Finalize before dump", &nextFinishBeforeDump);
+  popRecordingDisabledStyle(recordingSettingsLocked);
+  if (!recordingSettingsLocked && finishBeforeDumpChanged) {
+    recordingFinishBeforeDump = nextFinishBeforeDump;
+  }
 
   ImGui::Separator();
   if (recordingButton("Start", recordingActive)) {
