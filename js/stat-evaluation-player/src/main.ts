@@ -47,9 +47,14 @@ import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
   type ReplayLoadBundle,
-  type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
+import {
+  createFileReplaySource,
+  createRemoteReplaySource,
+  loadReplayBundleFromSource,
+  type ReplayInputSource,
+} from "./replayInputSources.ts";
 import {
   createMechanicsReviewReplaySource,
   formatMechanicsReviewClipDetails,
@@ -287,12 +292,6 @@ let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
-
-interface ReplayInputSource {
-  name: string;
-  preparingStatus: string;
-  readBytes(): Promise<Uint8Array>;
-}
 
 type ModuleCapabilityKind = "events" | "ranges" | "effects";
 const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
@@ -2048,43 +2047,6 @@ function includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): 
   return boostPickupFilters.includePickup(pickup);
 }
 
-function createFileReplaySource(file: File): ReplayInputSource {
-  return {
-    name: file.name,
-    preparingStatus: "Preparing replay...",
-    async readBytes() {
-      return new Uint8Array(await file.arrayBuffer());
-    },
-  };
-}
-
-function createRemoteReplaySource(
-  request: ReplayFetchRequest,
-  signal: AbortSignal,
-): ReplayInputSource {
-  return {
-    name: request.name,
-    preparingStatus: "Fetching replay...",
-    async readBytes() {
-      const response = await fetch(request.url, {
-        ...request.fetchInit,
-        signal,
-      });
-      if (!response.ok) {
-        const statusText = response.statusText ? ` ${response.statusText}` : "";
-        const authHint =
-          request.kind === "ballchasing" && [401, 403, 404].includes(response.status)
-            ? ". The replay may be private, unavailable, or not downloadable without a Ballchasing session"
-            : "";
-        throw new Error(
-          `Failed to fetch replay from ${request.url.href} (${response.status}${statusText})${authHint}`,
-        );
-      }
-      return new Uint8Array(await response.arrayBuffer());
-    },
-  };
-}
-
 async function loadReplay(source: ReplayInputSource): Promise<void> {
   await loadReplayBundleForDisplay(
     source,
@@ -2095,17 +2057,6 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
       }),
     ),
   );
-}
-
-async function loadReplayBundleFromSource(
-  source: ReplayInputSource,
-  onProgress?: (progress: ReplayLoadProgress) => void,
-): Promise<ReplayLoadBundle> {
-  const bytes = await source.readBytes();
-  return loadReplayBundleInWorker(bytes, {
-    reportEveryNFrames: 100,
-    onProgress,
-  });
 }
 
 async function loadReplayBundleForDisplay(
