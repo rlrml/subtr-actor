@@ -6827,7 +6827,27 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     return;
   }
 
-  ImGui::BeginChild("singleton-window-manager", ImVec2{0.0f, 118.0f}, true);
+  if (ImGui::SmallButton("Show all##singleton-windows")) {
+    for (SingletonWindowControl &window : windows) {
+      *window.open = true;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("Hide all##singleton-windows")) {
+    for (SingletonWindowControl &window : windows) {
+      *window.open = false;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("Focus visible##singleton-windows")) {
+    for (SingletonWindowControl &window : windows) {
+      if (*window.open) {
+        window.placement->pending_focus = true;
+      }
+    }
+  }
+
+  ImGui::BeginChild("singleton-window-manager", ImVec2{0.0f, 132.0f}, true);
   for (SingletonWindowControl &window : windows) {
     ImGui::PushID(window.label);
     if (*window.open) {
@@ -6858,6 +6878,34 @@ void SubtrActorPlugin::renderStatsWindowManager() {
   if (uiStatsWindows.empty()) {
     return;
   }
+
+  const size_t hiddenCount = static_cast<size_t>(std::count_if(
+      uiStatsWindows.begin(),
+      uiStatsWindows.end(),
+      [](const UiStatsWindow &window) { return !window.open; }));
+  if (ImGui::SmallButton("Show all##stats-windows")) {
+    for (UiStatsWindow &window : uiStatsWindows) {
+      window.open = true;
+      window.pending_focus = true;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("Hide all##stats-windows")) {
+    for (UiStatsWindow &window : uiStatsWindows) {
+      window.open = false;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("Remove hidden##stats-windows")) {
+    uiStatsWindows.erase(
+        std::remove_if(
+            uiStatsWindows.begin(),
+            uiStatsWindows.end(),
+            [](const UiStatsWindow &window) { return !window.open; }),
+        uiStatsWindows.end());
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%zu hidden", hiddenCount);
 
   ImGui::BeginChild("stats-window-manager", ImVec2{0.0f, 132.0f}, true);
   std::optional<size_t> removeIndex;
