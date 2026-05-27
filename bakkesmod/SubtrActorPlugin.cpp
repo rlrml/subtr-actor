@@ -8929,17 +8929,8 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
   ImGui::End();
 }
 
-void SubtrActorPlugin::renderSingletonWindowManager() {
-  struct SingletonWindowControl {
-    const char *label;
-    bool *open;
-    UiWindowPlacement *placement;
-    float x;
-    float y;
-    float width;
-    float height;
-  };
-
+std::array<SubtrActorPlugin::SingletonWindowControl, 13>
+SubtrActorPlugin::singletonWindowControls() {
   const float eventPlaylistX = rightAnchoredUiX(430.0f);
   const float statusX = rightAnchoredUiX(330.0f);
   const float playbackX = rightAnchoredUiX(336.0f, 32.0f);
@@ -8949,7 +8940,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
   const float moduleControlsX = rightAnchoredUiX(430.0f);
   const float touchControlsX = rightAnchoredUiX(410.0f);
 
-  std::array<SingletonWindowControl, 13> windows{{
+  return {{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement, 0.0f, 11.0f, 88.0f, 34.0f},
       {"Events", &uiEventsOpen, &eventsPlacement, 16.0f, 256.0f, 520.0f, 360.0f},
       {"Event playlist",
@@ -9012,6 +9003,10 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
        544.0f,
        420.0f},
   }};
+}
+
+void SubtrActorPlugin::renderSingletonWindowManager() {
+  std::array<SingletonWindowControl, 13> windows = singletonWindowControls();
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
       windows.begin(),
@@ -9229,59 +9224,18 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
 void SubtrActorPlugin::resetWindowPlacements() {
   nextUiWindowZIndex = 1;
   resetSingletonWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f, true);
-  resetScoreboardWindowPlacement();
-  resetSingletonWindowPlacement(eventsPlacement, 16.0f, 256.0f, 520.0f, 360.0f);
-  resetSingletonWindowPlacement(
-      eventPlaylistPlacement,
-      rightAnchoredUiX(430.0f),
-      256.0f,
-      430.0f,
-      430.0f);
-  resetSingletonWindowPlacement(statusPlacement, rightAnchoredUiX(330.0f), 68.0f, 330.0f, 220.0f);
-  resetSingletonWindowPlacement(cameraPlacement, 16.0f, 68.0f, 416.0f, 500.0f);
-  resetSingletonWindowPlacement(
-      playbackControlsPlacement,
-      rightAnchoredUiX(336.0f, 32.0f),
-      68.0f,
-      336.0f,
-      430.0f);
-  resetSingletonWindowPlacement(
-      recordingPlacement,
-      rightAnchoredUiX(416.0f, 32.0f),
-      384.0f,
-      416.0f,
-      380.0f);
-  resetSingletonWindowPlacement(graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f);
-  resetSingletonWindowPlacement(
-      mechanicsReviewPlacement,
-      rightAnchoredUiX(500.0f),
-      256.0f,
-      500.0f,
-      560.0f);
-  resetSingletonWindowPlacement(
-      replayLoadingPlacement,
-      rightAnchoredUiX(520.0f),
-      68.0f,
-      520.0f,
-      360.0f);
-  resetSingletonWindowPlacement(
-      moduleControlsPlacement,
-      rightAnchoredUiX(430.0f),
-      305.0f,
-      430.0f,
-      520.0f);
-  resetSingletonWindowPlacement(
-      touchControlsPlacement,
-      rightAnchoredUiX(410.0f),
-      256.0f,
-      410.0f,
-      380.0f);
-  resetSingletonWindowPlacement(
-      boostPickupControlsPlacement,
-      16.0f,
-      448.0f,
-      544.0f,
-      420.0f);
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.placement == &scoreboardPlacement) {
+      resetScoreboardWindowPlacement();
+      continue;
+    }
+    resetSingletonWindowPlacement(
+        *window.placement,
+        window.x,
+        window.y,
+        window.width,
+        window.height);
+  }
   for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
     resetStatsWindowPlacement(uiStatsWindows[index], index);
   }

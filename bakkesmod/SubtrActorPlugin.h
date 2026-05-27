@@ -162,6 +162,16 @@ private:
     int z_index = 0;
   };
 
+  struct SingletonWindowControl {
+    const char *label;
+    bool *open;
+    UiWindowPlacement *placement;
+    float x;
+    float y;
+    float width;
+    float height;
+  };
+
   struct PlayerStatSnapshot {
     int shots = 0;
     int saves = 0;
@@ -423,6 +433,7 @@ private:
   void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
   void renderModuleSummaryControls(const char *idSuffix);
   void renderModuleSettingsControls(const char *idSuffix, bool includeOpenButtons);
+  std::array<SingletonWindowControl, 13> singletonWindowControls();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void focusTopLoadedWindow();
