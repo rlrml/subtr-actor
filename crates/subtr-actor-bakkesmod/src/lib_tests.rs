@@ -159,7 +159,7 @@ fn rust_exported_function_names() -> BTreeSet<String> {
         .collect()
 }
 
-fn rust_source_files() -> [&'static str; 30] {
+fn rust_source_files() -> [&'static str; 32] {
     [
         include_str!("abi.rs"),
         include_str!("abi_events.rs"),
@@ -190,6 +190,8 @@ fn rust_source_files() -> [&'static str; 30] {
         include_str!("graph_output.rs"),
         include_str!("live.rs"),
         include_str!("replay_annotations.rs"),
+        include_str!("replay_annotations_lifecycle.rs"),
+        include_str!("replay_annotations_poll.rs"),
         include_str!("timeline.rs"),
     ]
 }
