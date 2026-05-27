@@ -10852,7 +10852,13 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     return;
   }
 
-  if (window.entries.empty()) {
+  const bool hasSupportedEntries = std::any_of(
+      window.entries.begin(),
+      window.entries.end(),
+      [&](const UiStatsWindow::Entry &entry) {
+        return statsWindowSupportsStat(window, entry.stat_id);
+      });
+  if (!hasSupportedEntries) {
     ImGui::Text("No stats added.");
     return;
   }
