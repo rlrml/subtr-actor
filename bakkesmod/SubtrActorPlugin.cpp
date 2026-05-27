@@ -2536,6 +2536,8 @@ void SubtrActorPlugin::applyUiConfigJson(
         uiStatsWindows.size(),
         sourceLabel));
   }
+  lastSavedUiConfigJson = uiConfigJson();
+  nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
 }
 
 std::string SubtrActorPlugin::uiConfigJson() const {
@@ -2738,7 +2740,24 @@ void SubtrActorPlugin::saveUiConfig() {
     return;
   }
 
-  file << uiConfigJson();
+  const std::string json = uiConfigJson();
+  file << json;
+  lastSavedUiConfigJson = json;
+  nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+}
+
+void SubtrActorPlugin::maybeAutosaveUiConfig() {
+  const auto now = std::chrono::steady_clock::now();
+  if (now < nextUiConfigAutosave) {
+    return;
+  }
+  nextUiConfigAutosave = now + std::chrono::seconds(2);
+
+  const std::string json = uiConfigJson();
+  if (json == lastSavedUiConfigJson) {
+    return;
+  }
+  saveUiConfig();
 }
 
 float SubtrActorPlugin::sampleIntervalSeconds() {
@@ -5221,6 +5240,7 @@ void SubtrActorPlugin::Render() {
   renderTouchControlsWindow();
   renderBoostPickupControlsWindow();
   renderStatsWindows();
+  maybeAutosaveUiConfig();
 }
 
 void SubtrActorPlugin::RenderSettings() {

@@ -330,6 +330,9 @@ private:
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
+  std::chrono::steady_clock::time_point nextUiConfigAutosave =
+      std::chrono::steady_clock::time_point{};
+  std::string lastSavedUiConfigJson;
 
   bool loadRustLibrary();
   void unloadRustLibrary();
@@ -424,6 +427,7 @@ private:
   void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();
+  void maybeAutosaveUiConfig();
   int recentEventCountForActor(std::string_view actor) const;
   int recentEventCountForTeam(uint8_t isTeam0) const;
   int recentEventCountForType(std::string_view type) const;
