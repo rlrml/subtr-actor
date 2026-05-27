@@ -4204,12 +4204,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
     } else {
       file << "null";
     }
-    file << ",\"team\":";
-    if (window.kind == UiStatsWindowKind::Team) {
-      file << "\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
-    } else {
-      file << "null";
-    }
+    file << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
     file << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
       if (j != 0) {
