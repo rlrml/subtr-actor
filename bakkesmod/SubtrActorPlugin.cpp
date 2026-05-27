@@ -6747,6 +6747,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreateButton("New goal labels", UiStatsWindowKind::GoalsOverview);
   renderStatsWindowCreateButton("New ad hoc stats", UiStatsWindowKind::AdHoc);
 
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
+  renderModuleSummaryControls("launcher-module-summary");
+
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     const bool liveAnalysis = liveProcessingEnabled();
     if (ImGui::Button(liveAnalysis ? "Stop analysis" : "Start analysis", ImVec2{170.0f, 0.0f})) {
@@ -6766,6 +6770,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
       uiLauncherOpen = false;
     }
+
     ImGui::Separator();
     std::array<LauncherWindowToggle, 3> pluginToolWindows{{
         {"Status", &uiStatusOpen, &statusPlacement},
@@ -6776,104 +6781,101 @@ void SubtrActorPlugin::renderLauncherWindow() {
       renderLauncherWindowToggle(window);
     }
     renderSingletonWindowManager();
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LAYOUT");
+    if (ImGui::Button("Default workspace")) {
+      applyDefaultUiWorkspace();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Review workspace")) {
+      applyReplayReviewUiWorkspace();
+    }
+    if (ImGui::Button("Debug workspace")) {
+      applyGraphDebugUiWorkspace();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Recording workspace")) {
+      applyRecordingUiWorkspace();
+    }
+    if (ImGui::Button("Reset positions")) {
+      resetWindowPlacements();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Default stats windows")) {
+      resetDefaultStatsWindows();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Hide side windows")) {
+      uiEventsOpen = false;
+      uiEventPlaylistOpen = false;
+      uiStatusOpen = false;
+      uiCameraOpen = false;
+      uiPlaybackControlsOpen = false;
+      uiRecordingOpen = false;
+      uiGraphInspectorOpen = false;
+      uiMechanicsReviewOpen = false;
+      uiReplayLoadingOpen = false;
+      uiTouchControlsOpen = false;
+      uiBoostPickupControlsOpen = false;
+    }
+    if (ImGui::Button("Save layout")) {
+      saveUiConfig();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reload layout")) {
+      loadUiConfig();
+    }
+    if (ImGui::Button("Copy layout JSON")) {
+      const std::string json = uiConfigJson();
+      ImGui::SetClipboardText(json.c_str());
+      cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Paste layout JSON")) {
+      const char *clipboardText = ImGui::GetClipboardText();
+      if (clipboardText == nullptr || clipboardText[0] == '\0') {
+        cvarManager->log("subtr-actor: clipboard does not contain UI config JSON");
+      } else {
+        applyUiConfigJson(clipboardText, "clipboard");
+      }
+    }
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+    const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
+        uiStatsWindows.begin(),
+        uiStatsWindows.end(),
+        [](const UiStatsWindow &window) { return window.open; }));
+    ImGui::Text(
+        "%zu visible / %zu stats windows",
+        visibleStatsWindows,
+        uiStatsWindows.size());
+    renderStatsWindowManager();
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
+    const std::vector<std::string> &moduleNames = statsModuleNames();
+    if (moduleNames.empty()) {
+      ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+    } else {
+      ImGui::BeginChild("module-summary", ImVec2{0.0f, 150.0f}, true);
+      for (const std::string &moduleName : moduleNames) {
+        if (ImGui::SmallButton(std::format("Open##module-{}", moduleName).c_str())) {
+          createStatsModuleWindow(moduleName);
+          uiLauncherOpen = false;
+        }
+        ImGui::SameLine();
+        ImGui::Text("%s", moduleName.c_str());
+      }
+      ImGui::EndChild();
+    }
+
+    ImGui::Separator();
+    renderSharedSettingsControls();
     ImGui::TreePop();
   }
 
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
-  renderModuleSummaryControls("launcher-module-summary");
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LAYOUT");
-  if (ImGui::Button("Default workspace")) {
-    applyDefaultUiWorkspace();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Review workspace")) {
-    applyReplayReviewUiWorkspace();
-  }
-  if (ImGui::Button("Debug workspace")) {
-    applyGraphDebugUiWorkspace();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Recording workspace")) {
-    applyRecordingUiWorkspace();
-  }
-  if (ImGui::Button("Reset positions")) {
-    resetWindowPlacements();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Default stats windows")) {
-    resetDefaultStatsWindows();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Hide side windows")) {
-    uiEventsOpen = false;
-    uiEventPlaylistOpen = false;
-    uiStatusOpen = false;
-    uiCameraOpen = false;
-    uiPlaybackControlsOpen = false;
-    uiRecordingOpen = false;
-    uiGraphInspectorOpen = false;
-    uiMechanicsReviewOpen = false;
-    uiReplayLoadingOpen = false;
-    uiTouchControlsOpen = false;
-    uiBoostPickupControlsOpen = false;
-  }
-  if (ImGui::Button("Save layout")) {
-    saveUiConfig();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload layout")) {
-    loadUiConfig();
-  }
-  if (ImGui::Button("Copy layout JSON")) {
-    const std::string json = uiConfigJson();
-    ImGui::SetClipboardText(json.c_str());
-    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Paste layout JSON")) {
-    const char *clipboardText = ImGui::GetClipboardText();
-    if (clipboardText == nullptr || clipboardText[0] == '\0') {
-      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON");
-    } else {
-      applyUiConfigJson(clipboardText, "clipboard");
-    }
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
-  const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
-      uiStatsWindows.begin(),
-      uiStatsWindows.end(),
-      [](const UiStatsWindow &window) { return window.open; }));
-  ImGui::Text(
-      "%zu visible / %zu stats windows",
-      visibleStatsWindows,
-      uiStatsWindows.size());
-  renderStatsWindowManager();
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
-  const std::vector<std::string> &moduleNames = statsModuleNames();
-  if (moduleNames.empty()) {
-    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
-  } else {
-    ImGui::BeginChild("module-summary", ImVec2{0.0f, 150.0f}, true);
-    for (const std::string &moduleName : moduleNames) {
-      if (ImGui::SmallButton(std::format("Open##module-{}", moduleName).c_str())) {
-        createStatsModuleWindow(moduleName);
-        uiLauncherOpen = false;
-      }
-      ImGui::SameLine();
-      ImGui::Text("%s", moduleName.c_str());
-    }
-    ImGui::EndChild();
-  }
-
-  ImGui::Separator();
-  renderSharedSettingsControls();
   ImGui::End();
 }
 
