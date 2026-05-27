@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::{anyhow, bail, Context};
@@ -12,8 +11,8 @@ use subtr_actor::{
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
     DoubleTapCalculator, FlickCalculator, FlipResetTracker, GoalEvent, HalfFlipCalculator,
-    MustyFlickCalculator, OneTimerCalculator, PlayerId, PlayerInfo, ProcessorView, ReplayMeta,
-    ReplayProcessor, SpeedFlipCalculator, SubtrActorResult, TimeAdvance, WavedashCalculator,
+    MustyFlickCalculator, OneTimerCalculator, ProcessorView, ReplayProcessor, SpeedFlipCalculator,
+    SubtrActorResult, TimeAdvance, WavedashCalculator,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -26,6 +25,10 @@ mod args_query;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_mechanics.rs"]
+mod mechanics;
+#[path = "build_mechanic_review_playlist_players.rs"]
+mod players;
 #[path = "build_mechanic_review_playlist_source_api.rs"]
 mod source_api;
 #[path = "build_mechanic_review_playlist_source_ballchasing.rs"]
@@ -40,16 +43,11 @@ mod source_parse;
 mod source_types;
 
 use config::{parse_args, Config};
-use constants::{ALL_MECHANICS, DEFAULT_MECHANICS};
+use mechanics::{graph_node_names_for_mechanics, resolve_mechanics};
+use players::{player_display_map, player_id_string, player_team_label};
 use source_collect::collect_sources;
 use source_parse::parse_replay_file;
 use source_types::ReplaySourceInput;
-
-#[derive(Clone)]
-struct PlayerDisplay {
-    name: String,
-    team: &'static str,
-}
 
 #[derive(Debug, Clone)]
 struct MechanicCandidate {
@@ -81,111 +79,8 @@ impl Collector for GoalScanCollector {
     }
 }
 
-fn player_id_string(player_id: &PlayerId) -> String {
-    match serde_json::to_value(player_id) {
-        Ok(Value::Object(map)) if map.len() == 1 => {
-            let (kind, value) = map.into_iter().next().expect("map has one value");
-            match value {
-                Value::String(value) => format!("{kind}:{value}"),
-                other => format!("{kind}:{other}"),
-            }
-        }
-        Ok(value) => value.to_string(),
-        Err(_) => format!("{player_id:?}"),
-    }
-}
-
-fn player_display_map(meta: &ReplayMeta) -> HashMap<String, PlayerDisplay> {
-    meta.team_zero
-        .iter()
-        .map(|player| (player, "blue"))
-        .chain(meta.team_one.iter().map(|player| (player, "orange")))
-        .map(|(player, team)| {
-            (
-                player_id_string(&player.remote_id),
-                player_display(player, team),
-            )
-        })
-        .collect()
-}
-
-fn player_display(player: &PlayerInfo, team: &'static str) -> PlayerDisplay {
-    PlayerDisplay {
-        name: player.name.clone(),
-        team,
-    }
-}
-
-fn resolve_mechanics(config: &Config) -> anyhow::Result<Vec<&'static str>> {
-    let requested: Vec<String> = if config.mechanics.is_empty() {
-        DEFAULT_MECHANICS
-            .iter()
-            .map(|name| (*name).to_owned())
-            .collect()
-    } else {
-        config.mechanics.clone()
-    };
-
-    let mut resolved = Vec::new();
-    for raw in requested {
-        let normalized = raw.trim().replace('-', "_").to_ascii_lowercase();
-        let names: Vec<&str> = match normalized.as_str() {
-            "default" => DEFAULT_MECHANICS.to_vec(),
-            "all" => ALL_MECHANICS.to_vec(),
-            name if ALL_MECHANICS.contains(&name) => vec![ALL_MECHANICS
-                .iter()
-                .copied()
-                .find(|candidate| *candidate == name)
-                .expect("mechanic is known")],
-            other => bail!(
-                "unknown mechanic {other}; supported mechanics are: {}, default, all",
-                ALL_MECHANICS.join(", ")
-            ),
-        };
-        for name in names {
-            if !resolved.contains(&name) {
-                resolved.push(name);
-            }
-        }
-    }
-    Ok(resolved)
-}
-
-fn graph_node_names_for_mechanics(mechanics: &[&str]) -> Vec<&'static str> {
-    let mut names = Vec::new();
-    for mechanic in mechanics {
-        let node = match *mechanic {
-            "flick" => Some("flick"),
-            "musty_flick" => Some("musty_flick"),
-            "one_timer" => Some("one_timer"),
-            "air_dribble" => Some("ball_carry"),
-            "ceiling_shot" => Some("ceiling_shot"),
-            "double_tap" => Some("double_tap"),
-            "speed_flip" => Some("speed_flip"),
-            "half_flip" => Some("half_flip"),
-            "wavedash" => Some("wavedash"),
-            "flip_reset" => Some("dodge_reset"),
-            _ => None,
-        };
-        if let Some(node) = node {
-            if !names.contains(&node) {
-                names.push(node);
-            }
-        }
-    }
-    names
-}
-
 fn confidence_pct(confidence: f32) -> u32 {
     (confidence * 100.0).round().clamp(0.0, 100.0) as u32
-}
-
-fn player_team_label(is_team_0: bool) -> &'static str {
-    if is_team_0 {
-        "blue"
-    } else {
-        "orange"
-    }
 }
 
 fn include_candidate(candidate: &MechanicCandidate, config: &Config) -> bool {
