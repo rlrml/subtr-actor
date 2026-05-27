@@ -30,7 +30,8 @@ constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr float GOAL_WATCH_LEAD_SECONDS = 4.0f;
 constexpr ImGuiWindowFlags UI_FLOATING_WINDOW_FLAGS =
-    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+    ImGuiWindowFlags_NoSavedSettings;
 constexpr ImGuiWindowFlags UI_CHROME_WINDOW_FLAGS =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
@@ -8012,7 +8013,8 @@ void SubtrActorPlugin::renderScoreboardWindow() {
   applyScoreboardWindowPlacement();
   constexpr ImGuiWindowFlags scoreboardFlags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoSavedSettings;
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{10.0f, 6.0f});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 999.0f);
   if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen, scoreboardFlags)) {
