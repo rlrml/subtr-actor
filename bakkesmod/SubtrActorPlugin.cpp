@@ -9203,35 +9203,22 @@ void SubtrActorPlugin::resetDefaultStatsWindows() {
 }
 
 void SubtrActorPlugin::applyDefaultUiWorkspace() {
-  uiLauncherOpen = true;
+  uiLauncherOpen = false;
   uiScoreboardOpen = true;
-  uiEventsOpen = true;
-  uiEventPlaylistOpen = true;
-  uiStatusOpen = true;
+  uiEventsOpen = false;
+  uiEventPlaylistOpen = false;
+  uiStatusOpen = false;
   uiCameraOpen = true;
-  uiPlaybackControlsOpen = true;
+  uiPlaybackControlsOpen = false;
   uiRecordingOpen = false;
   uiGraphInspectorOpen = false;
   uiMechanicsReviewOpen = false;
   uiReplayLoadingOpen = false;
-  uiModuleControlsOpen = true;
+  uiModuleControlsOpen = false;
   uiTouchControlsOpen = false;
   uiBoostPickupControlsOpen = false;
-  boostPickupPadBig = true;
-  boostPickupPadSmall = true;
-  boostPickupPadAmbiguous = true;
-  boostPickupActivityActive = true;
-  boostPickupActivityInactive = true;
-  boostPickupActivityUnknown = true;
-  boostPickupFieldOwn = true;
-  boostPickupFieldOpponent = true;
-  boostPickupFieldUnknown = true;
-  eventPlaylistMechanicsEnabled = true;
-  eventPlaylistTeamEventsEnabled = true;
-  eventPlaylistGoalContextEnabled = true;
-  eventPlaylistAutoFollow = true;
   resetWindowPlacements();
-  resetDefaultStatsWindows();
+  cameraPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::applyReplayReviewUiWorkspace() {

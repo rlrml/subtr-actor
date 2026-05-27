@@ -259,11 +259,11 @@ private:
   bool replayAnnotationLoadFailed = false;
   uintptr_t imguiContext = 0;
   bool uiWindowOpen = false;
-  bool uiLauncherOpen = true;
+  bool uiLauncherOpen = false;
   bool uiScoreboardOpen = true;
-  bool uiEventsOpen = true;
-  bool uiStatusOpen = true;
-  bool uiCameraOpen = false;
+  bool uiEventsOpen = false;
+  bool uiStatusOpen = false;
+  bool uiCameraOpen = true;
   bool uiPlaybackControlsOpen = false;
   bool uiRecordingOpen = false;
   bool uiGraphInspectorOpen = false;
