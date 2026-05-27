@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, bail, Context};
-use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::json;
 use subtr_actor::{
     playlist_generation::{
         PlaybackBound, PlaybackBoundKind, PlaylistAdvanceMode, PlaylistEndMode, PlaylistManifest,
@@ -10,7 +9,7 @@ use subtr_actor::{
     },
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
     BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
-    DoubleTapCalculator, FlickCalculator, FlipResetTracker, GoalEvent, HalfFlipCalculator,
+    DoubleTapCalculator, FlickCalculator, FlipResetTracker, HalfFlipCalculator,
     MustyFlickCalculator, OneTimerCalculator, ProcessorView, ReplayProcessor, SpeedFlipCalculator,
     SubtrActorResult, TimeAdvance, WavedashCalculator,
 };
@@ -21,6 +20,8 @@ mod args;
 mod args_default;
 #[path = "build_mechanic_review_playlist_args_query.rs"]
 mod args_query;
+#[path = "build_mechanic_review_playlist_candidate.rs"]
+mod candidate;
 #[path = "build_mechanic_review_playlist_config.rs"]
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
@@ -42,28 +43,16 @@ mod source_parse;
 #[path = "build_mechanic_review_playlist_source_types.rs"]
 mod source_types;
 
+use candidate::{
+    confidence_pct, enforce_min_clip_duration, event_json, followup_goal_for_candidate,
+    include_candidate, replay_duration_seconds, MechanicCandidate,
+};
 use config::{parse_args, Config};
 use mechanics::{graph_node_names_for_mechanics, resolve_mechanics};
 use players::{player_display_map, player_id_string, player_team_label};
 use source_collect::collect_sources;
 use source_parse::parse_replay_file;
 use source_types::ReplaySourceInput;
-
-#[derive(Debug, Clone)]
-struct MechanicCandidate {
-    mechanic: &'static str,
-    mechanic_label: &'static str,
-    detector: &'static str,
-    player_id: Option<String>,
-    is_team_0: Option<bool>,
-    event_time: f32,
-    event_frame: usize,
-    start_time: f32,
-    end_time: f32,
-    confidence: Option<f32>,
-    reason: String,
-    event: Value,
-}
 
 struct GoalScanCollector;
 
@@ -77,69 +66,6 @@ impl Collector for GoalScanCollector {
     ) -> SubtrActorResult<TimeAdvance> {
         Ok(TimeAdvance::NextFrame)
     }
-}
-
-fn confidence_pct(confidence: f32) -> u32 {
-    (confidence * 100.0).round().clamp(0.0, 100.0) as u32
-}
-
-fn include_candidate(candidate: &MechanicCandidate, config: &Config) -> bool {
-    candidate
-        .confidence
-        .map(|confidence| confidence >= config.min_confidence)
-        .unwrap_or(true)
-}
-
-fn followup_goal_for_candidate<'a>(
-    candidate: &MechanicCandidate,
-    goal_events: &'a [GoalEvent],
-    config: &Config,
-) -> Option<&'a GoalEvent> {
-    goal_events
-        .iter()
-        .filter(|goal| {
-            candidate
-                .is_team_0
-                .map(|is_team_0| goal.scoring_team_is_team_0 == is_team_0)
-                .unwrap_or(true)
-        })
-        .filter(|goal| goal.time >= candidate.event_time)
-        .filter(|goal| goal.time - candidate.event_time <= config.goal_lookahead_seconds)
-        .min_by(|left, right| left.time.total_cmp(&right.time))
-}
-
-fn replay_duration_seconds(replay: &boxcars::Replay) -> f32 {
-    replay
-        .network_frames
-        .as_ref()
-        .and_then(|frames| frames.frames.last())
-        .map(|frame| frame.time)
-        .unwrap_or(0.0)
-}
-
-fn enforce_min_clip_duration(
-    start_time: f32,
-    end_time: f32,
-    replay_duration: f32,
-    min_clip_seconds: f32,
-) -> (f32, f32) {
-    let mut start_time = start_time.clamp(0.0, replay_duration.max(0.0));
-    let mut end_time = end_time.clamp(start_time, replay_duration.max(start_time));
-    let duration = end_time - start_time;
-    if duration >= min_clip_seconds {
-        return (start_time, end_time);
-    }
-
-    let missing = min_clip_seconds - duration;
-    let extend_after = missing.min((replay_duration - end_time).max(0.0));
-    end_time += extend_after;
-    let remaining = missing - extend_after;
-    start_time = (start_time - remaining).max(0.0);
-    (start_time, end_time)
-}
-
-fn event_json<T: Serialize>(event: &T) -> Value {
-    serde_json::to_value(event).unwrap_or_else(|_| json!({ "serializationError": true }))
 }
 
 fn extract_candidates(
