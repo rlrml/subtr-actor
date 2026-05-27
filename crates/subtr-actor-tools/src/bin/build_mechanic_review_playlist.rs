@@ -1,9 +1,7 @@
 use anyhow::anyhow;
-use serde_json::json;
 use subtr_actor::{
-    playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
-    stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    ReplayProcessor,
+    playlist_generation::PlaylistManifestItem,
+    stats::analysis_graph::collect_builtin_analysis_graph_for_replay, ReplayProcessor,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -32,6 +30,8 @@ mod extract_movement;
 mod extract_touch;
 #[path = "build_mechanic_review_playlist_goal_scan.rs"]
 mod goal_scan;
+#[path = "build_mechanic_review_playlist_item.rs"]
+mod item;
 #[path = "build_mechanic_review_playlist_manifest.rs"]
 mod manifest;
 #[path = "build_mechanic_review_playlist_mechanics.rs"]
@@ -51,16 +51,14 @@ mod source_parse;
 #[path = "build_mechanic_review_playlist_source_types.rs"]
 mod source_types;
 
-use candidate::{
-    confidence_pct, enforce_min_clip_duration, event_json, followup_goal_for_candidate,
-    replay_duration_seconds,
-};
+use candidate::{enforce_min_clip_duration, followup_goal_for_candidate, replay_duration_seconds};
 use config::{parse_args, Config};
 use extract::extract_candidates;
 use goal_scan::GoalScanCollector;
+use item::build_playlist_item;
 use manifest::{build_manifest, write_manifest};
 use mechanics::graph_node_names_for_mechanics;
-use players::{player_display_map, player_team_label};
+use players::player_display_map;
 use source_types::ReplaySourceInput;
 
 pub(crate) fn build_items_for_source(
@@ -104,10 +102,6 @@ pub(crate) fn build_items_for_source(
             .player_id
             .as_ref()
             .and_then(|player_id| players.get(player_id));
-        let player_label = player
-            .map(|display| display.name.as_str())
-            .or(candidate.player_id.as_deref())
-            .unwrap_or("team event");
         let start_time = (candidate.start_time - config.before_seconds).max(0.0);
         let followup_goal = followup_goal_for_candidate(&candidate, &processor.goal_events, config);
         let padded_end_time = followup_goal
@@ -121,56 +115,14 @@ pub(crate) fn build_items_for_source(
             replay_duration,
             config.min_clip_seconds,
         );
-        let score = candidate
-            .confidence
-            .map(|confidence| format!(" {}%", confidence_pct(confidence)))
-            .unwrap_or_default();
-        let id = format!(
-            "{}:{}:{}:{}",
-            candidate.mechanic,
-            source.source_id,
-            candidate.event_frame,
-            candidate.player_id.as_deref().unwrap_or("team")
-        );
-
-        items.push(PlaylistManifestItem {
-            id: id.clone(),
-            replay: source.source_id.clone(),
-            start: PlaybackBound {
-                kind: PlaybackBoundKind::Time,
-                value: start_time,
-            },
-            end: PlaybackBound {
-                kind: PlaybackBoundKind::Time,
-                value: end_time,
-            },
-            label: format!("{}{score} - {player_label}", candidate.mechanic_label),
-            meta: json!({
-                "itemId": id,
-                "mechanic": candidate.mechanic,
-                "mechanicLabel": candidate.mechanic_label,
-                "detector": candidate.detector,
-                "confidence": candidate.confidence,
-                "reason": candidate.reason,
-                "playerId": candidate.player_id,
-                "playerName": player.map(|display| display.name.clone()),
-                "team": player.map(|display| display.team).or_else(|| candidate.is_team_0.map(player_team_label)),
-                "target": {
-                    "kind": "player-span",
-                    "playerId": candidate.player_id,
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "mechanicStartTime": candidate.start_time,
-                    "mechanicEndTime": candidate.end_time,
-                    "eventTime": candidate.event_time,
-                    "eventFrame": candidate.event_frame,
-                    "goalTime": followup_goal.map(|goal| goal.time),
-                    "goalFrame": followup_goal.map(|goal| goal.frame),
-                },
-                "followupGoal": followup_goal.map(event_json),
-                "event": candidate.event,
-            }),
-        });
+        items.push(build_playlist_item(
+            source,
+            candidate,
+            player,
+            start_time,
+            end_time,
+            followup_goal,
+        ));
     }
 
     Ok(items)
