@@ -3,6 +3,7 @@ mod config;
 mod conversion;
 mod model;
 
+pub(crate) use comparable_types::ComparableReplayStats;
 pub(crate) use config::StatMatcher;
 pub use config::{recommended_match_config, MatchConfig};
 pub(crate) use conversion::{

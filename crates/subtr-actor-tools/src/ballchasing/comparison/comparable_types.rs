@@ -13,7 +13,8 @@ mod compare_positioning;
 #[path = "comparable_types_structs.rs"]
 mod structs;
 
+pub(crate) use structs::ComparableReplayStats;
 pub(super) use structs::{
     ComparableBoostStats, ComparableCoreStats, ComparableDemoStats, ComparableMovementStats,
-    ComparablePlayerStats, ComparablePositioningStats, ComparableReplayStats,
+    ComparablePlayerStats, ComparablePositioningStats,
 };

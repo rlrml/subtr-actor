@@ -1,128 +1,18 @@
-use std::path::Path;
+#[path = "compare_core.rs"]
+mod core;
+#[path = "compare_file.rs"]
+mod file;
+#[path = "compare_parse.rs"]
+mod parse;
+#[path = "compare_types.rs"]
+mod types;
 
-use anyhow::Context;
-use serde::Serialize;
-use serde_json::Value;
-
-use super::comparison::{
-    build_actual_comparable_stats, build_expected_comparable_stats, compute_comparable_stats,
-    MatchConfig, StatMatcher,
+pub use core::{
+    compare_replay_against_ballchasing, compare_replay_against_ballchasing_with_breakdown,
 };
-use super::report::BallchasingComparisonReport;
-use subtr_actor::*;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct BallchasingComparableStats {
-    pub actual: Value,
-    pub expected: Value,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct BallchasingComparisonBreakdown {
-    pub is_match: bool,
-    pub mismatches: Vec<String>,
-    pub comparable_stats: BallchasingComparableStats,
-}
-
-pub fn parse_replay_bytes(data: &[u8]) -> anyhow::Result<boxcars::Replay> {
-    boxcars::ParserBuilder::new(data)
-        .always_check_crc()
-        .must_parse_network_data()
-        .parse()
-        .context("Failed to parse replay")
-}
-
-pub fn parse_replay_file(path: impl AsRef<Path>) -> anyhow::Result<boxcars::Replay> {
-    let path = path.as_ref();
-    let data = std::fs::read(path)
-        .with_context(|| format!("Failed to read replay file: {}", path.display()))?;
-    parse_replay_bytes(&data).with_context(|| format!("Failed to parse replay: {}", path.display()))
-}
-
-pub fn compare_replay_against_ballchasing(
-    replay: &boxcars::Replay,
-    ballchasing: &Value,
-    config: &MatchConfig,
-) -> SubtrActorResult<BallchasingComparisonReport> {
-    let computed = compute_comparable_stats(replay)?;
-    let actual = build_actual_comparable_stats(&computed);
-    let expected = build_expected_comparable_stats(ballchasing);
-
-    let mut matcher = StatMatcher::default();
-    expected.compare(&actual, &mut matcher, config);
-    Ok(BallchasingComparisonReport {
-        mismatches: matcher.into_mismatches(),
-    })
-}
-
-pub fn compare_replay_against_ballchasing_with_breakdown(
-    replay: &boxcars::Replay,
-    ballchasing: &Value,
-    config: &MatchConfig,
-) -> SubtrActorResult<BallchasingComparisonBreakdown> {
-    let computed = compute_comparable_stats(replay)?;
-    let actual = build_actual_comparable_stats(&computed);
-    let expected = build_expected_comparable_stats(ballchasing);
-
-    let mut matcher = StatMatcher::default();
-    expected.compare(&actual, &mut matcher, config);
-    let mismatches = matcher.into_mismatches();
-
-    Ok(BallchasingComparisonBreakdown {
-        is_match: mismatches.is_empty(),
-        mismatches,
-        comparable_stats: BallchasingComparableStats {
-            actual: serde_json::to_value(&actual).expect("comparable stats should serialize"),
-            expected: serde_json::to_value(&expected).expect("comparable stats should serialize"),
-        },
-    })
-}
-
-pub fn compare_replay_against_ballchasing_json_with_breakdown(
-    replay_path: impl AsRef<Path>,
-    json_path: impl AsRef<Path>,
-    config: &MatchConfig,
-) -> anyhow::Result<BallchasingComparisonBreakdown> {
-    let replay_path = replay_path.as_ref();
-    let json_path = json_path.as_ref();
-    let replay = parse_replay_file(replay_path)?;
-    let json_file = std::fs::File::open(json_path)
-        .with_context(|| format!("Failed to open ballchasing json: {}", json_path.display()))?;
-    let ballchasing: Value = serde_json::from_reader(json_file)
-        .with_context(|| format!("Failed to parse ballchasing json: {}", json_path.display()))?;
-
-    compare_replay_against_ballchasing_with_breakdown(&replay, &ballchasing, config)
-        .map_err(|error| anyhow::Error::new(error.variant))
-}
-
-pub fn compare_replay_against_ballchasing_json(
-    replay_path: impl AsRef<Path>,
-    json_path: impl AsRef<Path>,
-    config: &MatchConfig,
-) -> anyhow::Result<BallchasingComparisonReport> {
-    let replay_path = replay_path.as_ref();
-    let json_path = json_path.as_ref();
-    let replay = parse_replay_file(replay_path)?;
-    let json_file = std::fs::File::open(json_path)
-        .with_context(|| format!("Failed to open ballchasing json: {}", json_path.display()))?;
-    let ballchasing: Value = serde_json::from_reader(json_file)
-        .with_context(|| format!("Failed to parse ballchasing json: {}", json_path.display()))?;
-
-    compare_replay_against_ballchasing(&replay, &ballchasing, config)
-        .map_err(|error| anyhow::Error::new(error.variant))
-}
-
-pub fn compare_fixture_directory(
-    path: &Path,
-    config: &MatchConfig,
-) -> anyhow::Result<BallchasingComparisonReport> {
-    let (replay_path, json_path) = if path.is_dir() {
-        (path.join("replay.replay"), path.join("ballchasing.json"))
-    } else {
-        (
-            path.with_extension("replay"),
-            path.with_extension("ballchasing.json"),
-        )
-    };
-    compare_replay_against_ballchasing_json(&replay_path, &json_path, config)
-}
+pub use file::{
+    compare_fixture_directory, compare_replay_against_ballchasing_json,
+    compare_replay_against_ballchasing_json_with_breakdown,
+};
+pub use parse::{parse_replay_bytes, parse_replay_file};
+pub use types::{BallchasingComparableStats, BallchasingComparisonBreakdown};
