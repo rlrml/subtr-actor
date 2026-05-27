@@ -10527,7 +10527,7 @@ std::pair<float, float> SubtrActorPlugin::defaultStatsWindowSize(UiStatsWindowKi
   if (kind == UiStatsWindowKind::StatsModule) {
     return {680.0f, 460.0f};
   }
-  return {540.0f, 330.0f};
+  return {416.0f, 330.0f};
 }
 
 void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
