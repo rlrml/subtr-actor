@@ -124,6 +124,11 @@ struct EventFilterOption {
   const char *label;
 };
 
+struct JsonFieldSummary {
+  std::string label;
+  std::string value;
+};
+
 struct UiStatDefinition {
   const char *id;
   const char *label;
@@ -573,6 +578,136 @@ std::optional<size_t> parseJsonArrayPropertyElementCount(
     return std::nullopt;
   }
   return std::nullopt;
+}
+
+std::optional<size_t> parseJsonArrayElementCountAt(const std::string &json, size_t offset) {
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '[') {
+    return std::nullopt;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+  if (offset < json.size() && json[offset] == ']') {
+    return 0;
+  }
+
+  size_t count = 0;
+  while (offset < json.size()) {
+    if (!skipJsonValue(json, offset)) {
+      return std::nullopt;
+    }
+    count += 1;
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == ']') {
+      return count;
+    }
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+std::string summarizeJsonValueAt(const std::string &json, size_t offset) {
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size()) {
+    return "--";
+  }
+
+  if (json[offset] == '"') {
+    auto value = parseJsonString(json, offset);
+    if (!value) {
+      return "--";
+    }
+    return value->size() > 96 ? value->substr(0, 93) + "..." : *value;
+  }
+
+  if (json[offset] == '[') {
+    const auto count = parseJsonArrayElementCountAt(json, offset);
+    return count ? std::format("{} item{}", *count, *count == 1 ? "" : "s") : "array";
+  }
+
+  if (json[offset] == '{') {
+    return "object";
+  }
+
+  const size_t start = offset;
+  if (!skipJsonValue(json, offset)) {
+    return "--";
+  }
+  return json.substr(start, offset - start);
+}
+
+void collectJsonFieldSummaries(
+    const std::string &json,
+    std::string_view prefix,
+    std::vector<JsonFieldSummary> &out,
+    size_t maxFields,
+    int maxDepth) {
+  if (out.size() >= maxFields || maxDepth < 0) {
+    return;
+  }
+
+  size_t offset = 0;
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size() || json[offset] != '{') {
+    return;
+  }
+  ++offset;
+  skipJsonWhitespace(json, offset);
+
+  while (offset < json.size() && out.size() < maxFields) {
+    if (json[offset] == '}') {
+      return;
+    }
+
+    auto key = parseJsonString(json, offset);
+    if (!key) {
+      return;
+    }
+    skipJsonWhitespace(json, offset);
+    if (offset >= json.size() || json[offset] != ':') {
+      return;
+    }
+    ++offset;
+    skipJsonWhitespace(json, offset);
+
+    const std::string label =
+        prefix.empty() ? *key : std::format("{}.{}", prefix, *key);
+    const size_t valueStart = offset;
+    if (offset < json.size() && json[offset] == '{' && maxDepth > 0) {
+      size_t end = offset;
+      if (!skipJsonValue(json, end)) {
+        return;
+      }
+      collectJsonFieldSummaries(
+          json.substr(valueStart, end - valueStart),
+          label,
+          out,
+          maxFields,
+          maxDepth - 1);
+      offset = end;
+    } else {
+      out.push_back(JsonFieldSummary{label, summarizeJsonValueAt(json, offset)});
+      if (!skipJsonValue(json, offset)) {
+        return;
+      }
+    }
+
+    skipJsonWhitespace(json, offset);
+    if (offset < json.size() && json[offset] == ',') {
+      ++offset;
+      skipJsonWhitespace(json, offset);
+      continue;
+    }
+    if (offset < json.size() && json[offset] == '}') {
+      return;
+    }
+    return;
+  }
 }
 
 std::string escapeJsonString(std::string_view value) {
@@ -5506,6 +5641,102 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
   ImGui::EndChild();
 }
 
+void SubtrActorPlugin::renderStatsModuleJsonSummary(const std::string &json) {
+  auto renderFields = [](const char *tableId, const std::vector<JsonFieldSummary> &fields) {
+    ImGui::Columns(2, tableId, false);
+    for (const JsonFieldSummary &field : fields) {
+      ImGui::TextWrapped("%s", field.label.c_str());
+      ImGui::NextColumn();
+      ImGui::TextWrapped("%s", field.value.c_str());
+      ImGui::NextColumn();
+    }
+    ImGui::Columns(1);
+  };
+
+  bool renderedAny = false;
+  auto renderObjectSection = [&](const char *label, const char *propertyName, size_t maxFields) {
+    const auto object = parseJsonObjectProperty(json, propertyName);
+    if (!object) {
+      return;
+    }
+    renderedAny = true;
+    std::vector<JsonFieldSummary> fields;
+    collectJsonFieldSummaries(*object, "", fields, maxFields, 2);
+    if (ImGui::TreeNode(label)) {
+      if (fields.empty()) {
+        ImGui::Text("No scalar fields.");
+      } else {
+        renderFields(std::format("{}-fields", propertyName).c_str(), fields);
+      }
+      ImGui::TreePop();
+    }
+  };
+
+  const std::array<const char *, 4> arrayProperties{
+      "events",
+      "timeline",
+      "ledger_events",
+      "state_events",
+  };
+  std::vector<JsonFieldSummary> counts;
+  for (const char *propertyName : arrayProperties) {
+    const auto count = parseJsonArrayPropertyElementCount(json, propertyName);
+    if (count) {
+      counts.push_back(JsonFieldSummary{
+          propertyName,
+          std::format("{} item{}", *count, *count == 1 ? "" : "s"),
+      });
+    }
+  }
+  if (!counts.empty()) {
+    renderedAny = true;
+    if (ImGui::TreeNode("Event collections")) {
+      renderFields("module-event-counts", counts);
+      ImGui::TreePop();
+    }
+  }
+
+  renderObjectSection("Team zero", "team_zero", 16);
+  renderObjectSection("Team one", "team_one", 16);
+  renderObjectSection("Stats", "stats", 24);
+
+  const std::vector<std::string> playerStats = parseJsonObjectArrayProperty(json, "player_stats");
+  if (!playerStats.empty()) {
+    renderedAny = true;
+    if (ImGui::TreeNode(std::format("Player stats ({})", playerStats.size()).c_str())) {
+      for (size_t index = 0; index < playerStats.size(); index += 1) {
+        ImGui::PushID(static_cast<int>(index));
+        const auto playerId = parseJsonObjectProperty(playerStats[index], "player_id");
+        const std::string playerLabel =
+            playerId ? clippedDisplayText(*playerId, 96) : std::format("Player {}", index + 1);
+        if (ImGui::TreeNode(playerLabel.c_str())) {
+          const auto stats = parseJsonObjectProperty(playerStats[index], "stats");
+          if (stats) {
+            std::vector<JsonFieldSummary> fields;
+            collectJsonFieldSummaries(*stats, "", fields, 18, 2);
+            renderFields("player-stats-fields", fields);
+          } else {
+            ImGui::Text("No stats object.");
+          }
+          ImGui::TreePop();
+        }
+        ImGui::PopID();
+      }
+      ImGui::TreePop();
+    }
+  }
+
+  if (!renderedAny) {
+    std::vector<JsonFieldSummary> fields;
+    collectJsonFieldSummaries(json, "", fields, 32, 2);
+    if (fields.empty()) {
+      ImGui::TextWrapped("No structured summary is available for this JSON shape.");
+    } else {
+      renderFields("module-top-level-fields", fields);
+    }
+  }
+}
+
 void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
   if (!loaded || !engine) {
     ImGui::TextWrapped("Start live analysis to inspect graph-backed stats modules.");
@@ -5558,14 +5789,20 @@ void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
     ImGui::SetClipboardText(json.c_str());
   }
 
+  renderStatsModuleJsonSummary(json);
+  ImGui::Separator();
+
   const std::string display = clippedDisplayText(std::move(json));
-  ImGui::BeginChild(
-      std::format("module-json-{}", window.id).c_str(),
-      ImVec2{0.0f, 0.0f},
-      true,
-      ImGuiWindowFlags_HorizontalScrollbar);
-  ImGui::TextUnformatted(display.c_str(), display.c_str() + display.size());
-  ImGui::EndChild();
+  if (ImGui::TreeNode(std::format("Raw JSON##module-raw-{}", window.id).c_str())) {
+    ImGui::BeginChild(
+        std::format("module-json-{}", window.id).c_str(),
+        ImVec2{0.0f, 220.0f},
+        true,
+        ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::TextUnformatted(display.c_str(), display.c_str() + display.size());
+    ImGui::EndChild();
+    ImGui::TreePop();
+  }
 }
 
 void SubtrActorPlugin::render(CanvasWrapper canvas) {

@@ -297,6 +297,7 @@ private:
   void renderGoalsOverviewStats(UiStatsWindow &window);
   void renderAdHocStatsWindow(UiStatsWindow &window);
   void renderStatsModuleWindow(UiStatsWindow &window);
+  void renderStatsModuleJsonSummary(const std::string &json);
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
