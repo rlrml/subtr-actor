@@ -6565,17 +6565,16 @@ bool SubtrActorPlugin::renderModuleSummaryToggle(
     const char *label,
     bool active,
     const char *idSuffix) {
-  const std::string buttonLabel = std::format("{}##{}-{}", label, idSuffix, label);
+  const std::string buttonLabel =
+      std::format("{}   {}##{}-{}", label, active ? "On" : "Off", idSuffix, label);
   if (active) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
   }
-  const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{190.0f, 0.0f});
+  const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{230.0f, 0.0f});
   if (active) {
     ImGui::PopStyleColor(2);
   }
-  ImGui::SameLine();
-  ImGui::TextDisabled("%s", active ? "On" : "Off");
   return clicked;
 }
 
