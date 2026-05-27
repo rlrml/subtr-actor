@@ -1,6 +1,19 @@
 import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
 import type { BoostStateEvent } from "./generated/BoostStateEvent.ts";
 import type { BoostStats } from "./generated/BoostStats.ts";
+import {
+  addContinuousBoostSample,
+  applyBoostStateEvent,
+  applyContinuousBoostSample,
+} from "./boostLedgerContinuous.ts";
+import { addF32, f32 } from "./boostLedgerFloat.ts";
+import {
+  EMPTY_LEDGER_BOOST_STATS,
+  EVENT_DERIVED_BOOST_FIELDS,
+  createLedgerBoostStats,
+  type EventDerivedBoostField,
+  type EventDerivedBoostStats,
+} from "./boostLedgerStats.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -8,50 +21,7 @@ import type {
 } from "./statsTimeline.ts";
 
 const FLOAT_TOLERANCE = 0.001;
-const BOOST_MAX_AMOUNT = 255;
-const BOOST_ZERO_BAND_RAW = 1;
-const BOOST_FULL_BAND_MIN_RAW = BOOST_MAX_AMOUNT - 1;
-const F32_EPSILON = 1.1920928955078125e-7;
 
-const CONTINUOUS_BOOST_FIELDS = [
-  "tracked_time",
-  "boost_integral",
-  "time_zero_boost",
-  "time_hundred_boost",
-  "time_boost_0_25",
-  "time_boost_25_50",
-  "time_boost_50_75",
-  "time_boost_75_100",
-] as const;
-
-const LEDGER_BOOST_FIELDS = [
-  "amount_collected",
-  "amount_collected_inactive",
-  "big_pads_collected_inactive",
-  "small_pads_collected_inactive",
-  "amount_stolen",
-  "big_pads_collected",
-  "small_pads_collected",
-  "big_pads_stolen",
-  "small_pads_stolen",
-  "amount_collected_big",
-  "amount_stolen_big",
-  "amount_collected_small",
-  "amount_stolen_small",
-  "amount_respawned",
-  "overfill_total",
-  "overfill_from_stolen",
-  "amount_used",
-  "amount_used_while_grounded",
-  "amount_used_while_airborne",
-  "amount_used_while_supersonic",
-] as const;
-
-const EVENT_DERIVED_BOOST_FIELDS = [...CONTINUOUS_BOOST_FIELDS, ...LEDGER_BOOST_FIELDS] as const;
-
-type EventDerivedBoostField = (typeof EVENT_DERIVED_BOOST_FIELDS)[number];
-type EventDerivedBoostStats = Pick<BoostStats, EventDerivedBoostField> &
-  Pick<BoostStats, "labeled_amounts" | "labeled_counts">;
 type BoostLedgerMismatchScope = "team_zero" | "team_one" | "player";
 
 export interface BoostLedgerDerivationMismatch {
@@ -78,61 +48,6 @@ interface LedgerAccumulator {
   labeledCountsSnapshot: EventDerivedBoostStats["labeled_counts"];
   labeledCountsSnapshotVersion: number;
 }
-
-function f32(value: number): number {
-  return Math.fround(value);
-}
-
-function addF32(left: number, right: number): number {
-  return f32(f32(left) + f32(right));
-}
-
-function subF32(left: number, right: number): number {
-  return f32(f32(left) - f32(right));
-}
-
-function mulF32(left: number, right: number): number {
-  return f32(f32(left) * f32(right));
-}
-
-function divF32(left: number, right: number): number {
-  return f32(f32(left) / f32(right));
-}
-
-function createLedgerBoostStats(): EventDerivedBoostStats {
-  return {
-    tracked_time: 0,
-    boost_integral: 0,
-    time_zero_boost: 0,
-    time_hundred_boost: 0,
-    time_boost_0_25: 0,
-    time_boost_25_50: 0,
-    time_boost_50_75: 0,
-    time_boost_75_100: 0,
-    amount_collected: 0,
-    amount_collected_inactive: 0,
-    big_pads_collected_inactive: 0,
-    small_pads_collected_inactive: 0,
-    amount_stolen: 0,
-    big_pads_collected: 0,
-    small_pads_collected: 0,
-    big_pads_stolen: 0,
-    small_pads_stolen: 0,
-    amount_collected_big: 0,
-    amount_stolen_big: 0,
-    amount_collected_small: 0,
-    amount_stolen_small: 0,
-    amount_respawned: 0,
-    overfill_total: 0,
-    overfill_from_stolen: 0,
-    amount_used: 0,
-    amount_used_while_grounded: 0,
-    amount_used_while_airborne: 0,
-    amount_used_while_supersonic: 0,
-  };
-}
-
-const EMPTY_LEDGER_BOOST_STATS = createLedgerBoostStats();
 
 function createLedgerAccumulator(): LedgerAccumulator {
   return {
@@ -215,123 +130,6 @@ function addLabeledCount(
     JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
   );
   return true;
-}
-
-function boostPercentToAmount(boostPercent: number): number {
-  return divF32(mulF32(boostPercent, BOOST_MAX_AMOUNT), 100);
-}
-
-function intervalFractionInBoostRange(
-  startBoost: number,
-  endBoost: number,
-  minBoost: number,
-  maxBoost: number,
-): number {
-  const boostDelta = subF32(endBoost, startBoost);
-  if (Math.abs(boostDelta) <= F32_EPSILON) {
-    return startBoost >= minBoost && startBoost < maxBoost ? 1 : 0;
-  }
-
-  const tAtMin = divF32(subF32(minBoost, startBoost), boostDelta);
-  const tAtMax = divF32(subF32(maxBoost, startBoost), boostDelta);
-  const intervalStart = Math.max(Math.min(tAtMin, tAtMax), 0);
-  const intervalEnd = Math.min(Math.max(tAtMin, tAtMax), 1);
-  return Math.max(subF32(intervalEnd, intervalStart), 0);
-}
-
-function applyBoostStateEvent(accumulator: LedgerAccumulator, event: BoostStateEvent): void {
-  accumulator.currentBoostAmount = f32(event.boost_amount);
-  accumulator.currentBoostBefore = event.boost_before == null ? null : f32(event.boost_before);
-  accumulator.currentBoostFrame = event.frame;
-}
-
-function addContinuousBoostSample(
-  stats: EventDerivedBoostStats,
-  previousBoostAmount: number,
-  boostAmount: number,
-  dt: number,
-): void {
-  const previous = f32(previousBoostAmount);
-  const current = f32(boostAmount);
-  const sampleDt = f32(dt);
-  const averageBoostAmount = mulF32(addF32(previous, current), 0.5);
-
-  stats.tracked_time = addF32(stats.tracked_time, sampleDt);
-  stats.boost_integral = addF32(stats.boost_integral, mulF32(averageBoostAmount, sampleDt));
-  stats.time_zero_boost = addF32(
-    stats.time_zero_boost,
-    mulF32(sampleDt, intervalFractionInBoostRange(previous, current, 0, BOOST_ZERO_BAND_RAW)),
-  );
-  stats.time_hundred_boost = addF32(
-    stats.time_hundred_boost,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        BOOST_FULL_BAND_MIN_RAW,
-        BOOST_MAX_AMOUNT + 1,
-      ),
-    ),
-  );
-  stats.time_boost_0_25 = addF32(
-    stats.time_boost_0_25,
-    mulF32(sampleDt, intervalFractionInBoostRange(previous, current, 0, boostPercentToAmount(25))),
-  );
-  stats.time_boost_25_50 = addF32(
-    stats.time_boost_25_50,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        boostPercentToAmount(25),
-        boostPercentToAmount(50),
-      ),
-    ),
-  );
-  stats.time_boost_50_75 = addF32(
-    stats.time_boost_50_75,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        boostPercentToAmount(50),
-        boostPercentToAmount(75),
-      ),
-    ),
-  );
-  stats.time_boost_75_100 = addF32(
-    stats.time_boost_75_100,
-    mulF32(
-      sampleDt,
-      intervalFractionInBoostRange(
-        previous,
-        current,
-        boostPercentToAmount(75),
-        BOOST_MAX_AMOUNT + 1,
-      ),
-    ),
-  );
-}
-
-function applyContinuousBoostSample(
-  accumulator: LedgerAccumulator,
-  dt: number,
-  frameNumber: number,
-): [number, number] | null {
-  if (accumulator.currentBoostFrame !== frameNumber) {
-    return null;
-  }
-  const boostAmount = accumulator.currentBoostAmount;
-  if (boostAmount == null) {
-    return null;
-  }
-  const previousBoostAmount = accumulator.currentBoostBefore ?? boostAmount;
-  addContinuousBoostSample(accumulator.stats, previousBoostAmount, boostAmount, dt);
-  accumulator.previousBoostAmount = boostAmount;
-  return [previousBoostAmount, boostAmount];
 }
 
 function countPickupOnce(accumulator: LedgerAccumulator, event: BoostLedgerEvent): void {
