@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use subtr_actor::{Collector, ProcessorView, TimeAdvance};
 
@@ -12,11 +12,14 @@ mod constants;
 mod demolition;
 #[path = "replay_probe_replay.rs"]
 mod replay;
+#[path = "replay_probe_vector_ranges.rs"]
+mod vector_ranges;
 
 use args::{parse_args, ProbeCommand};
 use basic::{print_mechanics, print_metadata, print_plausibility};
 use demolition::print_demolition;
 use replay::parse_replay;
+use vector_ranges::print_vector_ranges;
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
 const MAX_GROUNDED_HEIGHT: f32 = 60.0;
@@ -577,229 +580,6 @@ fn print_legacy_rotation(path: &str) {
     probe.print_summary();
 }
 
-#[derive(Debug, Default)]
-struct VectorRangeStats {
-    count: usize,
-    min_x: f32,
-    max_x: f32,
-    min_y: f32,
-    max_y: f32,
-    min_z: f32,
-    max_z: f32,
-    max_abs_axis: f32,
-    magnitudes: Vec<f32>,
-}
-
-impl VectorRangeStats {
-    fn add(&mut self, vector: boxcars::Vector3f) {
-        if !(vector.x.is_finite() && vector.y.is_finite() && vector.z.is_finite()) {
-            return;
-        }
-
-        if self.count == 0 {
-            self.min_x = vector.x;
-            self.max_x = vector.x;
-            self.min_y = vector.y;
-            self.max_y = vector.y;
-            self.min_z = vector.z;
-            self.max_z = vector.z;
-        } else {
-            self.min_x = self.min_x.min(vector.x);
-            self.max_x = self.max_x.max(vector.x);
-            self.min_y = self.min_y.min(vector.y);
-            self.max_y = self.max_y.max(vector.y);
-            self.min_z = self.min_z.min(vector.z);
-            self.max_z = self.max_z.max(vector.z);
-        }
-        self.count += 1;
-        self.max_abs_axis = self
-            .max_abs_axis
-            .max(vector.x.abs())
-            .max(vector.y.abs())
-            .max(vector.z.abs());
-        self.magnitudes.push(vec_length(vector));
-    }
-
-    fn summary(&mut self) -> Option<VectorRangeSummary> {
-        if self.count == 0 {
-            return None;
-        }
-        self.magnitudes
-            .sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
-        Some(VectorRangeSummary {
-            count: self.count,
-            min_x: self.min_x,
-            max_x: self.max_x,
-            min_y: self.min_y,
-            max_y: self.max_y,
-            min_z: self.min_z,
-            max_z: self.max_z,
-            max_abs_axis: self.max_abs_axis,
-            median_magnitude: percentile_sorted(&self.magnitudes, 0.5),
-            p95_magnitude: percentile_sorted(&self.magnitudes, 0.95),
-            max_magnitude: *self.magnitudes.last().unwrap_or(&f32::NAN),
-        })
-    }
-}
-
-#[derive(Debug)]
-struct VectorRangeSummary {
-    count: usize,
-    min_x: f32,
-    max_x: f32,
-    min_y: f32,
-    max_y: f32,
-    min_z: f32,
-    max_z: f32,
-    max_abs_axis: f32,
-    median_magnitude: f32,
-    p95_magnitude: f32,
-    max_magnitude: f32,
-}
-
-fn print_vector_ranges(path: &str) {
-    let replay = parse_replay(path);
-    println!(
-        "replay={path} major_version={} minor_version={} net_version={:?}",
-        replay.major_version, replay.minor_version, replay.net_version
-    );
-
-    let mut ranges = BTreeMap::<&'static str, VectorRangeStats>::new();
-    if let Some(network_frames) = &replay.network_frames {
-        for frame in &network_frames.frames {
-            for actor in &frame.new_actors {
-                if let Some(location) = actor.initial_trajectory.location {
-                    add_vector3i(
-                        &mut ranges,
-                        "NewActor.initial_trajectory.location",
-                        location,
-                    );
-                }
-            }
-
-            for update in &frame.updated_actors {
-                record_attribute_vectors(&mut ranges, &update.attribute);
-            }
-        }
-    }
-
-    println!(
-        "{:<44} {:>8} {:>10} {:>10} {:>10} {:>10} {:>19} {:>19} {:>19}",
-        "field",
-        "count",
-        "axis_max",
-        "mag_p50",
-        "mag_p95",
-        "mag_max",
-        "x_range",
-        "y_range",
-        "z_range"
-    );
-    for (field, stats) in &mut ranges {
-        if let Some(summary) = stats.summary() {
-            println!(
-                "{:<44} {:>8} {:>10.2} {:>10.2} {:>10.2} {:>10.2} {:>9.2}..{:<9.2} {:>9.2}..{:<9.2} {:>9.2}..{:<9.2}",
-                field,
-                summary.count,
-                summary.max_abs_axis,
-                summary.median_magnitude,
-                summary.p95_magnitude,
-                summary.max_magnitude,
-                summary.min_x,
-                summary.max_x,
-                summary.min_y,
-                summary.max_y,
-                summary.min_z,
-                summary.max_z
-            );
-        }
-    }
-}
-
-fn record_attribute_vectors(
-    ranges: &mut BTreeMap<&'static str, VectorRangeStats>,
-    attribute: &boxcars::Attribute,
-) {
-    match attribute {
-        boxcars::Attribute::AppliedDamage(damage) => {
-            add_vector(ranges, "AppliedDamage.position", damage.position);
-        }
-        boxcars::Attribute::DamageState(state) => {
-            add_vector(ranges, "DamageState.ball_position", state.ball_position);
-        }
-        boxcars::Attribute::Demolish(demo) => {
-            add_vector(ranges, "Demolish.attack_velocity", demo.attack_velocity);
-            add_vector(ranges, "Demolish.victim_velocity", demo.victim_velocity);
-        }
-        boxcars::Attribute::DemolishExtended(demo) => {
-            add_vector(
-                ranges,
-                "DemolishExtended.attacker_velocity",
-                demo.attacker_velocity,
-            );
-            add_vector(
-                ranges,
-                "DemolishExtended.victim_velocity",
-                demo.victim_velocity,
-            );
-        }
-        boxcars::Attribute::DemolishFx(demo) => {
-            add_vector(ranges, "DemolishFx.attack_velocity", demo.attack_velocity);
-            add_vector(ranges, "DemolishFx.victim_velocity", demo.victim_velocity);
-        }
-        boxcars::Attribute::Explosion(explosion) => {
-            add_vector(ranges, "Explosion.location", explosion.location);
-        }
-        boxcars::Attribute::ExtendedExplosion(explosion) => {
-            add_vector(
-                ranges,
-                "ExtendedExplosion.explosion.location",
-                explosion.explosion.location,
-            );
-        }
-        boxcars::Attribute::Location(location) => {
-            add_vector(ranges, "Attribute::Location", *location);
-        }
-        boxcars::Attribute::Welded(welded) => {
-            add_vector(ranges, "Welded.offset", welded.offset);
-        }
-        boxcars::Attribute::RigidBody(rigid_body) => {
-            add_vector(ranges, "RigidBody.location", rigid_body.location);
-            if let Some(linear_velocity) = rigid_body.linear_velocity {
-                add_vector(ranges, "RigidBody.linear_velocity", linear_velocity);
-            }
-            if let Some(angular_velocity) = rigid_body.angular_velocity {
-                add_vector(ranges, "RigidBody.angular_velocity", angular_velocity);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn add_vector(
-    ranges: &mut BTreeMap<&'static str, VectorRangeStats>,
-    field: &'static str,
-    vector: boxcars::Vector3f,
-) {
-    ranges.entry(field).or_default().add(vector);
-}
-
-fn add_vector3i(
-    ranges: &mut BTreeMap<&'static str, VectorRangeStats>,
-    field: &'static str,
-    vector: boxcars::Vector3i,
-) {
-    add_vector(
-        ranges,
-        field,
-        boxcars::Vector3f {
-            x: vector.x as f32,
-            y: vector.y as f32,
-            z: vector.z as f32,
-        },
-    );
-}
-
 fn build_modes() -> Vec<QuaternionMode> {
     let orders = [
         [0, 1, 2],
@@ -967,7 +747,7 @@ fn derive_world_angular_velocity(
     angular_velocity.is_finite().then_some(angular_velocity)
 }
 
-fn vec_length(vector: boxcars::Vector3f) -> f32 {
+pub(crate) fn vec_length(vector: boxcars::Vector3f) -> f32 {
     glam::Vec3::new(vector.x, vector.y, vector.z).length()
 }
 
@@ -979,7 +759,7 @@ fn median(values: &mut [f32]) -> Option<f32> {
     Some(values[values.len() / 2])
 }
 
-fn percentile_sorted(values: &[f32], percentile: f32) -> f32 {
+pub(crate) fn percentile_sorted(values: &[f32], percentile: f32) -> f32 {
     if values.is_empty() {
         return f32::NAN;
     }
