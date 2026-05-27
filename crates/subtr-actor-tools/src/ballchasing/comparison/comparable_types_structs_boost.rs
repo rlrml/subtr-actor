@@ -1,0 +1,32 @@
+use serde::Serialize;
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub(crate) struct ComparableBoostStats {
+    pub(crate) bpm: Option<f64>,
+    pub(crate) avg_amount: Option<f64>,
+    pub(crate) amount_collected: Option<f64>,
+    pub(crate) amount_stolen: Option<f64>,
+    pub(crate) amount_collected_big: Option<f64>,
+    pub(crate) amount_stolen_big: Option<f64>,
+    pub(crate) amount_collected_small: Option<f64>,
+    pub(crate) amount_stolen_small: Option<f64>,
+    pub(crate) count_collected_big: Option<f64>,
+    pub(crate) count_stolen_big: Option<f64>,
+    pub(crate) count_collected_small: Option<f64>,
+    pub(crate) count_stolen_small: Option<f64>,
+    pub(crate) amount_overfill: Option<f64>,
+    pub(crate) amount_overfill_stolen: Option<f64>,
+    pub(crate) amount_used_while_supersonic: Option<f64>,
+    pub(crate) time_zero_boost: Option<f64>,
+    pub(crate) percent_zero_boost: Option<f64>,
+    pub(crate) time_full_boost: Option<f64>,
+    pub(crate) percent_full_boost: Option<f64>,
+    pub(crate) time_boost_0_25: Option<f64>,
+    pub(crate) time_boost_25_50: Option<f64>,
+    pub(crate) time_boost_50_75: Option<f64>,
+    pub(crate) time_boost_75_100: Option<f64>,
+    pub(crate) percent_boost_0_25: Option<f64>,
+    pub(crate) percent_boost_25_50: Option<f64>,
+    pub(crate) percent_boost_50_75: Option<f64>,
+    pub(crate) percent_boost_75_100: Option<f64>,
+}

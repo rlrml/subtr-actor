@@ -1,0 +1,31 @@
+use serde::Serialize;
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub(crate) struct ComparablePositioningStats {
+    pub(crate) avg_distance_to_ball: Option<f64>,
+    pub(crate) avg_distance_to_ball_possession: Option<f64>,
+    pub(crate) avg_distance_to_ball_no_possession: Option<f64>,
+    pub(crate) avg_distance_to_mates: Option<f64>,
+    pub(crate) time_defensive_third: Option<f64>,
+    pub(crate) time_neutral_third: Option<f64>,
+    pub(crate) time_offensive_third: Option<f64>,
+    pub(crate) time_defensive_half: Option<f64>,
+    pub(crate) time_offensive_half: Option<f64>,
+    pub(crate) time_behind_ball: Option<f64>,
+    pub(crate) time_infront_ball: Option<f64>,
+    pub(crate) time_most_back: Option<f64>,
+    pub(crate) time_most_forward: Option<f64>,
+    pub(crate) time_closest_to_ball: Option<f64>,
+    pub(crate) time_farthest_from_ball: Option<f64>,
+    pub(crate) percent_defensive_third: Option<f64>,
+    pub(crate) percent_neutral_third: Option<f64>,
+    pub(crate) percent_offensive_third: Option<f64>,
+    pub(crate) percent_defensive_half: Option<f64>,
+    pub(crate) percent_offensive_half: Option<f64>,
+    pub(crate) percent_behind_ball: Option<f64>,
+    pub(crate) percent_infront_ball: Option<f64>,
+    pub(crate) percent_most_back: Option<f64>,
+    pub(crate) percent_most_forward: Option<f64>,
+    pub(crate) percent_closest_to_ball: Option<f64>,
+    pub(crate) percent_farthest_from_ball: Option<f64>,
+}
