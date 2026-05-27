@@ -1,6 +1,6 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
-import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
+import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMechanics.ts";
 import {
   DELTA_EPSILON,
   mergeRange,

@@ -1,6 +1,6 @@
 import { getTeamClass } from "./statModules.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
+import { formatMechanicKind } from "./timelineMechanics.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 interface GoalLabelsReplay {
