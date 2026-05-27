@@ -7,6 +7,12 @@ pub use graph::{
 };
 
 #[macro_use]
+mod node_macro_call;
+#[macro_use]
+mod node_macro_custom;
+#[macro_use]
+mod node_macro_update_state;
+#[macro_use]
 mod node_macros;
 
 mod builtin_aliases;

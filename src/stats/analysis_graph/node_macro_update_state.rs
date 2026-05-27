@@ -1,0 +1,57 @@
+macro_rules! impl_analysis_node_update_state {
+    (
+        node = $node:ident,
+        state = $state:ty,
+        name = $name:literal,
+        dependencies = [$($dependency:expr => $dependency_ty:ty),* $(,)?],
+        $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
+        update_state = $field:ident.$method:ident
+        $(, finish = $finish_field:ident.$finish_method:ident)?
+        $(,)?
+    ) => {
+        impl Default for $node {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
+        impl AnalysisNode for $node {
+            type State = $state;
+
+            fn name(&self) -> &'static str {
+                $name
+            }
+
+            fn dependencies(&self) -> Vec<AnalysisDependency> {
+                vec![$($dependency),*]
+            }
+
+            $(
+                fn on_replay_meta(&mut self, $meta: &ReplayMeta) -> SubtrActorResult<()> {
+                    let $meta_self = self;
+                    $on_replay_meta
+                }
+            )?
+
+            fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+                let _ = ctx;
+                self.state = self.$field.$method($(ctx.get::<$dependency_ty>()?),*);
+                Ok(())
+            }
+
+            $(
+                fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+                    self.$finish_field.$finish_method()
+                }
+            )?
+
+            fn state(&self) -> &Self::State {
+                &self.state
+            }
+        }
+
+        pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
+            Box::new($node::new())
+        }
+    };
+}
