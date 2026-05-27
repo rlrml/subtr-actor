@@ -3,7 +3,7 @@ use serde_json::json;
 use subtr_actor::{
     playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    CeilingShotCalculator, ReplayProcessor,
+    ReplayProcessor,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -18,6 +18,8 @@ mod candidate;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_extract_ceiling.rs"]
+mod extract_ceiling;
 #[path = "build_mechanic_review_playlist_extract_flick.rs"]
 mod extract_flick;
 #[path = "build_mechanic_review_playlist_extract_flip_reset.rs"]
@@ -52,6 +54,7 @@ use candidate::{
     include_candidate, replay_duration_seconds, MechanicCandidate,
 };
 use config::{parse_args, Config};
+use extract_ceiling::push_ceiling_shot_candidates;
 use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
 use extract_flip_reset::push_flip_reset_candidates;
 use extract_movement::{
@@ -63,7 +66,7 @@ use extract_touch::{
 use goal_scan::GoalScanCollector;
 use manifest::{build_manifest, write_manifest};
 use mechanics::graph_node_names_for_mechanics;
-use players::{player_display_map, player_id_string, player_team_label};
+use players::{player_display_map, player_team_label};
 use source_types::ReplaySourceInput;
 
 fn extract_candidates(
@@ -92,31 +95,7 @@ fn extract_candidates(
                 push_flip_reset_candidates(replay, graph, &mut candidates)?;
             }
             "ceiling_shot" => {
-                let Some(calculator) = graph.state::<CeilingShotCalculator>() else {
-                    continue;
-                };
-                candidates.extend(calculator.events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "ceiling_shot",
-                        mechanic_label: "Ceiling Shot",
-                        detector: "builtin:ceiling_shot",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: event.ceiling_contact_time,
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; touch {:.2}s after ceiling; ball speed +{:.0}",
-                            confidence_pct(confidence),
-                            event.time_since_ceiling_contact,
-                            event.ball_speed_change
-                        ),
-                        event: event_json(event),
-                    }
-                }));
+                push_ceiling_shot_candidates(graph, &mut candidates);
             }
             "double_tap" => {
                 push_double_tap_candidates(graph, &mut candidates);
