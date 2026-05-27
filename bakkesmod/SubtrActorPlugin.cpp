@@ -6717,6 +6717,7 @@ void SubtrActorPlugin::Render() {
     return;
   }
 
+  renderEmptyStateWindow();
   renderScoreboardWindow();
   renderEventsWindow();
   renderStatusWindow();
@@ -7569,6 +7570,48 @@ void SubtrActorPlugin::renderLauncherWindow() {
   }
 
   ImGui::End();
+}
+
+void SubtrActorPlugin::renderEmptyStateWindow() {
+  if (uiLauncherOpen || uiReplayLoadingOpen || liveProcessingEnabled() || replayAnnotations ||
+      !sampledPlayers.empty()) {
+    return;
+  }
+
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  ImGui::SetNextWindowPos(
+      ImVec2{displaySize.x * 0.5f, displaySize.y * 0.5f},
+      ImGuiCond_Always,
+      ImVec2{0.5f, 0.5f});
+  ImGui::SetNextWindowBgAlpha(0.88f);
+  constexpr ImGuiWindowFlags emptyStateFlags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{18.0f, 14.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+  if (!ImGui::Begin("subtr-actor empty state##subtr-actor", nullptr, emptyStateFlags)) {
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    return;
+  }
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "subtr-actor");
+  ImGui::TextUnformatted("Load a replay to start.");
+  if (ImGui::Button("Load Replay...", ImVec2{150.0f, 0.0f})) {
+    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
+    resetReplayAnnotations();
+    tickReplayAnnotations();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Start live analysis", ImVec2{150.0f, 0.0f})) {
+    setCvarBool("subtr_actor_enabled", true);
+  }
+  if (ImGui::Button("Open menu", ImVec2{150.0f, 0.0f})) {
+    showSingletonWindow(uiLauncherOpen, launcherPlacement);
+  }
+
+  ImGui::End();
+  ImGui::PopStyleVar(2);
 }
 
 void SubtrActorPlugin::renderScoreboardWindow() {
