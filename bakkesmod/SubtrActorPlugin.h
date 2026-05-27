@@ -434,6 +434,8 @@ private:
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   void initializeStatsWindowPlacement(UiStatsWindow &window);
   void resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex);
+  void showStatsWindow(UiStatsWindow &window);
+  void focusStatsWindow(UiStatsWindow &window);
   void resetSingletonWindowPlacement(
       UiWindowPlacement &placement,
       float x,
@@ -442,6 +444,8 @@ private:
       float height,
       bool focus = false);
   void resetScoreboardWindowPlacement(bool focus = false);
+  void showSingletonWindow(bool &open, UiWindowPlacement &placement);
+  void focusSingletonWindow(UiWindowPlacement &placement);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,

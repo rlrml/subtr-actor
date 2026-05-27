@@ -2217,8 +2217,7 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_open_ui",
       [this](std::vector<std::string>) {
         uiWindowOpen = true;
-        uiLauncherOpen = true;
-        launcherPlacement.pending_focus = true;
+        showSingletonWindow(uiLauncherOpen, launcherPlacement);
       },
       "Opens the subtr-actor in-game launcher window.",
       PERMISSION_ALL);
@@ -2228,7 +2227,7 @@ void SubtrActorPlugin::onLoad() {
         uiWindowOpen = true;
         uiLauncherOpen = !uiLauncherOpen;
         if (uiLauncherOpen) {
-          launcherPlacement.pending_focus = true;
+          focusSingletonWindow(launcherPlacement);
         }
       },
       "Toggles the subtr-actor in-game launcher window.",
@@ -2275,8 +2274,7 @@ bool SubtrActorPlugin::IsActiveOverlay() {
 
 void SubtrActorPlugin::OnOpen() {
   uiWindowOpen = true;
-  uiLauncherOpen = true;
-  launcherPlacement.pending_focus = true;
+  showSingletonWindow(uiLauncherOpen, launcherPlacement);
 }
 
 void SubtrActorPlugin::OnClose() {
@@ -6503,6 +6501,16 @@ void SubtrActorPlugin::resetScoreboardWindowPlacement(bool focus) {
   resetSingletonWindowPlacement(scoreboardPlacement, x, 11.0f, width, height, focus);
 }
 
+void SubtrActorPlugin::focusSingletonWindow(UiWindowPlacement &placement) {
+  placement.pending_focus = true;
+  placement.z_index = nextUiWindowZIndex++;
+}
+
+void SubtrActorPlugin::showSingletonWindow(bool &open, UiWindowPlacement &placement) {
+  open = true;
+  focusSingletonWindow(placement);
+}
+
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
@@ -6626,6 +6634,16 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
       ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     window.z_index = std::max(window.z_index, nextUiWindowZIndex++);
   }
+}
+
+void SubtrActorPlugin::focusStatsWindow(UiStatsWindow &window) {
+  window.pending_focus = true;
+  window.z_index = nextUiWindowZIndex++;
+}
+
+void SubtrActorPlugin::showStatsWindow(UiStatsWindow &window) {
+  window.open = true;
+  focusStatsWindow(window);
 }
 
 bool SubtrActorPlugin::renderModuleSummaryToggle(
@@ -6829,8 +6847,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
   if (ImGui::Button("Load Replay...")) {
-    uiReplayLoadingOpen = true;
-    replayLoadingPlacement.pending_focus = true;
+    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
     resetReplayAnnotations();
     tickReplayAnnotations();
     uiLauncherOpen = false;
@@ -6846,9 +6863,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   auto renderLauncherWindowToggle = [&](LauncherWindowToggle &window) {
     ImGui::PushID(window.label);
     if (ImGui::Button(window.label, ImVec2{170.0f, 0.0f})) {
-      *window.open = !*window.open;
       if (*window.open) {
-        window.placement->pending_focus = true;
+        *window.open = false;
+      } else {
+        showSingletonWindow(*window.open, *window.placement);
       }
       uiLauncherOpen = false;
     }
@@ -6897,14 +6915,12 @@ void SubtrActorPlugin::renderLauncherWindow() {
       setCvarBool("subtr_actor_enabled", !liveAnalysis);
     }
     if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
-      uiGraphInspectorOpen = true;
-      graphInspectorPlacement.pending_focus = true;
+      showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
       verifyGraphRuntime({"subtr_actor_verify_graph"});
       uiLauncherOpen = false;
     }
     if (ImGui::Button("Open modules", ImVec2{170.0f, 0.0f})) {
-      uiModuleControlsOpen = true;
-      moduleControlsPlacement.pending_focus = true;
+      showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
       uiLauncherOpen = false;
     }
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
@@ -7357,8 +7373,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       playbackCurrentTime = seekTime;
       playbackSkipPostGoalTransitions = false;
       playbackSkipKickoffs = false;
-      uiPlaybackControlsOpen = true;
-      playbackControlsPlacement.pending_focus = true;
+      showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
       if (hasReplayServer) {
         replayServer.SkipToTime(seekTime);
         eventPlaylistStatus =
@@ -7466,13 +7481,11 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   if (candidates.empty()) {
     ImGui::TextWrapped("No visible events match the current review filters.");
     if (ImGui::Button("Open events")) {
-      uiEventsOpen = true;
-      eventsPlacement.pending_focus = true;
+      showSingletonWindow(uiEventsOpen, eventsPlacement);
     }
     ImGui::SameLine();
     if (ImGui::Button("Open playlist")) {
-      uiEventPlaylistOpen = true;
-      eventPlaylistPlacement.pending_focus = true;
+      showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
     }
     ImGui::End();
     return;
@@ -7519,8 +7532,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     mechanicsReviewClipStartSeconds = clipStart;
     mechanicsReviewClipEndSeconds = clipEnd;
     mechanicsReviewStatus = std::format("Playing clip {:.2f}s to {:.2f}s", clipStart, clipEnd);
-    uiPlaybackControlsOpen = true;
-    playbackControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
 
     ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
     if (!replayServer.IsNull()) {
@@ -7555,8 +7567,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   }
   ImGui::SameLine();
   if (ImGui::Button("Show playlist")) {
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
 
   if (ImGui::Button("Confirm")) {
@@ -7765,17 +7776,14 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   if (ImGui::Button("Open playback")) {
-    uiPlaybackControlsOpen = true;
-    playbackControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open review")) {
-    uiMechanicsReviewOpen = true;
-    mechanicsReviewPlacement.pending_focus = true;
+    showSingletonWindow(uiMechanicsReviewOpen, mechanicsReviewPlacement);
   }
   if (ImGui::Button("Open playlist")) {
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
 
   ImGui::End();
@@ -7854,43 +7862,35 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH INSPECTION");
   if (ImGui::Button("Open graph inspector")) {
-    uiGraphInspectorOpen = true;
-    graphInspectorPlacement.pending_focus = true;
+    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open camera")) {
-    uiCameraOpen = true;
-    cameraPlacement.pending_focus = true;
+    showSingletonWindow(uiCameraOpen, cameraPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open event playlist")) {
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open review")) {
-    uiMechanicsReviewOpen = true;
-    mechanicsReviewPlacement.pending_focus = true;
+    showSingletonWindow(uiMechanicsReviewOpen, mechanicsReviewPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open recording")) {
-    uiRecordingOpen = true;
-    recordingPlacement.pending_focus = true;
+    showSingletonWindow(uiRecordingOpen, recordingPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open replay loading")) {
-    uiReplayLoadingOpen = true;
-    replayLoadingPlacement.pending_focus = true;
+    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open touch controls")) {
-    uiTouchControlsOpen = true;
-    touchControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiTouchControlsOpen, touchControlsPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open boost filters")) {
-    uiBoostPickupControlsOpen = true;
-    boostPickupControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiBoostPickupControlsOpen, boostPickupControlsPlacement);
   }
 
   ImGui::End();
@@ -7991,25 +7991,22 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
   if (ImGui::Button("Show boost pickups")) {
     setCvarString("subtr_actor_overlay_event_types", "boost_pickup");
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open boost stats")) {
     createStatsModuleWindow("boost", 0);
   }
   if (ImGui::Button("Inspect boost nodes")) {
-    uiGraphInspectorOpen = true;
     graphInspectorView = 1;
     graphInspectorNodeQuery = "boost";
-    graphInspectorPlacement.pending_focus = true;
+    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Boost output")) {
-    uiGraphInspectorOpen = true;
     graphInspectorView = 0;
     selectedGraphOutput = "events";
-    graphInspectorPlacement.pending_focus = true;
+    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
 
   ImGui::End();
@@ -8073,24 +8070,21 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
   if (ImGui::Button("Show touches")) {
     setCvarString("subtr_actor_overlay_event_types", "touch");
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Show movement")) {
     setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   if (ImGui::Button("Open touch stats")) {
     createStatsModuleWindow("touch", 0);
   }
   ImGui::SameLine();
   if (ImGui::Button("Inspect touch nodes")) {
-    uiGraphInspectorOpen = true;
     graphInspectorView = 1;
     graphInspectorNodeQuery = "touch";
-    graphInspectorPlacement.pending_focus = true;
+    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
 
   ImGui::End();
@@ -8292,13 +8286,11 @@ void SubtrActorPlugin::renderCameraWindow() {
 
   ImGui::Separator();
   if (ImGui::Button("Open playback")) {
-    uiPlaybackControlsOpen = true;
-    playbackControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open recording")) {
-    uiRecordingOpen = true;
-    recordingPlacement.pending_focus = true;
+    showSingletonWindow(uiRecordingOpen, recordingPlacement);
   }
   if (targetPlayer != nullptr && ImGui::Button("Open player stats")) {
     createStatsWindow(UiStatsWindowKind::Player, true);
@@ -8515,17 +8507,14 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     verifyGraphRuntime({"subtr_actor_verify_graph"});
   }
   if (ImGui::Button("Open status")) {
-    uiStatusOpen = true;
-    statusPlacement.pending_focus = true;
+    showSingletonWindow(uiStatusOpen, statusPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open playlist")) {
-    uiEventPlaylistOpen = true;
-    eventPlaylistPlacement.pending_focus = true;
+    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   if (ImGui::Button("Open modules")) {
-    uiModuleControlsOpen = true;
-    moduleControlsPlacement.pending_focus = true;
+    showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
   }
 
   ImGui::End();
@@ -8690,13 +8679,11 @@ void SubtrActorPlugin::renderRecordingWindow() {
 
   ImGui::Separator();
   if (ImGui::Button("Open graph inspector")) {
-    uiGraphInspectorOpen = true;
-    graphInspectorPlacement.pending_focus = true;
+    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open replay loading")) {
-    uiReplayLoadingOpen = true;
-    replayLoadingPlacement.pending_focus = true;
+    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
   }
 
   ImGui::End();
@@ -8917,7 +8904,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
 
   if (ImGui::SmallButton("Show all##singleton-windows")) {
     for (SingletonWindowControl &window : windows) {
-      *window.open = true;
+      showSingletonWindow(*window.open, *window.placement);
     }
   }
   ImGui::SameLine();
@@ -8930,7 +8917,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
   if (ImGui::SmallButton("Focus visible##singleton-windows")) {
     for (SingletonWindowControl &window : windows) {
       if (*window.open) {
-        window.placement->pending_focus = true;
+        focusSingletonWindow(*window.placement);
       }
     }
   }
@@ -8944,12 +8931,11 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
-        window.placement->pending_focus = true;
+        focusSingletonWindow(*window.placement);
       }
     } else {
       if (ImGui::SmallButton("Show")) {
-        *window.open = true;
-        window.placement->pending_focus = true;
+        showSingletonWindow(*window.open, *window.placement);
       }
       ImGui::SameLine();
       ImGui::TextDisabled("Hidden");
@@ -8988,8 +8974,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
       [](const UiStatsWindow &window) { return !window.open; }));
   if (ImGui::SmallButton("Show all##stats-windows")) {
     for (UiStatsWindow &window : uiStatsWindows) {
-      window.open = true;
-      window.pending_focus = true;
+      showStatsWindow(window);
     }
   }
   ImGui::SameLine();
@@ -9030,12 +9015,11 @@ void SubtrActorPlugin::renderStatsWindowManager() {
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
-        window.pending_focus = true;
+        focusStatsWindow(window);
       }
     } else {
       if (ImGui::SmallButton("Show")) {
-        window.open = true;
-        window.pending_focus = true;
+        showStatsWindow(window);
       }
       ImGui::SameLine();
       ImGui::TextDisabled("Hidden");
@@ -9256,8 +9240,8 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = kind;
-  window.pending_focus = true;
   initializeStatsWindowPlacement(window);
+  focusStatsWindow(window);
   if (!sampledPlayers.empty()) {
     window.selected_player_index = sampledPlayers.front().player_index;
     window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
@@ -9273,10 +9257,10 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = UiStatsWindowKind::StatsModule;
-  window.pending_focus = true;
   window.module_name = std::move(moduleName);
   window.module_view = std::clamp(moduleView, 0, 2);
   initializeStatsWindowPlacement(window);
+  focusStatsWindow(window);
   uiStatsWindows.push_back(std::move(window));
 }
 
@@ -10217,8 +10201,7 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       playbackPlaying = true;
       playbackSkipPostGoalTransitions = false;
       playbackSkipKickoffs = false;
-      uiPlaybackControlsOpen = true;
-      playbackControlsPlacement.pending_focus = true;
+      showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
       if (hasReplayServer) {
         replayServer.StartPlaybackAtTime(seekTime);
         playbackStatus = std::format("Watching goal from {:.2f}s", seekTime);
@@ -10234,8 +10217,7 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       playbackPlaying = false;
       playbackSkipPostGoalTransitions = false;
       playbackSkipKickoffs = false;
-      uiPlaybackControlsOpen = true;
-      playbackControlsPlacement.pending_focus = true;
+      showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
       if (hasReplayServer) {
         replayServer.SkipToTime(seekTime);
         ReplayWrapper replay = replayServer.GetReplay();
