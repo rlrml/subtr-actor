@@ -166,6 +166,8 @@ private:
   struct SingletonWindowControl {
     const char *label;
     const char *config_id;
+    const char *legacy_open_key;
+    const char *legacy_placement_key;
     bool web_config;
     bool *open;
     UiWindowPlacement *placement;

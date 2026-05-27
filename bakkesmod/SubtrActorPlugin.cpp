@@ -2649,28 +2649,10 @@ void SubtrActorPlugin::applyUiConfigJson(
     loadPlacementObject(*object, out, visible);
   };
 
-  uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
-  uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
-  uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
-  uiCameraOpen = parseJsonBoolProperty(json, "camera_open").value_or(uiCameraOpen);
-  uiPlaybackControlsOpen =
-      parseJsonBoolProperty(json, "playback_controls_open").value_or(uiPlaybackControlsOpen);
-  uiRecordingOpen =
-      parseJsonBoolProperty(json, "recording_open").value_or(uiRecordingOpen);
-  uiGraphInspectorOpen =
-      parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
-  uiEventPlaylistOpen =
-      parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
-  uiMechanicsReviewOpen =
-      parseJsonBoolProperty(json, "mechanics_review_open").value_or(uiMechanicsReviewOpen);
-  uiReplayLoadingOpen =
-      parseJsonBoolProperty(json, "replay_loading_open").value_or(uiReplayLoadingOpen);
-  uiModuleControlsOpen =
-      parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
-  uiTouchControlsOpen =
-      parseJsonBoolProperty(json, "touch_controls_open").value_or(uiTouchControlsOpen);
-  uiBoostPickupControlsOpen =
-      parseJsonBoolProperty(json, "boost_pickup_controls_open").value_or(uiBoostPickupControlsOpen);
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    *window.open =
+        parseJsonBoolProperty(json, window.legacy_open_key).value_or(*window.open);
+  }
   eventPlaylistMechanicsEnabled = parseJsonBoolProperty(json, "event_playlist_mechanics_enabled")
                                       .value_or(eventPlaylistMechanicsEnabled);
   eventPlaylistTeamEventsEnabled = parseJsonBoolProperty(json, "event_playlist_team_enabled")
@@ -3052,31 +3034,9 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonStringProperty(json, "graph_inspector_node_query").value_or("");
 
   if (const auto placements = parseJsonObjectProperty(json, "placements")) {
-    loadPlacement(*placements, "scoreboard", scoreboardPlacement, &uiScoreboardOpen);
-    loadPlacement(*placements, "events", eventsPlacement, &uiEventsOpen);
-    loadPlacement(*placements, "status", statusPlacement, &uiStatusOpen);
-    loadPlacement(*placements, "camera", cameraPlacement, &uiCameraOpen);
-    loadPlacement(
-        *placements,
-        "playback_controls",
-        playbackControlsPlacement,
-        &uiPlaybackControlsOpen);
-    loadPlacement(*placements, "recording", recordingPlacement, &uiRecordingOpen);
-    loadPlacement(*placements, "graph_inspector", graphInspectorPlacement, &uiGraphInspectorOpen);
-    loadPlacement(*placements, "event_playlist", eventPlaylistPlacement, &uiEventPlaylistOpen);
-    loadPlacement(
-        *placements,
-        "mechanics_review",
-        mechanicsReviewPlacement,
-        &uiMechanicsReviewOpen);
-    loadPlacement(*placements, "replay_loading", replayLoadingPlacement, &uiReplayLoadingOpen);
-    loadPlacement(*placements, "module_controls", moduleControlsPlacement, &uiModuleControlsOpen);
-    loadPlacement(*placements, "touch_controls", touchControlsPlacement, &uiTouchControlsOpen);
-    loadPlacement(
-        *placements,
-        "boost_pickup_controls",
-        boostPickupControlsPlacement,
-        &uiBoostPickupControlsOpen);
+    for (const SingletonWindowControl &window : singletonWindowControls()) {
+      loadPlacement(*placements, window.legacy_placement_key, *window.placement, window.open);
+    }
   }
   auto loadWindowArray = [&](const char *propertyName, bool webConfig) {
     for (const std::string &object : parseJsonObjectArrayProperty(json, propertyName)) {
@@ -3273,27 +3233,11 @@ std::string SubtrActorPlugin::uiConfigJson() {
   std::ostringstream file;
   file << "{\n";
   file << "  \"version\": 1,\n";
-  file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
-  file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
-  file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
-  file << "  \"camera_open\": " << (uiCameraOpen ? "true" : "false") << ",\n";
-  file << "  \"playback_controls_open\": "
-       << (uiPlaybackControlsOpen ? "true" : "false") << ",\n";
-  file << "  \"recording_open\": " << (uiRecordingOpen ? "true" : "false") << ",\n";
-  file << "  \"graph_inspector_open\": " << (uiGraphInspectorOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"mechanics_review_open\": " << (uiMechanicsReviewOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"replay_loading_open\": " << (uiReplayLoadingOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"module_controls_open\": " << (uiModuleControlsOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"touch_controls_open\": " << (uiTouchControlsOpen ? "true" : "false")
-       << ",\n";
-  file << "  \"boost_pickup_controls_open\": "
-       << (uiBoostPickupControlsOpen ? "true" : "false") << ",\n";
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    const bool visible = window.open != nullptr && *window.open;
+    file << "  \"" << window.legacy_open_key << "\": "
+         << (visible ? "true" : "false") << ",\n";
+  }
   file << "  \"event_playlist_mechanics_enabled\": "
        << (eventPlaylistMechanicsEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_team_enabled\": "
@@ -3550,33 +3494,18 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  \"graph_inspector_node_query\": \""
        << escapeJsonString(graphInspectorNodeQuery) << "\",\n";
   file << "  \"placements\": {\n";
-  file << "    \"scoreboard\": ";
-  writePlacement(file, scoreboardPlacement, uiScoreboardOpen);
-  file << ",\n    \"events\": ";
-  writePlacement(file, eventsPlacement, uiEventsOpen);
-  file << ",\n    \"status\": ";
-  writePlacement(file, statusPlacement, uiStatusOpen);
-  file << ",\n    \"camera\": ";
-  writePlacement(file, cameraPlacement, uiCameraOpen);
-  file << ",\n    \"playback_controls\": ";
-  writePlacement(file, playbackControlsPlacement, uiPlaybackControlsOpen);
-  file << ",\n    \"recording\": ";
-  writePlacement(file, recordingPlacement, uiRecordingOpen);
-  file << ",\n    \"graph_inspector\": ";
-  writePlacement(file, graphInspectorPlacement, uiGraphInspectorOpen);
-  file << ",\n    \"event_playlist\": ";
-  writePlacement(file, eventPlaylistPlacement, uiEventPlaylistOpen);
-  file << ",\n    \"mechanics_review\": ";
-  writePlacement(file, mechanicsReviewPlacement, uiMechanicsReviewOpen);
-  file << ",\n    \"replay_loading\": ";
-  writePlacement(file, replayLoadingPlacement, uiReplayLoadingOpen);
-  file << ",\n    \"module_controls\": ";
-  writePlacement(file, moduleControlsPlacement, uiModuleControlsOpen);
-  file << ",\n    \"touch_controls\": ";
-  writePlacement(file, touchControlsPlacement, uiTouchControlsOpen);
-  file << ",\n    \"boost_pickup_controls\": ";
-  writePlacement(file, boostPickupControlsPlacement, uiBoostPickupControlsOpen);
-  file << "\n  },\n";
+  const std::array<SingletonWindowControl, 13> singletonWindows = singletonWindowControls();
+  for (size_t index = 0; index < singletonWindows.size(); index += 1) {
+    const SingletonWindowControl &window = singletonWindows[index];
+    const bool visible = window.open != nullptr && *window.open;
+    file << "    \"" << window.legacy_placement_key << "\": ";
+    writePlacement(file, *window.placement, visible);
+    if (index + 1 != singletonWindows.size()) {
+      file << ",";
+    }
+    file << "\n";
+  }
+  file << "  },\n";
   file << "  \"singletonWindows\": [\n";
   auto writeWindowConfig = [&](const SingletonWindowControl &window, bool last) {
     const bool visible = window.open != nullptr && *window.open;
@@ -8900,6 +8829,8 @@ SubtrActorPlugin::singletonWindowControls() {
   return {{
       {"Scoreboard",
        "scoreboard",
+       "scoreboard_open",
+       "scoreboard",
        true,
        &uiScoreboardOpen,
        &scoreboardPlacement,
@@ -8907,9 +8838,21 @@ SubtrActorPlugin::singletonWindowControls() {
        11.0f,
        88.0f,
        34.0f},
-      {"Events", "mechanics", true, &uiEventsOpen, &eventsPlacement, 16.0f, 256.0f, 520.0f, 360.0f},
+      {"Events",
+       "mechanics",
+       "events_open",
+       "events",
+       true,
+       &uiEventsOpen,
+       &eventsPlacement,
+       16.0f,
+       256.0f,
+       520.0f,
+       360.0f},
       {"Event playlist",
        "event-playlist",
+       "event_playlist_open",
+       "event_playlist",
        true,
        &uiEventPlaylistOpen,
        &eventPlaylistPlacement,
@@ -8917,10 +8860,32 @@ SubtrActorPlugin::singletonWindowControls() {
        256.0f,
        430.0f,
        430.0f},
-      {"Status", "status", false, &uiStatusOpen, &statusPlacement, statusX, 68.0f, 330.0f, 220.0f},
-      {"Camera", "camera", true, &uiCameraOpen, &cameraPlacement, 16.0f, 68.0f, 416.0f, 500.0f},
+      {"Status",
+       "status",
+       "status_open",
+       "status",
+       false,
+       &uiStatusOpen,
+       &statusPlacement,
+       statusX,
+       68.0f,
+       330.0f,
+       220.0f},
+      {"Camera",
+       "camera",
+       "camera_open",
+       "camera",
+       true,
+       &uiCameraOpen,
+       &cameraPlacement,
+       16.0f,
+       68.0f,
+       416.0f,
+       500.0f},
       {"Playback",
        "playback",
+       "playback_controls_open",
+       "playback_controls",
        true,
        &uiPlaybackControlsOpen,
        &playbackControlsPlacement,
@@ -8929,6 +8894,8 @@ SubtrActorPlugin::singletonWindowControls() {
        336.0f,
        430.0f},
       {"Recording",
+       "recording",
+       "recording_open",
        "recording",
        true,
        &uiRecordingOpen,
@@ -8939,6 +8906,8 @@ SubtrActorPlugin::singletonWindowControls() {
        380.0f},
       {"Graph inspector",
        "graph-inspector",
+       "graph_inspector_open",
+       "graph_inspector",
        false,
        &uiGraphInspectorOpen,
        &graphInspectorPlacement,
@@ -8948,6 +8917,8 @@ SubtrActorPlugin::singletonWindowControls() {
        520.0f},
       {"Mechanics review",
        "mechanics-review",
+       "mechanics_review_open",
+       "mechanics_review",
        true,
        &uiMechanicsReviewOpen,
        &mechanicsReviewPlacement,
@@ -8957,6 +8928,8 @@ SubtrActorPlugin::singletonWindowControls() {
        560.0f},
       {"Replay loading",
        "replay-loading",
+       "replay_loading_open",
+       "replay_loading",
        true,
        &uiReplayLoadingOpen,
        &replayLoadingPlacement,
@@ -8966,6 +8939,8 @@ SubtrActorPlugin::singletonWindowControls() {
        360.0f},
       {"Module controls",
        "module-controls",
+       "module_controls_open",
+       "module_controls",
        false,
        &uiModuleControlsOpen,
        &moduleControlsPlacement,
@@ -8975,6 +8950,8 @@ SubtrActorPlugin::singletonWindowControls() {
        520.0f},
       {"Touch controls",
        "touch-controls",
+       "touch_controls_open",
+       "touch_controls",
        true,
        &uiTouchControlsOpen,
        &touchControlsPlacement,
@@ -8984,6 +8961,8 @@ SubtrActorPlugin::singletonWindowControls() {
        380.0f},
       {"Boost pickup filters",
        "boost-pickups",
+       "boost_pickup_controls_open",
+       "boost_pickup_controls",
        true,
        &uiBoostPickupControlsOpen,
        &boostPickupControlsPlacement,
