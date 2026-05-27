@@ -10601,7 +10601,6 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   window.config_id = std::format("stats-{}", window.id);
   window.kind = kind;
   initializeStatsWindowPlacement(window);
-  focusStatsWindow(window);
   if (kind == UiStatsWindowKind::StatsModule) {
     const std::vector<std::string> &moduleNames = statsModuleNames();
     if (!moduleNames.empty()) {
@@ -10628,7 +10627,6 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
   window.module_name = std::move(moduleName);
   window.module_view = std::clamp(moduleView, 0, 2);
   initializeStatsWindowPlacement(window);
-  focusStatsWindow(window);
   uiStatsWindows.push_back(std::move(window));
   scheduleUiConfigAutosave();
 }
