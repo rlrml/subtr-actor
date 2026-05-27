@@ -3731,7 +3731,6 @@ void SubtrActorPlugin::applyUiConfigJson(
     window.module_name = parseJsonStringProperty(object, "module_name").value_or("");
     window.module_view = static_cast<int>(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
-    window.picker_query = parseJsonStringProperty(object, "picker_query").value_or("");
     const bool hasEntriesProperty = object.find("\"entries\"") != std::string::npos;
     for (const std::string &statId : parseJsonStringArrayProperty(object, "entries")) {
       window.entries.push_back(UiStatsWindow::Entry{normalizeUiStatId(statId), ""});
@@ -4153,7 +4152,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
          << (window.selected_team_is_team_0 != 0 ? "true" : "false")
          << ",\"module_name\":\"" << escapeJsonString(window.module_name) << "\""
          << ",\"module_view\":" << window.module_view
-         << ",\"picker_query\":\"" << escapeJsonString(window.picker_query) << "\""
          << ",\"has_placement\":" << (window.has_placement ? "true" : "false")
          << ",\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"width\":" << window.width << ",\"height\":" << window.height
@@ -11470,13 +11468,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
           queryBuffer.data(),
           queryBuffer.size())) {
     window.picker_query = queryBuffer.data();
-    scheduleUiConfigAutosave();
   }
   if (!window.picker_query.empty()) {
     ImGui::SameLine();
     if (ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())) {
       window.picker_query.clear();
-      scheduleUiConfigAutosave();
     }
   }
 
