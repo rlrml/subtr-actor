@@ -331,6 +331,30 @@ def main() -> int:
         "web stats window config always emits team",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'std::format("##stats-window-player-scope-{}", window.id).c_str()',
+        "player stats scope combo uses hidden label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format("##stats-window-team-scope-{}", window.id).c_str()',
+        "team stats scope combo uses hidden label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::BeginCombo("Player", selectedLabel.c_str())',
+        "visible player stats scope combo label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::BeginCombo("Team", selectedTeam)',
+        "visible team stats scope combo label",
+        errors,
+    )
 
     require_contains(
         plugin_source,
