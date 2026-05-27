@@ -7956,19 +7956,16 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
     const std::string itemLabel =
         std::format("{}  [{}]##{}-{}", definition.label, definition.id, window.id, definition.id);
+    if (alreadySelected && window.kind != UiStatsWindowKind::AdHoc) {
+      ImGui::TextDisabled("%s  [selected]", definition.label);
+      continue;
+    }
     if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
       if (window.kind == UiStatsWindowKind::AdHoc) {
         const std::string targetId = defaultAdHocTargetId(definition.id);
         if (!statsWindowHasStat(window, definition.id, targetId)) {
           window.entries.push_back(UiStatsWindow::Entry{definition.id, targetId});
         }
-      } else if (alreadySelected) {
-        window.entries.erase(
-            std::remove_if(
-                window.entries.begin(),
-                window.entries.end(),
-                [&](const UiStatsWindow::Entry &entry) { return entry.stat_id == definition.id; }),
-            window.entries.end());
       } else {
         window.entries.push_back(UiStatsWindow::Entry{definition.id, ""});
       }
