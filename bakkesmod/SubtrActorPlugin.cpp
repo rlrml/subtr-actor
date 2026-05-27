@@ -26,6 +26,7 @@ namespace {
 
 constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
+constexpr float GOAL_WATCH_LEAD_SECONDS = 4.0f;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
@@ -6984,8 +6985,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   const float currentPlaybackTime =
       hasReplayServer ? replayServer.GetReplayTimeElapsed() : playbackCurrentTime;
   auto eventSeekTime = [](const UiEventRecord &event) {
-    const float leadSeconds =
-        event.category == "goal_context" || event.type == "goal" ? 4.0f : 2.0f;
+    const float leadSeconds = event.category == "goal_context" || event.type == "goal"
+                                  ? GOAL_WATCH_LEAD_SECONDS
+                                  : 2.0f;
     return std::max(0.0f, event.time - leadSeconds);
   };
 
@@ -9510,13 +9512,66 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
   ImGui::Columns(1);
   ImGui::Separator();
   ImGui::BeginChild("goal-labels", ImVec2{0.0f, 0.0f}, true);
-  for (const UiEventRecord &event : recentUiEvents) {
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  const bool hasReplayServer = !replayServer.IsNull();
+  bool renderedAny = false;
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
     if (event.category != "goal_context" && event.type != "goal") {
       continue;
     }
+    renderedAny = true;
+    const float seekTime = std::max(0.0f, event.time - GOAL_WATCH_LEAD_SECONDS);
+    ImGui::PushID(static_cast<int>(index));
+    if (ImGui::SmallButton("Watch")) {
+      mechanicsReviewClipActive = false;
+      playbackCurrentTime = seekTime;
+      playbackPlaying = true;
+      playbackSkipPostGoalTransitions = false;
+      playbackSkipKickoffs = false;
+      uiPlaybackControlsOpen = true;
+      playbackControlsPlacement.pending_focus = true;
+      if (hasReplayServer) {
+        replayServer.StartPlaybackAtTime(seekTime);
+        playbackStatus = std::format("Watching goal from {:.2f}s", seekTime);
+      } else {
+        playbackStatus =
+            std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Cue")) {
+      mechanicsReviewClipActive = false;
+      playbackCurrentTime = seekTime;
+      playbackPlaying = false;
+      playbackSkipPostGoalTransitions = false;
+      playbackSkipKickoffs = false;
+      uiPlaybackControlsOpen = true;
+      playbackControlsPlacement.pending_focus = true;
+      if (hasReplayServer) {
+        replayServer.SkipToTime(seekTime);
+        ReplayWrapper replay = replayServer.GetReplay();
+        if (!replay.IsNull()) {
+          replay.StopPlayback();
+        }
+        playbackStatus = std::format("Cued goal at {:.2f}s", seekTime);
+      } else {
+        playbackStatus =
+            std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
+      }
+    }
+    ImGui::SameLine();
     ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());
     ImGui::SameLine();
     ImGui::TextWrapped("%s", event.label.c_str());
+    if (!event.details.empty()) {
+      ImGui::TextDisabled("%s", event.details.c_str());
+    }
+    ImGui::Separator();
+    ImGui::PopID();
+  }
+  if (!renderedAny) {
+    ImGui::TextWrapped("No goal labels have been observed yet.");
   }
   ImGui::EndChild();
 }
