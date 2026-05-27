@@ -3655,11 +3655,20 @@ std::string SubtrActorPlugin::uiConfigJson() const {
          << ",\"viewport\":{\"width\":" << window.viewport_width
          << ",\"height\":" << window.viewport_height << "}"
          << ",\"zIndex\":" << window.z_index
-         << ",\"visible\":" << (window.open ? "true" : "false") << "}"
-         << ",\"playerId\":\""
-         << escapeJsonString(webPlayerIdForWindow(window)) << "\""
-         << ",\"team\":\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange")
-         << "\",\"entries\":[";
+         << ",\"visible\":" << (window.open ? "true" : "false") << "}";
+    file << ",\"playerId\":";
+    if (window.kind == UiStatsWindowKind::Player) {
+      file << "\"" << escapeJsonString(webPlayerIdForWindow(window)) << "\"";
+    } else {
+      file << "null";
+    }
+    file << ",\"team\":";
+    if (window.kind == UiStatsWindowKind::Team) {
+      file << "\"" << (window.selected_team_is_team_0 != 0 ? "blue" : "orange") << "\"";
+    } else {
+      file << "null";
+    }
+    file << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
       if (j != 0) {
         file << ",";
