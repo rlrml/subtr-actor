@@ -25,6 +25,10 @@ import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createStatModules, getTeamClass, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
+import {
+  renderModuleSummaryView,
+  type ModuleCapabilityKind,
+} from "./moduleSummaryView.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import {
@@ -308,7 +312,6 @@ let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
 
-type ModuleCapabilityKind = "events" | "ranges" | "effects";
 const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "camera",
   "scoreboard",
@@ -1043,72 +1046,24 @@ function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
 }
 
 function renderModuleSummary(): void {
-  moduleSummaryEl.replaceChildren();
-
-  const timelineToggles: HTMLButtonElement[] = [];
-  const inGameVisualizationToggles: HTMLButtonElement[] = [];
-
-  for (const mod of MODULES) {
-    const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
-    if (!mod.getTimelineEvents && !mod.getTimelineRanges && !hasRenderEffect) {
-      continue;
-    }
-
-    if (mod.getTimelineEvents) {
-      timelineToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
-      );
-    }
-    if (mod.getTimelineRanges) {
-      timelineToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "ranges"), "ranges"),
-      );
-    }
-    if (hasRenderEffect) {
-      inGameVisualizationToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "effects"), "effects"),
-      );
-    }
-  }
-
-  const boostAnimationActive = replayPlayer?.getState().boostPickupAnimationEnabled ?? false;
-  const boostAnimation = document.createElement("button");
-  boostAnimation.type = "button";
-  boostAnimation.className = "module-summary-item";
-  boostAnimation.dataset.active = boostAnimationActive ? "true" : "false";
-  boostAnimation.setAttribute("aria-pressed", boostAnimationActive ? "true" : "false");
-  boostAnimation.addEventListener("click", () => {
-    const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
-    replayPlayer?.setBoostPickupAnimationEnabled(next);
-    setupActiveModules();
-    renderModuleSummary();
-    renderModuleSettings();
-    scheduleConfigUrlUpdate();
+  renderModuleSummaryView({
+    container: moduleSummaryEl,
+    modules: MODULES,
+    renderEffectModuleIds: RENDER_EFFECT_MODULE_IDS,
+    getActiveCapabilityIds,
+    toggleCapability,
+    boostPickupAnimationEnabled: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
+    toggleBoostPickupAnimation() {
+      const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
+      replayPlayer?.setBoostPickupAnimationEnabled(next);
+      setupActiveModules();
+      renderModuleSummary();
+      renderModuleSettings();
+      scheduleConfigUrlUpdate();
+    },
+    boostPadOverlayEnabled,
+    toggleBoostPadOverlay,
   });
-  const boostName = document.createElement("span");
-  boostName.textContent = "Boost pickup animation";
-  const boostState = document.createElement("strong");
-  boostState.textContent = boostAnimationActive ? "On" : "Off";
-  boostAnimation.append(boostName, boostState);
-  inGameVisualizationToggles.push(boostAnimation);
-
-  const boostPadOverlay = document.createElement("button");
-  boostPadOverlay.type = "button";
-  boostPadOverlay.className = "module-summary-item";
-  boostPadOverlay.dataset.active = boostPadOverlayEnabled ? "true" : "false";
-  boostPadOverlay.setAttribute("aria-pressed", boostPadOverlayEnabled ? "true" : "false");
-  boostPadOverlay.addEventListener("click", toggleBoostPadOverlay);
-  const boostPadName = document.createElement("span");
-  boostPadName.textContent = "Boost pad locations";
-  const boostPadState = document.createElement("strong");
-  boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
-  boostPadOverlay.append(boostPadName, boostPadState);
-  inGameVisualizationToggles.push(boostPadOverlay);
-
-  moduleSummaryEl.append(
-    renderModuleSummaryGroup("Timeline visualizations", timelineToggles),
-    renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles),
-  );
 }
 
 function setMechanicsReviewStatus(message: string): void {
@@ -1562,86 +1517,6 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
     mechanicsReviewBoundaryGuard = false;
   }
   return true;
-}
-
-function renderModuleSummaryGroup(title: string, items: HTMLButtonElement[]): HTMLElement {
-  const group = document.createElement("section");
-  group.className = "module-summary-group";
-
-  const heading = document.createElement("h3");
-  heading.textContent = title;
-
-  const list = document.createElement("div");
-  list.className = "module-list";
-  list.append(...items);
-
-  group.append(heading, list);
-  return group;
-}
-
-function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string {
-  const timelineLabels: Record<string, string> = {
-    "absolute-positioning:ranges": "Position zones",
-    "backboard:events": "Backboard",
-    "ball-carry:events": "Ball carry",
-    "boost:ranges": "Boost pickup timeline",
-    "bump:events": "Bump",
-    "ceiling-shot:events": "Ceiling shot",
-    "demo:events": "Demo",
-    "dodge-reset:events": "Dodge refresh",
-    "double-tap:events": "Double tap",
-    "fifty-fifty:events": "50/50",
-    "half-flip:events": "Half flip",
-    "musty-flick:events": "Musty flick",
-    "possession:ranges": "Possession",
-    "powerslide:events": "Powerslide",
-    "pressure:ranges": "Half control",
-    "rush:ranges": "Rush",
-    "speed-flip:events": "Speed flip",
-    "touch:events": "Touch",
-    "wavedash:events": "Wavedash",
-  };
-  const inGameVisualizationLabels: Record<string, string> = {
-    "absolute-positioning": "Position zones",
-    "ceiling-shot": "Ceiling shot labels",
-    "fifty-fifty": "50/50 labels",
-    pressure: "Half control",
-    "relative-positioning": "Player roles",
-    "speed-flip": "Speed flip labels",
-    touch: "Touch labels",
-  };
-
-  if (kind === "effects") {
-    return inGameVisualizationLabels[mod.id] ?? mod.label;
-  }
-
-  return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
-}
-
-function renderCapabilityToggle(
-  moduleId: string,
-  label: string,
-  kind: ModuleCapabilityKind,
-): HTMLButtonElement {
-  const activeIds = getActiveCapabilityIds(kind);
-  const active = activeIds.has(moduleId);
-  const item = document.createElement("button");
-  item.type = "button";
-  item.className = "module-summary-item";
-  item.dataset.active = active ? "true" : "false";
-  item.setAttribute("aria-pressed", active ? "true" : "false");
-  item.addEventListener("click", () => {
-    toggleCapability(moduleId, kind, !activeIds.has(moduleId));
-  });
-
-  const name = document.createElement("span");
-  name.textContent = label;
-
-  const state = document.createElement("strong");
-  state.textContent = active ? "On" : "Off";
-
-  item.append(name, state);
-  return item;
 }
 
 function renderModuleSettings(): void {
