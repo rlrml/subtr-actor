@@ -1,7 +1,7 @@
 use subtr_actor::PlayerFrame;
 
+use super::math::{median, vec_length};
 use super::replay::collect_replay_data;
-use super::{median, vec_length};
 
 pub(crate) fn print_demolition(path: &str) {
     let replay_data = collect_replay_data(path);

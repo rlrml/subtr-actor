@@ -1,4 +1,4 @@
-use super::super::{percentile_sorted, vec_length};
+use super::super::math::{percentile_sorted, vec_length};
 
 #[derive(Debug, Default)]
 pub(super) struct VectorRangeStats {

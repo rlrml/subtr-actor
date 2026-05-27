@@ -10,15 +10,21 @@ mod basic;
 mod constants;
 #[path = "replay_probe_demolition.rs"]
 mod demolition;
+#[path = "replay_probe_math.rs"]
+mod math;
 #[path = "replay_probe_replay.rs"]
 mod replay;
+#[path = "replay_probe_rotation_types.rs"]
+mod rotation_types;
 #[path = "replay_probe_vector_ranges.rs"]
 mod vector_ranges;
 
 use args::{parse_args, ProbeCommand};
 use basic::{print_mechanics, print_metadata, print_plausibility};
 use demolition::print_demolition;
+use math::{median, positive_fraction};
 use replay::parse_replay;
+use rotation_types::{EulerMode, EulerRotationOrder, EulerScale, QuaternionMode};
 use vector_ranges::print_vector_ranges;
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
@@ -31,91 +37,10 @@ const MIN_ROTATION_MODE_SAMPLE_COUNT: usize = 100;
 const MIN_ANGULAR_VELOCITY_SPEED: f32 = 30.0;
 const MIN_DERIVED_ORIENTATION_SPEED: f32 = 0.5;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct QuaternionMode {
-    missing_slot: usize,
-    order: [usize; 3],
-    signs: [i8; 3],
-    reconstruct_missing: bool,
-}
-
-impl QuaternionMode {
-    fn label(&self) -> String {
-        format!(
-            "{}@{} order={:?} signs={:?}",
-            if self.reconstruct_missing {
-                "reconstruct"
-            } else {
-                "zero"
-            },
-            self.missing_slot,
-            self.order,
-            self.signs
-        )
-    }
-}
-
 #[derive(Debug, Default)]
 struct ModeAccumulator {
     alignments: Vec<f32>,
     up_zs: Vec<f32>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct EulerMode {
-    order: [usize; 3],
-    signs: [i8; 3],
-    scale: EulerScale,
-    rotation_order: EulerRotationOrder,
-}
-
-impl EulerMode {
-    fn label(&self) -> String {
-        format!(
-            "euler order={:?} signs={:?} scale={:?} rot={:?}",
-            self.order, self.signs, self.scale, self.rotation_order
-        )
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum EulerScale {
-    Pi,
-    TwoPi,
-    HalfPi,
-}
-
-impl EulerScale {
-    fn factor(self) -> f32 {
-        match self {
-            Self::Pi => std::f32::consts::PI,
-            Self::TwoPi => std::f32::consts::TAU,
-            Self::HalfPi => std::f32::consts::FRAC_PI_2,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum EulerRotationOrder {
-    Xyz,
-    Xzy,
-    Yxz,
-    Yzx,
-    Zxy,
-    Zyx,
-}
-
-impl EulerRotationOrder {
-    fn to_glam(self) -> glam::EulerRot {
-        match self {
-            Self::Xyz => glam::EulerRot::XYZ,
-            Self::Xzy => glam::EulerRot::XZY,
-            Self::Yxz => glam::EulerRot::YXZ,
-            Self::Yzx => glam::EulerRot::YZX,
-            Self::Zxy => glam::EulerRot::ZXY,
-            Self::Zyx => glam::EulerRot::ZYX,
-        }
-    }
 }
 
 #[derive(Debug, Default)]
@@ -745,32 +670,4 @@ fn derive_world_angular_velocity(
     let (axis, angle) = delta.to_axis_angle();
     let angular_velocity = axis * (angle / dt);
     angular_velocity.is_finite().then_some(angular_velocity)
-}
-
-pub(crate) fn vec_length(vector: boxcars::Vector3f) -> f32 {
-    glam::Vec3::new(vector.x, vector.y, vector.z).length()
-}
-
-fn median(values: &mut [f32]) -> Option<f32> {
-    if values.is_empty() {
-        return None;
-    }
-    values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
-    Some(values[values.len() / 2])
-}
-
-pub(crate) fn percentile_sorted(values: &[f32], percentile: f32) -> f32 {
-    if values.is_empty() {
-        return f32::NAN;
-    }
-    let clamped = percentile.clamp(0.0, 1.0);
-    let index = ((values.len() - 1) as f32 * clamped).round() as usize;
-    values[index]
-}
-
-fn positive_fraction(values: &[f32]) -> Option<f32> {
-    if values.is_empty() {
-        return None;
-    }
-    Some(values.iter().filter(|value| **value > 0.0).count() as f32 / values.len() as f32)
 }
