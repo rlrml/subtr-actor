@@ -7160,6 +7160,14 @@ void SubtrActorPlugin::showSingletonWindow(bool &open, UiWindowPlacement &placem
   focusSingletonWindow(placement);
 }
 
+void SubtrActorPlugin::hideSingletonWindow(bool &open) {
+  if (!open) {
+    return;
+  }
+  open = false;
+  scheduleUiConfigAutosave();
+}
+
 void SubtrActorPlugin::hideLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -7216,8 +7224,7 @@ bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open
     ImGui::SetCursorPosX(rightAlignedX);
   }
   if (ImGui::SmallButton(hideLabel.c_str())) {
-    open = false;
-    scheduleUiConfigAutosave();
+    hideSingletonWindow(open);
     return true;
   }
   ImGui::Separator();
@@ -7656,9 +7663,8 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
       if (std::string_view{window.config_id} == "scoreboard") {
         continue;
       }
-      *window.open = false;
+      hideSingletonWindow(*window.open);
     }
-    scheduleUiConfigAutosave();
   }
   renderLayoutConfigControls("launcher-workspace-layout");
 }
@@ -7679,8 +7685,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
         std::format("{}   {}", window.label, isOpen ? "Hide" : "Show");
     if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
       if (*window.open) {
-        *window.open = false;
-        scheduleUiConfigAutosave();
+        hideSingletonWindow(*window.open);
       } else {
         showSingletonWindow(*window.open, *window.placement);
       }
@@ -10192,9 +10197,8 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
   ImGui::SameLine();
   if (ImGui::SmallButton("Hide all##singleton-windows")) {
     for (SingletonWindowControl &window : windows) {
-      *window.open = false;
+      hideSingletonWindow(*window.open);
     }
-    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::SmallButton("Focus visible##singleton-windows")) {
@@ -10210,8 +10214,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     ImGui::PushID(window.label);
     if (*window.open) {
       if (ImGui::SmallButton("Hide")) {
-        *window.open = false;
-        scheduleUiConfigAutosave();
+        hideSingletonWindow(*window.open);
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
