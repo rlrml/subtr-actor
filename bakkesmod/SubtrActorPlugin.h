@@ -388,6 +388,7 @@ private:
   void renderBoostPickupControlsWindow();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
+  void focusTopLoadedWindow();
   void resetWindowPlacements();
   void resetDefaultStatsWindows();
   void applyDefaultUiWorkspace();

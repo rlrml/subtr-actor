@@ -3090,6 +3090,7 @@ void SubtrActorPlugin::applyUiConfigJson(
         uiStatsWindows.size(),
         sourceLabel));
   }
+  focusTopLoadedWindow();
   lastSavedUiConfigJson = uiConfigJson();
   nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
 }
@@ -8153,6 +8154,53 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     uiStatsWindows.erase(uiStatsWindows.begin() + static_cast<std::ptrdiff_t>(*removeIndex));
   }
   ImGui::EndChild();
+}
+
+void SubtrActorPlugin::focusTopLoadedWindow() {
+  int topZIndex = 0;
+  UiWindowPlacement *topPlacement = nullptr;
+  UiStatsWindow *topStatsWindow = nullptr;
+
+  auto considerPlacement = [&](bool open, UiWindowPlacement &placement) {
+    placement.pending_focus = false;
+    if (!open || !placement.has_placement || placement.z_index <= topZIndex) {
+      return;
+    }
+    topZIndex = placement.z_index;
+    topPlacement = &placement;
+    topStatsWindow = nullptr;
+  };
+
+  considerPlacement(uiLauncherOpen, launcherPlacement);
+  considerPlacement(uiScoreboardOpen, scoreboardPlacement);
+  considerPlacement(uiEventsOpen, eventsPlacement);
+  considerPlacement(uiStatusOpen, statusPlacement);
+  considerPlacement(uiCameraOpen, cameraPlacement);
+  considerPlacement(uiPlaybackControlsOpen, playbackControlsPlacement);
+  considerPlacement(uiRecordingOpen, recordingPlacement);
+  considerPlacement(uiGraphInspectorOpen, graphInspectorPlacement);
+  considerPlacement(uiEventPlaylistOpen, eventPlaylistPlacement);
+  considerPlacement(uiMechanicsReviewOpen, mechanicsReviewPlacement);
+  considerPlacement(uiReplayLoadingOpen, replayLoadingPlacement);
+  considerPlacement(uiModuleControlsOpen, moduleControlsPlacement);
+  considerPlacement(uiTouchControlsOpen, touchControlsPlacement);
+  considerPlacement(uiBoostPickupControlsOpen, boostPickupControlsPlacement);
+
+  for (UiStatsWindow &window : uiStatsWindows) {
+    window.pending_focus = false;
+    if (!window.open || !window.has_placement || window.z_index <= topZIndex) {
+      continue;
+    }
+    topZIndex = window.z_index;
+    topPlacement = nullptr;
+    topStatsWindow = &window;
+  }
+
+  if (topStatsWindow != nullptr) {
+    topStatsWindow->pending_focus = true;
+  } else if (topPlacement != nullptr) {
+    topPlacement->pending_focus = true;
+  }
 }
 
 void SubtrActorPlugin::resetWindowPlacements() {
