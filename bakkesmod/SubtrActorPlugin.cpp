@@ -3448,6 +3448,7 @@ void SubtrActorPlugin::applyUiConfigJson(
       recordingPlaybackRateIndex = recordingPlaybackRateIndexForValue(*playbackRate);
     }
   }
+  bool applyPlaybackConfig = false;
   if (const auto playback = parseJsonObjectProperty(json, "playback")) {
     playbackCurrentTime = static_cast<float>(std::max(
         0.0,
@@ -3461,6 +3462,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     playbackSkipKickoffs =
         parseJsonBoolProperty(*playback, "skipKickoffs").value_or(playbackSkipKickoffs);
     playbackStatus = parseJsonStringProperty(*playback, "status").value_or(playbackStatus);
+    applyPlaybackConfig = true;
   }
   touchControlsMode = static_cast<int>(
       std::clamp(
@@ -3775,6 +3777,9 @@ void SubtrActorPlugin::applyUiConfigJson(
         sourceLabel));
   }
   focusTopLoadedWindow();
+  if (applyPlaybackConfig) {
+    applyPlaybackConfigToReplay(sourceLabel);
+  }
   lastSavedUiConfigJson = uiConfigJson();
   nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
 }
@@ -9166,6 +9171,41 @@ void SubtrActorPlugin::renderCameraWindow() {
   }
 
   ImGui::End();
+}
+
+void SubtrActorPlugin::applyPlaybackConfigToReplay(std::string_view sourceLabel) {
+  if (!gameWrapper || !gameWrapper->IsInReplay()) {
+    playbackStatus = std::format("Loaded playback config from {}", sourceLabel);
+    return;
+  }
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  if (replayServer.IsNull()) {
+    playbackStatus =
+        std::format("Loaded playback config from {}; replay controls unavailable", sourceLabel);
+    return;
+  }
+
+  mechanicsReviewClipActive = false;
+  playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
+  if (playbackPlaying) {
+    replayServer.StartPlaybackAtTime(playbackCurrentTime);
+    playbackStatus = std::format(
+        "Applied {} playback config: playing from {:.2f}s",
+        sourceLabel,
+        playbackCurrentTime);
+    return;
+  }
+
+  replayServer.SkipToTime(playbackCurrentTime);
+  ReplayWrapper replay = replayServer.GetReplay();
+  if (!replay.IsNull()) {
+    replay.StopPlayback();
+  }
+  playbackStatus = std::format(
+      "Applied {} playback config: paused at {:.2f}s",
+      sourceLabel,
+      playbackCurrentTime);
 }
 
 void SubtrActorPlugin::renderPlaybackControlsWindow() {

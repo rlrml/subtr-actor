@@ -449,6 +449,7 @@ private:
   void renderEventSourceControls();
   void renderStatusWindow();
   void renderCameraWindow();
+  void applyPlaybackConfigToReplay(std::string_view sourceLabel);
   void renderPlaybackControlsWindow();
   void renderRecordingWindow();
   void renderGraphInspectorWindow();
