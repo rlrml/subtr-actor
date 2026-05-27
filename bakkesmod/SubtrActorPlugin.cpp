@@ -7036,12 +7036,12 @@ void SubtrActorPlugin::renderEventSourceControls() {
     setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
   };
 
-  if (ImGui::SmallButton("All##event-sources")) {
+  if (ImGui::SmallButton("All events##event-sources")) {
     selected = selectedEventSourceTokens("all");
     applySelection();
   }
   ImGui::SameLine();
-  if (ImGui::SmallButton("None##event-sources")) {
+  if (ImGui::SmallButton("No events##event-sources")) {
     selected.clear();
     applySelection();
   }
@@ -7067,13 +7067,13 @@ void SubtrActorPlugin::renderEventSourceControls() {
     ImGui::PushID(option.value);
     bool enabled = containsString(selected, option.value);
     const std::string label = std::format("{} ({})", option.label, count);
-    if (ImGui::Checkbox(label.c_str(), &enabled)) {
-      if (enabled && !containsString(selected, option.value)) {
-        selected.emplace_back(option.value);
-      } else if (!enabled) {
+    if (renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")) {
+      if (enabled) {
         selected.erase(
             std::remove(selected.begin(), selected.end(), std::string{option.value}),
             selected.end());
+      } else {
+        selected.emplace_back(option.value);
       }
       applySelection();
     }
