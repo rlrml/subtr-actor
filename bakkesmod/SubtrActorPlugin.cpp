@@ -7703,6 +7703,15 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
   }
   captureStatsWindowPlacement(window);
 
+  if (ImGui::SmallButton(std::format("Hide##stats-window-hide-{}", window.id).c_str())) {
+    window.open = false;
+    ImGui::End();
+    return;
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", statsWindowKindLabel(window.kind));
+  ImGui::Separator();
+
   renderStatsWindowScopeSelector(window);
   renderStatsWindowAddControl(window);
   renderStatsWindowEntries(window);
