@@ -2791,6 +2791,7 @@ void SubtrActorPlugin::applyUiConfigJson(
             .value_or(playbackSkipPostGoalTransitions);
     playbackSkipKickoffs =
         parseJsonBoolProperty(*playback, "skipKickoffs").value_or(playbackSkipKickoffs);
+    playbackStatus = parseJsonStringProperty(*playback, "status").value_or(playbackStatus);
   }
   touchControlsMode = static_cast<int>(
       std::clamp(
@@ -3311,6 +3312,7 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << ",\"skipPostGoalTransitions\":"
        << (playbackSkipPostGoalTransitions ? "true" : "false")
        << ",\"skipKickoffs\":" << (playbackSkipKickoffs ? "true" : "false")
+       << ",\"status\":\"" << escapeJsonString(playbackStatus) << "\""
        << "},\n";
   file << "  \"camera\": {";
   file << "\"mode\":\"" << (cameraViewMode == 1 ? "follow" : "free") << "\"";
@@ -7887,21 +7889,57 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   } else {
     ImGui::TextDisabled("Last sampled: --");
   }
+  ImGui::Text("Status: %s", playbackStatus.c_str());
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");
+  auto applyPlaybackState = [&](bool shouldPlay) {
+    mechanicsReviewClipActive = false;
+    playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
+    playbackPlaying = shouldPlay;
+    if (!hasReplayServer) {
+      playbackStatus = "Open a Rocket League replay to control playback";
+      return;
+    }
+
+    if (shouldPlay) {
+      replayServer.StartPlaybackAtTime(playbackCurrentTime);
+      playbackStatus = std::format("Playing from {:.2f}s", playbackCurrentTime);
+      return;
+    }
+
+    replayServer.SkipToTime(playbackCurrentTime);
+    ReplayWrapper replay = replayServer.GetReplay();
+    if (!replay.IsNull()) {
+      replay.StopPlayback();
+    }
+    playbackStatus = std::format("Paused at {:.2f}s", playbackCurrentTime);
+  };
+
   ImGui::SetNextItemWidth(140.0f);
   ImGui::InputFloat("Current time", &playbackCurrentTime, 0.25f, 2.0f, "%.2f");
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
   ImGui::SetNextItemWidth(140.0f);
   ImGui::SliderFloat("Rate", &playbackRate, 0.1f, 4.0f, "%.2fx");
-  ImGui::Checkbox("Playing", &playbackPlaying);
+  if (ImGui::Button(playbackPlaying ? "Pause" : "Play")) {
+    applyPlaybackState(!playbackPlaying);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Seek")) {
+    applyPlaybackState(false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Live replay time") && hasReplayServer) {
+    playbackCurrentTime = replayServer.GetReplayTimeElapsed();
+    playbackStatus = std::format("Captured {:.2f}s", playbackCurrentTime);
+  }
+  bool nextPlaying = playbackPlaying;
+  if (ImGui::Checkbox("Playing", &nextPlaying)) {
+    applyPlaybackState(nextPlaying);
+  }
   ImGui::SameLine();
   ImGui::Checkbox("Skip goal transitions", &playbackSkipPostGoalTransitions);
   ImGui::Checkbox("Skip kickoffs", &playbackSkipKickoffs);
-  if (hasReplayServer && ImGui::SmallButton("Capture replay time")) {
-    playbackCurrentTime = replayServer.GetReplayTimeElapsed();
-  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");
