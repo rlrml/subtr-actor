@@ -3,7 +3,7 @@ use serde_json::json;
 use subtr_actor::{
     playlist_generation::{PlaybackBound, PlaybackBoundKind, PlaylistManifestItem},
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    CeilingShotCalculator, Collector, DodgeResetCalculator, FlipResetTracker, ReplayProcessor,
+    CeilingShotCalculator, ReplayProcessor,
 };
 
 #[path = "build_mechanic_review_playlist_args.rs"]
@@ -20,6 +20,8 @@ mod config;
 mod constants;
 #[path = "build_mechanic_review_playlist_extract_flick.rs"]
 mod extract_flick;
+#[path = "build_mechanic_review_playlist_extract_flip_reset.rs"]
+mod extract_flip_reset;
 #[path = "build_mechanic_review_playlist_extract_movement.rs"]
 mod extract_movement;
 #[path = "build_mechanic_review_playlist_extract_touch.rs"]
@@ -51,6 +53,7 @@ use candidate::{
 };
 use config::{parse_args, Config};
 use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
+use extract_flip_reset::push_flip_reset_candidates;
 use extract_movement::{
     push_half_flip_candidates, push_speed_flip_candidates, push_wavedash_candidates,
 };
@@ -86,54 +89,7 @@ fn extract_candidates(
                 push_air_dribble_candidates(graph, &mut candidates);
             }
             "flip_reset" => {
-                let tracker = FlipResetTracker::new()
-                    .process_replay(replay)
-                    .map_err(|err| {
-                        anyhow!("failed to collect flip reset tracker events: {err:?}")
-                    })?;
-                candidates.extend(tracker.flip_reset_events().iter().map(|event| {
-                    let confidence = event.confidence;
-                    MechanicCandidate {
-                        mechanic: "flip_reset",
-                        mechanic_label: "Flip Reset",
-                        detector: "builtin:flip_reset_tracker",
-                        player_id: Some(player_id_string(&event.player)),
-                        is_team_0: Some(event.is_team_0),
-                        event_time: event.time,
-                        event_frame: event.frame,
-                        start_time: event.time,
-                        end_time: event.time,
-                        confidence: Some(confidence),
-                        reason: format!(
-                            "{}% confidence; underside ball contact; closest approach {:.0}uu",
-                            confidence_pct(confidence),
-                            event.closest_approach_distance
-                        ),
-                        event: event_json(event),
-                    }
-                }));
-
-                if let Some(calculator) = graph.state::<DodgeResetCalculator>() {
-                    candidates.extend(calculator.on_ball_events().iter().map(|event| {
-                        MechanicCandidate {
-                            mechanic: "flip_reset",
-                            mechanic_label: "Flip Reset",
-                            detector: "builtin:dodge_reset:on_ball",
-                            player_id: Some(player_id_string(&event.player)),
-                            is_team_0: Some(event.is_team_0),
-                            event_time: event.time,
-                            event_frame: event.frame,
-                            start_time: event.time,
-                            end_time: event.time,
-                            confidence: None,
-                            reason: format!(
-                                "dodge refresh while close to the ball; counter value {}",
-                                event.counter_value
-                            ),
-                            event: event_json(event),
-                        }
-                    }));
-                }
+                push_flip_reset_candidates(replay, graph, &mut candidates)?;
             }
             "ceiling_shot" => {
                 let Some(calculator) = graph.state::<CeilingShotCalculator>() else {
