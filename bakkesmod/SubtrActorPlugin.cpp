@@ -7168,6 +7168,14 @@ void SubtrActorPlugin::hideSingletonWindow(bool &open) {
   scheduleUiConfigAutosave();
 }
 
+void SubtrActorPlugin::hideStatsWindow(UiStatsWindow &window) {
+  if (!window.open) {
+    return;
+  }
+  window.open = false;
+  scheduleUiConfigAutosave();
+}
+
 void SubtrActorPlugin::hideLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -10258,9 +10266,8 @@ void SubtrActorPlugin::renderStatsWindowManager() {
   ImGui::SameLine();
   if (ImGui::SmallButton("Hide all##stats-windows")) {
     for (UiStatsWindow &window : uiStatsWindows) {
-      window.open = false;
+      hideStatsWindow(window);
     }
-    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::SmallButton("Focus visible##stats-windows")) {
@@ -10299,8 +10306,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
 
     if (window.open) {
       if (ImGui::SmallButton("Hide")) {
-        window.open = false;
-        scheduleUiConfigAutosave();
+        hideStatsWindow(window);
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
@@ -11197,8 +11203,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t /*stackIn
     ImGui::SetCursorPosX(rightAlignedX);
   }
   if (ImGui::SmallButton(hideLabel.c_str())) {
-    window.open = false;
-    scheduleUiConfigAutosave();
+    hideStatsWindow(window);
     ImGui::End();
     return;
   }

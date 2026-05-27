@@ -509,6 +509,7 @@ private:
   void resetScoreboardWindowPlacement(bool focus = false);
   void showSingletonWindow(bool &open, UiWindowPlacement &placement);
   void hideSingletonWindow(bool &open);
+  void hideStatsWindow(UiStatsWindow &window);
   void focusSingletonWindow(UiWindowPlacement &placement);
   void hideLauncherWindow();
   void applyWindowPlacement(
