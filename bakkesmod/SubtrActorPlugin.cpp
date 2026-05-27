@@ -5259,6 +5259,30 @@ void SubtrActorPlugin::renderLauncherWindow() {
   }
   captureWindowPlacement(launcherPlacement);
 
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
+  if (ImGui::Button("Load Replay...")) {
+    uiReplayLoadingOpen = true;
+    replayLoadingPlacement.pending_focus = true;
+    resetReplayAnnotations();
+    tickReplayAnnotations();
+  }
+  ImGui::SameLine();
+  bool liveAnalysis = liveProcessingEnabled();
+  if (ImGui::Button(liveAnalysis ? "Stop analysis" : "Start analysis")) {
+    setCvarBool("subtr_actor_enabled", !liveAnalysis);
+  }
+  if (ImGui::Button("Verify graph")) {
+    uiGraphInspectorOpen = true;
+    graphInspectorPlacement.pending_focus = true;
+    verifyGraphRuntime({"subtr_actor_verify_graph"});
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open modules")) {
+    uiModuleControlsOpen = true;
+    moduleControlsPlacement.pending_focus = true;
+  }
+
+  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
   ImGui::Checkbox("Events", &uiEventsOpen);
