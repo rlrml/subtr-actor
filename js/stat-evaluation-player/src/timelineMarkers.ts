@@ -1,8 +1,4 @@
-import type {
-  ReplayModel,
-  ReplayTimelineEvent,
-  ReplayTimelineEventKind,
-} from "subtr-actor-player";
+import type { ReplayModel, ReplayTimelineEvent, ReplayTimelineEventKind } from "subtr-actor-player";
 import { buildFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
 import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";

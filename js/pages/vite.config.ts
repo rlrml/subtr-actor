@@ -52,7 +52,10 @@ export default defineConfig({
   plugins: [ensureWasmBindingsPlugin()],
   resolve: {
     alias: {
-      "@colonelpanic8/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
+      "@colonelpanic8/subtr-actor": path.resolve(
+        import.meta.dirname,
+        "../pkg/rl_replay_subtr_actor.js",
+      ),
       "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
       three: path.resolve(import.meta.dirname, "../stat-evaluation-player/node_modules/three"),
     },
