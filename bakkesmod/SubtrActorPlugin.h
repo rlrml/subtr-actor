@@ -121,6 +121,7 @@ private:
     uint32_t id = 0;
     UiStatsWindowKind kind = UiStatsWindowKind::Player;
     bool open = true;
+    bool pending_focus = false;
     bool picker_open = false;
     uint32_t selected_player_index = 0;
     uint8_t selected_team_is_team_0 = 1;
@@ -275,6 +276,7 @@ private:
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderStatusWindow();
+  void renderStatsWindowManager();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName);
   void applyWindowPlacement(
@@ -300,6 +302,7 @@ private:
   void renderStatsModuleWindow(UiStatsWindow &window);
   void renderStatsModuleJsonSummary(const std::string &json);
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
+  std::string statsWindowDisplayLabel(const UiStatsWindow &window) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
   void initializeStatsWindowEntries(UiStatsWindow &window);

@@ -4955,7 +4955,15 @@ void SubtrActorPlugin::renderLauncherWindow() {
   if (ImGui::Button("Reload layout")) {
     loadUiConfig();
   }
-  ImGui::Text("%zu stats windows open", uiStatsWindows.size());
+  const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
+      uiStatsWindows.begin(),
+      uiStatsWindows.end(),
+      [](const UiStatsWindow &window) { return window.open; }));
+  ImGui::Text(
+      "%zu visible / %zu stats windows",
+      visibleStatsWindows,
+      uiStatsWindows.size());
+  renderStatsWindowManager();
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
@@ -5092,10 +5100,54 @@ void SubtrActorPlugin::renderStatusWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderStatsWindowManager() {
+  if (uiStatsWindows.empty()) {
+    return;
+  }
+
+  ImGui::BeginChild("stats-window-manager", ImVec2{0.0f, 132.0f}, true);
+  std::optional<size_t> removeIndex;
+  for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
+    UiStatsWindow &window = uiStatsWindows[index];
+    ImGui::PushID(static_cast<int>(window.id));
+    const std::string label = statsWindowDisplayLabel(window);
+
+    if (window.open) {
+      if (ImGui::SmallButton("Hide")) {
+        window.open = false;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Focus")) {
+        window.pending_focus = true;
+      }
+    } else {
+      if (ImGui::SmallButton("Show")) {
+        window.open = true;
+        window.pending_focus = true;
+      }
+      ImGui::SameLine();
+      ImGui::TextDisabled("Hidden");
+    }
+
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Remove")) {
+      removeIndex = index;
+    }
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", label.c_str());
+    ImGui::PopID();
+  }
+  if (removeIndex) {
+    uiStatsWindows.erase(uiStatsWindows.begin() + static_cast<std::ptrdiff_t>(*removeIndex));
+  }
+  ImGui::EndChild();
+}
+
 void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = kind;
+  window.pending_focus = true;
   if (!sampledPlayers.empty()) {
     window.selected_player_index = sampledPlayers.front().player_index;
     window.selected_team_is_team_0 = sampledPlayers.front().is_team_0;
@@ -5108,6 +5160,7 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
   window.kind = UiStatsWindowKind::StatsModule;
+  window.pending_focus = true;
   window.module_name = std::move(moduleName);
   window.module_view = 0;
   window.width = 680.0f;
@@ -5117,14 +5170,10 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName) {
 
 void SubtrActorPlugin::renderStatsWindows() {
   for (UiStatsWindow &window : uiStatsWindows) {
-    renderStatsWindow(window);
+    if (window.open) {
+      renderStatsWindow(window);
+    }
   }
-  uiStatsWindows.erase(
-      std::remove_if(
-          uiStatsWindows.begin(),
-          uiStatsWindows.end(),
-          [](const UiStatsWindow &window) { return !window.open; }),
-      uiStatsWindows.end());
 }
 
 const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const {
@@ -5149,10 +5198,14 @@ const char *SubtrActorPlugin::statsWindowKindLabel(UiStatsWindowKind kind) const
 }
 
 std::string SubtrActorPlugin::statsWindowTitle(const UiStatsWindow &window) const {
+  return std::format("{}##subtr-actor-stats-{}", statsWindowDisplayLabel(window), window.id);
+}
+
+std::string SubtrActorPlugin::statsWindowDisplayLabel(const UiStatsWindow &window) const {
   if (window.kind == UiStatsWindowKind::StatsModule && !window.module_name.empty()) {
-    return std::format("Stats module: {}##subtr-actor-stats-{}", window.module_name, window.id);
+    return std::format("Stats module: {}", window.module_name);
   }
-  return std::format("{}##subtr-actor-stats-{}", statsWindowKindLabel(window.kind), window.id);
+  return std::format("{} {}", statsWindowKindLabel(window.kind), window.id);
 }
 
 const SaPlayerFrame *SubtrActorPlugin::sampledPlayerByIndex(uint32_t playerIndex) const {
@@ -5358,6 +5411,10 @@ std::string SubtrActorPlugin::teamStatValue(uint8_t isTeam0, std::string_view st
 
 void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
   applyStatsWindowPlacement(window);
+  if (window.pending_focus) {
+    ImGui::SetNextWindowFocus();
+    window.pending_focus = false;
+  }
   const std::string title = statsWindowTitle(window);
   if (!ImGui::Begin(title.c_str(), &window.open)) {
     ImGui::End();
