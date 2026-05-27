@@ -584,6 +584,8 @@ private:
   void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();
+  void scheduleUiConfigAutosave(
+      std::chrono::milliseconds delay = std::chrono::milliseconds(150));
   void maybeAutosaveUiConfig();
   void renderLayoutConfigControls(const char *idSuffix);
   int recentEventCountForActor(std::string_view actor) const;

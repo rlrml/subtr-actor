@@ -4246,6 +4246,13 @@ void SubtrActorPlugin::saveUiConfig() {
   nextUiConfigAutosave = std::chrono::steady_clock::now() + std::chrono::seconds(2);
 }
 
+void SubtrActorPlugin::scheduleUiConfigAutosave(std::chrono::milliseconds delay) {
+  const auto nextSave = std::chrono::steady_clock::now() + delay;
+  if (nextSave < nextUiConfigAutosave) {
+    nextUiConfigAutosave = nextSave;
+  }
+}
+
 void SubtrActorPlugin::maybeAutosaveUiConfig() {
   const auto now = std::chrono::steady_clock::now();
   if (now < nextUiConfigAutosave) {
@@ -7121,6 +7128,7 @@ void SubtrActorPlugin::resetSingletonWindowPlacement(
   placement.viewport_width = displaySize.x;
   placement.viewport_height = displaySize.y;
   placement.z_index = nextUiWindowZIndex++;
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::resetScoreboardWindowPlacement(bool focus) {
@@ -7134,6 +7142,7 @@ void SubtrActorPlugin::resetScoreboardWindowPlacement(bool focus) {
 void SubtrActorPlugin::focusSingletonWindow(UiWindowPlacement &placement) {
   placement.pending_focus = true;
   placement.z_index = nextUiWindowZIndex++;
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::showSingletonWindow(bool &open, UiWindowPlacement &placement) {
@@ -7142,6 +7151,14 @@ void SubtrActorPlugin::showSingletonWindow(bool &open, UiWindowPlacement &placem
 }
 
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
+  const bool hadPlacement = placement.has_placement;
+  const float previousX = placement.x;
+  const float previousY = placement.y;
+  const float previousWidth = placement.width;
+  const float previousHeight = placement.height;
+  const float previousViewportWidth = placement.viewport_width;
+  const float previousViewportHeight = placement.viewport_height;
+  const int previousZIndex = placement.z_index;
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
   placement.has_placement = true;
@@ -7155,6 +7172,13 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
       ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     placement.z_index = nextUiWindowZIndex++;
+  }
+  if (!hadPlacement || previousX != placement.x || previousY != placement.y ||
+      previousWidth != placement.width || previousHeight != placement.height ||
+      previousViewportWidth != placement.viewport_width ||
+      previousViewportHeight != placement.viewport_height ||
+      previousZIndex != placement.z_index) {
+    scheduleUiConfigAutosave();
   }
 }
 
@@ -7170,6 +7194,7 @@ bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open
   }
   if (ImGui::SmallButton(hideLabel.c_str())) {
     open = false;
+    scheduleUiConfigAutosave();
     return true;
   }
   ImGui::Separator();
@@ -7250,6 +7275,14 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
 }
 
 void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
+  const bool hadPlacement = window.has_placement;
+  const float previousX = window.x;
+  const float previousY = window.y;
+  const float previousWidth = window.width;
+  const float previousHeight = window.height;
+  const float previousViewportWidth = window.viewport_width;
+  const float previousViewportHeight = window.viewport_height;
+  const int previousZIndex = window.z_index;
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
   window.has_placement = true;
@@ -7264,11 +7297,19 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
       ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     window.z_index = nextUiWindowZIndex++;
   }
+  if (!hadPlacement || previousX != window.x || previousY != window.y ||
+      previousWidth != window.width || previousHeight != window.height ||
+      previousViewportWidth != window.viewport_width ||
+      previousViewportHeight != window.viewport_height ||
+      previousZIndex != window.z_index) {
+    scheduleUiConfigAutosave();
+  }
 }
 
 void SubtrActorPlugin::focusStatsWindow(UiStatsWindow &window) {
   window.pending_focus = true;
   window.z_index = nextUiWindowZIndex++;
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::showStatsWindow(UiStatsWindow &window) {
@@ -7577,6 +7618,7 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
       }
       *window.open = false;
     }
+    scheduleUiConfigAutosave();
   }
   renderLayoutConfigControls("launcher-workspace-layout");
 }
@@ -7598,6 +7640,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
     if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
       if (*window.open) {
         *window.open = false;
+        scheduleUiConfigAutosave();
       } else {
         showSingletonWindow(*window.open, *window.placement);
       }
@@ -10017,6 +10060,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     for (SingletonWindowControl &window : windows) {
       *window.open = false;
     }
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::SmallButton("Focus visible##singleton-windows")) {
@@ -10033,6 +10077,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     if (*window.open) {
       if (ImGui::SmallButton("Hide")) {
         *window.open = false;
+        scheduleUiConfigAutosave();
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
@@ -10087,6 +10132,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     for (UiStatsWindow &window : uiStatsWindows) {
       window.open = false;
     }
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   if (ImGui::SmallButton("Focus visible##stats-windows")) {
@@ -10110,6 +10156,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
             uiStatsWindows.end(),
             [](const UiStatsWindow &window) { return !window.open; }),
         uiStatsWindows.end());
+    scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
   ImGui::TextDisabled("%zu hidden", hiddenCount);
@@ -10125,6 +10172,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     if (window.open) {
       if (ImGui::SmallButton("Hide")) {
         window.open = false;
+        scheduleUiConfigAutosave();
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("Focus")) {
@@ -10166,9 +10214,11 @@ void SubtrActorPlugin::renderStatsWindowManager() {
   }
   if (removeIndex) {
     uiStatsWindows.erase(uiStatsWindows.begin() + static_cast<std::ptrdiff_t>(*removeIndex));
+    scheduleUiConfigAutosave();
   }
   if (duplicateWindow) {
     uiStatsWindows.push_back(std::move(*duplicateWindow));
+    scheduleUiConfigAutosave();
   }
   ImGui::EndChild();
 }
@@ -10237,6 +10287,7 @@ void SubtrActorPlugin::resetDefaultStatsWindows() {
       createStatsWindow(window.kind, true);
     }
   }
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::applyWorkspaceWindowVisibility(
@@ -10247,6 +10298,7 @@ void SubtrActorPlugin::applyWorkspaceWindowVisibility(
     *window.open = std::find(openWindowIds.begin(), openWindowIds.end(), window.config_id) !=
                    openWindowIds.end();
   }
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::applyDefaultUiWorkspace() {
@@ -10321,6 +10373,7 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
     initializeStatsWindowEntries(window);
   }
   uiStatsWindows.push_back(window);
+  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int moduleView) {
@@ -10333,6 +10386,7 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
   initializeStatsWindowPlacement(window);
   focusStatsWindow(window);
   uiStatsWindows.push_back(std::move(window));
+  scheduleUiConfigAutosave();
 }
 
 std::pair<float, float> SubtrActorPlugin::defaultStatsWindowSize(UiStatsWindowKind kind) const {
@@ -10367,6 +10421,7 @@ void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t s
   window.pending_apply_placement = true;
   window.pending_focus = window.open;
   window.z_index = nextUiWindowZIndex++;
+  scheduleUiConfigAutosave();
 }
 
 std::array<SubtrActorPlugin::StatsWindowKindControl, 7>
@@ -11016,6 +11071,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t stackInde
   ImGui::SameLine();
   if (ImGui::SmallButton(hideLabel.c_str())) {
     window.open = false;
+    scheduleUiConfigAutosave();
     ImGui::End();
     return;
   }
