@@ -7835,8 +7835,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderModuleSummaryControls("launcher-module-summary", false);
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SETTINGS");
-  renderModuleSettingsControls("launcher-module-settings", true);
+  renderModuleSettingsControls("launcher-module-settings", false);
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     if (ImGui::Button("Verify graph", ImVec2{170.0f, 0.0f})) {
