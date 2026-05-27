@@ -8130,18 +8130,67 @@ void SubtrActorPlugin::renderCameraWindow() {
     cameraFreePreset = 1;
   }
 
-  ImGui::SliderFloat("Distance scale", &cameraDistanceScale, 0.75f, 4.0f, "%.2fx");
-  ImGui::Checkbox("Ball cam", &cameraBallCamEnabled);
-  ImGui::Checkbox("Custom settings", &cameraCustomSettingsEnabled);
+  const bool hasAttachedCamera = targetPlayer != nullptr;
+  auto pushCameraDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+    }
+  };
+  auto popCameraDisabledStyle = [](bool disabled) {
+    if (disabled) {
+      ImGui::PopStyleVar();
+    }
+  };
+
+  float nextDistanceScale = cameraDistanceScale;
+  pushCameraDisabledStyle(!hasAttachedCamera);
+  const bool distanceScaleChanged =
+      ImGui::SliderFloat("Distance scale", &nextDistanceScale, 0.75f, 4.0f, "%.2fx");
+  popCameraDisabledStyle(!hasAttachedCamera);
+  if (hasAttachedCamera && distanceScaleChanged) {
+    cameraDistanceScale = nextDistanceScale;
+  }
+
+  bool nextBallCamEnabled = cameraBallCamEnabled;
+  pushCameraDisabledStyle(!hasAttachedCamera);
+  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);
+  popCameraDisabledStyle(!hasAttachedCamera);
+  if (hasAttachedCamera && ballCamChanged) {
+    cameraBallCamEnabled = nextBallCamEnabled;
+  }
+
+  bool nextCustomSettingsEnabled = cameraCustomSettingsEnabled;
+  pushCameraDisabledStyle(!hasAttachedCamera);
+  const bool customSettingsChanged =
+      ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled);
+  popCameraDisabledStyle(!hasAttachedCamera);
+  if (hasAttachedCamera && customSettingsChanged) {
+    cameraCustomSettingsEnabled = nextCustomSettingsEnabled;
+  }
   if (cameraCustomSettingsEnabled) {
-    ImGui::SliderFloat("FOV", &cameraCustomFov, 60.0f, 130.0f, "%.0f");
-    ImGui::SliderFloat("Height", &cameraCustomHeight, 40.0f, 240.0f, "%.0f");
-    ImGui::SliderFloat("Pitch", &cameraCustomPitch, -15.0f, 0.0f, "%.1f");
-    ImGui::SliderFloat("Distance", &cameraCustomDistance, 120.0f, 500.0f, "%.0f");
-    ImGui::SliderFloat("Stiffness", &cameraCustomStiffness, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Swivel speed", &cameraCustomSwivelSpeed, 0.1f, 10.0f, "%.1f");
-    ImGui::SliderFloat(
-        "Transition speed", &cameraCustomTransitionSpeed, 0.1f, 10.0f, "%.1f");
+    const bool customControlsDisabled = !hasAttachedCamera;
+    auto renderCustomSlider = [&](const char *label, float &value, float min, float max,
+                                  const char *format) {
+      float next = value;
+      pushCameraDisabledStyle(customControlsDisabled);
+      const bool changed = ImGui::SliderFloat(label, &next, min, max, format);
+      popCameraDisabledStyle(customControlsDisabled);
+      if (!customControlsDisabled && changed) {
+        value = next;
+      }
+    };
+    renderCustomSlider("FOV", cameraCustomFov, 60.0f, 130.0f, "%.0f");
+    renderCustomSlider("Height", cameraCustomHeight, 40.0f, 250.0f, "%.0f");
+    renderCustomSlider("Pitch", cameraCustomPitch, -30.0f, 30.0f, "%.1f");
+    renderCustomSlider("Distance", cameraCustomDistance, 100.0f, 500.0f, "%.0f");
+    renderCustomSlider("Stiffness", cameraCustomStiffness, 0.0f, 1.0f, "%.2f");
+    renderCustomSlider("Swivel speed", cameraCustomSwivelSpeed, 1.0f, 10.0f, "%.1f");
+    renderCustomSlider(
+        "Transition speed",
+        cameraCustomTransitionSpeed,
+        0.5f,
+        2.0f,
+        "%.2f");
   }
 
   const float fov = cameraCustomSettingsEnabled ? cameraCustomFov : 110.0f;
