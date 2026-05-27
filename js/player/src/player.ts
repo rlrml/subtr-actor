@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
+import { createReplayScene, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
@@ -14,19 +14,14 @@ import {
 } from "./player-internals/timeline";
 import {
   getActiveDemoEvent,
-  updateBoostTrail,
-  updateDemoIndicator,
 } from "./player-render-effects";
+import { renderReplayFrameScene } from "./player-render-frame";
 import { normalizeCustomCameraSettings } from "./player-camera-settings";
 import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
 import {
   getFreeCameraPreset,
-  interpolateQuaternion,
-  interpolatePosition,
-  rootPosition,
   updateFreeCameraTransition,
   updateAttachedCamera,
-  worldPosition,
 } from "./player-internals/spatial";
 import type {
   BeforeRenderCallback,
@@ -67,12 +62,6 @@ type FreeCameraTransition = {
   up: THREE.Vector3;
   fov: number;
 };
-
-function isPlayerSamplePresent(
-  sample: ReplayModel["players"][number]["frames"][number] | null | undefined,
-): boolean {
-  return Boolean(sample?.position) && sample?.isPresent !== false;
-}
 
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
@@ -593,217 +582,21 @@ export class ReplayPlayer extends EventTarget {
   private render(): void {
     const frameWindow = getFrameWindow(this.replay, this.currentTime);
     const frameIndex = frameWindow.frameIndex;
-    const ballFrame = this.replay.ballFrames[frameIndex] ?? null;
-    const nextBallFrame = this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
-    const interpolatedBallPosition = interpolatePosition(
-      ballFrame?.position ?? null,
-      nextBallFrame?.position ?? null,
-      frameWindow.alpha,
-    );
-    const ballPosition = interpolatedBallPosition
-      ? worldPosition(interpolatedBallPosition, this.fieldScale)
-      : null;
-    const renderPlayers: ReplayPlayerRenderTrackContext[] = [];
-
-    if (interpolatedBallPosition) {
-      this.sceneState.ballMesh.visible = true;
-      this.sceneState.ballMesh.position.copy(rootPosition(interpolatedBallPosition));
-      const ballRotation = interpolateQuaternion(
-        ballFrame?.rotation ?? null,
-        nextBallFrame?.rotation ?? null,
-        frameWindow.alpha,
-      );
-      if (ballRotation) {
-        this.sceneState.ballMesh.quaternion.copy(ballRotation);
-      } else {
-        this.sceneState.ballMesh.quaternion.identity();
-      }
-    } else {
-      this.sceneState.ballMesh.visible = false;
-    }
-
-    for (const [playerIndex, player] of this.replay.players.entries()) {
-      const mesh = this.sceneState.playerMeshes.get(player.id);
-      const boostTrail = this.sceneState.playerBoostTrails.get(player.id);
-      const boostMeter = this.sceneState.playerBoostMeters.get(player.id);
-      const demoIndicator = this.sceneState.playerDemoIndicators.get(player.id);
-      const frame = player.frames[frameIndex] ?? null;
-      const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
-      let interpolatedPosition: Vec3 | null = null;
-      let renderPosition: Vec3 | null = null;
-      let boostFraction = 0;
-      if (!mesh) {
-        if (demoIndicator) {
-          demoIndicator.group.visible = false;
-        }
-        renderPlayers.push({
-          track: player,
-          mesh: null,
-          boostTrail: boostTrail ?? null,
-          frame,
-          nextFrame,
-          interpolatedPosition: renderPosition,
-          boostFraction,
-        });
-        continue;
-      }
-
-      interpolatedPosition = interpolatePosition(
-        frame?.position ?? null,
-        nextFrame?.position ?? null,
-        frameWindow.alpha,
-      );
-      const activeDemoEvent = getActiveDemoEvent(this.replay, player.id, this.currentTime);
-      if (!interpolatedPosition) {
-        mesh.visible = false;
-        if (boostTrail) {
-          boostTrail.visible = false;
-        }
-        if (boostMeter) {
-          boostMeter.group.visible = false;
-        }
-        updateDemoIndicator({
-          indicator: demoIndicator ?? null,
-          fallbackPosition: null,
-          demoEvent: activeDemoEvent,
-          currentTime: this.currentTime,
-          camera: this.sceneState.camera,
-        });
-        renderPlayers.push({
-          track: player,
-          mesh,
-          boostTrail: boostTrail ?? null,
-          frame,
-          nextFrame,
-          interpolatedPosition: renderPosition,
-          boostFraction,
-        });
-        continue;
-      }
-
-      if (activeDemoEvent) {
-        mesh.visible = false;
-        if (boostTrail) {
-          boostTrail.visible = false;
-        }
-        if (boostMeter) {
-          boostMeter.group.visible = false;
-        }
-        updateDemoIndicator({
-          indicator: demoIndicator ?? null,
-          fallbackPosition: interpolatedPosition,
-          demoEvent: activeDemoEvent,
-          currentTime: this.currentTime,
-          camera: this.sceneState.camera,
-        });
-        renderPlayers.push({
-          track: player,
-          mesh,
-          boostTrail: boostTrail ?? null,
-          frame,
-          nextFrame,
-          interpolatedPosition: renderPosition,
-          boostFraction,
-        });
-        continue;
-      }
-
-      const playerVisible = isPlayerSamplePresent(frame);
-      if (!playerVisible) {
-        mesh.visible = false;
-        if (boostTrail) {
-          boostTrail.visible = false;
-        }
-        if (boostMeter) {
-          boostMeter.group.visible = false;
-        }
-        updateDemoIndicator({
-          indicator: demoIndicator ?? null,
-          fallbackPosition: interpolatedPosition,
-          demoEvent: activeDemoEvent,
-          currentTime: this.currentTime,
-          camera: this.sceneState.camera,
-        });
-        renderPlayers.push({
-          track: player,
-          mesh,
-          boostTrail: boostTrail ?? null,
-          frame,
-          nextFrame,
-          interpolatedPosition: renderPosition,
-          boostFraction,
-        });
-        continue;
-      }
-
-      mesh.visible = true;
-      if (demoIndicator) {
-        demoIndicator.group.visible = false;
-      }
-      renderPosition = interpolatedPosition;
-      mesh.position.copy(rootPosition(interpolatedPosition));
-      const rotation = interpolateQuaternion(
-        frame?.rotation ?? null,
-        nextFrame?.rotation ?? null,
-        frameWindow.alpha,
-      );
-      if (rotation) {
-        mesh.quaternion.copy(rotation);
-      } else {
-        mesh.quaternion.identity();
-      }
-
-      const currentBoostFraction = frame?.boostFraction ?? 0;
-      const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
-      boostFraction = THREE.MathUtils.lerp(
-        currentBoostFraction,
-        nextBoostFraction,
-        frameWindow.alpha,
-      );
-
-      if (boostTrail) {
-        const boostActive =
-          (frameWindow.alpha >= 0.5 ? nextFrame?.boostActive : frame?.boostActive) ??
-          frame?.boostActive ??
-          nextFrame?.boostActive ??
-          false;
-        updateBoostTrail(
-          boostTrail,
-          boostActive,
-          boostFraction,
-          this.currentTime,
-          playerIndex,
-        );
-      }
-
-      if (boostMeter) {
-        if (this.boostMeterEnabled) {
-          boostMeter.group.visible = true;
-          updateBoostMeter(
-            boostMeter,
-            boostFraction,
-            THREE.MathUtils.lerp(
-              frame?.boostAmount ?? 0,
-              nextFrame?.boostAmount ?? frame?.boostAmount ?? 0,
-              frameWindow.alpha,
-            ),
-            this.sceneState.camera,
-          );
-        } else {
-          boostMeter.group.visible = false;
-        }
-      }
-
-      renderPlayers.push({
-        track: player,
-        mesh,
-        boostTrail: boostTrail ?? null,
-        frame,
-        nextFrame,
-        interpolatedPosition: renderPosition,
-        boostFraction,
+    const {
+      ballFrame,
+      nextBallFrame,
+      ballPosition,
+      ballWorldPosition,
+      players: renderPlayers,
+    } =
+      renderReplayFrameScene({
+        replay: this.replay,
+        sceneState: this.sceneState,
+        frameWindow,
+        fieldScale: this.fieldScale,
+        currentTime: this.currentTime,
+        boostMeterEnabled: this.boostMeterEnabled,
       });
-    }
 
     updateAttachedCamera({
       sceneState: this.sceneState,
@@ -818,7 +611,7 @@ export class ReplayPlayer extends EventTarget {
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
         getActiveDemoEvent(this.replay, this.attachedPlayerId, this.currentTime) !== null,
-      ballPosition,
+      ballPosition: ballWorldPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
     });
