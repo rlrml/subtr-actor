@@ -1,19 +1,9 @@
 const FRAME_RESOLUTION_EPSILON_SECONDS: f32 = 1e-4;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub enum StatsFrameResolution {
-    #[default]
-    EveryFrame,
-    TimeStep {
-        seconds: f32,
-    },
-}
+#[path = "frame_resolution_types.rs"]
+mod types;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum FinalStatsFrameAction {
-    Append { dt: f32 },
-    ReplaceLast { dt: f32 },
-}
+pub use types::*;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct StatsFramePersistenceController {

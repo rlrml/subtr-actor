@@ -1,0 +1,32 @@
+pub(super) fn module_has_no_snapshot_config(module_name: &str) -> bool {
+    matches!(
+        module_name,
+        "core"
+            | "backboard"
+            | "ceiling_shot"
+            | "wall_aerial"
+            | "wall_aerial_shot"
+            | "center"
+            | "double_tap"
+            | "one_timer"
+            | "pass"
+            | "fifty_fifty"
+            | "possession"
+            | "touch"
+            | "whiff"
+            | "wavedash"
+            | "speed_flip"
+            | "half_flip"
+            | "flick"
+            | "musty_flick"
+            | "dodge_reset"
+            | "ball_carry"
+            | "air_dribble"
+            | "counter_attack_goal"
+            | "boost"
+            | "bump"
+            | "movement"
+            | "powerslide"
+            | "demo"
+    )
+}
