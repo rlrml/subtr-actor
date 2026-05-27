@@ -297,6 +297,10 @@ private:
   bool touchBreakdownHeight = false;
   bool touchBreakdownSurface = false;
   bool touchBreakdownDodge = false;
+  bool movementBreakdownSpeed = false;
+  bool movementBreakdownHeight = false;
+  bool possessionBreakdownState = false;
+  bool possessionBreakdownThird = false;
   bool boostPickupPadBig = true;
   bool boostPickupPadSmall = true;
   bool boostPickupPadAmbiguous = true;

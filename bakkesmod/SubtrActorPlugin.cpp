@@ -2766,6 +2766,14 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonBoolProperty(json, "touch_breakdown_surface").value_or(touchBreakdownSurface);
   touchBreakdownDodge =
       parseJsonBoolProperty(json, "touch_breakdown_dodge").value_or(touchBreakdownDodge);
+  movementBreakdownSpeed =
+      parseJsonBoolProperty(json, "movement_breakdown_speed").value_or(movementBreakdownSpeed);
+  movementBreakdownHeight =
+      parseJsonBoolProperty(json, "movement_breakdown_height").value_or(movementBreakdownHeight);
+  possessionBreakdownState = parseJsonBoolProperty(json, "possession_breakdown_state")
+                                 .value_or(possessionBreakdownState);
+  possessionBreakdownThird = parseJsonBoolProperty(json, "possession_breakdown_third")
+                                 .value_or(possessionBreakdownThird);
   boostPickupPadBig =
       parseJsonBoolProperty(json, "boost_pickup_pad_big").value_or(boostPickupPadBig);
   boostPickupPadSmall =
@@ -2831,6 +2839,22 @@ void SubtrActorPlugin::applyUiConfigJson(
         touchBreakdownHeight = containsString(breakdownClasses, "height_band");
         touchBreakdownSurface = containsString(breakdownClasses, "surface");
         touchBreakdownDodge = containsString(breakdownClasses, "dodge_state");
+      }
+    }
+    if (const auto movementConfig = parseJsonObjectProperty(*moduleConfigs, "movement")) {
+      const std::vector<std::string> breakdownClasses =
+          parseJsonStringArrayProperty(*movementConfig, "breakdownClasses");
+      if (jsonPropertyExists(*movementConfig, "breakdownClasses")) {
+        movementBreakdownSpeed = containsString(breakdownClasses, "speed_band");
+        movementBreakdownHeight = containsString(breakdownClasses, "height_band");
+      }
+    }
+    if (const auto possessionConfig = parseJsonObjectProperty(*moduleConfigs, "possession")) {
+      const std::vector<std::string> breakdownClasses =
+          parseJsonStringArrayProperty(*possessionConfig, "breakdownClasses");
+      if (jsonPropertyExists(*possessionConfig, "breakdownClasses")) {
+        possessionBreakdownState = containsString(breakdownClasses, "possession_state");
+        possessionBreakdownThird = containsString(breakdownClasses, "field_third");
       }
     }
   }
@@ -3259,6 +3283,18 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        {"height_band", touchBreakdownHeight},
        {"surface", touchBreakdownSurface},
        {"dodge_state", touchBreakdownDodge}});
+  file << "},\n";
+  file << "    \"movement\": {\"breakdownClasses\":";
+  writeEnabledStringArray(
+      file,
+      {{"speed_band", movementBreakdownSpeed},
+       {"height_band", movementBreakdownHeight}});
+  file << "},\n";
+  file << "    \"possession\": {\"breakdownClasses\":";
+  writeEnabledStringArray(
+      file,
+      {{"possession_state", possessionBreakdownState},
+       {"field_third", possessionBreakdownThird}});
   file << "}\n";
   file << "  },\n";
   file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
@@ -3289,6 +3325,14 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"touch_breakdown_surface\": " << (touchBreakdownSurface ? "true" : "false")
        << ",\n";
   file << "  \"touch_breakdown_dodge\": " << (touchBreakdownDodge ? "true" : "false")
+       << ",\n";
+  file << "  \"movement_breakdown_speed\": " << (movementBreakdownSpeed ? "true" : "false")
+       << ",\n";
+  file << "  \"movement_breakdown_height\": " << (movementBreakdownHeight ? "true" : "false")
+       << ",\n";
+  file << "  \"possession_breakdown_state\": " << (possessionBreakdownState ? "true" : "false")
+       << ",\n";
+  file << "  \"possession_breakdown_third\": " << (possessionBreakdownThird ? "true" : "false")
        << ",\n";
   file << "  \"boost_pickup_pad_big\": " << (boostPickupPadBig ? "true" : "false")
        << ",\n";
@@ -7018,6 +7062,24 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   ImGui::Checkbox("Playlist follow", &eventPlaylistAutoFollow);
 
   renderEventFilterCombo("Event filter");
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT DISPLAY");
+  ImGui::TextDisabled("Movement breakdown");
+  ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed);
+  ImGui::SameLine();
+  ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight);
+  if (ImGui::Button("Open movement stats")) {
+    createStatsModuleWindow("movement", 0);
+  }
+
+  ImGui::TextDisabled("Possession breakdown");
+  ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState);
+  ImGui::SameLine();
+  ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird);
+  if (ImGui::Button("Open possession stats")) {
+    createStatsModuleWindow("possession", 0);
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
