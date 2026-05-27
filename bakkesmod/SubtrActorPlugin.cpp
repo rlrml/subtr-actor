@@ -9341,6 +9341,8 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "New player stats",
        UI_STAT_SCOPE_PLAYER,
        true,
+       true,
+       true,
        true},
       {UiStatsWindowKind::Team,
        "team",
@@ -9348,12 +9350,16 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "New team stats",
        UI_STAT_SCOPE_TEAM,
        true,
+       true,
+       true,
        true},
       {UiStatsWindowKind::AllPlayers,
        "all-players",
        "All players stats",
        "New all players stats",
        UI_STAT_SCOPE_PLAYER,
+       false,
+       true,
        true,
        false},
       {UiStatsWindowKind::AllTeams,
@@ -9361,6 +9367,8 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "All teams stats",
        "New all teams stats",
        UI_STAT_SCOPE_TEAM,
+       false,
+       true,
        true,
        false},
       {UiStatsWindowKind::GoalsOverview,
@@ -9368,6 +9376,8 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "Goal labels",
        "New goal labels",
        UI_STAT_SCOPE_EVENT,
+       false,
+       false,
        true,
        true},
       {UiStatsWindowKind::AdHoc,
@@ -9375,6 +9385,8 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "Ad hoc stats",
        "New ad hoc stats",
        static_cast<uint8_t>(UI_STAT_SCOPE_PLAYER | UI_STAT_SCOPE_TEAM | UI_STAT_SCOPE_EVENT),
+       false,
+       true,
        true,
        false},
       {UiStatsWindowKind::StatsModule,
@@ -9382,6 +9394,8 @@ SubtrActorPlugin::statsWindowKindControls() const {
        "Stats module",
        "New stats module",
        0,
+       false,
+       false,
        false,
        false},
   }};
@@ -9422,6 +9436,24 @@ uint8_t SubtrActorPlugin::statsWindowKindStatScopes(UiStatsWindowKind kind) cons
     }
   }
   return 0;
+}
+
+bool SubtrActorPlugin::statsWindowKindHasScopeSelector(UiStatsWindowKind kind) const {
+  for (const StatsWindowKindControl &control : statsWindowKindControls()) {
+    if (control.kind == kind) {
+      return control.scope_selector;
+    }
+  }
+  return false;
+}
+
+bool SubtrActorPlugin::statsWindowKindHasStatPicker(UiStatsWindowKind kind) const {
+  for (const StatsWindowKindControl &control : statsWindowKindControls()) {
+    if (control.kind == kind) {
+      return control.stat_picker;
+    }
+  }
+  return false;
 }
 
 std::string SubtrActorPlugin::statsWindowTitle(const UiStatsWindow &window) const {
@@ -9798,8 +9830,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
   }
   captureStatsWindowPlacement(window);
 
-  const bool scopeHeaderOnly =
-      window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team;
+  const bool scopeHeaderOnly = statsWindowKindHasScopeSelector(window.kind);
   if (!scopeHeaderOnly) {
     ImGui::TextColored(
         ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
@@ -9923,13 +9954,13 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     return;
   }
 
-  if (window.kind == UiStatsWindowKind::GoalsOverview) {
+  if (!statsWindowKindHasStatPicker(window.kind)) {
     ImGui::Separator();
     return;
   }
 
   const std::string addButton = std::format("+##add-stat-{}", window.id);
-  if (window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team) {
+  if (statsWindowKindHasScopeSelector(window.kind)) {
     ImGui::SameLine();
   }
   if (ImGui::Button(addButton.c_str())) {

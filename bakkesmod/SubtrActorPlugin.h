@@ -188,6 +188,8 @@ private:
     const char *label;
     const char *create_label;
     uint8_t stat_scopes;
+    bool scope_selector;
+    bool stat_picker;
     bool web_config;
     bool default_window;
   };
@@ -515,6 +517,8 @@ private:
   const char *statsWindowKindConfigId(UiStatsWindowKind kind) const;
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   uint8_t statsWindowKindStatScopes(UiStatsWindowKind kind) const;
+  bool statsWindowKindHasScopeSelector(UiStatsWindowKind kind) const;
+  bool statsWindowKindHasStatPicker(UiStatsWindowKind kind) const;
   std::string statsWindowDisplayLabel(const UiStatsWindow &window) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
   const SaPlayerFrame *sampledPlayerByIndex(uint32_t playerIndex) const;
