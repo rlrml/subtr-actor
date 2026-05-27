@@ -9637,44 +9637,41 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
 }
 
 void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
-  if (lastTeamScores) {
-    ImGui::Text("Score: Blue %d - Orange %d", lastTeamScores->first, lastTeamScores->second);
-  } else {
-    ImGui::Text("Waiting for score data.");
-  }
-  ImGui::Columns(2, "goal-overview-stat-rows", false);
-  for (size_t i = 0; i < window.entries.size();) {
-    const std::string &statId = window.entries[i].stat_id;
-    if (!statsWindowSupportsStat(window, statId)) {
-      ++i;
-      continue;
+  (void)window;
+  std::vector<size_t> goalEventIndexes;
+  goalEventIndexes.reserve(recentUiEvents.size());
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
+    if (event.category == "goal_context" || event.type == "goal") {
+      goalEventIndexes.push_back(index);
     }
-    ImGui::Text("%s", uiStatLabel(statId));
-    ImGui::NextColumn();
-    ImGui::Text("%d", recentEventCountForType(statId));
-    ImGui::SameLine();
-    if (ImGui::Button(std::format("Remove##{}-{}", window.id, i).c_str())) {
-      window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-      ImGui::Columns(1);
-      return;
-    }
-    ImGui::NextColumn();
-    ++i;
   }
-  ImGui::Columns(1);
-  ImGui::Separator();
+  std::sort(goalEventIndexes.begin(), goalEventIndexes.end(), [&](size_t left, size_t right) {
+    const UiEventRecord &leftEvent = recentUiEvents[left];
+    const UiEventRecord &rightEvent = recentUiEvents[right];
+    if (leftEvent.time == rightEvent.time) {
+      return leftEvent.frame_number < rightEvent.frame_number;
+    }
+    return leftEvent.time < rightEvent.time;
+  });
+
   ImGui::BeginChild("goal-labels", ImVec2{0.0f, 0.0f}, true);
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
   const bool hasReplayServer = !replayServer.IsNull();
-  bool renderedAny = false;
-  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+  for (size_t ordinal = 0; ordinal < goalEventIndexes.size(); ordinal += 1) {
+    const size_t index = goalEventIndexes[ordinal];
     const UiEventRecord &event = recentUiEvents[index];
-    if (event.category != "goal_context" && event.type != "goal") {
-      continue;
-    }
-    renderedAny = true;
     const float seekTime = std::max(0.0f, event.time - GOAL_WATCH_LEAD_SECONDS);
     ImGui::PushID(static_cast<int>(index));
+    ImGui::TextColored(toImVec4(event.color), "Goal %zu", ordinal + 1);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%.2fs - %s", event.time, event.actor.c_str());
+    ImGui::TextWrapped("%s", event.label.c_str());
+    if (!event.details.empty()) {
+      ImGui::TextDisabled("%s", event.details.c_str());
+    } else {
+      ImGui::TextDisabled("Unlabeled");
+    }
     if (ImGui::SmallButton("Watch")) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
@@ -9712,18 +9709,11 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
             std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
       }
     }
-    ImGui::SameLine();
-    ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());
-    ImGui::SameLine();
-    ImGui::TextWrapped("%s", event.label.c_str());
-    if (!event.details.empty()) {
-      ImGui::TextDisabled("%s", event.details.c_str());
-    }
     ImGui::Separator();
     ImGui::PopID();
   }
-  if (!renderedAny) {
-    ImGui::TextWrapped("No goal labels have been observed yet.");
+  if (goalEventIndexes.empty()) {
+    ImGui::TextWrapped("No goals loaded.");
   }
   ImGui::EndChild();
 }
