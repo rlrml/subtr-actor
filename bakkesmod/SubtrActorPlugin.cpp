@@ -2295,7 +2295,32 @@ void SubtrActorPlugin::applyUiConfigJson(
     return;
   }
 
-  auto loadPlacement = [](
+  auto loadPlacementObject = [](
+                                 const std::string &object,
+                                 UiWindowPlacement &out,
+                                 bool *visible = nullptr) {
+    if (visible != nullptr) {
+      *visible = parseJsonBoolProperty(object, "visible").value_or(*visible);
+    }
+    out.has_placement = parseJsonBoolProperty(object, "has_placement").value_or(true);
+    out.pending_apply_placement = out.has_placement;
+    out.x = static_cast<float>(parseJsonNumberProperty(object, "x").value_or(out.x));
+    out.y = static_cast<float>(parseJsonNumberProperty(object, "y").value_or(out.y));
+    out.width = static_cast<float>(parseJsonNumberProperty(object, "width").value_or(out.width));
+    out.height =
+        static_cast<float>(parseJsonNumberProperty(object, "height").value_or(out.height));
+    out.viewport_width = static_cast<float>(
+        parseJsonNumberProperty(object, "viewport_width").value_or(out.viewport_width));
+    out.viewport_height = static_cast<float>(
+        parseJsonNumberProperty(object, "viewport_height").value_or(out.viewport_height));
+    if (const auto viewport = parseJsonObjectProperty(object, "viewport")) {
+      out.viewport_width = static_cast<float>(
+          parseJsonNumberProperty(*viewport, "width").value_or(out.viewport_width));
+      out.viewport_height = static_cast<float>(
+          parseJsonNumberProperty(*viewport, "height").value_or(out.viewport_height));
+    }
+  };
+  auto loadPlacement = [&loadPlacementObject](
                            const std::string &parent,
                            const char *name,
                            UiWindowPlacement &out,
@@ -2304,27 +2329,7 @@ void SubtrActorPlugin::applyUiConfigJson(
     if (!object) {
       return;
     }
-    if (visible != nullptr) {
-      *visible = parseJsonBoolProperty(*object, "visible").value_or(*visible);
-    }
-    out.has_placement = parseJsonBoolProperty(*object, "has_placement").value_or(true);
-    out.pending_apply_placement = out.has_placement;
-    out.x = static_cast<float>(parseJsonNumberProperty(*object, "x").value_or(out.x));
-    out.y = static_cast<float>(parseJsonNumberProperty(*object, "y").value_or(out.y));
-    out.width =
-        static_cast<float>(parseJsonNumberProperty(*object, "width").value_or(out.width));
-    out.height =
-        static_cast<float>(parseJsonNumberProperty(*object, "height").value_or(out.height));
-    out.viewport_width = static_cast<float>(
-        parseJsonNumberProperty(*object, "viewport_width").value_or(out.viewport_width));
-    out.viewport_height = static_cast<float>(
-        parseJsonNumberProperty(*object, "viewport_height").value_or(out.viewport_height));
-    if (const auto viewport = parseJsonObjectProperty(*object, "viewport")) {
-      out.viewport_width = static_cast<float>(
-          parseJsonNumberProperty(*viewport, "width").value_or(out.viewport_width));
-      out.viewport_height = static_cast<float>(
-          parseJsonNumberProperty(*viewport, "height").value_or(out.viewport_height));
-    }
+    loadPlacementObject(*object, out, visible);
   };
 
   uiLauncherOpen = parseJsonBoolProperty(json, "launcher_open").value_or(uiLauncherOpen);
@@ -2477,6 +2482,34 @@ void SubtrActorPlugin::applyUiConfigJson(
         "boost_pickup_controls",
         boostPickupControlsPlacement,
         &uiBoostPickupControlsOpen);
+  }
+  for (const std::string &object : parseJsonObjectArrayProperty(json, "singletonWindows")) {
+    const std::string id = parseJsonStringProperty(object, "id").value_or("");
+    const auto placement = parseJsonObjectProperty(object, "placement");
+    if (!placement) {
+      continue;
+    }
+    if (id == "camera") {
+      loadPlacementObject(*placement, cameraPlacement, &uiCameraOpen);
+    } else if (id == "scoreboard") {
+      loadPlacementObject(*placement, scoreboardPlacement, &uiScoreboardOpen);
+    } else if (id == "playback") {
+      loadPlacementObject(*placement, playbackControlsPlacement, &uiPlaybackControlsOpen);
+    } else if (id == "recording") {
+      loadPlacementObject(*placement, recordingPlacement, &uiRecordingOpen);
+    } else if (id == "mechanics") {
+      loadPlacementObject(*placement, eventsPlacement, &uiEventsOpen);
+    } else if (id == "event-playlist") {
+      loadPlacementObject(*placement, eventPlaylistPlacement, &uiEventPlaylistOpen);
+    } else if (id == "mechanics-review") {
+      loadPlacementObject(*placement, mechanicsReviewPlacement, &uiMechanicsReviewOpen);
+    } else if (id == "replay-loading") {
+      loadPlacementObject(*placement, replayLoadingPlacement, &uiReplayLoadingOpen);
+    } else if (id == "boost-pickups") {
+      loadPlacementObject(*placement, boostPickupControlsPlacement, &uiBoostPickupControlsOpen);
+    } else if (id == "touch-controls") {
+      loadPlacementObject(*placement, touchControlsPlacement, &uiTouchControlsOpen);
+    }
   }
 
   uiStatsWindows.clear();
@@ -2766,6 +2799,35 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << ",\n    \"boost_pickup_controls\": ";
   writePlacement(file, boostPickupControlsPlacement, uiBoostPickupControlsOpen);
   file << "\n  },\n";
+  file << "  \"singletonWindows\": [\n";
+  auto writeSingletonWindow = [&](
+                                  const char *id,
+                                  const UiWindowPlacement &placement,
+                                  bool visible,
+                                  bool last) {
+    file << "    {\"id\":\"" << id << "\",\"placement\":";
+    writePlacement(file, placement, visible);
+    file << "}";
+    if (!last) {
+      file << ",";
+    }
+    file << "\n";
+  };
+  writeSingletonWindow("camera", cameraPlacement, uiCameraOpen, false);
+  writeSingletonWindow("scoreboard", scoreboardPlacement, uiScoreboardOpen, false);
+  writeSingletonWindow("playback", playbackControlsPlacement, uiPlaybackControlsOpen, false);
+  writeSingletonWindow("recording", recordingPlacement, uiRecordingOpen, false);
+  writeSingletonWindow("mechanics", eventsPlacement, uiEventsOpen, false);
+  writeSingletonWindow("event-playlist", eventPlaylistPlacement, uiEventPlaylistOpen, false);
+  writeSingletonWindow("mechanics-review", mechanicsReviewPlacement, uiMechanicsReviewOpen, false);
+  writeSingletonWindow("replay-loading", replayLoadingPlacement, uiReplayLoadingOpen, false);
+  writeSingletonWindow(
+      "boost-pickups",
+      boostPickupControlsPlacement,
+      uiBoostPickupControlsOpen,
+      false);
+  writeSingletonWindow("touch-controls", touchControlsPlacement, uiTouchControlsOpen, true);
+  file << "  ],\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
