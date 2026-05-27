@@ -6676,11 +6676,6 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
           std::format("In-game visualizations##{}-ingame", idSuffix).c_str(),
           ImGuiTreeNodeFlags_DefaultOpen)) {
     renderCvarModuleSummaryToggle(
-        "Canvas HUD overlay",
-        "subtr_actor_overlay_enabled",
-        true,
-        idSuffix);
-    renderCvarModuleSummaryToggle(
         "Canvas status line",
         "subtr_actor_status_overlay_enabled",
         true,
@@ -7165,9 +7160,13 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
 
   const bool allSourcesEnabled = eventPlaylistMechanicsEnabled && eventPlaylistTeamEventsEnabled &&
-                                 eventPlaylistGoalContextEnabled;
-  const bool noSourcesEnabled = !eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
-                                !eventPlaylistGoalContextEnabled;
+                                 eventPlaylistGoalContextEnabled &&
+                                 allEventSourcesSelected(
+                                     cvarString("subtr_actor_overlay_event_types", "all"));
+  const bool noSourcesEnabled =
+      (!eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
+       !eventPlaylistGoalContextEnabled) ||
+      selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all")).empty();
   if (renderModuleSummaryToggle(
           std::format("All events ({})", recentUiEvents.size()).c_str(),
           allSourcesEnabled,
@@ -7175,11 +7174,13 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     eventPlaylistMechanicsEnabled = true;
     eventPlaylistTeamEventsEnabled = true;
     eventPlaylistGoalContextEnabled = true;
+    setCvarString("subtr_actor_overlay_event_types", "all");
   }
   if (renderModuleSummaryToggle("No events", noSourcesEnabled, "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = false;
     eventPlaylistTeamEventsEnabled = false;
     eventPlaylistGoalContextEnabled = false;
+    setCvarString("subtr_actor_overlay_event_types", "none");
   }
   ImGui::Checkbox("Follow", &eventPlaylistAutoFollow);
 
