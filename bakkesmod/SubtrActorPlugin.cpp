@@ -7609,7 +7609,23 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.28f, 0.57f, 0.72f, 1.0f});
   }
 
-  if (ImGui::Button("Menu##subtr-actor-launcher-toggle", ImVec2{42.0f, 42.0f})) {
+  const bool launcherToggleClicked =
+      ImGui::Button("##subtr-actor-launcher-toggle", ImVec2{42.0f, 42.0f});
+  const ImVec2 toggleMin = ImGui::GetItemRectMin();
+  const ImVec2 toggleMax = ImGui::GetItemRectMax();
+  const float toggleCenterX = (toggleMin.x + toggleMax.x) * 0.5f;
+  const float toggleCenterY = (toggleMin.y + toggleMax.y) * 0.5f;
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  const ImU32 barColor = ImGui::GetColorU32(ImVec4{0.93f, 0.96f, 0.98f, 1.0f});
+  for (const float yOffset : {-6.0f, 0.0f, 6.0f}) {
+    drawList->AddLine(
+        ImVec2{toggleCenterX - 9.5f, toggleCenterY + yOffset},
+        ImVec2{toggleCenterX + 9.5f, toggleCenterY + yOffset},
+        barColor,
+        2.0f);
+  }
+
+  if (launcherToggleClicked) {
     uiWindowOpen = true;
     if (uiLauncherOpen) {
       hideLauncherWindow();
