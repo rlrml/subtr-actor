@@ -376,6 +376,7 @@ private:
   void applyRecordingUiWorkspace();
   void createStatsWindow(UiStatsWindowKind kind, bool initializeEntries = false);
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
+  void initializeStatsWindowPlacement(UiStatsWindow &window);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,

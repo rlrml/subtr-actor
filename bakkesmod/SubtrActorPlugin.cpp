@@ -7406,6 +7406,7 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   window.id = nextUiStatsWindowId++;
   window.kind = kind;
   window.pending_focus = true;
+  initializeStatsWindowPlacement(window);
   if (!sampledPlayers.empty()) {
     window.selected_player_index = sampledPlayers.front().player_index;
     window.selected_team_is_team_0 = sampledPlayers.front().is_team_0;
@@ -7423,9 +7424,29 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
   window.pending_focus = true;
   window.module_name = std::move(moduleName);
   window.module_view = std::clamp(moduleView, 0, 2);
-  window.width = 680.0f;
-  window.height = 460.0f;
+  initializeStatsWindowPlacement(window);
   uiStatsWindows.push_back(std::move(window));
+}
+
+void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
+  const float offset = static_cast<float>(uiStatsWindows.size() * 18);
+  const bool isModuleWindow = window.kind == UiStatsWindowKind::StatsModule;
+  window.width = isModuleWindow ? 680.0f : 540.0f;
+  window.height = isModuleWindow ? 460.0f : 330.0f;
+  const ImVec2 position = mapWindowPositionToViewport(
+      96.0f + offset,
+      96.0f + offset,
+      window.width,
+      window.height,
+      0.0f,
+      0.0f);
+  window.x = position.x;
+  window.y = position.y;
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  window.viewport_width = displaySize.x;
+  window.viewport_height = displaySize.y;
+  window.has_placement = true;
+  window.pending_apply_placement = true;
 }
 
 void SubtrActorPlugin::renderStatsWindows() {
