@@ -585,6 +585,18 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'if (jsonPropertyExists(*overlays, "renderEffects")) {',
+        "web renderEffects import uses JSON parser",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'overlays->find("\\"renderEffects\\"")',
+        "web renderEffects import uses exact substring",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'std::string statId = statsWindowObjectsFromWeb\n                               ? parseJsonStringProperty(entryObject, "statId").value_or("")\n                               : parseJsonStringProperty(entryObject, "stat_id").value_or("");',
         "web selected stat import only reads statId",
         errors,

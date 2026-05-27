@@ -3328,7 +3328,7 @@ void SubtrActorPlugin::applyUiConfigJson(
 
     const std::vector<std::string> renderEffects =
         parseJsonStringArrayProperty(*overlays, "renderEffects");
-    if (overlays->find("\"renderEffects\"") != std::string::npos) {
+    if (jsonPropertyExists(*overlays, "renderEffects")) {
       const bool anyRenderEffect = !renderEffects.empty();
       renderEffectCeilingShotEnabled = containsString(renderEffects, "ceiling-shot");
       renderEffectFiftyFiftyEnabled = containsString(renderEffects, "fifty-fifty");
