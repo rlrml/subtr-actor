@@ -321,6 +321,7 @@ private:
   bool boostPickupPadBig = true;
   bool boostPickupPadSmall = true;
   bool boostPickupPadAmbiguous = true;
+  bool boostPickupAnimationEnabled = false;
   bool boostPickupActivityActive = true;
   bool boostPickupActivityInactive = true;
   bool boostPickupActivityUnknown = true;

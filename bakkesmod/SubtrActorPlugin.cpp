@@ -2649,6 +2649,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       boostPickupPadSmall = *boostPads;
       boostPickupPadAmbiguous = *boostPads;
     }
+    boostPickupAnimationEnabled = parseJsonBoolProperty(*overlays, "boostPickupAnimation")
+                                      .value_or(boostPickupAnimationEnabled);
   }
   cameraViewMode = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
@@ -2819,6 +2821,8 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonBoolProperty(json, "boost_pickup_pad_small").value_or(boostPickupPadSmall);
   boostPickupPadAmbiguous =
       parseJsonBoolProperty(json, "boost_pickup_pad_ambiguous").value_or(boostPickupPadAmbiguous);
+  boostPickupAnimationEnabled = parseJsonBoolProperty(json, "boost_pickup_animation_enabled")
+                                    .value_or(boostPickupAnimationEnabled);
   boostPickupActivityActive = parseJsonBoolProperty(json, "boost_pickup_activity_active")
                                   .value_or(boostPickupActivityActive);
   boostPickupActivityInactive = parseJsonBoolProperty(json, "boost_pickup_activity_inactive")
@@ -3277,7 +3281,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "    \"boostPads\": "
        << (boostPickupPadBig || boostPickupPadSmall || boostPickupPadAmbiguous ? "true" : "false")
        << ",\n";
-  file << "    \"boostPickupAnimation\": false\n";
+  file << "    \"boostPickupAnimation\": "
+       << (boostPickupAnimationEnabled ? "true" : "false") << "\n";
   file << "  },\n";
   const bool hasReplayServerForPlayback = gameWrapper && gameWrapper->IsInReplay() &&
                                           !gameWrapper->GetGameEventAsReplay().IsNull();
@@ -3410,6 +3415,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << ",\n";
   file << "  \"boost_pickup_pad_ambiguous\": "
        << (boostPickupPadAmbiguous ? "true" : "false") << ",\n";
+  file << "  \"boost_pickup_animation_enabled\": "
+       << (boostPickupAnimationEnabled ? "true" : "false") << ",\n";
   file << "  \"boost_pickup_activity_active\": "
        << (boostPickupActivityActive ? "true" : "false") << ",\n";
   file << "  \"boost_pickup_activity_inactive\": "
@@ -6411,6 +6418,18 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
         idSuffix);
     renderBoolModuleSummaryToggle("Speed flip labels", renderEffectSpeedFlipEnabled, idSuffix);
     renderBoolModuleSummaryToggle("Touch labels", renderEffectTouchEnabled, idSuffix);
+    renderBoolModuleSummaryToggle(
+        "Boost pickup animation",
+        boostPickupAnimationEnabled,
+        idSuffix);
+    const bool boostPadsEnabled =
+        boostPickupPadBig || boostPickupPadSmall || boostPickupPadAmbiguous;
+    if (renderModuleSummaryToggle("Boost pad locations", boostPadsEnabled, idSuffix)) {
+      const bool next = !boostPadsEnabled;
+      boostPickupPadBig = next;
+      boostPickupPadSmall = next;
+      boostPickupPadAmbiguous = next;
+    }
     ImGui::TreePop();
   }
 }
@@ -7323,6 +7342,8 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   ImGui::Text("Pending pad events: %zu", pendingBoostPadEvents.size());
   ImGui::Text("Recent boost pickups: %d", recentEventCountForType("boost_pickup"));
 
+  ImGui::Separator();
+  ImGui::Checkbox("Boost pickup animation", &boostPickupAnimationEnabled);
   ImGui::Separator();
   if (ImGui::Button("All filters")) {
     boostPickupPadBig = true;
