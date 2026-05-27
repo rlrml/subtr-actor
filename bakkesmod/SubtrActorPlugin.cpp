@@ -3680,6 +3680,7 @@ void SubtrActorPlugin::applyUiConfigJson(
   nextUiStatsWindowId = 1;
   const bool hasLegacyStatsWindows = jsonPropertyExists(json, "stats_windows");
   const bool hasWebStatsWindows = jsonPropertyExists(json, "statsWindows");
+  const bool statsWindowObjectsFromWeb = !hasLegacyStatsWindows && hasWebStatsWindows;
   const std::vector<std::string> statsWindowObjects =
       hasLegacyStatsWindows
           ? parseJsonObjectArrayProperty(json, "stats_windows")
@@ -3723,7 +3724,11 @@ void SubtrActorPlugin::applyUiConfigJson(
     nextUiStatsWindowId = std::max(nextUiStatsWindowId, window.id + 1);
     window.open = parseJsonBoolProperty(object, "open").value_or(true);
     window.open = parseJsonBoolProperty(object, "visible").value_or(window.open);
-    if (const auto placement = parseJsonObjectProperty(object, "placement")) {
+    std::optional<std::string> placement = parseJsonObjectProperty(object, "placement");
+    if (!placement && statsWindowObjectsFromWeb) {
+      placement = R"({"x":8,"y":8,"viewport":{"width":1,"height":1},"visible":true})";
+    }
+    if (placement) {
       window.open = parseJsonBoolProperty(*placement, "visible").value_or(window.open);
       window.has_placement = true;
       window.pending_apply_placement = true;
@@ -3790,7 +3795,7 @@ void SubtrActorPlugin::applyUiConfigJson(
       }
       window.entries.push_back(UiStatsWindow::Entry{statId, targetId});
     }
-    if (!hasEntriesProperty && window.entries.empty() &&
+    if (!statsWindowObjectsFromWeb && !hasEntriesProperty && window.entries.empty() &&
         window.kind != UiStatsWindowKind::StatsModule) {
       initializeStatsWindowEntries(window);
     }

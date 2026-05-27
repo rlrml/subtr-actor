@@ -477,6 +477,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "const bool statsWindowObjectsFromWeb = !hasLegacyStatsWindows && hasWebStatsWindows;",
+        "stats window import tracks web source",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'hasLegacyStatsWindows\n          ? parseJsonObjectArrayProperty(json, "stats_windows")',
         "stats window import prefers present legacy plugin config",
         errors,
@@ -497,6 +503,18 @@ def main() -> int:
         plugin_source,
         'if (!webConfig) {\n          continue;\n        }\n        placement = R"({"x":8,"y":8,"viewport":{"width":1,"height":1},"visible":true})";',
         "web singleton window import mirrors normalizePlacement defaults",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (!placement && statsWindowObjectsFromWeb) {\n      placement = R\"({\"x\":8,\"y\":8,\"viewport\":{\"width\":1,\"height\":1},\"visible\":true})\";\n    }",
+        "web stats window import mirrors normalizePlacement defaults",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (!statsWindowObjectsFromWeb && !hasEntriesProperty && window.entries.empty() &&",
+        "web stats window import preserves missing entries as empty",
         errors,
     )
     reject_contains(
