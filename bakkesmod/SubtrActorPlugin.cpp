@@ -6935,6 +6935,7 @@ void SubtrActorPlugin::RenderSettings() {
     ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(imguiContext));
   }
   renderSharedSettingsControls();
+  renderSettingsWindowControls();
 }
 
 void SubtrActorPlugin::renderSharedSettingsControls() {
@@ -7580,7 +7581,42 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
   renderLayoutConfigControls("launcher-workspace-layout");
 }
 
-void SubtrActorPlugin::renderLauncherStatsWindowControls() {
+void SubtrActorPlugin::renderWebWindowToggleControls(
+    const char *idSuffix,
+    bool closeLauncherOnToggle) {
+  ImGui::PushID(idSuffix);
+  for (const SingletonWindowControl &window : webSingletonWindowControls()) {
+    ImGui::PushID(window.label);
+    const bool isOpen = window.open != nullptr && *window.open;
+    if (isOpen) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
+    }
+    const std::string buttonLabel =
+        std::format("{}   {}", window.label, isOpen ? "Hide" : "Show");
+    if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
+      if (*window.open) {
+        *window.open = false;
+      } else {
+        showSingletonWindow(*window.open, *window.placement);
+      }
+      if (closeLauncherOnToggle) {
+        uiLauncherOpen = false;
+      }
+    }
+    if (isOpen) {
+      ImGui::PopStyleColor(3);
+    }
+    ImGui::PopID();
+  }
+  ImGui::PopID();
+}
+
+void SubtrActorPlugin::renderStatsWindowCreationControls(
+    const char *idSuffix,
+    bool closeLauncherOnCreate) {
+  ImGui::PushID(idSuffix);
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
   for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
     if (!kind.web_config) {
@@ -7588,15 +7624,20 @@ void SubtrActorPlugin::renderLauncherStatsWindowControls() {
     }
     if (ImGui::Button(kind.create_label, ImVec2{170.0f, 0.0f})) {
       createStatsWindow(kind.kind);
-      uiLauncherOpen = false;
+      if (closeLauncherOnCreate) {
+        uiLauncherOpen = false;
+      }
     }
   }
   if (!statsModuleNames().empty() &&
       ImGui::Button("New stats module", ImVec2{170.0f, 0.0f})) {
     createStatsWindow(UiStatsWindowKind::StatsModule);
-    uiLauncherOpen = false;
+    if (closeLauncherOnCreate) {
+      uiLauncherOpen = false;
+    }
   }
   if (uiStatsWindows.empty()) {
+    ImGui::PopID();
     return;
   }
 
@@ -7609,6 +7650,17 @@ void SubtrActorPlugin::renderLauncherStatsWindowControls() {
       visibleStatsWindows,
       uiStatsWindows.size());
   renderStatsWindowManager();
+  ImGui::PopID();
+}
+
+void SubtrActorPlugin::renderSettingsWindowControls() {
+  ImGui::Separator();
+  ImGui::Text("Windows");
+  renderWebWindowToggleControls("settings-web-windows", false);
+  renderSingletonWindowManager();
+
+  ImGui::Separator();
+  renderStatsWindowCreationControls("settings-stats-windows", false);
 }
 
 void SubtrActorPlugin::renderLauncherWindow() {
@@ -7639,36 +7691,11 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
-  auto renderLauncherWindowToggle = [&](const SingletonWindowControl &window) {
-    ImGui::PushID(window.label);
-    const bool isOpen = window.open != nullptr && *window.open;
-    if (isOpen) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
-    }
-    const std::string buttonLabel =
-        std::format("{}   {}", window.label, isOpen ? "Hide" : "Show");
-    if (ImGui::Button(buttonLabel.c_str(), ImVec2{210.0f, 0.0f})) {
-      if (*window.open) {
-        *window.open = false;
-      } else {
-        showSingletonWindow(*window.open, *window.placement);
-      }
-      uiLauncherOpen = false;
-    }
-    if (isOpen) {
-      ImGui::PopStyleColor(3);
-    }
-    ImGui::PopID();
-  };
-  for (const SingletonWindowControl &window : webSingletonWindowControls()) {
-    renderLauncherWindowToggle(window);
-  }
+  renderWebWindowToggleControls("launcher-web-windows", true);
   renderSingletonWindowManager();
 
   ImGui::Separator();
-  renderLauncherStatsWindowControls();
+  renderStatsWindowCreationControls("launcher-stats-windows", true);
 
   ImGui::Separator();
   renderLauncherWorkspaceControls();

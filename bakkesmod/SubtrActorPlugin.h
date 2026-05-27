@@ -441,7 +441,9 @@ private:
   void applyLauncherMenuPlacement();
   void renderLauncherWindow();
   void renderLauncherWorkspaceControls();
-  void renderLauncherStatsWindowControls();
+  void renderWebWindowToggleControls(const char *idSuffix, bool closeLauncherOnToggle);
+  void renderStatsWindowCreationControls(const char *idSuffix, bool closeLauncherOnCreate);
+  void renderSettingsWindowControls();
   void renderEmptyStateWindow();
   void renderFloatingWindowLayer();
   void renderScoreboardWindow();
