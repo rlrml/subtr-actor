@@ -1,86 +1,16 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use clap::Parser;
-use serde::Serialize;
-use serde_json::Value;
 use subtr_actor_tools::ballchasing::{
     compare_replay_against_ballchasing_json_with_breakdown, recommended_match_config,
 };
 
-#[derive(Debug, Serialize)]
-struct NumericDelta {
-    path: String,
-    actual: f64,
-    expected: f64,
-    delta: f64,
-    abs_delta: f64,
-}
+#[path = "ballchasing_breakdown_deltas.rs"]
+mod deltas;
+#[path = "ballchasing_breakdown_types.rs"]
+mod types;
 
-#[derive(Debug, Serialize)]
-struct OutputReport {
-    is_match: bool,
-    mismatch_count: usize,
-    mismatches: Vec<String>,
-    deltas: Vec<NumericDelta>,
-}
-
-#[derive(Debug, Parser)]
-#[command(about = "Compare a replay against exported Ballchasing JSON with numeric deltas.")]
-struct Args {
-    /// Replay file to compare.
-    replay_path: PathBuf,
-
-    /// Ballchasing JSON path to compare against.
-    ballchasing_json_path: PathBuf,
-
-    /// Optional output directory for comparison artifacts.
-    output_dir: Option<PathBuf>,
-}
-
-fn collect_numeric_deltas(
-    path: &str,
-    actual: &Value,
-    expected: &Value,
-    deltas: &mut Vec<NumericDelta>,
-) {
-    match (actual, expected) {
-        (Value::Number(actual), Value::Number(expected)) => {
-            let Some(actual) = actual.as_f64() else {
-                return;
-            };
-            let Some(expected) = expected.as_f64() else {
-                return;
-            };
-            if actual != expected {
-                let delta = actual - expected;
-                deltas.push(NumericDelta {
-                    path: path.to_string(),
-                    actual,
-                    expected,
-                    delta,
-                    abs_delta: delta.abs(),
-                });
-            }
-        }
-        (Value::Object(actual), Value::Object(expected)) => {
-            for (key, expected_value) in expected {
-                let child_path = if path.is_empty() {
-                    key.to_string()
-                } else {
-                    format!("{path}.{key}")
-                };
-                collect_numeric_deltas(
-                    &child_path,
-                    actual.get(key).unwrap_or(&Value::Null),
-                    expected_value,
-                    deltas,
-                );
-            }
-        }
-        _ => {}
-    }
-}
+use deltas::collect_numeric_deltas;
+use types::{Args, OutputReport};
 
 fn main() -> anyhow::Result<()> {
     let Args {
