@@ -293,6 +293,9 @@ private:
   void renderEventPlaylistWindow();
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
+  void resetWindowPlacements();
+  void resetDefaultStatsWindows();
+  void applyDefaultUiWorkspace();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName);
   void applyWindowPlacement(

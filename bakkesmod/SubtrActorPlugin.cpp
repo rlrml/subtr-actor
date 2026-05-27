@@ -1846,6 +1846,8 @@ bool SubtrActorPlugin::IsActiveOverlay() {
 
 void SubtrActorPlugin::OnOpen() {
   uiWindowOpen = true;
+  uiLauncherOpen = true;
+  launcherPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::OnClose() {
@@ -4983,6 +4985,33 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderSingletonWindowManager();
 
   ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LAYOUT");
+  if (ImGui::Button("Default workspace")) {
+    applyDefaultUiWorkspace();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reset positions")) {
+    resetWindowPlacements();
+  }
+  if (ImGui::Button("Default stats windows")) {
+    resetDefaultStatsWindows();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Hide side windows")) {
+    uiEventsOpen = false;
+    uiEventPlaylistOpen = false;
+    uiStatusOpen = false;
+    uiGraphInspectorOpen = false;
+  }
+  if (ImGui::Button("Save layout")) {
+    saveUiConfig();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reload layout")) {
+    loadUiConfig();
+  }
+
+  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
   if (ImGui::Button("New player stats")) {
     createStatsWindow(UiStatsWindowKind::Player);
@@ -5005,13 +5034,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
   if (ImGui::Button("New stats module")) {
     const std::vector<std::string> &moduleNames = statsModuleNames();
     createStatsModuleWindow(moduleNames.empty() ? "" : moduleNames.front());
-  }
-  if (ImGui::Button("Save layout")) {
-    saveUiConfig();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload layout")) {
-    loadUiConfig();
   }
   const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
       uiStatsWindows.begin(),
@@ -5528,6 +5550,53 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     uiStatsWindows.erase(uiStatsWindows.begin() + static_cast<std::ptrdiff_t>(*removeIndex));
   }
   ImGui::EndChild();
+}
+
+void SubtrActorPlugin::resetWindowPlacements() {
+  launcherPlacement = UiWindowPlacement{};
+  scoreboardPlacement = UiWindowPlacement{};
+  eventsPlacement = UiWindowPlacement{};
+  eventPlaylistPlacement = UiWindowPlacement{};
+  statusPlacement = UiWindowPlacement{};
+  graphInspectorPlacement = UiWindowPlacement{};
+
+  launcherPlacement.pending_focus = true;
+  for (UiStatsWindow &window : uiStatsWindows) {
+    window.has_placement = false;
+    window.pending_apply_placement = false;
+    window.pending_focus = window.open;
+    window.x = 0.0f;
+    window.y = 0.0f;
+    window.width = 540.0f;
+    window.height = 330.0f;
+    if (window.kind == UiStatsWindowKind::StatsModule) {
+      window.width = 680.0f;
+      window.height = 460.0f;
+    }
+  }
+}
+
+void SubtrActorPlugin::resetDefaultStatsWindows() {
+  uiStatsWindows.clear();
+  nextUiStatsWindowId = 1;
+  createStatsWindow(UiStatsWindowKind::Player);
+  createStatsWindow(UiStatsWindowKind::Team);
+  createStatsWindow(UiStatsWindowKind::GoalsOverview);
+}
+
+void SubtrActorPlugin::applyDefaultUiWorkspace() {
+  uiLauncherOpen = true;
+  uiScoreboardOpen = true;
+  uiEventsOpen = true;
+  uiEventPlaylistOpen = true;
+  uiStatusOpen = true;
+  uiGraphInspectorOpen = false;
+  eventPlaylistMechanicsEnabled = true;
+  eventPlaylistTeamEventsEnabled = true;
+  eventPlaylistGoalContextEnabled = true;
+  eventPlaylistAutoFollow = true;
+  resetWindowPlacements();
+  resetDefaultStatsWindows();
 }
 
 void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind) {
