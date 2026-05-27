@@ -20,6 +20,28 @@ PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 
+WEB_SINGLETON_WINDOW_IDS = (
+    "camera",
+    "scoreboard",
+    "playback",
+    "recording",
+    "mechanics",
+    "event-playlist",
+    "mechanics-review",
+    "replay-loading",
+    "boost-pickups",
+    "touch-controls",
+)
+
+WEB_STATS_WINDOW_KIND_IDS = (
+    "player",
+    "team",
+    "all-players",
+    "all-teams",
+    "goals-overview",
+    "ad-hoc",
+)
+
 
 @dataclass(frozen=True)
 class EventFamily:
@@ -191,6 +213,61 @@ def require_contains(source: str, needle: str, label: str, errors: list[str]) ->
         errors.append(f"missing {label}: {needle}")
 
 
+def singleton_window_controls(source: str) -> list[tuple[str, bool, int]]:
+    match = re.search(
+        r"return\s+\{\{(.*?)\}\};\s*\}\s*\n\s*std::vector<SubtrActorPlugin::SingletonWindowControl>",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing singletonWindowControls return block")
+
+    controls: list[tuple[str, bool, int]] = []
+    for control in re.finditer(
+        r'\{\s*"[^"]+",\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
+        r"(?P<web>true|false),\s*(?P<order>\d+),",
+        match.group(1),
+        re.DOTALL,
+    ):
+        controls.append(
+            (
+                control.group("id"),
+                control.group("web") == "true",
+                int(control.group("order")),
+            )
+        )
+    if not controls:
+        raise AssertionError("could not parse singletonWindowControls")
+    return controls
+
+
+def stats_window_kind_controls(source: str) -> list[tuple[str, bool]]:
+    match = re.search(
+        r"SubtrActorPlugin::statsWindowKindControls\(\)\s+const\s+\{\s+return\s+\{\{"
+        r"(.*?)\}\};\s*\}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing statsWindowKindControls return block")
+
+    controls: list[tuple[str, bool]] = []
+    for control in re.finditer(
+        r'\{\s*UiStatsWindowKind::\w+,\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
+        r"(?:static_cast<[^>]+>\([^)]*\)|[^,]+),\s*"
+        r"(?P<scope_selector>true|false),\s*"
+        r"(?P<stat_picker>true|false),\s*"
+        r"(?P<web>true|false),\s*"
+        r"(?P<default_window>true|false)\s*\}",
+        match.group(1),
+        re.DOTALL,
+    ):
+        controls.append((control.group("id"), control.group("web") == "true"))
+    if not controls:
+        raise AssertionError("could not parse statsWindowKindControls")
+    return controls
+
+
 def main() -> int:
     rust_source = RUST_SOURCE.read_text(encoding="utf-8")
     plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
@@ -214,6 +291,53 @@ def main() -> int:
                 f"registry mismatch {rust_name} != {cpp_name}: "
                 f"Rust={rust_values!r} C++={cpp_values!r}"
             )
+
+    web_window_ids = tuple(
+        window_id
+        for window_id, web_config, _ in sorted(
+            singleton_window_controls(plugin_source),
+            key=lambda control: (control[2], control[0]),
+        )
+        if web_config
+    )
+    if web_window_ids != WEB_SINGLETON_WINDOW_IDS:
+        errors.append(
+            "web singleton window order drifted from stats evaluation player: "
+            f"expected={WEB_SINGLETON_WINDOW_IDS!r} actual={web_window_ids!r}"
+        )
+
+    web_stats_window_kind_ids = tuple(
+        kind_id for kind_id, web_config in stats_window_kind_controls(plugin_source) if web_config
+    )
+    if web_stats_window_kind_ids != WEB_STATS_WINDOW_KIND_IDS:
+        errors.append(
+            "web stats window kind order drifted from stats evaluation player: "
+            f"expected={WEB_STATS_WINDOW_KIND_IDS!r} actual={web_stats_window_kind_ids!r}"
+        )
+
+    require_contains(
+        plugin_source,
+        "constexpr ImGuiWindowFlags UI_FLOATING_WINDOW_FLAGS",
+        "managed floating window flags",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "UI_FLOATING_WINDOW_FLAGS =\n"
+        "    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |\n"
+        "    ImGuiWindowFlags_NoSavedSettings;",
+        "managed floating windows opt out of implicit ImGui persistence",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "scoreboardFlags =\n"
+        "      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |\n"
+        "      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |\n"
+        "      ImGuiWindowFlags_NoSavedSettings;",
+        "scoreboard opts out of implicit ImGui persistence",
+        errors,
+    )
 
     required_event_fields = set(rust_array(rust_source, "REQUIRED_EVENT_HISTORY_FIELD_NAMES"))
     covered_event_fields = {family.graph_field for family in EVENT_FAMILIES}
