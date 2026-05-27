@@ -6711,14 +6711,16 @@ void SubtrActorPlugin::Render() {
     ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(imguiContext));
   }
 
-  renderLauncherToggleChrome();
-  renderLauncherWindow();
   if (!uiEnabled()) {
+    renderLauncherToggleChrome();
+    renderLauncherWindow();
     return;
   }
 
   renderEmptyStateWindow();
   renderFloatingWindowLayer();
+  renderLauncherToggleChrome();
+  renderLauncherWindow();
   maybeAutosaveUiConfig();
 }
 
