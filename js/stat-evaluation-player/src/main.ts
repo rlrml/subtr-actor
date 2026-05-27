@@ -16,10 +16,8 @@ import type {
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayTimelineEvent,
-  ReplayTimelineRange,
   ReplayPlayerState,
   ReplayPlayerTrack,
-  PlaylistManifestPage,
   TimelineOverlayPlugin,
 } from "@rlrml/player";
 import { getAppTemplate } from "./appTemplate.ts";
@@ -35,23 +33,16 @@ import {
   type StatsPlayerConfigAdapter,
 } from "./configAdapters.ts";
 import type {
-  PlayerStatsSnapshot,
   StatsFrame,
   StatsFrameLookup,
-  TeamStatsSnapshot,
   StatsTimeline,
 } from "./statsTimeline.ts";
-import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
-import { getStatDefinitionSearchMatches } from "./statSearch.ts";
+import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import {
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
-  formatMechanicKind,
   getMechanicKinds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
-import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
@@ -59,6 +50,35 @@ import {
   type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
+import {
+  createMechanicsReviewReplaySource,
+  formatMechanicsReviewClipDetails,
+  formatMechanicsReviewEventDetails,
+  formatMechanicsReviewStatus,
+  getMechanicsReviewBoundTime,
+  getMechanicsReviewDecisionEndpoint,
+  getMechanicsReviewItemLabel,
+  getMechanicsReviewMechanicLabel,
+  getMechanicsReviewPlayerId,
+  getMechanicsReviewPlayerName,
+  getMechanicsReviewReplayItems,
+  getMechanicsReviewReplayLabel,
+  getMechanicsReviewReplayPath,
+  getMechanicsReviewUrlFromLocation,
+  initializeMechanicsReviewReplayLoadStates,
+  mechanicsReviewAuthHeaders,
+  mechanicsReviewReplayLoadProgressValue,
+  mechanicsReviewReplayLoadStatusText,
+  parseMechanicsReviewPlaylistJson,
+  resolveMechanicsReviewUrl,
+  type ActiveMechanicsReview,
+  type MechanicsReviewItem,
+  type MechanicsReviewPlaylist,
+  type MechanicsReviewReplay,
+  type MechanicsReviewReplayLoadState,
+} from "./mechanicsReview.ts";
+import { createStatsWindowsManager } from "./statsWindows.ts";
+import { createEventWindowsManager } from "./eventWindows.ts";
 import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
@@ -74,12 +94,9 @@ import {
   type SingletonWindowId,
   type StatsPlayerConfig,
   type StatsPlayerConfigParamSnapshot,
-  type StatsWindowConfig,
   type StatsWindowKind,
-  type TeamScope,
   type WindowPlacementConfig,
 } from "./playerConfig.ts";
-import { playerIdToString } from "./touchOverlay.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -124,7 +141,7 @@ const MODULES = createStatModules(
       }
 
       const state = replayPlayer.getState();
-      renderStatsWindows(state.frameIndex);
+      statsWindowManager.render(state.frameIndex);
     },
     refreshTimelineRanges() {
       syncTimelineRanges();
@@ -154,75 +171,6 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "touch",
 ]);
 const TOUCH_MODULE_ID = "touch";
-const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
-const EVENT_PLAYLIST_PLAYER_COLORS = [
-  "#3b82f6",
-  "#06b6d4",
-  "#22c55e",
-  "#a855f7",
-  "#f97316",
-  "#ef4444",
-  "#f59e0b",
-  "#ec4899",
-];
-const EVENT_PLAYLIST_NEUTRAL_COLOR = "#d1d9e0";
-
-interface EventWindowSourceDefinition {
-  id: string;
-  label: string;
-  buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
-}
-
-interface EventTimelineSource {
-  id: string;
-  playlistId: string;
-  timelineKey: string;
-  timelineId: string;
-  group: string;
-  label: string;
-  count: number;
-  active: boolean;
-  buildTimelineEvents(): ReplayTimelineEvent[];
-  buildPlaylistEvents(): ReplayTimelineEvent[];
-  buildTimelineRanges?(): ReplayTimelineRange[];
-  setActive(enabled: boolean): void;
-}
-
-interface EventPlaylistSource {
-  id: string;
-  group: string;
-  label: string;
-  events: ReplayTimelineEvent[];
-}
-
-interface EventPlaylistItem {
-  key: string;
-  sourceId: string;
-  sourceLabel: string;
-  event: ReplayTimelineEvent;
-  color: string;
-}
-
-const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
-  {
-    id: "core",
-    label: "Shots, saves, assists",
-    buildEvents(ctx) {
-      return ctx.replay.timelineEvents.filter(
-        (event) => event.kind === "shot" || event.kind === "save" || event.kind === "assist",
-      );
-    },
-  },
-  {
-    id: "demo",
-    label: "Demos",
-    buildEvents(ctx) {
-      return ctx.replay.timelineEvents.filter((event) => event.kind === "demo");
-    },
-  },
-];
-
-const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [];
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -333,16 +281,12 @@ let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let nextWindowZIndex = 30;
-let nextStatsWindowId = 1;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
-let eventPlaylistActiveSourceIds: Set<string> | null = null;
-let eventPlaylistAutoFollow = true;
-let eventPlaylistLastActiveKey: string | null = null;
 
 interface ReplayInputSource {
   name: string;
@@ -364,97 +308,86 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "touch-controls",
 ];
 
-type MechanicsReviewPlaybackBound =
-  | { kind: "time"; value: number }
-  | { kind: "frame"; value: number };
-
-interface MechanicsReviewReplay {
-  id: string;
-  path?: string;
-  label?: string;
-  locator?: Record<string, unknown>;
-  meta?: Record<string, unknown>;
-}
-
-interface MechanicsReviewItemMeta {
-  confidence?: number | null;
-  eventId?: string;
-  mechanic?: string;
-  mechanicLabel?: string;
-  playerId?: string;
-  playerName?: string | null;
-  reason?: string;
-  reviewEndpoint?: string;
-  reviewStatus?: string | null;
-  target?: Record<string, unknown>;
-  followupGoal?: unknown;
-  [key: string]: unknown;
-}
-
-interface MechanicsReviewItem {
-  id?: string;
-  replay: string;
-  start: MechanicsReviewPlaybackBound;
-  end: MechanicsReviewPlaybackBound;
-  label?: string;
-  meta?: MechanicsReviewItemMeta;
-}
-
-interface MechanicsReviewPlaylist {
-  label?: string;
-  replays?: MechanicsReviewReplay[];
-  items: MechanicsReviewItem[];
-  page?: PlaylistManifestPage;
-  playback?: unknown;
-  meta?: unknown;
-}
-
-type MechanicsReviewReplayLoadStatus = "idle" | "loading" | "loaded" | "error";
-
-interface MechanicsReviewReplayLoadState {
-  replayId: string;
-  label: string;
-  path: string;
-  clipCount: number;
-  status: MechanicsReviewReplayLoadStatus;
-  progress: ReplayLoadProgress | null;
-  error: string | null;
-}
-
-interface ActiveMechanicsReview {
-  manifest: MechanicsReviewPlaylist;
-  sourceUrl: string | null;
-  replaysById: Map<string, MechanicsReviewReplay>;
-  replayLoadStates: Map<string, MechanicsReviewReplayLoadState>;
-  replayLoadCache: Map<string, Promise<ReplayLoadBundle>>;
-  currentIndex: number;
-  loading: boolean;
-  preloading: boolean;
-  currentReplayId: string | null;
-  currentClip: { startTime: number; endTime: number } | null;
-}
-
-interface SelectedStatEntry {
-  key: string;
-  statId: string;
-  targetId?: string;
-}
-
-interface StatsWindowState {
-  readonly id: string;
-  readonly kind: StatsWindowKind;
-  readonly entries: SelectedStatEntry[];
-  playerId: string | null;
-  team: TeamScope | null;
-  pickerOpen: boolean;
-  query: string;
-  element: HTMLElement;
-  body: HTMLElement;
-}
-
-const statsWindows = new Map<string, StatsWindowState>();
 let activeMechanicsReview: ActiveMechanicsReview | null = null;
 let mechanicsReviewBoundaryGuard = false;
+
+const statsWindowManager = createStatsWindowsManager({
+  getDefaultFrameIndex() {
+    return replayPlayer?.getState().frameIndex ?? 0;
+  },
+  getReplayPlayer() {
+    return replayPlayer;
+  },
+  getStatsFrame(frameIndex) {
+    return getCurrentStatsFrame(frameIndex);
+  },
+  getStatsTimeline() {
+    return statsTimeline;
+  },
+  getStatRegistry() {
+    return statRegistry;
+  },
+  getWindowLayer() {
+    return statsWindowLayer;
+  },
+  applyWindowPlacement,
+  bringWindowToFront,
+  cueGoalReplay(time) {
+    replayPlayer?.setState({
+      currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
+      playing: false,
+      skipPostGoalTransitionsEnabled: false,
+      skipKickoffsEnabled: false,
+    });
+    skipPostGoalTransitions.checked = false;
+    skipKickoffs.checked = false;
+    scheduleConfigUrlUpdate();
+  },
+  formatTime,
+  readWindowPlacement,
+  scheduleConfigUrlUpdate,
+  setLauncherOpen,
+  watchGoalReplay,
+});
+
+const eventWindowsManager = createEventWindowsManager({
+  cueTimelineEvent,
+  formatTime,
+  getActiveMechanicTimelineKinds() {
+    return activeMechanicTimelineKinds;
+  },
+  getActiveTimelineEventSourceIds() {
+    return activeTimelineEventSourceIds;
+  },
+  getModuleContext,
+  getModules() {
+    return MODULES;
+  },
+  getPlaylistWindowBody() {
+    return eventPlaylistWindowBody;
+  },
+  getReplayPlayer() {
+    return replayPlayer;
+  },
+  getTimelineWindowBody() {
+    return mechanicsTimelineWindowBody;
+  },
+  renderModuleSettings,
+  renderModuleSummary,
+  renderTimelineEventCount,
+  scheduleConfigUrlUpdate,
+  setMechanicTimelineKind(kind, enabled) {
+    if (enabled) {
+      activeMechanicTimelineKinds.add(kind);
+    } else {
+      activeMechanicTimelineKinds.delete(kind);
+    }
+  },
+  setupActiveModules,
+  syncTimelineEvents,
+  syncTimelineRanges,
+  toggleCapability,
+});
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
@@ -550,7 +483,7 @@ function toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boole
   renderModuleSettings();
   if (replayPlayer) {
     const state = replayPlayer.getState();
-    renderStatsWindows(state.frameIndex);
+    statsWindowManager.render(state.frameIndex);
   }
   renderTimelineEventCount();
   scheduleConfigUrlUpdate();
@@ -606,7 +539,7 @@ function syncTimelineEvents(): void {
     return;
   }
 
-  for (const source of getEventTimelineSources(ctx)) {
+  for (const source of eventWindowsManager.getTimelineSources(ctx)) {
     if (!source.active) {
       continue;
     }
@@ -644,7 +577,7 @@ function syncTimelineRanges(): void {
     );
   }
 
-  for (const source of getEventTimelineSources(ctx)) {
+  for (const source of eventWindowsManager.getTimelineSources(ctx)) {
     if (!source.active || !source.buildTimelineRanges) {
       continue;
     }
@@ -663,17 +596,7 @@ function renderTimelineEventCount(): void {
     return;
   }
 
-  eventsReadout.textContent = `${countVisibleTimelineSources(ctx)}`;
-}
-
-function countVisibleTimelineSources(ctx: StatModuleContext): number {
-  const goalCount = ctx.replay.timelineEvents.filter((event) => event.kind === "goal").length;
-  return (
-    goalCount +
-    getEventTimelineSources(ctx)
-      .filter((source) => source.active)
-      .reduce((count, source) => count + source.count, 0)
-  );
+  eventsReadout.textContent = `${eventWindowsManager.countVisibleTimelineSources(ctx)}`;
 }
 
 function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
@@ -772,20 +695,6 @@ function applyModuleConfigSnapshot(configs: Record<string, unknown>): void {
   applyConfigAdapterSnapshot(getConfigAdapters(), configs);
 }
 
-function getStatsWindowConfig(statsWindow: StatsWindowState): StatsWindowConfig {
-  return {
-    id: statsWindow.id,
-    kind: statsWindow.kind,
-    placement: readWindowPlacement(statsWindow.element),
-    playerId: statsWindow.playerId,
-    team: statsWindow.team,
-    entries: statsWindow.entries.map((entry) => ({
-      statId: entry.statId,
-      targetId: entry.targetId,
-    })),
-  };
-}
-
 function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
   const state = replayPlayer?.getState();
   return {
@@ -834,7 +743,7 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
     },
     recording: getRecordingConfigSnapshot(),
     singletonWindows: getSingletonWindowConfigs(),
-    statsWindows: [...statsWindows.values()].map(getStatsWindowConfig),
+    statsWindows: statsWindowManager.getConfigs(),
     moduleConfigs: getModuleConfigSnapshot(),
   };
 }
@@ -926,7 +835,7 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   }
   applyModuleConfigSnapshot(config.moduleConfigs);
   applyConfigToExistingWindows(config);
-  replaceStatsWindowsFromConfig(config.statsWindows);
+  statsWindowManager.replaceFromConfig(config.statsWindows);
   renderModuleSummary();
   renderModuleSettings();
   renderTimelineEventCount();
@@ -1021,7 +930,7 @@ function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
   setupActiveModules();
   renderModuleSummary();
   renderModuleSettings();
-  renderStatsWindows(replayPlayer.getState().frameIndex);
+  statsWindowManager.render(replayPlayer.getState().frameIndex);
 }
 
 function bringWindowToFront(windowEl: HTMLElement): void {
@@ -1188,981 +1097,9 @@ function renderModuleSummary(): void {
   );
 }
 
-function renderEventTimelineControls(): void {
-  mechanicsTimelineWindowBody.replaceChildren();
-
-  const ctx = getModuleContext();
-  const sources = getEventTimelineSources(ctx);
-
-  if (sources.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No events loaded.";
-    mechanicsTimelineWindowBody.append(empty);
-    return;
-  }
-
-  const actions = document.createElement("div");
-  actions.className = "mechanics-actions";
-
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.className = "module-summary-item";
-  allButton.addEventListener("click", () => {
-    for (const source of sources) {
-      source.setActive(true);
-    }
-    setupActiveModules();
-    syncTimelineEvents();
-    syncTimelineRanges();
-    renderEventTimelineControls();
-    renderModuleSummary();
-    renderModuleSettings();
-    renderTimelineEventCount();
-    scheduleConfigUrlUpdate();
-  });
-  const allName = document.createElement("span");
-  allName.textContent = "All events";
-  const allCount = document.createElement("strong");
-  allCount.textContent = `${sources.length}`;
-  allButton.append(allName, allCount);
-
-  const noneButton = document.createElement("button");
-  noneButton.type = "button";
-  noneButton.className = "module-summary-item";
-  noneButton.addEventListener("click", () => {
-    for (const source of sources) {
-      source.setActive(false);
-    }
-    setupActiveModules();
-    syncTimelineEvents();
-    syncTimelineRanges();
-    renderEventTimelineControls();
-    renderModuleSummary();
-    renderModuleSettings();
-    renderTimelineEventCount();
-    scheduleConfigUrlUpdate();
-  });
-  const noneName = document.createElement("span");
-  noneName.textContent = "No events";
-  const noneState = document.createElement("strong");
-  noneState.textContent = "Off";
-  noneButton.append(noneName, noneState);
-
-  actions.append(allButton, noneButton);
-  mechanicsTimelineWindowBody.append(actions);
-
-  const list = renderEventSourceList(sources);
-  if (list) {
-    mechanicsTimelineWindowBody.append(list);
-  }
-}
-
-function renderMechanicsTimelineControls(): void {
-  renderEventTimelineControls();
-}
-
-function getEventTimelineSources(ctx: StatModuleContext | null): EventTimelineSource[] {
-  if (!ctx) {
-    return [];
-  }
-
-  const sources: EventTimelineSource[] = [];
-  for (const source of REPLAY_EVENT_SOURCE_DEFINITIONS) {
-    const events = source.buildEvents(ctx);
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: source.id,
-      playlistId: `replay:${source.id}`,
-      timelineKey: `events:${source.id}`,
-      timelineId: `events:${source.id}`,
-      group: "Replay",
-      label: source.label,
-      count,
-      active: activeTimelineEventSourceIds.has(source.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(source.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const mod of MODULES.filter((module) => module.getTimelineEvents)) {
-    const events = mod.getTimelineEvents?.(ctx) ?? [];
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: mod.id,
-      playlistId: `module:${mod.id}`,
-      timelineKey: `module:${mod.id}`,
-      timelineId: `module:${mod.id}`,
-      group: "Stats",
-      label: mod.label,
-      count,
-      active: activeTimelineEventSourceIds.has(mod.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(mod.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
-    const events = source.buildEvents(ctx);
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: source.id,
-      playlistId: `extra:${source.id}`,
-      timelineKey: `extra:${source.id}`,
-      timelineId: `extra:${source.id}`,
-      group: "Stats",
-      label: source.label,
-      count,
-      active: activeTimelineEventSourceIds.has(source.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(source.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const kind of getMechanicKinds(ctx.statsTimeline)) {
-    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
-    const count = timelineEvents.length + timelineRanges.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: `mechanic:${kind}`,
-      playlistId: `mechanic:${kind}`,
-      timelineKey: `mechanic:${kind}`,
-      timelineId: `mechanic:${kind}`,
-      group: "Mechanics",
-      label: formatMechanicKind(kind),
-      count,
-      active: activeMechanicTimelineKinds.has(kind),
-      buildTimelineEvents() {
-        return timelineEvents;
-      },
-      buildPlaylistEvents() {
-        return playlistEvents;
-      },
-      buildTimelineRanges() {
-        return timelineRanges;
-      },
-      setActive(enabled) {
-        if (enabled) {
-          activeMechanicTimelineKinds.add(kind);
-        } else {
-          activeMechanicTimelineKinds.delete(kind);
-        }
-        scheduleConfigUrlUpdate();
-      },
-    });
-  }
-
-  return sources.sort((left, right) => left.label.localeCompare(right.label));
-}
-
-function renderEventSourceList(sources: EventTimelineSource[]): HTMLElement | null {
-  if (sources.length === 0) {
-    return null;
-  }
-
-  const list = document.createElement("div");
-  list.className = "module-list mechanics-list mechanics-event-list";
-  list.style.setProperty("--event-source-columns", `${getEventSourceColumnCount(sources.length)}`);
-
-  for (const source of sources) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "module-summary-item";
-    item.dataset.active = source.active ? "true" : "false";
-    item.setAttribute("aria-pressed", source.active ? "true" : "false");
-    item.addEventListener("click", () => {
-      source.setActive(!source.active);
-      syncTimelineEvents();
-      syncTimelineRanges();
-      renderEventTimelineControls();
-      renderTimelineEventCount();
-    });
-
-    const name = document.createElement("span");
-    name.textContent = source.label;
-
-    const state = document.createElement("strong");
-    state.textContent = `${source.active ? "On" : "Off"} ${source.count}`;
-
-    item.append(name, state);
-    list.append(item);
-  }
-
-  return list;
-}
-
-function getEventSourceColumnCount(sourceCount: number): number {
-  if (window.innerWidth < 640) {
-    return 1;
-  }
-  if (window.innerWidth < 900) {
-    return sourceCount >= 7 ? 2 : 1;
-  }
-  if (sourceCount >= 13) {
-    return 3;
-  }
-  if (sourceCount >= 7) {
-    return 2;
-  }
-  return 1;
-}
-
-function getEventPlaylistReplaySources(ctx: StatModuleContext): EventPlaylistSource[] {
-  const replaySources: EventPlaylistSource[] = [
-    {
-      id: "replay:goals",
-      group: "Replay",
-      label: "Goals",
-      events: ctx.replay.timelineEvents.filter((event) => event.kind === "goal"),
-    },
-  ];
-
-  return replaySources.filter((source) => source.events.length > 0);
-}
-
-function getEventPlaylistSources(): EventPlaylistSource[] {
-  const ctx = getModuleContext();
-  if (!ctx) {
-    return [];
-  }
-
-  const eventSources = getEventTimelineSources(ctx)
-    .map((source) => ({
-      id: source.playlistId,
-      group: source.group,
-      label: source.label,
-      events: source.buildPlaylistEvents(),
-    }))
-    .filter((source) => source.events.length > 0);
-
-  return [...getEventPlaylistReplaySources(ctx), ...eventSources];
-}
-
-function getEventPlaylistSelectedSourceIds(sources: EventPlaylistSource[]): Set<string> {
-  const sourceIds = sources.map((source) => source.id);
-  if (eventPlaylistActiveSourceIds === null) {
-    return new Set(sourceIds.filter((id) => !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS.has(id)));
-  }
-  return new Set(sourceIds.filter((id) => eventPlaylistActiveSourceIds?.has(id)));
-}
-
-function getEventPlaylistPlayerColor(event: ReplayTimelineEvent): string {
-  const playerId = event.playerId ?? null;
-  const playerIndex =
-    playerId && replayPlayer
-      ? replayPlayer.replay.players.findIndex((player) => player.id === playerId)
-      : -1;
-  if (playerIndex >= 0) {
-    return EVENT_PLAYLIST_PLAYER_COLORS[playerIndex % EVENT_PLAYLIST_PLAYER_COLORS.length]!;
-  }
-  return event.color ?? EVENT_PLAYLIST_NEUTRAL_COLOR;
-}
-
-function buildEventPlaylistItems(sources: EventPlaylistSource[]): EventPlaylistItem[] {
-  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources);
-  return sources
-    .filter((source) => selectedSourceIds.has(source.id))
-    .flatMap((source) =>
-      source.events.map((event, index) => ({
-        key: `${source.id}:${event.id ?? `${event.kind}:${event.time}:${index}`}`,
-        sourceId: source.id,
-        sourceLabel: source.label,
-        event,
-        color: getEventPlaylistPlayerColor(event),
-      })),
-    )
-    .sort((left, right) => {
-      if (left.event.time !== right.event.time) {
-        return left.event.time - right.event.time;
-      }
-      return (left.event.label ?? left.sourceLabel).localeCompare(
-        right.event.label ?? right.sourceLabel,
-      );
-    });
-}
-
-function setEventPlaylistSourceSelection(
-  sources: EventPlaylistSource[],
-  updater: (selected: Set<string>) => void,
-): void {
-  const selected = getEventPlaylistSelectedSourceIds(sources);
-  updater(selected);
-  eventPlaylistActiveSourceIds = selected;
-  eventPlaylistLastActiveKey = null;
-  renderEventPlaylistWindow();
-  const state = replayPlayer?.getState();
-  if (state) {
-    syncEventPlaylistTimeline(state);
-  }
-}
-
-function renderEventPlaylistWindow(): void {
-  if (!eventPlaylistWindowBody) {
-    return;
-  }
-
-  eventPlaylistWindowBody.replaceChildren();
-  const sources = getEventPlaylistSources();
-  if (sources.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = replayPlayer ? "No events loaded." : "Load a replay to see events.";
-    eventPlaylistWindowBody.append(empty);
-    return;
-  }
-
-  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources);
-  const items = buildEventPlaylistItems(sources);
-
-  const toolbar = document.createElement("div");
-  toolbar.className = "event-playlist-toolbar";
-
-  const filters = document.createElement("details");
-  filters.className = "event-playlist-filter";
-  filters.dataset.noDrag = "true";
-
-  const summary = document.createElement("summary");
-  summary.textContent = `Filters ${selectedSourceIds.size}/${sources.length}`;
-  filters.append(summary);
-
-  const filterPanel = document.createElement("div");
-  filterPanel.className = "event-playlist-filter-panel";
-
-  const actions = document.createElement("div");
-  actions.className = "event-playlist-filter-actions";
-
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.textContent = "All";
-  allButton.addEventListener("click", () => {
-    eventPlaylistActiveSourceIds = new Set(sources.map((source) => source.id));
-    eventPlaylistLastActiveKey = null;
-    renderEventPlaylistWindow();
-    const state = replayPlayer?.getState();
-    if (state) syncEventPlaylistTimeline(state);
-  });
-
-  const noneButton = document.createElement("button");
-  noneButton.type = "button";
-  noneButton.textContent = "None";
-  noneButton.addEventListener("click", () => {
-    eventPlaylistActiveSourceIds = new Set();
-    eventPlaylistLastActiveKey = null;
-    renderEventPlaylistWindow();
-  });
-
-  actions.append(allButton, noneButton);
-  filterPanel.append(actions);
-
-  const sourcesByGroup = new Map<string, EventPlaylistSource[]>();
-  for (const source of sources) {
-    const group = sourcesByGroup.get(source.group) ?? [];
-    group.push(source);
-    sourcesByGroup.set(source.group, group);
-  }
-
-  for (const [group, groupSources] of sourcesByGroup) {
-    const groupEl = document.createElement("section");
-    groupEl.className = "event-playlist-filter-group";
-    const heading = document.createElement("h3");
-    heading.textContent = group;
-    groupEl.append(heading);
-
-    for (const source of groupSources) {
-      const label = document.createElement("label");
-      label.className = "toggle event-playlist-filter-option";
-
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = selectedSourceIds.has(source.id);
-      input.addEventListener("change", () => {
-        setEventPlaylistSourceSelection(sources, (selected) => {
-          if (input.checked) {
-            selected.add(source.id);
-          } else {
-            selected.delete(source.id);
-          }
-        });
-      });
-
-      const text = document.createElement("span");
-      text.textContent = `${source.label} (${source.events.length})`;
-      label.append(input, text);
-      groupEl.append(label);
-    }
-
-    filterPanel.append(groupEl);
-  }
-
-  filters.append(filterPanel);
-
-  const followLabel = document.createElement("label");
-  followLabel.className = "toggle event-playlist-follow";
-  const followInput = document.createElement("input");
-  followInput.type = "checkbox";
-  followInput.checked = eventPlaylistAutoFollow;
-  followInput.addEventListener("change", () => {
-    eventPlaylistAutoFollow = followInput.checked;
-    const state = replayPlayer?.getState();
-    if (state) syncEventPlaylistTimeline(state, { forceScroll: true });
-  });
-  const followText = document.createElement("span");
-  followText.textContent = "Auto-follow";
-  followLabel.append(followInput, followText);
-
-  toolbar.append(filters, followLabel);
-
-  const list = document.createElement("div");
-  list.className = "event-playlist-list";
-  list.dataset.noDrag = "true";
-
-  if (items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No event types selected.";
-    list.append(empty);
-  } else {
-    for (const item of items) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "event-playlist-item";
-      button.dataset.eventKey = item.key;
-      button.dataset.eventTime = `${item.event.time}`;
-      button.style.setProperty("--event-color", item.color);
-      button.addEventListener("click", () => {
-        cueTimelineEvent(item.event);
-      });
-
-      const time = document.createElement("span");
-      time.className = "event-playlist-time";
-      time.textContent = formatTime(item.event.time);
-
-      const main = document.createElement("span");
-      main.className = "event-playlist-main";
-      const label = document.createElement("strong");
-      label.textContent = item.event.label ?? item.sourceLabel;
-      const meta = document.createElement("span");
-      meta.textContent = [
-        item.event.playerName ?? null,
-        item.event.frame !== undefined ? `frame ${item.event.frame}` : null,
-        item.sourceLabel,
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(" · ");
-      main.append(label, meta);
-
-      button.append(time, main);
-      list.append(button);
-    }
-  }
-
-  eventPlaylistWindowBody.append(toolbar, list);
-}
-
-function getEventPlaylistActiveItem(list: HTMLElement, currentTime: number): HTMLElement | null {
-  const items = [...list.querySelectorAll<HTMLElement>(".event-playlist-item")];
-  if (items.length === 0) {
-    return null;
-  }
-
-  let bestItem = items[0] ?? null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const item of items) {
-    const time = Number(item.dataset.eventTime);
-    if (!Number.isFinite(time)) {
-      continue;
-    }
-    const distance = Math.abs(time - currentTime);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestItem = item;
-    }
-  }
-  return bestItem;
-}
-
-function syncEventPlaylistTimeline(
-  state: ReplayPlayerState,
-  options: { forceScroll?: boolean } = {},
-): void {
-  const list = eventPlaylistWindowBody?.querySelector<HTMLElement>(".event-playlist-list");
-  if (!list) {
-    return;
-  }
-
-  const activeItem = getEventPlaylistActiveItem(list, state.currentTime);
-  const activeKey = activeItem?.dataset.eventKey ?? null;
-  if (activeKey === eventPlaylistLastActiveKey && !options.forceScroll) {
-    return;
-  }
-
-  list.querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']").forEach((item) => {
-    item.dataset.active = "false";
-  });
-
-  if (activeItem) {
-    activeItem.dataset.active = "true";
-    if (eventPlaylistAutoFollow || options.forceScroll) {
-      activeItem.scrollIntoView({ block: "nearest" });
-    }
-  }
-
-  eventPlaylistLastActiveKey = activeKey;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseMechanicsReviewBound(value: unknown): MechanicsReviewPlaybackBound | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  if (
-    (value.kind === "time" || value.kind === "frame") &&
-    typeof value.value === "number" &&
-    Number.isFinite(value.value)
-  ) {
-    return {
-      kind: value.kind,
-      value: value.value,
-    };
-  }
-  return null;
-}
-
-function parseOptionalMechanicsReviewPageInteger(
-  value: unknown,
-  field: string,
-): number | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (
-    typeof value !== "number" ||
-    !Number.isInteger(value) ||
-    !Number.isFinite(value) ||
-    value < 0
-  ) {
-    throw new Error(`Review playlist page ${field} must be a non-negative integer.`);
-  }
-  return value;
-}
-
-function parseOptionalMechanicsReviewPageString(value: unknown, field: string): string | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (typeof value !== "string") {
-    throw new Error(`Review playlist page ${field} must be a string.`);
-  }
-  return value;
-}
-
-function parseMechanicsReviewPage(value: unknown): PlaylistManifestPage | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (!isRecord(value)) {
-    throw new Error("Review playlist page must be an object.");
-  }
-
-  return {
-    next: parseOptionalMechanicsReviewPageString(value.next, "next"),
-    previous: parseOptionalMechanicsReviewPageString(value.previous, "previous"),
-    total: parseOptionalMechanicsReviewPageInteger(value.total, "total"),
-    count: parseOptionalMechanicsReviewPageInteger(value.count, "count"),
-    limit: parseOptionalMechanicsReviewPageInteger(value.limit, "limit"),
-    offset: parseOptionalMechanicsReviewPageInteger(value.offset, "offset"),
-  };
-}
-
-function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
-  if (!isRecord(value) || !Array.isArray(value.items)) {
-    throw new Error("Review playlist must contain an items array.");
-  }
-
-  const items = value.items.map((rawItem, index): MechanicsReviewItem => {
-    if (!isRecord(rawItem) || typeof rawItem.replay !== "string") {
-      throw new Error(`Invalid review item at index ${index}.`);
-    }
-    const start = parseMechanicsReviewBound(rawItem.start);
-    const end = parseMechanicsReviewBound(rawItem.end);
-    if (!start || !end) {
-      throw new Error(`Review item ${index + 1} has invalid start or end.`);
-    }
-    return {
-      id: typeof rawItem.id === "string" ? rawItem.id : undefined,
-      replay: rawItem.replay,
-      start,
-      end,
-      label: typeof rawItem.label === "string" ? rawItem.label : undefined,
-      meta: isRecord(rawItem.meta) ? rawItem.meta : undefined,
-    };
-  });
-
-  const replays = Array.isArray(value.replays)
-    ? value.replays
-        .map((rawReplay): MechanicsReviewReplay | null => {
-          if (!isRecord(rawReplay) || typeof rawReplay.id !== "string") {
-            return null;
-          }
-          return {
-            id: rawReplay.id,
-            path: typeof rawReplay.path === "string" ? rawReplay.path : undefined,
-            label: typeof rawReplay.label === "string" ? rawReplay.label : undefined,
-            locator: isRecord(rawReplay.locator) ? rawReplay.locator : undefined,
-            meta: isRecord(rawReplay.meta) ? rawReplay.meta : undefined,
-          };
-        })
-        .filter((replay): replay is MechanicsReviewReplay => replay !== null)
-    : undefined;
-
-  return {
-    label: typeof value.label === "string" ? value.label : undefined,
-    replays,
-    items,
-    page: parseMechanicsReviewPage(value.page),
-    playback: value.playback,
-    meta: value.meta,
-  };
-}
-
-function parseMechanicsReviewPlaylistJson(text: string): MechanicsReviewPlaylist {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new Error(
-      `Invalid review playlist JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  return parseMechanicsReviewPlaylist(parsed);
-}
-
-function getMechanicsReviewUrlFromLocation(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  return (
-    params.get("reviewPlaylist")?.trim() ||
-    params.get("review")?.trim() ||
-    params.get("playlist")?.trim() ||
-    params.get("playlistUrl")?.trim() ||
-    null
-  );
-}
-
-function isLikelyLocalFilePath(path: string): boolean {
-  return /^\/(?:home|Users|tmp|var\/tmp|mnt|media|run\/user|nix\/store)\//.test(path);
-}
-
-function resolveMechanicsReviewUrl(value: string, sourceUrl: string | null): string {
-  const path = value.startsWith("path:") ? value.slice("path:".length) : value;
-  if (/^https?:\/\//i.test(path) || path.startsWith("/@fs/")) {
-    return path;
-  }
-  if (path.startsWith("/")) {
-    if (isLikelyLocalFilePath(path)) {
-      return `/@fs${path}`;
-    }
-    if (sourceUrl) {
-      const base = new URL(sourceUrl, window.location.href);
-      if (base.origin !== window.location.origin) {
-        return new URL(path, base.origin).href;
-      }
-    }
-    return path;
-  }
-  return sourceUrl ? new URL(path, sourceUrl).href : path;
-}
-
-function getMechanicsReviewReplayPath(
-  item: MechanicsReviewItem,
-  review: ActiveMechanicsReview,
-): string {
-  const replay = review.replaysById.get(item.replay);
-  if (replay?.path) {
-    return replay.path;
-  }
-  if (
-    isRecord(replay?.locator) &&
-    replay.locator.kind === "path" &&
-    typeof replay.locator.path === "string"
-  ) {
-    return replay.locator.path;
-  }
-  if (
-    /^https?:\/\//i.test(item.replay) ||
-    item.replay.startsWith("/") ||
-    item.replay.startsWith("/@fs/") ||
-    item.replay.startsWith("path:")
-  ) {
-    return item.replay;
-  }
-  throw new Error(`Review replay "${item.replay}" does not include a loadable path.`);
-}
-
-function getMechanicsReviewReplayLabel(
-  item: MechanicsReviewItem,
-  review: ActiveMechanicsReview,
-): string {
-  const replay = review.replaysById.get(item.replay);
-  const rawPath = replay?.path ?? getMechanicsReviewReplayPath(item, review);
-  const fileName = rawPath
-    .replace(/^path:/, "")
-    .split("/")
-    .filter(Boolean)
-    .pop();
-  return replay?.label ?? fileName ?? "review replay";
-}
-
-function createMechanicsReviewReplaySource(
-  item: MechanicsReviewItem,
-  review: ActiveMechanicsReview,
-  signal?: AbortSignal,
-): ReplayInputSource {
-  const replayPath = getMechanicsReviewReplayPath(item, review);
-  const url = resolveMechanicsReviewUrl(replayPath, review.sourceUrl);
-  return {
-    name: getMechanicsReviewReplayLabel(item, review),
-    preparingStatus: "Loading review replay...",
-    async readBytes() {
-      const response = await fetch(url, { signal });
-      if (!response.ok) {
-        const statusText = response.statusText ? ` ${response.statusText}` : "";
-        throw new Error(
-          `Failed to fetch review replay from ${url} (${response.status}${statusText})`,
-        );
-      }
-      return new Uint8Array(await response.arrayBuffer());
-    },
-  };
-}
-
-function getMechanicsReviewBoundTime(bound: MechanicsReviewPlaybackBound): number {
-  if (bound.kind === "time") {
-    return bound.value;
-  }
-  const frameIndex = Math.max(0, Math.trunc(bound.value));
-  return (
-    replayPlayer?.replay.frames[frameIndex]?.time ?? replayPlayer?.replay.frames.at(-1)?.time ?? 0
-  );
-}
-
-function formatMechanicsReviewTime(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}s` : "--";
-}
-
-function formatMechanicsReviewBound(bound: MechanicsReviewPlaybackBound): string {
-  return bound.kind === "time"
-    ? formatMechanicsReviewTime(bound.value)
-    : `frame ${Math.trunc(bound.value)}`;
-}
-
-function getMechanicsReviewTargetNumber(
-  item: MechanicsReviewItem,
-  key: "startTime" | "endTime" | "eventTime",
-): number | null {
-  if (!isRecord(item.meta?.target)) {
-    return null;
-  }
-  const value = item.meta.target[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function getMechanicsReviewTargetFrame(
-  item: MechanicsReviewItem,
-  key: "startFrame" | "endFrame" | "eventFrame",
-): number | null {
-  if (!isRecord(item.meta?.target)) {
-    return null;
-  }
-  const value = item.meta.target[key];
-  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
-}
-
-function formatMechanicsReviewClipDetails(item: MechanicsReviewItem): string {
-  const clipStart = item.start.kind === "time" ? item.start.value : null;
-  const clipEnd = item.end.kind === "time" ? item.end.value : null;
-  const parts = [
-    `${formatMechanicsReviewBound(item.start)} to ${formatMechanicsReviewBound(item.end)}`,
-  ];
-  if (clipStart !== null && clipEnd !== null) {
-    parts.push(`${Math.max(0, clipEnd - clipStart).toFixed(1)}s clip`);
-  }
-  const targetStart =
-    getMechanicsReviewTargetNumber(item, "startTime") ??
-    getMechanicsReviewTargetNumber(item, "eventTime");
-  const targetEnd =
-    getMechanicsReviewTargetNumber(item, "endTime") ??
-    getMechanicsReviewTargetNumber(item, "eventTime");
-  if (clipStart !== null && targetStart !== null) {
-    parts.push(`${Math.max(0, targetStart - clipStart).toFixed(1)}s preroll`);
-  }
-  if (clipEnd !== null && targetEnd !== null) {
-    parts.push(`${Math.max(0, clipEnd - targetEnd).toFixed(1)}s postroll`);
-  }
-  return parts.join(" · ");
-}
-
-function formatMechanicsReviewEventDetails(item: MechanicsReviewItem): string {
-  const eventTime = getMechanicsReviewTargetNumber(item, "eventTime");
-  const startTime = getMechanicsReviewTargetNumber(item, "startTime");
-  const endTime = getMechanicsReviewTargetNumber(item, "endTime");
-  const eventFrame = getMechanicsReviewTargetFrame(item, "eventFrame");
-  const startFrame = getMechanicsReviewTargetFrame(item, "startFrame");
-  const endFrame = getMechanicsReviewTargetFrame(item, "endFrame");
-  const time =
-    startTime !== null && endTime !== null && Math.abs(endTime - startTime) > 0.001
-      ? `${formatMechanicsReviewTime(startTime)} to ${formatMechanicsReviewTime(endTime)}`
-      : formatMechanicsReviewTime(eventTime ?? startTime ?? endTime);
-  const frame =
-    startFrame !== null && endFrame !== null && endFrame !== startFrame
-      ? `frames ${startFrame}-${endFrame}`
-      : eventFrame !== null
-        ? `frame ${eventFrame}`
-        : startFrame !== null
-          ? `frame ${startFrame}`
-          : null;
-  return [time, frame].filter((part) => part && part !== "--").join(" · ") || "--";
-}
-
-function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
-  return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;
-}
-
-function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | null {
-  if (typeof item.meta?.playerId === "string") {
-    return item.meta.playerId;
-  }
-  if (isRecord(item.meta?.target) && typeof item.meta.target.playerId === "string") {
-    return item.meta.target.playerId;
-  }
-  return null;
-}
-
-function getMechanicsReviewPlayerName(item: MechanicsReviewItem): string {
-  if (typeof item.meta?.playerName === "string" && item.meta.playerName.trim()) {
-    return item.meta.playerName;
-  }
-  const playerId = getMechanicsReviewPlayerId(item);
-  return playerId
-    ? (replayPlayer?.replay.players.find((player) => player.id === playerId)?.name ?? playerId)
-    : "--";
-}
-
-function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
-  if (typeof item.meta?.mechanicLabel === "string" && item.meta.mechanicLabel.trim()) {
-    return item.meta.mechanicLabel;
-  }
-  return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";
-}
-
-function formatMechanicsReviewStatus(value: unknown): string {
-  return typeof value === "string" && value.trim() ? value.replaceAll("_", " ") : "unreviewed";
-}
-
-function getMechanicsReviewDecisionEndpoint(item: MechanicsReviewItem | null): string | null {
-  if (!item) {
-    return null;
-  }
-  if (typeof item.meta?.reviewEndpoint === "string" && item.meta.reviewEndpoint) {
-    return item.meta.reviewEndpoint;
-  }
-  const eventId =
-    typeof item.meta?.eventId === "string" && item.meta.eventId ? item.meta.eventId : item.id;
-  return eventId ? `/api/v1/mechanics/events/${encodeURIComponent(eventId)}/reviews` : null;
-}
-
-function mechanicsReviewAuthHeaders(): Record<string, string> {
-  const params = new URLSearchParams(window.location.search);
-  const token =
-    params.get("reviewToken") ??
-    params.get("token") ??
-    window.localStorage.getItem("rocket_sense_access_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 function setMechanicsReviewStatus(message: string): void {
   if (mechanicsReviewStatus) {
     mechanicsReviewStatus.textContent = message;
-  }
-}
-
-function getMechanicsReviewReplayItems(
-  review: ActiveMechanicsReview,
-): Map<string, MechanicsReviewItem> {
-  const itemsByReplayId = new Map<string, MechanicsReviewItem>();
-  for (const item of review.manifest.items) {
-    if (!itemsByReplayId.has(item.replay)) {
-      itemsByReplayId.set(item.replay, item);
-    }
-  }
-  return itemsByReplayId;
-}
-
-function getMechanicsReviewReplayClipCounts(review: ActiveMechanicsReview): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of review.manifest.items) {
-    counts.set(item.replay, (counts.get(item.replay) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function initializeMechanicsReviewReplayLoadStates(review: ActiveMechanicsReview): void {
-  const clipCounts = getMechanicsReviewReplayClipCounts(review);
-  for (const [replayId, item] of getMechanicsReviewReplayItems(review)) {
-    let path = "";
-    let label = replayId;
-    try {
-      path = getMechanicsReviewReplayPath(item, review);
-      label = getMechanicsReviewReplayLabel(item, review);
-    } catch {
-      const replay = review.replaysById.get(replayId);
-      label = replay?.label ?? replayId;
-    }
-    review.replayLoadStates.set(replayId, {
-      replayId,
-      label,
-      path,
-      clipCount: clipCounts.get(replayId) ?? 0,
-      status: "idle",
-      progress: null,
-      error: null,
-    });
   }
 }
 
@@ -2194,43 +1131,6 @@ function updateMechanicsReviewReplayLoadState(
   if (activeMechanicsReview === review) {
     renderMechanicsReviewReplayLoads(review);
   }
-}
-
-function formatReplayLoadStateProgress(progress: ReplayLoadProgress | null): string {
-  if (!progress) {
-    return "";
-  }
-  const label = formatReplayLoadProgress(progress);
-  if (progress.processedFrames !== undefined) {
-    const total = progress.totalFrames !== undefined ? ` / ${progress.totalFrames}` : "";
-    return `${label} (${progress.processedFrames}${total} frames)`;
-  }
-  if (progress.processedChunks !== undefined) {
-    const total = progress.totalChunks !== undefined ? ` / ${progress.totalChunks}` : "";
-    return `${label} (${progress.processedChunks}${total} chunks)`;
-  }
-  return label;
-}
-
-function mechanicsReviewReplayLoadStatusText(state: MechanicsReviewReplayLoadState): string {
-  if (state.status === "idle") {
-    return "Pending";
-  }
-  if (state.status === "loading") {
-    return formatReplayLoadStateProgress(state.progress) || "Loading";
-  }
-  if (state.status === "loaded") {
-    return "Loaded";
-  }
-  return state.error ? `Failed: ${state.error}` : "Failed";
-}
-
-function mechanicsReviewReplayLoadProgressValue(state: MechanicsReviewReplayLoadState): number {
-  if (state.status === "loaded") {
-    return 1;
-  }
-  const value = state.progress?.progress;
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 }
 
 function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null): void {
@@ -2406,7 +1306,9 @@ function renderMechanicsReviewWindow(): void {
     ? getMechanicsReviewItemLabel(item, review?.currentIndex ?? 0)
     : "No candidate selected";
   mechanicsReviewMechanic.textContent = item ? getMechanicsReviewMechanicLabel(item) : "--";
-  mechanicsReviewPlayer.textContent = item ? getMechanicsReviewPlayerName(item) : "--";
+  mechanicsReviewPlayer.textContent = item
+    ? getMechanicsReviewPlayerName(item, replayPlayer?.replay.players)
+    : "--";
   mechanicsReviewClip.textContent = item ? formatMechanicsReviewClipDetails(item) : "--";
   mechanicsReviewEvent.textContent = item ? formatMechanicsReviewEventDetails(item) : "--";
   mechanicsReviewReason.textContent = item?.meta?.reason ?? "--";
@@ -2526,10 +1428,13 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
     }
     preloadMechanicsReviewReplays(review, item.replay);
 
-    const startTime = Math.max(0, getMechanicsReviewBoundTime(item.start));
+    const startTime = Math.max(
+      0,
+      getMechanicsReviewBoundTime(item.start, replayPlayer?.replay.frames),
+    );
     const endTime = Math.min(
       replayPlayer?.getState().duration ?? Number.POSITIVE_INFINITY,
-      Math.max(startTime, getMechanicsReviewBoundTime(item.end)),
+      Math.max(startTime, getMechanicsReviewBoundTime(item.end, replayPlayer?.replay.frames)),
     );
     if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
       throw new Error("Review item has an empty playback range.");
@@ -2829,630 +1734,6 @@ function getCurrentStatsFrame(frameIndex: number): StatsFrame | null {
   return statsFrameLookup ? getStatsFrameForReplayFrame(statsFrameLookup, frameIndex) : null;
 }
 
-function getTeamSnapshot(frame: StatsFrame, team: TeamScope): TeamStatsSnapshot | null {
-  return team === "blue" ? (frame.team_zero ?? null) : (frame.team_one ?? null);
-}
-
-function getTeamLabel(team: TeamScope): string {
-  return team === "blue" ? "Blue" : "Orange";
-}
-
-function getPlayerTeamClass(playerId: string | null | undefined): string | null {
-  const player = replayPlayer?.replay.players.find((candidate) => candidate.id === playerId);
-  return player ? getTeamClass(player.isTeamZero) : null;
-}
-
-function getTeamScopeClass(team: TeamScope): string {
-  return getTeamClass(team === "blue");
-}
-
-function appendGroupedPlayerOptions(
-  select: HTMLSelectElement,
-  selectedPlayerId: string | null | undefined,
-): void {
-  const players = replayPlayer?.replay.players ?? [];
-  for (const team of ["blue", "orange"] as const) {
-    const teamPlayers = players.filter((player) => player.isTeamZero === (team === "blue"));
-    if (teamPlayers.length === 0) {
-      continue;
-    }
-
-    const group = document.createElement("optgroup");
-    group.label = `${getTeamLabel(team)} team`;
-    for (const player of teamPlayers) {
-      group.append(
-        new Option(
-          player.name,
-          player.id,
-          player.id === selectedPlayerId,
-          player.id === selectedPlayerId,
-        ),
-      );
-    }
-    select.append(group);
-  }
-}
-
-function getStatsWindowScopeTeamClass(statsWindow: StatsWindowState): string | null {
-  if (statsWindow.kind === "player") {
-    return getPlayerTeamClass(statsWindow.playerId);
-  }
-  if (statsWindow.kind === "team") {
-    return getTeamScopeClass(statsWindow.team ?? "blue");
-  }
-  return null;
-}
-
-function getStatTargetTeamClass(
-  definition: StatDefinition,
-  targetId: string | undefined,
-): string | null {
-  if (definition.scope === "player") {
-    return getPlayerTeamClass(targetId);
-  }
-  return getTeamScopeClass(targetId === "orange" ? "orange" : "blue");
-}
-
-function getStatsWindowTitle(kind: StatsWindowKind): string {
-  switch (kind) {
-    case "player":
-      return "Player stats";
-    case "team":
-      return "Team stats";
-    case "all-players":
-      return "All players stats";
-    case "all-teams":
-      return "All teams stats";
-    case "goals-overview":
-      return "Goal labels";
-    case "ad-hoc":
-      return "Ad hoc stats";
-  }
-}
-
-function hasStatsWindowScopeSelector(kind: StatsWindowKind): boolean {
-  return kind === "player" || kind === "team";
-}
-
-function hasStatsWindowStatPicker(kind: StatsWindowKind): boolean {
-  return kind !== "goals-overview";
-}
-
-function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
-  switch (kind) {
-    case "player":
-    case "all-players":
-      return "player";
-    case "team":
-    case "all-teams":
-      return "team";
-    case "goals-overview":
-      return null;
-    case "ad-hoc":
-      return null;
-  }
-}
-
-function getStatsWindowDefaultPosition(): { x: number; y: number } {
-  const offset = statsWindows.size * 18;
-  return {
-    x: Math.max(12, Math.min(window.innerWidth - 360, 96 + offset)),
-    y: Math.max(64, Math.min(window.innerHeight - 240, 96 + offset)),
-  };
-}
-
-function renderStatsWindows(
-  frameIndex = replayPlayer?.getState().frameIndex ?? 0,
-  options: { preserveOpenPickers?: boolean } = {},
-): void {
-  for (const statsWindow of statsWindows.values()) {
-    if (
-      options.preserveOpenPickers &&
-      (statsWindow.pickerOpen || statsWindow.element.contains(document.activeElement))
-    ) {
-      continue;
-    }
-    renderStatsWindow(statsWindow, frameIndex);
-  }
-}
-
-function createStatsWindow(kind: StatsWindowKind, config?: StatsWindowConfig): StatsWindowState {
-  const id = config?.id ?? `stats-${nextStatsWindowId++}`;
-  const idNumber = Number.parseInt(id.replace(/^stats-/, ""), 10);
-  if (Number.isFinite(idNumber)) {
-    nextStatsWindowId = Math.max(nextStatsWindowId, idNumber + 1);
-  }
-  const { x, y } = getStatsWindowDefaultPosition();
-  const element = document.createElement("section");
-  element.className = "stats-window";
-  element.dataset.windowId = id;
-  element.style.setProperty("--window-x", `${x}px`);
-  element.style.setProperty("--window-y", `${y}px`);
-  if (config) {
-    applyWindowPlacement(element, config.placement);
-  }
-
-  const header = document.createElement("header");
-  header.className = "stats-window-header";
-
-  const actions = document.createElement("div");
-  actions.className = "stats-window-actions";
-  const hideButton = document.createElement("button");
-  hideButton.type = "button";
-  hideButton.className = "stats-window-action";
-  hideButton.textContent = "Hide";
-  actions.append(hideButton);
-  if (hasStatsWindowScopeSelector(kind)) {
-    header.classList.add("stats-window-header-actions-only");
-    header.append(actions);
-  } else {
-    const title = document.createElement("h2");
-    title.textContent = getStatsWindowTitle(kind);
-    header.append(title, actions);
-  }
-
-  const body = document.createElement("div");
-  body.className = "stats-window-body";
-  element.append(header, body);
-  statsWindowLayer.append(element);
-
-  const state: StatsWindowState = {
-    id,
-    kind,
-    entries:
-      config?.entries.map((entry) => ({
-        key: `${id}:${entry.statId}:${entry.targetId ?? "scope"}`,
-        statId: entry.statId,
-        targetId: entry.targetId,
-      })) ?? [],
-    playerId: config?.playerId ?? replayPlayer?.replay.players[0]?.id ?? null,
-    team: config?.team ?? "blue",
-    pickerOpen: false,
-    query: "",
-    element,
-    body,
-  };
-
-  hideButton.addEventListener("click", () => {
-    element.hidden = true;
-    scheduleConfigUrlUpdate();
-  });
-
-  statsWindows.set(id, state);
-  if (!config) {
-    bringWindowToFront(element);
-  }
-  setLauncherOpen(false);
-  renderStatsWindow(state);
-  scheduleConfigUrlUpdate();
-  return state;
-}
-
-function replaceStatsWindowsFromConfig(configs: readonly StatsWindowConfig[]): void {
-  for (const statsWindow of statsWindows.values()) {
-    statsWindow.element.remove();
-  }
-  statsWindows.clear();
-  nextStatsWindowId = 1;
-  for (const config of configs) {
-    createStatsWindow(config.kind, config);
-  }
-}
-
-function renderStatsWindow(
-  statsWindow: StatsWindowState,
-  frameIndex = replayPlayer?.getState().frameIndex ?? 0,
-): void {
-  const activeElement = document.activeElement;
-  const searchFocused =
-    activeElement instanceof HTMLInputElement &&
-    activeElement.dataset.statsWindowSearch === statsWindow.id;
-  const searchSelectionStart = searchFocused ? activeElement.selectionStart : null;
-  const searchSelectionEnd = searchFocused ? activeElement.selectionEnd : null;
-  const searchSelectionDirection = searchFocused ? activeElement.selectionDirection : null;
-
-  statsWindow.body.replaceChildren();
-
-  renderStatsWindowScope(statsWindow);
-  if (hasStatsWindowStatPicker(statsWindow.kind)) {
-    renderStatsWindowAddControl(statsWindow);
-    renderStatsWindowPicker(statsWindow);
-  }
-  renderStatsWindowEntries(statsWindow, frameIndex);
-
-  if (searchFocused) {
-    const searchInput = statsWindow.body.querySelector<HTMLInputElement>(
-      `input[data-stats-window-search="${statsWindow.id}"]`,
-    );
-    searchInput?.focus({ preventScroll: true });
-    if (searchInput && searchSelectionStart !== null && searchSelectionEnd !== null) {
-      searchInput.setSelectionRange(
-        searchSelectionStart,
-        searchSelectionEnd,
-        searchSelectionDirection ?? "none",
-      );
-    }
-  }
-}
-
-function renderStatsWindowScope(statsWindow: StatsWindowState): void {
-  if (statsWindow.kind !== "player" && statsWindow.kind !== "team") {
-    return;
-  }
-
-  const row = document.createElement("div");
-  row.className = "stats-window-scope-row";
-
-  const select = document.createElement("select");
-  select.className = "stats-window-scope-select";
-  const teamClass = getStatsWindowScopeTeamClass(statsWindow);
-  if (teamClass) {
-    select.classList.add(teamClass);
-  }
-  select.setAttribute(
-    "aria-label",
-    statsWindow.kind === "player" ? "Player stats target" : "Team stats target",
-  );
-  if (statsWindow.kind === "player") {
-    appendGroupedPlayerOptions(select, statsWindow.playerId);
-    select.value = statsWindow.playerId ?? "";
-    select.addEventListener("change", () => {
-      statsWindow.playerId = select.value || null;
-      renderStatsWindow(statsWindow);
-      scheduleConfigUrlUpdate();
-    });
-  } else {
-    select.append(
-      new Option("Blue", "blue", statsWindow.team === "blue", statsWindow.team === "blue"),
-      new Option("Orange", "orange", statsWindow.team === "orange", statsWindow.team === "orange"),
-    );
-    select.value = statsWindow.team ?? "blue";
-    select.addEventListener("change", () => {
-      statsWindow.team = select.value === "orange" ? "orange" : "blue";
-      renderStatsWindow(statsWindow);
-      scheduleConfigUrlUpdate();
-    });
-  }
-
-  row.append(select);
-  statsWindow.body.append(row);
-}
-
-function renderStatsWindowAddControl(statsWindow: StatsWindowState): void {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "stats-window-add-button";
-  button.textContent = "+";
-  button.title = "Add stat";
-  button.setAttribute("aria-label", "Add stat");
-  button.setAttribute("aria-expanded", String(statsWindow.pickerOpen));
-  activateButton(button, () => {
-    statsWindow.pickerOpen = !statsWindow.pickerOpen;
-    renderStatsWindow(statsWindow);
-  });
-
-  if (hasStatsWindowScopeSelector(statsWindow.kind)) {
-    const scopeRow = statsWindow.body.querySelector(".stats-window-scope-row");
-    scopeRow?.append(button);
-    return;
-  }
-
-  const toolbar = document.createElement("div");
-  toolbar.className = "stats-window-toolbar";
-  toolbar.append(button);
-  statsWindow.body.append(toolbar);
-}
-
-function activateButton(button: HTMLButtonElement, callback: () => void): void {
-  let pointerActivated = false;
-  button.addEventListener("pointerdown", (event) => {
-    if (button.disabled) {
-      return;
-    }
-    pointerActivated = true;
-    event.preventDefault();
-    callback();
-  });
-  button.addEventListener("click", () => {
-    if (pointerActivated) {
-      pointerActivated = false;
-      return;
-    }
-    if (!button.disabled) {
-      callback();
-    }
-  });
-}
-
-function renderStatsWindowPicker(statsWindow: StatsWindowState): void {
-  const picker = document.createElement("div");
-  picker.className = "stats-window-picker";
-  picker.hidden = !statsWindow.pickerOpen;
-  if (picker.hidden) {
-    statsWindow.body.append(picker);
-    return;
-  }
-
-  const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
-  const queryInput = document.createElement("input");
-  queryInput.type = "search";
-  queryInput.placeholder = "Search stats";
-  queryInput.value = statsWindow.query;
-  queryInput.dataset.statsWindowSearch = statsWindow.id;
-
-  const list = document.createElement("div");
-  list.className = "stats-window-picker-list";
-  queryInput.addEventListener("input", () => {
-    statsWindow.query = queryInput.value;
-    renderStatsWindowPickerList(statsWindow, list, allowedScope);
-  });
-
-  renderStatsWindowPickerList(statsWindow, list, allowedScope);
-
-  picker.append(queryInput, list);
-  statsWindow.body.append(picker);
-}
-
-function renderStatsWindowPickerList(
-  statsWindow: StatsWindowState,
-  list: HTMLElement,
-  allowedScope: StatScopeKind | null,
-): void {
-  list.replaceChildren();
-
-  const scopeDefinitions = allowedScope
-    ? statRegistry.filter((definition) => definition.scope === allowedScope)
-    : statRegistry;
-  const definitions = getStatDefinitionSearchMatches(scopeDefinitions, statsWindow.query);
-
-  const groupByCategory = new Map<string, StatDefinition[]>();
-  for (const definition of definitions) {
-    const group = groupByCategory.get(definition.category) ?? [];
-    group.push(definition);
-    groupByCategory.set(definition.category, group);
-  }
-
-  for (const [category, group] of groupByCategory) {
-    if (group.length < 2) continue;
-    const addGroup = document.createElement("button");
-    addGroup.type = "button";
-    addGroup.className = "stats-window-picker-item";
-    addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;
-    activateButton(addGroup, () => {
-      for (const definition of group) {
-        addStatToWindow(statsWindow, definition);
-      }
-      renderStatsWindow(statsWindow);
-      scheduleConfigUrlUpdate();
-    });
-    list.append(addGroup);
-  }
-
-  for (const definition of definitions) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "stats-window-picker-item";
-    item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;
-    item.disabled =
-      statsWindow.kind !== "ad-hoc" &&
-      statsWindow.entries.some((entry) => entry.statId === definition.id);
-    activateButton(item, () => {
-      addStatToWindow(statsWindow, definition);
-      renderStatsWindow(statsWindow);
-      scheduleConfigUrlUpdate();
-    });
-    list.append(item);
-  }
-
-  if (definitions.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = statRegistry.length === 0 ? "No stats available." : "No matching stats.";
-    list.append(empty);
-  }
-}
-
-function addStatToWindow(statsWindow: StatsWindowState, definition: StatDefinition): void {
-  const targetId = statsWindow.kind === "ad-hoc" ? getDefaultAdHocTargetId(definition) : undefined;
-  if (
-    statsWindow.entries.some(
-      (entry) => entry.statId === definition.id && entry.targetId === targetId,
-    )
-  ) {
-    return;
-  }
-  statsWindow.entries.push({
-    key: `${statsWindow.id}:${definition.id}:${targetId ?? "scope"}`,
-    statId: definition.id,
-    targetId,
-  });
-}
-
-function getDefaultAdHocTargetId(definition: StatDefinition): string {
-  if (definition.scope === "player") {
-    return replayPlayer?.replay.players[0]?.id ?? "";
-  }
-  return "blue";
-}
-
-function removeStatFromWindow(statsWindow: StatsWindowState, entryKey: string): void {
-  const index = statsWindow.entries.findIndex((entry) => entry.key === entryKey);
-  if (index >= 0) {
-    statsWindow.entries.splice(index, 1);
-  }
-}
-
-function renderStatsWindowEntries(statsWindow: StatsWindowState, frameIndex: number): void {
-  if (statsWindow.kind === "goals-overview") {
-    renderGoalLabelsOverview(statsWindow);
-    return;
-  }
-
-  const allowedScope = getStatsWindowAllowedScope(statsWindow.kind);
-  const entries = statsWindow.entries
-    .map((entry) => ({ entry, definition: getStatById(entry.statId) }))
-    .filter(
-      (item): item is { entry: SelectedStatEntry; definition: StatDefinition } =>
-        item.definition !== null && (!allowedScope || item.definition.scope === allowedScope),
-    );
-
-  if (entries.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No stats added.";
-    statsWindow.body.append(empty);
-    return;
-  }
-
-  const frame = getCurrentStatsFrame(frameIndex);
-  if (!frame) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "Load a replay to show stats.";
-    statsWindow.body.append(empty);
-    return;
-  }
-
-  if (statsWindow.kind === "all-players") {
-    renderAllPlayersStats(statsWindow, frame, entries);
-    return;
-  }
-  if (statsWindow.kind === "all-teams") {
-    renderAllTeamsStats(statsWindow, frame, entries);
-    return;
-  }
-  if (statsWindow.kind === "player") {
-    const player = statsWindow.playerId
-      ? (frame.players.find(
-          (candidate) => playerIdToString(candidate.player_id) === statsWindow.playerId,
-        ) ?? null)
-      : null;
-    renderScopedStatList(statsWindow, player, entries);
-    return;
-  }
-  if (statsWindow.kind === "team") {
-    renderScopedStatList(statsWindow, getTeamSnapshot(frame, statsWindow.team ?? "blue"), entries);
-    return;
-  }
-  if (statsWindow.kind === "ad-hoc") {
-    renderAdHocStats(statsWindow, frame, entries);
-  }
-}
-
-function renderGoalLabelsOverview(statsWindow: StatsWindowState): void {
-  const timeline = statsTimeline;
-  const replay = replayPlayer?.replay ?? null;
-  if (!timeline || !replay) {
-    appendStatsWindowEmpty(statsWindow, "Load a replay to show goal labels.");
-    return;
-  }
-
-  const goalContexts = [...(timeline.events.goal_context ?? [])].sort(
-    (left, right) => left.time - right.time,
-  );
-  const tagsByGoalIndex = new Map<number, typeof timeline.events.goal_tags>();
-  for (const tag of timeline.events.goal_tags ?? []) {
-    const group = tagsByGoalIndex.get(tag.goal_index) ?? [];
-    group.push(tag);
-    tagsByGoalIndex.set(tag.goal_index, group);
-  }
-  for (const group of tagsByGoalIndex.values()) {
-    group.sort(
-      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
-    );
-  }
-
-  const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
-  for (const index of tagsByGoalIndex.keys()) {
-    goalIndexes.add(index);
-  }
-  const orderedGoalIndexes = [...goalIndexes].sort((left, right) => left - right);
-  if (orderedGoalIndexes.length === 0) {
-    appendStatsWindowEmpty(statsWindow, "No goals loaded.");
-    return;
-  }
-
-  const list = document.createElement("div");
-  list.className = "goal-label-list";
-  for (const goalIndex of orderedGoalIndexes) {
-    const context = goalContexts[goalIndex] ?? null;
-    const tags = tagsByGoalIndex.get(goalIndex) ?? [];
-    const firstTag = tags[0] ?? null;
-    const time = context?.time ?? firstTag?.time ?? 0;
-    const scorer = context?.scorer ?? firstTag?.scorer ?? null;
-    const scorerId = scorer ? playerIdToString(scorer) : null;
-    const scorerName = scorer
-      ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
-      : "Unknown scorer";
-    const isTeamZero = context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
-
-    const item = document.createElement("section");
-    item.className = "goal-label-item";
-    if (isTeamZero !== null) {
-      item.classList.add(getTeamClass(isTeamZero));
-    }
-
-    const header = document.createElement("header");
-    const title = document.createElement("h3");
-    title.textContent = `Goal ${goalIndex + 1}`;
-    const meta = document.createElement("span");
-    meta.textContent = `${formatTime(time)} · ${scorerName}`;
-    header.append(title, meta);
-
-    const labels = document.createElement("div");
-    labels.className = "goal-label-tags";
-    if (tags.length === 0) {
-      const empty = document.createElement("span");
-      empty.className = "goal-label-tag goal-label-tag-empty";
-      empty.textContent = "Unlabeled";
-      labels.append(empty);
-    } else {
-      for (const tag of tags) {
-        const chip = document.createElement("span");
-        chip.className = "goal-label-tag";
-        chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;
-        labels.append(chip);
-      }
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "goal-label-actions";
-    const watch = document.createElement("button");
-    watch.type = "button";
-    watch.className = "goal-label-watch";
-    watch.textContent = "Watch";
-    watch.addEventListener("click", () => {
-      watchGoalReplay(time, scorerId);
-    });
-    const jump = document.createElement("button");
-    jump.type = "button";
-    jump.textContent = "Cue";
-    jump.addEventListener("click", () => {
-      replayPlayer?.setState({
-        currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
-        playing: false,
-        skipPostGoalTransitionsEnabled: false,
-        skipKickoffsEnabled: false,
-      });
-      skipPostGoalTransitions.checked = false;
-      skipKickoffs.checked = false;
-      scheduleConfigUrlUpdate();
-    });
-    actions.append(watch, jump);
-
-    item.append(header, labels, actions);
-    list.append(item);
-  }
-  statsWindow.body.append(list);
-}
-
-function appendStatsWindowEmpty(statsWindow: StatsWindowState, message: string): void {
-  const empty = document.createElement("p");
-  empty.className = "stat-window-empty";
-  empty.textContent = message;
-  statsWindow.body.append(empty);
-}
-
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) {
     return "--";
@@ -3460,208 +1741,6 @@ function formatTime(seconds: number): string {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
   const remainingSeconds = Math.max(0, seconds) - minutes * 60;
   return `${minutes}:${remainingSeconds.toFixed(1).padStart(4, "0")}`;
-}
-
-function renderScopedStatList(
-  statsWindow: StatsWindowState,
-  target: PlayerStatsSnapshot | TeamStatsSnapshot | null,
-  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
-): void {
-  const list = document.createElement("div");
-  list.className = "stats-window-stat-list";
-  for (const { entry, definition } of entries) {
-    list.append(
-      renderStatRow(
-        statsWindow,
-        entry,
-        definition,
-        target ? definition.format(definition.read(target)) : "--",
-      ),
-    );
-  }
-  statsWindow.body.append(list);
-}
-
-function renderAllPlayersStats(
-  statsWindow: StatsWindowState,
-  frame: StatsFrame,
-  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
-): void {
-  const list = document.createElement("div");
-  list.className = "stats-window-team-list";
-  for (const team of ["blue", "orange"] as const) {
-    const players = frame.players.filter((player) => player.is_team_0 === (team === "blue"));
-    if (players.length === 0) {
-      continue;
-    }
-
-    const teamSection = document.createElement("section");
-    teamSection.className = `stats-window-team-group ${getTeamScopeClass(team)}`;
-
-    const teamHeader = document.createElement("header");
-    teamHeader.className = "stats-window-team-header";
-    const teamTitle = document.createElement("h3");
-    teamTitle.textContent = `${getTeamLabel(team)} team`;
-    const teamMeta = document.createElement("span");
-    teamMeta.textContent = `${players.length} player${players.length === 1 ? "" : "s"}`;
-    teamHeader.append(teamTitle, teamMeta);
-    teamSection.append(teamHeader);
-
-    const playerList = document.createElement("div");
-    playerList.className = "stats-window-entity-list";
-    for (const player of players) {
-      const section = document.createElement("section");
-      section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;
-      const title = document.createElement("h4");
-      title.className = "stats-window-entity-title";
-      title.textContent = player.name;
-      section.append(title);
-      for (const { entry, definition } of entries) {
-        section.append(
-          renderStatRow(statsWindow, entry, definition, definition.format(definition.read(player))),
-        );
-      }
-      playerList.append(section);
-    }
-    teamSection.append(playerList);
-    list.append(teamSection);
-  }
-  statsWindow.body.append(list);
-}
-
-function renderAllTeamsStats(
-  statsWindow: StatsWindowState,
-  frame: StatsFrame,
-  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
-): void {
-  const list = document.createElement("div");
-  list.className = "stats-window-entity-list";
-  for (const team of ["blue", "orange"] as const) {
-    const snapshot = getTeamSnapshot(frame, team);
-    const section = document.createElement("section");
-    section.className = `stats-window-entity ${getTeamScopeClass(team)}`;
-    const title = document.createElement("h3");
-    title.className = "stats-window-entity-title";
-    title.textContent = getTeamLabel(team);
-    section.append(title);
-    for (const { entry, definition } of entries) {
-      section.append(
-        renderStatRow(
-          statsWindow,
-          entry,
-          definition,
-          snapshot ? definition.format(definition.read(snapshot)) : "--",
-        ),
-      );
-    }
-    list.append(section);
-  }
-  statsWindow.body.append(list);
-}
-
-function renderAdHocStats(
-  statsWindow: StatsWindowState,
-  frame: StatsFrame,
-  entries: Array<{ entry: SelectedStatEntry; definition: StatDefinition }>,
-): void {
-  const list = document.createElement("div");
-  list.className = "stats-window-stat-list";
-  for (const { entry, definition } of entries) {
-    const target = getAdHocTarget(frame, definition, entry.targetId);
-    list.append(
-      renderStatRow(
-        statsWindow,
-        entry,
-        definition,
-        target ? definition.format(definition.read(target)) : "--",
-      ),
-    );
-  }
-  statsWindow.body.append(list);
-}
-
-function getAdHocTarget(
-  frame: StatsFrame,
-  definition: StatDefinition,
-  targetId: string | undefined,
-): PlayerStatsSnapshot | TeamStatsSnapshot | null {
-  if (definition.scope === "player") {
-    return (
-      frame.players.find((player) => playerIdToString(player.player_id) === targetId) ??
-      frame.players[0] ??
-      null
-    );
-  }
-  return getTeamSnapshot(frame, targetId === "orange" ? "orange" : "blue");
-}
-
-function renderStatRow(
-  statsWindow: StatsWindowState,
-  entry: SelectedStatEntry,
-  definition: StatDefinition,
-  value: string,
-): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "stats-window-stat-row";
-  const name = document.createElement("span");
-  name.className = "stats-window-stat-name";
-  name.textContent = definition.label;
-  if (statsWindow.kind === "ad-hoc") {
-    const targetSelect = document.createElement("select");
-    targetSelect.className = "stats-window-stat-target";
-    const teamClass = getStatTargetTeamClass(definition, entry.targetId);
-    if (teamClass) {
-      targetSelect.classList.add(teamClass);
-    }
-    if (definition.scope === "player") {
-      appendGroupedPlayerOptions(targetSelect, entry.targetId);
-    } else {
-      targetSelect.append(
-        new Option("Blue", "blue", entry.targetId === "blue", entry.targetId === "blue"),
-        new Option("Orange", "orange", entry.targetId === "orange", entry.targetId === "orange"),
-      );
-    }
-    targetSelect.value = entry.targetId ?? "";
-    targetSelect.addEventListener("change", () => {
-      const nextTargetId = targetSelect.value;
-      if (
-        statsWindow.entries.some(
-          (candidate) =>
-            candidate !== entry &&
-            candidate.statId === entry.statId &&
-            candidate.targetId === nextTargetId,
-        )
-      ) {
-        renderStatsWindow(statsWindow);
-        return;
-      }
-      const index = statsWindow.entries.findIndex((candidate) => candidate.key === entry.key);
-      if (index >= 0) {
-        statsWindow.entries[index] = {
-          key: `${statsWindow.id}:${entry.statId}:${nextTargetId}`,
-          statId: entry.statId,
-          targetId: nextTargetId,
-        };
-      }
-      renderStatsWindow(statsWindow);
-      scheduleConfigUrlUpdate();
-    });
-    name.append(" ", targetSelect);
-  }
-  const valueEl = document.createElement("span");
-  valueEl.className = "stats-window-stat-value";
-  valueEl.textContent = value;
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "stats-window-stat-remove";
-  remove.textContent = "x";
-  remove.addEventListener("click", () => {
-    removeStatFromWindow(statsWindow, entry.key);
-    renderStatsWindow(statsWindow);
-    scheduleConfigUrlUpdate();
-  });
-  row.append(name, valueEl, remove);
-  return row;
 }
 
 function formatSetting(value: number | undefined, suffix = "", digits = 0): string {
@@ -3960,9 +2039,9 @@ function renderSnapshot(state: ReplayPlayerState): void {
 
   syncCameraControlAvailability(state);
   renderCameraProfile(state);
-  renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
+  statsWindowManager.render(state.frameIndex, { preserveOpenPickers: true });
   renderScoreboard(state.frameIndex);
-  syncEventPlaylistTimeline(state);
+  eventWindowsManager.syncPlaylistTimeline(state);
 }
 
 function includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): boolean {
@@ -4058,12 +2137,11 @@ async function loadReplayBundleForDisplay(
   clearTimelineRangeSources();
   clearStandalonePlugins();
   clearRenderCaches();
-  eventPlaylistActiveSourceIds = null;
-  eventPlaylistLastActiveKey = null;
+  eventWindowsManager.resetPlaylistState();
   renderScoreboard();
   renderTimelineEventCount();
-  renderMechanicsTimelineControls();
-  renderEventPlaylistWindow();
+  eventWindowsManager.renderTimelineControls();
+  eventWindowsManager.renderPlaylistWindow();
   renderModuleSettings();
   syncRecordingWindow();
 
@@ -4129,16 +2207,15 @@ async function loadReplayBundleForDisplay(
     playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
     framesReadout.textContent = `${replay.frameCount}`;
     renderTimelineEventCount();
-    renderMechanicsTimelineControls();
-    eventPlaylistActiveSourceIds = null;
-    eventPlaylistLastActiveKey = null;
-    renderEventPlaylistWindow();
+    eventWindowsManager.renderTimelineControls();
+    eventWindowsManager.resetPlaylistState();
+    eventWindowsManager.renderPlaylistWindow();
     setTransportEnabled(true);
     syncCameraControlAvailability(replayPlayer.getState());
     renderSnapshot(replayPlayer.getState());
-    renderStatsWindows(replayPlayer.getState().frameIndex);
+    statsWindowManager.render(replayPlayer.getState().frameIndex);
     renderScoreboard(replayPlayer.getState().frameIndex);
-    syncEventPlaylistTimeline(replayPlayer.getState(), { forceScroll: true });
+    eventWindowsManager.syncPlaylistTimeline(replayPlayer.getState(), { forceScroll: true });
     renderModuleSettings();
     syncRecordingWindow();
     replayLoadModal?.hide();
@@ -4334,7 +2411,7 @@ export function mountStatEvaluationPlayer(
     statsTimeline = null;
     statsFrameLookup = null;
     statRegistry = createStatRegistry(null);
-    statsWindows.clear();
+    statsWindowManager.clear();
     clearTimelineEventSources();
     clearTimelineRangeSources();
     clearStandalonePlugins();
@@ -4346,9 +2423,7 @@ export function mountStatEvaluationPlayer(
     activeTimelineRangeModuleIds = new Set<string>();
     activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
-    eventPlaylistActiveSourceIds = null;
-    eventPlaylistAutoFollow = true;
-    eventPlaylistLastActiveKey = null;
+    eventWindowsManager.resetPlaylistState();
     activeMechanicsReview = null;
     mechanicsReviewBoundaryGuard = false;
     boostPadOverlayEnabled = true;
@@ -4360,7 +2435,6 @@ export function mountStatEvaluationPlayer(
       configUrlUpdateTimer = null;
     }
     isApplyingConfig = false;
-    nextStatsWindowId = 1;
     nextWindowZIndex = 30;
     removeRenderHook = null;
     if (appRoot === root) {
@@ -4441,7 +2515,7 @@ export function mountStatEvaluationPlayer(
     button.addEventListener(
       "click",
       () => {
-        createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);
+        statsWindowManager.create(button.dataset.createStatsWindow as StatsWindowKind);
       },
       { signal: listeners.signal },
     );
@@ -4788,7 +2862,7 @@ export function mountStatEvaluationPlayer(
   syncRecordingWindow();
   renderTimelineEventCount();
   renderMechanicsReviewWindow();
-  renderEventPlaylistWindow();
+  eventWindowsManager.renderPlaylistWindow();
   if (options.initialBundle) {
     void loadReplayBundleForDisplay(
       {
