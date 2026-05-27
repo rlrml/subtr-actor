@@ -2425,6 +2425,29 @@ std::optional<std::string> SubtrActorPlugin::statsPlayerCfgJsonFromClipboard(
   return json.substr(jsonFirstByte);
 }
 
+std::optional<std::string> SubtrActorPlugin::statsPlayerCfgFromJson(const std::string &json) {
+  if (!encodedStatsPlayerConfigLen || !writeEncodedStatsPlayerConfig ||
+      json.find('\0') != std::string::npos) {
+    return std::nullopt;
+  }
+
+  const size_t byteCount = encodedStatsPlayerConfigLen(json.c_str());
+  if (byteCount == 0) {
+    return std::nullopt;
+  }
+
+  std::string encoded(byteCount, '\0');
+  const size_t written = writeEncodedStatsPlayerConfig(
+      json.c_str(),
+      reinterpret_cast<uint8_t *>(encoded.data()),
+      encoded.size());
+  if (written == 0 || written > encoded.size()) {
+    return std::nullopt;
+  }
+  encoded.resize(written);
+  return std::format("#cfg={}", encoded);
+}
+
 std::string SubtrActorPlugin::webUiStatIdForWindow(
     const UiStatsWindow &window,
     const UiStatsWindow::Entry &entry) const {
@@ -2965,6 +2988,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_decoded_stats_player_config_json_len"));
   writeDecodedStatsPlayerConfigJson = reinterpret_cast<WriteDecodedStatsPlayerConfigJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_decoded_stats_player_config_json"));
+  encodedStatsPlayerConfigLen = reinterpret_cast<EncodedStatsPlayerConfigLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_encoded_stats_player_config_len"));
+  writeEncodedStatsPlayerConfig = reinterpret_cast<WriteEncodedStatsPlayerConfig>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_encoded_stats_player_config"));
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
   drainTeamEvents = reinterpret_cast<DrainTeamEvents>(
@@ -2993,6 +3020,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !analysisNodeJsonLen || !writeAnalysisNodeJson || !analysisNodeNamesJsonLen ||
       !writeAnalysisNodeNamesJson || !graphInfoJsonLen || !writeGraphInfoJson ||
       !decodedStatsPlayerConfigJsonLen || !writeDecodedStatsPlayerConfigJson ||
+      !encodedStatsPlayerConfigLen || !writeEncodedStatsPlayerConfig ||
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
       !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
@@ -3048,6 +3076,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeGraphInfoJson = nullptr;
   decodedStatsPlayerConfigJsonLen = nullptr;
   writeDecodedStatsPlayerConfigJson = nullptr;
+  encodedStatsPlayerConfigLen = nullptr;
+  writeEncodedStatsPlayerConfig = nullptr;
   drainEvents = nullptr;
   drainTeamEvents = nullptr;
   drainGoalContextEvents = nullptr;
@@ -7515,7 +7545,9 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
   ImGui::SameLine();
   if (ImGui::Button("Copy layout cfg")) {
     const std::string json = uiConfigJson();
-    const std::string cfg = std::format("#cfg={}", urlEncode(json));
+    const std::optional<std::string> encodedCfg = statsPlayerCfgFromJson(json);
+    const std::string cfg =
+        encodedCfg.value_or(std::format("#cfg={}", urlEncode(json)));
     ImGui::SetClipboardText(cfg.c_str());
     cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
   }

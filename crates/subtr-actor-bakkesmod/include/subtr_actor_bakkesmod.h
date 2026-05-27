@@ -298,6 +298,12 @@ size_t subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
     const char *encoded_config,
     uint8_t *out_bytes,
     size_t max_bytes);
+size_t subtr_actor_bakkesmod_encoded_stats_player_config_len(
+    const char *json_config);
+size_t subtr_actor_bakkesmod_write_encoded_stats_player_config(
+    const char *json_config,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_events_json(
     const SaEngine *engine,

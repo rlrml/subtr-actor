@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ffi::{CStr, CString};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
@@ -10,7 +10,11 @@ use std::slice;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use base64::Engine as _;
 use boxcars::{ParserBuilder, Quaternion, RemoteId, RigidBody, Vector3f};
-use flate2::read::{DeflateDecoder, ZlibDecoder};
+use flate2::{
+    read::{DeflateDecoder, ZlibDecoder},
+    write::DeflateEncoder,
+    Compression,
+};
 use subtr_actor::{
     boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
@@ -2794,6 +2798,16 @@ fn decode_stats_player_config_json(value: &CStr) -> Option<Vec<u8>> {
     inflate_stats_player_config_bytes(&compressed)
 }
 
+fn encode_stats_player_config_json(value: &CStr) -> Option<Vec<u8>> {
+    let value = value.to_str().ok()?.trim();
+    serde_json::from_str::<serde_json::Value>(value).ok()?;
+
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(value.as_bytes()).ok()?;
+    let compressed = encoder.finish().ok()?;
+    Some(URL_SAFE_NO_PAD.encode(compressed).into_bytes())
+}
+
 fn refresh_timeline_graph_state(engine: &mut SaEngine) {
     let Some(events) = engine
         .graph
@@ -3182,6 +3196,56 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config
     }
     let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
     let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the byte length of the compressed base64url stats-player cfg value.
+///
+/// The output format matches the web stats evaluation player's `cfg` payload:
+/// raw deflate of UTF-8 JSON, encoded as unpadded base64url.
+///
+/// # Safety
+///
+/// `json_config` must either be null or point to a valid null-terminated UTF-8
+/// JSON string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_encoded_stats_player_config_len(
+    json_config: *const c_char,
+) -> usize {
+    if json_config.is_null() {
+        return 0;
+    }
+    let json_config = unsafe { CStr::from_ptr(json_config) };
+    encode_stats_player_config_json(json_config)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the compressed base64url stats-player cfg value into caller storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_encoded_stats_player_config_len` first to size the
+/// destination buffer.
+///
+/// # Safety
+///
+/// `json_config` must point to a valid null-terminated UTF-8 JSON string.
+/// `out_bytes` must point to writable storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_encoded_stats_player_config(
+    json_config: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if json_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let json_config = unsafe { CStr::from_ptr(json_config) };
+    let Some(bytes) = encode_stats_player_config_json(json_config) else {
         return 0;
     };
     let count = max_bytes.min(bytes.len());
@@ -3808,7 +3872,6 @@ mod tests {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use std::collections::{BTreeMap, BTreeSet};
     use std::ffi::CString;
-    use std::io::Write as _;
     use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
@@ -3866,6 +3929,44 @@ mod tests {
         let byte_count =
             unsafe { subtr_actor_bakkesmod_decoded_stats_player_config_json_len(json.as_ptr()) };
         assert_eq!(byte_count, json.as_bytes().len());
+    }
+
+    #[test]
+    fn encodes_stats_player_config_cfg_payload() {
+        let json = r#"{"version":1,"statsWindows":[]}"#;
+        let json_cstr = CString::new(json).unwrap();
+
+        let encoded_count =
+            unsafe { subtr_actor_bakkesmod_encoded_stats_player_config_len(json_cstr.as_ptr()) };
+        assert!(encoded_count > 0);
+        assert!(encoded_count < json.len() * 2);
+
+        let mut encoded = vec![0; encoded_count];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_encoded_stats_player_config(
+                json_cstr.as_ptr(),
+                encoded.as_mut_ptr(),
+                encoded.len(),
+            )
+        };
+        assert_eq!(written, encoded_count);
+        let encoded_cstr = CString::new(encoded).unwrap();
+
+        let decoded_count = unsafe {
+            subtr_actor_bakkesmod_decoded_stats_player_config_json_len(encoded_cstr.as_ptr())
+        };
+        assert_eq!(decoded_count, json.len());
+
+        let mut decoded = vec![0; decoded_count];
+        let decoded_written = unsafe {
+            subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+                encoded_cstr.as_ptr(),
+                decoded.as_mut_ptr(),
+                decoded.len(),
+            )
+        };
+        assert_eq!(decoded_written, json.len());
+        assert_eq!(String::from_utf8(decoded).unwrap(), json);
     }
 
     fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
