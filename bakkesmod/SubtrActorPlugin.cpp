@@ -4277,30 +4277,39 @@ void SubtrActorPlugin::maybeAutosaveUiConfig() {
   saveUiConfig();
 }
 
-void SubtrActorPlugin::renderLayoutConfigControls(const char *idSuffix) {
+void SubtrActorPlugin::renderLayoutConfigControls(const char *idSuffix, bool fullWidth) {
   ImGui::PushID(idSuffix);
-  if (ImGui::Button("Save layout")) {
+  auto buttonSize = [fullWidth]() {
+    return ImVec2{fullWidth ? ImGui::GetContentRegionAvail().x : 0.0f, 0.0f};
+  };
+  if (ImGui::Button("Save layout", buttonSize())) {
     saveUiConfig();
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload layout")) {
+  if (!fullWidth) {
+    ImGui::SameLine();
+  }
+  if (ImGui::Button("Reload layout", buttonSize())) {
     loadUiConfig();
   }
-  if (ImGui::Button("Copy layout JSON")) {
+  if (ImGui::Button("Copy layout JSON", buttonSize())) {
     const std::string json = uiConfigJson();
     ImGui::SetClipboardText(json.c_str());
     cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Copy layout cfg")) {
+  if (!fullWidth) {
+    ImGui::SameLine();
+  }
+  if (ImGui::Button("Copy layout cfg", buttonSize())) {
     const std::string json = uiConfigJson();
     const std::optional<std::string> encodedCfg = statsPlayerCfgFromJson(json);
     const std::string cfg = encodedCfg.value_or(std::format("#cfg={}", urlEncode(json)));
     ImGui::SetClipboardText(cfg.c_str());
     cvarManager->log(std::format("subtr-actor: copied {} UI config hash bytes", cfg.size()));
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Paste layout")) {
+  if (!fullWidth) {
+    ImGui::SameLine();
+  }
+  if (ImGui::Button("Paste layout", buttonSize())) {
     const char *clipboardText = ImGui::GetClipboardText();
     if (clipboardText == nullptr || clipboardText[0] == '\0') {
       cvarManager->log("subtr-actor: clipboard does not contain UI config JSON or cfg");
@@ -7738,29 +7747,26 @@ void SubtrActorPlugin::applyLauncherMenuPlacement() {
 
 void SubtrActorPlugin::renderLauncherWorkspaceControls() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WORKSPACES");
-  if (ImGui::Button("Default workspace")) {
+  const float workspaceButtonWidth = ImGui::GetContentRegionAvail().x;
+  if (ImGui::Button("Default workspace", ImVec2{workspaceButtonWidth, 0.0f})) {
     applyDefaultUiWorkspace();
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Review workspace")) {
+  if (ImGui::Button("Review workspace", ImVec2{workspaceButtonWidth, 0.0f})) {
     applyReplayReviewUiWorkspace();
   }
-  if (ImGui::Button("Debug workspace")) {
+  if (ImGui::Button("Debug workspace", ImVec2{workspaceButtonWidth, 0.0f})) {
     applyGraphDebugUiWorkspace();
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Recording workspace")) {
+  if (ImGui::Button("Recording workspace", ImVec2{workspaceButtonWidth, 0.0f})) {
     applyRecordingUiWorkspace();
   }
-  if (ImGui::Button("Reset positions")) {
+  if (ImGui::Button("Reset positions", ImVec2{workspaceButtonWidth, 0.0f})) {
     resetWindowPlacements();
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Default stats windows")) {
+  if (ImGui::Button("Default stats windows", ImVec2{workspaceButtonWidth, 0.0f})) {
     resetDefaultStatsWindows();
   }
-  ImGui::SameLine();
-  if (ImGui::Button("Hide side windows")) {
+  if (ImGui::Button("Hide side windows", ImVec2{workspaceButtonWidth, 0.0f})) {
     for (const SingletonWindowControl &window : singletonWindowControls()) {
       if (std::string_view{window.config_id} == "scoreboard") {
         continue;
@@ -7768,7 +7774,7 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
       hideSingletonWindow(*window.open);
     }
   }
-  renderLayoutConfigControls("launcher-workspace-layout");
+  renderLayoutConfigControls("launcher-workspace-layout", true);
 }
 
 void SubtrActorPlugin::renderWebWindowToggleControls(

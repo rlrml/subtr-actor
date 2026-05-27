@@ -617,7 +617,7 @@ private:
   void scheduleUiConfigAutosave(
       std::chrono::milliseconds delay = std::chrono::milliseconds(150));
   void maybeAutosaveUiConfig();
-  void renderLayoutConfigControls(const char *idSuffix);
+  void renderLayoutConfigControls(const char *idSuffix, bool fullWidth = false);
   int recentEventCountForActor(std::string_view actor) const;
   int recentEventCountForTeam(uint8_t isTeam0) const;
   int recentEventCountForType(std::string_view type) const;
