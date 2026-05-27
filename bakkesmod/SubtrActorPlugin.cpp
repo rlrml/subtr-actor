@@ -2167,12 +2167,21 @@ void SubtrActorPlugin::loadUiConfig() {
   uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
   uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
+  uiGraphInspectorOpen =
+      parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
+  graphInspectorView = static_cast<int>(
+      std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
+  selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
+  selectedAnalysisNode = parseJsonStringProperty(json, "selected_analysis_node").value_or("");
+  graphInspectorNodeQuery =
+      parseJsonStringProperty(json, "graph_inspector_node_query").value_or("");
 
   if (const auto placements = parseJsonObjectProperty(json, "placements")) {
     loadPlacement(*placements, "launcher", launcherPlacement);
     loadPlacement(*placements, "scoreboard", scoreboardPlacement);
     loadPlacement(*placements, "events", eventsPlacement);
     loadPlacement(*placements, "status", statusPlacement);
+    loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
   }
 
   uiStatsWindows.clear();
@@ -2288,6 +2297,15 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
   file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
+  file << "  \"graph_inspector_open\": " << (uiGraphInspectorOpen ? "true" : "false")
+       << ",\n";
+  file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
+  file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
+       << "\",\n";
+  file << "  \"selected_analysis_node\": \"" << escapeJsonString(selectedAnalysisNode)
+       << "\",\n";
+  file << "  \"graph_inspector_node_query\": \""
+       << escapeJsonString(graphInspectorNodeQuery) << "\",\n";
   file << "  \"placements\": {\n";
   file << "    \"launcher\": ";
   writePlacement(file, launcherPlacement);
@@ -2297,6 +2315,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, eventsPlacement);
   file << ",\n    \"status\": ";
   writePlacement(file, statusPlacement);
+  file << ",\n    \"graph_inspector\": ";
+  writePlacement(file, graphInspectorPlacement);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -4795,6 +4815,7 @@ void SubtrActorPlugin::Render() {
   renderScoreboardWindow();
   renderEventsWindow();
   renderStatusWindow();
+  renderGraphInspectorWindow();
   renderStatsWindows();
 }
 
@@ -4923,6 +4944,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
   ImGui::Checkbox("Events", &uiEventsOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
+  ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
@@ -5097,6 +5119,175 @@ void SubtrActorPlugin::renderStatusWindow() {
   ImGui::Text("Sample interval: %.0fms", sampleIntervalSeconds() * 1000.0f);
   ImGui::Text("Players sampled: %zu", sampledPlayers.size());
   ImGui::Text("Recent events: %zu", recentUiEvents.size());
+  ImGui::End();
+}
+
+std::vector<std::string> SubtrActorPlugin::graphOutputNames() {
+  std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
+  std::vector<std::string> names =
+      parseJsonStringArrayProperty(graphInfoJson, "graph_output_names");
+  if (names.empty()) {
+    graphInfoJson = readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "graph_info");
+    names = parseJsonStringArrayProperty(graphInfoJson, "graph_output_names");
+  }
+  if (names.empty()) {
+    names.assign(VERIFY_GRAPH_OUTPUTS.begin(), VERIFY_GRAPH_OUTPUTS.end());
+  }
+  return names;
+}
+
+std::vector<std::string> SubtrActorPlugin::analysisNodeNames() {
+  std::vector<std::string> names =
+      parseJsonStringArray(readJsonBuffer(analysisNodeNamesJsonLen, writeAnalysisNodeNamesJson));
+  if (!names.empty()) {
+    return names;
+  }
+
+  std::string graphInfoJson = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
+  names = parseJsonStringArrayProperty(graphInfoJson, "callable_analysis_node_names");
+  if (names.empty()) {
+    names = parseJsonStringArrayProperty(graphInfoJson, "node_names");
+  }
+  if (names.empty()) {
+    graphInfoJson = readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "graph_info");
+    names = parseJsonStringArrayProperty(graphInfoJson, "callable_analysis_node_names");
+  }
+  if (names.empty()) {
+    names = parseJsonStringArrayProperty(graphInfoJson, "node_names");
+  }
+  return names;
+}
+
+void SubtrActorPlugin::renderGraphInspectorWindow() {
+  if (!uiGraphInspectorOpen) {
+    return;
+  }
+
+  applyWindowPlacement(graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f);
+  if (!ImGui::Begin("Graph inspector##subtr-actor", &uiGraphInspectorOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(graphInspectorPlacement);
+
+  if (!loaded || !engine) {
+    ImGui::TextWrapped("Start live analysis to inspect graph outputs and analysis nodes.");
+    ImGui::End();
+    return;
+  }
+
+  ImGui::RadioButton("Outputs##graph-inspector-view", &graphInspectorView, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("Analysis nodes##graph-inspector-view", &graphInspectorView, 1);
+  ImGui::SameLine();
+  ImGui::RadioButton("Graph info##graph-inspector-view", &graphInspectorView, 2);
+  ImGui::Separator();
+
+  if (graphInspectorView == 0) {
+    const std::vector<std::string> names = graphOutputNames();
+    if (selectedGraphOutput.empty() && !names.empty()) {
+      selectedGraphOutput = names.front();
+    }
+    if (!containsString(names, selectedGraphOutput) && !names.empty()) {
+      selectedGraphOutput = names.front();
+    }
+
+    const char *selected =
+        selectedGraphOutput.empty() ? "Select graph output" : selectedGraphOutput.c_str();
+    if (ImGui::BeginCombo("Output", selected)) {
+      for (const std::string &name : names) {
+        const bool isSelected = name == selectedGraphOutput;
+        if (ImGui::Selectable(name.c_str(), isSelected)) {
+          selectedGraphOutput = name;
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    if (selectedGraphOutput.empty()) {
+      ImGui::TextWrapped("No graph outputs are registered.");
+    } else {
+      const std::string json =
+          readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, selectedGraphOutput);
+      renderJsonInspectorPayload(
+          "graph-output",
+          std::format("Graph output: {}", selectedGraphOutput),
+          json);
+    }
+  } else if (graphInspectorView == 1) {
+    const std::vector<std::string> names = analysisNodeNames();
+    if (selectedAnalysisNode.empty() && !names.empty()) {
+      selectedAnalysisNode = names.front();
+    }
+    if (!containsString(names, selectedAnalysisNode) && !names.empty()) {
+      selectedAnalysisNode = names.front();
+    }
+
+    std::array<char, 160> queryBuffer{};
+    const size_t querySize =
+        std::min(graphInspectorNodeQuery.size(), queryBuffer.size() - 1);
+    std::copy_n(graphInspectorNodeQuery.data(), querySize, queryBuffer.data());
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputText("Search nodes", queryBuffer.data(), queryBuffer.size())) {
+      graphInspectorNodeQuery = queryBuffer.data();
+    }
+    if (!graphInspectorNodeQuery.empty()) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Clear##graph-node-search")) {
+        graphInspectorNodeQuery.clear();
+      }
+    }
+
+    const std::vector<std::string_view> tokens = statSearchTokens(graphInspectorNodeQuery);
+    auto matchesSearch = [&](const std::string &name) {
+      if (tokens.empty()) {
+        return true;
+      }
+      const std::string normalized = normalizeStatSearchText(name);
+      return std::all_of(tokens.begin(), tokens.end(), [&](std::string_view token) {
+        return normalized.find(token) != std::string::npos;
+      });
+    };
+
+    ImGui::BeginChild("graph-node-list", ImVec2{220.0f, 0.0f}, true);
+    size_t visibleCount = 0;
+    for (const std::string &name : names) {
+      if (!matchesSearch(name)) {
+        continue;
+      }
+      visibleCount += 1;
+      const bool isSelected = name == selectedAnalysisNode;
+      if (ImGui::Selectable(name.c_str(), isSelected)) {
+        selectedAnalysisNode = name;
+      }
+    }
+    if (visibleCount == 0) {
+      ImGui::TextWrapped("No matching analysis nodes.");
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+    ImGui::BeginChild("graph-node-payload", ImVec2{0.0f, 0.0f}, true);
+    if (selectedAnalysisNode.empty()) {
+      ImGui::TextWrapped("No callable analysis nodes are registered.");
+    } else {
+      const std::string json =
+          readNamedJsonBuffer(analysisNodeJsonLen, writeAnalysisNodeJson, selectedAnalysisNode);
+      renderJsonInspectorPayload(
+          "analysis-node",
+          std::format("Analysis node: {}", selectedAnalysisNode),
+          json);
+    }
+    ImGui::EndChild();
+  } else {
+    graphInspectorView = 2;
+    std::string json = readJsonBuffer(graphInfoJsonLen, writeGraphInfoJson);
+    if (json.empty()) {
+      json = readNamedJsonBuffer(graphOutputJsonLen, writeGraphOutputJson, "graph_info");
+    }
+    renderJsonInspectorPayload("graph-info", "Graph info", json);
+  }
+
   ImGui::End();
 }
 
@@ -5839,7 +6030,7 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
   ImGui::EndChild();
 }
 
-void SubtrActorPlugin::renderStatsModuleJsonSummary(const std::string &json) {
+void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
   auto renderFields = [](const char *tableId, const std::vector<JsonFieldSummary> &fields) {
     ImGui::Columns(2, tableId, false);
     for (const JsonFieldSummary &field : fields) {
@@ -5935,6 +6126,37 @@ void SubtrActorPlugin::renderStatsModuleJsonSummary(const std::string &json) {
   }
 }
 
+void SubtrActorPlugin::renderJsonInspectorPayload(
+    const char *id,
+    const std::string &label,
+    const std::string &json) {
+  if (json.empty()) {
+    ImGui::TextWrapped("%s is not available from the live graph yet.", label.c_str());
+    return;
+  }
+
+  ImGui::Text("%s (%zu bytes)", label.c_str(), json.size());
+  ImGui::SameLine();
+  if (ImGui::SmallButton(std::format("Copy##{}-json", id).c_str())) {
+    ImGui::SetClipboardText(json.c_str());
+  }
+
+  renderJsonSummary(json);
+  ImGui::Separator();
+
+  const std::string display = clippedDisplayText(json);
+  if (ImGui::TreeNode(std::format("Raw JSON##{}-raw", id).c_str())) {
+    ImGui::BeginChild(
+        std::format("{}-json", id).c_str(),
+        ImVec2{0.0f, 220.0f},
+        true,
+        ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::TextUnformatted(display.c_str(), display.c_str() + display.size());
+    ImGui::EndChild();
+    ImGui::TreePop();
+  }
+}
+
 void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
   if (!loaded || !engine) {
     ImGui::TextWrapped("Start live analysis to inspect graph-backed stats modules.");
@@ -5987,7 +6209,7 @@ void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
     ImGui::SetClipboardText(json.c_str());
   }
 
-  renderStatsModuleJsonSummary(json);
+  renderJsonSummary(json);
   ImGui::Separator();
 
   const std::string display = clippedDisplayText(std::move(json));

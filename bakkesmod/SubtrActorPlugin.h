@@ -244,6 +244,11 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
+  bool uiGraphInspectorOpen = false;
+  int graphInspectorView = 0;
+  std::string selectedGraphOutput;
+  std::string selectedAnalysisNode;
+  std::string graphInspectorNodeQuery;
   uint32_t nextUiStatsWindowId = 1;
   std::deque<UiEventRecord> recentUiEvents;
   std::vector<UiStatsWindow> uiStatsWindows;
@@ -251,6 +256,7 @@ private:
   UiWindowPlacement scoreboardPlacement;
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
+  UiWindowPlacement graphInspectorPlacement;
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
@@ -276,6 +282,7 @@ private:
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderStatusWindow();
+  void renderGraphInspectorWindow();
   void renderStatsWindowManager();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName);
@@ -300,7 +307,10 @@ private:
   void renderGoalsOverviewStats(UiStatsWindow &window);
   void renderAdHocStatsWindow(UiStatsWindow &window);
   void renderStatsModuleWindow(UiStatsWindow &window);
-  void renderStatsModuleJsonSummary(const std::string &json);
+  void renderJsonSummary(const std::string &json);
+  void renderJsonInspectorPayload(const char *id, const std::string &label, const std::string &json);
+  std::vector<std::string> graphOutputNames();
+  std::vector<std::string> analysisNodeNames();
   const char *statsWindowKindLabel(UiStatsWindowKind kind) const;
   std::string statsWindowDisplayLabel(const UiStatsWindow &window) const;
   std::string statsWindowTitle(const UiStatsWindow &window) const;
