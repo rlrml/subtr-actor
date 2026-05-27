@@ -13,30 +13,14 @@ import type {
 import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
-import { createStatModules, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
-import type { StatModule, StatModuleContext } from "./statModules.ts";
-import {
-  renderModuleSummaryView,
-  type ModuleCapabilityKind,
-} from "./moduleSummaryView.ts";
 import { FloatingWindowController, mustElement } from "./floatingWindows.ts";
-import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
-import {
-  applyConfigAdapterSnapshot,
-  getConfigAdapterSnapshot,
-  type StatsPlayerConfigAdapter,
-} from "./configAdapters.ts";
 import type {
   StatsFrame,
   StatsFrameLookup,
   StatsTimeline,
 } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
-import {
-  getMechanicKinds,
-  mechanicKindToModuleId,
-} from "./timelineMarkers.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
 import {
   createFileReplaySource,
@@ -57,12 +41,16 @@ import {
 } from "./replayLoadController.ts";
 import { renderScoreboardWindow } from "./scoreboardWindow.ts";
 import {
+  createModuleRuntimeController,
+  type ModuleRuntimeController,
+} from "./moduleRuntimeController.ts";
+import {
   createMechanicsReviewController,
   getMechanicsReviewElements,
   type MechanicsReviewController,
 } from "./mechanicsReviewController.ts";
 import { createStatsWindowsManager } from "./statsWindows.ts";
-import { createEventWindowsManager } from "./eventWindows.ts";
+import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
@@ -87,68 +75,9 @@ let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
-let removeRenderHook: (() => void) | null = null;
 let lastPlayingSnapshotUiUpdateAt = 0;
 
-const timelineSourceRemovers = new Map<string, () => void>();
-const timelineRangeSourceRemovers = new Map<string, () => void>();
 const standalonePluginRemovers = new Map<string, () => void>();
-
-const boostPickupFilters = createBoostPickupFilterController({
-  refreshTimelineRanges() {
-    syncTimelineRanges();
-  },
-  rerenderCurrentState() {
-    if (!replayPlayer) {
-      return;
-    }
-    replayPlayer.setBoostPickupAnimationEnabled(
-      replayPlayer.getState().boostPickupAnimationEnabled,
-    );
-  },
-  requestConfigSync() {
-    scheduleConfigUrlUpdate();
-  },
-});
-
-const MODULES = createStatModules(
-  {
-    rerenderCurrentState() {
-      if (!replayPlayer) {
-        return;
-      }
-
-      const state = replayPlayer.getState();
-      statsWindowManager.render(state.frameIndex);
-    },
-    refreshTimelineRanges() {
-      syncTimelineRanges();
-    },
-    requestConfigSync() {
-      scheduleConfigUrlUpdate();
-    },
-  },
-  {
-    boostPickupFilters,
-  },
-);
-
-let activeModules: StatModule[] = [];
-let activeTimelineEventSourceIds = new Set<string>();
-let activeTimelineRangeModuleIds = new Set<string>();
-let activeMechanicTimelineKinds = new Set<string>();
-let activeRenderEffectModuleIds = new Set<string>();
-
-const RENDER_EFFECT_MODULE_IDS = new Set([
-  "ceiling-shot",
-  "fifty-fifty",
-  "pressure",
-  RELATIVE_POSITIONING_MODULE_ID,
-  "absolute-positioning",
-  "speed-flip",
-  "touch",
-]);
-const TOUCH_MODULE_ID = "touch";
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -221,6 +150,8 @@ let mechanicsReviewController: MechanicsReviewController | null = null;
 let recordingControls: RecordingControls | null = null;
 let cameraControls: CameraControls | null = null;
 let replayLoadController: ReplayLoadController | null = null;
+let moduleRuntimeController: ModuleRuntimeController;
+let eventWindowsManager: EventWindowsManager;
 
 const statsWindowManager = createStatsWindowsManager({
   getDefaultFrameIndex() {
@@ -262,18 +193,55 @@ const statsWindowManager = createStatsWindowsManager({
   watchGoalReplay,
 });
 
-const eventWindowsManager = createEventWindowsManager({
+moduleRuntimeController = createModuleRuntimeController({
+  getEventWindowsManager() {
+    return eventWindowsManager;
+  },
+  getReplayPlayer() {
+    return replayPlayer;
+  },
+  getStatsFrameLookup() {
+    return statsFrameLookup;
+  },
+  getStatsTimeline() {
+    return statsTimeline;
+  },
+  getTimelineOverlay() {
+    return timelineOverlay;
+  },
+  renderTimelineEvent(event) {
+    return {
+      ...event,
+      seekTime: timelineEventSeekTime(event),
+    };
+  },
+  rerenderStatsWindow() {
+    if (!replayPlayer) {
+      return;
+    }
+
+    const state = replayPlayer.getState();
+    statsWindowManager.render(state.frameIndex);
+  },
+  renderModuleRuntimeViews: afterModuleRuntimeChange,
+  renderTimelineEventCountValue(value) {
+    eventsReadout.textContent = value;
+  },
+  requestConfigSync: scheduleConfigUrlUpdate,
+});
+
+eventWindowsManager = createEventWindowsManager({
   cueTimelineEvent,
   formatTime,
   getActiveMechanicTimelineKinds() {
-    return activeMechanicTimelineKinds;
+    return moduleRuntimeController.getActiveMechanicTimelineKinds();
   },
   getActiveTimelineEventSourceIds() {
-    return activeTimelineEventSourceIds;
+    return moduleRuntimeController.getActiveTimelineEventSourceIds();
   },
-  getModuleContext,
+  getModuleContext: () => moduleRuntimeController.getContext(),
   getModules() {
-    return MODULES;
+    return moduleRuntimeController.modules;
   },
   getPlaylistWindowBody() {
     return eventPlaylistWindowBody;
@@ -286,133 +254,21 @@ const eventWindowsManager = createEventWindowsManager({
   },
   renderModuleSettings,
   renderModuleSummary,
-  renderTimelineEventCount,
+  renderTimelineEventCount: () => moduleRuntimeController.renderTimelineEventCount(),
   scheduleConfigUrlUpdate,
   setMechanicTimelineKind(kind, enabled) {
-    if (enabled) {
-      activeMechanicTimelineKinds.add(kind);
-    } else {
-      activeMechanicTimelineKinds.delete(kind);
-    }
+    moduleRuntimeController.setMechanicTimelineKind(kind, enabled);
   },
-  setupActiveModules,
-  syncTimelineEvents,
-  syncTimelineRanges,
-  toggleCapability,
+  setupActiveModules: () => moduleRuntimeController.setupActiveModules(),
+  syncTimelineEvents: () => moduleRuntimeController.syncTimelineEvents(),
+  syncTimelineRanges: () => moduleRuntimeController.syncTimelineRanges(),
+  toggleCapability: (id, kind, enabled) =>
+    moduleRuntimeController.toggleCapability(id, kind, enabled),
 });
 
-function getActiveModuleIds(): Set<string> {
-  return new Set([
-    ...activeTimelineEventSourceIds,
-    ...activeTimelineRangeModuleIds,
-    ...activeRenderEffectModuleIds,
-  ]);
-}
-
-function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
-  return kind === "events"
-    ? activeTimelineEventSourceIds
-    : kind === "ranges"
-      ? activeTimelineRangeModuleIds
-      : activeRenderEffectModuleIds;
-}
-
-function clearRenderCaches(): void {}
-
-function getModuleContext(): StatModuleContext | null {
-  if (!replayPlayer || !statsTimeline || !statsFrameLookup) {
-    return null;
-  }
-
-  return {
-    player: replayPlayer,
-    replay: replayPlayer.replay,
-    statsTimeline,
-    statsFrameLookup,
-    fieldScale: replayPlayer.options.fieldScale ?? 1,
-  };
-}
-
-function setupActiveModules(): void {
-  teardownActiveModules();
-
-  const ctx = getModuleContext();
-  if (!ctx) return;
-
-  const activeSourceIds = getActiveModuleIds();
-  activeModules = MODULES.filter((mod) => activeSourceIds.has(mod.id));
-  boostPickupFilters.setup(ctx);
-
-  for (const mod of activeModules) {
-    mod.setup(ctx);
-  }
-
-  removeRenderHook = ctx.player.onBeforeRender((info) => {
-    for (const mod of activeModules) {
-      if (activeRenderEffectModuleIds.has(mod.id)) {
-        mod.onBeforeRender(info);
-      }
-    }
-  });
-
-  syncTimelineEvents();
-  syncTimelineRanges();
-  clearRenderCaches();
-}
-
-function migrateMechanicBackedTimelineEventSelections(): void {
-  for (const kind of getMechanicKinds(statsTimeline)) {
-    const moduleId = mechanicKindToModuleId(kind);
-    if (activeTimelineEventSourceIds.delete(moduleId)) {
-      activeMechanicTimelineKinds.add(kind);
-    }
-  }
-}
-
-function teardownActiveModules(): void {
-  removeRenderHook?.();
-  removeRenderHook = null;
-  clearTimelineEventSources();
-  clearTimelineRangeSources();
-
-  for (const mod of activeModules) {
-    mod.teardown();
-  }
-  activeModules = [];
-  clearRenderCaches();
-}
-
-function toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boolean): void {
-  const activeIds = getActiveCapabilityIds(kind);
-  if (enabled) {
-    activeIds.add(id);
-  } else {
-    activeIds.delete(id);
-  }
-
-  setupActiveModules();
+function afterModuleRuntimeChange(): void {
   renderModuleSummary();
   renderModuleSettings();
-  if (replayPlayer) {
-    const state = replayPlayer.getState();
-    statsWindowManager.render(state.frameIndex);
-  }
-  renderTimelineEventCount();
-  scheduleConfigUrlUpdate();
-}
-
-function clearTimelineEventSources(): void {
-  for (const removeSource of timelineSourceRemovers.values()) {
-    removeSource();
-  }
-  timelineSourceRemovers.clear();
-}
-
-function clearTimelineRangeSources(): void {
-  for (const removeSource of timelineRangeSourceRemovers.values()) {
-    removeSource();
-  }
-  timelineRangeSourceRemovers.clear();
 }
 
 function clearStandalonePlugins(): void {
@@ -443,104 +299,6 @@ function toggleBoostPadOverlay(): void {
   scheduleConfigUrlUpdate();
 }
 
-function syncTimelineEvents(): void {
-  clearTimelineEventSources();
-
-  const ctx = getModuleContext();
-  if (!timelineOverlay || !ctx) {
-    return;
-  }
-
-  for (const source of eventWindowsManager.getTimelineSources(ctx)) {
-    if (!source.active) {
-      continue;
-    }
-    const events = source.buildTimelineEvents();
-    if (events.length === 0) continue;
-
-    timelineSourceRemovers.set(
-      source.timelineKey,
-      timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
-        id: source.timelineId,
-        label: source.label,
-      }),
-    );
-  }
-
-  timelineOverlay.refreshEvents();
-}
-
-function syncTimelineRanges(): void {
-  clearTimelineRangeSources();
-
-  const ctx = getModuleContext();
-  if (!timelineOverlay || !ctx) {
-    return;
-  }
-
-  for (const mod of activeModules) {
-    if (!activeTimelineRangeModuleIds.has(mod.id) || !mod.getTimelineRanges) {
-      continue;
-    }
-
-    timelineRangeSourceRemovers.set(
-      mod.id,
-      timelineOverlay.addRangeSource(() => mod.getTimelineRanges?.(ctx) ?? []),
-    );
-  }
-
-  for (const source of eventWindowsManager.getTimelineSources(ctx)) {
-    if (!source.active || !source.buildTimelineRanges) {
-      continue;
-    }
-    const ranges = source.buildTimelineRanges();
-    if (ranges.length === 0) continue;
-    timelineRangeSourceRemovers.set(source.timelineKey, timelineOverlay.addRangeSource(ranges));
-  }
-
-  timelineOverlay.refreshRanges();
-}
-
-function renderTimelineEventCount(): void {
-  const ctx = getModuleContext();
-  if (!ctx) {
-    eventsReadout.textContent = "--";
-    return;
-  }
-
-  eventsReadout.textContent = `${eventWindowsManager.countVisibleTimelineSources(ctx)}`;
-}
-
-function getSingletonWindowConfigs() {
-  return floatingWindows.getSingletonWindowConfigs(SINGLETON_WINDOW_IDS);
-}
-
-function getConfigAdapters(): StatsPlayerConfigAdapter[] {
-  return MODULES.filter((mod) => mod.getConfig || mod.applyConfig).map((mod) => {
-    const adapter: StatsPlayerConfigAdapter = {
-      id: mod.id,
-    };
-    if (mod.id === "boost") {
-      adapter.aliases = ["boost-pickup-animation"];
-    }
-    if (mod.getConfig) {
-      adapter.getConfig = () => mod.getConfig?.();
-    }
-    if (mod.applyConfig) {
-      adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
-    }
-    return adapter;
-  });
-}
-
-function getModuleConfigSnapshot(): Record<string, unknown> {
-  return getConfigAdapterSnapshot(getConfigAdapters());
-}
-
-function applyModuleConfigSnapshot(configs: Record<string, unknown>): void {
-  applyConfigAdapterSnapshot(getConfigAdapters(), configs);
-}
-
 function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
   const state = replayPlayer?.getState();
   return {
@@ -554,28 +312,21 @@ function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
   };
 }
 
-function getCameraConfigSnapshot(): PlayerCameraConfig {
-  return cameraControls?.getConfigSnapshot() ?? {};
-}
-
 function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
   return {
     version: STATS_PLAYER_CONFIG_VERSION,
     playback: getPlaybackConfigSnapshot(),
-    camera: getCameraConfigSnapshot(),
+    camera: cameraControls?.getConfigSnapshot() ?? {},
     overlays: {
-      timelineEvents: [...activeTimelineEventSourceIds],
-      timelineRanges: [...activeTimelineRangeModuleIds],
-      mechanics: [...activeMechanicTimelineKinds],
-      renderEffects: [...activeRenderEffectModuleIds],
+      ...moduleRuntimeController.getOverlayConfigSnapshot(),
       followedPlayerHud: false,
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
     },
     recording: recordingControls?.getConfigSnapshot() ?? {},
-    singletonWindows: getSingletonWindowConfigs(),
+    singletonWindows: floatingWindows.getSingletonWindowConfigs(SINGLETON_WINDOW_IDS),
     statsWindows: statsWindowManager.getConfigs(),
-    moduleConfigs: getModuleConfigSnapshot(),
+    moduleConfigs: moduleRuntimeController.getModuleConfigSnapshot(),
   };
 }
 
@@ -596,16 +347,8 @@ function scheduleConfigUrlUpdate(): void {
   }, 150);
 }
 
-function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
-  floatingWindows.applyWindowConfigs(config.singletonWindows);
-}
-
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
-  activeTimelineEventSourceIds = new Set(config.overlays.timelineEvents);
-  activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
-  activeMechanicTimelineKinds = new Set(config.overlays.mechanics);
-  migrateMechanicBackedTimelineEventSelections();
-  activeRenderEffectModuleIds = new Set(config.overlays.renderEffects);
+  moduleRuntimeController.setOverlayConfig(config.overlays);
   boostPadOverlayEnabled = config.overlays.boostPads;
   skipPostGoalTransitions.checked =
     config.playback.skipPostGoalTransitions ?? skipPostGoalTransitions.checked;
@@ -614,12 +357,12 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
     playbackRate.value = `${config.playback.rate}`;
   }
   recordingControls?.applyConfig(config.recording);
-  applyModuleConfigSnapshot(config.moduleConfigs);
-  applyConfigToExistingWindows(config);
+  moduleRuntimeController.applyModuleConfigSnapshot(config.moduleConfigs);
+  floatingWindows.applyWindowConfigs(config.singletonWindows);
   statsWindowManager.replaceFromConfig(config.statsWindows);
   renderModuleSummary();
   renderModuleSettings();
-  renderTimelineEventCount();
+  moduleRuntimeController.renderTimelineEventCount();
 }
 
 function getReplayPlayerStatePatchFromConfig(
@@ -701,7 +444,7 @@ function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
   );
   cameraControls?.applyReplayConfig(config.camera);
   syncBoostPadOverlayPlugin();
-  setupActiveModules();
+  moduleRuntimeController.setupActiveModules();
   renderModuleSummary();
   renderModuleSettings();
   statsWindowManager.render(replayPlayer.getState().frameIndex);
@@ -730,63 +473,16 @@ function openReplayFilePicker(): void {
   setLauncherOpen(false);
 }
 
-function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
-  floatingWindows.installDragging(root, signal);
-}
-
 function renderModuleSummary(): void {
-  renderModuleSummaryView({
-    container: moduleSummaryEl,
-    modules: MODULES,
-    renderEffectModuleIds: RENDER_EFFECT_MODULE_IDS,
-    getActiveCapabilityIds,
-    toggleCapability,
-    boostPickupAnimationEnabled: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-    toggleBoostPickupAnimation() {
-      const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
-      replayPlayer?.setBoostPickupAnimationEnabled(next);
-      setupActiveModules();
-      renderModuleSummary();
-      renderModuleSettings();
-      scheduleConfigUrlUpdate();
-    },
+  moduleRuntimeController.renderModuleSummary(moduleSummaryEl, {
     boostPadOverlayEnabled,
     toggleBoostPadOverlay,
   });
 }
 
 function renderModuleSettings(): void {
-  moduleSettingsEl.replaceChildren();
-
-  const ctx = getModuleContext();
-  const panels = activeModules
-    .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)
-    .map((mod) => mod.renderSettings?.(ctx) ?? null)
-    .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
-
-  if (panels.length === 0) {
-    moduleSettingsEl.hidden = true;
-    renderBoostPickupFiltersWindow();
-    renderTouchControlsWindow();
-    return;
-  }
-
-  moduleSettingsEl.hidden = false;
-  moduleSettingsEl.append(...panels);
-  renderBoostPickupFiltersWindow();
-  renderTouchControlsWindow();
-}
-
-function renderBoostPickupFiltersWindow(): void {
-  if (!boostPickupFiltersWindowBody) {
-    return;
-  }
-
-  const ctx = getModuleContext();
-  const panel = boostPickupFilters.renderSettings(ctx, {
-    showHeader: false,
-  });
-  boostPickupFiltersWindowBody.replaceChildren(panel);
+  moduleRuntimeController.renderModuleSettings(moduleSettingsEl, touchControlsWindowBody);
+  moduleRuntimeController.renderBoostPickupFiltersWindow(boostPickupFiltersWindowBody);
 }
 
 function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0): void {
@@ -799,20 +495,6 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
     getCurrentStatsFrame(frameIndex),
     replayPlayer !== null,
   );
-}
-
-function renderTouchControlsWindow(): void {
-  if (!touchControlsWindowBody) {
-    return;
-  }
-
-  const ctx = getModuleContext();
-  const touchModule = MODULES.find((mod) => mod.id === TOUCH_MODULE_ID);
-  const panel = touchModule?.renderSettings?.(ctx) ?? null;
-  touchControlsWindowBody.replaceChildren();
-  if (panel instanceof HTMLElement) {
-    touchControlsWindowBody.append(panel);
-  }
 }
 
 function getStatById(statId: string): StatDefinition | null {
@@ -944,7 +626,7 @@ export function mountStatEvaluationPlayer(
     statusReadout,
     viewport,
     getActiveTimelineEventSourceIds() {
-      return activeTimelineEventSourceIds;
+      return moduleRuntimeController.getActiveTimelineEventSourceIds();
     },
     getInitialConfig() {
       return initialUrlConfig;
@@ -959,13 +641,19 @@ export function mountStatEvaluationPlayer(
       return replayPlayer;
     },
     includeBoostPickupAnimationPickup(pickup) {
-      return boostPickupFilters.includePickup(pickup);
+      return moduleRuntimeController.includeBoostPickupAnimationPickup(pickup);
     },
     applyConfigToReplayPlayer,
-    clearRenderCaches,
+    clearRenderCaches() {
+      moduleRuntimeController.clearRenderCaches();
+    },
     clearStandalonePlugins,
-    clearTimelineEventSources,
-    clearTimelineRangeSources,
+    clearTimelineEventSources() {
+      moduleRuntimeController.clearTimelineEventSources();
+    },
+    clearTimelineRangeSources() {
+      moduleRuntimeController.clearTimelineRangeSources();
+    },
     eventWindowsRenderPlaylistWindow() {
       eventWindowsManager.renderPlaylistWindow();
     },
@@ -978,14 +666,18 @@ export function mountStatEvaluationPlayer(
     eventWindowsSyncPlaylistTimeline(state, options) {
       eventWindowsManager.syncPlaylistTimeline(state, options);
     },
-    migrateMechanicBackedTimelineEventSelections,
+    migrateMechanicBackedTimelineEventSelections() {
+      moduleRuntimeController.migrateMechanicBackedTimelineEventSelections();
+    },
     recordingSync(status) {
       recordingControls?.sync(status);
     },
     renderModuleSettings,
     renderScoreboard,
     renderSnapshot,
-    renderTimelineEventCount,
+    renderTimelineEventCount() {
+      moduleRuntimeController.renderTimelineEventCount();
+    },
     setCanvasRecorder(recorder) {
       canvasRecorder = recorder;
     },
@@ -1018,7 +710,9 @@ export function mountStatEvaluationPlayer(
     setUnsubscribe(nextUnsubscribe) {
       unsubscribe = nextUnsubscribe;
     },
-    setupActiveModules,
+    setupActiveModules() {
+      moduleRuntimeController.setupActiveModules();
+    },
     statsWindowsRender(frameIndex) {
       statsWindowManager.render(frameIndex);
     },
@@ -1026,7 +720,9 @@ export function mountStatEvaluationPlayer(
     syncCameraAvailability(state) {
       cameraControls?.syncAvailability(state);
     },
-    teardownActiveModules,
+    teardownActiveModules() {
+      moduleRuntimeController.teardownActiveModules();
+    },
     unsubscribeCurrent() {
       unsubscribe?.();
       unsubscribe = null;
@@ -1080,13 +776,13 @@ export function mountStatEvaluationPlayer(
   }
 
   const listeners = new AbortController();
-  installWindowDragging(floatingWindowLayer, listeners.signal);
-  installWindowDragging(statsWindowLayer, listeners.signal);
+  floatingWindows.installDragging(floatingWindowLayer, listeners.signal);
+  floatingWindows.installDragging(statsWindowLayer, listeners.signal);
   const cleanup = () => {
     listeners.abort();
     unsubscribe?.();
     unsubscribe = null;
-    teardownActiveModules();
+    moduleRuntimeController.teardownActiveModules();
     replayPlayer?.destroy();
     replayPlayer = null;
     canvasRecorder = null;
@@ -1095,17 +791,12 @@ export function mountStatEvaluationPlayer(
     statsFrameLookup = null;
     statRegistry = createStatRegistry(null);
     statsWindowManager.clear();
-    clearTimelineEventSources();
-    clearTimelineRangeSources();
+    moduleRuntimeController.clearTimelineEventSources();
+    moduleRuntimeController.clearTimelineRangeSources();
     clearStandalonePlugins();
-    clearRenderCaches();
-    activeModules = [];
+    moduleRuntimeController.reset();
     replayLoadModal?.destroy();
     replayLoadModal = null;
-    activeTimelineEventSourceIds = new Set<string>();
-    activeTimelineRangeModuleIds = new Set<string>();
-    activeMechanicTimelineKinds = new Set<string>();
-    activeRenderEffectModuleIds = new Set<string>();
     eventWindowsManager.resetPlaylistState();
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
@@ -1121,7 +812,6 @@ export function mountStatEvaluationPlayer(
     }
     isApplyingConfig = false;
     floatingWindows.resetZIndex();
-    removeRenderHook = null;
     if (appRoot === root) {
       appRoot = null;
       root.replaceChildren();
@@ -1270,7 +960,7 @@ export function mountStatEvaluationPlayer(
   renderScoreboard();
   cameraControls?.syncAvailability();
   recordingControls?.sync();
-  renderTimelineEventCount();
+  moduleRuntimeController.renderTimelineEventCount();
   mechanicsReviewController?.render();
   eventWindowsManager.renderPlaylistWindow();
   if (options.initialBundle) {
