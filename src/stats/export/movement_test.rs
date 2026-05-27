@@ -1,4 +1,5 @@
 use super::*;
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[test]
 fn movement_export_includes_labeled_tracked_time_stats() {

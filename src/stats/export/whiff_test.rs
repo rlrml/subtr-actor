@@ -1,4 +1,5 @@
 use super::*;
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[test]
 fn whiff_export_includes_labeled_whiff_count_stats() {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[test]
 fn rush_export_includes_labeled_rush_count_stats() {

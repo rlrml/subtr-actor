@@ -1,6 +1,4 @@
 use crate::{ExportedStat, RushStats, StatFieldProvider};
-#[cfg(test)]
-use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[path = "rush_export_labeled.rs"]
 mod labeled;

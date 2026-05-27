@@ -1,6 +1,4 @@
 use crate::{ExportedStat, StatFieldProvider, TouchStats};
-#[cfg(test)]
-use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[path = "touch_export_ball_movement.rs"]
 mod ball_movement;

@@ -1,6 +1,4 @@
 use crate::{ExportedStat, MovementStats, StatFieldProvider};
-#[cfg(test)]
-use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[path = "movement_export_core.rs"]
 mod core;

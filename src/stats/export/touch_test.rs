@@ -1,4 +1,5 @@
 use super::*;
+use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[test]
 fn touch_export_includes_labeled_touch_count_stats() {

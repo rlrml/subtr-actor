@@ -1,6 +1,4 @@
 use crate::{ExportedStat, StatFieldProvider, WhiffStats};
-#[cfg(test)]
-use crate::{StatLabel, StatValue, LABELED_STAT_VARIANT};
 
 #[path = "whiff_export_counts.rs"]
 mod counts;
