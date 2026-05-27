@@ -7141,7 +7141,30 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     bool includeOpenButtons) {
   ImGui::PushID(idSuffix);
 
+  auto settingReadout = [](std::initializer_list<std::pair<bool, const char *>> parts,
+                           std::string_view separator) {
+    std::string readout;
+    for (const auto &[enabled, label] : parts) {
+      if (!enabled) {
+        continue;
+      }
+      if (!readout.empty()) {
+        readout += separator;
+      }
+      readout += label;
+    }
+    return readout.empty() ? std::string{"Total only"} : readout;
+  };
+
   ImGui::TextDisabled("Movement breakdown");
+  ImGui::SameLine();
+  ImGui::TextColored(
+      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+      "%s",
+      settingReadout(
+          {{movementBreakdownSpeed, "Speed band"}, {movementBreakdownHeight, "Height band"}},
+          " + ")
+          .c_str());
   ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed);
   ImGui::SameLine();
   ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight);
@@ -7150,6 +7173,14 @@ void SubtrActorPlugin::renderModuleSettingsControls(
   }
 
   ImGui::TextDisabled("Possession breakdown");
+  ImGui::SameLine();
+  ImGui::TextColored(
+      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+      "%s",
+      settingReadout(
+          {{possessionBreakdownState, "Control"}, {possessionBreakdownThird, "Third"}},
+          " x ")
+          .c_str());
   ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState);
   ImGui::SameLine();
   ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird);
