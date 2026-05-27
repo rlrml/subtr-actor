@@ -155,7 +155,7 @@ struct UiStatIdAlias {
   const char *local_id;
 };
 
-constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
+constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
     {"all", "All events"},
     {"mechanics", "All mechanics"},
     {"team", "Team events"},
@@ -163,11 +163,13 @@ constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"touch", "Touch"},
     {"touch_ball_movement", "Touch movement"},
     {"dodge_reset", "Dodge refresh"},
+    {"backboard", "Backboard"},
     {"boost_pickup", "Boost pickup"},
     {"boost_ledger", "Boost ledger"},
     {"boost_state", "Boost state"},
     {"speed_flip", "Speed flip"},
     {"half_flip", "Half flip"},
+    {"powerslide", "Powerslide"},
     {"wavedash", "Wavedash"},
     {"ball_carry", "Ball carry"},
     {"air_dribble", "Air dribble"},
@@ -177,6 +179,7 @@ constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"center", "Center"},
     {"flip_reset", "Flip reset"},
     {"double_tap", "Double tap"},
+    {"fifty_fifty", "50/50"},
     {"flick", "Flick"},
     {"musty_flick", "Musty flick"},
     {"one_timer", "One timer"},
@@ -188,18 +191,21 @@ constexpr std::array<EventFilterOption, 30> EVENT_FILTER_OPTIONS{{
     {"goal", "Goal"},
 }};
 
-constexpr std::array<const char *, 21> MECHANIC_FILTER_TOKENS{{
+constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
     "speed_flip",
     "half_flip",
+    "powerslide",
     "wavedash",
     "ball_carry",
     "air_dribble",
+    "backboard",
     "ceiling_shot",
     "wall_aerial",
     "wall_aerial_shot",
     "center",
     "flip_reset",
     "double_tap",
+    "fifty_fifty",
     "flick",
     "musty_flick",
     "one_timer",
@@ -6639,14 +6645,18 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
           ImGuiTreeNodeFlags_DefaultOpen)) {
     renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix);
     renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix);
+    renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix);
     renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix);
     renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix);
+    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix);
     renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix);
     renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix);
     renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix);
     renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix);
     renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix);
+    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix);
     renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix);
+    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix);
     renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix);
     renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix);
     renderBoolModuleSummaryToggle("Team event playlist", eventPlaylistTeamEventsEnabled, idSuffix);
