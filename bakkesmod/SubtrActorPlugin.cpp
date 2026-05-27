@@ -2905,6 +2905,16 @@ void SubtrActorPlugin::applyUiConfigJson(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
   mechanicsReviewIndex = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "mechanics_review_index").value_or(0.0)));
+  mechanicsReviewClipLeadSeconds = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "mechanics_review_clip_lead_seconds")
+          .value_or(mechanicsReviewClipLeadSeconds),
+      0.0,
+      10.0));
+  mechanicsReviewClipTrailSeconds = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "mechanics_review_clip_trail_seconds")
+          .value_or(mechanicsReviewClipTrailSeconds),
+      0.0,
+      10.0));
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
   selectedAnalysisNode = parseJsonStringProperty(json, "selected_analysis_node").value_or("");
   graphInspectorNodeQuery =
@@ -3431,6 +3441,8 @@ std::string SubtrActorPlugin::uiConfigJson() const {
        << (boostPickupFieldUnknown ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
   file << "  \"mechanics_review_index\": " << mechanicsReviewIndex << ",\n";
+  file << "  \"mechanics_review_clip_lead_seconds\": " << mechanicsReviewClipLeadSeconds << ",\n";
+  file << "  \"mechanics_review_clip_trail_seconds\": " << mechanicsReviewClipTrailSeconds << ",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
   file << "  \"selected_analysis_node\": \"" << escapeJsonString(selectedAnalysisNode)
@@ -7000,6 +7012,11 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
 
   renderEventFilterCombo("Event filter");
+  ImGui::SetNextItemWidth(120.0f);
+  ImGui::SliderFloat("Clip lead", &mechanicsReviewClipLeadSeconds, 0.0f, 10.0f, "%.1fs");
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(120.0f);
+  ImGui::SliderFloat("Clip trail", &mechanicsReviewClipTrailSeconds, 0.0f, 10.0f, "%.1fs");
 
   ImGui::Separator();
   if (candidates.empty()) {
@@ -7019,6 +7036,8 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
 
   UiEventRecord &current = recentUiEvents[candidates[static_cast<size_t>(mechanicsReviewIndex)]];
   const std::string currentKey = mechanicsReviewKey(current);
+  const float clipStart = std::max(0.0f, current.time - mechanicsReviewClipLeadSeconds);
+  const float clipEnd = current.time + mechanicsReviewClipTrailSeconds;
   ImGui::Text(
       "%d / %zu",
       mechanicsReviewIndex + 1,
@@ -7027,7 +7046,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::Text("Decision: %s", mechanicsReviewDecisionLabel(current));
   ImGui::Text("Mechanic: %s", current.type.c_str());
   ImGui::Text("Player: %s", current.actor.c_str());
-  ImGui::Text("Clip: %.2fs to %.2fs", std::max(0.0f, current.time - 2.0f), current.time + 2.0f);
+  ImGui::Text("Clip: %.2fs to %.2fs", clipStart, clipEnd);
   ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));
   if (!current.details.empty()) {
     ImGui::TextWrapped("Reason: %s", current.details.c_str());
@@ -7035,6 +7054,23 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
 
   if (ImGui::Button("Prev") && mechanicsReviewIndex > 0) {
     mechanicsReviewIndex -= 1;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Replay clip")) {
+    playbackCurrentTime = clipStart;
+    playbackPlaying = true;
+    playbackSkipPostGoalTransitions = false;
+    playbackSkipKickoffs = false;
+    uiPlaybackControlsOpen = true;
+    playbackControlsPlacement.pending_focus = true;
+
+    ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+    if (!replayServer.IsNull()) {
+      replayServer.StartPlaybackAtTime(clipStart);
+    } else {
+      cvarManager->log(
+          "subtr-actor: replay clip selected; open a replay to seek in Rocket League");
+    }
   }
   ImGui::SameLine();
   if (ImGui::Button("Next") &&

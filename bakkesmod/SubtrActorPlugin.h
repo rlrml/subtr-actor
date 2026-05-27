@@ -330,6 +330,8 @@ private:
   bool boostPickupFieldUnknown = true;
   int graphInspectorView = 0;
   int mechanicsReviewIndex = 0;
+  float mechanicsReviewClipLeadSeconds = 2.0f;
+  float mechanicsReviewClipTrailSeconds = 2.0f;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
   std::string graphInspectorNodeQuery;
