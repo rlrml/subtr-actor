@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createReplayScene, updateBoostMeter, type DemoIndicator, type ReplayScene } from "./scene";
+import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
@@ -9,12 +9,16 @@ import {
   getReplayPlaybackEndTime,
   inferKickoffGameState,
   inferLiveGameState,
-  isKickoffFrame,
-  isLiveGameplayFrame,
-  isPostGoalTransitionFrame,
   projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
+import {
+  getActiveDemoEvent,
+  updateBoostTrail,
+  updateDemoIndicator,
+} from "./player-render-effects";
+import { normalizeCustomCameraSettings } from "./player-camera-settings";
+import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
 import {
   getFreeCameraPreset,
   interpolateQuaternion,
@@ -51,7 +55,6 @@ import type {
 const DEFAULT_FIELD_SCALE = 1;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const DEFAULT_CAMERA_VIEW_MODE: ReplayCameraViewMode = "free";
-const DEMO_INDICATOR_DURATION_SECONDS = 3.2;
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
@@ -64,37 +67,6 @@ type FreeCameraTransition = {
   up: THREE.Vector3;
   fov: number;
 };
-
-function finiteSetting(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeCustomCameraSettings(
-  settings: CameraSettings | null | undefined,
-): CameraSettings | null {
-  if (!settings) {
-    return null;
-  }
-
-  const normalized: CameraSettings = {};
-  const fov = finiteSetting(settings.fov);
-  const height = finiteSetting(settings.height);
-  const pitch = finiteSetting(settings.pitch);
-  const distance = finiteSetting(settings.distance);
-  const stiffness = finiteSetting(settings.stiffness);
-  const swivelSpeed = finiteSetting(settings.swivelSpeed);
-  const transitionSpeed = finiteSetting(settings.transitionSpeed);
-  if (fov !== undefined) normalized.fov = fov;
-  if (height !== undefined) normalized.height = height;
-  if (pitch !== undefined) normalized.pitch = pitch;
-  if (distance !== undefined) normalized.distance = distance;
-  if (stiffness !== undefined) normalized.stiffness = stiffness;
-  if (swivelSpeed !== undefined) normalized.swivelSpeed = swivelSpeed;
-  if (transitionSpeed !== undefined) {
-    normalized.transitionSpeed = transitionSpeed;
-  }
-  return normalized;
-}
 
 function isPlayerSamplePresent(
   sample: ReplayModel["players"][number]["frames"][number] | null | undefined,
@@ -681,7 +653,7 @@ export class ReplayPlayer extends EventTarget {
         nextFrame?.position ?? null,
         frameWindow.alpha,
       );
-      const activeDemoEvent = this.getActiveDemoEvent(player.id, this.currentTime);
+      const activeDemoEvent = getActiveDemoEvent(this.replay, player.id, this.currentTime);
       if (!interpolatedPosition) {
         mesh.visible = false;
         if (boostTrail) {
@@ -690,7 +662,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(player.id, demoIndicator ?? null, null, activeDemoEvent);
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: null,
+          demoEvent: activeDemoEvent,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -711,12 +689,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(
-          player.id,
-          demoIndicator ?? null,
-          interpolatedPosition,
-          activeDemoEvent,
-        );
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: interpolatedPosition,
+          demoEvent: activeDemoEvent,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -738,7 +717,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(player.id, demoIndicator ?? null, interpolatedPosition);
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: interpolatedPosition,
+          demoEvent: activeDemoEvent,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -782,7 +767,7 @@ export class ReplayPlayer extends EventTarget {
           frame?.boostActive ??
           nextFrame?.boostActive ??
           false;
-        this.updateBoostTrail(
+        updateBoostTrail(
           boostTrail,
           boostActive,
           boostFraction,
@@ -832,7 +817,7 @@ export class ReplayPlayer extends EventTarget {
       frameIndex,
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
-        this.getActiveDemoEvent(this.attachedPlayerId, this.currentTime) !== null,
+        getActiveDemoEvent(this.replay, this.attachedPlayerId, this.currentTime) !== null,
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
@@ -875,21 +860,17 @@ export class ReplayPlayer extends EventTarget {
       return false;
     }
 
-    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
-    const frame = this.replay.frames[frameIndex];
-    if (!frame || !isKickoffFrame(frame, this.kickoffGameState)) {
-      return false;
-    }
-
-    const nextLiveFrame = this.replay.frames.find(
-      (candidate, index) =>
-        index > frameIndex && isLiveGameplayFrame(candidate, this.liveGameState),
+    const skipTime = findKickoffSkipTime(
+      this.replay,
+      this.currentTime,
+      this.kickoffGameState,
+      this.liveGameState,
     );
-    if (!nextLiveFrame || nextLiveFrame.time === this.currentTime) {
+    if (skipTime === null) {
       return false;
     }
 
-    this.currentTime = nextLiveFrame.time;
+    this.currentTime = skipTime;
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
@@ -901,64 +882,17 @@ export class ReplayPlayer extends EventTarget {
       return false;
     }
 
-    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
-    const frame = this.replay.frames[frameIndex];
-    if (
-      !frame ||
-      !isPostGoalTransitionFrame(
-        this.replay,
-        frame,
-        frameIndex,
-        this.liveGameState,
-        this.kickoffGameState,
-      )
-    ) {
-      return false;
-    }
-
-    const nextFrame = this.replay.frames.find(
-      (candidate, index) =>
-        index > frameIndex &&
-        !isPostGoalTransitionFrame(
-          this.replay,
-          candidate,
-          index,
-          this.liveGameState,
-          this.kickoffGameState,
-        ),
+    const skipTime = findPostGoalTransitionSkipTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
     );
-    if (!nextFrame) {
-      let startIndex = frameIndex;
-      while (
-        startIndex > 0 &&
-        isPostGoalTransitionFrame(
-          this.replay,
-          this.replay.frames[startIndex - 1],
-          startIndex - 1,
-          this.liveGameState,
-          this.kickoffGameState,
-        )
-      ) {
-        startIndex -= 1;
-      }
-
-      const transitionStartTime = this.replay.frames[startIndex]?.time;
-      if (transitionStartTime === undefined || transitionStartTime === this.currentTime) {
-        return false;
-      }
-
-      this.currentTime = transitionStartTime;
-      if (this.playing) {
-        this.reanchorPlaybackClock(now);
-      }
-      return true;
-    }
-
-    if (nextFrame.time === this.currentTime) {
+    if (skipTime === null) {
       return false;
     }
 
-    this.currentTime = nextFrame.time;
+    this.currentTime = skipTime;
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
@@ -1057,111 +991,4 @@ export class ReplayPlayer extends EventTarget {
     this.dispatchEvent(new CustomEvent<ReplayPlayerState>("change", { detail: state }));
   }
 
-  private getActiveDemoEvent(
-    victimPlayerId: string,
-    currentTime: number,
-  ): ReplayTimelineEvent | null {
-    for (let index = this.replay.timelineEvents.length - 1; index >= 0; index -= 1) {
-      const event = this.replay.timelineEvents[index]!;
-      const age = currentTime - event.time;
-      if (age < 0) {
-        continue;
-      }
-      if (age > DEMO_INDICATOR_DURATION_SECONDS) {
-        break;
-      }
-      if (event.kind === "demo" && event.secondaryPlayerId === victimPlayerId) {
-        return event;
-      }
-    }
-    return null;
-  }
-
-  private updateDemoIndicator(
-    playerId: string,
-    indicator: DemoIndicator | null,
-    fallbackPosition: Vec3 | null,
-    demoEvent: ReplayTimelineEvent | null = this.getActiveDemoEvent(playerId, this.currentTime),
-  ): void {
-    if (!indicator) {
-      return;
-    }
-
-    const position = demoEvent?.location ?? fallbackPosition;
-    if (!demoEvent || !position) {
-      indicator.group.visible = false;
-      return;
-    }
-
-    const age = Math.max(0, this.currentTime - demoEvent.time);
-    const phase = this.currentTime * 8;
-    const pulse = 1 + 0.08 * Math.sin(phase);
-    indicator.group.visible = true;
-    indicator.group.position.copy(rootPosition(position));
-    indicator.ring.rotation.z = phase * 0.15;
-    indicator.ring.scale.setScalar(pulse);
-    indicator.label.quaternion.copy(this.sceneState.camera.quaternion);
-    indicator.label.scale.setScalar(1 + 0.04 * Math.sin(phase + 1.3));
-
-    const opacity = THREE.MathUtils.clamp(1 - age / DEMO_INDICATOR_DURATION_SECONDS, 0.28, 1);
-    for (const node of [indicator.ring, indicator.label]) {
-      const material = node.material;
-      if (material instanceof THREE.Material) {
-        material.opacity = opacity;
-      }
-    }
-  }
-
-  private updateBoostTrail(
-    boostTrail: THREE.Group,
-    boostActive: boolean,
-    boostFraction: number,
-    time: number,
-    playerIndex: number,
-  ): void {
-    if (!boostActive) {
-      boostTrail.visible = false;
-      return;
-    }
-
-    boostTrail.visible = true;
-
-    const phase = time * 36 + playerIndex * 1.7;
-    const pulse = 0.86 + 0.14 * Math.sin(phase);
-    const intensity = THREE.MathUtils.clamp(0.62 + boostFraction * 0.88, 0.62, 1.5);
-    const lengthScale = intensity * (1.02 + pulse * 0.52);
-    const widthScale = 1.02 + intensity * 0.28;
-    boostTrail.scale.set(lengthScale, widthScale, widthScale);
-
-    for (const [index, child] of boostTrail.children.entries()) {
-      const plume = child as THREE.Group;
-      const plumePulse = 0.92 + 0.14 * Math.sin(phase + index * 0.85);
-      plume.scale.setScalar(plumePulse);
-
-      plume.traverse((node: THREE.Object3D) => {
-        if (!(node instanceof THREE.Mesh)) {
-          return;
-        }
-
-        const material = node.material;
-        if (!(material instanceof THREE.MeshBasicMaterial)) {
-          return;
-        }
-
-        switch (node.name) {
-          case "outer-flame":
-            material.opacity = 0.24 + intensity * 0.24;
-            break;
-          case "inner-flame":
-            material.opacity = 0.58 + intensity * 0.3;
-            break;
-          case "glow":
-            material.opacity = 0.4 + intensity * 0.26;
-            break;
-          default:
-            break;
-        }
-      });
-    }
-  }
 }
