@@ -128,6 +128,7 @@ int moduleAnchor = 0;
 struct EventFilterOption {
   const char *value;
   const char *label;
+  const char *group;
 };
 
 struct JsonFieldSummary {
@@ -156,39 +157,39 @@ struct UiStatIdAlias {
 };
 
 constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
-    {"all", "All events"},
-    {"mechanics", "All mechanics"},
-    {"team", "Team events"},
-    {"goal_context", "Goal context"},
-    {"touch", "Touch"},
-    {"touch_ball_movement", "Touch movement"},
-    {"dodge_reset", "Dodge refresh"},
-    {"backboard", "Backboard"},
-    {"boost_pickup", "Boost pickup"},
-    {"boost_ledger", "Boost ledger"},
-    {"boost_state", "Boost state"},
-    {"speed_flip", "Speed flip"},
-    {"half_flip", "Half flip"},
-    {"powerslide", "Powerslide"},
-    {"wavedash", "Wavedash"},
-    {"ball_carry", "Ball carry"},
-    {"air_dribble", "Air dribble"},
-    {"ceiling_shot", "Ceiling shot"},
-    {"wall_aerial", "Wall aerial"},
-    {"wall_aerial_shot", "Wall aerial shot"},
-    {"center", "Center"},
-    {"flip_reset", "Flip reset"},
-    {"double_tap", "Double tap"},
-    {"fifty_fifty", "50/50"},
-    {"flick", "Flick"},
-    {"musty_flick", "Musty flick"},
-    {"one_timer", "One timer"},
-    {"pass", "Pass"},
-    {"half_volley", "Half volley"},
-    {"whiff", "Whiff"},
-    {"bump", "Bump"},
-    {"demo", "Demo"},
-    {"goal", "Goal"},
+    {"all", "All events", "All"},
+    {"goal", "Goal", "Replay"},
+    {"mechanics", "All mechanics", "Sources"},
+    {"team", "Team events", "Sources"},
+    {"goal_context", "Goal context", "Sources"},
+    {"touch", "Touch", "Stats"},
+    {"touch_ball_movement", "Touch movement", "Stats"},
+    {"dodge_reset", "Dodge refresh", "Stats"},
+    {"boost_pickup", "Boost pickup", "Stats"},
+    {"boost_ledger", "Boost ledger", "Stats"},
+    {"boost_state", "Boost state", "Stats"},
+    {"backboard", "Backboard", "Mechanics"},
+    {"speed_flip", "Speed flip", "Mechanics"},
+    {"half_flip", "Half flip", "Mechanics"},
+    {"powerslide", "Powerslide", "Mechanics"},
+    {"wavedash", "Wavedash", "Mechanics"},
+    {"ball_carry", "Ball carry", "Mechanics"},
+    {"air_dribble", "Air dribble", "Mechanics"},
+    {"ceiling_shot", "Ceiling shot", "Mechanics"},
+    {"wall_aerial", "Wall aerial", "Mechanics"},
+    {"wall_aerial_shot", "Wall aerial shot", "Mechanics"},
+    {"center", "Center", "Mechanics"},
+    {"flip_reset", "Flip reset", "Mechanics"},
+    {"double_tap", "Double tap", "Mechanics"},
+    {"fifty_fifty", "50/50", "Mechanics"},
+    {"flick", "Flick", "Mechanics"},
+    {"musty_flick", "Musty flick", "Mechanics"},
+    {"one_timer", "One timer", "Mechanics"},
+    {"pass", "Pass", "Mechanics"},
+    {"half_volley", "Half volley", "Mechanics"},
+    {"whiff", "Whiff", "Mechanics"},
+    {"bump", "Bump", "Mechanics"},
+    {"demo", "Demo", "Mechanics"},
 }};
 
 constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
@@ -6342,10 +6343,18 @@ bool SubtrActorPlugin::renderEventFilterCombo(const char *label) {
   ImGui::TextDisabled("%s", preview.c_str());
   ImGui::Separator();
 
-  ImGui::Columns(2, std::format("{}-event-filter-columns", label).c_str(), false);
+  std::string_view currentGroup;
   for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
     if (std::string_view{option.value} == "all") {
       continue;
+    }
+    const std::string_view optionGroup{option.group};
+    if (currentGroup != optionGroup) {
+      if (!currentGroup.empty()) {
+        ImGui::Separator();
+      }
+      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", option.group);
+      currentGroup = optionGroup;
     }
 
     ImGui::PushID(option.value);
@@ -6361,9 +6370,7 @@ bool SubtrActorPlugin::renderEventFilterCombo(const char *label) {
       applySelection();
     }
     ImGui::PopID();
-    ImGui::NextColumn();
   }
-  ImGui::Columns(1);
   ImGui::EndCombo();
   return changed;
 }
@@ -7055,11 +7062,19 @@ void SubtrActorPlugin::renderEventSourceControls() {
       eventFilterPreview(cvarString("subtr_actor_overlay_event_types", "all"));
   ImGui::TextDisabled("%s", preview.c_str());
 
-  ImGui::BeginChild("event-source-list", ImVec2{0.0f, 145.0f}, true);
-  ImGui::Columns(2, "event-source-columns", false);
+  ImGui::BeginChild("event-source-list", ImVec2{0.0f, 185.0f}, true);
+  std::string_view currentGroup;
   for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
     if (std::string_view{option.value} == "all") {
       continue;
+    }
+    const std::string_view optionGroup{option.group};
+    if (currentGroup != optionGroup) {
+      if (!currentGroup.empty()) {
+        ImGui::Separator();
+      }
+      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", option.group);
+      currentGroup = optionGroup;
     }
 
     size_t count = 0;
@@ -7083,9 +7098,7 @@ void SubtrActorPlugin::renderEventSourceControls() {
       applySelection();
     }
     ImGui::PopID();
-    ImGui::NextColumn();
   }
-  ImGui::Columns(1);
   ImGui::EndChild();
   ImGui::TreePop();
 }
