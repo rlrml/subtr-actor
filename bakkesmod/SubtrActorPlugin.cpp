@@ -27,6 +27,8 @@ namespace {
 constexpr float PI = 3.14159265358979323846f;
 constexpr float UNREAL_ROTATOR_TO_RADIANS = (2.0f * PI) / 65536.0f;
 constexpr float GOAL_WATCH_LEAD_SECONDS = 4.0f;
+constexpr ImGuiWindowFlags UI_FLOATING_WINDOW_FLAGS =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
@@ -6680,7 +6682,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     return;
   }
   applyWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f);
-  if (!ImGui::Begin("subtr-actor", &uiLauncherOpen)) {
+  if (!ImGui::Begin("subtr-actor", &uiLauncherOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -6917,7 +6919,7 @@ void SubtrActorPlugin::renderEventsWindow() {
     return;
   }
   applyWindowPlacement(eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f);
-  if (!ImGui::Begin("Events##subtr-actor", &uiEventsOpen)) {
+  if (!ImGui::Begin("Events##subtr-actor", &uiEventsOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7083,7 +7085,10 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
 
   applyWindowPlacement(eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f);
-  if (!ImGui::Begin("Event playlist##subtr-actor", &uiEventPlaylistOpen)) {
+  if (!ImGui::Begin(
+          "Event playlist##subtr-actor",
+          &uiEventPlaylistOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7244,7 +7249,10 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   }
 
   applyWindowPlacement(mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f);
-  if (!ImGui::Begin("Mechanics review##subtr-actor", &uiMechanicsReviewOpen)) {
+  if (!ImGui::Begin(
+          "Mechanics review##subtr-actor",
+          &uiMechanicsReviewOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7454,7 +7462,10 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   }
 
   applyWindowPlacement(replayLoadingPlacement, 960.0f, 68.0f, 520.0f, 360.0f);
-  if (!ImGui::Begin("Replay loading##subtr-actor", &uiReplayLoadingOpen)) {
+  if (!ImGui::Begin(
+          "Replay loading##subtr-actor",
+          &uiReplayLoadingOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7556,7 +7567,10 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   }
 
   applyWindowPlacement(moduleControlsPlacement, 980.0f, 305.0f, 430.0f, 520.0f);
-  if (!ImGui::Begin("Module controls##subtr-actor", &uiModuleControlsOpen)) {
+  if (!ImGui::Begin(
+          "Module controls##subtr-actor",
+          &uiModuleControlsOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7682,7 +7696,10 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   }
 
   applyWindowPlacement(boostPickupControlsPlacement, 1000.0f, 560.0f, 430.0f, 420.0f);
-  if (!ImGui::Begin("Boost pickup filters##subtr-actor", &uiBoostPickupControlsOpen)) {
+  if (!ImGui::Begin(
+          "Boost pickup filters##subtr-actor",
+          &uiBoostPickupControlsOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7798,7 +7815,10 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   }
 
   applyWindowPlacement(touchControlsPlacement, 980.0f, 160.0f, 410.0f, 380.0f);
-  if (!ImGui::Begin("Touch controls##subtr-actor", &uiTouchControlsOpen)) {
+  if (!ImGui::Begin(
+          "Touch controls##subtr-actor",
+          &uiTouchControlsOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7875,7 +7895,7 @@ void SubtrActorPlugin::renderStatusWindow() {
     return;
   }
   applyWindowPlacement(statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f);
-  if (!ImGui::Begin("Status##subtr-actor", &uiStatusOpen)) {
+  if (!ImGui::Begin("Status##subtr-actor", &uiStatusOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -7915,7 +7935,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   const SaPlayerFrame *targetPlayer = cameraViewMode == 1 ? selectedPlayer : nullptr;
 
   applyWindowPlacement(cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f);
-  if (!ImGui::Begin("Camera##subtr-actor", &uiCameraOpen)) {
+  if (!ImGui::Begin("Camera##subtr-actor", &uiCameraOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -8044,7 +8064,10 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   }
 
   applyWindowPlacement(playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f);
-  if (!ImGui::Begin("Playback controls##subtr-actor", &uiPlaybackControlsOpen)) {
+  if (!ImGui::Begin(
+          "Playback controls##subtr-actor",
+          &uiPlaybackControlsOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -8212,7 +8235,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
   }
 
   applyWindowPlacement(recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f);
-  if (!ImGui::Begin("Recording##subtr-actor", &uiRecordingOpen)) {
+  if (!ImGui::Begin("Recording##subtr-actor", &uiRecordingOpen, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -8378,7 +8401,10 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
   }
 
   applyWindowPlacement(graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f);
-  if (!ImGui::Begin("Graph inspector##subtr-actor", &uiGraphInspectorOpen)) {
+  if (!ImGui::Begin(
+          "Graph inspector##subtr-actor",
+          &uiGraphInspectorOpen,
+          UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
@@ -9314,7 +9340,7 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window) {
     window.pending_focus = false;
   }
   const std::string title = statsWindowTitle(window);
-  if (!ImGui::Begin(title.c_str(), &window.open)) {
+  if (!ImGui::Begin(title.c_str(), &window.open, UI_FLOATING_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
