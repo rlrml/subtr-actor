@@ -245,6 +245,11 @@ private:
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
   bool uiGraphInspectorOpen = false;
+  bool uiEventPlaylistOpen = false;
+  bool eventPlaylistMechanicsEnabled = true;
+  bool eventPlaylistTeamEventsEnabled = true;
+  bool eventPlaylistGoalContextEnabled = true;
+  bool eventPlaylistAutoFollow = true;
   int graphInspectorView = 0;
   std::string selectedGraphOutput;
   std::string selectedAnalysisNode;
@@ -257,6 +262,7 @@ private:
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
   UiWindowPlacement graphInspectorPlacement;
+  UiWindowPlacement eventPlaylistPlacement;
   std::vector<std::string> cachedStatsModuleNames;
   std::chrono::steady_clock::time_point nextStatsModuleNamesRefresh =
       std::chrono::steady_clock::time_point{};
@@ -283,6 +289,7 @@ private:
   void renderEventsWindow();
   void renderStatusWindow();
   void renderGraphInspectorWindow();
+  void renderEventPlaylistWindow();
   void renderStatsWindowManager();
   void createStatsWindow(UiStatsWindowKind kind);
   void createStatsModuleWindow(std::string moduleName);
@@ -335,6 +342,7 @@ private:
   void setCvarString(const char *name, std::string_view value);
   void appendUiEvent(UiEventRecord event);
   bool uiEventVisible(const UiEventRecord &event);
+  bool eventPlaylistSourceEnabled(const UiEventRecord &event) const;
   void tickReplayAnnotations();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);

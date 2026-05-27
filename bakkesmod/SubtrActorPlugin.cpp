@@ -2169,6 +2169,17 @@ void SubtrActorPlugin::loadUiConfig() {
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
   uiGraphInspectorOpen =
       parseJsonBoolProperty(json, "graph_inspector_open").value_or(uiGraphInspectorOpen);
+  uiEventPlaylistOpen =
+      parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
+  eventPlaylistMechanicsEnabled = parseJsonBoolProperty(json, "event_playlist_mechanics_enabled")
+                                      .value_or(eventPlaylistMechanicsEnabled);
+  eventPlaylistTeamEventsEnabled = parseJsonBoolProperty(json, "event_playlist_team_enabled")
+                                       .value_or(eventPlaylistTeamEventsEnabled);
+  eventPlaylistGoalContextEnabled =
+      parseJsonBoolProperty(json, "event_playlist_goal_context_enabled")
+          .value_or(eventPlaylistGoalContextEnabled);
+  eventPlaylistAutoFollow =
+      parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
   graphInspectorView = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
@@ -2182,6 +2193,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "events", eventsPlacement);
     loadPlacement(*placements, "status", statusPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
+    loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
   }
 
   uiStatsWindows.clear();
@@ -2299,6 +2311,16 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_open\": " << (uiGraphInspectorOpen ? "true" : "false")
        << ",\n";
+  file << "  \"event_playlist_open\": " << (uiEventPlaylistOpen ? "true" : "false")
+       << ",\n";
+  file << "  \"event_playlist_mechanics_enabled\": "
+       << (eventPlaylistMechanicsEnabled ? "true" : "false") << ",\n";
+  file << "  \"event_playlist_team_enabled\": "
+       << (eventPlaylistTeamEventsEnabled ? "true" : "false") << ",\n";
+  file << "  \"event_playlist_goal_context_enabled\": "
+       << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
+  file << "  \"event_playlist_auto_follow\": "
+       << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
   file << "  \"graph_inspector_view\": " << graphInspectorView << ",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
@@ -2317,6 +2339,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, statusPlacement);
   file << ",\n    \"graph_inspector\": ";
   writePlacement(file, graphInspectorPlacement);
+  file << ",\n    \"event_playlist\": ";
+  writePlacement(file, eventPlaylistPlacement);
   file << "\n  },\n";
   file << "  \"stats_windows\": [\n";
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
@@ -4816,6 +4840,7 @@ void SubtrActorPlugin::Render() {
   renderEventsWindow();
   renderStatusWindow();
   renderGraphInspectorWindow();
+  renderEventPlaylistWindow();
   renderStatsWindows();
 }
 
@@ -4943,6 +4968,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   ImGui::Checkbox("Scoreboard", &uiScoreboardOpen);
   ImGui::Checkbox("Events", &uiEventsOpen);
+  ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
 
@@ -5095,6 +5121,114 @@ void SubtrActorPlugin::renderEventsWindow() {
   }
 
   ImGui::Columns(1);
+  ImGui::EndChild();
+  ImGui::End();
+}
+
+bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) const {
+  if (event.category == "mechanics") {
+    return eventPlaylistMechanicsEnabled;
+  }
+  if (event.category == "team") {
+    return eventPlaylistTeamEventsEnabled;
+  }
+  if (event.category == "goal_context" || event.type == "goal") {
+    return eventPlaylistGoalContextEnabled;
+  }
+  return true;
+}
+
+void SubtrActorPlugin::renderEventPlaylistWindow() {
+  if (!uiEventPlaylistOpen) {
+    return;
+  }
+
+  applyWindowPlacement(eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f);
+  if (!ImGui::Begin("Event playlist##subtr-actor", &uiEventPlaylistOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(eventPlaylistPlacement);
+
+  size_t selectedCount = 0;
+  size_t visibleCount = 0;
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (eventPlaylistSourceEnabled(event)) {
+      selectedCount += 1;
+      if (uiEventVisible(event)) {
+        visibleCount += 1;
+      }
+    }
+  }
+
+  if (ImGui::Button("All sources")) {
+    eventPlaylistMechanicsEnabled = true;
+    eventPlaylistTeamEventsEnabled = true;
+    eventPlaylistGoalContextEnabled = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("No sources")) {
+    eventPlaylistMechanicsEnabled = false;
+    eventPlaylistTeamEventsEnabled = false;
+    eventPlaylistGoalContextEnabled = false;
+  }
+  ImGui::SameLine();
+  ImGui::Checkbox("Follow", &eventPlaylistAutoFollow);
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "SOURCES");
+  ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled);
+  ImGui::SameLine();
+  ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled);
+
+  std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  if (ImGui::BeginCombo("Event filter", eventFilterLabel(currentFilter))) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      const bool selected = normalizeEventFilterToken(currentFilter) == option.value;
+      if (ImGui::Selectable(option.label, selected)) {
+        setCvarString("subtr_actor_overlay_event_types", option.value);
+        currentFilter = option.value;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  ImGui::Text(
+      "%zu visible / %zu selected / %zu recent",
+      visibleCount,
+      selectedCount,
+      recentUiEvents.size());
+  ImGui::Separator();
+
+  ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
+  bool renderedAny = false;
+  for (const UiEventRecord &event : recentUiEvents) {
+    if (!eventPlaylistSourceEnabled(event) || !uiEventVisible(event)) {
+      continue;
+    }
+    renderedAny = true;
+
+    ImGui::PushID(static_cast<int>(event.frame_number));
+    const ImVec4 color = toImVec4(event.color);
+    ImGui::TextColored(color, "%.2fs", event.time);
+    ImGui::SameLine();
+    ImGui::TextColored(color, "%s", event.actor.c_str());
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", event.label.c_str());
+    if (!event.details.empty()) {
+      ImGui::TextDisabled("%s", event.details.c_str());
+    }
+    ImGui::TextDisabled("%s / %s", event.category.c_str(), event.type.c_str());
+    ImGui::Separator();
+    ImGui::PopID();
+  }
+  if (!renderedAny) {
+    ImGui::TextWrapped("No events match the selected playlist sources.");
+  } else if (eventPlaylistAutoFollow) {
+    ImGui::SetScrollHereY(1.0f);
+  }
   ImGui::EndChild();
   ImGui::End();
 }
