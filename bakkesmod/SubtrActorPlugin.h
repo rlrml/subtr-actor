@@ -415,6 +415,7 @@ private:
       const char *idSuffix);
   void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
   void renderModuleSummaryControls(const char *idSuffix);
+  void renderModuleSettingsControls(const char *idSuffix, bool includeOpenButtons);
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void focusTopLoadedWindow();

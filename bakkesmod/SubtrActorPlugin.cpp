@@ -6738,6 +6738,30 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
   }
 }
 
+void SubtrActorPlugin::renderModuleSettingsControls(
+    const char *idSuffix,
+    bool includeOpenButtons) {
+  ImGui::PushID(idSuffix);
+
+  ImGui::TextDisabled("Movement breakdown");
+  ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed);
+  ImGui::SameLine();
+  ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight);
+  if (includeOpenButtons && ImGui::Button("Open movement stats")) {
+    createStatsModuleWindow("movement", 0);
+  }
+
+  ImGui::TextDisabled("Possession breakdown");
+  ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState);
+  ImGui::SameLine();
+  ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird);
+  if (includeOpenButtons && ImGui::Button("Open possession stats")) {
+    createStatsModuleWindow("possession", 0);
+  }
+
+  ImGui::PopID();
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -6808,6 +6832,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
   renderModuleSummaryControls("launcher-module-summary");
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SETTINGS");
+  renderModuleSettingsControls("launcher-module-settings", true);
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     const bool liveAnalysis = liveProcessingEnabled();
@@ -7669,21 +7697,7 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT DISPLAY");
-  ImGui::TextDisabled("Movement breakdown");
-  ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed);
-  ImGui::SameLine();
-  ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight);
-  if (ImGui::Button("Open movement stats")) {
-    createStatsModuleWindow("movement", 0);
-  }
-
-  ImGui::TextDisabled("Possession breakdown");
-  ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState);
-  ImGui::SameLine();
-  ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird);
-  if (ImGui::Button("Open possession stats")) {
-    createStatsModuleWindow("possession", 0);
-  }
+  renderModuleSettingsControls("module-controls-settings", true);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
