@@ -1,6 +1,13 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
+import {
+  DELTA_EPSILON,
+  mergeRange,
+  mergeRangeForLane,
+  resolveRangeBounds,
+  sortTimelineEvents,
+} from "./timelineRangeMerge.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -9,8 +16,6 @@ import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import type { PressureEvent } from "./generated/PressureEvent.ts";
 
-const RANGE_MERGE_EPSILON_SECONDS = 0.02;
-const DELTA_EPSILON = 0.0001;
 const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y = 200;
 const BOOST_PICKUP_TICK_SECONDS = 0.08;
 const BLUE_TIMELINE_COLOR = "#3b82f6";
@@ -202,21 +207,6 @@ function createPressureRange(
     color: isTeamZero ? "rgba(89, 195, 255, 0.76)" : "rgba(255, 193, 92, 0.76)",
     isTeamZero,
   };
-}
-
-function sortTimelineEvents<T extends { frame: number; time: number }>(events: readonly T[]): T[] {
-  return events
-    .map((event, index) => ({ event, index }))
-    .sort((left, right) => {
-      if (left.event.frame !== right.event.frame) {
-        return left.event.frame - right.event.frame;
-      }
-      if (left.event.time !== right.event.time) {
-        return left.event.time - right.event.time;
-      }
-      return left.index - right.index;
-    })
-    .map(({ event }) => event);
 }
 
 function buildPossessionTimelineRangesFromEvents(
@@ -910,63 +900,4 @@ export function buildTimeInZoneTimelineRanges(
   }
 
   return ranges;
-}
-
-function resolveRangeBounds(
-  frame: { frame_number: number; time: number; dt: number },
-  previousFrame: { frame_number: number; time: number } | null,
-  replay?: ReplayModel,
-): { startTime: number; endTime: number } {
-  const endTime = replay?.frames[frame.frame_number]?.time ?? frame.time;
-  const startTime = previousFrame
-    ? (replay?.frames[previousFrame.frame_number]?.time ?? previousFrame.time)
-    : Math.max(0, endTime - frame.dt);
-
-  return {
-    startTime: Math.max(0, startTime),
-    endTime: Math.max(startTime, endTime),
-  };
-}
-
-function mergeRange(ranges: ReplayTimelineRange[], nextRange: ReplayTimelineRange | null): void {
-  if (!nextRange) {
-    return;
-  }
-
-  const previousRange = ranges[ranges.length - 1];
-  if (
-    previousRange &&
-    previousRange.lane === nextRange.lane &&
-    previousRange.label === nextRange.label &&
-    Math.abs(previousRange.endTime - nextRange.startTime) <= RANGE_MERGE_EPSILON_SECONDS
-  ) {
-    previousRange.endTime = nextRange.endTime;
-    return;
-  }
-
-  ranges.push(nextRange);
-}
-
-function mergeRangeForLane(
-  ranges: ReplayTimelineRange[],
-  lastRangeByLane: Map<string, ReplayTimelineRange>,
-  nextRange: ReplayTimelineRange | null,
-): void {
-  if (!nextRange) {
-    return;
-  }
-
-  const laneKey = nextRange.lane ?? "";
-  const previousRange = lastRangeByLane.get(laneKey);
-  if (
-    previousRange &&
-    previousRange.label === nextRange.label &&
-    Math.abs(previousRange.endTime - nextRange.startTime) <= RANGE_MERGE_EPSILON_SECONDS
-  ) {
-    previousRange.endTime = nextRange.endTime;
-    return;
-  }
-
-  ranges.push(nextRange);
-  lastRangeByLane.set(laneKey, nextRange);
 }
