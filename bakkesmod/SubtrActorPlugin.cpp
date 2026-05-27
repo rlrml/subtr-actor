@@ -7380,9 +7380,10 @@ void SubtrActorPlugin::renderCvarModuleSummaryToggle(
     const char *label,
     const char *name,
     bool defaultValue,
-    const char *idSuffix) {
+    const char *idSuffix,
+    float width) {
   const bool active = cvarBool(name, defaultValue);
-  if (renderModuleSummaryToggle(label, active, idSuffix)) {
+  if (renderModuleSummaryToggle(label, active, idSuffix, width)) {
     setCvarBool(name, !active);
   }
 }
@@ -7390,8 +7391,9 @@ void SubtrActorPlugin::renderCvarModuleSummaryToggle(
 void SubtrActorPlugin::renderBoolModuleSummaryToggle(
     const char *label,
     bool &active,
-    const char *idSuffix) {
-  if (renderModuleSummaryToggle(label, active, idSuffix)) {
+    const char *idSuffix,
+    float width) {
+  if (renderModuleSummaryToggle(label, active, idSuffix, width)) {
     active = !active;
     scheduleUiConfigAutosave();
   }
@@ -7400,13 +7402,14 @@ void SubtrActorPlugin::renderBoolModuleSummaryToggle(
 void SubtrActorPlugin::renderEventFilterModuleSummaryToggle(
     const char *label,
     const char *token,
-    const char *idSuffix) {
+    const char *idSuffix,
+    float width) {
   std::vector<std::string> selected =
       selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all"));
   const bool active =
       eventPlaylistMechanicsEnabled &&
       (containsString(selected, "mechanics") || containsString(selected, token));
-  if (!renderModuleSummaryToggle(label, active, idSuffix)) {
+  if (!renderModuleSummaryToggle(label, active, idSuffix, width)) {
     return;
   }
 
@@ -7432,44 +7435,59 @@ void SubtrActorPlugin::renderEventFilterModuleSummaryToggle(
   setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
 }
 
-void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix, bool collapsibleGroups) {
+void SubtrActorPlugin::renderModuleSummaryControls(
+    const char *idSuffix,
+    bool collapsibleGroups,
+    float toggleWidth) {
   auto renderTimelineControls = [&]() {
-    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix);
-    renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix);
-    renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix);
-    renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix);
-    renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix);
-    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix);
-    renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix);
-    renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix);
-    renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix);
-    renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix);
-    renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix);
-    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix);
-    renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix);
-    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix);
-    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix);
-    renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix);
-    renderBoolModuleSummaryToggle("Team event playlist", eventPlaylistTeamEventsEnabled, idSuffix);
+    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix, toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Team event playlist",
+        eventPlaylistTeamEventsEnabled,
+        idSuffix,
+        toggleWidth);
     renderBoolModuleSummaryToggle(
         "Goal context playlist",
         eventPlaylistGoalContextEnabled,
-        idSuffix);
-    renderBoolModuleSummaryToggle("Boost pickup timeline", timelineRangeBoostEnabled, idSuffix);
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Boost pickup timeline",
+        timelineRangeBoostEnabled,
+        idSuffix,
+        toggleWidth);
     renderBoolModuleSummaryToggle(
         "Possession timeline",
         timelineRangePossessionEnabled,
-        idSuffix);
+        idSuffix,
+        toggleWidth);
     renderBoolModuleSummaryToggle(
         "Half control timeline",
         timelineRangePressureEnabled,
-        idSuffix);
-    renderBoolModuleSummaryToggle("Rush timeline", timelineRangeRushEnabled, idSuffix);
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle("Rush timeline", timelineRangeRushEnabled, idSuffix, toggleWidth);
     renderBoolModuleSummaryToggle(
         "Position zones timeline",
         timelineRangeAbsolutePositioningEnabled,
-        idSuffix);
-    renderBoolModuleSummaryToggle("Playlist follow", eventPlaylistAutoFollow, idSuffix);
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle("Playlist follow", eventPlaylistAutoFollow, idSuffix, toggleWidth);
   };
 
   auto renderInGameControls = [&]() {
@@ -7477,39 +7495,61 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix, bool co
         "Canvas status line",
         "subtr_actor_status_overlay_enabled",
         true,
-        idSuffix);
+        idSuffix,
+        toggleWidth);
     renderCvarModuleSummaryToggle(
         "HUD mechanics",
         "subtr_actor_overlay_mechanics_enabled",
         true,
-        idSuffix);
+        idSuffix,
+        toggleWidth);
     renderCvarModuleSummaryToggle(
         "HUD team events",
         "subtr_actor_overlay_team_events_enabled",
         true,
-        idSuffix);
+        idSuffix,
+        toggleWidth);
     renderCvarModuleSummaryToggle(
         "HUD goal context",
         "subtr_actor_overlay_goal_context_enabled",
         true,
-        idSuffix);
-    renderBoolModuleSummaryToggle("Ceiling shot labels", renderEffectCeilingShotEnabled, idSuffix);
-    renderBoolModuleSummaryToggle("50/50 labels", renderEffectFiftyFiftyEnabled, idSuffix);
-    renderBoolModuleSummaryToggle("Half control", renderEffectPressureEnabled, idSuffix);
-    renderBoolModuleSummaryToggle("Player roles", renderEffectRelativePositioningEnabled, idSuffix);
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Ceiling shot labels",
+        renderEffectCeilingShotEnabled,
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "50/50 labels",
+        renderEffectFiftyFiftyEnabled,
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle("Half control", renderEffectPressureEnabled, idSuffix, toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Player roles",
+        renderEffectRelativePositioningEnabled,
+        idSuffix,
+        toggleWidth);
     renderBoolModuleSummaryToggle(
         "Position zones",
         renderEffectAbsolutePositioningEnabled,
-        idSuffix);
-    renderBoolModuleSummaryToggle("Speed flip labels", renderEffectSpeedFlipEnabled, idSuffix);
-    renderBoolModuleSummaryToggle("Touch labels", renderEffectTouchEnabled, idSuffix);
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Speed flip labels",
+        renderEffectSpeedFlipEnabled,
+        idSuffix,
+        toggleWidth);
+    renderBoolModuleSummaryToggle("Touch labels", renderEffectTouchEnabled, idSuffix, toggleWidth);
     renderBoolModuleSummaryToggle(
         "Boost pickup animation",
         boostPickupAnimationEnabled,
-        idSuffix);
+        idSuffix,
+        toggleWidth);
     const bool boostPadsEnabled =
         boostPickupPadBig || boostPickupPadSmall || boostPickupPadAmbiguous;
-    if (renderModuleSummaryToggle("Boost pad locations", boostPadsEnabled, idSuffix)) {
+    if (renderModuleSummaryToggle("Boost pad locations", boostPadsEnabled, idSuffix, toggleWidth)) {
       const bool next = !boostPadsEnabled;
       boostPickupPadBig = next;
       boostPickupPadSmall = next;
@@ -7839,7 +7879,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
 
   ImGui::Separator();
-  renderModuleSummaryControls("launcher-module-summary", false);
+  renderModuleSummaryControls("launcher-module-summary", false, 0.0f);
 
   ImGui::Separator();
   renderModuleSettingsControls("launcher-module-settings", false, true);

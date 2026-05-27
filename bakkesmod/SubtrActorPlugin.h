@@ -481,13 +481,22 @@ private:
       const char *label,
       const char *name,
       bool defaultValue,
-      const char *idSuffix);
+      const char *idSuffix,
+      float width = 230.0f);
   void renderEventFilterModuleSummaryToggle(
       const char *label,
       const char *token,
-      const char *idSuffix);
-  void renderBoolModuleSummaryToggle(const char *label, bool &active, const char *idSuffix);
-  void renderModuleSummaryControls(const char *idSuffix, bool collapsibleGroups = true);
+      const char *idSuffix,
+      float width = 230.0f);
+  void renderBoolModuleSummaryToggle(
+      const char *label,
+      bool &active,
+      const char *idSuffix,
+      float width = 230.0f);
+  void renderModuleSummaryControls(
+      const char *idSuffix,
+      bool collapsibleGroups = true,
+      float toggleWidth = 230.0f);
   void renderModuleSettingsControls(
       const char *idSuffix,
       bool includeOpenButtons,
