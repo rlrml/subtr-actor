@@ -19,28 +19,8 @@ RUST_SOURCE = REPO_ROOT / "crates/subtr-actor-bakkesmod/src/lib.rs"
 PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
-
-WEB_SINGLETON_WINDOW_IDS = (
-    "camera",
-    "scoreboard",
-    "playback",
-    "recording",
-    "mechanics",
-    "event-playlist",
-    "mechanics-review",
-    "replay-loading",
-    "boost-pickups",
-    "touch-controls",
-)
-
-WEB_STATS_WINDOW_KIND_IDS = (
-    "player",
-    "team",
-    "all-players",
-    "all-teams",
-    "goals-overview",
-    "ad-hoc",
-)
+WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
+WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
 
 
 @dataclass(frozen=True)
@@ -208,6 +188,28 @@ def cpp_array(source: str, name: str) -> list[str]:
     return quoted_strings(match.group(1))
 
 
+def ts_array(source: str, name: str) -> list[str]:
+    match = re.search(
+        rf"const\s+{re.escape(name)}\s*:[^=]+=\s*\[(.*?)\];",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"missing TypeScript array {name}")
+    return quoted_strings(match.group(1))
+
+
+def ts_type_alias_strings(source: str, name: str) -> list[str]:
+    match = re.search(
+        rf"export\s+type\s+{re.escape(name)}\s*=\s*(.*?);",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"missing TypeScript type alias {name}")
+    return quoted_strings(match.group(1))
+
+
 def require_contains(source: str, needle: str, label: str, errors: list[str]) -> None:
     if needle not in source:
         errors.append(f"missing {label}: {needle}")
@@ -278,6 +280,8 @@ def main() -> int:
     plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
     plugin_header = PLUGIN_HEADER.read_text(encoding="utf-8")
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
+    web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
+    web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
     cpp_combined = plugin_header + "\n" + plugin_source
     errors: list[str] = []
 
@@ -297,6 +301,19 @@ def main() -> int:
                 f"Rust={rust_values!r} C++={cpp_values!r}"
             )
 
+    web_singleton_type_ids = tuple(
+        ts_type_alias_strings(web_player_config_source, "SingletonWindowId")
+    )
+    web_singleton_window_ids = tuple(ts_array(web_player_main_source, "SINGLETON_WINDOW_IDS"))
+    if web_singleton_window_ids != web_singleton_type_ids:
+        errors.append(
+            "stats evaluation player singleton window order differs from its config type: "
+            f"type={web_singleton_type_ids!r} array={web_singleton_window_ids!r}"
+        )
+    web_stats_window_kind_ids = tuple(
+        ts_type_alias_strings(web_player_config_source, "StatsWindowKind")
+    )
+
     web_window_ids = tuple(
         window_id
         for window_id, web_config, _ in sorted(
@@ -305,19 +322,19 @@ def main() -> int:
         )
         if web_config
     )
-    if web_window_ids != WEB_SINGLETON_WINDOW_IDS:
+    if web_window_ids != web_singleton_window_ids:
         errors.append(
             "web singleton window order drifted from stats evaluation player: "
-            f"expected={WEB_SINGLETON_WINDOW_IDS!r} actual={web_window_ids!r}"
+            f"expected={web_singleton_window_ids!r} actual={web_window_ids!r}"
         )
 
-    web_stats_window_kind_ids = tuple(
+    plugin_web_stats_window_kind_ids = tuple(
         kind_id for kind_id, web_config in stats_window_kind_controls(plugin_source) if web_config
     )
-    if web_stats_window_kind_ids != WEB_STATS_WINDOW_KIND_IDS:
+    if plugin_web_stats_window_kind_ids != web_stats_window_kind_ids:
         errors.append(
             "web stats window kind order drifted from stats evaluation player: "
-            f"expected={WEB_STATS_WINDOW_KIND_IDS!r} actual={web_stats_window_kind_ids!r}"
+            f"expected={web_stats_window_kind_ids!r} actual={plugin_web_stats_window_kind_ids!r}"
         )
     require_contains(
         plugin_source,
