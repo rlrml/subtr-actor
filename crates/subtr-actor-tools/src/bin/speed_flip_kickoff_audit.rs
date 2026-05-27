@@ -3,56 +3,14 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
-use serde::Serialize;
 use subtr_actor::{GameplayPhase, PlayerId, ReplayMeta, ReplayStatsFrame, StatsTimelineCollector};
 
+#[path = "speed_flip_kickoff_audit_types.rs"]
+mod types;
+
+use types::{Args, Audit, DetectedSpeedFlip, KickoffAudit, ReplayAudit};
+
 const DETECTION_WINDOW_SECONDS: f32 = 1.5;
-
-#[derive(Debug, Serialize)]
-struct Audit {
-    replays: Vec<ReplayAudit>,
-}
-
-#[derive(Debug, Serialize)]
-struct ReplayAudit {
-    path: String,
-    kickoff_count: usize,
-    team_kickoff_opportunities: usize,
-    detected_team_kickoffs: usize,
-    speed_flip_event_count: usize,
-    kickoffs: Vec<KickoffAudit>,
-}
-
-#[derive(Debug, Serialize)]
-struct KickoffAudit {
-    index: usize,
-    start_time: f32,
-    start_frame: usize,
-    blue_front_players: Vec<String>,
-    orange_front_players: Vec<String>,
-    blue_detected: Vec<DetectedSpeedFlip>,
-    orange_detected: Vec<DetectedSpeedFlip>,
-}
-
-#[derive(Debug, Serialize)]
-struct DetectedSpeedFlip {
-    player: String,
-    time: f32,
-    time_since_kickoff_start: f32,
-    confidence: f32,
-    diagonal_score: f32,
-    cancel_score: f32,
-    speed_score: f32,
-    max_speed: f32,
-}
-
-#[derive(Debug, Parser)]
-#[command(about = "Audit speed-flip detections during replay kickoffs.")]
-struct Args {
-    /// Replay paths to audit.
-    #[arg(value_name = "replay", num_args = 1..)]
-    paths: Vec<String>,
-}
 
 fn main() -> anyhow::Result<()> {
     let Args { paths } = Args::parse();
@@ -66,6 +24,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(deprecated)]
 fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
     let replay = parse_replay(path)?;
     let timeline = StatsTimelineCollector::new()
