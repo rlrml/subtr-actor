@@ -487,6 +487,18 @@ def main() -> int:
         "stats window import falls back to present web config",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'std::optional<std::string> placement = parseJsonObjectProperty(object, "placement");',
+        "window array import can default missing web placement",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (!webConfig) {\n          continue;\n        }\n        placement = R"({"x":8,"y":8,"viewport":{"width":1,"height":1},"visible":true})";',
+        "web singleton window import mirrors normalizePlacement defaults",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'if (statsWindowObjects.empty()) {\n    statsWindowObjects = parseJsonObjectArrayProperty(json, "statsWindows");\n  }',

@@ -3655,9 +3655,12 @@ void SubtrActorPlugin::applyUiConfigJson(
   auto loadWindowArray = [&](const char *propertyName, bool webConfig) {
     for (const std::string &object : parseJsonObjectArrayProperty(json, propertyName)) {
       const std::string id = parseJsonStringProperty(object, "id").value_or("");
-      const auto placement = parseJsonObjectProperty(object, "placement");
+      std::optional<std::string> placement = parseJsonObjectProperty(object, "placement");
       if (!placement) {
-        continue;
+        if (!webConfig) {
+          continue;
+        }
+        placement = R"({"x":8,"y":8,"viewport":{"width":1,"height":1},"visible":true})";
       }
       for (const SingletonWindowControl &window : singletonWindowControls()) {
         if (window.web_config != webConfig || id != window.config_id) {
