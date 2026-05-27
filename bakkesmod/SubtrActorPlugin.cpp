@@ -12,6 +12,7 @@
 #include <iterator>
 #include <limits>
 #include <sstream>
+#include <tuple>
 #include <type_traits>
 
 #include "imgui/imgui.h"
@@ -9399,14 +9400,34 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
     if (ImGui::BeginCombo(std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
                           selectedLabel.c_str())) {
-      for (const SaPlayerFrame &player : sampledPlayers) {
-        const std::string nextTarget = webPlayerIdForIndex(player.player_index);
-        const bool isSelected = statsWindowTargetsEqual(statId, entry.target_id, nextTarget);
-        if (ImGui::Selectable(playerLabel(player.player_index, player.is_team_0).c_str(),
-                              isSelected) &&
-            !statsWindowHasStat(window, statId, nextTarget)) {
-          entry.target_id = nextTarget;
+      for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
+        const bool hasTeamPlayers = std::any_of(
+            sampledPlayers.begin(),
+            sampledPlayers.end(),
+            [isTeam0](const SaPlayerFrame &player) { return player.is_team_0 == isTeam0; });
+        if (!hasTeamPlayers) {
+          continue;
         }
+
+        const LinearColor color =
+            isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+        ImGui::TextColored(toImVec4(color), "%s team", teamLabel(isTeam0).c_str());
+        for (const SaPlayerFrame &player : sampledPlayers) {
+          if (player.is_team_0 != isTeam0) {
+            continue;
+          }
+          const std::string nextTarget = webPlayerIdForIndex(player.player_index);
+          const bool isSelected = statsWindowTargetsEqual(statId, entry.target_id, nextTarget);
+          if (ImGui::Selectable(playerLabel(player.player_index, player.is_team_0).c_str(),
+                                isSelected) &&
+              !statsWindowHasStat(window, statId, nextTarget)) {
+            entry.target_id = nextTarget;
+          }
+        }
+        ImGui::Separator();
+      }
+      if (sampledPlayers.empty()) {
+        ImGui::TextDisabled("Waiting for sampled players.");
       }
       ImGui::EndCombo();
     }
@@ -9417,13 +9438,18 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
   if (ImGui::BeginCombo(
           std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
           selectedTeam)) {
-    if (ImGui::Selectable("Blue", entry.target_id != "orange") &&
-        !statsWindowHasStat(window, statId, "blue")) {
-      entry.target_id = "blue";
-    }
-    if (ImGui::Selectable("Orange", entry.target_id == "orange") &&
-        !statsWindowHasStat(window, statId, "orange")) {
-      entry.target_id = "orange";
+    for (const auto &[label, targetId, isTeam0] : {
+             std::tuple<const char *, const char *, uint8_t>{"Blue", "blue", uint8_t{1}},
+             std::tuple<const char *, const char *, uint8_t>{"Orange", "orange", uint8_t{0}},
+         }) {
+      const LinearColor color =
+          isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+      ImGui::PushStyleColor(ImGuiCol_Text, toImVec4(color));
+      if (ImGui::Selectable(label, entry.target_id == targetId) &&
+          !statsWindowHasStat(window, statId, targetId)) {
+        entry.target_id = targetId;
+      }
+      ImGui::PopStyleColor();
     }
     ImGui::EndCombo();
   }
