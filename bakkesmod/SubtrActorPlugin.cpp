@@ -7407,6 +7407,19 @@ void SubtrActorPlugin::renderLauncherWindow() {
       renderStatsWindowCreateButton(kind.create_label, kind.kind);
     }
   }
+  if (!uiStatsWindows.empty()) {
+    const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
+        uiStatsWindows.begin(),
+        uiStatsWindows.end(),
+        [](const UiStatsWindow &window) { return window.open; }));
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+    ImGui::Text(
+        "%zu visible / %zu stats windows",
+        visibleStatsWindows,
+        uiStatsWindows.size());
+    renderStatsWindowManager();
+  }
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
@@ -7507,18 +7520,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
             "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
       }
     }
-
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
-    const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
-        uiStatsWindows.begin(),
-        uiStatsWindows.end(),
-        [](const UiStatsWindow &window) { return window.open; }));
-    ImGui::Text(
-        "%zu visible / %zu stats windows",
-        visibleStatsWindows,
-        uiStatsWindows.size());
-    renderStatsWindowManager();
 
     ImGui::Separator();
     ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH MODULES");
