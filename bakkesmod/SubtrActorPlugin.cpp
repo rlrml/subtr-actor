@@ -2637,18 +2637,15 @@ void SubtrActorPlugin::applyUiConfigJson(
     out.z_index = static_cast<int>(parseJsonNumberProperty(object, "zIndex").value_or(out.z_index));
     nextUiWindowZIndex = std::max(nextUiWindowZIndex, out.z_index + 1);
   };
-  auto loadPlacement = [&loadPlacementObject](
-                           const std::string &parent,
-                           const char *name,
-                           UiWindowPlacement &out,
-                           bool *visible = nullptr) {
-    const auto object = parseJsonObjectProperty(parent, name);
-    if (!object) {
-      return;
-    }
-    loadPlacementObject(*object, out, visible);
-  };
-
+  auto applyDefaultPlacementSize =
+      [](const std::string &object, UiWindowPlacement &out, float width, float height) {
+        if (!parseJsonNumberProperty(object, "width") || out.width <= 0.0f) {
+          out.width = width;
+        }
+        if (!parseJsonNumberProperty(object, "height") || out.height <= 0.0f) {
+          out.height = height;
+        }
+      };
   for (const SingletonWindowControl &window : singletonWindowControls()) {
     *window.open =
         parseJsonBoolProperty(json, window.legacy_open_key).value_or(*window.open);
@@ -3035,7 +3032,12 @@ void SubtrActorPlugin::applyUiConfigJson(
 
   if (const auto placements = parseJsonObjectProperty(json, "placements")) {
     for (const SingletonWindowControl &window : singletonWindowControls()) {
-      loadPlacement(*placements, window.legacy_placement_key, *window.placement, window.open);
+      const auto object = parseJsonObjectProperty(*placements, window.legacy_placement_key);
+      if (!object) {
+        continue;
+      }
+      loadPlacementObject(*object, *window.placement, window.open);
+      applyDefaultPlacementSize(*object, *window.placement, window.width, window.height);
     }
   }
   auto loadWindowArray = [&](const char *propertyName, bool webConfig) {
@@ -3050,6 +3052,7 @@ void SubtrActorPlugin::applyUiConfigJson(
           continue;
         }
         loadPlacementObject(*placement, *window.placement, window.open);
+        applyDefaultPlacementSize(*placement, *window.placement, window.width, window.height);
         break;
       }
     }
@@ -3183,6 +3186,13 @@ void SubtrActorPlugin::applyUiConfigJson(
         parseJsonNumberProperty(object, "viewport_height").value_or(window.viewport_height));
     window.z_index =
         static_cast<int>(parseJsonNumberProperty(object, "zIndex").value_or(window.z_index));
+    const auto [defaultWidth, defaultHeight] = defaultStatsWindowSize(window.kind);
+    if (window.width <= 0.0f) {
+      window.width = defaultWidth;
+    }
+    if (window.height <= 0.0f) {
+      window.height = defaultHeight;
+    }
     nextUiWindowZIndex = std::max(nextUiWindowZIndex, window.z_index + 1);
     uiStatsWindows.push_back(std::move(window));
   }
@@ -6510,9 +6520,10 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
   if (window.has_placement) {
     const ImGuiCond condition =
         window.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+    const auto [defaultWidth, defaultHeight] = defaultStatsWindowSize(window.kind);
     const ImVec2 size{
-        std::max(180.0f, window.width),
-        std::max(120.0f, window.height),
+        std::max(180.0f, window.width > 0.0f ? window.width : defaultWidth),
+        std::max(120.0f, window.height > 0.0f ? window.height : defaultHeight),
     };
     const ImVec2 position = mapWindowPositionToViewport(
         window.x,
@@ -6531,8 +6542,7 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
     return;
   }
   const float offset = static_cast<float>((window.id - 1) * 24);
-  const float width = window.kind == UiStatsWindowKind::StatsModule ? 680.0f : 540.0f;
-  const float height = window.kind == UiStatsWindowKind::StatsModule ? 460.0f : 330.0f;
+  const auto [width, height] = defaultStatsWindowSize(window.kind);
   ImGui::SetNextWindowPos(
       mapWindowPositionToViewport(96.0f + offset, 96.0f + offset, width, height, 0.0f, 0.0f),
       ImGuiCond_FirstUseEver);
@@ -9297,15 +9307,22 @@ void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int modul
   uiStatsWindows.push_back(std::move(window));
 }
 
+std::pair<float, float> SubtrActorPlugin::defaultStatsWindowSize(UiStatsWindowKind kind) const {
+  if (kind == UiStatsWindowKind::StatsModule) {
+    return {680.0f, 460.0f};
+  }
+  return {540.0f, 330.0f};
+}
+
 void SubtrActorPlugin::initializeStatsWindowPlacement(UiStatsWindow &window) {
   resetStatsWindowPlacement(window, uiStatsWindows.size());
 }
 
 void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex) {
   const float offset = static_cast<float>(stackIndex * 18);
-  const bool isModuleWindow = window.kind == UiStatsWindowKind::StatsModule;
-  window.width = isModuleWindow ? 680.0f : 540.0f;
-  window.height = isModuleWindow ? 460.0f : 330.0f;
+  const auto [width, height] = defaultStatsWindowSize(window.kind);
+  window.width = width;
+  window.height = height;
   const ImVec2 position = mapWindowPositionToViewport(
       96.0f + offset,
       96.0f + offset,
