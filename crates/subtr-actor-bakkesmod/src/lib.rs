@@ -1,7 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
@@ -284,6 +284,14 @@ pub struct SaMechanicEvent {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SaReplayPlayerInfo {
+    pub player_index: u32,
+    pub is_team_0: u8,
+    pub name: *const c_char,
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SaTeamEventKind {
     Rush = 1,
@@ -349,6 +357,8 @@ pub struct SaEngine {
 
 pub struct SaReplayAnnotations {
     events: Vec<SaMechanicEvent>,
+    players: Vec<SaReplayPlayerInfo>,
+    _player_names: Vec<CString>,
     cursor: usize,
     last_poll_time: f32,
     initialized: bool,
@@ -2186,6 +2196,22 @@ fn replay_player_index_map(replay_meta: &ReplayMeta) -> HashMap<RemoteId, u32> {
         .collect()
 }
 
+fn replay_annotation_players(replay_meta: &ReplayMeta) -> (Vec<CString>, Vec<SaReplayPlayerInfo>) {
+    let mut names = Vec::new();
+    let mut players = Vec::new();
+    for (player_index, player) in replay_meta.player_order().enumerate() {
+        names.push(CString::new(player.name.as_str()).unwrap_or_else(|_| {
+            CString::new(player.name.replace('\0', "")).expect("nul bytes removed")
+        }));
+        players.push(SaReplayPlayerInfo {
+            player_index: player_index as u32,
+            is_team_0: (player_index < replay_meta.team_zero.len()) as u8,
+            name: names.last().expect("player name was just pushed").as_ptr(),
+        });
+    }
+    (names, players)
+}
+
 fn replay_player_index(index_map: &HashMap<RemoteId, u32>, id: &RemoteId) -> u32 {
     index_map
         .get(id)
@@ -2785,8 +2811,11 @@ fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplayAnnotations
     let timeline =
         StatsTimelineEventCollector::new().get_replay_stats_timeline_scaffold(&replay)?;
     let events = replay_annotations_from_timeline(&timeline.replay_meta, &timeline.events);
+    let (player_names, players) = replay_annotation_players(&timeline.replay_meta);
     Ok(SaReplayAnnotations {
         events,
+        players,
+        _player_names: player_names,
         cursor: 0,
         last_poll_time: 0.0,
         initialized: false,
@@ -2831,6 +2860,36 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
     unsafe { annotations.as_ref() }
         .map(|annotations| annotations.events.len())
         .unwrap_or(0)
+}
+
+/// Returns the number of replay players available for annotation labels.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_player_count(
+    annotations: *const SaReplayAnnotations,
+) -> usize {
+    unsafe { annotations.as_ref() }
+        .map(|annotations| annotations.players.len())
+        .unwrap_or(0)
+}
+
+/// Copies replay player metadata into `out_players`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
+    annotations: *const SaReplayAnnotations,
+    out_players: *mut SaReplayPlayerInfo,
+    max_players: usize,
+) -> usize {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return 0;
+    };
+    if max_players == 0 || out_players.is_null() {
+        return 0;
+    }
+    let count = annotations.players.len().min(max_players);
+    unsafe {
+        ptr::copy_nonoverlapping(annotations.players.as_ptr(), out_players, count);
+    }
+    count
 }
 
 /// Drains annotation events whose normal replay-processing timestamp has been
@@ -4043,6 +4102,28 @@ mod tests {
         let annotation_count =
             unsafe { subtr_actor_bakkesmod_replay_annotation_count(annotations) };
         assert!(annotation_count > 0);
+        let player_count =
+            unsafe { subtr_actor_bakkesmod_replay_annotation_player_count(annotations) };
+        assert!(player_count > 0);
+        let mut players = vec![
+            SaReplayPlayerInfo {
+                player_index: 0,
+                is_team_0: 0,
+                name: ptr::null(),
+            };
+            player_count
+        ];
+        let copied_players = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_players(
+                annotations,
+                players.as_mut_ptr(),
+                players.len(),
+            )
+        };
+        assert_eq!(copied_players, player_count);
+        assert!(players[..copied_players]
+            .iter()
+            .any(|player| !player.name.is_null()));
         let final_time = unsafe { (*annotations).events.last().expect("events").time + 1.0 };
 
         let mut events = vec![
@@ -4104,6 +4185,7 @@ mod tests {
             "SaDemolishEvent",
             "SaLiveFrame",
             "SaMechanicEvent",
+            "SaReplayPlayerInfo",
             "SaTeamEvent",
             "SaGoalContextEvent",
         ] {
@@ -4296,6 +4378,14 @@ mod tests {
                     ("uint64_t", "frame_number"),
                     ("float", "time"),
                     ("float", "confidence"),
+                ],
+            ),
+            (
+                "SaReplayPlayerInfo",
+                vec![
+                    ("uint32_t", "player_index"),
+                    ("uint8_t", "is_team_0"),
+                    ("const char *", "name"),
                 ],
             ),
             (
@@ -4527,6 +4617,11 @@ mod tests {
         assert_offset!(SaMechanicEvent, frame_number, 16);
         assert_offset!(SaMechanicEvent, time, 24);
         assert_offset!(SaMechanicEvent, confidence, 28);
+
+        assert_layout!(SaReplayPlayerInfo, size = 16, align = 8);
+        assert_offset!(SaReplayPlayerInfo, player_index, 0);
+        assert_offset!(SaReplayPlayerInfo, is_team_0, 4);
+        assert_offset!(SaReplayPlayerInfo, name, 8);
 
         assert_layout!(SaTeamEvent, size = 48, align = 8);
         assert_offset!(SaTeamEvent, kind, 0);

@@ -1216,6 +1216,13 @@ static_assert(offsetof(SaMechanicEvent, frame_number) == 16);
 static_assert(offsetof(SaMechanicEvent, time) == 24);
 static_assert(offsetof(SaMechanicEvent, confidence) == 28);
 
+static_assert(std::is_standard_layout_v<SaReplayPlayerInfo>);
+static_assert(sizeof(SaReplayPlayerInfo) == 16);
+static_assert(alignof(SaReplayPlayerInfo) == 8);
+static_assert(offsetof(SaReplayPlayerInfo, player_index) == 0);
+static_assert(offsetof(SaReplayPlayerInfo, is_team_0) == 4);
+static_assert(offsetof(SaReplayPlayerInfo, name) == 8);
+
 static_assert(std::is_standard_layout_v<SaTeamEvent>);
 static_assert(sizeof(SaTeamEvent) == 48);
 static_assert(alignof(SaTeamEvent) == 8);
@@ -2427,6 +2434,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotations_destroy"));
   replayAnnotationCount = reinterpret_cast<ReplayAnnotationCount>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_count"));
+  replayAnnotationPlayerCount = reinterpret_cast<ReplayAnnotationPlayerCount>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_player_count"));
+  writeReplayAnnotationPlayers = reinterpret_cast<WriteReplayAnnotationPlayers>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_players"));
   pollReplayAnnotations = reinterpret_cast<PollReplayAnnotations>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_poll_replay_annotations"));
 
@@ -2440,6 +2451,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !writeAnalysisNodeNamesJson || !graphInfoJsonLen || !writeGraphInfoJson ||
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
+      !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
       !pollReplayAnnotations) {
     unloadRustLibrary();
     return false;
@@ -2496,6 +2508,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   replayAnnotationsCreate = nullptr;
   replayAnnotationsDestroy = nullptr;
   replayAnnotationCount = nullptr;
+  replayAnnotationPlayerCount = nullptr;
+  writeReplayAnnotationPlayers = nullptr;
   pollReplayAnnotations = nullptr;
 }
 
@@ -3840,6 +3854,28 @@ void SubtrActorPlugin::resetReplayAnnotations() {
   replayAnnotationLoadFailed = false;
 }
 
+void SubtrActorPlugin::importReplayAnnotationPlayers() {
+  if (!replayAnnotations || !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers) {
+    return;
+  }
+
+  const size_t playerCount = replayAnnotationPlayerCount(replayAnnotations);
+  if (playerCount == 0) {
+    return;
+  }
+
+  std::vector<SaReplayPlayerInfo> players(playerCount);
+  const size_t copied =
+      writeReplayAnnotationPlayers(replayAnnotations, players.data(), players.size());
+  for (size_t i = 0; i < copied; i += 1) {
+    const SaReplayPlayerInfo &player = players[i];
+    if (player.name != nullptr && player.name[0] != '\0') {
+      playerNamesByIndex[player.player_index] = player.name;
+    }
+    playerTeamsByIndex[player.player_index] = player.is_team_0;
+  }
+}
+
 std::optional<std::string> SubtrActorPlugin::currentReplayPath(ReplayServerWrapper replayServer) {
   if (replayServer.IsNull()) {
     return std::nullopt;
@@ -3922,6 +3958,7 @@ void SubtrActorPlugin::tickReplayAnnotations() {
     replayAnnotationLoadFailed = false;
     const size_t annotationCount =
         replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
+    importReplayAnnotationPlayers();
     cvarManager->log(std::format(
         "subtr-actor: loaded {} replay annotations from normal replay processor for {}",
         annotationCount,

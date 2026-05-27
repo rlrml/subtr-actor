@@ -164,6 +164,8 @@ $RustNeedles = @(
     "subtr_actor_bakkesmod_analysis_node_names_json_len",
     "subtr_actor_bakkesmod_write_analysis_node_names_json",
     "subtr_actor_bakkesmod_replay_annotations_create",
+    "subtr_actor_bakkesmod_replay_annotation_player_count",
+    "subtr_actor_bakkesmod_write_replay_annotation_players",
     "subtr_actor_bakkesmod_poll_replay_annotations",
     "callable_analysis_node_names",
     "builtin_analysis_node_names",

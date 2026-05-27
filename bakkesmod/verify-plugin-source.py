@@ -138,6 +138,8 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
     ("subtr_actor_bakkesmod_replay_annotations_create", "replayAnnotationsCreate"),
     ("subtr_actor_bakkesmod_replay_annotations_destroy", "replayAnnotationsDestroy"),
     ("subtr_actor_bakkesmod_replay_annotation_count", "replayAnnotationCount"),
+    ("subtr_actor_bakkesmod_replay_annotation_player_count", "replayAnnotationPlayerCount"),
+    ("subtr_actor_bakkesmod_write_replay_annotation_players", "writeReplayAnnotationPlayers"),
     ("subtr_actor_bakkesmod_poll_replay_annotations", "pollReplayAnnotations"),
 )
 

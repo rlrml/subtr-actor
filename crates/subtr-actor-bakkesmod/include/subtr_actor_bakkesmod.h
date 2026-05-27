@@ -222,6 +222,12 @@ typedef struct SaMechanicEvent {
   float confidence;
 } SaMechanicEvent;
 
+typedef struct SaReplayPlayerInfo {
+  uint32_t player_index;
+  uint8_t is_team_0;
+  const char *name;
+} SaReplayPlayerInfo;
+
 typedef enum SaTeamEventKind {
   SaTeamEventKindRush = 1,
 } SaTeamEventKind;
@@ -268,6 +274,12 @@ void subtr_actor_bakkesmod_replay_annotations_destroy(
     SaReplayAnnotations *annotations);
 size_t subtr_actor_bakkesmod_replay_annotation_count(
     const SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_replay_annotation_player_count(
+    const SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_write_replay_annotation_players(
+    const SaReplayAnnotations *annotations,
+    SaReplayPlayerInfo *out_players,
+    size_t max_players);
 size_t subtr_actor_bakkesmod_poll_replay_annotations(
     SaReplayAnnotations *annotations,
     float replay_time,
