@@ -2783,7 +2783,7 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_open_ui",
       [this](std::vector<std::string>) {
         uiWindowOpen = true;
-        showSingletonWindow(uiLauncherOpen, launcherPlacement);
+        showLauncherWindow();
       },
       "Opens the subtr-actor in-game launcher window.",
       PERMISSION_ALL);
@@ -2794,7 +2794,7 @@ void SubtrActorPlugin::onLoad() {
         if (uiLauncherOpen) {
           hideLauncherWindow();
         } else {
-          showSingletonWindow(uiLauncherOpen, launcherPlacement);
+          showLauncherWindow();
         }
       },
       "Toggles the subtr-actor in-game launcher window.",
@@ -2841,7 +2841,7 @@ bool SubtrActorPlugin::IsActiveOverlay() {
 
 void SubtrActorPlugin::OnOpen() {
   uiWindowOpen = true;
-  showSingletonWindow(uiLauncherOpen, launcherPlacement);
+  showLauncherWindow();
 }
 
 void SubtrActorPlugin::OnClose() {
@@ -7187,12 +7187,17 @@ void SubtrActorPlugin::hideStatsWindow(UiStatsWindow &window) {
   scheduleUiConfigAutosave();
 }
 
+void SubtrActorPlugin::showLauncherWindow() {
+  uiWindowOpen = true;
+  uiLauncherOpen = true;
+  launcherPlacement.pending_focus = true;
+}
+
 void SubtrActorPlugin::hideLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
   }
   uiLauncherOpen = false;
-  scheduleUiConfigAutosave();
 }
 
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
@@ -7719,7 +7724,7 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
     if (uiLauncherOpen) {
       hideLauncherWindow();
     } else {
-      showSingletonWindow(uiLauncherOpen, launcherPlacement);
+      showLauncherWindow();
     }
   }
 
@@ -7875,7 +7880,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
     ImGui::End();
     return;
   }
-  captureWindowPlacement(launcherPlacement);
   const bool launcherHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
@@ -7999,7 +8003,7 @@ void SubtrActorPlugin::renderEmptyStateWindow() {
     setCvarBool("subtr_actor_enabled", true);
   }
   if (ImGui::Button("Open menu", ImVec2{150.0f, 0.0f})) {
-    showSingletonWindow(uiLauncherOpen, launcherPlacement);
+    showLauncherWindow();
   }
 
   ImGui::End();
@@ -10507,7 +10511,8 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
 
 void SubtrActorPlugin::resetWindowPlacements() {
   nextUiWindowZIndex = 1;
-  resetSingletonWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f, true);
+  launcherPlacement = {};
+  launcherPlacement.pending_focus = uiLauncherOpen;
   for (const SingletonWindowControl &window : singletonWindowControls()) {
     if (window.placement == &scoreboardPlacement) {
       resetScoreboardWindowPlacement();

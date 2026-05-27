@@ -536,6 +536,7 @@ private:
   void hideSingletonWindow(bool &open);
   void hideStatsWindow(UiStatsWindow &window);
   void focusSingletonWindow(UiWindowPlacement &placement);
+  void showLauncherWindow();
   void hideLauncherWindow();
   void applyWindowPlacement(
       UiWindowPlacement &placement,
