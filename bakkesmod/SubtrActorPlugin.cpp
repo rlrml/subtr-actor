@@ -3530,20 +3530,11 @@ std::string SubtrActorPlugin::uiConfigJson() {
   std::vector<SingletonWindowControl> webWindows;
   std::vector<SingletonWindowControl> pluginWindows;
   for (const SingletonWindowControl &window : singletonWindowControls()) {
-    if (window.web_config) {
-      webWindows.push_back(window);
-    } else {
+    if (!window.web_config) {
       pluginWindows.push_back(window);
     }
   }
-  std::sort(
-      webWindows.begin(),
-      webWindows.end(),
-      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
-        return left.launcher_order == right.launcher_order
-                   ? std::string_view{left.config_id} < std::string_view{right.config_id}
-                   : left.launcher_order < right.launcher_order;
-      });
+  webWindows = webSingletonWindowControls();
   for (size_t index = 0; index < webWindows.size(); index += 1) {
     writeWindowConfig(webWindows[index], index + 1 == webWindows.size());
   }
@@ -6866,21 +6857,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
   };
 
-  std::vector<SingletonWindowControl> launcherWindows;
-  for (const SingletonWindowControl &window : singletonWindowControls()) {
-    if (window.web_config) {
-      launcherWindows.push_back(window);
-    }
-  }
-  std::sort(
-      launcherWindows.begin(),
-      launcherWindows.end(),
-      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
-        return left.launcher_order == right.launcher_order
-                   ? std::string_view{left.config_id} < std::string_view{right.config_id}
-                   : left.launcher_order < right.launcher_order;
-      });
-  for (const SingletonWindowControl &window : launcherWindows) {
+  for (const SingletonWindowControl &window : webSingletonWindowControls()) {
     renderLauncherWindowToggle(window);
   }
   for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
@@ -9014,6 +8991,25 @@ SubtrActorPlugin::singletonWindowControls() {
        544.0f,
        420.0f},
   }};
+}
+
+std::vector<SubtrActorPlugin::SingletonWindowControl>
+SubtrActorPlugin::webSingletonWindowControls() {
+  std::vector<SingletonWindowControl> windows;
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.web_config) {
+      windows.push_back(window);
+    }
+  }
+  std::sort(
+      windows.begin(),
+      windows.end(),
+      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
+        return left.launcher_order == right.launcher_order
+                   ? std::string_view{left.config_id} < std::string_view{right.config_id}
+                   : left.launcher_order < right.launcher_order;
+      });
+  return windows;
 }
 
 void SubtrActorPlugin::renderSingletonWindowManager() {

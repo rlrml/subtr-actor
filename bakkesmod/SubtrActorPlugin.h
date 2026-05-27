@@ -457,6 +457,7 @@ private:
   void renderModuleSummaryControls(const char *idSuffix);
   void renderModuleSettingsControls(const char *idSuffix, bool includeOpenButtons);
   std::array<SingletonWindowControl, 13> singletonWindowControls();
+  std::vector<SingletonWindowControl> webSingletonWindowControls();
   std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
