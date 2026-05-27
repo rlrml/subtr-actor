@@ -1,6 +1,5 @@
 import { ReplayPlayer } from "./player";
 import { findFrameIndexAtTime } from "./replay-data";
-import { loadReplayFromBytes } from "./wasm";
 import type {
   CameraSettings,
   LoadedReplay,
@@ -11,13 +10,10 @@ import type {
   PlaylistLoadSource,
   PlaylistPreloadContext,
   PlaylistPreloadPolicy,
-  PlaylistSourceLoadContext,
-  PlaylistSourceLoadProgress,
   PlaylistSourceLoadState,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayPreloadPolicy,
-  RawReplayFramesData,
   ReplayModel,
   ReplayPlaylistPlayerOptions,
   ReplayPlaylistPlayerSnapshot,
@@ -27,41 +23,37 @@ import type {
   ResolvedPlaybackBound,
   ResolvedPlaylistItem,
 } from "./types";
+import { createFullReplayPlaylistItem, createStaticReplaySource } from "./playlist-sources";
+import { describeError } from "./playlist-errors";
+import { PlaylistLoadCache } from "./playlist-load-cache";
+import {
+  createInitialPreferences,
+  normalizeCustomCameraSettings,
+  type PlayerPreferences,
+} from "./playlist-preferences";
 
-const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
-const DEFAULT_PLAYBACK_RATE = 1;
+export { PlaylistLoadCache } from "./playlist-load-cache";
+export {
+  createFullReplayPlaylistItem,
+  createReplayBytesSource,
+  createReplayFileSource,
+  createReplayPathSource,
+  createReplaySource,
+  createStaticReplaySource,
+  frameBound,
+  timeBound,
+} from "./playlist-sources";
+export type { FullReplayPlaylistItemOptions } from "./playlist-sources";
+
 const END_TIME_EPSILON = 0.0001;
 
 type ReplayPlaylistPlayerListener = (state: ReplayPlaylistPlayerState) => void;
-
-type ReplayPathLoader = (
-  path: string,
-  context?: PlaylistSourceLoadContext,
-) => Promise<LoadedReplay>;
-type ReplaySourceLoader = (context?: PlaylistSourceLoadContext) => Promise<LoadedReplay>;
-
-export interface FullReplayPlaylistItemOptions {
-  label?: string;
-  meta?: Record<string, unknown>;
-}
 
 export interface ReplayPlaylistPlayerSingleReplayOptions extends ReplayPlaylistPlayerOptions {
   replayId?: string;
   itemLabel?: string;
   itemMeta?: Record<string, unknown>;
 }
-
-type PlayerPreferences = {
-  speed: number;
-  cameraDistanceScale: number;
-  customCameraSettings: CameraSettings | null;
-  cameraViewMode: ReplayCameraViewMode;
-  attachedPlayerId: string | null;
-  ballCamEnabled: boolean;
-  boostPickupAnimationEnabled: boolean;
-  skipPostGoalTransitionsEnabled: boolean;
-  skipKickoffsEnabled: boolean;
-};
 
 function isPlaylistSource<TSource extends PlaylistLoadSource<unknown>>(
   value: string | TSource,
@@ -80,41 +72,6 @@ function clampFrameIndex(replay: ReplayModel, value: number): number {
 
   const maxFrameIndex = replay.frames.length - 1;
   return clamp(Math.round(value), 0, maxFrameIndex);
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load replay";
-}
-
-function finiteSetting(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeCustomCameraSettings(
-  settings: CameraSettings | null | undefined,
-): CameraSettings | null {
-  if (!settings) {
-    return null;
-  }
-
-  const normalized: CameraSettings = {};
-  const fov = finiteSetting(settings.fov);
-  const height = finiteSetting(settings.height);
-  const pitch = finiteSetting(settings.pitch);
-  const distance = finiteSetting(settings.distance);
-  const stiffness = finiteSetting(settings.stiffness);
-  const swivelSpeed = finiteSetting(settings.swivelSpeed);
-  const transitionSpeed = finiteSetting(settings.transitionSpeed);
-  if (fov !== undefined) normalized.fov = fov;
-  if (height !== undefined) normalized.height = height;
-  if (pitch !== undefined) normalized.pitch = pitch;
-  if (distance !== undefined) normalized.distance = distance;
-  if (stiffness !== undefined) normalized.stiffness = stiffness;
-  if (swivelSpeed !== undefined) normalized.swivelSpeed = swivelSpeed;
-  if (transitionSpeed !== undefined) {
-    normalized.transitionSpeed = transitionSpeed;
-  }
-  return normalized;
 }
 
 function resolvePlaybackBound(replay: ReplayModel, bound: PlaybackBound): ResolvedPlaybackBound {
@@ -142,24 +99,6 @@ function validateResolvedBounds(
     const label = item.label ? ` "${item.label}"` : "";
     throw new Error(`Playlist item${label} ends before it starts`);
   }
-}
-
-function createInitialPreferences(options: ReplayPlaylistPlayerOptions): PlayerPreferences {
-  return {
-    speed: Math.max(0.1, options.initialPlaybackRate ?? DEFAULT_PLAYBACK_RATE),
-    cameraDistanceScale: Math.max(
-      0.25,
-      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
-    ),
-    customCameraSettings: normalizeCustomCameraSettings(options.initialCustomCameraSettings),
-    cameraViewMode:
-      options.initialCameraViewMode ?? (options.initialAttachedPlayerId ? "follow" : "free"),
-    attachedPlayerId: options.initialAttachedPlayerId ?? null,
-    ballCamEnabled: options.initialBallCamEnabled ?? false,
-    boostPickupAnimationEnabled: options.initialBoostPickupAnimationEnabled ?? true,
-    skipPostGoalTransitionsEnabled: options.initialSkipPostGoalTransitionsEnabled ?? true,
-    skipKickoffsEnabled: options.initialSkipKickoffsEnabled ?? false,
-  };
 }
 
 function normalizePreloadPolicy<
@@ -306,193 +245,6 @@ function resolvePolicySources<
   }
 
   return sources;
-}
-
-export function frameBound(value: number): PlaybackBound {
-  return { kind: "frame", value };
-}
-
-export function timeBound(value: number): PlaybackBound {
-  return { kind: "time", value };
-}
-
-export function createReplaySource(id: string, load: ReplaySourceLoader): ReplaySource {
-  return { id, load };
-}
-
-export function createStaticReplaySource(id: string, replay: LoadedReplay): ReplaySource {
-  return createReplaySource(id, async () => replay);
-}
-
-export function createReplayBytesSource(id: string, data: Uint8Array): ReplaySource {
-  return createReplaySource(id, async () => loadReplayFromBytes(data, { useWorker: true }));
-}
-
-export function createReplayFileSource(
-  file: File,
-  id = file.webkitRelativePath || file.name,
-): ReplaySource {
-  return createReplaySource(id, async () => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return loadReplayFromBytes(bytes, { useWorker: true });
-  });
-}
-
-export function createReplayPathSource(
-  path: string,
-  loadReplay: ReplayPathLoader,
-  id = path,
-): ReplaySource {
-  return createReplaySource(id, async (context) => loadReplay(path, context));
-}
-
-export function createFullReplayPlaylistItem(
-  replay: ReplaySource,
-  options: FullReplayPlaylistItemOptions = {},
-): PlaylistItem {
-  return {
-    replay,
-    start: timeBound(0),
-    end: timeBound(Number.POSITIVE_INFINITY),
-    label: options.label,
-    meta: options.meta,
-  };
-}
-
-export class PlaylistLoadCache<
-  TLoaded,
-  TSource extends PlaylistLoadSource<TLoaded> = PlaylistLoadSource<TLoaded>,
-> {
-  private readonly cache = new Map<string, Promise<TLoaded>>();
-  private readonly states = new Map<string, PlaylistSourceLoadState>();
-  private readonly listeners = new Set<() => void>();
-
-  load(source: TSource): Promise<TLoaded> {
-    const cached = this.cache.get(source.id);
-    if (cached) {
-      return cached;
-    }
-
-    this.setSourceState(source.id, {
-      status: "loading",
-      progress: null,
-      error: null,
-      startedAt: Date.now(),
-      completedAt: null,
-    });
-    const context: PlaylistSourceLoadContext = {
-      sourceId: source.id,
-      updateProgress: (progress) => this.updateProgress(source.id, progress),
-    };
-    const loadPromise = Promise.resolve()
-      .then(() => source.load(context))
-      .then((loaded) => {
-        this.setSourceState(source.id, {
-          status: "loaded",
-          progress: null,
-          error: null,
-          completedAt: Date.now(),
-        });
-        return loaded;
-      })
-      .catch((error) => {
-        this.cache.delete(source.id);
-        this.setSourceState(source.id, {
-          status: "error",
-          error: describeError(error),
-          completedAt: Date.now(),
-        });
-        throw error;
-      });
-    this.cache.set(source.id, loadPromise);
-    return loadPromise;
-  }
-
-  preload(sources: Iterable<TSource>): void {
-    for (const source of sources) {
-      void this.load(source).catch(() => {
-        // Preload errors are exposed through cache state and should not surface
-        // as unhandled promise rejections.
-      });
-    }
-  }
-
-  has(source: TSource | string): boolean {
-    return this.cache.has(typeof source === "string" ? source : source.id);
-  }
-
-  delete(source: TSource | string): boolean {
-    const sourceId = typeof source === "string" ? source : source.id;
-    const deleted = this.cache.delete(sourceId);
-    if (deleted) {
-      this.states.delete(sourceId);
-      this.emitChange();
-    }
-    return deleted;
-  }
-
-  clear(): void {
-    this.cache.clear();
-    if (this.states.size > 0) {
-      this.states.clear();
-      this.emitChange();
-    }
-  }
-
-  getState(source: TSource | string): PlaylistSourceLoadState {
-    const sourceId = typeof source === "string" ? source : source.id;
-    return (
-      this.states.get(sourceId) ?? {
-        sourceId,
-        status: "idle",
-        progress: null,
-        error: null,
-        startedAt: null,
-        updatedAt: null,
-        completedAt: null,
-      }
-    );
-  }
-
-  getStates(): PlaylistSourceLoadState[] {
-    return Array.from(this.states.values());
-  }
-
-  subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
-
-  private updateProgress(sourceId: string, progress: PlaylistSourceLoadProgress): void {
-    const current = this.getState(sourceId);
-    this.setSourceState(sourceId, {
-      status: current.status === "idle" ? "loading" : current.status,
-      progress,
-      updatedAt: Date.now(),
-    });
-  }
-
-  private setSourceState(
-    sourceId: string,
-    patch: Partial<Omit<PlaylistSourceLoadState, "sourceId">>,
-  ): void {
-    const current = this.getState(sourceId);
-    this.states.set(sourceId, {
-      ...current,
-      ...patch,
-      sourceId,
-      updatedAt: patch.updatedAt ?? Date.now(),
-    });
-    this.emitChange();
-  }
-
-  private emitChange(): void {
-    for (const listener of this.listeners) {
-      listener();
-    }
-  }
 }
 
 export interface PlaylistSessionState<
@@ -1217,4 +969,4 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 }
 
-export type { RawReplayFramesData };
+export type { RawReplayFramesData } from "./types";
