@@ -9451,12 +9451,15 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     return;
   }
 
-  const std::string addButton = std::format("+ Add stat##{}", window.id);
+  const std::string addButton = std::format("+##add-stat-{}", window.id);
   if (window.kind == UiStatsWindowKind::Player || window.kind == UiStatsWindowKind::Team) {
     ImGui::SameLine();
   }
   if (ImGui::Button(addButton.c_str())) {
     window.picker_open = !window.picker_open;
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip("Add stat");
   }
   ImGui::SameLine();
   const std::string resetButton = std::format("Reset##{}", window.id);
@@ -9638,10 +9641,13 @@ void SubtrActorPlugin::renderPlayerStatsTable(
     ImGui::NextColumn();
     ImGui::Text("%s", playerStatValue(player, statId).c_str());
     ImGui::NextColumn();
-    if (ImGui::Button(std::format("Remove##{}-{}", window.id, i).c_str())) {
+    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       ImGui::Columns(1);
       return;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Remove stat");
     }
     ImGui::NextColumn();
     ++i;
@@ -9664,10 +9670,13 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
     ImGui::NextColumn();
     ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
     ImGui::NextColumn();
-    if (ImGui::Button(std::format("Remove##{}-{}", window.id, i).c_str())) {
+    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       ImGui::Columns(1);
       return;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Remove stat");
     }
     ImGui::NextColumn();
     ++i;
@@ -9717,12 +9726,15 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
           ImGui::NextColumn();
           ImGui::Text("%s", playerStatValue(player, statId).c_str());
           ImGui::NextColumn();
-          if (ImGui::SmallButton(std::format("Remove##{}-{}", window.id, i).c_str())) {
+          if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
             window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
             ImGui::Columns(1);
             ImGui::TreePop();
             ImGui::PopID();
             return true;
+          }
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Remove stat");
           }
           ImGui::NextColumn();
           ++i;
@@ -9759,10 +9771,14 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
       ImGui::NextColumn();
       ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
       ImGui::NextColumn();
-      if (ImGui::SmallButton(std::format("Remove##{}-{}-{}", window.id, isTeam0, i).c_str())) {
+      if (ImGui::SmallButton(
+              std::format("x##remove-stat-{}-{}-{}", window.id, isTeam0, i).c_str())) {
         window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
         ImGui::Columns(1);
         return;
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Remove stat");
       }
       ImGui::NextColumn();
       ++i;
@@ -9869,10 +9885,13 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
     ImGui::NextColumn();
     ImGui::Text("%s", adHocStatValue(statId, entry.target_id).c_str());
     ImGui::NextColumn();
-    if (ImGui::Button(std::format("Remove##{}-{}", window.id, i).c_str())) {
+    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       ImGui::Columns(1);
       return;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Remove stat");
     }
     ImGui::NextColumn();
     ++i;
