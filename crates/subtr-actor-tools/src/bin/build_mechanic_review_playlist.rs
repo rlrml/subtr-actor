@@ -18,6 +18,8 @@ mod candidate;
 mod config;
 #[path = "build_mechanic_review_playlist_constants.rs"]
 mod constants;
+#[path = "build_mechanic_review_playlist_extract.rs"]
+mod extract;
 #[path = "build_mechanic_review_playlist_extract_ceiling.rs"]
 mod extract_ceiling;
 #[path = "build_mechanic_review_playlist_extract_flick.rs"]
@@ -51,77 +53,15 @@ mod source_types;
 
 use candidate::{
     confidence_pct, enforce_min_clip_duration, event_json, followup_goal_for_candidate,
-    include_candidate, replay_duration_seconds, MechanicCandidate,
+    replay_duration_seconds,
 };
 use config::{parse_args, Config};
-use extract_ceiling::push_ceiling_shot_candidates;
-use extract_flick::{push_flick_candidates, push_musty_flick_candidates};
-use extract_flip_reset::push_flip_reset_candidates;
-use extract_movement::{
-    push_half_flip_candidates, push_speed_flip_candidates, push_wavedash_candidates,
-};
-use extract_touch::{
-    push_air_dribble_candidates, push_double_tap_candidates, push_one_timer_candidates,
-};
+use extract::extract_candidates;
 use goal_scan::GoalScanCollector;
 use manifest::{build_manifest, write_manifest};
 use mechanics::graph_node_names_for_mechanics;
 use players::{player_display_map, player_team_label};
 use source_types::ReplaySourceInput;
-
-fn extract_candidates(
-    replay: &boxcars::Replay,
-    graph: &subtr_actor::stats::analysis_graph::AnalysisGraph,
-    mechanics: &[&str],
-    config: &Config,
-) -> anyhow::Result<Vec<MechanicCandidate>> {
-    let mut candidates = Vec::new();
-
-    for mechanic in mechanics {
-        match *mechanic {
-            "flick" => {
-                push_flick_candidates(graph, &mut candidates);
-            }
-            "musty_flick" => {
-                push_musty_flick_candidates(graph, &mut candidates);
-            }
-            "one_timer" => {
-                push_one_timer_candidates(graph, &mut candidates);
-            }
-            "air_dribble" => {
-                push_air_dribble_candidates(graph, &mut candidates);
-            }
-            "flip_reset" => {
-                push_flip_reset_candidates(replay, graph, &mut candidates)?;
-            }
-            "ceiling_shot" => {
-                push_ceiling_shot_candidates(graph, &mut candidates);
-            }
-            "double_tap" => {
-                push_double_tap_candidates(graph, &mut candidates);
-            }
-            "speed_flip" => {
-                push_speed_flip_candidates(graph, &mut candidates);
-            }
-            "half_flip" => {
-                push_half_flip_candidates(graph, &mut candidates);
-            }
-            "wavedash" => {
-                push_wavedash_candidates(graph, &mut candidates);
-            }
-            _ => {}
-        }
-    }
-
-    candidates.retain(|candidate| include_candidate(candidate, config));
-    candidates.sort_by(|left, right| {
-        left.start_time
-            .total_cmp(&right.start_time)
-            .then_with(|| left.mechanic.cmp(right.mechanic))
-            .then_with(|| left.event_frame.cmp(&right.event_frame))
-    });
-    Ok(candidates)
-}
 
 pub(crate) fn build_items_for_source(
     source: &ReplaySourceInput,
