@@ -8517,8 +8517,39 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     return;
   }
 
+  auto touchBreakdownReadout = [&]() {
+    std::string readout;
+    for (const auto &[enabled, label] : {
+             std::pair<bool, const char *>{touchBreakdownKind, "Kind"},
+             std::pair<bool, const char *>{touchBreakdownHeight, "Height"},
+             std::pair<bool, const char *>{touchBreakdownSurface, "Surface"},
+             std::pair<bool, const char *>{touchBreakdownDodge, "Dodge"},
+         }) {
+      if (!enabled) {
+        continue;
+      }
+      if (!readout.empty()) {
+        readout += " + ";
+      }
+      readout += label;
+    }
+    return readout.empty() ? std::string{"Total only"} : readout;
+  };
+
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TOUCH MARKERS");
+  ImGui::SameLine();
+  ImGui::TextColored(
+      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+      "%.1fs",
+      touchMarkerDecaySeconds);
   ImGui::SliderFloat("Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs");
+
+  ImGui::TextDisabled("Touch mode");
+  ImGui::SameLine();
+  ImGui::TextColored(
+      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+      "%s",
+      touchControlsMode == 1 ? "Advancement" : "Markers");
   if (ImGui::RadioButton("Markers##touch-mode", &touchControlsMode, 0)) {
     setCvarString("subtr_actor_overlay_event_types", "touch");
   }
@@ -8529,6 +8560,11 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT BREAKDOWN");
+  ImGui::SameLine();
+  ImGui::TextColored(
+      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
+      "%s",
+      touchBreakdownReadout().c_str());
   ImGui::Checkbox("Kind", &touchBreakdownKind);
   ImGui::SameLine();
   ImGui::Checkbox("Height", &touchBreakdownHeight);
