@@ -3475,8 +3475,8 @@ void SubtrActorPlugin::applyUiConfigJson(
     UiStatsWindow window{};
     window.kind = *parsedKind;
 
-    window.id = static_cast<uint32_t>(parseJsonNumberProperty(object, "id").value_or(0.0));
     if (const auto idString = parseJsonStringProperty(object, "id")) {
+      window.config_id = *idString;
       const size_t digitOffset = idString->find_first_of("0123456789");
       if (digitOffset != std::string::npos) {
         try {
@@ -3486,8 +3486,15 @@ void SubtrActorPlugin::applyUiConfigJson(
         }
       }
     }
+    if (const auto configId = parseJsonStringProperty(object, "config_id")) {
+      window.config_id = *configId;
+    }
+    window.id = static_cast<uint32_t>(parseJsonNumberProperty(object, "id").value_or(window.id));
     if (window.id == 0) {
       window.id = nextUiStatsWindowId;
+    }
+    if (window.config_id.empty()) {
+      window.config_id = std::format("stats-{}", window.id);
     }
     nextUiStatsWindowId = std::max(nextUiStatsWindowId, window.id + 1);
     window.open = parseJsonBoolProperty(object, "open").value_or(true);
@@ -3944,6 +3951,10 @@ std::string SubtrActorPlugin::uiConfigJson() {
          << statsWindowKindConfigId(window.kind)
          << "\",\"open\":" << (window.open ? "true" : "false")
          << ",\"visible\":" << (window.open ? "true" : "false")
+         << ",\"config_id\":\""
+         << escapeJsonString(window.config_id.empty() ? std::format("stats-{}", window.id)
+                                                      : window.config_id)
+         << "\""
          << ",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
          << ",\"height\":" << window.viewport_height << "}"
@@ -3993,7 +4004,9 @@ std::string SubtrActorPlugin::uiConfigJson() {
     if (wroteWebStatsWindow) {
       file << ",\n";
     }
-    file << "    {\"id\":\"stats-" << window.id << "\",\"kind\":\""
+    const std::string configId =
+        window.config_id.empty() ? std::format("stats-{}", window.id) : window.config_id;
+    file << "    {\"id\":\"" << escapeJsonString(configId) << "\",\"kind\":\""
          << statsWindowKindConfigId(window.kind)
          << "\",\"placement\":{\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"viewport\":{\"width\":" << window.viewport_width
@@ -9729,6 +9742,7 @@ void SubtrActorPlugin::renderStatsWindowManager() {
     if (ImGui::SmallButton("Duplicate")) {
       UiStatsWindow copy = window;
       copy.id = nextUiStatsWindowId++;
+      copy.config_id = std::format("stats-{}", copy.id);
       copy.open = true;
       copy.pending_focus = true;
       copy.picker_open = false;
@@ -9884,6 +9898,7 @@ void SubtrActorPlugin::applyRecordingUiWorkspace() {
 void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initializeEntries) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
+  window.config_id = std::format("stats-{}", window.id);
   window.kind = kind;
   initializeStatsWindowPlacement(window);
   focusStatsWindow(window);
@@ -9901,6 +9916,7 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
 void SubtrActorPlugin::createStatsModuleWindow(std::string moduleName, int moduleView) {
   UiStatsWindow window{};
   window.id = nextUiStatsWindowId++;
+  window.config_id = std::format("stats-{}", window.id);
   window.kind = UiStatsWindowKind::StatsModule;
   window.module_name = std::move(moduleName);
   window.module_view = std::clamp(moduleView, 0, 2);

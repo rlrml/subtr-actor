@@ -130,6 +130,7 @@ private:
     };
 
     uint32_t id = 0;
+    std::string config_id;
     UiStatsWindowKind kind = UiStatsWindowKind::Player;
     bool open = true;
     bool pending_focus = false;
