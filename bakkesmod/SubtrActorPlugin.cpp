@@ -6358,6 +6358,11 @@ void SubtrActorPlugin::renderLauncherWindow() {
     renderBoolToggle("Mechanics playlist", eventPlaylistMechanicsEnabled);
     renderBoolToggle("Team event playlist", eventPlaylistTeamEventsEnabled);
     renderBoolToggle("Goal context playlist", eventPlaylistGoalContextEnabled);
+    renderBoolToggle("Boost pickup timeline", timelineRangeBoostEnabled);
+    renderBoolToggle("Possession timeline", timelineRangePossessionEnabled);
+    renderBoolToggle("Half control timeline", timelineRangePressureEnabled);
+    renderBoolToggle("Rush timeline", timelineRangeRushEnabled);
+    renderBoolToggle("Position zones timeline", timelineRangeAbsolutePositioningEnabled);
     renderBoolToggle("Playlist follow", eventPlaylistAutoFollow);
     ImGui::TreePop();
   }
@@ -6367,6 +6372,13 @@ void SubtrActorPlugin::renderLauncherWindow() {
     renderCvarToggle("HUD mechanics", "subtr_actor_overlay_mechanics_enabled", true);
     renderCvarToggle("HUD team events", "subtr_actor_overlay_team_events_enabled", true);
     renderCvarToggle("HUD goal context", "subtr_actor_overlay_goal_context_enabled", true);
+    renderBoolToggle("Ceiling shot labels", renderEffectCeilingShotEnabled);
+    renderBoolToggle("50/50 labels", renderEffectFiftyFiftyEnabled);
+    renderBoolToggle("Half control", renderEffectPressureEnabled);
+    renderBoolToggle("Player roles", renderEffectRelativePositioningEnabled);
+    renderBoolToggle("Position zones", renderEffectAbsolutePositioningEnabled);
+    renderBoolToggle("Speed flip labels", renderEffectSpeedFlipEnabled);
+    renderBoolToggle("Touch labels", renderEffectTouchEnabled);
     ImGui::TreePop();
   }
 
