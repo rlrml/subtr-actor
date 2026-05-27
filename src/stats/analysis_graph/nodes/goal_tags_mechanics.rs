@@ -1,0 +1,44 @@
+use super::*;
+
+mechanic_goal_tag_node!(
+    FlickGoalNode,
+    FlickGoalCalculator,
+    "flick_goal",
+    flick_dependency,
+    FlickCalculator
+);
+mechanic_goal_tag_node!(
+    DoubleTapGoalNode,
+    DoubleTapGoalCalculator,
+    "double_tap_goal",
+    double_tap_dependency,
+    DoubleTapCalculator
+);
+mechanic_goal_tag_node!(
+    OneTimerGoalNode,
+    OneTimerGoalCalculator,
+    "one_timer_goal",
+    one_timer_dependency,
+    OneTimerCalculator
+);
+mechanic_goal_tag_node!(
+    PassingGoalNode,
+    PassingGoalCalculator,
+    "passing_goal",
+    pass_dependency,
+    PassCalculator
+);
+mechanic_goal_tag_node!(
+    AirDribbleGoalNode,
+    AirDribbleGoalCalculator,
+    "air_dribble_goal",
+    ball_carry_dependency,
+    BallCarryCalculator
+);
+mechanic_goal_tag_node!(
+    FlipResetGoalNode,
+    FlipResetGoalCalculator,
+    "flip_reset_goal",
+    dodge_reset_dependency,
+    DodgeResetCalculator
+);

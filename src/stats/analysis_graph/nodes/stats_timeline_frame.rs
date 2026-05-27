@@ -2,14 +2,27 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+#[path = "stats_timeline_frame_dependencies.rs"]
+mod stats_timeline_frame_dependencies;
+#[path = "stats_timeline_frame_node.rs"]
+mod stats_timeline_frame_node;
+#[path = "stats_timeline_frame_player.rs"]
+mod stats_timeline_frame_player;
+#[path = "stats_timeline_frame_snapshot.rs"]
+mod stats_timeline_frame_snapshot;
+#[path = "stats_timeline_frame_team.rs"]
+mod stats_timeline_frame_team;
+#[path = "stats_timeline_frame_team_helpers.rs"]
+mod stats_timeline_frame_team_helpers;
+
 #[derive(Debug, Clone, Default)]
 pub struct StatsTimelineFrameState {
     pub frame: Option<ReplayStatsFrame>,
 }
 
 pub struct StatsTimelineFrameNode {
-    replay_meta: Option<ReplayMeta>,
-    state: StatsTimelineFrameState,
+    pub(super) replay_meta: Option<ReplayMeta>,
+    pub(super) state: StatsTimelineFrameState,
 }
 
 impl StatsTimelineFrameNode {
@@ -20,391 +33,18 @@ impl StatsTimelineFrameNode {
         }
     }
 
-    fn replay_meta(&self) -> SubtrActorResult<&ReplayMeta> {
+    pub(super) fn replay_meta(&self) -> SubtrActorResult<&ReplayMeta> {
         self.replay_meta.as_ref().ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
                 "missing ReplayMeta state while building timeline frame".to_owned(),
             ))
         })
     }
-
-    fn is_team_zero_player(replay_meta: &ReplayMeta, player: &PlayerInfo) -> bool {
-        replay_meta
-            .team_zero
-            .iter()
-            .any(|team_player| team_player.remote_id == player.remote_id)
-    }
-
-    fn team_snapshot(
-        &self,
-        ctx: &AnalysisStateContext<'_>,
-        is_team_zero: bool,
-    ) -> SubtrActorResult<TeamStatsSnapshot> {
-        let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
-        let possession = ctx.get::<PossessionCalculator>()?;
-        let pressure = ctx.get::<PressureCalculator>()?;
-        let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
-        let rotation = ctx.get::<RotationCalculator>()?;
-        let rush = ctx.get::<RushCalculator>()?;
-        let match_stats = ctx.get::<MatchStatsCalculator>()?;
-        let backboard = ctx.get::<BackboardCalculator>()?;
-        let double_tap = ctx.get::<DoubleTapCalculator>()?;
-        let one_timer = ctx.get::<OneTimerCalculator>()?;
-        let pass = ctx.get::<PassCalculator>()?;
-        let ball_carry = ctx.get::<BallCarryCalculator>()?;
-        let boost = ctx.get::<BoostCalculator>()?;
-        let bump = ctx.get::<BumpCalculator>()?;
-        let half_volley = ctx.get::<HalfVolleyCalculator>()?;
-        let movement = ctx.get::<MovementCalculator>()?;
-        let powerslide = ctx.get::<PowerslideCalculator>()?;
-        let demo = ctx.get::<DemoCalculator>()?;
-        Ok(TeamStatsSnapshot {
-            fifty_fifty: fifty_fifty.stats().for_team(is_team_zero),
-            possession: possession.stats().for_team(is_team_zero),
-            pressure: pressure.stats().for_team(is_team_zero),
-            territorial_pressure: territorial_pressure.stats().for_team(is_team_zero),
-            rotation: if is_team_zero {
-                rotation.team_zero_stats().clone()
-            } else {
-                rotation.team_one_stats().clone()
-            },
-            rush: rush.stats().for_team(is_team_zero),
-            core: if is_team_zero {
-                match_stats.team_zero_stats()
-            } else {
-                match_stats.team_one_stats()
-            },
-            backboard: if is_team_zero {
-                backboard.team_zero_stats().clone()
-            } else {
-                backboard.team_one_stats().clone()
-            },
-            double_tap: if is_team_zero {
-                double_tap.team_zero_stats().clone()
-            } else {
-                double_tap.team_one_stats().clone()
-            },
-            one_timer: if is_team_zero {
-                one_timer.team_zero_stats().clone()
-            } else {
-                one_timer.team_one_stats().clone()
-            },
-            pass: if is_team_zero {
-                pass.team_zero_stats().clone()
-            } else {
-                pass.team_one_stats().clone()
-            },
-            ball_carry: if is_team_zero {
-                ball_carry.team_zero_stats().clone()
-            } else {
-                ball_carry.team_one_stats().clone()
-            },
-            air_dribble: if is_team_zero {
-                ball_carry.team_zero_air_dribble_stats().clone()
-            } else {
-                ball_carry.team_one_air_dribble_stats().clone()
-            },
-            boost: if is_team_zero {
-                boost.team_zero_stats().clone()
-            } else {
-                boost.team_one_stats().clone()
-            },
-            bump: if is_team_zero {
-                bump.team_zero_stats().clone()
-            } else {
-                bump.team_one_stats().clone()
-            },
-            half_volley: if is_team_zero {
-                half_volley.team_zero_stats().clone()
-            } else {
-                half_volley.team_one_stats().clone()
-            },
-            movement: if is_team_zero {
-                movement.team_zero_stats().clone()
-            } else {
-                movement.team_one_stats().clone()
-            },
-            powerslide: if is_team_zero {
-                powerslide.team_zero_stats().clone()
-            } else {
-                powerslide.team_one_stats().clone()
-            },
-            demo: if is_team_zero {
-                demo.team_zero_stats().clone()
-            } else {
-                demo.team_one_stats().clone()
-            },
-        })
-    }
-
-    fn player_snapshot(
-        &self,
-        ctx: &AnalysisStateContext<'_>,
-        replay_meta: &ReplayMeta,
-        player: &PlayerInfo,
-    ) -> SubtrActorResult<PlayerStatsSnapshot> {
-        let player_id = &player.remote_id;
-        Ok(PlayerStatsSnapshot {
-            player_id: player.remote_id.clone(),
-            name: player.name.clone(),
-            is_team_0: Self::is_team_zero_player(replay_meta, player),
-            core: ctx
-                .get::<MatchStatsCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            backboard: ctx
-                .get::<BackboardCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            ceiling_shot: ctx
-                .get::<CeilingShotCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            wall_aerial: ctx
-                .get::<WallAerialCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            wall_aerial_shot: ctx
-                .get::<WallAerialShotCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            double_tap: ctx
-                .get::<DoubleTapCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            one_timer: ctx
-                .get::<OneTimerCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            pass: ctx
-                .get::<PassCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            fifty_fifty: ctx
-                .get::<FiftyFiftyCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            speed_flip: ctx
-                .get::<SpeedFlipCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            half_flip: ctx
-                .get::<HalfFlipCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            wavedash: ctx
-                .get::<WavedashCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            touch: ctx
-                .get::<TouchCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            whiff: ctx
-                .get::<WhiffCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            flick: ctx
-                .get::<FlickCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            musty_flick: ctx
-                .get::<MustyFlickCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            dodge_reset: ctx
-                .get::<DodgeResetCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            ball_carry: ctx
-                .get::<BallCarryCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            air_dribble: ctx
-                .get::<BallCarryCalculator>()?
-                .player_air_dribble_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            boost: ctx
-                .get::<BoostCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            bump: ctx
-                .get::<BumpCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            half_volley: ctx
-                .get::<HalfVolleyCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            movement: ctx
-                .get::<MovementCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            positioning: ctx
-                .get::<PositioningCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            rotation: ctx
-                .get::<RotationCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            powerslide: ctx
-                .get::<PowerslideCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-            demo: ctx
-                .get::<DemoCalculator>()?
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
-        })
-    }
-
-    fn update_snapshot(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        let replay_meta = self.replay_meta()?;
-        let frame = ctx.get::<FrameInfo>()?;
-        let gameplay = ctx.get::<GameplayState>()?;
-        let live_play_state = ctx.get::<LivePlayState>()?;
-        self.state.frame = Some(ReplayStatsFrame {
-            frame_number: frame.frame_number,
-            time: frame.time,
-            dt: frame.dt,
-            seconds_remaining: frame.seconds_remaining,
-            game_state: gameplay.game_state,
-            ball_has_been_hit: gameplay.ball_has_been_hit,
-            kickoff_countdown_time: gameplay.kickoff_countdown_time,
-            gameplay_phase: live_play_state.gameplay_phase,
-            is_live_play: live_play_state.is_live_play,
-            team_zero: self.team_snapshot(ctx, true)?,
-            team_one: self.team_snapshot(ctx, false)?,
-            players: replay_meta
-                .player_order()
-                .map(|player| self.player_snapshot(ctx, replay_meta, player))
-                .collect::<SubtrActorResult<Vec<_>>>()?,
-        });
-        Ok(())
-    }
 }
 
 impl Default for StatsTimelineFrameNode {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl AnalysisNode for StatsTimelineFrameNode {
-    type State = StatsTimelineFrameState;
-
-    fn name(&self) -> &'static str {
-        "stats_timeline_frame"
-    }
-
-    fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
-        self.replay_meta = Some(meta.clone());
-        Ok(())
-    }
-
-    fn dependencies(&self) -> NodeDependencies {
-        vec![
-            frame_info_dependency(),
-            gameplay_state_dependency(),
-            live_play_dependency(),
-            match_stats_dependency(),
-            backboard_dependency(),
-            ceiling_shot_dependency(),
-            wall_aerial_dependency(),
-            wall_aerial_shot_dependency(),
-            double_tap_dependency(),
-            one_timer_dependency(),
-            pass_dependency(),
-            fifty_fifty_dependency(),
-            possession_dependency(),
-            pressure_dependency(),
-            territorial_pressure_dependency(),
-            rotation_dependency(),
-            rush_dependency(),
-            touch_dependency(),
-            whiff_dependency(),
-            wavedash_dependency(),
-            speed_flip_dependency(),
-            half_flip_dependency(),
-            flick_dependency(),
-            musty_flick_dependency(),
-            dodge_reset_dependency(),
-            ball_carry_dependency(),
-            boost_dependency(),
-            bump_dependency(),
-            half_volley_dependency(),
-            movement_dependency(),
-            positioning_dependency(),
-            powerslide_dependency(),
-            demo_dependency(),
-        ]
-    }
-
-    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.update_snapshot(ctx)
-    }
-
-    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.update_snapshot(ctx)
-    }
-
-    fn state(&self) -> &Self::State {
-        &self.state
     }
 }
 
