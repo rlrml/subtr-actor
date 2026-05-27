@@ -4737,6 +4737,22 @@ fn fifty_fifty_player_possession_label_for_derivation(
     }
 }
 
+fn fifty_fifty_player_dodge_state_label_for_derivation(
+    player_team_is_team_0: bool,
+    event: &FiftyFiftyEvent,
+) -> StatLabel {
+    let dodge_contact = if player_team_is_team_0 {
+        event.team_zero_dodge_contact
+    } else {
+        event.team_one_dodge_contact
+    };
+    if dodge_contact {
+        StatLabel::new("dodge_state", "dodge")
+    } else {
+        StatLabel::new("dodge_state", "no_dodge")
+    }
+}
+
 fn apply_fifty_fifty_team_event(
     stats: &mut FiftyFiftyTeamStats,
     team_is_team_0: bool,
@@ -4787,6 +4803,7 @@ fn apply_fifty_fifty_player_event(
             player_team_is_team_0,
             event.possession_team_is_team_0,
         ),
+        fifty_fifty_player_dodge_state_label_for_derivation(player_team_is_team_0, event),
     ]);
     stats.count += 1;
     match event.winning_team_is_team_0 {

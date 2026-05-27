@@ -96,6 +96,13 @@ function playerPossessionLabel(
   };
 }
 
+function playerDodgeStateLabel(playerTeamIsTeam0: boolean, event: FiftyFiftyEvent): StatLabel {
+  const dodgeContact = playerTeamIsTeam0
+    ? event.team_zero_dodge_contact
+    : event.team_one_dodge_contact;
+  return { key: "dodge_state", value: dodgeContact ? "dodge" : "no_dodge" };
+}
+
 function labelSortKey(label: StatLabel): string {
   return `${label.key}\u0000${label.value}`;
 }
@@ -180,6 +187,7 @@ function applyFiftyFiftyPlayerEvent(
     phaseLabel(event.is_kickoff),
     playerOutcomeLabel(playerTeamIsTeam0, event.winning_team_is_team_0),
     playerPossessionLabel(playerTeamIsTeam0, event.possession_team_is_team_0),
+    playerDodgeStateLabel(playerTeamIsTeam0, event),
   ]);
 
   stats.count += 1;

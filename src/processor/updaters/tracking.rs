@@ -56,12 +56,16 @@ impl<'a> ReplayProcessor<'a> {
                 _ => continue,
             };
             let estimated_player = self.estimate_touching_player(team_is_team_0, frame.time);
+            let dodge_contact = estimated_player
+                .as_ref()
+                .is_some_and(|(player, _)| self.get_dodge_active(player).unwrap_or(0) % 2 == 1);
             let event = TouchEvent {
                 time: frame.time,
                 frame: frame_index,
                 team_is_team_0,
                 player: estimated_player.as_ref().map(|(player, _)| player.clone()),
                 closest_approach_distance: estimated_player.map(|(_, distance)| distance),
+                dodge_contact,
             };
             self.current_frame_touch_events.push(event.clone());
             self.touch_events.push(event);

@@ -110,6 +110,7 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
                 team_is_team_0: true,
                 player: Some(player_id.clone()),
                 closest_approach_distance: Some(0.0),
+                dodge_contact: false,
             }]),
             &live_play,
         )
@@ -152,6 +153,7 @@ fn rejects_dodge_touch_without_controlled_setup() {
                     team_is_team_0: true,
                     player: Some(player_id.clone()),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }],
                 ..TouchState::default()
             },
@@ -181,6 +183,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
                     team_is_team_0: true,
                     player: Some(player_id.clone()),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }]),
                 &live_play,
             )
@@ -201,6 +204,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
                 team_is_team_0: true,
                 player: Some(player_id.clone()),
                 closest_approach_distance: Some(0.0),
+                dodge_contact: false,
             }]),
             &live_play,
         )
@@ -234,6 +238,7 @@ fn rejects_tiny_multi_touch_setup() {
                     team_is_team_0: true,
                     player: Some(player_id.clone()),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }]),
                 &live_play,
             )
@@ -259,6 +264,7 @@ fn rejects_tiny_multi_touch_setup() {
                 team_is_team_0: true,
                 player: Some(player_id.clone()),
                 closest_approach_distance: Some(0.0),
+                dodge_contact: false,
             }]),
             &live_play,
         )
@@ -309,6 +315,7 @@ fn rejects_dodge_after_ball_has_left_car() {
                 team_is_team_0: true,
                 player: Some(player_id.clone()),
                 closest_approach_distance: Some(0.0),
+                dodge_contact: false,
             }]),
             &live_play,
         )

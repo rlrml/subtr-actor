@@ -71,6 +71,7 @@ fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
             team_is_team_0: true,
             player: Some(player.clone()),
             closest_approach_distance: Some(0.0),
+            dodge_contact: false,
         }],
         last_touch: Some(TouchEvent {
             time,
@@ -78,6 +79,7 @@ fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
             team_is_team_0: true,
             player: Some(player.clone()),
             closest_approach_distance: Some(0.0),
+            dodge_contact: false,
         }),
         last_touch_player: Some(player),
         last_touch_team_is_team_0: Some(true),

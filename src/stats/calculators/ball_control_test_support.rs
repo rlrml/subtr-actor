@@ -64,6 +64,7 @@ pub(crate) fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
             team_is_team_0: true,
             player: Some(player_id.clone()),
             closest_approach_distance: None,
+            dodge_contact: false,
         }],
         last_touch: Some(TouchEvent {
             time,
@@ -71,6 +72,7 @@ pub(crate) fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
             team_is_team_0: true,
             player: Some(player_id.clone()),
             closest_approach_distance: None,
+            dodge_contact: false,
         }),
         last_touch_player: Some(player_id),
         last_touch_team_is_team_0: Some(true),

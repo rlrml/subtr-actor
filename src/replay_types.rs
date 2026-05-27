@@ -234,6 +234,7 @@ pub struct TouchEvent {
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
     pub closest_approach_distance: Option<f32>,
+    pub dodge_contact: bool,
 }
 
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.

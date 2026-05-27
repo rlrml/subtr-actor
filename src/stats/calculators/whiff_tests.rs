@@ -135,6 +135,7 @@ fn touch_cancels_active_whiff_candidate() {
                     team_is_team_0: true,
                     player: Some(player_id.clone()),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }],
                 ..TouchState::default()
             },
@@ -178,6 +179,7 @@ fn opponent_touch_counts_as_beaten_to_ball_not_whiff() {
                     team_is_team_0: false,
                     player: Some(opponent_id),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }],
                 ..TouchState::default()
             },
@@ -224,6 +226,7 @@ fn teammate_touch_cancels_active_whiff_candidate() {
                     team_is_team_0: true,
                     player: Some(teammate_id),
                     closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
                 }],
                 ..TouchState::default()
             },
