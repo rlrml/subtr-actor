@@ -3809,6 +3809,16 @@ std::string SubtrActorPlugin::uiConfigJson() {
         << ",\"viewport_height\":" << placement.viewport_height
         << ",\"zIndex\":" << placement.z_index << "}";
   };
+  auto writeStatsPlayerPlacement = [](
+                                       std::ostream &out,
+                                       const UiWindowPlacement &placement,
+                                       bool visible) {
+    out << "{\"x\":" << placement.x << ",\"y\":" << placement.y
+        << ",\"viewport\":{\"width\":" << placement.viewport_width
+        << ",\"height\":" << placement.viewport_height << "}"
+        << ",\"zIndex\":" << placement.z_index
+        << ",\"visible\":" << (visible ? "true" : "false") << "}";
+  };
   auto writeEnabledStringArray =
       [](std::ostream &out, std::initializer_list<std::pair<const char *, bool>> values) {
         out << "[";
@@ -4103,10 +4113,14 @@ std::string SubtrActorPlugin::uiConfigJson() {
   }
   file << "  },\n";
   file << "  \"singletonWindows\": [\n";
-  auto writeWindowConfig = [&](const SingletonWindowControl &window, bool last) {
+  auto writeWindowConfig = [&](const SingletonWindowControl &window, bool last, bool webConfig) {
     const bool visible = window.open != nullptr && *window.open;
     file << "    {\"id\":\"" << window.config_id << "\",\"placement\":";
-    writePlacement(file, *window.placement, visible);
+    if (webConfig) {
+      writeStatsPlayerPlacement(file, *window.placement, visible);
+    } else {
+      writePlacement(file, *window.placement, visible);
+    }
     file << "}";
     if (!last) {
       file << ",";
@@ -4122,12 +4136,12 @@ std::string SubtrActorPlugin::uiConfigJson() {
   }
   webWindows = webSingletonWindowControls();
   for (size_t index = 0; index < webWindows.size(); index += 1) {
-    writeWindowConfig(webWindows[index], index + 1 == webWindows.size());
+    writeWindowConfig(webWindows[index], index + 1 == webWindows.size(), true);
   }
   file << "  ],\n";
   file << "  \"pluginWindows\": [\n";
   for (size_t index = 0; index < pluginWindows.size(); index += 1) {
-    writeWindowConfig(pluginWindows[index], index + 1 == pluginWindows.size());
+    writeWindowConfig(pluginWindows[index], index + 1 == pluginWindows.size(), false);
   }
   file << "  ],\n";
   file << "  \"stats_windows\": [\n";
