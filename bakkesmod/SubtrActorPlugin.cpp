@@ -6308,6 +6308,28 @@ void SubtrActorPlugin::applyWindowPlacement(
   applyFocus();
 }
 
+void SubtrActorPlugin::resetSingletonWindowPlacement(
+    UiWindowPlacement &placement,
+    float x,
+    float y,
+    float width,
+    float height,
+    bool focus) {
+  const ImVec2 position =
+      mapWindowPositionToViewport(x, y, width, height, 0.0f, 0.0f);
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  placement.has_placement = true;
+  placement.pending_apply_placement = true;
+  placement.pending_focus = focus;
+  placement.x = position.x;
+  placement.y = position.y;
+  placement.width = width;
+  placement.height = height;
+  placement.viewport_width = displaySize.x;
+  placement.viewport_height = displaySize.y;
+  placement.z_index = nextUiWindowZIndex++;
+}
+
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
@@ -8327,22 +8349,26 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     const char *label;
     bool *open;
     UiWindowPlacement *placement;
+    float x;
+    float y;
+    float width;
+    float height;
   };
 
   std::array<SingletonWindowControl, 13> windows{{
-      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
-      {"Events", &uiEventsOpen, &eventsPlacement},
-      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
-      {"Status", &uiStatusOpen, &statusPlacement},
-      {"Camera", &uiCameraOpen, &cameraPlacement},
-      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
-      {"Recording", &uiRecordingOpen, &recordingPlacement},
-      {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
-      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
-      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
-      {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
-      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
-      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
+      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f},
+      {"Events", &uiEventsOpen, &eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f},
+      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f},
+      {"Status", &uiStatusOpen, &statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f},
+      {"Camera", &uiCameraOpen, &cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f},
+      {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f},
+      {"Recording", &uiRecordingOpen, &recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f},
+      {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f},
+      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f},
+      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement, 960.0f, 68.0f, 520.0f, 360.0f},
+      {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement, 980.0f, 305.0f, 430.0f, 520.0f},
+      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement, 980.0f, 160.0f, 410.0f, 380.0f},
+      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement, 1000.0f, 560.0f, 430.0f, 420.0f},
   }};
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
@@ -8393,6 +8419,17 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
       }
       ImGui::SameLine();
       ImGui::TextDisabled("Hidden");
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reset")) {
+      *window.open = true;
+      resetSingletonWindowPlacement(
+          *window.placement,
+          window.x,
+          window.y,
+          window.width,
+          window.height,
+          true);
     }
     ImGui::SameLine();
     ImGui::TextWrapped("%s", window.label);
@@ -8549,22 +8586,25 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
 
 void SubtrActorPlugin::resetWindowPlacements() {
   nextUiWindowZIndex = 1;
-  launcherPlacement = UiWindowPlacement{};
-  scoreboardPlacement = UiWindowPlacement{};
-  eventsPlacement = UiWindowPlacement{};
-  eventPlaylistPlacement = UiWindowPlacement{};
-  statusPlacement = UiWindowPlacement{};
-  cameraPlacement = UiWindowPlacement{};
-  playbackControlsPlacement = UiWindowPlacement{};
-  recordingPlacement = UiWindowPlacement{};
-  graphInspectorPlacement = UiWindowPlacement{};
-  mechanicsReviewPlacement = UiWindowPlacement{};
-  replayLoadingPlacement = UiWindowPlacement{};
-  moduleControlsPlacement = UiWindowPlacement{};
-  touchControlsPlacement = UiWindowPlacement{};
-  boostPickupControlsPlacement = UiWindowPlacement{};
-
-  launcherPlacement.pending_focus = true;
+  resetSingletonWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f, true);
+  resetSingletonWindowPlacement(scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f);
+  resetSingletonWindowPlacement(eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f);
+  resetSingletonWindowPlacement(eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f);
+  resetSingletonWindowPlacement(statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f);
+  resetSingletonWindowPlacement(cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f);
+  resetSingletonWindowPlacement(playbackControlsPlacement, 880.0f, 68.0f, 360.0f, 430.0f);
+  resetSingletonWindowPlacement(recordingPlacement, 990.0f, 250.0f, 400.0f, 380.0f);
+  resetSingletonWindowPlacement(graphInspectorPlacement, 360.0f, 68.0f, 700.0f, 520.0f);
+  resetSingletonWindowPlacement(mechanicsReviewPlacement, 980.0f, 160.0f, 500.0f, 560.0f);
+  resetSingletonWindowPlacement(replayLoadingPlacement, 960.0f, 68.0f, 520.0f, 360.0f);
+  resetSingletonWindowPlacement(moduleControlsPlacement, 980.0f, 305.0f, 430.0f, 520.0f);
+  resetSingletonWindowPlacement(touchControlsPlacement, 980.0f, 160.0f, 410.0f, 380.0f);
+  resetSingletonWindowPlacement(
+      boostPickupControlsPlacement,
+      1000.0f,
+      560.0f,
+      430.0f,
+      420.0f);
   for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
     resetStatsWindowPlacement(uiStatsWindows[index], index);
   }

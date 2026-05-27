@@ -421,6 +421,13 @@ private:
   void createStatsModuleWindow(std::string moduleName, int moduleView = 0);
   void initializeStatsWindowPlacement(UiStatsWindow &window);
   void resetStatsWindowPlacement(UiStatsWindow &window, size_t stackIndex);
+  void resetSingletonWindowPlacement(
+      UiWindowPlacement &placement,
+      float x,
+      float y,
+      float width,
+      float height,
+      bool focus = false);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,
