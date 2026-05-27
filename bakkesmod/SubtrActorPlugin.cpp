@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <format>
+#include <initializer_list>
 #include <iterator>
 #include <sstream>
 #include <type_traits>
@@ -840,6 +841,11 @@ bool findJsonPropertyValueOffset(
   ++offset;
   skipJsonWhitespace(json, offset);
   return offset < json.size();
+}
+
+bool jsonPropertyExists(const std::string &json, const std::string &propertyName) {
+  size_t offset = 0;
+  return findJsonPropertyValueOffset(json, propertyName, offset);
 }
 
 std::optional<std::string> parseJsonStringProperty(
@@ -2540,11 +2546,13 @@ void SubtrActorPlugin::applyUiConfigJson(
       recordingPlaybackRateIndex = recordingPlaybackRateIndexForValue(*playbackRate);
     }
   }
-
   touchControlsMode = static_cast<int>(
-      std::clamp(parseJsonNumberProperty(json, "touch_controls_mode").value_or(1.0), 0.0, 1.0));
+      std::clamp(
+          parseJsonNumberProperty(json, "touch_controls_mode").value_or(touchControlsMode),
+          0.0,
+          1.0));
   touchMarkerDecaySeconds = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "touch_marker_decay_seconds").value_or(5.0),
+      parseJsonNumberProperty(json, "touch_marker_decay_seconds").value_or(touchMarkerDecaySeconds),
       1.0,
       10.0));
   touchBreakdownKind =
@@ -2573,6 +2581,56 @@ void SubtrActorPlugin::applyUiConfigJson(
                                  .value_or(boostPickupFieldOpponent);
   boostPickupFieldUnknown = parseJsonBoolProperty(json, "boost_pickup_field_unknown")
                                 .value_or(boostPickupFieldUnknown);
+  if (const auto moduleConfigs = parseJsonObjectProperty(json, "moduleConfigs")) {
+    std::optional<std::string> boostConfig = parseJsonObjectProperty(*moduleConfigs, "boost");
+    if (!boostConfig) {
+      boostConfig = parseJsonObjectProperty(*moduleConfigs, "boost-pickup-animation");
+    }
+    if (boostConfig) {
+      const std::vector<std::string> padTypes =
+          parseJsonStringArrayProperty(*boostConfig, "padTypes");
+      if (jsonPropertyExists(*boostConfig, "padTypes")) {
+        boostPickupPadBig = containsString(padTypes, "big");
+        boostPickupPadSmall = containsString(padTypes, "small");
+        boostPickupPadAmbiguous = containsString(padTypes, "ambiguous");
+      }
+      const std::vector<std::string> activities =
+          parseJsonStringArrayProperty(*boostConfig, "activities");
+      if (jsonPropertyExists(*boostConfig, "activities")) {
+        boostPickupActivityActive = containsString(activities, "active");
+        boostPickupActivityInactive = containsString(activities, "inactive");
+        boostPickupActivityUnknown = containsString(activities, "unknown");
+      }
+      const std::vector<std::string> fieldHalves =
+          parseJsonStringArrayProperty(*boostConfig, "fieldHalves");
+      if (jsonPropertyExists(*boostConfig, "fieldHalves")) {
+        boostPickupFieldOwn = containsString(fieldHalves, "own");
+        boostPickupFieldOpponent = containsString(fieldHalves, "opponent");
+        boostPickupFieldUnknown = containsString(fieldHalves, "unknown");
+      }
+    }
+    if (const auto touchConfig = parseJsonObjectProperty(*moduleConfigs, "touch")) {
+      touchMarkerDecaySeconds = static_cast<float>(std::clamp(
+          parseJsonNumberProperty(*touchConfig, "decaySeconds").value_or(touchMarkerDecaySeconds),
+          1.0,
+          10.0));
+      if (const auto overlayMode = parseJsonStringProperty(*touchConfig, "overlayMode")) {
+        if (*overlayMode == "markers") {
+          touchControlsMode = 0;
+        } else if (*overlayMode == "advancement") {
+          touchControlsMode = 1;
+        }
+      }
+      const std::vector<std::string> breakdownClasses =
+          parseJsonStringArrayProperty(*touchConfig, "breakdownClasses");
+      if (jsonPropertyExists(*touchConfig, "breakdownClasses")) {
+        touchBreakdownKind = containsString(breakdownClasses, "kind");
+        touchBreakdownHeight = containsString(breakdownClasses, "height_band");
+        touchBreakdownSurface = containsString(breakdownClasses, "surface");
+        touchBreakdownDodge = containsString(breakdownClasses, "dodge_state");
+      }
+    }
+  }
   graphInspectorView = static_cast<int>(
       std::max(0.0, parseJsonNumberProperty(json, "graph_inspector_view").value_or(0.0)));
   mechanicsReviewIndex = static_cast<int>(
@@ -2813,6 +2871,22 @@ std::string SubtrActorPlugin::uiConfigJson() const {
         << ",\"viewport_height\":" << placement.viewport_height
         << ",\"zIndex\":" << placement.z_index << "}";
   };
+  auto writeEnabledStringArray =
+      [](std::ostream &out, std::initializer_list<std::pair<const char *, bool>> values) {
+        out << "[";
+        bool wroteValue = false;
+        for (const auto &[value, enabled] : values) {
+          if (!enabled) {
+            continue;
+          }
+          if (wroteValue) {
+            out << ",";
+          }
+          out << "\"" << value << "\"";
+          wroteValue = true;
+        }
+        out << "]";
+      };
 
   std::ostringstream file;
   file << "{\n";
@@ -2918,6 +2992,37 @@ std::string SubtrActorPlugin::uiConfigJson() const {
   file << "  \"recording\": {\"fps\":" << recordingFps
        << ",\"playbackRate\":" << recordingPlaybackRateFromIndex(recordingPlaybackRateIndex)
        << "},\n";
+  file << "  \"moduleConfigs\": {\n";
+  file << "    \"boost\": {\"padTypes\":";
+  writeEnabledStringArray(
+      file,
+      {{"big", boostPickupPadBig},
+       {"small", boostPickupPadSmall},
+       {"ambiguous", boostPickupPadAmbiguous}});
+  file << ",\"comparisons\":[\"both\"],\"activities\":";
+  writeEnabledStringArray(
+      file,
+      {{"active", boostPickupActivityActive},
+       {"inactive", boostPickupActivityInactive},
+       {"unknown", boostPickupActivityUnknown}});
+  file << ",\"fieldHalves\":";
+  writeEnabledStringArray(
+      file,
+      {{"own", boostPickupFieldOwn},
+       {"opponent", boostPickupFieldOpponent},
+       {"unknown", boostPickupFieldUnknown}});
+  file << ",\"playerIds\":null},\n";
+  file << "    \"touch\": {\"decaySeconds\":" << touchMarkerDecaySeconds
+       << ",\"overlayMode\":\"" << (touchControlsMode == 0 ? "markers" : "advancement")
+       << "\",\"breakdownClasses\":";
+  writeEnabledStringArray(
+      file,
+      {{"kind", touchBreakdownKind},
+       {"height_band", touchBreakdownHeight},
+       {"surface", touchBreakdownSurface},
+       {"dodge_state", touchBreakdownDodge}});
+  file << "}\n";
+  file << "  },\n";
   file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
   file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
   file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
