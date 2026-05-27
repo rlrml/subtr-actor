@@ -8386,6 +8386,17 @@ void SubtrActorPlugin::renderRecordingWindow() {
                 std::chrono::steady_clock::now() - recordingStartedAt)
                 .count()
           : 0.0;
+  const bool hasGraphSnapshot = recordingSnapshotCount > 0 || recordingLastBytes > 0;
+  auto recordingButton = [](const char *label, bool disabled) {
+    if (disabled) {
+      ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+    }
+    const bool clicked = ImGui::Button(label);
+    if (disabled) {
+      ImGui::PopStyleVar();
+    }
+    return clicked && !disabled;
+  };
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");
   ImGui::SliderInt("FPS", &recordingFps, 1, 120);
@@ -8403,18 +8414,18 @@ void SubtrActorPlugin::renderRecordingWindow() {
   ImGui::Checkbox("Finalize before dump", &recordingFinishBeforeDump);
 
   ImGui::Separator();
-  if (ImGui::Button("Start")) {
+  if (recordingButton("Start", recordingActive)) {
     recordingActive = true;
     recordingStartedAt = std::chrono::steady_clock::now();
     recordingStatus = "Recording analysis snapshots";
   }
   ImGui::SameLine();
-  if (ImGui::Button("Full replay")) {
+  if (recordingButton("Full replay", recordingActive || !loaded || !engine)) {
     recordingActive = false;
     dumpSnapshot(true);
   }
   ImGui::SameLine();
-  if (ImGui::Button("Stop")) {
+  if (recordingButton("Stop", !recordingActive)) {
     recordingActive = false;
     dumpSnapshot(recordingFinishBeforeDump);
   }
@@ -8428,7 +8439,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
         outputDirectory.string()));
   }
   ImGui::SameLine();
-  if (ImGui::Button("Clear")) {
+  if (recordingButton("Clear", recordingActive || !hasGraphSnapshot)) {
     recordingActive = false;
     recordingSnapshotCount = 0;
     recordingLastBytes = 0;
