@@ -1,16 +1,22 @@
 use std::collections::{BTreeMap, HashMap};
 
-use subtr_actor::{
-    evaluate_replay_plausibility, Collector, PlayerFrame, ProcessorView, ReplayDataCollector,
-    StatsTimelineCollector, TimeAdvance,
-};
+use subtr_actor::{Collector, ProcessorView, TimeAdvance};
 
 #[path = "replay_probe_args.rs"]
 mod args;
+#[path = "replay_probe_basic.rs"]
+mod basic;
 #[path = "replay_probe_constants.rs"]
 mod constants;
+#[path = "replay_probe_demolition.rs"]
+mod demolition;
+#[path = "replay_probe_replay.rs"]
+mod replay;
 
 use args::{parse_args, ProbeCommand};
+use basic::{print_mechanics, print_metadata, print_plausibility};
+use demolition::print_demolition;
+use replay::parse_replay;
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
 const MAX_GROUNDED_HEIGHT: f32 = 60.0;
@@ -559,84 +565,6 @@ fn main() {
     }
 }
 
-fn parse_replay(path: &str) -> boxcars::Replay {
-    let data = std::fs::read(path).unwrap_or_else(|error| panic!("failed to read {path}: {error}"));
-    boxcars::ParserBuilder::new(&data[..])
-        .must_parse_network_data()
-        .on_error_check_crc()
-        .parse()
-        .unwrap_or_else(|error| panic!("failed to parse {path}: {error}"))
-}
-
-fn collect_replay_data(path: &str) -> subtr_actor::ReplayData {
-    let replay = parse_replay(path);
-    ReplayDataCollector::new()
-        .get_replay_data(&replay)
-        .unwrap_or_else(|error| panic!("failed to collect replay data for {path}: {error:?}"))
-}
-
-fn print_metadata(path: &str) {
-    let replay = parse_replay(path);
-    let build_version = replay
-        .properties
-        .iter()
-        .find(|(key, _)| key == "BuildVersion")
-        .and_then(|(_, value)| value.as_string());
-    let num_frames = replay
-        .properties
-        .iter()
-        .find(|(key, _)| key == "NumFrames")
-        .and_then(|(_, value)| value.as_i32());
-    let match_type = replay
-        .properties
-        .iter()
-        .find(|(key, _)| key == "MatchType")
-        .and_then(|(_, value)| value.as_string());
-
-    println!(
-        "replay={path} major_version={} minor_version={} net_version={:?} build_version={:?} match_type={:?} num_frames={:?}",
-        replay.major_version,
-        replay.minor_version,
-        replay.net_version,
-        build_version,
-        match_type,
-        num_frames
-    );
-}
-
-fn print_plausibility(path: &str) {
-    let replay_data = collect_replay_data(path);
-    let report = evaluate_replay_plausibility(&replay_data);
-    println!("{report:#?}");
-}
-
-fn print_mechanics(path: &str) {
-    let replay = parse_replay(path);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
-        .unwrap_or_else(|error| panic!("failed to collect stats timeline for {path}: {error:?}"));
-    for event in &timeline.events.flick {
-        println!(
-            "flick {}",
-            serde_json::to_string(event).expect("flick event should serialize")
-        );
-    }
-    for event in &timeline.events.dodge_reset {
-        println!(
-            "dodge_reset {}",
-            serde_json::to_string(event).expect("dodge-reset event should serialize")
-        );
-    }
-    for event in &timeline.events.mechanics {
-        if event.kind == "flip_reset" || event.kind == "flick" {
-            println!(
-                "mechanic {}",
-                serde_json::to_string(event).expect("mechanic event should serialize")
-            );
-        }
-    }
-}
-
 fn print_legacy_rotation(path: &str) {
     let replay = parse_replay(path);
     println!(
@@ -647,69 +575,6 @@ fn print_legacy_rotation(path: &str) {
         .process_replay(&replay)
         .unwrap_or_else(|error| panic!("failed to process {path}: {error:?}"));
     probe.print_summary();
-}
-
-fn print_demolition(path: &str) {
-    let replay_data = collect_replay_data(path);
-    let mut attacker_ratios = Vec::new();
-    let mut victim_ratios = Vec::new();
-
-    for demolish in &replay_data.demolish_infos {
-        if let Some(player_data) = replay_data
-            .frame_data
-            .players
-            .iter()
-            .find(|(player_id, _)| player_id == &demolish.attacker)
-            .map(|(_, player_data)| player_data)
-        {
-            if let Some(PlayerFrame::Data { rigid_body, .. }) =
-                player_data.frames().get(demolish.frame)
-            {
-                if let Some(linear_velocity) = rigid_body.linear_velocity {
-                    let demo_speed = vec_length(demolish.attacker_velocity);
-                    let rigid_body_speed = vec_length(linear_velocity);
-                    if demo_speed.is_finite()
-                        && rigid_body_speed.is_finite()
-                        && demo_speed > 0.0
-                        && rigid_body_speed > 0.0
-                    {
-                        attacker_ratios.push(demo_speed / rigid_body_speed);
-                    }
-                }
-            }
-        }
-
-        if let Some(player_data) = replay_data
-            .frame_data
-            .players
-            .iter()
-            .find(|(player_id, _)| player_id == &demolish.victim)
-            .map(|(_, player_data)| player_data)
-        {
-            if let Some(PlayerFrame::Data { rigid_body, .. }) =
-                player_data.frames().get(demolish.frame)
-            {
-                if let Some(linear_velocity) = rigid_body.linear_velocity {
-                    let demo_speed = vec_length(demolish.victim_velocity);
-                    let rigid_body_speed = vec_length(linear_velocity);
-                    if demo_speed.is_finite()
-                        && rigid_body_speed.is_finite()
-                        && demo_speed > 0.0
-                        && rigid_body_speed > 0.0
-                    {
-                        victim_ratios.push(demo_speed / rigid_body_speed);
-                    }
-                }
-            }
-        }
-    }
-
-    println!(
-        "replay={path} demolishes={} attacker_ratio_median={:?} victim_ratio_median={:?}",
-        replay_data.demolish_infos.len(),
-        median(&mut attacker_ratios),
-        median(&mut victim_ratios)
-    );
 }
 
 #[derive(Debug, Default)]
