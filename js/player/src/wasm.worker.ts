@@ -3,58 +3,8 @@
 import * as subtrActor from "@rlrml/subtr-actor";
 import { normalizeReplayData } from "./replay-data";
 import type { RawReplayFramesData, ReplayLoadProgress } from "./types";
-
-type ReplayValidation = {
-  valid: boolean;
-  message?: string;
-  error?: string;
-};
-
-interface ReplayLoadRequest {
-  type: "load-replay";
-  bytes: ArrayBuffer;
-  reportEveryNFrames: number;
-}
-
-interface ReplayProgressMessage {
-  type: "progress";
-  progress: ReplayLoadProgress;
-}
-
-interface ReplayDoneMessage {
-  type: "done";
-  rawBuffer: ArrayBuffer;
-  replayBuffer: ArrayBuffer;
-}
-
-interface ReplayErrorMessage {
-  type: "error";
-  error: string;
-}
-
-type ReplayWorkerResponse = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
-
-function toPlainData<T>(value: T): T {
-  if (value instanceof Map) {
-    return Object.fromEntries(
-      Array.from(value.entries()).map(([key, entry]) => [key, toPlainData(entry)]),
-    ) as T;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => toPlainData(entry)) as T;
-  }
-
-  if (value && typeof value === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = toPlainData(entry);
-    }
-    return result as T;
-  }
-
-  return value;
-}
+import type { ReplayLoadRequest, ReplayValidation, ReplayWorkerMessage } from "./wasm-messages";
+import { toPlainData } from "./wasm-plain-data";
 
 async function ensureBindingsReady(): Promise<void> {
   const maybeInit = (
@@ -67,7 +17,7 @@ async function ensureBindingsReady(): Promise<void> {
   }
 }
 
-function postMessageToMain(message: ReplayWorkerResponse): void {
+function postMessageToMain(message: ReplayWorkerMessage): void {
   self.postMessage(message);
 }
 
