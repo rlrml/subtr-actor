@@ -10872,12 +10872,20 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     }
     break;
   case UiStatsWindowKind::Team:
+    if (sampledPlayers.empty() && currentStatsJson().empty()) {
+      ImGui::TextWrapped("Start live analysis or load replay stats to show team stats.");
+      break;
+    }
     renderTeamStatsTable(window, window.selected_team_is_team_0);
     break;
   case UiStatsWindowKind::AllPlayers:
     renderAllPlayersStatsTable(window);
     break;
   case UiStatsWindowKind::AllTeams:
+    if (sampledPlayers.empty() && currentStatsJson().empty()) {
+      ImGui::TextWrapped("Start live analysis or load replay stats to show team stats.");
+      break;
+    }
     renderAllTeamsStatsTable(window);
     break;
   case UiStatsWindowKind::GoalsOverview:
