@@ -9982,14 +9982,14 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
 
 std::array<SubtrActorPlugin::SingletonWindowControl, 13>
 SubtrActorPlugin::singletonWindowControls() {
-  const float eventPlaylistX = rightAnchoredUiX(430.0f);
+  const float eventPlaylistX = rightAnchoredUiX(432.0f);
   const float statusX = rightAnchoredUiX(330.0f);
   const float playbackX = rightAnchoredUiX(336.0f, 32.0f);
   const float recordingX = rightAnchoredUiX(416.0f, 32.0f);
-  const float mechanicsReviewX = rightAnchoredUiX(500.0f);
-  const float replayLoadingX = rightAnchoredUiX(520.0f);
+  const float mechanicsReviewX = rightAnchoredUiX(480.0f);
+  const float replayLoadingX = rightAnchoredUiX(512.0f);
   const float moduleControlsX = rightAnchoredUiX(430.0f);
-  const float touchControlsX = rightAnchoredUiX(410.0f);
+  const float touchControlsX = rightAnchoredUiX(384.0f);
 
   return {{
       {"Scoreboard",
@@ -10026,7 +10026,7 @@ SubtrActorPlugin::singletonWindowControls() {
        &eventPlaylistPlacement,
        eventPlaylistX,
        256.0f,
-       430.0f,
+       432.0f,
        430.0f},
       {"Status",
        "status",
@@ -10098,7 +10098,7 @@ SubtrActorPlugin::singletonWindowControls() {
        &mechanicsReviewPlacement,
        mechanicsReviewX,
        256.0f,
-       500.0f,
+       480.0f,
        560.0f},
       {"Replay loading",
        "replay-loading",
@@ -10110,7 +10110,7 @@ SubtrActorPlugin::singletonWindowControls() {
        &replayLoadingPlacement,
        replayLoadingX,
        68.0f,
-       520.0f,
+       512.0f,
        360.0f},
       {"Module controls",
        "module-controls",
@@ -10134,7 +10134,7 @@ SubtrActorPlugin::singletonWindowControls() {
        &touchControlsPlacement,
        touchControlsX,
        256.0f,
-       410.0f,
+       384.0f,
        380.0f},
       {"Boost pickup filters",
        "boost-pickups",
