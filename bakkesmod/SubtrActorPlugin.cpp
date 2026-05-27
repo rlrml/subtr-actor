@@ -6858,10 +6858,22 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
   };
 
+  std::vector<SingletonWindowControl> launcherWindows;
   for (const SingletonWindowControl &window : singletonWindowControls()) {
     if (window.web_config) {
-      renderLauncherWindowToggle(window);
+      launcherWindows.push_back(window);
     }
+  }
+  std::sort(
+      launcherWindows.begin(),
+      launcherWindows.end(),
+      [](const SingletonWindowControl &left, const SingletonWindowControl &right) {
+        return left.launcher_order == right.launcher_order
+                   ? std::string_view{left.config_id} < std::string_view{right.config_id}
+                   : left.launcher_order < right.launcher_order;
+      });
+  for (const SingletonWindowControl &window : launcherWindows) {
+    renderLauncherWindowToggle(window);
   }
   for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
     if (kind.web_config) {
@@ -8842,6 +8854,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "scoreboard_open",
        "scoreboard",
        true,
+       1,
        &uiScoreboardOpen,
        &scoreboardPlacement,
        0.0f,
@@ -8853,6 +8866,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "events_open",
        "events",
        true,
+       4,
        &uiEventsOpen,
        &eventsPlacement,
        16.0f,
@@ -8864,6 +8878,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "event_playlist_open",
        "event_playlist",
        true,
+       5,
        &uiEventPlaylistOpen,
        &eventPlaylistPlacement,
        eventPlaylistX,
@@ -8875,6 +8890,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "status_open",
        "status",
        false,
+       100,
        &uiStatusOpen,
        &statusPlacement,
        statusX,
@@ -8886,6 +8902,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "camera_open",
        "camera",
        true,
+       0,
        &uiCameraOpen,
        &cameraPlacement,
        16.0f,
@@ -8897,6 +8914,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "playback_controls_open",
        "playback_controls",
        true,
+       2,
        &uiPlaybackControlsOpen,
        &playbackControlsPlacement,
        playbackX,
@@ -8908,6 +8926,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "recording_open",
        "recording",
        true,
+       3,
        &uiRecordingOpen,
        &recordingPlacement,
        recordingX,
@@ -8919,6 +8938,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "graph_inspector_open",
        "graph_inspector",
        false,
+       101,
        &uiGraphInspectorOpen,
        &graphInspectorPlacement,
        360.0f,
@@ -8930,6 +8950,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "mechanics_review_open",
        "mechanics_review",
        true,
+       6,
        &uiMechanicsReviewOpen,
        &mechanicsReviewPlacement,
        mechanicsReviewX,
@@ -8941,6 +8962,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "replay_loading_open",
        "replay_loading",
        true,
+       7,
        &uiReplayLoadingOpen,
        &replayLoadingPlacement,
        replayLoadingX,
@@ -8952,6 +8974,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "module_controls_open",
        "module_controls",
        false,
+       102,
        &uiModuleControlsOpen,
        &moduleControlsPlacement,
        moduleControlsX,
@@ -8963,6 +8986,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "touch_controls_open",
        "touch_controls",
        true,
+       9,
        &uiTouchControlsOpen,
        &touchControlsPlacement,
        touchControlsX,
@@ -8974,6 +8998,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "boost_pickup_controls_open",
        "boost_pickup_controls",
        true,
+       8,
        &uiBoostPickupControlsOpen,
        &boostPickupControlsPlacement,
        16.0f,

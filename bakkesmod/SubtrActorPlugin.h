@@ -174,6 +174,7 @@ private:
     const char *legacy_open_key;
     const char *legacy_placement_key;
     bool web_config;
+    int launcher_order;
     bool *open;
     UiWindowPlacement *placement;
     float x;
