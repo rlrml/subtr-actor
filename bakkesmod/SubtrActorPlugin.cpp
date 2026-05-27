@@ -241,20 +241,28 @@ bool containsString(const std::vector<std::string> &values, std::string_view val
          }) != values.end();
 }
 
-ImVec2 clampWindowPositionToViewport(float x, float y, float width, float height) {
+ImVec2 mapWindowPositionToViewport(
+    float x,
+    float y,
+    float width,
+    float height,
+    float sourceViewportWidth,
+    float sourceViewportHeight) {
   const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
   if (displaySize.x <= 0.0f || displaySize.y <= 0.0f) {
     return ImVec2{x, y};
   }
 
   constexpr float margin = 8.0f;
+  const float scaleX = sourceViewportWidth > 0.0f ? displaySize.x / sourceViewportWidth : 1.0f;
+  const float scaleY = sourceViewportHeight > 0.0f ? displaySize.y / sourceViewportHeight : 1.0f;
   const float clampedWidth = std::max(120.0f, width);
   const float clampedHeight = std::max(80.0f, height);
   const float maxX = std::max(margin, displaySize.x - clampedWidth);
   const float maxY = std::max(margin, displaySize.y - clampedHeight);
   return ImVec2{
-      std::clamp(x, margin, maxX),
-      std::clamp(y, margin, maxY),
+      std::clamp(x * scaleX, margin, maxX),
+      std::clamp(y * scaleY, margin, maxY),
   };
 }
 
@@ -2267,6 +2275,10 @@ void SubtrActorPlugin::loadUiConfig() {
         static_cast<float>(parseJsonNumberProperty(*object, "width").value_or(out.width));
     out.height =
         static_cast<float>(parseJsonNumberProperty(*object, "height").value_or(out.height));
+    out.viewport_width = static_cast<float>(
+        parseJsonNumberProperty(*object, "viewport_width").value_or(out.viewport_width));
+    out.viewport_height = static_cast<float>(
+        parseJsonNumberProperty(*object, "viewport_height").value_or(out.viewport_height));
   };
 
   uiLauncherOpen = parseJsonBoolProperty(json, "launcher_open").value_or(uiLauncherOpen);
@@ -2462,6 +2474,10 @@ void SubtrActorPlugin::loadUiConfig() {
         static_cast<float>(parseJsonNumberProperty(object, "width").value_or(window.width));
     window.height =
         static_cast<float>(parseJsonNumberProperty(object, "height").value_or(window.height));
+    window.viewport_width = static_cast<float>(
+        parseJsonNumberProperty(object, "viewport_width").value_or(window.viewport_width));
+    window.viewport_height = static_cast<float>(
+        parseJsonNumberProperty(object, "viewport_height").value_or(window.viewport_height));
     uiStatsWindows.push_back(std::move(window));
   }
 
@@ -2507,7 +2523,9 @@ void SubtrActorPlugin::saveUiConfig() {
   auto writePlacement = [](std::ostream &out, const UiWindowPlacement &placement) {
     out << "{\"has_placement\":" << (placement.has_placement ? "true" : "false")
         << ",\"x\":" << placement.x << ",\"y\":" << placement.y
-        << ",\"width\":" << placement.width << ",\"height\":" << placement.height << "}";
+        << ",\"width\":" << placement.width << ",\"height\":" << placement.height
+        << ",\"viewport_width\":" << placement.viewport_width
+        << ",\"viewport_height\":" << placement.viewport_height << "}";
   };
 
   std::ofstream file(path, std::ios::binary);
@@ -2647,6 +2665,8 @@ void SubtrActorPlugin::saveUiConfig() {
          << ",\"has_placement\":" << (window.has_placement ? "true" : "false")
          << ",\"x\":" << window.x << ",\"y\":" << window.y
          << ",\"width\":" << window.width << ",\"height\":" << window.height
+         << ",\"viewport_width\":" << window.viewport_width
+         << ",\"viewport_height\":" << window.viewport_height
          << ",\"entries\":[";
     for (size_t j = 0; j < window.entries.size(); j += 1) {
       if (j != 0) {
@@ -5220,8 +5240,13 @@ void SubtrActorPlugin::applyWindowPlacement(
         std::max(120.0f, placement.width),
         std::max(80.0f, placement.height),
     };
-    const ImVec2 position =
-        clampWindowPositionToViewport(placement.x, placement.y, size.x, size.y);
+    const ImVec2 position = mapWindowPositionToViewport(
+        placement.x,
+        placement.y,
+        size.x,
+        size.y,
+        placement.viewport_width,
+        placement.viewport_height);
     ImGui::SetNextWindowPos(position, condition);
     ImGui::SetNextWindowSize(size, condition);
     placement.x = position.x;
@@ -5232,7 +5257,7 @@ void SubtrActorPlugin::applyWindowPlacement(
     applyFocus();
     return;
   }
-  const ImVec2 defaultPosition = clampWindowPositionToViewport(x, y, width, height);
+  const ImVec2 defaultPosition = mapWindowPositionToViewport(x, y, width, height, 0.0f, 0.0f);
   ImGui::SetNextWindowPos(defaultPosition, ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
   applyFocus();
@@ -5246,6 +5271,9 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   placement.y = position.y;
   placement.width = size.x;
   placement.height = size.y;
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  placement.viewport_width = displaySize.x;
+  placement.viewport_height = displaySize.y;
 }
 
 void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
@@ -5256,7 +5284,13 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
         std::max(180.0f, window.width),
         std::max(120.0f, window.height),
     };
-    const ImVec2 position = clampWindowPositionToViewport(window.x, window.y, size.x, size.y);
+    const ImVec2 position = mapWindowPositionToViewport(
+        window.x,
+        window.y,
+        size.x,
+        size.y,
+        window.viewport_width,
+        window.viewport_height);
     ImGui::SetNextWindowPos(position, condition);
     ImGui::SetNextWindowSize(size, condition);
     window.x = position.x;
@@ -5270,7 +5304,7 @@ void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
   const float width = window.kind == UiStatsWindowKind::StatsModule ? 680.0f : 540.0f;
   const float height = window.kind == UiStatsWindowKind::StatsModule ? 460.0f : 330.0f;
   ImGui::SetNextWindowPos(
-      clampWindowPositionToViewport(96.0f + offset, 96.0f + offset, width, height),
+      mapWindowPositionToViewport(96.0f + offset, 96.0f + offset, width, height, 0.0f, 0.0f),
       ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_FirstUseEver);
 }
@@ -5283,6 +5317,9 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   window.y = position.y;
   window.width = size.x;
   window.height = size.y;
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  window.viewport_width = displaySize.x;
+  window.viewport_height = displaySize.y;
 }
 
 void SubtrActorPlugin::renderLauncherWindow() {

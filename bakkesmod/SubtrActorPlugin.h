@@ -135,6 +135,8 @@ private:
     float y = 0.0f;
     float width = 540.0f;
     float height = 330.0f;
+    float viewport_width = 0.0f;
+    float viewport_height = 0.0f;
   };
 
   struct UiWindowPlacement {
@@ -145,6 +147,8 @@ private:
     float y = 0.0f;
     float width = 0.0f;
     float height = 0.0f;
+    float viewport_width = 0.0f;
+    float viewport_height = 0.0f;
   };
 
   struct PlayerStatSnapshot {
