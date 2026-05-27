@@ -3078,48 +3078,25 @@ void SubtrActorPlugin::applyUiConfigJson(
         boostPickupControlsPlacement,
         &uiBoostPickupControlsOpen);
   }
-  for (const std::string &object : parseJsonObjectArrayProperty(json, "singletonWindows")) {
-    const std::string id = parseJsonStringProperty(object, "id").value_or("");
-    const auto placement = parseJsonObjectProperty(object, "placement");
-    if (!placement) {
-      continue;
-    }
-    if (id == "camera") {
-      loadPlacementObject(*placement, cameraPlacement, &uiCameraOpen);
-    } else if (id == "scoreboard") {
-      loadPlacementObject(*placement, scoreboardPlacement, &uiScoreboardOpen);
-    } else if (id == "playback") {
-      loadPlacementObject(*placement, playbackControlsPlacement, &uiPlaybackControlsOpen);
-    } else if (id == "recording") {
-      loadPlacementObject(*placement, recordingPlacement, &uiRecordingOpen);
-    } else if (id == "mechanics") {
-      loadPlacementObject(*placement, eventsPlacement, &uiEventsOpen);
-    } else if (id == "event-playlist") {
-      loadPlacementObject(*placement, eventPlaylistPlacement, &uiEventPlaylistOpen);
-    } else if (id == "mechanics-review") {
-      loadPlacementObject(*placement, mechanicsReviewPlacement, &uiMechanicsReviewOpen);
-    } else if (id == "replay-loading") {
-      loadPlacementObject(*placement, replayLoadingPlacement, &uiReplayLoadingOpen);
-    } else if (id == "boost-pickups") {
-      loadPlacementObject(*placement, boostPickupControlsPlacement, &uiBoostPickupControlsOpen);
-    } else if (id == "touch-controls") {
-      loadPlacementObject(*placement, touchControlsPlacement, &uiTouchControlsOpen);
-    }
-  }
-  for (const std::string &object : parseJsonObjectArrayProperty(json, "pluginWindows")) {
-    const std::string id = parseJsonStringProperty(object, "id").value_or("");
-    const auto placement = parseJsonObjectProperty(object, "placement");
-    if (!placement) {
-      continue;
-    }
-    for (const SingletonWindowControl &window : singletonWindowControls()) {
-      if (window.web_config || id != window.config_id) {
+  auto loadWindowArray = [&](const char *propertyName, bool webConfig) {
+    for (const std::string &object : parseJsonObjectArrayProperty(json, propertyName)) {
+      const std::string id = parseJsonStringProperty(object, "id").value_or("");
+      const auto placement = parseJsonObjectProperty(object, "placement");
+      if (!placement) {
         continue;
       }
-      loadPlacementObject(*placement, *window.placement, window.open);
-      break;
+      for (const SingletonWindowControl &window : singletonWindowControls()) {
+        if (window.web_config != webConfig || id != window.config_id) {
+          continue;
+        }
+        loadPlacementObject(*placement, *window.placement, window.open);
+        break;
+      }
     }
-  }
+  };
+  loadWindowArray("singletonWindows", true);
+  loadWindowArray("pluginWindows", false);
+  loadWindowArray("plugin_windows", false);
 
   uiStatsWindows.clear();
   nextUiStatsWindowId = 1;
@@ -6933,12 +6910,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
-  struct LauncherWindowToggle {
-    const char *label;
-    bool *open;
-    UiWindowPlacement *placement;
-  };
-  auto renderLauncherWindowToggle = [&](LauncherWindowToggle &window) {
+  auto renderLauncherWindowToggle = [&](const SingletonWindowControl &window) {
     ImGui::PushID(window.label);
     if (ImGui::Button(window.label, ImVec2{170.0f, 0.0f})) {
       if (*window.open) {
@@ -6957,20 +6929,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
   };
 
-  std::array<LauncherWindowToggle, 10> webLauncherWindows{{
-      {"Camera", &uiCameraOpen, &cameraPlacement},
-      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
-      {"Playback", &uiPlaybackControlsOpen, &playbackControlsPlacement},
-      {"Recording", &uiRecordingOpen, &recordingPlacement},
-      {"Events", &uiEventsOpen, &eventsPlacement},
-      {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
-      {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
-      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
-      {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
-      {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
-  }};
-  for (LauncherWindowToggle &window : webLauncherWindows) {
-    renderLauncherWindowToggle(window);
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.web_config) {
+      renderLauncherWindowToggle(window);
+    }
   }
   renderStatsWindowCreateButton("New player stats", UiStatsWindowKind::Player);
   renderStatsWindowCreateButton("New team stats", UiStatsWindowKind::Team);
@@ -7006,13 +6968,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
 
     ImGui::Separator();
-    std::array<LauncherWindowToggle, 3> pluginToolWindows{{
-        {"Status", &uiStatusOpen, &statusPlacement},
-        {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
-        {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
-    }};
-    for (LauncherWindowToggle &window : pluginToolWindows) {
-      renderLauncherWindowToggle(window);
+    for (const SingletonWindowControl &window : singletonWindowControls()) {
+      if (!window.web_config) {
+        renderLauncherWindowToggle(window);
+      }
     }
     renderSingletonWindowManager();
 
@@ -7041,17 +7000,12 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Hide side windows")) {
-      uiEventsOpen = false;
-      uiEventPlaylistOpen = false;
-      uiStatusOpen = false;
-      uiCameraOpen = false;
-      uiPlaybackControlsOpen = false;
-      uiRecordingOpen = false;
-      uiGraphInspectorOpen = false;
-      uiMechanicsReviewOpen = false;
-      uiReplayLoadingOpen = false;
-      uiTouchControlsOpen = false;
-      uiBoostPickupControlsOpen = false;
+      for (const SingletonWindowControl &window : singletonWindowControls()) {
+        if (std::string_view{window.config_id} == "scoreboard") {
+          continue;
+        }
+        *window.open = false;
+      }
     }
     if (ImGui::Button("Save layout")) {
       saveUiConfig();
