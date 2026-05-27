@@ -15,6 +15,7 @@ import {
   getStatEvaluationPlayerElements,
   type StatEvaluationPlayerElements,
 } from "./appElements.ts";
+import { installStatEvaluationPlayerEventListeners } from "./appEventListeners.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { FloatingWindowController } from "./floatingWindows.ts";
@@ -26,7 +27,6 @@ import type {
 } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
-import { createFileReplaySource } from "./replayInputSources.ts";
 import {
   createCameraControls,
   getCameraControlElements,
@@ -63,7 +63,6 @@ import {
   type PlayerPlaybackConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
-  type StatsWindowKind,
 } from "./playerConfig.ts";
 import { logStatsPlayerConfigLoadDebug } from "./playerConfigDebug.ts";
 
@@ -772,129 +771,37 @@ export function mountStatEvaluationPlayer(
     }
   }
 
-  appElements.launcherToggle.addEventListener(
-    "click",
-    () => {
-      setLauncherOpen(appElements.launcherMenu.hidden);
-    },
-    { signal: listeners.signal },
-  );
-
-  root.addEventListener(
-    "click",
-    (event) => {
-      if (!(event.target instanceof Element)) {
-        return;
-      }
-      if (!event.target.closest(".top-chrome")) {
-        setLauncherOpen(false);
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  appElements.loadReplayAction.addEventListener("click", openReplayFilePicker, {
+  installStatEvaluationPlayerEventListeners({
+    root,
+    elements: appElements,
     signal: listeners.signal,
-  });
-  appElements.emptyLoadReplay.addEventListener("click", openReplayFilePicker, {
-    signal: listeners.signal,
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-window-toggle]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const id = button.dataset.windowToggle as SingletonWindowId | undefined;
-        if (id) {
-          toggleWindow(id);
-          setLauncherOpen(false);
-        }
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-window-hide]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const id = button.dataset.windowHide ?? floatingWindows.getElementWindowId(button);
-        if (id) {
-          hideWindow(id);
-        }
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-create-stats-window]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        statsWindowManager.create(button.dataset.createStatsWindow as StatsWindowKind);
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  appElements.fileInput.addEventListener(
-    "change",
-    async () => {
-      const file = appElements.fileInput.files?.[0];
-      if (!file) return;
-
-      try {
-        mechanicsReviewController?.clearCurrentReplay();
-        await replayLoadController?.loadReplay(createFileReplaySource(file));
-      } catch (error) {
-        console.error("Failed to load replay:", error);
-        appElements.statusReadout.textContent =
-          error instanceof Error ? error.message : "Failed to load replay";
-      }
+    createStatsWindow(kind) {
+      statsWindowManager.create(kind);
     },
-    { signal: listeners.signal },
-  );
-
-  mechanicsReviewController?.installListeners(listeners.signal);
-
-  appElements.togglePlayback.addEventListener(
-    "click",
-    () => {
-      replayPlayer?.togglePlayback();
-      scheduleConfigUrlUpdate();
+    getCameraControls() {
+      return cameraControls;
     },
-    { signal: listeners.signal },
-  );
-
-  appElements.playbackRate.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setPlaybackRate(Number(appElements.playbackRate.value));
-      scheduleConfigUrlUpdate();
+    getElementWindowId(element) {
+      return floatingWindows.getElementWindowId(element);
     },
-    { signal: listeners.signal },
-  );
-
-  recordingControls?.installListeners(listeners.signal);
-  cameraControls?.installListeners(listeners.signal);
-
-  appElements.skipPostGoalTransitions.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setSkipPostGoalTransitionsEnabled(appElements.skipPostGoalTransitions.checked);
-      scheduleConfigUrlUpdate();
+    getMechanicsReviewController() {
+      return mechanicsReviewController;
     },
-    { signal: listeners.signal },
-  );
-
-  appElements.skipKickoffs.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setSkipKickoffsEnabled(appElements.skipKickoffs.checked);
-      scheduleConfigUrlUpdate();
+    getRecordingControls() {
+      return recordingControls;
     },
-    { signal: listeners.signal },
-  );
+    getReplayLoadController() {
+      return replayLoadController;
+    },
+    getReplayPlayer() {
+      return replayPlayer;
+    },
+    hideWindow,
+    openReplayFilePicker,
+    scheduleConfigUrlUpdate,
+    setLauncherOpen,
+    toggleWindow,
+  });
 
   renderModuleSummary();
   renderModuleSettings();
