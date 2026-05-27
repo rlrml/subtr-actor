@@ -3592,6 +3592,12 @@ void SubtrActorPlugin::applyUiConfigJson(
         boostPickupFieldOpponent = containsString(fieldHalves, "opponent");
         boostPickupFieldUnknown = containsString(fieldHalves, "unknown");
       }
+      if (jsonPropertyExists(*boostConfig, "playerIds")) {
+        boostPickupPlayerFilterEnabled = !jsonPropertyIsNull(*boostConfig, "playerIds");
+        boostPickupPlayerIds = boostPickupPlayerFilterEnabled
+                                   ? parseJsonStringArrayProperty(*boostConfig, "playerIds")
+                                   : std::vector<std::string>{};
+      }
     }
     if (const auto touchConfig = parseJsonObjectProperty(*moduleConfigs, "touch")) {
       touchMarkerDecaySeconds = static_cast<float>(std::clamp(
@@ -3920,6 +3926,16 @@ std::string SubtrActorPlugin::uiConfigJson() {
         }
         out << "]";
       };
+  auto writeStringArray = [](std::ostream &out, const std::vector<std::string> &values) {
+    out << "[";
+    for (size_t index = 0; index < values.size(); ++index) {
+      if (index > 0) {
+        out << ",";
+      }
+      out << "\"" << escapeJsonString(values[index]) << "\"";
+    }
+    out << "]";
+  };
 
   std::ostringstream file;
   file << "{\n";
@@ -4093,7 +4109,13 @@ std::string SubtrActorPlugin::uiConfigJson() {
       {{"own", boostPickupFieldOwn},
        {"opponent", boostPickupFieldOpponent},
        {"unknown", boostPickupFieldUnknown}});
-  file << ",\"playerIds\":null},\n";
+  file << ",\"playerIds\":";
+  if (boostPickupPlayerFilterEnabled) {
+    writeStringArray(file, boostPickupPlayerIds);
+  } else {
+    file << "null";
+  }
+  file << "},\n";
   file << "    \"touch\": {\"decaySeconds\":" << touchMarkerDecaySeconds
        << ",\"overlayMode\":\"" << (touchControlsMode == 0 ? "markers" : "advancement")
        << "\",\"breakdownClasses\":";
@@ -9107,11 +9129,17 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   const int activeFieldHalves = static_cast<int>(boostPickupFieldOwn) +
                                 static_cast<int>(boostPickupFieldOpponent) +
                                 static_cast<int>(boostPickupFieldUnknown);
+  const size_t activePlayers =
+      boostPickupPlayerFilterEnabled ? boostPickupPlayerIds.size() : sampledPlayers.size();
   const bool hidden =
-      activePadTypes == 0 || activeActivities == 0 || activeFieldHalves == 0;
+      activePadTypes == 0 || activeActivities == 0 || activeFieldHalves == 0 ||
+      (boostPickupPlayerFilterEnabled && boostPickupPlayerIds.empty());
   const int constrainedGroups = static_cast<int>(activePadTypes < 3) +
                                 static_cast<int>(activeActivities < 3) +
-                                static_cast<int>(activeFieldHalves < 3);
+                                static_cast<int>(activeFieldHalves < 3) +
+                                static_cast<int>(
+                                    boostPickupPlayerFilterEnabled &&
+                                    activePlayers < sampledPlayers.size());
   const std::string pickupReadout =
       hidden ? "Hidden"
              : constrainedGroups == 0 ? "All labels"
@@ -9137,6 +9165,8 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     boostPickupFieldOwn = true;
     boostPickupFieldOpponent = true;
     boostPickupFieldUnknown = true;
+    boostPickupPlayerFilterEnabled = false;
+    boostPickupPlayerIds.clear();
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
@@ -9150,6 +9180,8 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     boostPickupFieldOwn = false;
     boostPickupFieldOpponent = false;
     boostPickupFieldUnknown = false;
+    boostPickupPlayerFilterEnabled = true;
+    boostPickupPlayerIds.clear();
     scheduleUiConfigAutosave();
   }
 
@@ -9190,6 +9222,50 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   }
   if (ImGui::Checkbox("Unknown half", &boostPickupFieldUnknown)) {
     scheduleUiConfigAutosave();
+  }
+
+  if (!sampledPlayers.empty()) {
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYER");
+    if (ImGui::Button("All players")) {
+      boostPickupPlayerFilterEnabled = false;
+      boostPickupPlayerIds.clear();
+      scheduleUiConfigAutosave();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("No players")) {
+      boostPickupPlayerFilterEnabled = true;
+      boostPickupPlayerIds.clear();
+      scheduleUiConfigAutosave();
+    }
+    for (const SaPlayerFrame &player : sampledPlayers) {
+      const std::string playerId = webPlayerIdForIndex(player.player_index);
+      bool selected =
+          !boostPickupPlayerFilterEnabled || containsString(boostPickupPlayerIds, playerId);
+      const std::string label = std::format(
+          "{}##boost-pickup-player-{}",
+          playerLabel(player.player_index, player.is_team_0),
+          player.player_index);
+      if (ImGui::Checkbox(label.c_str(), &selected)) {
+        if (!boostPickupPlayerFilterEnabled) {
+          boostPickupPlayerIds.clear();
+          for (const SaPlayerFrame &candidate : sampledPlayers) {
+            boostPickupPlayerIds.push_back(webPlayerIdForIndex(candidate.player_index));
+          }
+          boostPickupPlayerFilterEnabled = true;
+        }
+        if (selected) {
+          if (!containsString(boostPickupPlayerIds, playerId)) {
+            boostPickupPlayerIds.push_back(playerId);
+          }
+        } else {
+          boostPickupPlayerIds.erase(
+              std::remove(boostPickupPlayerIds.begin(), boostPickupPlayerIds.end(), playerId),
+              boostPickupPlayerIds.end());
+        }
+        scheduleUiConfigAutosave();
+      }
+    }
   }
 
   ImGui::Separator();

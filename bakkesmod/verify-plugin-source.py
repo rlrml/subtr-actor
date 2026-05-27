@@ -589,6 +589,30 @@ def main() -> int:
         "web renderEffects import uses JSON parser",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'if (jsonPropertyExists(*boostConfig, "playerIds")) {',
+        "web boost playerIds import uses JSON parser",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'boostPickupPlayerFilterEnabled = !jsonPropertyIsNull(*boostConfig, "playerIds");',
+        "web boost playerIds null preserves all-player filter",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "writeStringArray(file, boostPickupPlayerIds);",
+        "web boost playerIds config emits selected players",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYER");',
+        "boost pickup filters expose web player filter group",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'overlays->find("\\"renderEffects\\"")',

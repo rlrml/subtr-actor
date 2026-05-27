@@ -382,6 +382,8 @@ private:
   bool boostPickupFieldOwn = true;
   bool boostPickupFieldOpponent = true;
   bool boostPickupFieldUnknown = true;
+  bool boostPickupPlayerFilterEnabled = false;
+  std::vector<std::string> boostPickupPlayerIds;
   int graphInspectorView = 0;
   int mechanicsReviewIndex = 0;
   float mechanicsReviewClipLeadSeconds = 2.0f;
