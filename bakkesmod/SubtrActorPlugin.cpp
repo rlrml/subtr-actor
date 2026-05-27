@@ -6452,12 +6452,19 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
 }
 
 bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open) {
-  if (ImGui::SmallButton(std::format("Hide##singleton-window-hide-{}", label).c_str())) {
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", label);
+  ImGui::SameLine();
+  const std::string hideLabel = std::format("Hide##singleton-window-hide-{}", label);
+  const float hideWidth =
+      ImGui::CalcTextSize("Hide").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+  const float rightAlignedX = ImGui::GetWindowContentRegionMax().x - hideWidth;
+  if (rightAlignedX > ImGui::GetCursorPosX()) {
+    ImGui::SetCursorPosX(rightAlignedX);
+  }
+  if (ImGui::SmallButton(hideLabel.c_str())) {
     open = false;
     return true;
   }
-  ImGui::SameLine();
-  ImGui::TextDisabled("%s", label);
   ImGui::Separator();
   return false;
 }
