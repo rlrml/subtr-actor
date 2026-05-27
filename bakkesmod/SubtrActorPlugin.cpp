@@ -7783,7 +7783,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderSingletonWindowManager();
 
   ImGui::Separator();
-  renderStatsWindowCreationControls("launcher-stats-windows", true);
+  renderStatsWindowCreationControls("launcher-stats-windows", false);
 
   ImGui::Separator();
   renderLauncherWorkspaceControls();
