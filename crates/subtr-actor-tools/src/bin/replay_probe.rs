@@ -14,6 +14,10 @@ mod demolition;
 mod math;
 #[path = "replay_probe_replay.rs"]
 mod replay;
+#[path = "replay_probe_rotation_interpret.rs"]
+mod rotation_interpret;
+#[path = "replay_probe_rotation_modes.rs"]
+mod rotation_modes;
 #[path = "replay_probe_rotation_types.rs"]
 mod rotation_types;
 #[path = "replay_probe_vector_ranges.rs"]
@@ -24,7 +28,12 @@ use basic::{print_mechanics, print_metadata, print_plausibility};
 use demolition::print_demolition;
 use math::{median, positive_fraction};
 use replay::parse_replay;
-use rotation_types::{EulerMode, EulerRotationOrder, EulerScale, QuaternionMode};
+use rotation_interpret::{
+    derive_world_angular_velocity, reinterpret_euler_rotation, reinterpret_quaternion,
+    rotation_alignment,
+};
+use rotation_modes::{build_euler_modes, build_modes};
+use rotation_types::{EulerMode, QuaternionMode};
 use vector_ranges::print_vector_ranges;
 
 const MIN_FORWARD_ALIGNMENT_SPEED: f32 = 500.0;
@@ -503,171 +512,4 @@ fn print_legacy_rotation(path: &str) {
         .process_replay(&replay)
         .unwrap_or_else(|error| panic!("failed to process {path}: {error:?}"));
     probe.print_summary();
-}
-
-fn build_modes() -> Vec<QuaternionMode> {
-    let orders = [
-        [0, 1, 2],
-        [0, 2, 1],
-        [1, 0, 2],
-        [1, 2, 0],
-        [2, 0, 1],
-        [2, 1, 0],
-    ];
-    let signs = [
-        [1, 1, 1],
-        [1, 1, -1],
-        [1, -1, 1],
-        [1, -1, -1],
-        [-1, 1, 1],
-        [-1, 1, -1],
-        [-1, -1, 1],
-        [-1, -1, -1],
-    ];
-
-    let mut modes = Vec::new();
-    for missing_slot in 0..4 {
-        for order in orders {
-            for sign in signs {
-                for reconstruct_missing in [false, true] {
-                    modes.push(QuaternionMode {
-                        missing_slot,
-                        order,
-                        signs: sign,
-                        reconstruct_missing,
-                    });
-                }
-            }
-        }
-    }
-    modes
-}
-
-fn build_euler_modes() -> Vec<EulerMode> {
-    let orders = [
-        [0, 1, 2],
-        [0, 2, 1],
-        [1, 0, 2],
-        [1, 2, 0],
-        [2, 0, 1],
-        [2, 1, 0],
-    ];
-    let signs = [
-        [1, 1, 1],
-        [1, 1, -1],
-        [1, -1, 1],
-        [1, -1, -1],
-        [-1, 1, 1],
-        [-1, 1, -1],
-        [-1, -1, 1],
-        [-1, -1, -1],
-    ];
-    let scales = [EulerScale::Pi, EulerScale::TwoPi, EulerScale::HalfPi];
-    let rotation_orders = [
-        EulerRotationOrder::Xyz,
-        EulerRotationOrder::Xzy,
-        EulerRotationOrder::Yxz,
-        EulerRotationOrder::Yzx,
-        EulerRotationOrder::Zxy,
-        EulerRotationOrder::Zyx,
-    ];
-
-    let mut modes = Vec::new();
-    for order in orders {
-        for sign in signs {
-            for scale in scales {
-                for rotation_order in rotation_orders {
-                    modes.push(EulerMode {
-                        order,
-                        signs: sign,
-                        scale,
-                        rotation_order,
-                    });
-                }
-            }
-        }
-    }
-    modes
-}
-
-fn reinterpret_quaternion(raw: boxcars::Quaternion, mode: QuaternionMode) -> Option<glam::Quat> {
-    let source = [raw.x, raw.y, raw.z];
-    let values = [
-        source[mode.order[0]] * f32::from(mode.signs[0]),
-        source[mode.order[1]] * f32::from(mode.signs[1]),
-        source[mode.order[2]] * f32::from(mode.signs[2]),
-    ];
-    let mut components = [0.0; 4];
-    let mut value_index = 0;
-    for (slot, component) in components.iter_mut().enumerate() {
-        if slot == mode.missing_slot {
-            continue;
-        }
-        *component = values[value_index];
-        value_index += 1;
-    }
-    if mode.reconstruct_missing {
-        let sum_squares: f32 = components
-            .iter()
-            .map(|component| component * component)
-            .sum();
-        if sum_squares > 1.0 + 0.001 {
-            return None;
-        }
-        components[mode.missing_slot] = (1.0 - sum_squares.min(1.0)).sqrt();
-    }
-    let quaternion =
-        glam::Quat::from_xyzw(components[0], components[1], components[2], components[3]);
-    (quaternion.length_squared() > f32::EPSILON).then(|| quaternion.normalize())
-}
-
-fn reinterpret_euler_rotation(raw: boxcars::Quaternion, mode: EulerMode) -> glam::Quat {
-    let source = [raw.x, raw.y, raw.z];
-    let factor = mode.scale.factor();
-    let values = [
-        source[mode.order[0]] * f32::from(mode.signs[0]) * factor,
-        source[mode.order[1]] * f32::from(mode.signs[1]) * factor,
-        source[mode.order[2]] * f32::from(mode.signs[2]) * factor,
-    ];
-    glam::Quat::from_euler(
-        mode.rotation_order.to_glam(),
-        values[0],
-        values[1],
-        values[2],
-    )
-}
-
-fn rotation_alignment(
-    quaternion: glam::Quat,
-    linear_velocity: boxcars::Vector3f,
-) -> Option<(f32, f32)> {
-    let forward = quaternion * glam::Vec3::X;
-    let forward_xy = forward.truncate().normalize_or_zero();
-    let velocity_xy = glam::Vec2::new(linear_velocity.x, linear_velocity.y).normalize_or_zero();
-    let alignment = forward_xy.dot(velocity_xy);
-    alignment
-        .is_finite()
-        .then_some((alignment, (quaternion * glam::Vec3::Z).z))
-}
-
-fn derive_world_angular_velocity(
-    previous_rotation: glam::Quat,
-    mut current_rotation: glam::Quat,
-    dt: f32,
-) -> Option<glam::Vec3> {
-    if dt <= 0.0 {
-        return None;
-    }
-    if previous_rotation.dot(current_rotation) < 0.0 {
-        current_rotation = glam::Quat::from_xyzw(
-            -current_rotation.x,
-            -current_rotation.y,
-            -current_rotation.z,
-            -current_rotation.w,
-        );
-    }
-    let delta = current_rotation * previous_rotation.inverse();
-    let (axis, angle) = delta.to_axis_angle();
-    let angular_velocity = axis * (angle / dt);
-    angular_velocity.is_finite().then_some(angular_velocity)
 }
