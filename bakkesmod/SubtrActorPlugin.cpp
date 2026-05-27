@@ -7815,9 +7815,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
 
   ImGui::Separator();
-  renderLauncherWorkspaceControls();
-
-  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "VISUALIZATIONS");
   renderModuleSummaryControls("launcher-module-summary");
 
@@ -7868,6 +7865,9 @@ void SubtrActorPlugin::renderLauncherWindow() {
     if (ImGui::Button("Close launcher", ImVec2{170.0f, 0.0f})) {
       hideLauncherWindow();
     }
+
+    ImGui::Separator();
+    renderLauncherWorkspaceControls();
 
     ImGui::Separator();
     renderSharedSettingsControls();
