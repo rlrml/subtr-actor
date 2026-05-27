@@ -7411,6 +7411,32 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
   }
 }
 
+void SubtrActorPlugin::renderLauncherStatsWindowControls() {
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
+  for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
+    if (!kind.web_config) {
+      continue;
+    }
+    if (ImGui::Button(kind.create_label, ImVec2{170.0f, 0.0f})) {
+      createStatsWindow(kind.kind);
+      uiLauncherOpen = false;
+    }
+  }
+  if (uiStatsWindows.empty()) {
+    return;
+  }
+
+  const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
+      uiStatsWindows.begin(),
+      uiStatsWindows.end(),
+      [](const UiStatsWindow &window) { return window.open; }));
+  ImGui::Text(
+      "%zu visible / %zu stats windows",
+      visibleStatsWindows,
+      uiStatsWindows.size());
+  renderStatsWindowManager();
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
@@ -7462,34 +7488,12 @@ void SubtrActorPlugin::renderLauncherWindow() {
     }
     ImGui::PopID();
   };
-  auto renderStatsWindowCreateButton = [&](const char *label, UiStatsWindowKind kind) {
-    if (ImGui::Button(label, ImVec2{170.0f, 0.0f})) {
-      createStatsWindow(kind);
-      uiLauncherOpen = false;
-    }
-  };
-
   for (const SingletonWindowControl &window : webSingletonWindowControls()) {
     renderLauncherWindowToggle(window);
   }
-  for (const StatsWindowKindControl &kind : statsWindowKindControls()) {
-    if (kind.web_config) {
-      renderStatsWindowCreateButton(kind.create_label, kind.kind);
-    }
-  }
-  if (!uiStatsWindows.empty()) {
-    const size_t visibleStatsWindows = static_cast<size_t>(std::count_if(
-        uiStatsWindows.begin(),
-        uiStatsWindows.end(),
-        [](const UiStatsWindow &window) { return window.open; }));
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STATS WINDOWS");
-    ImGui::Text(
-        "%zu visible / %zu stats windows",
-        visibleStatsWindows,
-        uiStatsWindows.size());
-    renderStatsWindowManager();
-  }
+
+  ImGui::Separator();
+  renderLauncherStatsWindowControls();
 
   ImGui::Separator();
   renderLauncherWorkspaceControls();

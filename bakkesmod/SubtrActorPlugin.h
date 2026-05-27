@@ -433,6 +433,7 @@ private:
   void applyLauncherMenuPlacement();
   void renderLauncherWindow();
   void renderLauncherWorkspaceControls();
+  void renderLauncherStatsWindowControls();
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderEventSourceControls();
