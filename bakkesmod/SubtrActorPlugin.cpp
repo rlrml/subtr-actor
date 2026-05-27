@@ -2183,6 +2183,8 @@ void SubtrActorPlugin::loadUiConfig() {
       parseJsonBoolProperty(json, "event_playlist_open").value_or(uiEventPlaylistOpen);
   uiMechanicsReviewOpen =
       parseJsonBoolProperty(json, "mechanics_review_open").value_or(uiMechanicsReviewOpen);
+  uiReplayLoadingOpen =
+      parseJsonBoolProperty(json, "replay_loading_open").value_or(uiReplayLoadingOpen);
   uiModuleControlsOpen =
       parseJsonBoolProperty(json, "module_controls_open").value_or(uiModuleControlsOpen);
   uiTouchControlsOpen =
@@ -2248,6 +2250,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
     loadPlacement(*placements, "event_playlist", eventPlaylistPlacement);
     loadPlacement(*placements, "mechanics_review", mechanicsReviewPlacement);
+    loadPlacement(*placements, "replay_loading", replayLoadingPlacement);
     loadPlacement(*placements, "module_controls", moduleControlsPlacement);
     loadPlacement(*placements, "touch_controls", touchControlsPlacement);
     loadPlacement(*placements, "boost_pickup_controls", boostPickupControlsPlacement);
@@ -2374,6 +2377,8 @@ void SubtrActorPlugin::saveUiConfig() {
        << ",\n";
   file << "  \"mechanics_review_open\": " << (uiMechanicsReviewOpen ? "true" : "false")
        << ",\n";
+  file << "  \"replay_loading_open\": " << (uiReplayLoadingOpen ? "true" : "false")
+       << ",\n";
   file << "  \"module_controls_open\": " << (uiModuleControlsOpen ? "true" : "false")
        << ",\n";
   file << "  \"touch_controls_open\": " << (uiTouchControlsOpen ? "true" : "false")
@@ -2441,6 +2446,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, eventPlaylistPlacement);
   file << ",\n    \"mechanics_review\": ";
   writePlacement(file, mechanicsReviewPlacement);
+  file << ",\n    \"replay_loading\": ";
+  writePlacement(file, replayLoadingPlacement);
   file << ",\n    \"module_controls\": ";
   writePlacement(file, moduleControlsPlacement);
   file << ",\n    \"touch_controls\": ";
@@ -4952,6 +4959,7 @@ void SubtrActorPlugin::Render() {
   renderGraphInspectorWindow();
   renderEventPlaylistWindow();
   renderMechanicsReviewWindow();
+  renderReplayLoadingWindow();
   renderModuleControlsWindow();
   renderTouchControlsWindow();
   renderBoostPickupControlsWindow();
@@ -5096,6 +5104,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
   ImGui::Checkbox("Mechanics review", &uiMechanicsReviewOpen);
+  ImGui::Checkbox("Replay loading", &uiReplayLoadingOpen);
   ImGui::Checkbox("Module controls", &uiModuleControlsOpen);
   ImGui::Checkbox("Touch controls", &uiTouchControlsOpen);
   ImGui::Checkbox("Boost pickup filters", &uiBoostPickupControlsOpen);
@@ -5121,6 +5130,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiPlaybackControlsOpen = false;
     uiGraphInspectorOpen = false;
     uiMechanicsReviewOpen = false;
+    uiReplayLoadingOpen = false;
     uiTouchControlsOpen = false;
     uiBoostPickupControlsOpen = false;
   }
@@ -5574,6 +5584,104 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::End();
 }
 
+void SubtrActorPlugin::renderReplayLoadingWindow() {
+  if (!uiReplayLoadingOpen) {
+    return;
+  }
+
+  applyWindowPlacement(replayLoadingPlacement, 960.0f, 68.0f, 520.0f, 360.0f);
+  if (!ImGui::Begin("Replay loading##subtr-actor", &uiReplayLoadingOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(replayLoadingPlacement);
+
+  const bool annotationsEnabled = replayAnnotationsEnabled();
+  const bool inReplay = gameWrapper->IsInReplay();
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  const bool hasReplayServer = !replayServer.IsNull();
+  const std::optional<std::string> replayPath =
+      hasReplayServer ? currentReplayPath(replayServer) : std::nullopt;
+  std::string rawReplayPath;
+  if (hasReplayServer) {
+    ReplayWrapper replay = replayServer.GetReplay();
+    if (!replay.IsNull()) {
+      rawReplayPath = replay.GetFilePath().ToString();
+    }
+  }
+  const size_t annotationCount =
+      replayAnnotations && replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
+  const char *status = !annotationsEnabled
+                           ? "Disabled"
+                           : !inReplay       ? "Waiting for replay"
+                           : replayAnnotations ? "Loaded"
+                           : replayAnnotationLoadFailed ? "Failed"
+                                                        : "Scanning";
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY LOADING");
+  ImGui::Text("Summary: %s", replayPath ? "1 replay candidate" : "0 replay candidates");
+  ImGui::Text("Active: %s", status);
+  ImGui::Text("In replay: %s", inReplay ? "yes" : "no");
+  if (hasReplayServer) {
+    ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
+  }
+  ImGui::Text("Annotations: %zu", annotationCount);
+
+  ImGui::Separator();
+  bool annotationsValue = annotationsEnabled;
+  if (ImGui::Checkbox("Replay annotations", &annotationsValue)) {
+    setCvarBool("subtr_actor_replay_annotations_enabled", annotationsValue);
+    if (!annotationsValue) {
+      resetReplayAnnotations();
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Retry load")) {
+    resetReplayAnnotations();
+    tickReplayAnnotations();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear load")) {
+    resetReplayAnnotations();
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CURRENT REPLAY");
+  if (replayPath) {
+    ImGui::TextWrapped("Resolved: %s", replayPath->c_str());
+  } else {
+    ImGui::TextDisabled("Resolved: --");
+  }
+  if (!rawReplayPath.empty()) {
+    ImGui::TextWrapped("Raw: %s", rawReplayPath.c_str());
+  } else {
+    ImGui::TextDisabled("Raw: --");
+  }
+  if (!replayAnnotationPath.empty()) {
+    ImGui::TextWrapped("Processed: %s", replayAnnotationPath.c_str());
+  } else {
+    ImGui::TextDisabled("Processed: --");
+  }
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
+  if (ImGui::Button("Open playback")) {
+    uiPlaybackControlsOpen = true;
+    playbackControlsPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open review")) {
+    uiMechanicsReviewOpen = true;
+    mechanicsReviewPlacement.pending_focus = true;
+  }
+  if (ImGui::Button("Open playlist")) {
+    uiEventPlaylistOpen = true;
+    eventPlaylistPlacement.pending_focus = true;
+  }
+
+  ImGui::End();
+}
+
 void SubtrActorPlugin::renderModuleControlsWindow() {
   if (!uiModuleControlsOpen) {
     return;
@@ -5662,6 +5770,11 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
   if (ImGui::Button("Open review")) {
     uiMechanicsReviewOpen = true;
     mechanicsReviewPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open replay loading")) {
+    uiReplayLoadingOpen = true;
+    replayLoadingPlacement.pending_focus = true;
   }
   ImGui::SameLine();
   if (ImGui::Button("Open touch controls")) {
@@ -6170,7 +6283,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 10> windows{{
+  std::array<SingletonWindowControl, 11> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
@@ -6178,6 +6291,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
       {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
       {"Mechanics review", &uiMechanicsReviewOpen, &mechanicsReviewPlacement},
+      {"Replay loading", &uiReplayLoadingOpen, &replayLoadingPlacement},
       {"Module controls", &uiModuleControlsOpen, &moduleControlsPlacement},
       {"Touch controls", &uiTouchControlsOpen, &touchControlsPlacement},
       {"Boost pickup filters", &uiBoostPickupControlsOpen, &boostPickupControlsPlacement},
@@ -6272,6 +6386,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   playbackControlsPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
   mechanicsReviewPlacement = UiWindowPlacement{};
+  replayLoadingPlacement = UiWindowPlacement{};
   moduleControlsPlacement = UiWindowPlacement{};
   touchControlsPlacement = UiWindowPlacement{};
   boostPickupControlsPlacement = UiWindowPlacement{};
@@ -6309,6 +6424,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiPlaybackControlsOpen = true;
   uiGraphInspectorOpen = false;
   uiMechanicsReviewOpen = false;
+  uiReplayLoadingOpen = false;
   uiModuleControlsOpen = true;
   uiTouchControlsOpen = false;
   uiBoostPickupControlsOpen = false;

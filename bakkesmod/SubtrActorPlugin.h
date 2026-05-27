@@ -249,6 +249,7 @@ private:
   bool uiGraphInspectorOpen = false;
   bool uiEventPlaylistOpen = false;
   bool uiMechanicsReviewOpen = false;
+  bool uiReplayLoadingOpen = false;
   bool uiModuleControlsOpen = false;
   bool uiTouchControlsOpen = false;
   bool uiBoostPickupControlsOpen = false;
@@ -288,6 +289,7 @@ private:
   UiWindowPlacement graphInspectorPlacement;
   UiWindowPlacement eventPlaylistPlacement;
   UiWindowPlacement mechanicsReviewPlacement;
+  UiWindowPlacement replayLoadingPlacement;
   UiWindowPlacement moduleControlsPlacement;
   UiWindowPlacement touchControlsPlacement;
   UiWindowPlacement boostPickupControlsPlacement;
@@ -320,6 +322,7 @@ private:
   void renderGraphInspectorWindow();
   void renderEventPlaylistWindow();
   void renderMechanicsReviewWindow();
+  void renderReplayLoadingWindow();
   void renderModuleControlsWindow();
   void renderTouchControlsWindow();
   void renderBoostPickupControlsWindow();
