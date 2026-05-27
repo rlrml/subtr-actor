@@ -1644,6 +1644,22 @@ const char *uiStatLabel(std::string_view statId) {
   return "Stat";
 }
 
+const char *uiStatScopeLabel(const UiStatDefinition &definition) {
+  if (definition.player && definition.team) {
+    return "player/team";
+  }
+  if (definition.player) {
+    return "player";
+  }
+  if (definition.team) {
+    return "team";
+  }
+  if (definition.event) {
+    return "event";
+  }
+  return "stat";
+}
+
 std::optional<std::string_view> coreStatsPlayerField(std::string_view localStatId) {
   if (
       localStatId == "score" ||
@@ -9627,18 +9643,17 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     return;
   }
 
-  const char *currentCategory = nullptr;
   for (const UiStatDefinitionMatch &match : matches) {
     const UiStatDefinition &definition = *match.definition;
-    if (currentCategory == nullptr || std::string_view(currentCategory) != definition.category) {
-      currentCategory = definition.category;
-      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", currentCategory);
-    }
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
-    const std::string itemLabel =
-        std::format("{}  [{}]##{}-{}", definition.label, definition.id, window.id, definition.id);
+    const std::string itemLabel = std::format(
+        "{}  [{}]##{}-{}",
+        definition.label,
+        uiStatScopeLabel(definition),
+        window.id,
+        definition.id);
     if (alreadySelected && window.kind != UiStatsWindowKind::AdHoc) {
-      ImGui::TextDisabled("%s  [selected]", definition.label);
+      ImGui::TextDisabled("%s  [%s selected]", definition.label, uiStatScopeLabel(definition));
       continue;
     }
     if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
