@@ -1369,6 +1369,75 @@ bool eventFilterAllows(
   return !sawToken;
 }
 
+std::vector<std::string> eventFilterTokens(std::string_view rawFilter) {
+  std::vector<std::string> tokens;
+  std::string token;
+
+  auto flushToken = [&]() {
+    if (!token.empty()) {
+      tokens.push_back(token);
+      token.clear();
+    }
+  };
+
+  for (const char ch : rawFilter) {
+    const unsigned char value = static_cast<unsigned char>(ch);
+    if (ch == ',' || ch == ';' || ch == '|' || std::isspace(value) != 0) {
+      flushToken();
+      continue;
+    }
+    if (std::isalnum(value) != 0) {
+      token.push_back(static_cast<char>(std::tolower(value)));
+    } else if ((ch == '_' || ch == '-') && !token.empty() && token.back() != '_') {
+      token.push_back('_');
+    }
+  }
+  flushToken();
+  return tokens;
+}
+
+bool allEventSourcesSelected(std::string_view rawFilter) {
+  const std::vector<std::string> tokens = eventFilterTokens(rawFilter);
+  return tokens.empty() || containsString(tokens, "all");
+}
+
+std::vector<std::string> selectedEventSourceTokens(std::string_view rawFilter) {
+  std::vector<std::string> tokens;
+  if (allEventSourcesSelected(rawFilter)) {
+    for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+      if (std::string_view{option.value} != "all") {
+        tokens.emplace_back(option.value);
+      }
+    }
+    return tokens;
+  }
+
+  for (const std::string &token : eventFilterTokens(rawFilter)) {
+    if (token != "all" && token != "none" && !containsString(tokens, token)) {
+      tokens.push_back(token);
+    }
+  }
+  return tokens;
+}
+
+std::string eventFilterFromSelectedSources(const std::vector<std::string> &tokens) {
+  if (tokens.empty()) {
+    return "none";
+  }
+  if (tokens.size() + 1 >= EVENT_FILTER_OPTIONS.size()) {
+    return "all";
+  }
+
+  std::string filter;
+  for (const std::string &token : tokens) {
+    if (!filter.empty()) {
+      filter += ",";
+    }
+    filter += token;
+  }
+  return filter;
+}
+
 const char *eventFilterLabel(std::string_view value) {
   const std::string normalized = normalizeEventFilterToken(value);
   for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
@@ -5348,6 +5417,8 @@ void SubtrActorPlugin::renderEventsWindow() {
     mechanicsReviewIndex = 0;
   }
 
+  renderEventSourceControls();
+
   size_t visibleCount = 0;
   for (const UiEventRecord &event : recentUiEvents) {
     if (uiEventVisible(event)) {
@@ -5386,6 +5457,65 @@ void SubtrActorPlugin::renderEventsWindow() {
   ImGui::Columns(1);
   ImGui::EndChild();
   ImGui::End();
+}
+
+void SubtrActorPlugin::renderEventSourceControls() {
+  ImGui::SetNextItemOpen(true, ImGuiCond_FirstUseEver);
+  if (!ImGui::TreeNode("Event sources##event-source-controls")) {
+    return;
+  }
+
+  std::vector<std::string> selected =
+      selectedEventSourceTokens(cvarString("subtr_actor_overlay_event_types", "all"));
+  auto applySelection = [&]() {
+    setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
+  };
+
+  if (ImGui::SmallButton("All##event-sources")) {
+    selected = selectedEventSourceTokens("all");
+    applySelection();
+  }
+  ImGui::SameLine();
+  if (ImGui::SmallButton("None##event-sources")) {
+    selected.clear();
+    applySelection();
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", eventFilterLabel(cvarString("subtr_actor_overlay_event_types", "all")));
+
+  ImGui::BeginChild("event-source-list", ImVec2{0.0f, 145.0f}, true);
+  ImGui::Columns(2, "event-source-columns", false);
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (std::string_view{option.value} == "all") {
+      continue;
+    }
+
+    size_t count = 0;
+    for (const UiEventRecord &event : recentUiEvents) {
+      if (eventFilterAllows(option.value, event.category, event.type)) {
+        count += 1;
+      }
+    }
+
+    ImGui::PushID(option.value);
+    bool enabled = containsString(selected, option.value);
+    const std::string label = std::format("{} ({})", option.label, count);
+    if (ImGui::Checkbox(label.c_str(), &enabled)) {
+      if (enabled && !containsString(selected, option.value)) {
+        selected.emplace_back(option.value);
+      } else if (!enabled) {
+        selected.erase(
+            std::remove(selected.begin(), selected.end(), std::string{option.value}),
+            selected.end());
+      }
+      applySelection();
+    }
+    ImGui::PopID();
+    ImGui::NextColumn();
+  }
+  ImGui::Columns(1);
+  ImGui::EndChild();
+  ImGui::TreePop();
 }
 
 bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) const {

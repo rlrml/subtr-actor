@@ -342,6 +342,7 @@ private:
   void renderLauncherWindow();
   void renderScoreboardWindow();
   void renderEventsWindow();
+  void renderEventSourceControls();
   void renderStatusWindow();
   void renderCameraWindow();
   void renderPlaybackControlsWindow();
