@@ -419,6 +419,8 @@ private:
       std::string_view statId,
       size_t index);
   std::filesystem::path uiConfigPath() const;
+  std::string uiConfigJson() const;
+  void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();
   int recentEventCountForActor(std::string_view actor) const;

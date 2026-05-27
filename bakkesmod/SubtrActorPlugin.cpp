@@ -9,6 +9,7 @@
 #include <fstream>
 #include <format>
 #include <iterator>
+#include <sstream>
 #include <type_traits>
 
 #include "imgui/imgui.h"
@@ -2281,6 +2282,18 @@ void SubtrActorPlugin::loadUiConfig() {
   }
 
   const std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  applyUiConfigJson(json, path.string());
+}
+
+void SubtrActorPlugin::applyUiConfigJson(
+    const std::string &json,
+    std::string_view sourceLabel) {
+  const size_t firstJsonByte = json.find_first_not_of(" \t\r\n");
+  if (firstJsonByte == std::string::npos || json[firstJsonByte] != '{' ||
+      json.find("\"version\"") == std::string::npos) {
+    cvarManager->log(std::format("subtr-actor: ignored invalid UI config from {}", sourceLabel));
+    return;
+  }
 
   auto loadPlacement = [](const std::string &parent, const char *name, UiWindowPlacement &out) {
     const auto object = parseJsonObjectProperty(parent, name);
@@ -2521,20 +2534,11 @@ void SubtrActorPlugin::loadUiConfig() {
     cvarManager->log(std::format(
         "subtr-actor: loaded {} UI stats windows from {}",
         uiStatsWindows.size(),
-        path.string()));
+        sourceLabel));
   }
 }
 
-void SubtrActorPlugin::saveUiConfig() {
-  const auto path = uiConfigPath();
-  std::error_code error;
-  std::filesystem::create_directories(path.parent_path(), error);
-  if (error) {
-    cvarManager->log(
-        std::format("subtr-actor: failed to create UI config directory: {}", error.message()));
-    return;
-  }
-
+std::string SubtrActorPlugin::uiConfigJson() const {
   auto kindValue = [](UiStatsWindowKind kind) {
     switch (kind) {
     case UiStatsWindowKind::Player:
@@ -2564,12 +2568,7 @@ void SubtrActorPlugin::saveUiConfig() {
         << ",\"viewport_height\":" << placement.viewport_height << "}";
   };
 
-  std::ofstream file(path, std::ios::binary);
-  if (!file) {
-    cvarManager->log(std::format("subtr-actor: failed to write UI config {}", path.string()));
-    return;
-  }
-
+  std::ostringstream file;
   file << "{\n";
   file << "  \"version\": 1,\n";
   file << "  \"launcher_open\": " << (uiLauncherOpen ? "true" : "false") << ",\n";
@@ -2720,6 +2719,26 @@ void SubtrActorPlugin::saveUiConfig() {
   }
   file << "  ]\n";
   file << "}\n";
+  return file.str();
+}
+
+void SubtrActorPlugin::saveUiConfig() {
+  const auto path = uiConfigPath();
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error) {
+    cvarManager->log(
+        std::format("subtr-actor: failed to create UI config directory: {}", error.message()));
+    return;
+  }
+
+  std::ofstream file(path, std::ios::binary);
+  if (!file) {
+    cvarManager->log(std::format("subtr-actor: failed to write UI config {}", path.string()));
+    return;
+  }
+
+  file << uiConfigJson();
 }
 
 float SubtrActorPlugin::sampleIntervalSeconds() {
@@ -5525,6 +5544,20 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::SameLine();
   if (ImGui::Button("Reload layout")) {
     loadUiConfig();
+  }
+  if (ImGui::Button("Copy layout JSON")) {
+    const std::string json = uiConfigJson();
+    ImGui::SetClipboardText(json.c_str());
+    cvarManager->log(std::format("subtr-actor: copied {} UI config bytes", json.size()));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Paste layout JSON")) {
+    const char *clipboardText = ImGui::GetClipboardText();
+    if (clipboardText == nullptr || clipboardText[0] == '\0') {
+      cvarManager->log("subtr-actor: clipboard does not contain UI config JSON");
+    } else {
+      applyUiConfigJson(clipboardText, "clipboard");
+    }
   }
 
   ImGui::Separator();
