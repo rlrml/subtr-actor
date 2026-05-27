@@ -7432,10 +7432,8 @@ void SubtrActorPlugin::renderEventFilterModuleSummaryToggle(
   setCvarString("subtr_actor_overlay_event_types", eventFilterFromSelectedSources(selected));
 }
 
-void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
-  if (ImGui::TreeNodeEx(
-          std::format("Timeline visualizations##{}-timeline", idSuffix).c_str(),
-          ImGuiTreeNodeFlags_DefaultOpen)) {
+void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix, bool collapsibleGroups) {
+  auto renderTimelineControls = [&]() {
     renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix);
     renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix);
     renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix);
@@ -7472,12 +7470,9 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
         timelineRangeAbsolutePositioningEnabled,
         idSuffix);
     renderBoolModuleSummaryToggle("Playlist follow", eventPlaylistAutoFollow, idSuffix);
-    ImGui::TreePop();
-  }
+  };
 
-  if (ImGui::TreeNodeEx(
-          std::format("In-game visualizations##{}-ingame", idSuffix).c_str(),
-          ImGuiTreeNodeFlags_DefaultOpen)) {
+  auto renderInGameControls = [&]() {
     renderCvarModuleSummaryToggle(
         "Canvas status line",
         "subtr_actor_status_overlay_enabled",
@@ -7521,8 +7516,30 @@ void SubtrActorPlugin::renderModuleSummaryControls(const char *idSuffix) {
       boostPickupPadAmbiguous = next;
       scheduleUiConfigAutosave();
     }
-    ImGui::TreePop();
+  };
+
+  if (collapsibleGroups) {
+    if (ImGui::TreeNodeEx(
+            std::format("Timeline visualizations##{}-timeline", idSuffix).c_str(),
+            ImGuiTreeNodeFlags_DefaultOpen)) {
+      renderTimelineControls();
+      ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNodeEx(
+            std::format("In-game visualizations##{}-ingame", idSuffix).c_str(),
+            ImGuiTreeNodeFlags_DefaultOpen)) {
+      renderInGameControls();
+      ImGui::TreePop();
+    }
+    return;
   }
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMELINE VISUALIZATIONS");
+  renderTimelineControls();
+  ImGui::Spacing();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "IN-GAME VISUALIZATIONS");
+  renderInGameControls();
 }
 
 void SubtrActorPlugin::renderModuleSettingsControls(
@@ -7815,7 +7832,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);
 
   ImGui::Separator();
-  renderModuleSummaryControls("launcher-module-summary");
+  renderModuleSummaryControls("launcher-module-summary", false);
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "MODULE SETTINGS");
