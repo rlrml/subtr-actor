@@ -84,6 +84,8 @@ private:
   using WriteAnalysisNodeNamesJson = WriteJson;
   using GraphInfoJsonLen = JsonLen;
   using WriteGraphInfoJson = WriteJson;
+  using DecodedStatsPlayerConfigJsonLen = size_t (*)(const char *);
+  using WriteDecodedStatsPlayerConfigJson = size_t (*)(const char *, uint8_t *, size_t);
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
   using DrainTeamEvents = size_t (*)(SaEngine *, SaTeamEvent *, size_t);
   using DrainGoalContextEvents = size_t (*)(SaEngine *, SaGoalContextEvent *, size_t);
@@ -238,6 +240,8 @@ private:
   WriteAnalysisNodeNamesJson writeAnalysisNodeNamesJson = nullptr;
   GraphInfoJsonLen graphInfoJsonLen = nullptr;
   WriteGraphInfoJson writeGraphInfoJson = nullptr;
+  DecodedStatsPlayerConfigJsonLen decodedStatsPlayerConfigJsonLen = nullptr;
+  WriteDecodedStatsPlayerConfigJson writeDecodedStatsPlayerConfigJson = nullptr;
   DrainEvents drainEvents = nullptr;
   DrainTeamEvents drainTeamEvents = nullptr;
   DrainGoalContextEvents drainGoalContextEvents = nullptr;
@@ -568,6 +572,7 @@ private:
       size_t index);
   std::filesystem::path uiConfigPath() const;
   std::string uiConfigJson();
+  std::optional<std::string> statsPlayerCfgJsonFromClipboard(std::string_view clipboardText);
   void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();

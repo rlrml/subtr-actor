@@ -1079,7 +1079,7 @@ std::optional<std::string> urlDecode(std::string_view value) {
   return decoded;
 }
 
-std::optional<std::string> statsPlayerCfgJsonFromClipboard(std::string_view clipboardText) {
+std::optional<std::string> statsPlayerCfgValueFromClipboard(std::string_view clipboardText) {
   const size_t firstByte = clipboardText.find_first_not_of(" \t\r\n");
   if (firstByte == std::string_view::npos) {
     return std::nullopt;
@@ -1103,7 +1103,7 @@ std::optional<std::string> statsPlayerCfgJsonFromClipboard(std::string_view clip
     return std::nullopt;
   }
   const size_t decodedFirstByte = decoded->find_first_not_of(" \t\r\n");
-  if (decodedFirstByte == std::string::npos || (*decoded)[decodedFirstByte] != '{') {
+  if (decodedFirstByte == std::string::npos) {
     return std::nullopt;
   }
   return decoded->substr(decodedFirstByte);
@@ -2381,6 +2381,50 @@ SaPlayerFrame syntheticPlayer(
 
 } // namespace
 
+std::optional<std::string> SubtrActorPlugin::statsPlayerCfgJsonFromClipboard(
+    std::string_view clipboardText) {
+  const std::optional<std::string> value = statsPlayerCfgValueFromClipboard(clipboardText);
+  if (!value) {
+    return std::nullopt;
+  }
+
+  const size_t firstByte = value->find_first_not_of(" \t\r\n");
+  if (firstByte == std::string::npos) {
+    return std::nullopt;
+  }
+  if ((*value)[firstByte] == '{') {
+    return value->substr(firstByte);
+  }
+
+  if (!decodedStatsPlayerConfigJsonLen || !writeDecodedStatsPlayerConfigJson) {
+    return std::nullopt;
+  }
+
+  const std::string encoded = value->substr(firstByte);
+  if (encoded.find('\0') != std::string::npos) {
+    return std::nullopt;
+  }
+  const size_t byteCount = decodedStatsPlayerConfigJsonLen(encoded.c_str());
+  if (byteCount == 0) {
+    return std::nullopt;
+  }
+
+  std::string json(byteCount, '\0');
+  const size_t written = writeDecodedStatsPlayerConfigJson(
+      encoded.c_str(),
+      reinterpret_cast<uint8_t *>(json.data()),
+      json.size());
+  if (written == 0 || written > json.size()) {
+    return std::nullopt;
+  }
+  json.resize(written);
+  const size_t jsonFirstByte = json.find_first_not_of(" \t\r\n");
+  if (jsonFirstByte == std::string::npos || json[jsonFirstByte] != '{') {
+    return std::nullopt;
+  }
+  return json.substr(jsonFirstByte);
+}
+
 std::string SubtrActorPlugin::webUiStatIdForWindow(
     const UiStatsWindow &window,
     const UiStatsWindow::Entry &entry) const {
@@ -2917,6 +2961,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_graph_info_json_len"));
   writeGraphInfoJson = reinterpret_cast<WriteGraphInfoJson>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_graph_info_json"));
+  decodedStatsPlayerConfigJsonLen = reinterpret_cast<DecodedStatsPlayerConfigJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_decoded_stats_player_config_json_len"));
+  writeDecodedStatsPlayerConfigJson = reinterpret_cast<WriteDecodedStatsPlayerConfigJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_decoded_stats_player_config_json"));
   drainEvents = reinterpret_cast<DrainEvents>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_drain_events"));
   drainTeamEvents = reinterpret_cast<DrainTeamEvents>(
@@ -2944,6 +2992,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !writeStatsModuleConfigJson || !graphOutputJsonLen || !writeGraphOutputJson ||
       !analysisNodeJsonLen || !writeAnalysisNodeJson || !analysisNodeNamesJsonLen ||
       !writeAnalysisNodeNamesJson || !graphInfoJsonLen || !writeGraphInfoJson ||
+      !decodedStatsPlayerConfigJsonLen || !writeDecodedStatsPlayerConfigJson ||
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
       !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
@@ -2997,6 +3046,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   writeAnalysisNodeNamesJson = nullptr;
   graphInfoJsonLen = nullptr;
   writeGraphInfoJson = nullptr;
+  decodedStatsPlayerConfigJsonLen = nullptr;
+  writeDecodedStatsPlayerConfigJson = nullptr;
   drainEvents = nullptr;
   drainTeamEvents = nullptr;
   drainGoalContextEvents = nullptr;
@@ -7478,7 +7529,7 @@ void SubtrActorPlugin::renderLauncherWorkspaceControls() {
       applyUiConfigJson(*configJson, "clipboard");
     } else {
       cvarManager->log(
-          "subtr-actor: clipboard does not contain raw UI config JSON or a raw JSON cfg value");
+          "subtr-actor: clipboard does not contain UI config JSON or a stats-player cfg value");
     }
   }
 }

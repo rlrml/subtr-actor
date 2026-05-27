@@ -292,6 +292,12 @@ int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame 
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_pending_team_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_pending_goal_context_event_count(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_decoded_stats_player_config_json_len(
+    const char *encoded_config);
+size_t subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+    const char *encoded_config,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_events_json(
     const SaEngine *engine,

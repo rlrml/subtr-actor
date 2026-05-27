@@ -110,6 +110,14 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
     ("subtr_actor_bakkesmod_engine_reset", "engineReset"),
     ("subtr_actor_bakkesmod_finish", "engineFinish"),
     ("subtr_actor_bakkesmod_process_frame", "processFrame"),
+    (
+        "subtr_actor_bakkesmod_decoded_stats_player_config_json_len",
+        "decodedStatsPlayerConfigJsonLen",
+    ),
+    (
+        "subtr_actor_bakkesmod_write_decoded_stats_player_config_json",
+        "writeDecodedStatsPlayerConfigJson",
+    ),
     ("subtr_actor_bakkesmod_events_json_len", "eventsJsonLen"),
     ("subtr_actor_bakkesmod_write_events_json", "writeEventsJson"),
     ("subtr_actor_bakkesmod_frame_json_len", "frameJsonLen"),

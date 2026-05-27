@@ -163,6 +163,8 @@ $RustNeedles = @(
     "subtr_actor_bakkesmod_write_analysis_node_json",
     "subtr_actor_bakkesmod_analysis_node_names_json_len",
     "subtr_actor_bakkesmod_write_analysis_node_names_json",
+    "subtr_actor_bakkesmod_decoded_stats_player_config_json_len",
+    "subtr_actor_bakkesmod_write_decoded_stats_player_config_json",
     "subtr_actor_bakkesmod_replay_annotations_create",
     "subtr_actor_bakkesmod_replay_annotation_player_count",
     "subtr_actor_bakkesmod_write_replay_annotation_players",

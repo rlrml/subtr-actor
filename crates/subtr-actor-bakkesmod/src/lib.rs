@@ -2,11 +2,15 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ffi::{CStr, CString};
+use std::io::Read;
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine as _;
 use boxcars::{ParserBuilder, Quaternion, RemoteId, RigidBody, Vector3f};
+use flate2::read::{DeflateDecoder, ZlibDecoder};
 use subtr_actor::{
     boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
@@ -2757,6 +2761,39 @@ fn serialize_live_graph_output(engine: &SaEngine, output_name: &str) -> Option<V
     }
 }
 
+fn inflate_stats_player_config_bytes(compressed: &[u8]) -> Option<Vec<u8>> {
+    let mut raw_decoder = DeflateDecoder::new(compressed);
+    let mut json = Vec::new();
+    if raw_decoder.read_to_end(&mut json).is_ok()
+        && serde_json::from_slice::<serde_json::Value>(&json).is_ok()
+    {
+        return Some(json);
+    }
+
+    let mut zlib_decoder = ZlibDecoder::new(compressed);
+    let mut json = Vec::new();
+    if zlib_decoder.read_to_end(&mut json).is_ok()
+        && serde_json::from_slice::<serde_json::Value>(&json).is_ok()
+    {
+        return Some(json);
+    }
+
+    None
+}
+
+fn decode_stats_player_config_json(value: &CStr) -> Option<Vec<u8>> {
+    let value = value.to_str().ok()?.trim();
+    if value.starts_with('{') {
+        return Some(value.as_bytes().to_vec());
+    }
+
+    let compressed = URL_SAFE_NO_PAD
+        .decode(value)
+        .or_else(|_| URL_SAFE.decode(value))
+        .ok()?;
+    inflate_stats_player_config_bytes(&compressed)
+}
+
 fn refresh_timeline_graph_state(engine: &mut SaEngine) {
     let Some(events) = engine
         .graph
@@ -3100,6 +3137,56 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
         .as_ref()
         .map(|engine| engine.pending_goal_context_events.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of a decoded stats-player config JSON payload.
+///
+/// Accepts the compressed base64url `cfg` value emitted by the web stats
+/// evaluation player. Raw JSON is accepted as a compatibility fallback.
+///
+/// # Safety
+///
+/// `encoded_config` must either be null or point to a valid null-terminated
+/// UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_decoded_stats_player_config_json_len(
+    encoded_config: *const c_char,
+) -> usize {
+    if encoded_config.is_null() {
+        return 0;
+    }
+    let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
+    decode_stats_player_config_json(encoded_config)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes a decoded stats-player config JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_decoded_stats_player_config_json_len` first to size
+/// the destination buffer.
+///
+/// # Safety
+///
+/// `encoded_config` must point to a valid null-terminated UTF-8 string.
+/// `out_bytes` must point to writable storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+    encoded_config: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if encoded_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
+    let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
 }
 
 #[no_mangle]
@@ -3718,8 +3805,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use std::collections::{BTreeMap, BTreeSet};
     use std::ffi::CString;
+    use std::io::Write as _;
     use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
     use subtr_actor::{
         BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
@@ -3740,6 +3829,43 @@ mod tests {
             .join("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay")
             .canonicalize()
             .expect("real replay fixture should resolve")
+    }
+
+    fn deflated_base64url_json(json: &str) -> CString {
+        let mut encoder =
+            flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::best());
+        encoder.write_all(json.as_bytes()).unwrap();
+        let compressed = encoder.finish().unwrap();
+        CString::new(URL_SAFE_NO_PAD.encode(compressed)).unwrap()
+    }
+
+    #[test]
+    fn decodes_stats_player_config_cfg_payload() {
+        let json = r#"{"version":1,"playback":{},"camera":{},"overlays":{"timelineEvents":[],"timelineRanges":[],"mechanics":[],"renderEffects":[],"followedPlayerHud":false,"boostPads":false,"boostPickupAnimation":false},"recording":{},"singletonWindows":[],"statsWindows":[],"moduleConfigs":{}}"#;
+        let encoded = deflated_base64url_json(json);
+
+        let byte_count =
+            unsafe { subtr_actor_bakkesmod_decoded_stats_player_config_json_len(encoded.as_ptr()) };
+        assert_eq!(byte_count, json.len());
+
+        let mut bytes = vec![0; byte_count];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+                encoded.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json.len());
+        assert_eq!(String::from_utf8(bytes).unwrap(), json);
+    }
+
+    #[test]
+    fn decoded_stats_player_config_accepts_raw_json_fallback() {
+        let json = CString::new(r#"{"version":1,"statsWindows":[]}"#).unwrap();
+        let byte_count =
+            unsafe { subtr_actor_bakkesmod_decoded_stats_player_config_json_len(json.as_ptr()) };
+        assert_eq!(byte_count, json.as_bytes().len());
     }
 
     fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
