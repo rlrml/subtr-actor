@@ -393,6 +393,7 @@ private:
   void resetProfileTiming();
   void render(CanvasWrapper canvas);
   void renderLauncherToggleChrome();
+  void applyLauncherMenuPlacement();
   void renderLauncherWindow();
   void renderScoreboardWindow();
   void renderEventsWindow();

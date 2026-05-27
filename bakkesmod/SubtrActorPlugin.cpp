@@ -34,6 +34,9 @@ constexpr ImGuiWindowFlags UI_CHROME_WINDOW_FLAGS =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
+constexpr ImGuiWindowFlags UI_LAUNCHER_MENU_WINDOW_FLAGS =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 constexpr wchar_t RUST_DLL_NAME[] = L"subtr_actor_bakkesmod.dll";
 constexpr char BALL_TOUCH_EVENT[] = "Function TAGame.Ball_TA.OnCarTouch";
 constexpr char BOOST_PICKED_UP_EVENT[] = "Function TAGame.VehiclePickup_TA.EventPickedUp";
@@ -6876,12 +6879,29 @@ void SubtrActorPlugin::renderLauncherToggleChrome() {
   ImGui::PopStyleVar(2);
 }
 
+void SubtrActorPlugin::applyLauncherMenuPlacement() {
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const float width = 340.0f;
+  const float height = std::max(320.0f, displaySize.y > 0.0f ? displaySize.y - 68.0f : 650.0f);
+  ImGui::SetNextWindowPos(ImVec2{12.0f, 50.0f}, ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2{width, height}, ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.92f);
+  if (launcherPlacement.pending_focus) {
+    ImGui::SetNextWindowFocus();
+    launcherPlacement.z_index = nextUiWindowZIndex++;
+    launcherPlacement.pending_focus = false;
+  }
+}
+
 void SubtrActorPlugin::renderLauncherWindow() {
   if (!uiLauncherOpen) {
     return;
   }
-  applyWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f);
-  if (!ImGui::Begin("subtr-actor", &uiLauncherOpen, UI_FLOATING_WINDOW_FLAGS)) {
+  applyLauncherMenuPlacement();
+  if (!ImGui::Begin(
+          "subtr-actor menu##subtr-actor",
+          &uiLauncherOpen,
+          UI_LAUNCHER_MENU_WINDOW_FLAGS)) {
     ImGui::End();
     return;
   }
