@@ -6426,6 +6426,14 @@ void SubtrActorPlugin::resetSingletonWindowPlacement(
   placement.z_index = nextUiWindowZIndex++;
 }
 
+void SubtrActorPlugin::resetScoreboardWindowPlacement(bool focus) {
+  constexpr float width = 88.0f;
+  constexpr float height = 34.0f;
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const float x = displaySize.x > 0.0f ? (displaySize.x - width) * 0.5f : 760.0f;
+  resetSingletonWindowPlacement(scoreboardPlacement, x, 11.0f, width, height, focus);
+}
+
 void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   const ImVec2 position = ImGui::GetWindowPos();
   const ImVec2 size = ImGui::GetWindowSize();
@@ -6452,6 +6460,46 @@ bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open
   ImGui::TextDisabled("%s", label);
   ImGui::Separator();
   return false;
+}
+
+void SubtrActorPlugin::applyScoreboardWindowPlacement() {
+  auto applyFocus = [&]() {
+    if (scoreboardPlacement.pending_focus) {
+      ImGui::SetNextWindowFocus();
+      scoreboardPlacement.z_index = nextUiWindowZIndex++;
+      scoreboardPlacement.pending_focus = false;
+    }
+  };
+
+  if (scoreboardPlacement.has_placement) {
+    const ImGuiCond condition =
+        scoreboardPlacement.pending_apply_placement ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+    const float width = std::max(70.0f, scoreboardPlacement.width);
+    const float height = std::max(28.0f, scoreboardPlacement.height);
+    const ImVec2 position = mapWindowPositionToViewport(
+        scoreboardPlacement.x,
+        scoreboardPlacement.y,
+        width,
+        height,
+        scoreboardPlacement.viewport_width,
+        scoreboardPlacement.viewport_height);
+    ImGui::SetNextWindowPos(position, condition);
+    scoreboardPlacement.x = position.x;
+    scoreboardPlacement.y = position.y;
+    scoreboardPlacement.width = width;
+    scoreboardPlacement.height = height;
+    scoreboardPlacement.pending_apply_placement = false;
+    applyFocus();
+    return;
+  }
+
+  constexpr float width = 88.0f;
+  constexpr float height = 34.0f;
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  const float x = displaySize.x > 0.0f ? (displaySize.x - width) * 0.5f : 760.0f;
+  const ImVec2 position = mapWindowPositionToViewport(x, 11.0f, width, height, 0.0f, 0.0f);
+  ImGui::SetNextWindowPos(position, ImGuiCond_FirstUseEver);
+  applyFocus();
 }
 
 void SubtrActorPlugin::applyStatsWindowPlacement(UiStatsWindow &window) {
@@ -6827,12 +6875,15 @@ void SubtrActorPlugin::renderScoreboardWindow() {
   if (!uiScoreboardOpen) {
     return;
   }
-  applyWindowPlacement(scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f);
+  applyScoreboardWindowPlacement();
   constexpr ImGuiWindowFlags scoreboardFlags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{10.0f, 6.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 999.0f);
   if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen, scoreboardFlags)) {
     ImGui::End();
+    ImGui::PopStyleVar(2);
     return;
   }
   captureWindowPlacement(scoreboardPlacement);
@@ -6851,6 +6902,7 @@ void SubtrActorPlugin::renderScoreboardWindow() {
     ImGui::TextDisabled("Load a replay to show the scoreboard.");
   }
   ImGui::End();
+  ImGui::PopStyleVar(2);
 }
 
 void SubtrActorPlugin::renderEventsWindow() {
@@ -8462,7 +8514,7 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
   };
 
   std::array<SingletonWindowControl, 13> windows{{
-      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f},
+      {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement, 0.0f, 11.0f, 88.0f, 34.0f},
       {"Events", &uiEventsOpen, &eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f},
       {"Status", &uiStatusOpen, &statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f},
@@ -8529,13 +8581,17 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     ImGui::SameLine();
     if (ImGui::SmallButton("Reset")) {
       *window.open = true;
-      resetSingletonWindowPlacement(
-          *window.placement,
-          window.x,
-          window.y,
-          window.width,
-          window.height,
-          true);
+      if (window.placement == &scoreboardPlacement) {
+        resetScoreboardWindowPlacement(true);
+      } else {
+        resetSingletonWindowPlacement(
+            *window.placement,
+            window.x,
+            window.y,
+            window.width,
+            window.height,
+            true);
+      }
     }
     ImGui::SameLine();
     ImGui::TextWrapped("%s", window.label);
@@ -8693,7 +8749,7 @@ void SubtrActorPlugin::focusTopLoadedWindow() {
 void SubtrActorPlugin::resetWindowPlacements() {
   nextUiWindowZIndex = 1;
   resetSingletonWindowPlacement(launcherPlacement, 16.0f, 68.0f, 340.0f, 430.0f, true);
-  resetSingletonWindowPlacement(scoreboardPlacement, 760.0f, 18.0f, 210.0f, 78.0f);
+  resetScoreboardWindowPlacement();
   resetSingletonWindowPlacement(eventsPlacement, 16.0f, 505.0f, 520.0f, 360.0f);
   resetSingletonWindowPlacement(eventPlaylistPlacement, 545.0f, 505.0f, 430.0f, 430.0f);
   resetSingletonWindowPlacement(statusPlacement, 1230.0f, 68.0f, 330.0f, 220.0f);

@@ -431,12 +431,14 @@ private:
       float width,
       float height,
       bool focus = false);
+  void resetScoreboardWindowPlacement(bool focus = false);
   void applyWindowPlacement(
       UiWindowPlacement &placement,
       float x,
       float y,
       float width,
       float height);
+  void applyScoreboardWindowPlacement();
   void captureWindowPlacement(UiWindowPlacement &placement);
   bool renderSingletonWindowHeader(const char *label, bool &open);
   void applyStatsWindowPlacement(UiStatsWindow &window);
