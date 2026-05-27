@@ -3782,19 +3782,26 @@ void SubtrActorPlugin::applyUiConfigJson(
         std::max(0.0, parseJsonNumberProperty(object, "module_view").value_or(0.0)));
     const bool hasEntriesProperty = object.find("\"entries\"") != std::string::npos;
     for (const std::string &statId : parseJsonStringArrayProperty(object, "entries")) {
+      if (statsWindowObjectsFromWeb) {
+        continue;
+      }
       window.entries.push_back(UiStatsWindow::Entry{normalizeUiStatId(statId), ""});
     }
     for (const std::string &entryObject : parseJsonObjectArrayProperty(object, "entries")) {
-      std::string statId = parseJsonStringProperty(entryObject, "stat_id").value_or("");
-      if (statId.empty()) {
+      std::string statId = statsWindowObjectsFromWeb
+                               ? parseJsonStringProperty(entryObject, "statId").value_or("")
+                               : parseJsonStringProperty(entryObject, "stat_id").value_or("");
+      if (!statsWindowObjectsFromWeb && statId.empty()) {
         statId = parseJsonStringProperty(entryObject, "statId").value_or("");
       }
       if (statId.empty()) {
         continue;
       }
       statId = normalizeUiStatId(statId);
-      std::string targetId = parseJsonStringProperty(entryObject, "target_id").value_or("");
-      if (targetId.empty()) {
+      std::string targetId = statsWindowObjectsFromWeb
+                                 ? parseJsonStringProperty(entryObject, "targetId").value_or("")
+                                 : parseJsonStringProperty(entryObject, "target_id").value_or("");
+      if (!statsWindowObjectsFromWeb && targetId.empty()) {
         targetId = parseJsonStringProperty(entryObject, "targetId").value_or("");
       }
       window.entries.push_back(UiStatsWindow::Entry{statId, targetId});

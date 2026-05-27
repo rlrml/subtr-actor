@@ -523,6 +523,24 @@ def main() -> int:
         "web stats window import preserves missing entries as empty",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'std::string statId = statsWindowObjectsFromWeb\n                               ? parseJsonStringProperty(entryObject, "statId").value_or("")\n                               : parseJsonStringProperty(entryObject, "stat_id").value_or("");',
+        "web selected stat import only reads statId",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::string targetId = statsWindowObjectsFromWeb\n                                 ? parseJsonStringProperty(entryObject, "targetId").value_or("")\n                                 : parseJsonStringProperty(entryObject, "target_id").value_or("");',
+        "web selected stat import only reads targetId",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (statsWindowObjectsFromWeb) {\n        continue;\n      }",
+        "web selected stat import rejects string-array entries",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'if (statsWindowObjects.empty()) {\n    statsWindowObjects = parseJsonObjectArrayProperty(json, "statsWindows");\n  }',
