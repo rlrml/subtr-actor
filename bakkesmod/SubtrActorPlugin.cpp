@@ -1032,6 +1032,29 @@ std::string clippedDisplayText(std::string value, size_t maxBytes = 24000) {
   return value;
 }
 
+std::string formatGraphStatNumber(double value) {
+  if (!std::isfinite(value)) {
+    return "--";
+  }
+  if (std::trunc(value) == value) {
+    return std::format("{:.0f}", value);
+  }
+
+  double rounded = std::round(value * 1000.0) / 1000.0;
+  if (rounded == 0.0) {
+    rounded = 0.0;
+  }
+
+  std::string formatted = std::format("{:.3f}", rounded);
+  while (!formatted.empty() && formatted.back() == '0') {
+    formatted.pop_back();
+  }
+  if (!formatted.empty() && formatted.back() == '.') {
+    formatted.pop_back();
+  }
+  return formatted.empty() ? "--" : formatted;
+}
+
 std::string formatByteSize(size_t bytes) {
   constexpr double KIB = 1024.0;
   constexpr double MIB = KIB * 1024.0;
@@ -1208,6 +1231,56 @@ std::vector<std::string_view> dotPathSegments(std::string_view path) {
   return segments;
 }
 
+std::string formatGraphStatJsonValueAt(const std::string &json, size_t offset) {
+  skipJsonWhitespace(json, offset);
+  if (offset >= json.size()) {
+    return "--";
+  }
+
+  if (json.compare(offset, 4, "null") == 0) {
+    return "--";
+  }
+  if (json.compare(offset, 4, "true") == 0) {
+    return "true";
+  }
+  if (json.compare(offset, 5, "false") == 0) {
+    return "false";
+  }
+
+  if (json[offset] == '"') {
+    auto value = parseJsonString(json, offset);
+    return value ? clippedDisplayText(*value, 240) : "--";
+  }
+
+  if (json[offset] == '[') {
+    const auto count = parseJsonArrayElementCountAt(json, offset);
+    if (count && *count == 0) {
+      return "[]";
+    }
+    const size_t start = offset;
+    size_t end = offset;
+    if (!skipJsonValue(json, end)) {
+      return "--";
+    }
+    return clippedDisplayText(json.substr(start, end - start), 240);
+  }
+
+  if (json[offset] == '{') {
+    return "object";
+  }
+
+  const size_t start = offset;
+  size_t end = offset;
+  if (!skipJsonValue(json, end)) {
+    return "--";
+  }
+  try {
+    return formatGraphStatNumber(std::stod(json.substr(start, end - start)));
+  } catch (...) {
+    return "--";
+  }
+}
+
 std::optional<std::string> jsonDisplayValueAtPath(
     const std::string &json,
     std::string_view path) {
@@ -1222,7 +1295,7 @@ std::optional<std::string> jsonDisplayValueAtPath(
       return std::nullopt;
     }
     if (index + 1 == segments.size()) {
-      return summarizeJsonValueAt(*value, 0);
+      return formatGraphStatJsonValueAt(*value, 0);
     }
     size_t offset = 0;
     skipJsonWhitespace(*value, offset);
