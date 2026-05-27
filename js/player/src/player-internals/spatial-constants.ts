@@ -1,0 +1,24 @@
+import * as THREE from "three";
+
+export const CHASE_CAMERA_HEIGHT_MULTIPLIER = 1.4;
+export const CAMERA_SMOOTHING = 0.18;
+export const FREE_CAMERA_TRANSITION_SMOOTHING = 0.14;
+export const GROUND_HEIGHT_THRESHOLD_UU = 120;
+export const MIN_CAMERA_HEIGHT_UU = 90;
+export const PLAYER_FOCUS_HEIGHT_UU = 40;
+export const BALL_CAM_HEIGHT_BIAS_UU = 45;
+export const BALL_CAM_LOOK_BLEND = 0.58;
+export const BALL_CAM_DIRECTION_BLEND = 0.82;
+export const BALL_CAM_MAX_FOV = 132;
+export const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
+export const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
+export const OVERHEAD_UP = new THREE.Vector3(-1, 0, 0);
+export const OVERHEAD_CAMERA_POSITION_UU = new THREE.Vector3(0, 0, 18800);
+export const OVERHEAD_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 700);
+export const SIDE_CAMERA_POSITION_UU = new THREE.Vector3(-9600, -12600, 6400);
+export const SIDE_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 900);
+export const FREE_CAMERA_FOV = 48;
+export const CAMERA_POSITION_EPSILON_SQ = 16;
+export const CAMERA_TARGET_EPSILON_SQ = 16;
+export const CAMERA_UP_EPSILON_RAD = 0.003;
+export const CAMERA_FOV_EPSILON = 0.05;
