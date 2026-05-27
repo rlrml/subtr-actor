@@ -9108,6 +9108,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   if (ImGui::BeginCombo("Target", selectedLabel.c_str())) {
     if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
       cameraViewMode = 0;
+      scheduleUiConfigAutosave();
     }
     for (const SaPlayerFrame &player : sampledPlayers) {
       const std::string label = std::format(
@@ -9120,18 +9121,27 @@ void SubtrActorPlugin::renderCameraWindow() {
         cameraSelectedPlayerIndex = player.player_index;
         cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
         cameraViewMode = 1;
+        scheduleUiConfigAutosave();
       }
     }
     ImGui::EndCombo();
   }
 
-  ImGui::RadioButton("Free##camera-view", &cameraViewMode, 0);
+  if (ImGui::RadioButton("Free##camera-view", &cameraViewMode, 0)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::RadioButton("Follow##camera-view", &cameraViewMode, 1);
+  if (ImGui::RadioButton("Follow##camera-view", &cameraViewMode, 1)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::RadioButton("Overhead##camera-view", &cameraViewMode, 2);
+  if (ImGui::RadioButton("Overhead##camera-view", &cameraViewMode, 2)) {
+    scheduleUiConfigAutosave();
+  }
   ImGui::SameLine();
-  ImGui::RadioButton("Diagonal##camera-view", &cameraViewMode, 3);
+  if (ImGui::RadioButton("Diagonal##camera-view", &cameraViewMode, 3)) {
+    scheduleUiConfigAutosave();
+  }
 
   if (cameraViewMode == 2) {
     cameraFreePreset = 0;
@@ -9158,6 +9168,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   popCameraDisabledStyle(!hasAttachedCamera);
   if (hasAttachedCamera && distanceScaleChanged) {
     cameraDistanceScale = nextDistanceScale;
+    scheduleUiConfigAutosave();
   }
 
   bool nextBallCamEnabled = cameraBallCamEnabled;
@@ -9166,6 +9177,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   popCameraDisabledStyle(!hasAttachedCamera);
   if (hasAttachedCamera && ballCamChanged) {
     cameraBallCamEnabled = nextBallCamEnabled;
+    scheduleUiConfigAutosave();
   }
 
   bool nextCustomSettingsEnabled = cameraCustomSettingsEnabled;
@@ -9175,6 +9187,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   popCameraDisabledStyle(!hasAttachedCamera);
   if (hasAttachedCamera && customSettingsChanged) {
     cameraCustomSettingsEnabled = nextCustomSettingsEnabled;
+    scheduleUiConfigAutosave();
   }
   if (cameraCustomSettingsEnabled) {
     const bool customControlsDisabled = !hasAttachedCamera;
@@ -9186,6 +9199,7 @@ void SubtrActorPlugin::renderCameraWindow() {
       popCameraDisabledStyle(customControlsDisabled);
       if (!customControlsDisabled && changed) {
         value = next;
+        scheduleUiConfigAutosave();
       }
     };
     renderCustomSlider("FOV", cameraCustomFov, 60.0f, 130.0f, "%.0f");
@@ -9357,12 +9371,14 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     playbackPlaying = shouldPlay;
     if (!hasReplayServer) {
       playbackStatus = "Open a Rocket League replay to control playback";
+      scheduleUiConfigAutosave();
       return;
     }
 
     if (shouldPlay) {
       replayServer.StartPlaybackAtTime(playbackCurrentTime);
       playbackStatus = std::format("Playing from {:.2f}s", playbackCurrentTime);
+      scheduleUiConfigAutosave();
       return;
     }
 
@@ -9372,6 +9388,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
       replay.StopPlayback();
     }
     playbackStatus = std::format("Paused at {:.2f}s", playbackCurrentTime);
+    scheduleUiConfigAutosave();
   };
 
   ImGui::SetNextItemWidth(140.0f);
@@ -9382,6 +9399,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && currentTimeChanged) {
     playbackCurrentTime = nextPlaybackCurrentTime;
+    scheduleUiConfigAutosave();
   }
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
   ImGui::SetNextItemWidth(140.0f);
@@ -9392,6 +9410,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && rateChanged) {
     playbackRate = nextPlaybackRate;
+    scheduleUiConfigAutosave();
   }
   if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled)) {
     applyPlaybackState(!playbackPlaying);
@@ -9404,6 +9423,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   if (playbackButton("Live replay time", !hasReplayServer)) {
     playbackCurrentTime = replayServer.GetReplayTimeElapsed();
     playbackStatus = std::format("Captured {:.2f}s", playbackCurrentTime);
+    scheduleUiConfigAutosave();
   }
   bool nextPlaying = playbackPlaying;
   pushPlaybackDisabledStyle(!transportEnabled);
@@ -9420,6 +9440,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && skipGoalChanged) {
     playbackSkipPostGoalTransitions = nextSkipPostGoalTransitions;
+    scheduleUiConfigAutosave();
   }
   bool nextSkipKickoffs = playbackSkipKickoffs;
   pushPlaybackDisabledStyle(!transportEnabled);
@@ -9427,6 +9448,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && skipKickoffsChanged) {
     playbackSkipKickoffs = nextSkipKickoffs;
+    scheduleUiConfigAutosave();
   }
 
   ImGui::Separator();
@@ -9591,6 +9613,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
   popRecordingDisabledStyle(recordingSettingsLocked);
   if (!recordingSettingsLocked && fpsChanged) {
     recordingFps = nextRecordingFps;
+    scheduleUiConfigAutosave();
   }
   const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
   recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
@@ -9606,8 +9629,9 @@ void SubtrActorPlugin::renderRecordingWindow() {
     ImGui::EndCombo();
   }
   popRecordingDisabledStyle(recordingSettingsLocked);
-  if (!recordingSettingsLocked) {
+  if (!recordingSettingsLocked && nextRecordingPlaybackRateIndex != recordingPlaybackRateIndex) {
     recordingPlaybackRateIndex = nextRecordingPlaybackRateIndex;
+    scheduleUiConfigAutosave();
   }
   bool nextFinishBeforeDump = recordingFinishBeforeDump;
   pushRecordingDisabledStyle(recordingSettingsLocked);
@@ -9616,6 +9640,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
   popRecordingDisabledStyle(recordingSettingsLocked);
   if (!recordingSettingsLocked && finishBeforeDumpChanged) {
     recordingFinishBeforeDump = nextFinishBeforeDump;
+    scheduleUiConfigAutosave();
   }
 
   ImGui::Separator();
