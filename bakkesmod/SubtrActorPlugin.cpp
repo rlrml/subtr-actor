@@ -2187,6 +2187,7 @@ void SubtrActorPlugin::loadUiConfig() {
   uiScoreboardOpen = parseJsonBoolProperty(json, "scoreboard_open").value_or(uiScoreboardOpen);
   uiEventsOpen = parseJsonBoolProperty(json, "events_open").value_or(uiEventsOpen);
   uiStatusOpen = parseJsonBoolProperty(json, "status_open").value_or(uiStatusOpen);
+  uiCameraOpen = parseJsonBoolProperty(json, "camera_open").value_or(uiCameraOpen);
   uiPlaybackControlsOpen =
       parseJsonBoolProperty(json, "playback_controls_open").value_or(uiPlaybackControlsOpen);
   uiRecordingOpen =
@@ -2214,6 +2215,47 @@ void SubtrActorPlugin::loadUiConfig() {
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  cameraViewMode = static_cast<int>(
+      std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
+  cameraFreePreset = static_cast<int>(
+      std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(0.0), 0.0, 1.0));
+  cameraSelectedPlayerIndex = static_cast<uint32_t>(
+      std::max(0.0, parseJsonNumberProperty(json, "camera_selected_player_index").value_or(0.0)));
+  cameraDistanceScale = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_distance_scale").value_or(1.0),
+      0.75,
+      4.0));
+  cameraCustomSettingsEnabled =
+      parseJsonBoolProperty(json, "camera_custom_settings_enabled")
+          .value_or(cameraCustomSettingsEnabled);
+  cameraBallCamEnabled =
+      parseJsonBoolProperty(json, "camera_ball_cam_enabled").value_or(cameraBallCamEnabled);
+  cameraCustomFov = static_cast<float>(
+      std::clamp(parseJsonNumberProperty(json, "camera_custom_fov").value_or(110.0), 60.0, 130.0));
+  cameraCustomHeight = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_height").value_or(100.0),
+      40.0,
+      250.0));
+  cameraCustomPitch = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_pitch").value_or(-4.0),
+      -30.0,
+      30.0));
+  cameraCustomDistance = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_distance").value_or(270.0),
+      100.0,
+      500.0));
+  cameraCustomStiffness = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_stiffness").value_or(0.0),
+      0.0,
+      1.0));
+  cameraCustomSwivelSpeed = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_swivel_speed").value_or(1.0),
+      1.0,
+      10.0));
+  cameraCustomTransitionSpeed = static_cast<float>(std::clamp(
+      parseJsonNumberProperty(json, "camera_custom_transition_speed").value_or(1.0),
+      0.5,
+      2.0));
   recordingFps = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "recording_fps").value_or(60.0), 1.0, 120.0));
   recordingPlaybackRateIndex = static_cast<int>(std::clamp(
@@ -2269,6 +2311,7 @@ void SubtrActorPlugin::loadUiConfig() {
     loadPlacement(*placements, "scoreboard", scoreboardPlacement);
     loadPlacement(*placements, "events", eventsPlacement);
     loadPlacement(*placements, "status", statusPlacement);
+    loadPlacement(*placements, "camera", cameraPlacement);
     loadPlacement(*placements, "playback_controls", playbackControlsPlacement);
     loadPlacement(*placements, "recording", recordingPlacement);
     loadPlacement(*placements, "graph_inspector", graphInspectorPlacement);
@@ -2393,6 +2436,7 @@ void SubtrActorPlugin::saveUiConfig() {
   file << "  \"scoreboard_open\": " << (uiScoreboardOpen ? "true" : "false") << ",\n";
   file << "  \"events_open\": " << (uiEventsOpen ? "true" : "false") << ",\n";
   file << "  \"status_open\": " << (uiStatusOpen ? "true" : "false") << ",\n";
+  file << "  \"camera_open\": " << (uiCameraOpen ? "true" : "false") << ",\n";
   file << "  \"playback_controls_open\": "
        << (uiPlaybackControlsOpen ? "true" : "false") << ",\n";
   file << "  \"recording_open\": " << (uiRecordingOpen ? "true" : "false") << ",\n";
@@ -2418,6 +2462,21 @@ void SubtrActorPlugin::saveUiConfig() {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
+  file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
+  file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
+  file << "  \"camera_distance_scale\": " << cameraDistanceScale << ",\n";
+  file << "  \"camera_custom_settings_enabled\": "
+       << (cameraCustomSettingsEnabled ? "true" : "false") << ",\n";
+  file << "  \"camera_ball_cam_enabled\": " << (cameraBallCamEnabled ? "true" : "false")
+       << ",\n";
+  file << "  \"camera_custom_fov\": " << cameraCustomFov << ",\n";
+  file << "  \"camera_custom_height\": " << cameraCustomHeight << ",\n";
+  file << "  \"camera_custom_pitch\": " << cameraCustomPitch << ",\n";
+  file << "  \"camera_custom_distance\": " << cameraCustomDistance << ",\n";
+  file << "  \"camera_custom_stiffness\": " << cameraCustomStiffness << ",\n";
+  file << "  \"camera_custom_swivel_speed\": " << cameraCustomSwivelSpeed << ",\n";
+  file << "  \"camera_custom_transition_speed\": " << cameraCustomTransitionSpeed << ",\n";
   file << "  \"recording_fps\": " << recordingFps << ",\n";
   file << "  \"recording_playback_rate_index\": " << recordingPlaybackRateIndex << ",\n";
   file << "  \"recording_finish_before_dump\": "
@@ -2467,6 +2526,8 @@ void SubtrActorPlugin::saveUiConfig() {
   writePlacement(file, eventsPlacement);
   file << ",\n    \"status\": ";
   writePlacement(file, statusPlacement);
+  file << ",\n    \"camera\": ";
+  writePlacement(file, cameraPlacement);
   file << ",\n    \"playback_controls\": ";
   writePlacement(file, playbackControlsPlacement);
   file << ",\n    \"recording\": ";
@@ -4986,6 +5047,7 @@ void SubtrActorPlugin::Render() {
   renderScoreboardWindow();
   renderEventsWindow();
   renderStatusWindow();
+  renderCameraWindow();
   renderPlaybackControlsWindow();
   renderRecordingWindow();
   renderGraphInspectorWindow();
@@ -5133,6 +5195,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Checkbox("Events", &uiEventsOpen);
   ImGui::Checkbox("Event playlist", &uiEventPlaylistOpen);
   ImGui::Checkbox("Status", &uiStatusOpen);
+  ImGui::Checkbox("Camera", &uiCameraOpen);
   ImGui::Checkbox("Playback controls", &uiPlaybackControlsOpen);
   ImGui::Checkbox("Recording", &uiRecordingOpen);
   ImGui::Checkbox("Graph inspector", &uiGraphInspectorOpen);
@@ -5160,6 +5223,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     uiEventsOpen = false;
     uiEventPlaylistOpen = false;
     uiStatusOpen = false;
+    uiCameraOpen = false;
     uiPlaybackControlsOpen = false;
     uiRecordingOpen = false;
     uiGraphInspectorOpen = false;
@@ -5796,6 +5860,11 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     graphInspectorPlacement.pending_focus = true;
   }
   ImGui::SameLine();
+  if (ImGui::Button("Open camera")) {
+    uiCameraOpen = true;
+    cameraPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
   if (ImGui::Button("Open event playlist")) {
     uiEventPlaylistOpen = true;
     eventPlaylistPlacement.pending_focus = true;
@@ -6033,6 +6102,136 @@ void SubtrActorPlugin::renderStatusWindow() {
   ImGui::Text("Sample interval: %.0fms", sampleIntervalSeconds() * 1000.0f);
   ImGui::Text("Players sampled: %zu", sampledPlayers.size());
   ImGui::Text("Recent events: %zu", recentUiEvents.size());
+  ImGui::End();
+}
+
+void SubtrActorPlugin::renderCameraWindow() {
+  if (!uiCameraOpen) {
+    return;
+  }
+
+  const SaPlayerFrame *selectedPlayer = sampledPlayerByIndex(cameraSelectedPlayerIndex);
+  if (cameraViewMode == 1 && selectedPlayer == nullptr && !sampledPlayers.empty()) {
+    cameraSelectedPlayerIndex = sampledPlayers.front().player_index;
+    selectedPlayer = sampledPlayerByIndex(cameraSelectedPlayerIndex);
+  }
+  const SaPlayerFrame *targetPlayer = cameraViewMode == 1 ? selectedPlayer : nullptr;
+
+  applyWindowPlacement(cameraPlacement, 720.0f, 68.0f, 360.0f, 500.0f);
+  if (!ImGui::Begin("Camera##subtr-actor", &uiCameraOpen)) {
+    ImGui::End();
+    return;
+  }
+  captureWindowPlacement(cameraPlacement);
+
+  constexpr std::array<const char *, 4> viewModes{
+      "Free",
+      "Follow",
+      "Overhead",
+      "Diagonal",
+  };
+  cameraViewMode = std::clamp(cameraViewMode, 0, static_cast<int>(viewModes.size()) - 1);
+
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");
+  const std::string selectedLabel =
+      targetPlayer == nullptr
+          ? "Free camera"
+          : playerLabel(targetPlayer->player_index, targetPlayer->is_team_0);
+  if (ImGui::BeginCombo("Target", selectedLabel.c_str())) {
+    if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
+      cameraViewMode = 0;
+    }
+    for (const SaPlayerFrame &player : sampledPlayers) {
+      const std::string label = std::format(
+          "{}##camera-player-{}",
+          playerLabel(player.player_index, player.is_team_0),
+          player.player_index);
+      if (ImGui::Selectable(
+              label.c_str(), targetPlayer != nullptr &&
+                                 targetPlayer->player_index == player.player_index)) {
+        cameraSelectedPlayerIndex = player.player_index;
+        cameraViewMode = 1;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  ImGui::RadioButton("Free##camera-view", &cameraViewMode, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("Follow##camera-view", &cameraViewMode, 1);
+  ImGui::SameLine();
+  ImGui::RadioButton("Overhead##camera-view", &cameraViewMode, 2);
+  ImGui::SameLine();
+  ImGui::RadioButton("Diagonal##camera-view", &cameraViewMode, 3);
+
+  if (cameraViewMode == 2) {
+    cameraFreePreset = 0;
+  } else if (cameraViewMode == 3) {
+    cameraFreePreset = 1;
+  }
+
+  ImGui::SliderFloat("Distance scale", &cameraDistanceScale, 0.75f, 4.0f, "%.2fx");
+  ImGui::Checkbox("Ball cam", &cameraBallCamEnabled);
+  ImGui::Checkbox("Custom settings", &cameraCustomSettingsEnabled);
+  if (cameraCustomSettingsEnabled) {
+    ImGui::SliderFloat("FOV", &cameraCustomFov, 60.0f, 130.0f, "%.0f");
+    ImGui::SliderFloat("Height", &cameraCustomHeight, 40.0f, 240.0f, "%.0f");
+    ImGui::SliderFloat("Pitch", &cameraCustomPitch, -15.0f, 0.0f, "%.1f");
+    ImGui::SliderFloat("Distance", &cameraCustomDistance, 120.0f, 500.0f, "%.0f");
+    ImGui::SliderFloat("Stiffness", &cameraCustomStiffness, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Swivel speed", &cameraCustomSwivelSpeed, 0.1f, 10.0f, "%.1f");
+    ImGui::SliderFloat(
+        "Transition speed", &cameraCustomTransitionSpeed, 0.1f, 10.0f, "%.1f");
+  }
+
+  const float fov = cameraCustomSettingsEnabled ? cameraCustomFov : 110.0f;
+  const float height = cameraCustomSettingsEnabled ? cameraCustomHeight : 100.0f;
+  const float pitch = cameraCustomSettingsEnabled ? cameraCustomPitch : -4.0f;
+  const float distance = (cameraCustomSettingsEnabled ? cameraCustomDistance : 270.0f) *
+                         cameraDistanceScale;
+  const float stiffness = cameraCustomSettingsEnabled ? cameraCustomStiffness : 0.0f;
+
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");
+  ImGui::Text("Mode: %s", viewModes[static_cast<size_t>(cameraViewMode)]);
+  ImGui::Text("Target: %s", selectedLabel.c_str());
+  ImGui::Text("FOV %.0f  Height %.0f  Pitch %.1f", fov, height, pitch);
+  ImGui::Text("Distance %.0f  Stiffness %.2f", distance, stiffness);
+  ImGui::Text("Ball cam: %s", cameraBallCamEnabled ? "on" : "off");
+  if (targetPlayer == nullptr) {
+    ImGui::TextDisabled("No player target selected.");
+  } else if (targetPlayer->has_rigid_body == 0) {
+    ImGui::TextDisabled("Selected player has no rigid body sample.");
+  } else {
+    const SaVec3 location = targetPlayer->rigid_body.location;
+    const SaVec3 velocity = targetPlayer->rigid_body.linear_velocity;
+    ImGui::Text(
+        "Location: %.0f, %.0f, %.0f", location.x, location.y, location.z);
+    if (targetPlayer->rigid_body.has_linear_velocity != 0) {
+      ImGui::Text(
+          "Velocity: %.0f, %.0f, %.0f", velocity.x, velocity.y, velocity.z);
+    }
+  }
+
+  ImGui::Separator();
+  if (ImGui::Button("Open playback")) {
+    uiPlaybackControlsOpen = true;
+    playbackControlsPlacement.pending_focus = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Open recording")) {
+    uiRecordingOpen = true;
+    recordingPlacement.pending_focus = true;
+  }
+  if (targetPlayer != nullptr && ImGui::Button("Open player stats")) {
+    createStatsWindow(UiStatsWindowKind::Player);
+    if (!uiStatsWindows.empty()) {
+      UiStatsWindow &window = uiStatsWindows.back();
+      window.selected_player_index = targetPlayer->player_index;
+      window.selected_team_is_team_0 = targetPlayer->is_team_0;
+    }
+  }
+
   ImGui::End();
 }
 
@@ -6448,11 +6647,12 @@ void SubtrActorPlugin::renderSingletonWindowManager() {
     UiWindowPlacement *placement;
   };
 
-  std::array<SingletonWindowControl, 12> windows{{
+  std::array<SingletonWindowControl, 13> windows{{
       {"Scoreboard", &uiScoreboardOpen, &scoreboardPlacement},
       {"Events", &uiEventsOpen, &eventsPlacement},
       {"Event playlist", &uiEventPlaylistOpen, &eventPlaylistPlacement},
       {"Status", &uiStatusOpen, &statusPlacement},
+      {"Camera", &uiCameraOpen, &cameraPlacement},
       {"Playback controls", &uiPlaybackControlsOpen, &playbackControlsPlacement},
       {"Recording", &uiRecordingOpen, &recordingPlacement},
       {"Graph inspector", &uiGraphInspectorOpen, &graphInspectorPlacement},
@@ -6549,6 +6749,7 @@ void SubtrActorPlugin::resetWindowPlacements() {
   eventsPlacement = UiWindowPlacement{};
   eventPlaylistPlacement = UiWindowPlacement{};
   statusPlacement = UiWindowPlacement{};
+  cameraPlacement = UiWindowPlacement{};
   playbackControlsPlacement = UiWindowPlacement{};
   recordingPlacement = UiWindowPlacement{};
   graphInspectorPlacement = UiWindowPlacement{};
@@ -6588,6 +6789,7 @@ void SubtrActorPlugin::applyDefaultUiWorkspace() {
   uiEventsOpen = true;
   uiEventPlaylistOpen = true;
   uiStatusOpen = true;
+  uiCameraOpen = true;
   uiPlaybackControlsOpen = true;
   uiRecordingOpen = false;
   uiGraphInspectorOpen = false;

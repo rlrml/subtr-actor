@@ -245,6 +245,7 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = true;
   bool uiStatusOpen = true;
+  bool uiCameraOpen = false;
   bool uiPlaybackControlsOpen = false;
   bool uiRecordingOpen = false;
   bool uiGraphInspectorOpen = false;
@@ -258,6 +259,19 @@ private:
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
   bool eventPlaylistAutoFollow = true;
+  int cameraViewMode = 0;
+  int cameraFreePreset = 0;
+  uint32_t cameraSelectedPlayerIndex = 0;
+  float cameraDistanceScale = 1.0f;
+  bool cameraCustomSettingsEnabled = false;
+  bool cameraBallCamEnabled = false;
+  float cameraCustomFov = 110.0f;
+  float cameraCustomHeight = 100.0f;
+  float cameraCustomPitch = -4.0f;
+  float cameraCustomDistance = 270.0f;
+  float cameraCustomStiffness = 0.0f;
+  float cameraCustomSwivelSpeed = 1.0f;
+  float cameraCustomTransitionSpeed = 1.0f;
   int recordingFps = 60;
   int recordingPlaybackRateIndex = 1;
   bool recordingFinishBeforeDump = false;
@@ -294,6 +308,7 @@ private:
   UiWindowPlacement scoreboardPlacement;
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
+  UiWindowPlacement cameraPlacement;
   UiWindowPlacement playbackControlsPlacement;
   UiWindowPlacement recordingPlacement;
   UiWindowPlacement graphInspectorPlacement;
@@ -328,6 +343,7 @@ private:
   void renderScoreboardWindow();
   void renderEventsWindow();
   void renderStatusWindow();
+  void renderCameraWindow();
   void renderPlaybackControlsWindow();
   void renderRecordingWindow();
   void renderGraphInspectorWindow();
