@@ -7378,6 +7378,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       ImGui::TextDisabled("%s", event.details.c_str());
     }
     ImGui::TextDisabled("%s / %s", event.category.c_str(), event.type.c_str());
+    if (active && eventPlaylistAutoFollow) {
+      ImGui::SetScrollHereY(0.5f);
+    }
     ImGui::Separator();
     ImGui::PopID();
   }
@@ -7385,8 +7388,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::TextWrapped(
         noSourcesEnabled ? "No event types selected."
                          : "No events match the selected playlist filters.");
-  } else if (eventPlaylistAutoFollow) {
-    ImGui::SetScrollHereY(1.0f);
   }
   ImGui::EndChild();
   ImGui::End();
