@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeReplayData, normalizeReplayDataAsync } from "@rlrml/subtr-actor-player";
-import type { RawReplayFramesData } from "@rlrml/subtr-actor-player";
+import { normalizeReplayData, normalizeReplayDataAsync } from "subtr-actor-player";
+import type { RawReplayFramesData } from "subtr-actor-player";
 
 function rigidBody(x: number, y: number, z: number) {
   return {

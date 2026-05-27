@@ -1,11 +1,11 @@
-import { ReplayPlayer } from "@rlrml/subtr-actor-player";
+import { ReplayPlayer } from "subtr-actor-player";
 import type {
   FrameRenderInfo,
   BoostPickupAnimationPickup,
   ReplayModel,
   ReplayTimelineEvent,
   ReplayTimelineRange,
-} from "@rlrml/subtr-actor-player";
+} from "subtr-actor-player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot, StatsFrameLookup, StatsTimeline } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";

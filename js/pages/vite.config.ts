@@ -52,8 +52,8 @@ export default defineConfig({
   plugins: [ensureWasmBindingsPlugin()],
   resolve: {
     alias: {
-      "@rlrml/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
-      "@rlrml/subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+      "@colonelpanic8/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
+      "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
       three: path.resolve(import.meta.dirname, "../stat-evaluation-player/node_modules/three"),
     },
   },
@@ -68,7 +68,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["@rlrml/subtr-actor", "@rlrml/subtr-actor-player"],
+    exclude: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
   },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),

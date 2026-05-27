@@ -9,9 +9,9 @@
     "noEmit": false,
     "baseUrl": ".",
     "paths": {
-      "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.d.ts"],
-      "@rlrml/subtr-actor-player": ["../player/dist/lib.d.ts"],
-      "@rlrml/subtr-actor-player/generated/*": ["../player/dist/generated/*"],
+      "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.d.ts"],
+      "subtr-actor-player": ["../player/dist/lib.d.ts"],
+      "subtr-actor-player/generated/*": ["../player/dist/generated/*"],
       "three": ["./node_modules/@types/three/index.d.ts"],
       "three/examples/jsm/*": ["./node_modules/@types/three/examples/jsm/*"]
     }

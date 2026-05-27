@@ -1,4 +1,4 @@
-import type { ReplayTimelineEvent } from "@rlrml/subtr-actor-player";
+import type { ReplayTimelineEvent } from "subtr-actor-player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot } from "../statsTimeline.ts";
 import {

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ReplayModel, ReplayScene } from "@rlrml/subtr-actor-player";
+import type { ReplayModel, ReplayScene } from "subtr-actor-player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-touch-overlay-styles";

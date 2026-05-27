@@ -1,1 +1,1 @@
-export type { PlayerInfo } from "@rlrml/subtr-actor-player/generated/PlayerInfo";
+export type { PlayerInfo } from "subtr-actor-player/generated/PlayerInfo";

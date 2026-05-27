@@ -5,7 +5,7 @@ declare module "*.wasm?url" {
   export default url;
 }
 
-declare module "@rlrml/subtr-actor" {
+declare module "@colonelpanic8/subtr-actor" {
   export default function init(moduleOrPath?: unknown): Promise<unknown>;
   export function get_replay_frames_data(data: Uint8Array): unknown;
   export function get_replay_frames_data_with_progress(

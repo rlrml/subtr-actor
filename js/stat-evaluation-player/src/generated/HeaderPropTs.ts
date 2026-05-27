@@ -1,1 +1,1 @@
-export type { HeaderPropTs } from "@rlrml/subtr-actor-player/generated/HeaderPropTs";
+export type { HeaderPropTs } from "subtr-actor-player/generated/HeaderPropTs";

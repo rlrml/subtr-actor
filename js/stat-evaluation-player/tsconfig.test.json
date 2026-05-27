@@ -2,8 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
-      "@rlrml/subtr-actor-player": ["../player/src/lib.ts"]
+      "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
+      "subtr-actor-player": ["../player/src/lib.ts"]
     }
   }
 }

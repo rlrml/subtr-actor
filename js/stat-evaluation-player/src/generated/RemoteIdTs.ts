@@ -1,1 +1,1 @@
-export type { RemoteIdTs } from "@rlrml/subtr-actor-player/generated/RemoteIdTs";
+export type { RemoteIdTs } from "subtr-actor-player/generated/RemoteIdTs";

@@ -74,7 +74,7 @@ async function main() {
             build: "vite build",
           },
           dependencies: {
-            "@rlrml/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
+            "@colonelpanic8/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
             [playerPackage.name]: `file:${path.relative(consumerDir, playerTarballPath)}`,
             [sourcePackage.name]: `file:${path.relative(consumerDir, statsTarballPath)}`,
             three: "^0.180.0",

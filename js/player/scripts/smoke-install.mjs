@@ -70,8 +70,8 @@ async function main() {
             build: "vite build",
           },
           dependencies: {
-            "@rlrml/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
-            "@rlrml/subtr-actor-player": `file:${path.relative(consumerDir, playerTarballPath)}`,
+            "@colonelpanic8/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
+            "subtr-actor-player": `file:${path.relative(consumerDir, playerTarballPath)}`,
             three: "^0.180.0",
           },
           devDependencies: {
@@ -129,7 +129,7 @@ async function main() {
         "  parsePlaylistManifest,",
         "  type PlaylistManifest,",
         "  type ReplayPlayerOptions,",
-        '} from "@rlrml/subtr-actor-player";',
+        '} from "subtr-actor-player";',
         "",
         "const manifest: PlaylistManifest = parsePlaylistManifest({",
         "  items: [",
