@@ -1752,7 +1752,7 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'if (jsonPropertyExists(*overlays, "renderEffects")) {',
+        'const bool hasRenderEffects = jsonPropertyExists(*overlays, "renderEffects");',
         "web renderEffects import uses JSON parser",
         errors,
     )
@@ -1760,6 +1760,12 @@ def main() -> int:
         plugin_source,
         'jsonPropertyExists(*overlays, "pluginRenderEffects")',
         "plugin-only render effects import uses separate plugin config field",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'parseJsonBoolProperty(*overlays, "pluginHudOverlay")',
+        "plugin-only HUD overlay master imports from separate plugin config field",
         errors,
     )
     require_contains(
@@ -1836,6 +1842,12 @@ def main() -> int:
         plugin_source,
         'file << "    \\"pluginRenderEffects\\": [";',
         "plugin-only render effects export uses separate plugin config field",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'file << "    \\"pluginHudOverlay\\": " << (hudOverlayEnabled ? "true" : "false") << ",\\n";',
+        "plugin-only HUD overlay master exports separate plugin config field",
         errors,
     )
     require_contains(

@@ -3379,8 +3379,10 @@ void SubtrActorPlugin::applyUiConfigJson(
 
     const std::vector<std::string> renderEffects =
         parseJsonStringArrayProperty(*overlays, "renderEffects");
-    if (jsonPropertyExists(*overlays, "renderEffects")) {
-      const bool anyRenderEffect = !renderEffects.empty();
+    const bool hasRenderEffects = jsonPropertyExists(*overlays, "renderEffects");
+    bool anyRenderEffect = false;
+    if (hasRenderEffects) {
+      anyRenderEffect = !renderEffects.empty();
       renderEffectCeilingShotEnabled = containsString(renderEffects, "ceiling-shot");
       renderEffectFiftyFiftyEnabled = containsString(renderEffects, "fifty-fifty");
       renderEffectPressureEnabled = containsString(renderEffects, "pressure");
@@ -3390,18 +3392,23 @@ void SubtrActorPlugin::applyUiConfigJson(
           containsString(renderEffects, "absolute-positioning");
       renderEffectSpeedFlipEnabled = containsString(renderEffects, "speed-flip");
       renderEffectTouchEnabled = containsString(renderEffects, "touch");
-      setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect);
     }
     const bool hasPluginRenderEffects = jsonPropertyExists(*overlays, "pluginRenderEffects");
     std::vector<std::string> pluginRenderEffects =
         parseJsonStringArrayProperty(*overlays, "pluginRenderEffects");
-    const bool hasRenderEffects = jsonPropertyExists(*overlays, "renderEffects");
     if (!hasPluginRenderEffects && hasRenderEffects) {
       for (const char *id : {"mechanics", "team", "goal_context"}) {
         if (containsString(renderEffects, id)) {
           pluginRenderEffects.emplace_back(id);
         }
       }
+    }
+    if (const auto pluginHudOverlay = parseJsonBoolProperty(*overlays, "pluginHudOverlay")) {
+      setCvarBool("subtr_actor_overlay_enabled", *pluginHudOverlay);
+    } else if (hasPluginRenderEffects) {
+      setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect || !pluginRenderEffects.empty());
+    } else if (hasRenderEffects) {
+      setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect);
     }
     if (hasPluginRenderEffects || hasRenderEffects) {
       setCvarBool(
@@ -4096,6 +4103,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
   writeOverlayId("team", cvarBool("subtr_actor_overlay_team_events_enabled", true));
   writeOverlayId("goal_context", cvarBool("subtr_actor_overlay_goal_context_enabled", true));
   file << "],\n";
+  file << "    \"pluginHudOverlay\": " << (hudOverlayEnabled ? "true" : "false") << ",\n";
   file << "    \"followedPlayerHud\": false,\n";
   file << "    \"boostPads\": "
        << (boostPickupPadBig || boostPickupPadSmall || boostPickupPadAmbiguous ? "true" : "false")
