@@ -8811,19 +8811,11 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                                                         : "Scanning";
   const std::string replaySummary = replayPath ? "1 replay" : "0 replays";
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY LOADING");
   ImGui::Text("%s", replaySummary.c_str());
   ImGui::SameLine();
   ImGui::Text("%s", status);
-  ImGui::Text("In replay: %s", inReplay ? "yes" : "no");
-  if (hasReplayServer) {
-    ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
-  }
-  ImGui::Text("Annotations: %zu", annotationCount);
-  ImGui::Text("Players: %zu", annotationPlayers.size());
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY SOURCES");
   ImGui::BeginChild("replay-loading-list", ImVec2{0.0f, 112.0f}, true);
   if (!replayPath && rawReplayPath.empty() && replayAnnotationPath.empty()) {
     ImGui::TextDisabled("No replay sources.");
@@ -8846,14 +8838,7 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
       replayMeta.push_back(std::format("{} players", annotationPlayers.size()));
     }
     if (!replayMeta.empty()) {
-      std::string metaText;
-      for (const std::string &part : replayMeta) {
-        if (!metaText.empty()) {
-          metaText += " | ";
-        }
-        metaText += part;
-      }
-      ImGui::TextDisabled("%s", metaText.c_str());
+      ImGui::TextDisabled("%s", joinStrings(replayMeta, " · ").c_str());
     }
     ImGui::TextColored(
         replayAnnotations ? ImVec4{0.50f, 0.86f, 0.62f, 1.0f}
@@ -8864,72 +8849,6 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
         status);
   }
   ImGui::EndChild();
-
-  if (!annotationPlayers.empty()) {
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYERS");
-    ImGui::BeginChild("replay-loading-players", ImVec2{0.0f, 96.0f}, true);
-    for (const SaReplayPlayerInfo &player : annotationPlayers) {
-      const char *name = player.name == nullptr || player.name[0] == '\0' ? "--" : player.name;
-      ImGui::TextColored(
-          player.is_team_0 != 0 ? ImVec4{0.31f, 0.75f, 1.0f, 1.0f}
-                                : ImVec4{1.0f, 0.69f, 0.31f, 1.0f},
-          "%s",
-          player.is_team_0 != 0 ? "Blue" : "Orange");
-      ImGui::SameLine();
-      ImGui::Text("#%u %s", player.player_index + 1, name);
-    }
-    ImGui::EndChild();
-  }
-
-  ImGui::Separator();
-  bool annotationsValue = annotationsEnabled;
-  if (ImGui::Checkbox("Replay annotations", &annotationsValue)) {
-    setCvarBool("subtr_actor_replay_annotations_enabled", annotationsValue);
-    if (!annotationsValue) {
-      resetReplayAnnotations();
-    }
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Retry load")) {
-    resetReplayAnnotations();
-    tickReplayAnnotations();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Clear load")) {
-    resetReplayAnnotations();
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CURRENT REPLAY");
-  if (replayPath) {
-    ImGui::TextWrapped("Resolved: %s", replayPath->c_str());
-  } else {
-    ImGui::TextDisabled("Resolved: --");
-  }
-  if (!rawReplayPath.empty()) {
-    ImGui::TextWrapped("Raw: %s", rawReplayPath.c_str());
-  } else {
-    ImGui::TextDisabled("Raw: --");
-  }
-  if (!replayAnnotationPath.empty()) {
-    ImGui::TextWrapped("Processed: %s", replayAnnotationPath.c_str());
-  } else {
-    ImGui::TextDisabled("Processed: --");
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
-  if (ImGui::Button("Open playback")) {
-    showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open review")) {
-    showSingletonWindow(uiMechanicsReviewOpen, mechanicsReviewPlacement);
-  }
-  if (ImGui::Button("Open playlist")) {
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-  }
 
   ImGui::End();
 }

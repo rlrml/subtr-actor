@@ -1259,6 +1259,18 @@ def main() -> int:
         "plugin replay loading summary uses web-like replay count",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        '.join(" · ");',
+        "stats evaluation player replay loading rows use dot-separated metadata",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'joinStrings(replayMeta, " · ")',
+        "plugin replay loading source row uses web-like dot-separated metadata",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'ImGui::Text("Summary: %s", replayPath ? "1 replay candidate" : "0 replay candidates");',
@@ -1271,6 +1283,26 @@ def main() -> int:
         "plugin replay loading active status label",
         errors,
     )
+    for plugin_only_replay_loading_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY LOADING");',
+        'ImGui::Text("In replay: %s", inReplay ? "yes" : "no");',
+        'ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());',
+        'ImGui::Text("Annotations: %zu", annotationCount);',
+        'ImGui::Text("Players: %zu", annotationPlayers.size());',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY SOURCES");',
+        'ImGui::BeginChild("replay-loading-players", ImVec2{0.0f, 96.0f}, true);',
+        'ImGui::Checkbox("Replay annotations", &annotationsValue)',
+        'ImGui::Button("Retry load")',
+        'ImGui::Button("Clear load")',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CURRENT REPLAY");',
+        'metaText += " | ";',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_replay_loading_surface,
+            "plugin replay loading plugin-only management surface",
+            errors,
+        )
     for label, plugin_needle in (
         ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
         ("Half control", '"Half control",\n        timelineRangePressureEnabled'),
