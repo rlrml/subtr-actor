@@ -721,6 +721,33 @@ def main() -> int:
         "plugin playback exposes web-like detail grid",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {\n"
+        "  const state = replayPlayer?.getState();\n"
+        "  return {\n"
+        "    currentTime: state?.currentTime,",
+        "stats evaluation player playback config snapshot is explicit",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "playbackStatus",
+        "plugin playback persists hidden status state",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'parseJsonStringProperty(*playback, "status")',
+        "plugin playback imports hidden status field",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        ',\\"status\\":',
+        "plugin playback exports hidden status field",
+        errors,
+    )
     for plugin_only_playback_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");',
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");',

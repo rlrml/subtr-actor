@@ -3533,7 +3533,6 @@ void SubtrActorPlugin::applyUiConfigJson(
             .value_or(playbackSkipPostGoalTransitions);
     playbackSkipKickoffs =
         parseJsonBoolProperty(*playback, "skipKickoffs").value_or(playbackSkipKickoffs);
-    playbackStatus = parseJsonStringProperty(*playback, "status").value_or(playbackStatus);
     applyPlaybackConfig = true;
   }
   touchControlsMode = static_cast<int>(
@@ -4065,7 +4064,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
        << ",\"skipPostGoalTransitions\":"
        << (playbackSkipPostGoalTransitions ? "true" : "false")
        << ",\"skipKickoffs\":" << (playbackSkipKickoffs ? "true" : "false")
-       << ",\"status\":\"" << escapeJsonString(playbackStatus) << "\""
        << "},\n";
   file << "  \"camera\": {";
   file << "\"mode\":\"" << (cameraViewMode == 1 ? "follow" : "free") << "\"";
@@ -9296,15 +9294,13 @@ void SubtrActorPlugin::renderCameraWindow() {
 }
 
 void SubtrActorPlugin::applyPlaybackConfigToReplay(std::string_view sourceLabel) {
+  (void)sourceLabel;
   if (!gameWrapper || !gameWrapper->IsInReplay()) {
-    playbackStatus = std::format("Loaded playback config from {}", sourceLabel);
     return;
   }
 
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
   if (replayServer.IsNull()) {
-    playbackStatus =
-        std::format("Loaded playback config from {}; replay controls unavailable", sourceLabel);
     return;
   }
 
@@ -9312,10 +9308,6 @@ void SubtrActorPlugin::applyPlaybackConfigToReplay(std::string_view sourceLabel)
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
   if (playbackPlaying) {
     replayServer.StartPlaybackAtTime(playbackCurrentTime);
-    playbackStatus = std::format(
-        "Applied {} playback config: playing from {:.2f}s",
-        sourceLabel,
-        playbackCurrentTime);
     return;
   }
 
@@ -9324,10 +9316,6 @@ void SubtrActorPlugin::applyPlaybackConfigToReplay(std::string_view sourceLabel)
   if (!replay.IsNull()) {
     replay.StopPlayback();
   }
-  playbackStatus = std::format(
-      "Applied {} playback config: paused at {:.2f}s",
-      sourceLabel,
-      playbackCurrentTime);
 }
 
 void SubtrActorPlugin::renderPlaybackControlsWindow() {
@@ -9377,14 +9365,12 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
     playbackPlaying = shouldPlay;
     if (!hasReplayServer) {
-      playbackStatus = "Open a Rocket League replay to control playback";
       scheduleUiConfigAutosave();
       return;
     }
 
     if (shouldPlay) {
       replayServer.StartPlaybackAtTime(playbackCurrentTime);
-      playbackStatus = std::format("Playing from {:.2f}s", playbackCurrentTime);
       scheduleUiConfigAutosave();
       return;
     }
@@ -9394,7 +9380,6 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     if (!replay.IsNull()) {
       replay.StopPlayback();
     }
-    playbackStatus = std::format("Paused at {:.2f}s", playbackCurrentTime);
     scheduleUiConfigAutosave();
   };
 
@@ -11593,10 +11578,10 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
       if (hasReplayServer) {
         replayServer.StartPlaybackAtTime(seekTime);
-        playbackStatus = std::format("Watching goal from {:.2f}s", seekTime);
       } else {
-        playbackStatus =
-            std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
+        cvarManager->log(std::format(
+            "subtr-actor: selected goal at {:.2f}s; open a replay to seek",
+            seekTime));
       }
     }
     ImGui::SameLine();
@@ -11613,10 +11598,10 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
         if (!replay.IsNull()) {
           replay.StopPlayback();
         }
-        playbackStatus = std::format("Cued goal at {:.2f}s", seekTime);
       } else {
-        playbackStatus =
-            std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
+        cvarManager->log(std::format(
+            "subtr-actor: selected goal at {:.2f}s; open a replay to seek",
+            seekTime));
       }
     }
     ImGui::Spacing();
