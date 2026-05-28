@@ -55,7 +55,7 @@ import {
   type MechanicsReviewController,
 } from "./mechanicsReviewController.ts";
 import { createReplayCueingController } from "./replayCueing.ts";
-import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
+import type { EventWindowsManager } from "./eventWindows.ts";
 import {
   getReplayPlayerStatePatchFromConfig,
 } from "./appConfigSnapshot.ts";
@@ -70,6 +70,7 @@ import {
 } from "./appConfigUrlSync.ts";
 import { createStandalonePluginController } from "./standalonePlugins.ts";
 import { createAppStatsWindowsManager } from "./appStatsWindowsManager.ts";
+import { createAppEventWindowsManager } from "./appEventWindowsManager.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -195,40 +196,21 @@ moduleRuntimeController = createModuleRuntimeController({
   requestConfigSync: scheduleConfigUrlUpdate,
 });
 
-eventWindowsManager = createEventWindowsManager({
+eventWindowsManager = createAppEventWindowsManager({
   cueTimelineEvent,
   formatTime,
-  getActiveMechanicTimelineKinds() {
-    return moduleRuntimeController.getActiveMechanicTimelineKinds();
+  getElements() {
+    return appElements;
   },
-  getActiveTimelineEventSourceIds() {
-    return moduleRuntimeController.getActiveTimelineEventSourceIds();
-  },
-  getModuleContext: () => moduleRuntimeController.getContext(),
-  getModules() {
-    return moduleRuntimeController.modules;
-  },
-  getPlaylistWindowBody() {
-    return appElements.eventPlaylistWindowBody;
+  getModuleRuntimeController() {
+    return moduleRuntimeController;
   },
   getReplayPlayer() {
     return replayPlayer;
   },
-  getTimelineWindowBody() {
-    return appElements.mechanicsTimelineWindowBody;
-  },
   renderModuleSettings,
   renderModuleSummary,
-  renderTimelineEventCount: () => moduleRuntimeController.renderTimelineEventCount(),
   scheduleConfigUrlUpdate,
-  setMechanicTimelineKind(kind, enabled) {
-    moduleRuntimeController.setMechanicTimelineKind(kind, enabled);
-  },
-  setupActiveModules: () => moduleRuntimeController.setupActiveModules(),
-  syncTimelineEvents: () => moduleRuntimeController.syncTimelineEvents(),
-  syncTimelineRanges: () => moduleRuntimeController.syncTimelineRanges(),
-  toggleCapability: (id, kind, enabled) =>
-    moduleRuntimeController.toggleCapability(id, kind, enabled),
 });
 
 function afterModuleRuntimeChange(): void {
