@@ -31,6 +31,7 @@ endif()
 message(STATUS "BakkesMod SDK: ${BAKKESMOD_SDK_DIR}")
 
 add_library(SubtrActorPlugin SHARED
+  SubtrActorPluginAbiLayout.cpp
   SubtrActorPlugin.cpp
   SubtrActorPluginGraphDump.cpp
   SubtrActorPluginGraphJson.cpp
