@@ -2386,6 +2386,24 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "const fileName = rawPath\n    .replace(/^path:/, \"\")\n    .split(\"/\")\n    .filter(Boolean)\n    .pop();",
+        "stats evaluation player replay loading row title derives a file label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::string replaySourceDisplayLabel(std::string_view path) {",
+        "plugin replay loading has a web-like replay source label helper",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string title = replaySourceDisplayLabel(titlePath);',
+        "plugin replay loading row title uses a file label",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'joinStrings(replayMeta, " · ")',
         "plugin replay loading source row uses web-like dot-separated metadata",
@@ -2413,6 +2431,12 @@ def main() -> int:
         plugin_source,
         'ImGui::Text("Active: %s", status);',
         "plugin replay loading active status label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'const std::string title = replayPath ? *replayPath\n                              : !rawReplayPath.empty() ? rawReplayPath\n                                                       : replayAnnotationPath;',
+        "plugin replay loading row title uses the full replay path",
         errors,
     )
     for plugin_only_replay_loading_surface in (

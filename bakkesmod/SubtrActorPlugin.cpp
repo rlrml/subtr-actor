@@ -75,6 +75,18 @@ std::string formatEventPlaylistTime(float seconds) {
   return std::format("{}:{:04.1f}", minutes, remainingSeconds);
 }
 
+std::string replaySourceDisplayLabel(std::string_view path) {
+  constexpr std::string_view prefix = "path:";
+  if (path.starts_with(prefix)) {
+    path.remove_prefix(prefix.size());
+  }
+  const size_t lastSeparator = path.find_last_of("/\\");
+  if (lastSeparator != std::string_view::npos) {
+    path.remove_prefix(lastSeparator + 1);
+  }
+  return path.empty() ? "review replay" : std::string{path};
+}
+
 std::string joinStrings(const std::vector<std::string> &parts, std::string_view separator) {
   std::string joined;
   for (const std::string &part : parts) {
@@ -9292,16 +9304,17 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   if (!hasReplaySource) {
     ImGui::TextDisabled("No replay sources.");
   } else {
-    const std::string title = replayPath ? *replayPath
-                              : !rawReplayPath.empty() ? rawReplayPath
-                                                       : replayAnnotationPath;
+    const std::string titlePath = replayPath ? *replayPath
+                                  : !rawReplayPath.empty() ? rawReplayPath
+                                                           : replayAnnotationPath;
+    const std::string title = replaySourceDisplayLabel(titlePath);
     const float replayLoadProgress = replayAnnotations ? 1.0f : 0.0f;
     ImGui::TextWrapped("%s", title.c_str());
     std::vector<std::string> replayMeta;
     if (!rawReplayPath.empty()) {
       replayMeta.push_back(std::format("raw: {}", rawReplayPath));
     }
-    if (!replayAnnotationPath.empty() && replayAnnotationPath != title) {
+    if (!replayAnnotationPath.empty() && replayAnnotationPath != titlePath) {
       replayMeta.push_back(std::format("processed: {}", replayAnnotationPath));
     }
     if (annotationCount > 0) {
