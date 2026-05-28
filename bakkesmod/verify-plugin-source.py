@@ -780,6 +780,8 @@ def main() -> int:
     for plugin_only_recording_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");',
         'ImGui::Checkbox("Finalize before dump"',
+        "recordingFinishBeforeDump",
+        '"recording_finish_before_dump"',
         'ImGui::Button("Snapshot")',
         'ImGui::Button("Log folder")',
     ):

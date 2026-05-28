@@ -355,7 +355,6 @@ private:
   std::string playbackStatus = "Stopped";
   int recordingFps = 60;
   int recordingPlaybackRateIndex = 1;
-  bool recordingFinishBeforeDump = false;
   bool recordingActive = false;
   int recordingSnapshotCount = 0;
   size_t recordingLastBytes = 0;

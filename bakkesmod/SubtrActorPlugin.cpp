@@ -3434,9 +3434,6 @@ void SubtrActorPlugin::applyUiConfigJson(
       parseJsonNumberProperty(json, "recording_playback_rate_index").value_or(1.0),
       0.0,
       3.0));
-  recordingFinishBeforeDump =
-      parseJsonBoolProperty(json, "recording_finish_before_dump")
-          .value_or(recordingFinishBeforeDump);
 
   if (const auto camera = parseJsonObjectProperty(json, "camera")) {
     const std::optional<std::string> mode = parseJsonStringProperty(*camera, "mode");
@@ -4174,8 +4171,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  \"camera_custom_transition_speed\": " << cameraCustomTransitionSpeed << ",\n";
   file << "  \"recording_fps\": " << recordingFps << ",\n";
   file << "  \"recording_playback_rate_index\": " << recordingPlaybackRateIndex << ",\n";
-  file << "  \"recording_finish_before_dump\": "
-       << (recordingFinishBeforeDump ? "true" : "false") << ",\n";
   file << "  \"touch_controls_mode\": " << touchControlsMode << ",\n";
   file << "  \"touch_marker_decay_seconds\": " << touchMarkerDecaySeconds << ",\n";
   file << "  \"touch_breakdown_kind\": " << (touchBreakdownKind ? "true" : "false")
@@ -9631,7 +9626,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
   ImGui::SameLine();
   if (recordingButton("Stop", !recordingActive)) {
     recordingActive = false;
-    dumpSnapshot(recordingFinishBeforeDump);
+    dumpSnapshot(false);
   }
   if (recordingButton("Download", recordingActive || !hasGraphSnapshot)) {
     cvarManager->log(std::format(
