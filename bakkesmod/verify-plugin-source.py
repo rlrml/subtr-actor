@@ -2037,15 +2037,35 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        "current->label.empty() ? eventTypeDisplayLabel(current->type)\n"
-        "                               : current->label;",
-        "plugin mechanics review current title formats unlabeled mechanics",
+        'return std::format("Review item {}", index + 1);',
+        "plugin mechanics review item labels have review-item fallback",
         errors,
     )
     require_contains(
         plugin_source,
-        "const std::string title = event.label.empty() ? eventTypeDisplayLabel(event.type) : event.label;",
+        "mechanicsReviewItemTitle(\n"
+        "                               *current,\n"
+        "                               static_cast<size_t>(mechanicsReviewIndex))",
+        "plugin mechanics review current title uses shared web-like item label fallback",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::string title = mechanicsReviewItemTitle(event, i);",
         "plugin mechanics review row title formats unlabeled mechanics",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "current->label.empty() ? eventTypeDisplayLabel(current->type)\n"
+        "                               : current->label;",
+        "plugin mechanics review current title omits review item fallback",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "const std::string title = event.label.empty() ? eventTypeDisplayLabel(event.type) : event.label;",
+        "plugin mechanics review row title omits review item fallback",
         errors,
     )
     reject_contains(
