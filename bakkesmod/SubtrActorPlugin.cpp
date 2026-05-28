@@ -3352,7 +3352,13 @@ void SubtrActorPlugin::applyUiConfigJson(
           appendUniqueFilterToken(selectedFilters, token);
         }
       }
-      if (hasMechanicFilters && !mechanicFilters.empty()) {
+      const bool hasSelectedMechanicFilter = std::any_of(
+          selectedFilters.begin(),
+          selectedFilters.end(),
+          [](const std::string &token) {
+            return token == "mechanics" || isMechanicFilterToken(token);
+          });
+      if ((hasMechanicFilters && !mechanicFilters.empty()) || hasSelectedMechanicFilter) {
         eventPlaylistMechanicsEnabled = true;
       }
       setCvarString(
@@ -4008,7 +4014,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
     file << "\"" << id << "\"";
     wroteOverlayValue = true;
   };
-  writeOverlayId("mechanics", eventPlaylistMechanicsEnabled);
   writeOverlayId("team", eventPlaylistTeamEventsEnabled);
   writeOverlayId("goal_context", eventPlaylistGoalContextEnabled);
   if (!allEventSourcesSelected(currentEventFilter)) {
@@ -4031,19 +4036,27 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "],\n";
   file << "    \"mechanics\": [";
   const bool allMechanicsSelected =
-      allEventSourcesSelected(currentEventFilter) ||
-      containsString(currentEventFilterTokens, "mechanics");
+      eventPlaylistMechanicsEnabled &&
+      (allEventSourcesSelected(currentEventFilter) ||
+       containsString(currentEventFilterTokens, "mechanics"));
   bool wroteMechanicFilter = false;
-  if (!allMechanicsSelected) {
+  auto writeMechanicFilterId = [&](std::string_view token) {
+    if (wroteMechanicFilter) {
+      file << ",";
+    }
+    file << "\"" << escapeJsonString(token) << "\"";
+    wroteMechanicFilter = true;
+  };
+  if (allMechanicsSelected) {
+    for (const char *token : MECHANIC_FILTER_TOKENS) {
+      writeMechanicFilterId(token);
+    }
+  } else if (eventPlaylistMechanicsEnabled) {
     for (const std::string &token : currentEventFilterTokens) {
       if (!isMechanicFilterToken(token)) {
         continue;
       }
-      if (wroteMechanicFilter) {
-        file << ",";
-      }
-      file << "\"" << escapeJsonString(token) << "\"";
-      wroteMechanicFilter = true;
+      writeMechanicFilterId(token);
     }
   }
   file << "],\n";

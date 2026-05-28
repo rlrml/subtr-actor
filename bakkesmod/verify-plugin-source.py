@@ -1788,6 +1788,28 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "const bool hasSelectedMechanicFilter = std::any_of(\n"
+        "          selectedFilters.begin(),\n"
+        "          selectedFilters.end(),",
+        "web mechanic timeline event import enables mechanic playlist group",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId("mechanics", eventPlaylistMechanicsEnabled);',
+        "web timelineEvents exports plugin-only broad mechanics id",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "for (const char *token : MECHANIC_FILTER_TOKENS) {\n"
+        "      writeMechanicFilterId(token);\n"
+        "    }",
+        "web mechanics config exports concrete mechanic filters for all-mechanics selection",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'std::string statId = statsWindowObjectsFromWeb\n                               ? parseJsonStringProperty(entryObject, "statId").value_or("")\n                               : parseJsonStringProperty(entryObject, "stat_id").value_or("");',
         "web selected stat import only reads statId",
         errors,
