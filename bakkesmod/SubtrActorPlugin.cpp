@@ -8663,9 +8663,13 @@ void SubtrActorPlugin::renderScoreboardWindow() {
       ImGuiWindowFlags_NoSavedSettings;
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{10.0f, 6.0f});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 999.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{0.03f, 0.07f, 0.10f, 0.88f});
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.12f});
   if (!ImGui::Begin("Scoreboard##subtr-actor", &uiScoreboardOpen, scoreboardFlags)) {
     ImGui::End();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(3);
     return;
   }
   captureWindowPlacement(scoreboardPlacement);
@@ -8685,7 +8689,8 @@ void SubtrActorPlugin::renderScoreboardWindow() {
     ImGui::TextDisabled("Load a replay to show the scoreboard.");
   }
   ImGui::End();
-  ImGui::PopStyleVar(2);
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(3);
 }
 
 void SubtrActorPlugin::renderEventsWindow() {

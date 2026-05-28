@@ -4261,6 +4261,48 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".floating-window,\n"
+        ".stats-window,\n"
+        ".scoreboard-window {\n"
+        "  position: absolute;\n"
+        "  left: clamp(0.8rem, var(--window-x, 1rem), calc(100vw - 18rem));",
+        "stats evaluation player scoreboard shares overlay chrome base",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        "  border: 1px solid rgba(255, 255, 255, 0.12);\n"
+        "  border-radius: var(--ui-radius-lg);\n"
+        "  background: var(--ui-overlay-bg);",
+        "stats evaluation player scoreboard shares overlay border/background",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".scoreboard-window {\n"
+        "  left: 50%;\n"
+        "  top: 0.7rem;\n"
+        "  width: auto;",
+        "stats evaluation player scoreboard is a centered pill",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 999.0f);\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);\n"
+        "  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{0.03f, 0.07f, 0.10f, 0.88f});\n"
+        "  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.12f});",
+        "plugin scoreboard uses web-like pill background and border",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PopStyleColor(2);\n  ImGui::PopStyleVar(3);",
+        "plugin scoreboard restores pill chrome style stack",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "renderScoreboard(state.frameIndex);",
         "stats evaluation player scoreboard follows current replay frame",
