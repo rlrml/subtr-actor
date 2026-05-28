@@ -8918,37 +8918,6 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     return;
   }
 
-  if (ImGui::Button("All filters")) {
-    boostPickupPadBig = true;
-    boostPickupPadSmall = true;
-    boostPickupPadAmbiguous = true;
-    boostPickupActivityActive = true;
-    boostPickupActivityInactive = true;
-    boostPickupActivityUnknown = true;
-    boostPickupFieldOwn = true;
-    boostPickupFieldOpponent = true;
-    boostPickupFieldUnknown = true;
-    boostPickupPlayerFilterEnabled = false;
-    boostPickupPlayerIds.clear();
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Hide pickups")) {
-    boostPickupPadBig = false;
-    boostPickupPadSmall = false;
-    boostPickupPadAmbiguous = false;
-    boostPickupActivityActive = false;
-    boostPickupActivityInactive = false;
-    boostPickupActivityUnknown = false;
-    boostPickupFieldOwn = false;
-    boostPickupFieldOpponent = false;
-    boostPickupFieldUnknown = false;
-    boostPickupPlayerFilterEnabled = true;
-    boostPickupPlayerIds.clear();
-    scheduleUiConfigAutosave();
-  }
-
-  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Pad type");
   if (ImGui::Checkbox("Big pads", &boostPickupPadBig)) {
     scheduleUiConfigAutosave();
@@ -8990,17 +8959,6 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   if (!sampledPlayers.empty()) {
     ImGui::Separator();
     ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Player");
-    if (ImGui::Button("All players")) {
-      boostPickupPlayerFilterEnabled = false;
-      boostPickupPlayerIds.clear();
-      scheduleUiConfigAutosave();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("No players")) {
-      boostPickupPlayerFilterEnabled = true;
-      boostPickupPlayerIds.clear();
-      scheduleUiConfigAutosave();
-    }
     for (const SaPlayerFrame &player : sampledPlayers) {
       const std::string playerId = webPlayerIdForIndex(player.player_index);
       bool selected =

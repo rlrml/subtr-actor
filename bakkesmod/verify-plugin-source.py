@@ -878,6 +878,10 @@ def main() -> int:
         'ImGui::Button("Open boost stats")',
         'ImGui::Button("Inspect boost nodes")',
         'ImGui::Button("Boost output")',
+        'ImGui::Button("All filters")',
+        'ImGui::Button("Hide pickups")',
+        'ImGui::Button("All players")',
+        'ImGui::Button("No players")',
     ):
         reject_contains(
             plugin_source,
