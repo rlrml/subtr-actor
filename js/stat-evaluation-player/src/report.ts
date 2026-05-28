@@ -1,20 +1,13 @@
 import "./report.css";
-import { toBoostDisplayUnits } from "./boostFormatting.ts";
 import { formatReplayLoadProgress, loadReplayBundleInWorker } from "./replayLoader.ts";
 import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
 import { createStatsFrameLookup } from "./statsTimeline.ts";
 import { renderBoostPage } from "./reportBoostPage.ts";
 import { el } from "./reportDom.ts";
-import { formatSeconds, formatTime } from "./reportFormat.ts";
 import { renderGoalsPage, type StatsReportGoalWatchRequest } from "./reportGoalsPage.ts";
 import { renderInvolvementPage } from "./reportInvolvementPage.ts";
-import { createPageIntro, createSummaryCard, getLeader } from "./reportLayout.ts";
-import {
-  renderCharts,
-  renderMetricGrid,
-  renderTerritoryShareChart,
-  type ChartSpec,
-} from "./reportCharts.ts";
+import { createPageIntro } from "./reportLayout.ts";
+import { renderOverviewPage } from "./reportOverviewPage.ts";
 import { renderTerritoryPage } from "./reportTerritoryPage.ts";
 import type {
   PlayerStatsSnapshot,
@@ -60,15 +53,6 @@ const PAGES: readonly { id: ReportPageId; label: string }[] = [
   { id: "territory", label: "Possession & territory" },
   { id: "involvement", label: "Player involvement" },
   { id: "dump", label: "All stats" },
-];
-
-const OVERVIEW_CHARTS: ChartSpec[] = [
-  { statId: "player:core.score", kind: "bar", title: "Score by player" },
-  { statId: "player:core.shots", kind: "bar", title: "Shots by player" },
-  { statId: "player:touch.touch_count", kind: "bar", title: "Touches by player" },
-  { statId: "team:core.shots", kind: "pie", title: "Shot share" },
-  { statId: "team:possession.possession_time", kind: "pie", title: "Possession share" },
-  { statId: "team:pressure.offensive_pressure_time", kind: "bar", title: "Offensive pressure" },
 ];
 
 function targetName(target: StatsTarget, scope: StatScopeKind, index: number): string {
@@ -124,18 +108,6 @@ function isStatsReportDefinitionVisible(definition: StatDefinition): boolean {
   return !definition.path.includes("entries");
 }
 
-function createSummary(state: ReportState, finalFrame: StatsFrame): HTMLElement {
-  const summary = el("section", { className: "stats-report-summary" });
-  const duration = finalFrame.time > 0 ? formatSeconds(finalFrame.time) : "--";
-  summary.append(
-    createSummaryCard("Replay", state.fileName),
-    createSummaryCard("Frames", state.statsTimeline.frames.length.toLocaleString()),
-    createSummaryCard("Duration", duration),
-    createSummaryCard("Players", finalFrame.players.length.toLocaleString()),
-  );
-  return summary;
-}
-
 function renderStatsTable(
   key: string,
   definitions: StatDefinition[],
@@ -177,53 +149,6 @@ function renderStatsTable(
   wrap.append(table);
   section.append(header, wrap);
   return section;
-}
-
-function renderOverviewPage(
-  state: ReportState,
-  finalFrame: StatsFrame,
-  definitions: StatDefinition[],
-): HTMLElement {
-  const page = el("div", { className: "stats-report-page" });
-  page.append(createSummary(state, finalFrame));
-  page.append(
-    createPageIntro(
-      "Featured stats",
-      "A shorter readout of stable scoreboard, touch, boost, possession, and pressure signals. The raw export remains available in All stats.",
-    ),
-  );
-
-  const score = `${finalFrame.team_zero.core.goals}-${finalFrame.team_one.core.goals}`;
-  page.append(
-    renderMetricGrid([
-      createSummaryCard("Final score", score, "Blue - Orange"),
-      getLeader(
-        finalFrame.players,
-        (player) => player.touch.touch_count,
-        (value) => `${value} touches`,
-      ),
-      getLeader(
-        finalFrame.players,
-        (player) =>
-          player.boost.tracked_time > 0
-            ? toBoostDisplayUnits(player.boost.boost_integral / player.boost.tracked_time)
-            : 0,
-        (value) => `${Number(value.toFixed(0))} avg boost`,
-      ),
-      getLeader(
-        finalFrame.players,
-        (player) => player.core.score,
-        (value) => `${value} score`,
-      ),
-    ]),
-  );
-
-  const charts =
-    renderCharts(definitions, finalFrame, OVERVIEW_CHARTS) ??
-    el("section", { className: "stats-report-charts" });
-  charts.append(renderTerritoryShareChart(finalFrame));
-  page.append(charts);
-  return page;
 }
 
 function renderDumpPage(
