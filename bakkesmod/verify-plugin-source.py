@@ -2242,6 +2242,64 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".module-summary-item {\n"
+        "  appearance: none;\n"
+        "  display: inline-flex;\n"
+        "  align-items: center;\n"
+        "  justify-content: space-between;\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "  min-height: var(--ui-control-height);\n"
+        "  padding: var(--ui-control-padding-block) var(--ui-control-padding-inline);\n"
+        "  border-radius: var(--ui-radius-pill);\n"
+        "  border: 1px solid var(--ui-border-subtle);\n"
+        "  background: rgba(255, 255, 255, 0.03);",
+        "stats evaluation player module summary items use muted pill chrome",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".module-summary-item[data-active=\"true\"] {\n"
+        "  border-color: rgba(75, 148, 255, 0.22);\n"
+        "  background: rgba(75, 148, 255, 0.08);\n"
+        "  color: #dceafb;\n"
+        "}",
+        "stats evaluation player active module summary items use blue pill chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{10.0f, 5.0f});\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 999.0f);\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);",
+        "plugin module summary toggles use web-like pill geometry",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "active ? ImVec4{0.29f, 0.58f, 1.0f, 0.08f} : ImVec4{1.0f, 1.0f, 1.0f, 0.03f}",
+        "plugin module summary toggles mirror web active/inactive backgrounds",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "active ? ImVec4{0.29f, 0.58f, 1.0f, 0.22f} : ImVec4{1.0f, 1.0f, 1.0f, 0.10f}",
+        "plugin module summary toggles mirror web active/inactive borders",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PopStyleColor(5);\n  ImGui::PopStyleVar(3);",
+        "plugin module summary toggles restore web-like style stack",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "ImVec4{0.16f, 0.35f, 0.28f, 1.0f}",
+        "plugin module summary toggles use old green active fill",
+        errors,
+    )
+    require_contains(
         plugin_header,
         "bool includePluginControls = true",
         "plugin module summary can hide plugin-only controls for web-like launcher",

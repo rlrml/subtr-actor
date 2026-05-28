@@ -121,6 +121,32 @@ void popWebFloatingWindowStyle() {
   ImGui::PopStyleVar(4);
 }
 
+void pushWebModuleSummaryButtonStyle(bool active) {
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{10.0f, 5.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 999.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+  ImGui::PushStyleColor(
+      ImGuiCol_Button,
+      active ? ImVec4{0.29f, 0.58f, 1.0f, 0.08f} : ImVec4{1.0f, 1.0f, 1.0f, 0.03f});
+  ImGui::PushStyleColor(
+      ImGuiCol_ButtonHovered,
+      active ? ImVec4{0.29f, 0.58f, 1.0f, 0.14f} : ImVec4{1.0f, 1.0f, 1.0f, 0.07f});
+  ImGui::PushStyleColor(
+      ImGuiCol_ButtonActive,
+      active ? ImVec4{0.29f, 0.58f, 1.0f, 0.20f} : ImVec4{1.0f, 1.0f, 1.0f, 0.11f});
+  ImGui::PushStyleColor(
+      ImGuiCol_Border,
+      active ? ImVec4{0.29f, 0.58f, 1.0f, 0.22f} : ImVec4{1.0f, 1.0f, 1.0f, 0.10f});
+  ImGui::PushStyleColor(
+      ImGuiCol_Text,
+      active ? ImVec4{0.86f, 0.92f, 0.98f, 1.0f} : ImVec4{0.63f, 0.70f, 0.76f, 1.0f});
+}
+
+void popWebModuleSummaryButtonStyle() {
+  ImGui::PopStyleColor(5);
+  ImGui::PopStyleVar(3);
+}
+
 void renderWebDetailGridCell(std::string_view label, std::string_view value) {
   const std::string labelString{label};
   const std::string valueString{value};
@@ -8020,14 +8046,9 @@ bool SubtrActorPlugin::renderModuleSummaryToggle(
     float width) {
   const std::string buttonLabel =
       std::format("{}   {}##{}-{}", label, active ? "On" : "Off", idSuffix, label);
-  if (active) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
-  }
+  pushWebModuleSummaryButtonStyle(active);
   const bool clicked = ImGui::Button(buttonLabel.c_str(), ImVec2{width, 0.0f});
-  if (active) {
-    ImGui::PopStyleColor(2);
-  }
+  popWebModuleSummaryButtonStyle();
   if (width <= 0.0f) {
     const float itemRight = ImGui::GetItemRectMax().x;
     const float contentRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
@@ -8487,9 +8508,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
     ImGui::PushID(window.label);
     const bool isOpen = window.open != nullptr && *window.open;
     if (includeState && isOpen) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
+      pushWebModuleSummaryButtonStyle(true);
     }
     const std::string buttonLabel{window.label};
     const float buttonWidth = fullWidth ? ImGui::GetContentRegionAvail().x : 210.0f;
@@ -8504,7 +8523,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
       }
     }
     if (includeState && isOpen) {
-      ImGui::PopStyleColor(3);
+      popWebModuleSummaryButtonStyle();
     }
     ImGui::PopID();
   }
@@ -8760,7 +8779,9 @@ void SubtrActorPlugin::renderEventSourceControls() {
   }
 
   auto renderEventSourceAction = [](const std::string &label) {
+    pushWebModuleSummaryButtonStyle(false);
     const bool clicked = ImGui::Button(label.c_str());
+    popWebModuleSummaryButtonStyle();
     const float itemRight = ImGui::GetItemRectMax().x;
     const float contentRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
     if (contentRight - itemRight > 112.0f) {
@@ -8769,20 +8790,15 @@ void SubtrActorPlugin::renderEventSourceControls() {
     return clicked;
   };
   auto renderEventSourceRow = [](const EventFilterOption &option, bool enabled, size_t count) {
-    if (enabled) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
-    }
     const std::string label = std::format(
         "{}   {} {}##event-sources-{}",
         option.label,
         enabled ? "On" : "Off",
         count,
         option.value);
+    pushWebModuleSummaryButtonStyle(enabled);
     const bool clicked = ImGui::Button(label.c_str());
-    if (enabled) {
-      ImGui::PopStyleColor(2);
-    }
+    popWebModuleSummaryButtonStyle();
     return clicked;
   };
 
