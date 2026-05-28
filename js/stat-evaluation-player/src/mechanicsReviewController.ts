@@ -2,17 +2,12 @@ import type { ReplayPlayer, ReplayPlayerState } from "@rlrml/player";
 import { mustElement } from "./floatingWindows.ts";
 import {
   createMechanicsReviewReplaySource,
-  formatMechanicsReviewClipDetails,
-  formatMechanicsReviewEventDetails,
   formatMechanicsReviewStatus,
   getMechanicsReviewBoundTime,
   getMechanicsReviewDecisionEndpoint,
   getMechanicsReviewItemLabel,
-  getMechanicsReviewMechanicLabel,
   getMechanicsReviewPlayerId,
-  getMechanicsReviewPlayerName,
   getMechanicsReviewReplayItems,
-  getMechanicsReviewReplayLabel,
   getMechanicsReviewReplayPath,
   getMechanicsReviewUrlFromLocation,
   initializeMechanicsReviewReplayLoadStates,
@@ -32,6 +27,7 @@ import {
   type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import type { ReplayInputSource } from "./replayInputSources.ts";
+import { renderMechanicsReviewPanel } from "./mechanicsReviewPanel.ts";
 import { renderMechanicsReviewReplayLoads } from "./mechanicsReviewReplayLoads.ts";
 
 export interface MechanicsReviewElements {
@@ -399,65 +395,14 @@ export function createMechanicsReviewController(
   }
 
   function render(): void {
-    const review = activeReview;
-    const items = review?.manifest.items ?? [];
-    const item = review ? (items[review.currentIndex] ?? null) : null;
-    const hasItems = items.length > 0;
-
-    elements.count.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
-    elements.index.textContent =
-      hasItems && review ? `${review.currentIndex + 1} / ${items.length}` : "0 / 0";
-    elements.title.textContent = item
-      ? getMechanicsReviewItemLabel(item, review?.currentIndex ?? 0)
-      : "No candidate selected";
-    elements.mechanic.textContent = item ? getMechanicsReviewMechanicLabel(item) : "--";
-    elements.player.textContent = item
-      ? getMechanicsReviewPlayerName(item, options.getReplayPlayer()?.replay.players)
-      : "--";
-    elements.clip.textContent = item ? formatMechanicsReviewClipDetails(item) : "--";
-    elements.event.textContent = item ? formatMechanicsReviewEventDetails(item) : "--";
-    elements.reason.textContent = item?.meta?.reason ?? "--";
-    elements.previous.disabled = !review || review.loading || review.currentIndex <= 0;
-    elements.replay.disabled = !review || review.loading || !review.currentClip;
-    elements.next.disabled =
-      !review || review.loading || review.currentIndex >= items.length - 1;
-    const decisionDisabled =
-      !review || review.loading || getMechanicsReviewDecisionEndpoint(item) === null;
-    elements.confirm.disabled = decisionDisabled;
-    elements.reject.disabled = decisionDisabled;
-    elements.uncertain.disabled = decisionDisabled;
-    renderReplayLoads(review);
-
-    elements.list.replaceChildren();
-    if (!review || items.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "stat-window-empty";
-      empty.textContent = "No review playlist loaded.";
-      elements.list.append(empty);
-      return;
-    }
-
-    items.forEach((candidate, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "mechanics-review-item";
-      button.dataset.active = index === review.currentIndex ? "true" : "false";
-      button.disabled = review.loading;
-      button.addEventListener("click", () => {
+    renderMechanicsReviewPanel({
+      elements,
+      review: activeReview,
+      getReplayPlayer: options.getReplayPlayer,
+      renderReplayLoads,
+      activateItem(index) {
         void activateItem(index);
-      });
-
-      const title = document.createElement("span");
-      title.textContent = getMechanicsReviewItemLabel(candidate, index);
-
-      const meta = document.createElement("strong");
-      meta.textContent = [
-        getMechanicsReviewMechanicLabel(candidate),
-        formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
-      ].join(" · ");
-
-      button.append(title, meta);
-      elements.list.append(button);
+      },
     });
   }
 
