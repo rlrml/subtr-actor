@@ -529,6 +529,30 @@ def main() -> int:
         "plugin mechanics review rows use prefix/raw-seconds/status-in-title shape",
         errors,
     )
+    require_contains(
+        web_player_template_source,
+        '<span id="replay-loading-summary">0 replays</span>',
+        "stats evaluation player replay loading summary starts as replay count",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string replaySummary = replayPath ? "1 replay" : "0 replays";',
+        "plugin replay loading summary uses web-like replay count",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::Text("Summary: %s", replayPath ? "1 replay candidate" : "0 replay candidates");',
+        "plugin replay loading summary label/candidate wording",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::Text("Active: %s", status);',
+        "plugin replay loading active status label",
+        errors,
+    )
     for label, plugin_needle in (
         ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
         ("Half control", '"Half control",\n        timelineRangePressureEnabled'),

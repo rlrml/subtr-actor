@@ -8910,10 +8910,12 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                            : replayAnnotations ? "Loaded"
                            : replayAnnotationLoadFailed ? "Failed"
                                                         : "Scanning";
+  const std::string replaySummary = replayPath ? "1 replay" : "0 replays";
 
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY LOADING");
-  ImGui::Text("Summary: %s", replayPath ? "1 replay candidate" : "0 replay candidates");
-  ImGui::Text("Active: %s", status);
+  ImGui::Text("%s", replaySummary.c_str());
+  ImGui::SameLine();
+  ImGui::Text("%s", status);
   ImGui::Text("In replay: %s", inReplay ? "yes" : "no");
   if (hasReplayServer) {
     ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
