@@ -1875,6 +1875,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        plugin_source,
+        "const std::string eventLabel = event.label.empty() ? sourceLabel : event.label;",
+        "plugin event playlist row title falls back to source label like web",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "const std::string eventLabel = event.label.empty() ? event.type : event.label;",
+        "plugin event playlist row title falls back to raw event type",
+        errors,
+    )
+    require_contains(
         web_player_timeline_markers_source,
         'label: `${playerName} speed flip ${qualityPercent}%`,',
         "stats evaluation player player mechanics include player names in titles",

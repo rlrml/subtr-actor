@@ -8961,7 +8961,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     const bool active = activeEventIndex && *activeEventIndex == index;
     const float seekTime = eventSeekTime(event);
     const std::string timeLabel = formatEventPlaylistTime(event.time);
-    const std::string eventLabel = event.label.empty() ? event.type : event.label;
+    const std::string sourceLabel = sourceLabelForEvent(event);
+    const std::string eventLabel = event.label.empty() ? sourceLabel : event.label;
     const std::string itemLabel =
         std::format("{}  {}##event-playlist-item", timeLabel, eventLabel);
     ImGui::PushStyleColor(ImGuiCol_Text, color);
@@ -8984,7 +8985,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     if (event.frame_number != 0) {
       metaParts.push_back(std::format("frame {}", event.frame_number));
     }
-    const std::string sourceLabel = sourceLabelForEvent(event);
     if (!sourceLabel.empty()) {
       metaParts.push_back(sourceLabel);
     }
