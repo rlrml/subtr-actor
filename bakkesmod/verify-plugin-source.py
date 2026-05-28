@@ -870,8 +870,44 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextDisabled("Camera profile");\n  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);\n  if (ImGui::BeginCombo("##attached-player", selectedLabel.c_str()))',
+        'ImGui::TextDisabled("Camera profile");\n  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);\n  const bool profileDisabled = !hasCameraContext;\n  pushCameraDisabledStyle(profileDisabled);\n  const bool profileOpen = ImGui::BeginCombo("##attached-player", selectedLabel.c_str());',
         "plugin camera profile selector mirrors web label and hidden control id",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "attachedPlayer.disabled = !enabled;",
+        "stats evaluation player disables attached player selector with transport",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'button.disabled = !hasReplay || (mode === "follow" && !canFollow);',
+        "stats evaluation player disables unavailable camera modes",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "cameraViewOverheadButton.disabled = !hasReplay;",
+        "stats evaluation player disables overhead camera without replay",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool hasCameraContext = !sampledPlayers.empty();",
+        "plugin camera derives replay context for disabled controls",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'cameraViewButton("Follow##camera-view", 1, !hasCameraContext || selectedPlayer == nullptr)',
+        "plugin disables follow camera without replay player context",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'cameraViewButton("Overhead##camera-view", 2, !hasCameraContext)',
+        "plugin disables preset camera modes without replay context",
         errors,
     )
     require_contains(

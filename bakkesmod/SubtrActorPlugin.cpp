@@ -9580,61 +9580,7 @@ void SubtrActorPlugin::renderCameraWindow() {
   };
   cameraViewMode = std::clamp(cameraViewMode, 0, static_cast<int>(viewModes.size()) - 1);
 
-  const std::string selectedLabel =
-      targetPlayer == nullptr
-          ? "Free camera"
-          : playerLabel(targetPlayer->player_index, targetPlayer->is_team_0);
-  ImGui::TextDisabled("Camera profile");
-  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-  if (ImGui::BeginCombo("##attached-player", selectedLabel.c_str())) {
-    if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
-      cameraViewMode = 0;
-      cameraFreePreset = -1;
-      scheduleUiConfigAutosave();
-    }
-    for (const SaPlayerFrame &player : sampledPlayers) {
-      const std::string label = std::format(
-          "{}##camera-player-{}",
-          playerLabel(player.player_index, player.is_team_0),
-          player.player_index);
-      if (ImGui::Selectable(
-              label.c_str(), targetPlayer != nullptr &&
-                                 targetPlayer->player_index == player.player_index)) {
-        cameraSelectedPlayerIndex = player.player_index;
-        cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
-        cameraViewMode = 1;
-        cameraFreePreset = -1;
-        scheduleUiConfigAutosave();
-      }
-    }
-    ImGui::EndCombo();
-  }
-
-  if (ImGui::RadioButton("Free##camera-view", &cameraViewMode, 0)) {
-    cameraFreePreset = -1;
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::RadioButton("Follow##camera-view", &cameraViewMode, 1)) {
-    cameraFreePreset = -1;
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::RadioButton("Overhead##camera-view", &cameraViewMode, 2)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::RadioButton("Diagonal##camera-view", &cameraViewMode, 3)) {
-    scheduleUiConfigAutosave();
-  }
-
-  if (cameraViewMode == 2) {
-    cameraFreePreset = 0;
-  } else if (cameraViewMode == 3) {
-    cameraFreePreset = 1;
-  }
-
-  const bool hasAttachedCamera = targetPlayer != nullptr;
+  const bool hasCameraContext = !sampledPlayers.empty();
   auto pushCameraDisabledStyle = [](bool disabled) {
     if (disabled) {
       ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
@@ -9646,6 +9592,82 @@ void SubtrActorPlugin::renderCameraWindow() {
     }
   };
 
+  const std::string selectedLabel =
+      targetPlayer == nullptr
+          ? "Free camera"
+          : playerLabel(targetPlayer->player_index, targetPlayer->is_team_0);
+  ImGui::TextDisabled("Camera profile");
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+  const bool profileDisabled = !hasCameraContext;
+  pushCameraDisabledStyle(profileDisabled);
+  const bool profileOpen = ImGui::BeginCombo("##attached-player", selectedLabel.c_str());
+  popCameraDisabledStyle(profileDisabled);
+  if (profileOpen) {
+    if (profileDisabled) {
+      ImGui::CloseCurrentPopup();
+      ImGui::EndCombo();
+    } else {
+      if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
+        cameraViewMode = 0;
+        cameraFreePreset = -1;
+        scheduleUiConfigAutosave();
+      }
+      for (const SaPlayerFrame &player : sampledPlayers) {
+        const std::string label = std::format(
+            "{}##camera-player-{}",
+            playerLabel(player.player_index, player.is_team_0),
+            player.player_index);
+        if (ImGui::Selectable(
+                label.c_str(), targetPlayer != nullptr &&
+                                   targetPlayer->player_index == player.player_index)) {
+          cameraSelectedPlayerIndex = player.player_index;
+          cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
+          cameraViewMode = 1;
+          cameraFreePreset = -1;
+          scheduleUiConfigAutosave();
+        }
+      }
+      ImGui::EndCombo();
+    }
+  }
+
+  auto cameraViewButton = [&](const char *label, int mode, bool disabled) {
+    int nextMode = cameraViewMode;
+    pushCameraDisabledStyle(disabled);
+    const bool clicked = ImGui::RadioButton(label, &nextMode, mode);
+    popCameraDisabledStyle(disabled);
+    return clicked && !disabled;
+  };
+
+  if (cameraViewButton("Free##camera-view", 0, !hasCameraContext)) {
+    cameraViewMode = 0;
+    cameraFreePreset = -1;
+    scheduleUiConfigAutosave();
+  }
+  ImGui::SameLine();
+  if (cameraViewButton("Follow##camera-view", 1, !hasCameraContext || selectedPlayer == nullptr)) {
+    cameraViewMode = 1;
+    cameraFreePreset = -1;
+    scheduleUiConfigAutosave();
+  }
+  ImGui::SameLine();
+  if (cameraViewButton("Overhead##camera-view", 2, !hasCameraContext)) {
+    cameraViewMode = 2;
+    scheduleUiConfigAutosave();
+  }
+  ImGui::SameLine();
+  if (cameraViewButton("Diagonal##camera-view", 3, !hasCameraContext)) {
+    cameraViewMode = 3;
+    scheduleUiConfigAutosave();
+  }
+
+  if (cameraViewMode == 2) {
+    cameraFreePreset = 0;
+  } else if (cameraViewMode == 3) {
+    cameraFreePreset = 1;
+  }
+
+  const bool hasAttachedCamera = targetPlayer != nullptr;
   float nextDistanceScale = cameraDistanceScale;
   pushCameraDisabledStyle(!hasAttachedCamera);
   const bool distanceScaleChanged =
