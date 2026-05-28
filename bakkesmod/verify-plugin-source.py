@@ -1217,6 +1217,37 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);',
+        "stats evaluation player defaults touch and powerslide out of playlist",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'eventPlaylistSourceFilter = "default";',
+        "plugin replay review playlist starts from web-like default source selection",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'return optionValue != "all" && optionValue != "mechanics" && optionValue != "touch" &&\n'
+        '         optionValue != "powerslide";',
+        "plugin event playlist default excludes broad mechanics, touch, and powerslide",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '{"goal", "Goals", "Replay"}',
+        "plugin event playlist goal source label mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '{"demo", "Demos", "Replay"}',
+        "plugin event playlist demo source label mirrors web",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'std::format(\n'
         '      "Filters {}/{}##event-playlist-filter",\n'

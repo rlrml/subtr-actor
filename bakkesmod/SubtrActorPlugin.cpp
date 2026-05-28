@@ -208,8 +208,9 @@ std::string normalizeUiStatId(std::string_view statId);
 
 constexpr std::array<EventFilterOption, 34> EVENT_FILTER_OPTIONS{{
     {"all", "All events", "All"},
-    {"goal", "Goal", "Replay"},
+    {"goal", "Goals", "Replay"},
     {"core", "Shots, saves, assists", "Replay"},
+    {"demo", "Demos", "Replay"},
     {"mechanics", "All mechanics", "Sources"},
     {"team", "Team events", "Sources"},
     {"goal_context", "Goal context", "Sources"},
@@ -240,7 +241,6 @@ constexpr std::array<EventFilterOption, 34> EVENT_FILTER_OPTIONS{{
     {"half_volley", "Half volley", "Mechanics"},
     {"whiff", "Whiff", "Mechanics"},
     {"bump", "Bump", "Mechanics"},
-    {"demo", "Demo", "Mechanics"},
 }};
 
 constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
@@ -2099,6 +2099,36 @@ std::vector<std::string> eventFilterTokens(std::string_view rawFilter) {
   return tokens;
 }
 
+bool eventPlaylistUsesDefaultSources(std::string_view rawFilter) {
+  const std::vector<std::string> tokens = eventFilterTokens(rawFilter);
+  return tokens.size() == 1 && tokens.front() == "default";
+}
+
+bool defaultEventPlaylistSourceOption(std::string_view optionValue) {
+  return optionValue != "all" && optionValue != "mechanics" && optionValue != "touch" &&
+         optionValue != "powerslide";
+}
+
+std::vector<std::string> defaultEventPlaylistSourceTokens() {
+  std::vector<std::string> tokens;
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (defaultEventPlaylistSourceOption(option.value)) {
+      tokens.emplace_back(option.value);
+    }
+  }
+  return tokens;
+}
+
+bool defaultEventPlaylistSourceAllows(std::string_view category, std::string_view type) {
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (defaultEventPlaylistSourceOption(option.value) &&
+        eventFilterAllows(option.value, category, type)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool allEventSourcesSelected(std::string_view rawFilter) {
   const std::vector<std::string> tokens = eventFilterTokens(rawFilter);
   return tokens.empty() || containsString(tokens, "all");
@@ -2106,6 +2136,9 @@ bool allEventSourcesSelected(std::string_view rawFilter) {
 
 std::vector<std::string> selectedEventSourceTokens(std::string_view rawFilter) {
   std::vector<std::string> tokens;
+  if (eventPlaylistUsesDefaultSources(rawFilter)) {
+    return defaultEventPlaylistSourceTokens();
+  }
   if (allEventSourcesSelected(rawFilter)) {
     for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
       if (std::string_view{option.value} != "all") {
@@ -2152,6 +2185,9 @@ const char *eventFilterLabel(std::string_view value) {
 }
 
 std::string eventFilterPreview(std::string_view rawFilter) {
+  if (eventPlaylistUsesDefaultSources(rawFilter)) {
+    return "Default events";
+  }
   const std::vector<std::string> selected = selectedEventSourceTokens(rawFilter);
   if (allEventSourcesSelected(rawFilter)) {
     return "All events";
@@ -7767,7 +7803,7 @@ void SubtrActorPlugin::renderModuleSummaryControls(
       renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix, toggleWidth);
       renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix, toggleWidth);
       renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix, toggleWidth);
-      renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Demos", "demo", idSuffix, toggleWidth);
       renderBoolModuleSummaryToggle(
           "Team event playlist",
           eventPlaylistTeamEventsEnabled,
@@ -8382,6 +8418,9 @@ void SubtrActorPlugin::renderEventSourceControls() {
 }
 
 bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) const {
+  if (eventPlaylistUsesDefaultSources(eventPlaylistSourceFilter)) {
+    return defaultEventPlaylistSourceAllows(event.category, event.type);
+  }
   return eventFilterAllows(eventPlaylistSourceFilter, event.category, event.type);
 }
 
@@ -10414,7 +10453,7 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;
   eventPlaylistAutoFollow = true;
-  eventPlaylistSourceFilter = "all";
+  eventPlaylistSourceFilter = "default";
   resetWindowPlacements();
   mechanicsReviewPlacement.pending_focus = true;
   replayLoadingPlacement.pending_focus = true;
