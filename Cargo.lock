@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "rl-replay-subtr-actor"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "boxcars",
  "console_error_panic_hook",
@@ -1250,7 +1250,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subtr-actor"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "boxcars",
@@ -1269,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-bakkesmod"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "boxcars",
  "serde_json",
@@ -1278,7 +1278,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-py"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "boxcars",
  "numpy",
@@ -1289,7 +1289,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-tools"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "boxcars",

@@ -6,6 +6,19 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+## v0.12.0 - 2026-05-28
+
+- Add stats-player event count derivation so timeline event totals can be
+  searched, displayed, and compared alongside other stat snapshots.
+- Tag dodge-contact touches through the Rust replay output, stats timeline, and
+  player overlays so dodge-assisted fifty-fifties and touch events carry their
+  contact context.
+- Publish the JavaScript bindings, replay player, and stats player under the
+  `@rlrml` npm scope, with docs and package wiring updated for the scoped
+  package names.
+- Fix GitHub Pages builds across the Nix and non-Nix CI paths.
+- Refresh Rust, Python, and JavaScript release metadata to `0.12.0`.
+
 ## v0.11.0 - 2026-05-26
 
 - Add territorial pressure stats to the Rust timeline, serialized stats output,
