@@ -447,6 +447,42 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'renderModuleSummaryGroup("Timeline visualizations", timelineToggles)',
+        "stats evaluation player launcher module summary timeline group",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles)',
+        "stats evaluation player launcher module summary in-game group",
+        errors,
+    )
+    require_contains(
+        plugin_header,
+        "bool includePluginControls = true",
+        "plugin module summary can hide plugin-only controls for web-like launcher",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryControls("launcher-module-summary", false, 0.0f, false);',
+        "launcher module summary excludes plugin-only controls like the web player",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryControls("module-controls-summary");',
+        "dedicated module controls keep plugin-only module controls",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'renderModuleSummaryControls("launcher-module-summary", false, 0.0f);',
+        "launcher module summary includes plugin-only controls",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "summary.textContent = `Filters ${selectedSourceIds.size}/${sources.length}`;",
         "stats evaluation player event playlist filter count label",
         errors,

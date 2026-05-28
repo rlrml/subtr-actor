@@ -498,7 +498,8 @@ private:
   void renderModuleSummaryControls(
       const char *idSuffix,
       bool collapsibleGroups = true,
-      float toggleWidth = 230.0f);
+      float toggleWidth = 230.0f,
+      bool includePluginControls = true);
   void renderModuleSettingsControls(
       const char *idSuffix,
       bool includeOpenButtons,

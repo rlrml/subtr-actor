@@ -7592,7 +7592,8 @@ void SubtrActorPlugin::renderEventFilterModuleSummaryToggle(
 void SubtrActorPlugin::renderModuleSummaryControls(
     const char *idSuffix,
     bool collapsibleGroups,
-    float toggleWidth) {
+    float toggleWidth,
+    bool includePluginControls) {
   auto renderTimelineControls = [&]() {
     renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix, toggleWidth);
     renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);
@@ -7610,16 +7611,18 @@ void SubtrActorPlugin::renderModuleSummaryControls(
     renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix, toggleWidth);
     renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix, toggleWidth);
     renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix, toggleWidth);
-    renderBoolModuleSummaryToggle(
-        "Team event playlist",
-        eventPlaylistTeamEventsEnabled,
-        idSuffix,
-        toggleWidth);
-    renderBoolModuleSummaryToggle(
-        "Goal context playlist",
-        eventPlaylistGoalContextEnabled,
-        idSuffix,
-        toggleWidth);
+    if (includePluginControls) {
+      renderBoolModuleSummaryToggle(
+          "Team event playlist",
+          eventPlaylistTeamEventsEnabled,
+          idSuffix,
+          toggleWidth);
+      renderBoolModuleSummaryToggle(
+          "Goal context playlist",
+          eventPlaylistGoalContextEnabled,
+          idSuffix,
+          toggleWidth);
+    }
     renderBoolModuleSummaryToggle(
         "Boost pickup timeline",
         timelineRangeBoostEnabled,
@@ -7641,34 +7644,42 @@ void SubtrActorPlugin::renderModuleSummaryControls(
         timelineRangeAbsolutePositioningEnabled,
         idSuffix,
         toggleWidth);
-    renderBoolModuleSummaryToggle("Playlist follow", eventPlaylistAutoFollow, idSuffix, toggleWidth);
+    if (includePluginControls) {
+      renderBoolModuleSummaryToggle(
+          "Playlist follow",
+          eventPlaylistAutoFollow,
+          idSuffix,
+          toggleWidth);
+    }
   };
 
   auto renderInGameControls = [&]() {
-    renderCvarModuleSummaryToggle(
-        "Canvas status line",
-        "subtr_actor_status_overlay_enabled",
-        true,
-        idSuffix,
-        toggleWidth);
-    renderCvarModuleSummaryToggle(
-        "HUD mechanics",
-        "subtr_actor_overlay_mechanics_enabled",
-        true,
-        idSuffix,
-        toggleWidth);
-    renderCvarModuleSummaryToggle(
-        "HUD team events",
-        "subtr_actor_overlay_team_events_enabled",
-        true,
-        idSuffix,
-        toggleWidth);
-    renderCvarModuleSummaryToggle(
-        "HUD goal context",
-        "subtr_actor_overlay_goal_context_enabled",
-        true,
-        idSuffix,
-        toggleWidth);
+    if (includePluginControls) {
+      renderCvarModuleSummaryToggle(
+          "Canvas status line",
+          "subtr_actor_status_overlay_enabled",
+          true,
+          idSuffix,
+          toggleWidth);
+      renderCvarModuleSummaryToggle(
+          "HUD mechanics",
+          "subtr_actor_overlay_mechanics_enabled",
+          true,
+          idSuffix,
+          toggleWidth);
+      renderCvarModuleSummaryToggle(
+          "HUD team events",
+          "subtr_actor_overlay_team_events_enabled",
+          true,
+          idSuffix,
+          toggleWidth);
+      renderCvarModuleSummaryToggle(
+          "HUD goal context",
+          "subtr_actor_overlay_goal_context_enabled",
+          true,
+          idSuffix,
+          toggleWidth);
+    }
     renderBoolModuleSummaryToggle(
         "Ceiling shot labels",
         renderEffectCeilingShotEnabled,
@@ -8028,7 +8039,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
   renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);
 
   ImGui::Separator();
-  renderModuleSummaryControls("launcher-module-summary", false, 0.0f);
+  renderModuleSummaryControls("launcher-module-summary", false, 0.0f, false);
 
   ImGui::Separator();
   renderModuleSettingsControls("launcher-module-settings", false, true);
