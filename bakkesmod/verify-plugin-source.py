@@ -1991,10 +1991,62 @@ def main() -> int:
         )
         require_contains(
             plugin_source,
-            f'ImGui::TextColored(ImVec4{{0.53f, 0.69f, 0.83f, 1.0f}}, "{boost_filter_label}");',
+            f'renderBoostFilterGroupTitle("{boost_filter_label}");',
             f"plugin boost pickup filter label {boost_filter_label}",
             errors,
         )
+    require_contains(
+        web_player_boost_pickup_filters_source,
+        'settingsEl.className = "boost-pickup-filter-panel";',
+        "stats evaluation player boost pickup filters render a settings panel",
+        errors,
+    )
+    require_contains(
+        web_player_boost_pickup_filters_source,
+        'header.className = "boost-pickup-filter-summary";',
+        "stats evaluation player boost pickup filters render a summary row",
+        errors,
+    )
+    require_contains(
+        web_player_boost_pickup_filters_source,
+        'grid.className = "boost-pickup-filter-grid";',
+        "stats evaluation player boost pickup filters render a grid",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".boost-pickup-filter-grid {\n"
+        "  display: grid;\n"
+        "  grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+        "  gap: 0.75rem 1rem;\n"
+        "}",
+        "stats evaluation player boost pickup filter grid is two columns",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(2, "boost-pickup-filter-grid", false);',
+        "plugin boost pickup filter groups use web-like two-column grid",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string pickupReadout =\n      pickupsHidden ? "Hidden"\n                    : constrainedGroups == 0 ? "All labels"',
+        "plugin boost pickup filters render web-like summary readout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::SetCursorPosX(std::max(\n      ImGui::GetCursorPosX(),\n      ImGui::GetWindowContentRegionMax().x - pickupReadoutWidth));',
+        "plugin boost pickup summary is right-aligned like web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "auto renderBoostFilterCheckbox = [&](const char *label, bool &value, bool sameLine)",
+        "plugin boost pickup filter options share web-like option renderer",
+        errors,
+    )
     require_contains(
         web_player_boost_pickup_filters_source,
         'optionText.textContent = `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`;',
@@ -2026,6 +2078,8 @@ def main() -> int:
         'ImGui::Button("Hide pickups")',
         'ImGui::Button("All players")',
         'ImGui::Button("No players")',
+        'ImGui::Separator();\n  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Activity");',
+        'ImGui::Separator();\n  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Field half");',
     ):
         reject_contains(
             plugin_source,
@@ -3869,7 +3923,7 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Player");',
+        'renderBoostFilterGroupTitle("Player");',
         "boost pickup filters expose web player filter group",
         errors,
     )

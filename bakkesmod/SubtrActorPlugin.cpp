@@ -9719,47 +9719,69 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     return;
   }
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Pad type");
-  if (ImGui::Checkbox("Big pads", &boostPickupPadBig)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Small pads", &boostPickupPadSmall)) {
-    scheduleUiConfigAutosave();
-  }
-  if (ImGui::Checkbox("Ambiguous pads", &boostPickupPadAmbiguous)) {
-    scheduleUiConfigAutosave();
-  }
+  auto selectedCount = [](std::initializer_list<bool> values) {
+    return static_cast<int>(std::count(values.begin(), values.end(), true));
+  };
+  const int padSelected =
+      selectedCount({boostPickupPadBig, boostPickupPadSmall, boostPickupPadAmbiguous});
+  const int activitySelected = selectedCount(
+      {boostPickupActivityActive, boostPickupActivityInactive, boostPickupActivityUnknown});
+  const int fieldSelected =
+      selectedCount({boostPickupFieldOwn, boostPickupFieldOpponent, boostPickupFieldUnknown});
+  const int playerSelected = boostPickupPlayerFilterEnabled
+                                 ? static_cast<int>(boostPickupPlayerIds.size())
+                                 : static_cast<int>(sampledPlayers.size());
+  const bool pickupsHidden = padSelected == 0 || activitySelected == 0 || fieldSelected == 0 ||
+                             (boostPickupPlayerFilterEnabled && playerSelected == 0);
+  const int constrainedGroups =
+      (padSelected < 3 ? 1 : 0) + (activitySelected < 3 ? 1 : 0) +
+      (fieldSelected < 3 ? 1 : 0) +
+      (boostPickupPlayerFilterEnabled &&
+               playerSelected < static_cast<int>(sampledPlayers.size())
+           ? 1
+           : 0);
+  const std::string pickupReadout =
+      pickupsHidden ? "Hidden"
+                    : constrainedGroups == 0 ? "All labels"
+                                             : std::format("{} filters", constrainedGroups);
+  const float pickupReadoutWidth = ImGui::CalcTextSize(pickupReadout.c_str()).x;
+  ImGui::SetCursorPosX(std::max(
+      ImGui::GetCursorPosX(),
+      ImGui::GetWindowContentRegionMax().x - pickupReadoutWidth));
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", pickupReadout.c_str());
 
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Activity");
-  if (ImGui::Checkbox("Active play", &boostPickupActivityActive)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Inactive play", &boostPickupActivityInactive)) {
-    scheduleUiConfigAutosave();
-  }
-  if (ImGui::Checkbox("Unknown activity", &boostPickupActivityUnknown)) {
-    scheduleUiConfigAutosave();
-  }
+  auto renderBoostFilterGroupTitle = [](const char *title) {
+    ImGui::TextColored(ImVec4{0.84f, 0.90f, 0.94f, 1.0f}, "%s", title);
+  };
+  auto renderBoostFilterCheckbox = [&](const char *label, bool &value, bool sameLine) {
+    if (sameLine) {
+      ImGui::SameLine();
+    }
+    if (ImGui::Checkbox(label, &value)) {
+      scheduleUiConfigAutosave();
+    }
+  };
 
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Field half");
-  if (ImGui::Checkbox("Own half", &boostPickupFieldOwn)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Opponent half", &boostPickupFieldOpponent)) {
-    scheduleUiConfigAutosave();
-  }
-  if (ImGui::Checkbox("Unknown half", &boostPickupFieldUnknown)) {
-    scheduleUiConfigAutosave();
-  }
+  ImGui::Columns(2, "boost-pickup-filter-grid", false);
+  renderBoostFilterGroupTitle("Pad type");
+  renderBoostFilterCheckbox("Big pads", boostPickupPadBig, false);
+  renderBoostFilterCheckbox("Small pads", boostPickupPadSmall, true);
+  renderBoostFilterCheckbox("Ambiguous pads", boostPickupPadAmbiguous, false);
+  ImGui::NextColumn();
+  renderBoostFilterGroupTitle("Activity");
+  renderBoostFilterCheckbox("Active play", boostPickupActivityActive, false);
+  renderBoostFilterCheckbox("Inactive play", boostPickupActivityInactive, true);
+  renderBoostFilterCheckbox("Unknown activity", boostPickupActivityUnknown, false);
+  ImGui::NextColumn();
+  renderBoostFilterGroupTitle("Field half");
+  renderBoostFilterCheckbox("Own half", boostPickupFieldOwn, false);
+  renderBoostFilterCheckbox("Opponent half", boostPickupFieldOpponent, true);
+  renderBoostFilterCheckbox("Unknown half", boostPickupFieldUnknown, false);
+  ImGui::Columns(1);
 
   if (!sampledPlayers.empty()) {
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Player");
+    ImGui::Spacing();
+    renderBoostFilterGroupTitle("Player");
     for (const SaPlayerFrame &player : sampledPlayers) {
       const std::string playerId = webPlayerIdForIndex(player.player_index);
       bool selected =
