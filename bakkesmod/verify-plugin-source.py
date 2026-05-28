@@ -941,7 +941,13 @@ def main() -> int:
         "launcher actions expose replay loading like the web player",
         errors,
     )
-    reject_contains(
+    require_contains(
+        web_player_main_source,
+        "function openReplayFilePicker(): void {\n  fileInput.click();\n  setLauncherOpen(false);\n}",
+        "stats evaluation player closes launcher after Load Replay action",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'if (ImGui::Button("Load Replay...", ImVec2{actionButtonWidth, 0.0f})) {\n'
         "    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
@@ -949,7 +955,7 @@ def main() -> int:
         "    tickReplayAnnotations();\n"
         "    hideLauncherWindow();\n"
         "  }",
-        "plugin launcher closes after Load Replay action",
+        "plugin launcher closes after Load Replay action like web",
         errors,
     )
     require_contains(

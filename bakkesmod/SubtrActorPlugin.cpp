@@ -8037,6 +8037,7 @@ void SubtrActorPlugin::renderLauncherWindow() {
     showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
     resetReplayAnnotations();
     tickReplayAnnotations();
+    hideLauncherWindow();
   }
 
   ImGui::Separator();
