@@ -9175,6 +9175,7 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     const std::string title = replayPath ? *replayPath
                               : !rawReplayPath.empty() ? rawReplayPath
                                                        : replayAnnotationPath;
+    const float replayLoadProgress = replayAnnotations ? 1.0f : 0.0f;
     ImGui::TextWrapped("%s", title.c_str());
     std::vector<std::string> replayMeta;
     if (!rawReplayPath.empty()) {
@@ -9199,6 +9200,7 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                               : ImVec4{0.72f, 0.78f, 0.86f, 1.0f},
         "%s",
         status);
+    ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");
   }
   ImGui::EndChild();
 

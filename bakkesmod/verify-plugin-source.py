@@ -1732,6 +1732,18 @@ def main() -> int:
         "plugin replay loading source row uses web-like dot-separated metadata",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'progress.className = "mechanics-review-replay-load-progress";',
+        "stats evaluation player replay loading rows include progress bars",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");',
+        "plugin replay loading source row includes web-like progress bar",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'ImGui::Text("Summary: %s", replayPath ? "1 replay candidate" : "0 replay candidates");',
