@@ -51,6 +51,7 @@ import {
   getMechanicsReviewElements,
   type MechanicsReviewController,
 } from "./mechanicsReviewController.ts";
+import { createReplayCueingController } from "./replayCueing.ts";
 import { createStatsWindowsManager } from "./statsWindows.ts";
 import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import {
@@ -127,6 +128,8 @@ let cameraControls: CameraControls | null = null;
 let replayLoadController: ReplayLoadController | null = null;
 let moduleRuntimeController: ModuleRuntimeController;
 let eventWindowsManager: EventWindowsManager;
+let cueTimelineEvent: (event: ReplayTimelineEvent) => void = () => {};
+let watchGoalReplay: (time: number, scorerId: string | null) => void = () => {};
 
 const statsWindowManager = createStatsWindowsManager({
   getDefaultFrameIndex() {
@@ -320,49 +323,6 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   moduleRuntimeController.renderTimelineEventCount();
 }
 
-function watchGoalReplay(time: number, scorerId: string | null): void {
-  if (!replayPlayer || !Number.isFinite(time)) {
-    return;
-  }
-
-  mechanicsReviewController?.clearCurrentClip();
-
-  const canFollowScorer =
-    scorerId !== null && replayPlayer.replay.players.some((player) => player.id === scorerId);
-  if (canFollowScorer) {
-    replayPlayer.setAttachedPlayer(scorerId);
-    replayPlayer.setCameraViewMode("follow");
-    cameraControls?.clearFreePreset();
-  }
-
-  appElements.skipPostGoalTransitions.checked = false;
-  appElements.skipKickoffs.checked = false;
-  replayPlayer.setState({
-    currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
-    playing: true,
-    skipPostGoalTransitionsEnabled: false,
-    skipKickoffsEnabled: false,
-  });
-  scheduleConfigUrlUpdate();
-}
-
-function cueTimelineEvent(event: ReplayTimelineEvent): void {
-  if (!replayPlayer) {
-    return;
-  }
-
-  mechanicsReviewController?.clearCurrentClip();
-
-  appElements.skipPostGoalTransitions.checked = false;
-  appElements.skipKickoffs.checked = false;
-  replayPlayer.setState({
-    currentTime: timelineEventSeekTime(event),
-    skipPostGoalTransitionsEnabled: false,
-    skipKickoffsEnabled: false,
-  });
-  scheduleConfigUrlUpdate();
-}
-
 function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
   if (!replayPlayer) {
     return;
@@ -491,6 +451,20 @@ export function mountStatEvaluationPlayer(
   replayLoadModal = createReplayLoadModal(root);
 
   appElements = getStatEvaluationPlayerElements(root);
+  ({ cueTimelineEvent, watchGoalReplay } = createReplayCueingController({
+    elements: appElements,
+    getCameraControls() {
+      return cameraControls;
+    },
+    getMechanicsReviewController() {
+      return mechanicsReviewController;
+    },
+    getReplayPlayer() {
+      return replayPlayer;
+    },
+    scheduleConfigUrlUpdate,
+  }));
+
   recordingControls = createRecordingControls({
     elements: getRecordingControlElements(root),
     getRecorder() {
