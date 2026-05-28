@@ -863,8 +863,11 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'std::format("Add all {}   {}##{}-{}", category, count, window.id, category);',
-        "plugin stats picker category row mirrors web count layout",
+        'renderStatsPickerItem(\n'
+        '            std::format("Add all {}", category),\n'
+        '            std::to_string(count),\n'
+        '            std::format("all-{}", category))',
+        "plugin stats picker category row mirrors web button/count layout",
         errors,
     )
     require_contains(
@@ -875,8 +878,27 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'std::format(\n        "{}   {}##{}-{}",',
-        "plugin stats picker stat row mirrors web label/scope layout",
+        "renderStatsPickerItem(\n"
+        "            definition.label,\n"
+        "            uiStatScopeLabel(definition),\n"
+        "            definition.id,\n"
+        "            disabled)",
+        "plugin stats picker stat row mirrors web button label/scope layout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string buttonId = std::format("##stats-picker-item-{}-{}", window.id, id);',
+        "plugin stats picker rows use dedicated hidden ImGui ids like web button rows",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddText(\n"
+        "        ImVec2{rightX, textY},\n"
+        "        disabled ? IM_COL32(107, 133, 156, 255) : IM_COL32(135, 175, 212, 255),\n"
+        "        metaString.c_str());",
+        "plugin stats picker rows draw right-aligned web accent metadata",
         errors,
     )
     require_contains(
@@ -922,8 +944,12 @@ def main() -> int:
         'std::format("Search stats##{}", window.id).c_str()',
         'ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())',
         'std::format("Add all {} ({})##{}-{}", category, count, window.id, category)',
+        'std::format("Add all {}   {}##{}-{}", category, count, window.id, category)',
         'std::format(\n        "{}  [{}]##{}-{}",',
+        'std::format(\n        "{}   {}##{}-{}",',
         'ImGui::TextDisabled(\n          "%s  [%s selected]",',
+        'ImGui::TextDisabled(\n          "%s   %s",',
+        "ImGui::Selectable(itemLabel.c_str(), alreadySelected)",
         'ImGui::Text("No matching stats.");',
         'void renderStatsWindowEmpty(std::string_view message) {\n  ImGui::Spacing();\n  ImGui::TextDisabled("%s", std::string{message}.c_str());\n}',
     ):

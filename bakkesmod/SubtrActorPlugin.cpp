@@ -12088,6 +12088,54 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(2);
   };
+  auto renderStatsPickerItem = [&](std::string_view label,
+                                   std::string_view meta,
+                                   std::string_view id,
+                                   bool disabled = false) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const std::string buttonId = std::format("##stats-picker-item-{}-{}", window.id, id);
+    const float rowWidth = ImGui::GetContentRegionAvail().x;
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{8.0f, 5.0f});
+    ImGui::PushStyleColor(
+        ImGuiCol_Button,
+        disabled ? ImVec4{1.0f, 1.0f, 1.0f, 0.03f} : ImVec4{1.0f, 1.0f, 1.0f, 0.06f});
+    ImGui::PushStyleColor(
+        ImGuiCol_ButtonHovered,
+        disabled ? ImVec4{1.0f, 1.0f, 1.0f, 0.03f} : ImVec4{1.0f, 1.0f, 1.0f, 0.10f});
+    ImGui::PushStyleColor(
+        ImGuiCol_ButtonActive,
+        disabled ? ImVec4{1.0f, 1.0f, 1.0f, 0.03f} : ImVec4{1.0f, 1.0f, 1.0f, 0.14f});
+    const bool clicked = ImGui::Button(buttonId.c_str(), ImVec2{rowWidth, 0.0f});
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+
+    const ImVec2 rowMin = ImGui::GetItemRectMin();
+    const ImVec2 rowMax = ImGui::GetItemRectMax();
+    const float textY =
+        rowMin.y + std::max(0.0f, (rowMax.y - rowMin.y - ImGui::GetTextLineHeight()) * 0.5f);
+    const std::string labelString{label};
+    const std::string metaString = uppercaseHeaderLabel(meta);
+    const ImVec2 metaSize = ImGui::CalcTextSize(metaString.c_str());
+    const float rightX = rowMax.x - style.FramePadding.x - metaSize.x;
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    const ImU32 labelColor =
+        disabled ? IM_COL32(115, 132, 146, 255) : IM_COL32(237, 245, 250, 255);
+    drawList->PushClipRect(
+        ImVec2{rowMin.x + style.FramePadding.x, rowMin.y},
+        ImVec2{rightX - 8.0f, rowMax.y},
+        true);
+    drawList->AddText(
+        ImVec2{rowMin.x + style.FramePadding.x, textY},
+        labelColor,
+        labelString.c_str());
+    drawList->PopClipRect();
+    drawList->AddText(
+        ImVec2{rightX, textY},
+        disabled ? IM_COL32(107, 133, 156, 255) : IM_COL32(135, 175, 212, 255),
+        metaString.c_str());
+    return clicked && !disabled;
+  };
 
   std::array<char, 128> queryBuffer{};
   const size_t querySize = std::min(window.picker_query.size(), queryBuffer.size() - 1);
@@ -12161,9 +12209,10 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     if (count < 2) {
       continue;
     }
-    const std::string label =
-        std::format("Add all {}   {}##{}-{}", category, count, window.id, category);
-    if (ImGui::SmallButton(label.c_str())) {
+    if (renderStatsPickerItem(
+            std::format("Add all {}", category),
+            std::to_string(count),
+            std::format("all-{}", category))) {
       bool added = false;
       for (const UiStatDefinitionMatch &match : matches) {
         if (category != match.definition.category) {
@@ -12193,20 +12242,12 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   for (const UiStatDefinitionMatch &match : matches) {
     const UiStatDefinitionCandidate &definition = match.definition;
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
-    const std::string itemLabel = std::format(
-        "{}   {}##{}-{}",
-        definition.label,
-        uiStatScopeLabel(definition),
-        window.id,
-        definition.id);
-    if (alreadySelected && window.kind != UiStatsWindowKind::AdHoc) {
-      ImGui::TextDisabled(
-          "%s   %s",
-          definition.label.c_str(),
-          uiStatScopeLabel(definition));
-      continue;
-    }
-    if (ImGui::Selectable(itemLabel.c_str(), alreadySelected)) {
+    const bool disabled = alreadySelected && window.kind != UiStatsWindowKind::AdHoc;
+    if (renderStatsPickerItem(
+            definition.label,
+            uiStatScopeLabel(definition),
+            definition.id,
+            disabled)) {
       if (window.kind == UiStatsWindowKind::AdHoc) {
         const std::string targetId = defaultAdHocTargetId(definition.id);
         if (!statsWindowHasStat(window, definition.id, targetId)) {
