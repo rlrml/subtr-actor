@@ -9411,19 +9411,10 @@ void SubtrActorPlugin::renderCameraWindow() {
     scheduleUiConfigAutosave();
   }
 
-  bool nextBallCamEnabled = cameraBallCamEnabled;
-  pushCameraDisabledStyle(!hasAttachedCamera);
-  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);
-  popCameraDisabledStyle(!hasAttachedCamera);
-  if (hasAttachedCamera && ballCamChanged) {
-    cameraBallCamEnabled = nextBallCamEnabled;
-    scheduleUiConfigAutosave();
-  }
-
   bool nextCustomSettingsEnabled = cameraCustomSettingsEnabled;
   pushCameraDisabledStyle(!hasAttachedCamera);
   const bool customSettingsChanged =
-      ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled);
+      ImGui::Checkbox("Custom camera settings", &nextCustomSettingsEnabled);
   popCameraDisabledStyle(!hasAttachedCamera);
   if (hasAttachedCamera && customSettingsChanged) {
     cameraCustomSettingsEnabled = nextCustomSettingsEnabled;

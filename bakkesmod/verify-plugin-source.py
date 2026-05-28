@@ -813,11 +813,25 @@ def main() -> int:
         "plugin camera uses web-like detail grid",
         errors,
     )
+    require_contains(
+        web_player_template_source,
+        "<span>Custom camera settings</span>",
+        "stats evaluation player camera custom settings toggle",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Checkbox("Custom camera settings", &nextCustomSettingsEnabled)',
+        "plugin camera custom settings toggle mirrors web label",
+        errors,
+    )
     for plugin_only_camera_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");',
         'ImGui::BeginCombo("Target", selectedLabel.c_str())',
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
         'ImGui::Button("Open player stats")',
+        'ImGui::Checkbox("Ball cam", &nextBallCamEnabled)',
+        'ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled)',
     ):
         reject_contains(
             plugin_source,
