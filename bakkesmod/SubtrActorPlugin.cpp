@@ -2506,6 +2506,20 @@ ImVec4 toImVec4(LinearColor color) {
   };
 }
 
+LinearColor eventPlaylistPlayerColor(uint32_t playerIndex) {
+  const std::array<LinearColor, 8> colors{{
+      {0x3b, 0x82, 0xf6, 0xff},
+      {0x06, 0xb6, 0xd4, 0xff},
+      {0x22, 0xc5, 0x5e, 0xff},
+      {0xa8, 0x55, 0xf7, 0xff},
+      {0xf9, 0x73, 0x16, 0xff},
+      {0xef, 0x44, 0x44, 0xff},
+      {0xf5, 0x9e, 0x0b, 0xff},
+      {0xec, 0x48, 0x99, 0xff},
+  }};
+  return colors[playerIndex % colors.size()];
+}
+
 std::string teamEventLabel(const SaTeamEvent &event) {
   switch (event.kind) {
   case SaTeamEventKindRush:
@@ -7231,6 +7245,8 @@ void SubtrActorPlugin::pushGoalEventMessage(const SaGoalEvent &event) {
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.timing.frame_number,
       event.timing.time,
+      event.has_player,
+      event.player_index,
   });
 }
 
@@ -7258,6 +7274,8 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.frame_number,
       event.time,
+      1,
+      event.player_index,
   });
 
   if (isCorePlayerStat) {
@@ -7304,6 +7322,8 @@ void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.start_frame,
       event.start_time,
+      0,
+      0,
   });
 
   if (!overlayCategoryEnabled("team")) {
@@ -7338,6 +7358,8 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.frame_number,
       event.time,
+      event.has_scorer,
+      event.scorer_index,
   });
 
   if (!overlayCategoryEnabled("goal_context")) {
@@ -7371,6 +7393,8 @@ void SubtrActorPlugin::pushPlayerStatEventMessage(const SaPlayerStatEvent &event
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.timing.frame_number,
       event.timing.time,
+      1,
+      event.player_index,
   });
 }
 
@@ -8869,7 +8893,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     const UiEventRecord &event = recentUiEvents[index];
 
     ImGui::PushID(static_cast<int>(index));
-    const ImVec4 color = toImVec4(event.color);
+    const ImVec4 color =
+        toImVec4(event.has_player != 0 ? eventPlaylistPlayerColor(event.player_index)
+                                       : event.color);
     const bool active = activeEventIndex && *activeEventIndex == index;
     const float seekTime = eventSeekTime(event);
     const std::string timeLabel = formatEventPlaylistTime(event.time);

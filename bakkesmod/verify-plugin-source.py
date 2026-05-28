@@ -1397,6 +1397,30 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "const EVENT_PLAYLIST_PLAYER_COLORS = [",
+        "stats evaluation player event playlist has player color palette",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "return EVENT_PLAYLIST_PLAYER_COLORS[playerIndex % EVENT_PLAYLIST_PLAYER_COLORS.length]!",
+        "stats evaluation player event playlist colors rows by player",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "LinearColor eventPlaylistPlayerColor(uint32_t playerIndex)",
+        "plugin event playlist has player color palette",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "event.has_player != 0 ? eventPlaylistPlayerColor(event.player_index)",
+        "plugin event playlist colors player rows by player",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "label.textContent = item.event.label ?? item.sourceLabel;",
         "stats evaluation player event playlist row title uses event label",
         errors,

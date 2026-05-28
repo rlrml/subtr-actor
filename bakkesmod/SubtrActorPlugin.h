@@ -122,6 +122,8 @@ private:
     LinearColor color;
     uint64_t frame_number = 0;
     float time = 0.0f;
+    uint8_t has_player = 0;
+    uint32_t player_index = 0;
   };
 
   enum class UiStatsWindowKind {
