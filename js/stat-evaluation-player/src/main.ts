@@ -55,7 +55,6 @@ import {
   type MechanicsReviewController,
 } from "./mechanicsReviewController.ts";
 import { createReplayCueingController } from "./replayCueing.ts";
-import { createStatsWindowsManager } from "./statsWindows.ts";
 import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import {
   getReplayPlayerStatePatchFromConfig,
@@ -70,6 +69,7 @@ import {
   type StatsPlayerConfigUrlSyncController,
 } from "./appConfigUrlSync.ts";
 import { createStandalonePluginController } from "./standalonePlugins.ts";
+import { createAppStatsWindowsManager } from "./appStatsWindowsManager.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -135,9 +135,11 @@ let eventWindowsManager: EventWindowsManager;
 let cueTimelineEvent: (event: ReplayTimelineEvent) => void = () => {};
 let watchGoalReplay: (time: number, scorerId: string | null) => void = () => {};
 
-const statsWindowManager = createStatsWindowsManager({
-  getDefaultFrameIndex() {
-    return replayPlayer?.getState().frameIndex ?? 0;
+const statsWindowManager = createAppStatsWindowsManager({
+  floatingWindows,
+  goalWatchLeadSeconds: GOAL_WATCH_LEAD_SECONDS,
+  getElements() {
+    return appElements;
   },
   getReplayPlayer() {
     return replayPlayer;
@@ -151,25 +153,6 @@ const statsWindowManager = createStatsWindowsManager({
   getStatRegistry() {
     return statRegistry;
   },
-  getWindowLayer() {
-    return appElements.statsWindowLayer;
-  },
-  applyWindowPlacement: (windowEl, placement) =>
-    floatingWindows.applyWindowPlacement(windowEl, placement),
-  bringWindowToFront: (windowEl) => floatingWindows.bringWindowToFront(windowEl),
-  cueGoalReplay(time) {
-    replayPlayer?.setState({
-      currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
-      playing: false,
-      skipPostGoalTransitionsEnabled: false,
-      skipKickoffsEnabled: false,
-    });
-    appElements.skipPostGoalTransitions.checked = false;
-    appElements.skipKickoffs.checked = false;
-    scheduleConfigUrlUpdate();
-  },
-  formatTime,
-  readWindowPlacement: (windowEl) => floatingWindows.readWindowPlacement(windowEl),
   scheduleConfigUrlUpdate,
   setLauncherOpen,
   watchGoalReplay,
