@@ -22,6 +22,7 @@ PLUGIN_README = REPO_ROOT / "bakkesmod/README.md"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
+WEB_PLAYER_STYLES_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/styles.css"
 WEB_PLAYER_TEMPLATE_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/appTemplate.ts"
 WEB_PLAYER_TIMELINE_MARKERS_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/timelineMarkers.ts"
 WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE = (
@@ -473,6 +474,7 @@ def main() -> int:
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
     web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
+    web_player_styles_source = WEB_PLAYER_STYLES_SOURCE.read_text(encoding="utf-8")
     web_player_template_source = WEB_PLAYER_TEMPLATE_SOURCE.read_text(encoding="utf-8")
     web_player_timeline_markers_source = WEB_PLAYER_TIMELINE_MARKERS_SOURCE.read_text(
         encoding="utf-8"
@@ -581,6 +583,45 @@ def main() -> int:
             f"expected={web_initial_window_visibility_ordered!r} "
             f"actual={plugin_initial_window_visibility!r}"
         )
+    require_contains(
+        web_player_styles_source,
+        ".floating-window,\n.stats-window,\n.scoreboard-window {\n"
+        "  position: absolute;\n"
+        "  left: clamp(0.8rem, var(--window-x, 1rem), calc(100vw - 18rem));",
+        "stats evaluation player floating windows share overlay chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "void pushWebFloatingWindowStyle() {\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{14.0f, 12.0f});\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{8.0f, 8.0f});\n"
+        "  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{0.03f, 0.07f, 0.10f, 0.88f});\n"
+        "  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.12f});\n"
+        "}",
+        "plugin floating windows share web-like overlay chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (entry.kind == RenderEntryKind::Stats) {\n"
+        "      renderWithFloatingWindowStyle([&]() {\n"
+        "        renderStatsWindow(uiStatsWindows[entry.stats_index], entry.stats_index);\n"
+        "      });",
+        "plugin stats windows use shared web-like overlay chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (id == "scoreboard") {\n'
+        "      renderScoreboardWindow();\n"
+        '    } else if (id == "mechanics") {\n'
+        "      renderWithFloatingWindowStyle([&]() { renderEventsWindow(); });",
+        "plugin leaves scoreboard pill separate from shared floating chrome",
+        errors,
+    )
 
     plugin_web_stats_window_controls = tuple(
         (kind_id, label)

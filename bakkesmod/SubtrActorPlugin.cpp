@@ -98,6 +98,20 @@ std::string joinStrings(const std::vector<std::string> &parts, std::string_view 
   return joined;
 }
 
+void pushWebFloatingWindowStyle() {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{14.0f, 12.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{8.0f, 8.0f});
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{0.03f, 0.07f, 0.10f, 0.88f});
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.12f});
+}
+
+void popWebFloatingWindowStyle() {
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(4);
+}
+
 constexpr char FRAME_EVENTS_STATE_NODE[] = "frame_events_state";
 constexpr std::array<const char *, 7> FRAME_EVENTS_STATE_EVENT_FIELDS{
     "active_demos",
@@ -7488,6 +7502,12 @@ void SubtrActorPlugin::renderFloatingWindowLayer() {
     int fallback_order = 0;
   };
 
+  auto renderWithFloatingWindowStyle = [](auto &&renderWindow) {
+    pushWebFloatingWindowStyle();
+    renderWindow();
+    popWebFloatingWindowStyle();
+  };
+
   std::vector<RenderEntry> renderOrder;
   for (const SingletonWindowControl &window : singletonWindowControls()) {
     if (*window.open) {
@@ -7522,7 +7542,9 @@ void SubtrActorPlugin::renderFloatingWindowLayer() {
 
   for (const RenderEntry &entry : renderOrder) {
     if (entry.kind == RenderEntryKind::Stats) {
-      renderStatsWindow(uiStatsWindows[entry.stats_index], entry.stats_index);
+      renderWithFloatingWindowStyle([&]() {
+        renderStatsWindow(uiStatsWindows[entry.stats_index], entry.stats_index);
+      });
       continue;
     }
 
@@ -7530,29 +7552,29 @@ void SubtrActorPlugin::renderFloatingWindowLayer() {
     if (id == "scoreboard") {
       renderScoreboardWindow();
     } else if (id == "mechanics") {
-      renderEventsWindow();
+      renderWithFloatingWindowStyle([&]() { renderEventsWindow(); });
     } else if (id == "event-playlist") {
-      renderEventPlaylistWindow();
+      renderWithFloatingWindowStyle([&]() { renderEventPlaylistWindow(); });
     } else if (id == "status") {
-      renderStatusWindow();
+      renderWithFloatingWindowStyle([&]() { renderStatusWindow(); });
     } else if (id == "camera") {
-      renderCameraWindow();
+      renderWithFloatingWindowStyle([&]() { renderCameraWindow(); });
     } else if (id == "playback") {
-      renderPlaybackControlsWindow();
+      renderWithFloatingWindowStyle([&]() { renderPlaybackControlsWindow(); });
     } else if (id == "recording") {
-      renderRecordingWindow();
+      renderWithFloatingWindowStyle([&]() { renderRecordingWindow(); });
     } else if (id == "graph-inspector") {
-      renderGraphInspectorWindow();
+      renderWithFloatingWindowStyle([&]() { renderGraphInspectorWindow(); });
     } else if (id == "mechanics-review") {
-      renderMechanicsReviewWindow();
+      renderWithFloatingWindowStyle([&]() { renderMechanicsReviewWindow(); });
     } else if (id == "replay-loading") {
-      renderReplayLoadingWindow();
+      renderWithFloatingWindowStyle([&]() { renderReplayLoadingWindow(); });
     } else if (id == "module-controls") {
-      renderModuleControlsWindow();
+      renderWithFloatingWindowStyle([&]() { renderModuleControlsWindow(); });
     } else if (id == "touch-controls") {
-      renderTouchControlsWindow();
+      renderWithFloatingWindowStyle([&]() { renderTouchControlsWindow(); });
     } else if (id == "boost-pickups") {
-      renderBoostPickupControlsWindow();
+      renderWithFloatingWindowStyle([&]() { renderBoostPickupControlsWindow(); });
     }
   }
 }
