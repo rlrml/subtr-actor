@@ -1,6 +1,5 @@
 import "./styles.css";
 import {
-  createBoostPadOverlayPlugin,
   timelineEventSeekTime,
   ReplayPlayer,
 } from "@rlrml/player";
@@ -70,6 +69,7 @@ import {
   createStatsPlayerConfigUrlSyncController,
   type StatsPlayerConfigUrlSyncController,
 } from "./appConfigUrlSync.ts";
+import { createStandalonePluginController } from "./standalonePlugins.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -81,8 +81,6 @@ let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
-
-const standalonePluginRemovers = new Map<string, () => void>();
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -101,7 +99,6 @@ let appElements!: StatEvaluationPlayerElements;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
-let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let configUrlSyncController: StatsPlayerConfigUrlSyncController | null = null;
@@ -122,6 +119,11 @@ const floatingWindows = new FloatingWindowController(
   () => appRoot ?? document,
   scheduleConfigUrlUpdate,
 );
+const standalonePluginController = createStandalonePluginController({
+  getReplayPlayer() {
+    return replayPlayer;
+  },
+});
 
 let mechanicsReviewController: MechanicsReviewController | null = null;
 let recordingControls: RecordingControls | null = null;
@@ -252,29 +254,15 @@ function afterModuleRuntimeChange(): void {
 }
 
 function clearStandalonePlugins(): void {
-  for (const removePlugin of standalonePluginRemovers.values()) {
-    removePlugin();
-  }
-  standalonePluginRemovers.clear();
+  standalonePluginController.clear();
 }
 
 function syncBoostPadOverlayPlugin(): void {
-  standalonePluginRemovers.get("boost-pad-overlay")?.();
-  standalonePluginRemovers.delete("boost-pad-overlay");
-
-  if (!replayPlayer || !boostPadOverlayEnabled) {
-    return;
-  }
-
-  standalonePluginRemovers.set(
-    "boost-pad-overlay",
-    replayPlayer.addPlugin(createBoostPadOverlayPlugin()),
-  );
+  standalonePluginController.syncBoostPadOverlayPlugin();
 }
 
 function toggleBoostPadOverlay(): void {
-  boostPadOverlayEnabled = !boostPadOverlayEnabled;
-  syncBoostPadOverlayPlugin();
+  standalonePluginController.toggleBoostPadOverlay();
   renderModuleSummary();
   scheduleConfigUrlUpdate();
 }
@@ -285,7 +273,7 @@ function scheduleConfigUrlUpdate(): void {
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   moduleRuntimeController.setOverlayConfig(config.overlays);
-  boostPadOverlayEnabled = config.overlays.boostPads;
+  standalonePluginController.setBoostPadOverlayEnabled(config.overlays.boostPads);
   appElements.skipPostGoalTransitions.checked =
     config.playback.skipPostGoalTransitions ?? appElements.skipPostGoalTransitions.checked;
   appElements.skipKickoffs.checked =
@@ -342,7 +330,7 @@ function openReplayFilePicker(): void {
 
 function renderModuleSummary(): void {
   moduleRuntimeController.renderModuleSummary(appElements.moduleSummaryEl, {
-    boostPadOverlayEnabled,
+    boostPadOverlayEnabled: standalonePluginController.isBoostPadOverlayEnabled(),
     toggleBoostPadOverlay,
   });
 }
@@ -428,7 +416,7 @@ export function mountStatEvaluationPlayer(
     },
     getSnapshotOptions() {
       return {
-        boostPadOverlayEnabled,
+        boostPadOverlayEnabled: standalonePluginController.isBoostPadOverlayEnabled(),
         cameraControls,
         elements: appElements,
         floatingWindows,
@@ -645,7 +633,6 @@ export function mountStatEvaluationPlayer(
     statsWindowManager.clear();
     moduleRuntimeController.clearTimelineEventSources();
     moduleRuntimeController.clearTimelineRangeSources();
-    clearStandalonePlugins();
     moduleRuntimeController.reset();
     replayLoadModal?.destroy();
     replayLoadModal = null;
@@ -656,7 +643,7 @@ export function mountStatEvaluationPlayer(
     cameraControls = null;
     replayLoadController = null;
     replaySnapshotRenderer = null;
-    boostPadOverlayEnabled = true;
+    standalonePluginController.reset();
     loadedReplayName = null;
     initialUrlConfig = null;
     configUrlSyncController?.reset();
