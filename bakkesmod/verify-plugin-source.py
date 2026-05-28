@@ -990,22 +990,22 @@ def main() -> int:
         "stats evaluation player launcher creates stats windows",
         errors,
     )
-    if re.search(
-        r"data-create-stats-window.*?createStatsWindow\(button\.dataset\.createStatsWindow as StatsWindowKind\);.*?setLauncherOpen\(false\);",
+    require_contains(
         web_player_main_source,
-        re.DOTALL,
-    ):
-        errors.append("stats evaluation player launcher closes after stats window creation")
+        "setLauncherOpen(false);\n  renderStatsWindow(state);",
+        "stats evaluation player closes launcher after stats window creation",
+        errors,
+    )
     require_contains(
         plugin_source,
-        'renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);',
-        "plugin launcher keeps menu open after stats window creation like the web player",
+        'renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);',
+        "plugin launcher closes after stats window creation like the web player",
         errors,
     )
     reject_contains(
         plugin_source,
-        'renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);',
-        "plugin launcher closes after stats window creation",
+        'renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);',
+        "plugin launcher keeps menu open after stats window creation",
         errors,
     )
     require_contains(
